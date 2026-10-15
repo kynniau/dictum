@@ -49,9 +49,12 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     public LegacyFolders LegacyFolders() => new(Path.Combine(paths.ConfigDir, "..", "legacy-config"), Path.Combine(paths.LocalDir, "..", "legacy-local"));
     public IPackageInfo Package => FakePackage;
 
+    /// <summary>Listeners created from now on fail to start, as when Windows refuses the hook.</summary>
+    public bool RefuseListeners { get; set; }
+
     public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log)
     {
-        LastListener = new FakeHotkeyListener(matcher, post);
+        LastListener = new FakeHotkeyListener(matcher, post) { Refused = RefuseListeners };
         Listeners.Add(LastListener);
         return LastListener;
     }
@@ -81,11 +84,11 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
 
 internal sealed class FakeHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post) : IHotkeyListener
 {
-    public HotkeyMatcher Matcher { get; private set; } = matcher;
+    public HotkeyMatcher Matcher { get; } = matcher;
     public bool Enabled { get; set; } = true;
     public bool Disposed { get; private set; }
-    public void UpdateMatcher(HotkeyMatcher m) => Matcher = m;
-    public bool Start() => true;
+    public bool Refused { get; init; }
+    public bool Start() => !Refused;
     public void Post(HookEvent e) => post(e);
     public void Dispose() => Disposed = true;
 }
@@ -224,11 +227,13 @@ internal sealed class Scratch : IDisposable
     public AppPaths Paths { get; }
 
     /// <summary>A shell over a fake platform with scripted dialogs, not started (no tray, no hook, no models).</summary>
-    public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell()
+    /// <param name="speechModels">A speech model manager with a fake loader, for tests that make a model ready; else the real one.</param>
+    public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
-        var shell = new AppShell(platform, Paths, NullLog.Instance, new SecretRedactor(), new ShellOptions(), dialogs, gpuMachine: () => false);
+        var shell = new AppShell(platform, Paths, NullLog.Instance, new SecretRedactor(), new ShellOptions(), dialogs, gpuMachine: () => false,
+            speechModels: speechModels);
         return (shell, platform, dialogs);
     }
 

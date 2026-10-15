@@ -51,8 +51,8 @@ public static class SettingsFile
             {
                 ["about"] = "Dictum settings. Save the file and changes are picked up automatically (or use Settings > About > Reload settings). Keys starting with _ are comments. Secrets (API keys) go in the .env file next to this one, never here. Full reference: README.md > Settings reference.",
                 ["enabled"] = "Master switch for the hotkey; the switch at the top of the tray panel writes this.",
-                ["hotkey"] = "Single key (RightCtrl, CapsLock, F9, Pause, RightAlt...) or modifiers+key (Ctrl+Win, Ctrl+Shift+Space). The Fn key cannot be used.",
-                ["suppress_hotkey"] = "true: the focused app does not see the hotkey. Chords only ever suppress their final non-modifier key.",
+                ["hotkey"] = "Single key (RightCtrl, CapsLock, F9, Pause, RightAlt...), a mouse button (RightMouse, MiddleMouse, Mouse4, Mouse5; never the left one) or modifiers+key (Ctrl+Win, Ctrl+Shift+Space, Ctrl+Mouse4). The Fn key cannot be used.",
+                ["suppress_hotkey"] = "true: the focused app does not see the hotkey. Chords only ever suppress their final non-modifier key. A mouse-button hotkey is always hidden from the app under the pointer, whatever this says.",
                 ["tap_ms"] = "A press shorter than this is a tap (start of a double-tap) rather than a hold.",
                 ["double_tap_ms"] = "Window for the second tap that starts hands-free mode.",
                 ["min_recording_ms"] = "Recordings shorter than this are discarded.",

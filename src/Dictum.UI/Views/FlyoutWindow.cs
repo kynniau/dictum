@@ -93,11 +93,14 @@ internal sealed class FlyoutWindow : Window
         var micBox = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 6), Child = micRow };
         micBox[!Border.BackgroundProperty] = new DynamicResourceExtension("SegmentBrush");
 
+        var settings = Wide(Ui.Button("Settings", "secondary", () => shell.OpenSettings()));
         var actions = Ui.Columns(2, 8,
             Wide(Ui.Button("Calibrate my voice", "secondary", shell.OpenCalibration)),
             Wide(Ui.Button("Dictionary", "secondary", shell.OpenAddWord)),
+            Wide(Ui.Button("Snippets", "secondary", shell.OpenAddSnippet)),
             Wide(Ui.Button("Fix last dictation", "secondary", () => shell.OpenFixLast())),
-            Wide(Ui.Button("Settings", "secondary", () => shell.OpenSettings())));
+            settings);
+        Grid.SetColumnSpan(settings, 2); // the odd one out takes the whole last row
 
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         footer.Children.Add(Ui.Row(6, Ui.Icon(Ui.LockIcon, 14), _privacy));

@@ -23,7 +23,9 @@ public readonly record struct KeyDecision(bool Suppress, HotkeySignal Signal, bo
 /// safe to call from inside the hook callback.
 /// Suppression rules (SPEC §3): Esc is never suppressed; a single-key hotkey is suppressed when
 /// <c>suppress_hotkey</c> is on; in a chord only the final non-modifier key is suppressed, never a bare
-/// modifier, and only while the chord is complete. Auto-repeat never produces a signal.
+/// modifier, and only while the chord is complete. A mouse-button trigger is suppressed whatever
+/// <c>suppress_hotkey</c> says: its click reaching the app under the pointer on release (a context menu, a browser
+/// Back) would wreck the dictation. Auto-repeat never produces a signal.
 /// </summary>
 public sealed class HotkeyMatcher
 {
@@ -86,7 +88,8 @@ public sealed class HotkeyMatcher
             _active = true;
             _activeTriggerVk = vk;
             // Single key: suppressible even if it is a modifier (default RightCtrl). Chord: only a non-modifier trigger.
-            var suppress = SuppressEnabled && isTrigger && (!Spec.IsChord || !Spec.Trigger.IsModifier);
+            // A mouse button is always swallowed (class summary).
+            var suppress = (SuppressEnabled || Vk.IsMouseButton(vk)) && isTrigger && (!Spec.IsChord || !Spec.Trigger.IsModifier);
             _triggerSuppressed = suppress;
             var mask = !suppress && ChordHoldsWinOrAlt();
             return new KeyDecision(suppress, HotkeySignal.Down, mask);

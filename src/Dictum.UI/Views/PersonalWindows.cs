@@ -213,10 +213,68 @@ internal sealed class AddWordWindow : DialogWindow
         var close = Ui.Button("Close", "secondary", Close);
         var links = Ui.Row(12,
             Ui.Button("Open dictionary file", "link", () => status.Text = shell.OpenPath(shell.Personal.EnsureDictionaryFile(), folder: false) ?? ""),
-            Ui.Button("Open corrections file", "link", () => status.Text = shell.OpenPath(shell.Paths.CorrectionsFile, folder: false) ?? "corrections.txt is created when you save your first correction."));
+            Ui.Button("Open corrections file", "link", () => status.Text = shell.OpenPath(shell.Paths.CorrectionsFile, folder: false) ?? "corrections.txt is created when you save your first correction."),
+            Ui.Button("Add a snippet…", "link", shell.OpenAddSnippet));
         Compose(Ui.Stack(10,
             Ui.Text("A name, product or term that whisper and the clean-up model should spell your way."),
             term, status, links), close, add);
         Opened += (_, _) => term.Focus();
+    }
+}
+
+/// <summary>
+/// Snippets (SPEC §16.6): a short phrase you say and the text Dictum pastes in its place, exactly as typed here: an email
+/// address, a booking link, a signature. Writes one line to snippets.txt. Opened on purpose, so it takes focus.
+/// </summary>
+internal sealed class AddSnippetWindow : DialogWindow
+{
+    public const int MaxPhraseLength = 100;
+    public const int MaxTextLength = 2000;
+
+    /// <summary>SendInputSender types a line break as the Enter key, which sends the message in some chat apps.</summary>
+    public const string TypeModeNote = "In Type mode each line break is typed as Enter, which sends the message in some chat apps.";
+
+    public AddSnippetWindow(AppShell shell) : base("Add a snippet", 520)
+    {
+        Topmost = true;
+        var phrase = new TextBox { MaxLength = MaxPhraseLength, Watermark = "For example: my email, or my booking link" };
+        AutomationProperties.SetName(phrase, "When you say");
+        var text = new TextBox
+        {
+            MaxLength = MaxTextLength,
+            Watermark = "For example: kyle@example.com, or https://calendly.com/example/30min",
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 64,
+            MaxHeight = 180,
+        };
+        AutomationProperties.SetName(text, "Dictum pastes");
+        var status = Ui.Text("", "caption");
+        var add = Ui.Button("Add", "primary", () =>
+        {
+            var said = phrase.Text?.Trim() ?? "";
+            var pasted = text.Text?.Trim() ?? "";
+            if (shell.Personal.CheckNewSnippet(said, pasted) is { } problem)
+            {
+                status.Text = problem;
+                return;
+            }
+            var replaced = shell.Personal.AddSnippet(said, pasted);
+            status.Text = $"{(replaced ? "Updated" : "Added")}. Say \"{said}\" in a dictation and the text is pasted in its place.";
+            phrase.Text = "";
+            text.Text = "";
+            phrase.Focus();
+        }, ex => status.Text = $"That did not work: {ex.Message}");
+        add.IsDefault = true;
+        var close = Ui.Button("Close", "secondary", Close);
+        var open = Ui.Button("Open snippets file", "link", () => status.Text = shell.OpenPath(shell.Personal.EnsureSnippetsFile(), folder: false) ?? "");
+        Compose(Ui.Stack(10,
+            Ui.Text("Say a short phrase and Dictum pastes your text in its place: an email address, a booking link, a signature. " +
+                    "The text is pasted exactly as you type it here, line breaks included. Whole words, any case."),
+            Ui.Stack(4, Ui.Text("When you say", "caption"), phrase),
+            Ui.Stack(4, Ui.Text("Dictum pastes", "caption"), text,
+                Ui.Text(TypeModeNote + " In snippets.txt this window writes each line break as \\n and each backslash as \\\\.", "caption")),
+            status, open), close, add);
+        Opened += (_, _) => phrase.Focus();
     }
 }

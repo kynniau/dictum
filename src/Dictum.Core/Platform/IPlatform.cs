@@ -109,10 +109,7 @@ public interface IHotkeyListener : IDisposable
     /// <summary>When false the hotkey passes through untouched and Esc is not watched.</summary>
     bool Enabled { get; set; }
 
-    /// <summary>Swaps the hotkey; takes effect on the next key event.</summary>
-    void UpdateMatcher(HotkeyMatcher matcher);
-
-    /// <summary>Installs the listener; false if the system refused.</summary>
+    /// <summary>Installs the listener; false if the system refused. A hotkey change replaces the listener (AppShell).</summary>
     bool Start();
 }
 

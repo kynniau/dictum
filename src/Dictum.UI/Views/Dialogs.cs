@@ -160,7 +160,8 @@ internal sealed class HotkeyCheckWindow : DialogWindow
         var skip = Ui.Button("Skip", "secondary", Close);
         Compose(Ui.Stack(12,
             Ui.Text("Dictum records while you hold this key and pastes when you let go. Press it now: the box shows exactly what Windows " +
-                    "receives, and the light comes on while the key is held. Press a different key to choose it instead."),
+                    "receives, and the light comes on while the key is held. Press a different key, or a mouse button other than the left " +
+                    "one, to choose it instead."),
             box,
             Ui.Text(MacNote, "caption")), skip, use);
         Closed += (_, _) => box.Dispose();

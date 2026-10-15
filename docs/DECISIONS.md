@@ -820,3 +820,142 @@ process could set to point PowerShell and Notepad at a planted copy (lens probe,
 Pinned by `SystemProgramsTests`; observed failing with the variable lookup restored
 ("Expected: C:\WINDOWS, Actual: ...\Temp\fakewin"). This crosses no privilege boundary
 but closes the last way the removal step could be steered from outside the app.
+
+## Mouse-button hotkeys, fix-hotkey capture box and snippets (16/10/2026, branch feature/mouse-hotkey-snippets)
+
+Asked for: hold a mouse button instead of a key; choose the fix-last hotkey by pressing it; "say a phrase, paste a
+link" snippets.
+
+**Mouse buttons as hotkeys**
+
+- A mouse button is a virtual key to Windows (VK_RBUTTON 0x02, VK_MBUTTON 0x04, VK_XBUTTON1 0x05, VK_XBUTTON2 0x06;
+  Virtual-Key Codes page on Microsoft Learn, read 16/10/2026), so `HotkeySpec.CanFireTogether` and the state machine
+  needed no change and `HotkeyMatcher` and `HotkeyCapture` treat a button as a key: the parser gained the names
+  (`RightMouse`, `MiddleMouse`, `Mouse4`, `Mouse5`, with aliases) and `HotkeySpec.UsesMouse`. The matcher's one
+  difference for a button (review fix, below) is that a button trigger is always swallowed.
+- One thread hosts both hooks. `LowLevelMouseProc` and `LowLevelKeyboardProc` are each "called in the context of the
+  thread that installed it" (Microsoft Learn, read 16/10/2026), so installing WH_MOUSE_LL from the existing hook thread
+  serialises both callbacks on it and one matcher serves keys and buttons without a lock; `Ctrl+Mouse4` works for free.
+  The class is now `InputHook` (file `InputHook.cs`, formerly `KeyboardHook.cs`); the log line reads "Input hook
+  installed" and `TrayStartupTests` counts that.
+- A hotkey listener installs the mouse hook only when its hotkey names a mouse button, decided once when it starts, on
+  the hook thread. A hotkey change recreates the listener (the shell disposes it and starts another); there is no
+  in-place swap (`IHotkeyListener.UpdateMatcher` was unused in production and was deleted with its refresh message in
+  the review fixes). Reason: a WH_MOUSE_LL hook is on the path of every mouse event on the PC; users of a keyboard
+  hotkey should not pay for it. The callback decodes only the six button messages (WM_RBUTTONDOWN/UP 0x0204/0x0205,
+  WM_MBUTTONDOWN/UP 0x0207/0x0208, WM_XBUTTONDOWN/UP 0x020B/0x020C; side button from the high word of
+  MSLLHOOKSTRUCT.mouseData, XBUTTON1 = 1, XBUTTON2 = 2; all read on Microsoft Learn 16/10/2026) and passes moves and
+  wheel turns on without reading the struct (pinned since the review fixes by decoding tests on a marshalled struct,
+  with WM_MOUSEMOVE 0x0200 and WM_LBUTTONDOWN 0x0201 from their Microsoft Learn pages, read 16/10/2026).
+- A hotkey listener's `Start()` returns false when its mouse hook fails, so the existing "The global hotkey could not
+  be registered" notice covers it. A fix_hotkey listener that fails to start is now disposed before the notice (review
+  fix), so its thread and a keyboard hook that did install do not live on unreferenced.
+- The left button is refused by the parser (names, `0x01`, inside a chord) with the reason: holding it to dictate would
+  swallow every click. The hook never decodes it, so `HotkeyCapture` can only ever see it from a fake; `NameOf(0x01)`
+  says "LeftMouse" for the capture box's "Windows received" line.
+- A mouse-button trigger is always swallowed, down and up, whatever `suppress_hotkey` says (review fix C): with
+  suppression off its click reached the app under the pointer on release (a context menu on the right button, Back in
+  a browser on Mouse4) and wrecked the dictation. `HotkeyMatcher` suppresses when `suppress_hotkey` is on or the key is
+  a mouse button; `suppress_hotkey` still governs keys. Settings has no note for that case any more.
+- The dictation listener is on only while `enabled` is true, no capture box pauses it, and, for a mouse-button hotkey,
+  the speech model is ready (`ModelManager.IsReady`; review fix A). Reason: the button is always swallowed, so during
+  the first-run download (the hook starts before `Models.Ensure`), a failed load or a model swap it vanished from every
+  app with nothing to dictate with. One helper, `AppShell.ApplyHookEnabled`, applies the rule from `StartHook`,
+  `ApplyEnabled`, `PauseHotkey` and its undo, and every model state change; the shell now subscribes to both model
+  managers' `Changed` in its constructor instead of in `Start` (nothing loads before `Start`, so production behaviour
+  is the same, and the rule holds from the first load). A keyboard hotkey keeps its old rule (the controller ignores a
+  press while no model is ready), and so does the fix hotkey. Accepted edge: a model load that starts while a mouse
+  hotkey is held turns the listener off mid-hold; the release is swallowed with no Up signal, so that recording runs
+  on until the button is pressed and released again (the stale held state makes the next press count as a repeat) or
+  until the `hands_free_max_seconds` auto-stop.
+- The key monitor (capture box, `--selftest`) always installs the mouse hook: it is short-lived, and the box must be
+  able to name a button when one is pressed. So the mouse is also watched while a capture box listens or `--selftest`
+  runs, whatever the hotkey (the README said "only while a hotkey names a mouse button" until the review fixes). For
+  the monitor the mouse hook is best-effort (`MouseRequired` is false): a refused WH_MOUSE_LL is logged as a warning,
+  keys are still reported and `Start()` succeeds.
+- Observed here (16/10/2026, after the review fixes; ungated test
+  `The_mouse_hook_is_installed_only_for_a_hotkey_that_names_a_mouse_button`): a real `InputHook` for Mouse5 logged
+  "Mouse hook installed", and one for F24 logged "Input hook installed" with no mouse hook line. The gated SendInput
+  test for Mouse4 (`DICTUM_UI_TESTS=1`, `Hook_thread_sees_an_injected_side_button_press`) passed on this desktop after
+  the review fixes, as it had before them: an injected XBUTTON1 down and up reached the real WH_MOUSE_LL hook and the
+  matcher posted exactly one Down and one Up (the F24 keyboard test passed in the same run). Full suite after the
+  review fixes: 781 tests, 762 passed, 19 skipped, 0 failed (before them: 752, 733, 19, 0).
+- Not changed: the Mac row in `src/Dictum.Mac/README.md` names the CGEventTap mapping that would be needed.
+
+**Fix-hotkey capture box**
+
+- Settings → General now has a second `HotkeyCaptureBox` (caption and prompt are constructor parameters; "None" when
+  no hotkey is set; `Reset` after "Turn off"), with "Use for Fix last dictation" and "Turn off". The box raises
+  `Started`, and the page stops the other box, so a press names one hotkey, never both; both hotkeys stay paused while
+  either box listens (the existing `PauseHotkey` counter). The old text field is gone.
+- Keyboard reach (review fix D): a keyboard user tabbing to a box's Save button made Tab the candidate, and a bare Enter
+  or Space (the buttons' own activation keys) did the same. The parser now refuses Tab like Esc ("Tab moves keyboard
+  focus everywhere and cannot be the hotkey", by name and as `0x09`), and `HotkeyCapture.Feed` names no hotkey for a
+  gesture whose trigger is Tab or for a bare Enter or Space; chords such as `Ctrl+Shift+Space` stay valid, and the box
+  still shows what arrived ("Tab up"). A settings.json naming `Tab` now gets the loader's usual treatment of an invalid
+  hotkey: a warning and the default.
+- Each box's Change… / Stop listening button has an accessible name tied to its caption ("Press your hotkey: change",
+  "Press the key for Fix last dictation: stop listening"), so the two boxes' buttons can be told apart (review fix).
+- A box the user has not captured a new key in follows settings.json on every redraw: the page remembers the value it
+  last saw per box and resets a box still showing it; a new capture is kept until it is saved (review fix).
+
+**Snippets (`snippets.txt`)**
+
+- Reuse, not a new primitive: a snippet is a `Corrections` instance with `Verbatim = true`
+  (`Corrections.LoadSnippets`), loaded into `PersonalText.Snippets`. Same file format, whole-word matching,
+  longest-first and later-line-wins rules; the only differences are verbatim output (a correction would have written
+  "Https://…" for "My calendly" at a sentence start, because `Cased` capitalises a lower-case written form there) and
+  `\n` standing for a line break and `\\` for a backslash (corrections keep the characters as written).
+- Exact text (review fix B): the `Corrections` constructor no longer trims a snippet's text (it trimmed after `\n` had
+  become a line break, so a break at either end, or a text that was only a break, was lost); corrections still trim.
+  `SnippetLine` writes each `\` as `\\` before writing line breaks as `\n`, and loading reads both escapes in one
+  left-to-right pass (`\\(\\|n)`), so a typed `\\server\new-clients` reads back as typed instead of with a line break
+  in it; a hand-written lone backslash before any other character is left as it is. `CheckNewSnippet` refuses a phrase
+  containing a line break (it would split the line in the file).
+- `PersonalService.CheckNewSnippet` is an instance method (review fix): it also refuses a phrase the profanity filter
+  would change, because the filter runs before the snippets and such a snippet could never match.
+- Type mode types a line break as the Enter key (`SendInputSender`), which sends the message in some chat apps. Not
+  changed in code; the README and the Add-a-snippet window say so.
+- Known and unhandled: Fix last dictation compares the user's edit with what was pasted, which includes any snippet
+  text, so a correction it suggests from a change inside snippet output (a word of a pasted address, say) is written
+  to corrections.txt but can never fire: corrections run on the dictated text, before the snippets.
+- Logging: counts only, as for the other files; the pipeline's line now reads "Corrections, the profanity filter or
+  snippets changed the text.", and the pasted text (snippet text included) reaches the log only with `log_transcripts`.
+- Order: corrections, profanity filter, snippets, paste. Snippets last because their text is typed by the user, not
+  dictated, and must be pasted exactly; it also lets a correction repair a misheard trigger before the snippet matches
+  and keeps a correction or the filter from rewriting a word inside a pasted URL. Trade-off, deliberate: the filter does
+  not see a snippet's text, so a user can paste a word the filter would mask by putting it in a snippet themselves.
+- `snippets.txt` is a personal file everywhere the others are: `AppRules.PersonalFiles` (watcher reload),
+  `PathRegistry` (Storage page, removal), the removal confirmation text, `PersonalText.Summary` (count only). It is not
+  in the Dictate→Dictum migration list because the earlier build never had one.
+- UI: tray panel → "Snippets" (the fifth action button; "Settings" spans the last row) and "Add a snippet…" in the
+  dictionary window open `AddSnippetWindow`: two fields, the second multi-line, `PersonalService.CheckNewSnippet` for
+  the refusals, "Updated." when the phrase already existed. Quitting closes it with the shell's other windows (review
+  fix: `CloseWindows` had left it out).
+
+**Review fixes: pins (16/10/2026)**
+
+Each test below was observed failing on the reverted behaviour, then passing with the fix restored:
+
+- A: `A_mouse_hotkey_lets_its_button_through_until_a_speech_model_is_ready`, with the readiness condition removed from
+  `ApplyHookEnabled`, and separately with the call removed from `ModelStateChanged`.
+- B: `A_snippet_keeps_a_line_break_at_either_end_or_one_that_is_all_of_it` (the trim restored);
+  `A_backslash_is_written_as_two_and_read_back_as_typed` (the old escaping, and separately the old unescape alone);
+  the three line-break rows of `A_snippet_needs_a_one_line_phrase_with_a_word_in_it_and_some_text` (the refusal removed).
+- C: `A_mouse_button_is_swallowed_even_with_suppression_off` (suppression following the setting again).
+- D: `Tab_is_refused_like_Esc`, `Tab_in_any_gesture_and_a_bare_Enter_or_Space_name_no_hotkey` and
+  `Tab_and_a_bare_Enter_or_Space_in_a_listening_box_choose_nothing` (the parser refusal removed); the last two again
+  with only the bare Enter/Space rule removed.
+- Minor fixes: `A_phrase_the_profanity_filter_would_change_is_refused`,
+  `A_fix_hotkey_listener_the_system_refuses_is_disposed`, `Quitting_closes_the_add_a_snippet_window`,
+  `A_box_with_no_new_capture_follows_an_edit_to_settings_json` and the accessible-name lines of
+  `Only_one_capture_box_listens_at_a_time`, each with its fix reverted.
+- Not pinned by a test: the key monitor's best-effort mouse hook (it needs Windows to refuse WH_MOUSE_LL).
+
+**Recalled, not verified (this batch)**
+
+- That Windows applies a left/right button swap before WH_MOUSE_LL sees the messages (so `RightMouse` would be the
+  physical left button on a swapped mouse). The README avoids the claim and says only that a name means whichever
+  button Windows reports as that button.
+- That an Avalonia `TextBox` with `AcceptsReturn` keeps Enter from firing the dialog's default button (the Add-a-snippet
+  window relies on it for the multi-line field).

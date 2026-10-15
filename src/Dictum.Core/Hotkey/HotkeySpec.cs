@@ -25,6 +25,9 @@ public sealed record HotkeySpec(IReadOnlyList<KeyGroup> Modifiers, KeyGroup Trig
 
     public IEnumerable<KeyGroup> AllKeys => Modifiers.Append(Trigger);
 
+    /// <summary>True when a mouse button is part of the hotkey (RightMouse, Ctrl+Mouse4): the listener then watches the mouse too.</summary>
+    public bool UsesMouse => AllKeys.Any(g => g.Vks.Any(Vk.IsMouseButton));
+
     public override string ToString() => Display;
 
     /// <summary>
@@ -47,6 +50,8 @@ public sealed record HotkeySpec(IReadOnlyList<KeyGroup> Modifiers, KeyGroup Trig
 /// <summary>Virtual-key codes used by the hotkey code (winuser.h values).</summary>
 public static class Vk
 {
+    /// <summary>Mouse buttons (VK_LBUTTON … VK_XBUTTON2): Windows gives them virtual-key codes, so the matcher treats them as keys.</summary>
+    public const int LButton = 0x01, RButton = 0x02, MButton = 0x04, XButton1 = 0x05, XButton2 = 0x06;
     public const int Back = 0x08, Tab = 0x09, Return = 0x0D, Pause = 0x13, Capital = 0x14, Escape = 0x1B, Space = 0x20;
     public const int Control = 0x11, Shift = 0x10, Menu = 0x12;
     public const int LWin = 0x5B, RWin = 0x5C, Apps = 0x5D;
@@ -61,4 +66,7 @@ public static class Vk
     public const int MenuMask = 0xE8;
 
     public static bool IsWinOrAlt(int vk) => vk is LWin or RWin or LMenu or RMenu or Menu;
+
+    /// <summary>A mouse button a hotkey may use: right, middle or a side button, never the left (primary) one.</summary>
+    public static bool IsMouseButton(int vk) => vk is RButton or MButton or XButton1 or XButton2;
 }

@@ -75,8 +75,8 @@ public sealed partial class AppShell
         {
             RemovalScope.CalibrationRecordings => "your calibration recordings",
             RemovalScope.Logs => "the logs",
-            RemovalScope.AllDataIncludingSettings => "all of Dictum's data, including settings, your dictionary and corrections (never your .env keys or the program)",
-            _ => "all of Dictum's data: models, recordings, logs (settings, your dictionary, corrections and .env keys are kept)",
+            RemovalScope.AllDataIncludingSettings => "all of Dictum's data, including settings, your dictionary, corrections and snippets (never your .env keys or the program)",
+            _ => "all of Dictum's data: models, recordings, logs (settings, your dictionary, corrections, snippets and .env keys are kept)",
         };
         if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.",
                 new DialogChoice("Delete", IsDefault: true, IsDanger: true), new DialogChoice("Cancel")) != 0)
@@ -122,7 +122,7 @@ public sealed partial class AppShell
                         : Platform.Removal.ProgramFolderProblem() is { } problem ? $"Dictum then quits. The program itself is not removed: {problem}"
                         : "Dictum then quits. The program's files listed above are removed after it has closed, and its folder too if nothing else is left in it.");
         if (Dialogs.Ask("Remove Dictum completely", first, new DialogChoice("Continue", IsDanger: true), new DialogChoice("Cancel", IsDefault: true)) != 0) return false;
-        if (!Dialogs.TypeToConfirm("Remove Dictum completely", "There is no undo: your models, recordings, settings, dictionary, corrections and keys are deleted for good. Type DELETE to confirm.", "DELETE"))
+        if (!Dialogs.TypeToConfirm("Remove Dictum completely", "There is no undo: your models, recordings, settings, dictionary, corrections, snippets and keys are deleted for good. Type DELETE to confirm.", "DELETE"))
             return false;
 
         _log.Info("Remove Dictum completely: confirmed twice; deleting.");

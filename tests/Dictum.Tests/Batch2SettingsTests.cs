@@ -147,6 +147,6 @@ public class PipelineFinishTests
         Assert.Equal(["Ask Kynni about the secret merger."], inserted);
         Assert.Equal(inserted, remembered);
         Assert.Equal(logTranscripts, log.All.Contains("secret merger", StringComparison.Ordinal));
-        Assert.Contains("Corrections and the profanity filter changed the text.", log.All);
+        Assert.Contains("Corrections, the profanity filter or snippets changed the text.", log.All);
     }
 }

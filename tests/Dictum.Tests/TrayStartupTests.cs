@@ -57,11 +57,11 @@ public class TrayStartupTests(ITestOutputHelper output)
         foreach (var line in lines) output.WriteLine(line);
         var text = string.Join("\n", lines);
         Assert.Contains("Tray icon added to the notification area.", text);
-        Assert.Contains("Personal files: dictionary 1 term(s), corrections 1 rule(s), profanity mask", text);
+        Assert.Contains("Personal files: dictionary 1 term(s), corrections 1 rule(s), snippets 0, profanity mask", text);
         Assert.Contains("Personal files: dictionary 2 term(s)", text); // the file watcher picked up the edit
         Assert.Contains("Speech decoding: greedy, dictionary prompt of 5 characters.", text); // "Kynni"
         Assert.Contains("Speech decoding: greedy, dictionary prompt of 11 characters.", text); // "Kynni, Xero"
-        Assert.Equal(2, lines.Count(l => l.Contains("Keyboard hook installed", StringComparison.Ordinal))); // hotkey and fix_hotkey
+        Assert.Equal(2, lines.Count(l => l.Contains("Input hook installed", StringComparison.Ordinal))); // hotkey and fix_hotkey
         Assert.Single(lines, l => l.Contains("Whisper model ", StringComparison.Ordinal) && l.Contains(" loaded in ", StringComparison.Ordinal));
         Assert.Contains("--exit-after 12: shutting down", text);
         Assert.Contains("Dictum exited.", text);

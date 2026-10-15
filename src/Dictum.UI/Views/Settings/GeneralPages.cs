@@ -15,9 +15,18 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ToggleSwitch _enabled;
     private readonly ToggleSwitch _login;
     private readonly TextBlock _loginHint = Ui.Text("", "hint");
+    public const string MouseNote = "A mouse button works too: hold the right or middle button or a side button (Mouse4, Mouse5), and double-tap it for " +
+                                    "hands-free. The left button cannot be used. Hands-free stops by itself after hands_free_max_seconds in settings.json (5 minutes unless changed).";
+    private const string FixCaption = "Press the key for Fix last dictation";
+    private const string FixPrompt = "Listening: press the key or mouse button that should open Fix last dictation.";
+
     private readonly HotkeyCaptureBox _capture;
     private readonly Button _saveHotkey;
-    private readonly TextBox _fixHotkey = new() { Width = 200, Watermark = "none" };
+    private readonly HotkeyCaptureBox _fixCapture;
+    private readonly Button _saveFix;
+    private readonly Button _clearFix;
+    private string _savedHotkey; // what settings.json held at the last redraw, per box: a box still showing it follows the file
+    private string _savedFix;
     private readonly ToggleSwitch _pill;
     private readonly Segments _indicator;
     private readonly ComboBox _corner = new() { ItemsSource = CornerLabels, Width = 200 };
@@ -30,10 +39,17 @@ internal sealed class GeneralPage : SettingsPage
     {
         _enabled = Ui.Switch(true, on => Run(() => Shell.SetEnabled(on)));
         _login = Ui.Switch(false, on => _ = SetLoginAsync(on));
+        _savedHotkey = shell.Settings.Hotkey;
+        _savedFix = shell.Settings.FixHotkey ?? "";
         _capture = new HotkeyCaptureBox(shell, shell.Settings.Hotkey, listenAtOnce: false);
         _saveHotkey = Ui.Button("Use this hotkey", "primary", SaveHotkey);
         _capture.Captured += key => _saveHotkey.IsEnabled = key != Shell.Settings.Hotkey;
-        var saveFix = Ui.Button("Save", "secondary", SaveFixHotkey);
+        _fixCapture = new HotkeyCaptureBox(shell, shell.Settings.FixHotkey, listenAtOnce: false, FixCaption, FixPrompt);
+        _saveFix = Ui.Button("Use for Fix last dictation", "primary", SaveFixHotkey);
+        _clearFix = Ui.Button("Turn off", "secondary", ClearFixHotkey);
+        _fixCapture.Captured += key => _saveFix.IsEnabled = key != (Shell.Settings.FixHotkey ?? "");
+        _capture.Started += _fixCapture.Stop; // one box listens at a time, so a press names one hotkey, never both
+        _fixCapture.Started += _capture.Stop;
         _pill = Ui.Switch(true, on => Write(("pill.enabled", Json(on))));
         _indicator = new Segments(IndicatorLabels, 0, i => Write(("indicator.mode", Json(IndicatorSettings.Modes[i]))), "Big recording indicator");
         _corner.SelectionChanged += (_, _) =>
@@ -56,8 +72,12 @@ internal sealed class GeneralPage : SettingsPage
                 Ui.Text("Hold the hotkey to record and let go to paste; tap it to start hands-free and tap again to stop. Esc cancels."),
                 _capture,
                 Ui.Row(8, _saveHotkey),
-                Ui.Text(HotkeyCheckWindow.MacNote, "caption"),
-                Ui.Line("Fix last dictation hotkey", Ui.Row(8, _fixHotkey, saveFix), "Optional. A key the dictation hotkey does not use, for example F8.")), "Hotkey"),
+                Ui.Text(MouseNote, "caption"),
+                Ui.Text(HotkeyCheckWindow.MacNote, "caption")), "Hotkey"),
+            Ui.Card(Ui.Stack(12,
+                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse5 work well."),
+                _fixCapture,
+                Ui.Row(8, _saveFix, _clearFix)), "Fix last dictation hotkey"),
             Ui.Card(Ui.Stack(4,
                 Ui.Line("Pill", _pill, "The small status bar above the taskbar."),
                 Ui.Line("Big recording indicator", _indicator, "Orb: a badge in a corner. Edge: a red glow around the screen."),
@@ -75,8 +95,15 @@ internal sealed class GeneralPage : SettingsPage
         Ui.SetQuietly(_enabled, s.Enabled);
         Ui.SetQuietly(_login, Shell.Platform.Startup.IsEnabled());
         _loginHint.Text = $"Uses the {Shell.Platform.Startup.Mechanism}.";
+        // A box the user has not captured a new key in follows settings.json (an edit in the file, a reload); one holding a
+        // new capture keeps it until it is saved.
+        if (!_capture.Listening && _capture.Hotkey == _savedHotkey) _capture.Reset(s.Hotkey);
+        _savedHotkey = s.Hotkey;
+        if (!_fixCapture.Listening && _fixCapture.Hotkey == _savedFix) _fixCapture.Reset(s.FixHotkey);
+        _savedFix = s.FixHotkey ?? "";
         _saveHotkey.IsEnabled = _capture.Hotkey != s.Hotkey;
-        _fixHotkey.Text = s.FixHotkey ?? "";
+        _saveFix.IsEnabled = _fixCapture.Hotkey != (s.FixHotkey ?? "");
+        _clearFix.IsEnabled = s.FixHotkey is not null;
         Ui.SetQuietly(_pill, s.Pill.Enabled);
         _indicator.Select(Math.Max(0, Array.IndexOf(IndicatorSettings.Modes, s.Indicator.Mode)));
         _corner.SelectedIndex = Math.Max(0, Array.IndexOf(IndicatorSettings.Corners, s.Indicator.OrbCorner));
@@ -87,7 +114,11 @@ internal sealed class GeneralPage : SettingsPage
         Ui.SetQuietly(_restore, s.Insert.RestoreClipboard);
     }
 
-    public override void Leave() => _capture.Stop();
+    public override void Leave()
+    {
+        _capture.Stop();
+        _fixCapture.Stop();
+    }
 
     private async Task SetLoginAsync(bool on)
     {
@@ -117,11 +148,10 @@ internal sealed class GeneralPage : SettingsPage
 
     private void SaveFixHotkey()
     {
-        var text = _fixHotkey.Text?.Trim() ?? "";
-        if (text.Length == 0 || text.Equals("none", StringComparison.OrdinalIgnoreCase))
+        var text = _fixCapture.Hotkey;
+        if (text.Length == 0)
         {
-            Write(("fix_hotkey", null));
-            Say("The fix-last hotkey is off.");
+            Say("Press Change… and then the key you want, or Turn off.");
             return;
         }
         if (!HotkeyParser.TryParse(text, out var spec, out var error))
@@ -134,8 +164,17 @@ internal sealed class GeneralPage : SettingsPage
             Say($"{spec.Display} shares keys with the dictation hotkey ({main.Display}); one press would do both. Choose another key.");
             return;
         }
+        _fixCapture.Stop();
         Write(("fix_hotkey", Json(text)));
         Say($"{spec.Display} now opens Fix last dictation.");
+    }
+
+    private void ClearFixHotkey()
+    {
+        _fixCapture.Stop();
+        _fixCapture.Reset(null);
+        Write(("fix_hotkey", null));
+        Say("The fix-last hotkey is off.");
     }
 }
 

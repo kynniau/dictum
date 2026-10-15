@@ -12,6 +12,7 @@ public sealed partial class AppShell
     private CalibrationWindow? _calibration;
     private FixLastWindow? _fixLast;
     private AddWordWindow? _addWord;
+    private AddSnippetWindow? _addSnippet;
     private long _flyoutClosedAt;
 
     /// <summary>A click on the tray icon: opens the panel beside it, or closes it if it is open.</summary>
@@ -102,6 +103,19 @@ public sealed partial class AppShell
         _addWord.Activate();
     }
 
+    /// <summary>Tray panel → Snippets, or "Add a snippet…" in the dictionary window (SPEC §16.6).</summary>
+    public void OpenAddSnippet()
+    {
+        _flyout?.Close();
+        if (_addSnippet is null)
+        {
+            _addSnippet = new AddSnippetWindow(this);
+            _addSnippet.Closed += (_, _) => _addSnippet = null;
+            _addSnippet.Show();
+        }
+        _addSnippet.Activate();
+    }
+
     /// <summary>SPEC §20 at first run: the hotkey capture box after the model pickers, writing the key the user keeps.</summary>
     private void FirstRunHotkeyCheck()
     {
@@ -116,7 +130,7 @@ public sealed partial class AppShell
 
     private void CloseWindows()
     {
-        foreach (var window in new Window?[] { _flyout, _settingsWindow, _calibration, _fixLast, _addWord })
+        foreach (var window in new Window?[] { _flyout, _settingsWindow, _calibration, _fixLast, _addWord, _addSnippet })
         {
             try
             {
