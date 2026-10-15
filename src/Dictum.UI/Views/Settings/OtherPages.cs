@@ -9,21 +9,21 @@ namespace Dictum.UI.Views.Settings;
 
 /// <summary>
 /// Settings → Clean-up: what tidies the text now, the profanity setting, grammar assist, and cloud clean-up behind the
-/// explicit consent dialog (SPEC §22): nothing is sent anywhere until the user agrees to the named host.
+/// explicit consent dialog (SPEC §22): nothing is sent anywhere until the user agrees to the named host. The Service list
+/// offers Anthropic and the presets in <see cref="CloudPresets"/>, which only fill in the fields below it.
 /// </summary>
 internal sealed class CleanupPage : SettingsPage
 {
-    private static readonly string[] Providers = [LlmSettings.Anthropic, LlmSettings.OpenAiCompatible];
-
     private readonly TextBlock _now = Ui.Text("");
     private readonly Segments _profanity;
     private readonly ToggleSwitch _grammar;
     private readonly StackPanel _cloudOn = new() { Spacing = 10 };
     private readonly StackPanel _cloudOff = new() { Spacing = 10 };
     private readonly TextBlock _cloudState = Ui.Text("");
-    private readonly ComboBox _provider = new() { ItemsSource = new[] { "Anthropic (Claude)", "OpenAI-compatible server" }, SelectedIndex = 0, Width = 320 };
+    private readonly ComboBox _provider = new() { ItemsSource = new[] { "Anthropic (Claude)" }.Concat(CloudPresets.All.Select(p => p.Name)).ToArray(), SelectedIndex = 0, Width = 320 };
     private readonly TextBox _baseUrl = new() { Width = 320 };
     private readonly TextBox _model = new() { Width = 320 };
+    private readonly TextBlock _key = Ui.Text("", "caption");
     private readonly Button _enable;
     private readonly TextBlock _offline = Ui.Text("", "caption");
 
@@ -41,7 +41,7 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Line("Service", _provider),
             Ui.Line("Server address", _baseUrl, "Leave empty for Anthropic. A plain http:// address must be on this PC."),
             Ui.Line("Model", _model),
-            Ui.Text($"The key goes in .env in the settings folder: {EnvKeys}.", "caption"),
+            _key,
             Ui.Row(8, _enable, Ui.Button("Open the settings folder", "secondary", () => Say(Shell.OpenPath(Shell.RealPath(Shell.Paths.ConfigDir), folder: true) ?? ""))),
             _offline]);
         _cloudOn.Children.AddRange([_cloudState, Ui.Row(8, Ui.Button("Switch cloud clean-up off", "secondary", () => Run(() =>
@@ -58,8 +58,6 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff), "Cloud clean-up"));
     }
 
-    private const string EnvKeys = "ANTHROPIC_API_KEY for Anthropic, LLM_API_KEY for an OpenAI-compatible server that needs one";
-
     protected override void Redraw()
     {
         var s = Shell.Settings;
@@ -70,23 +68,34 @@ internal sealed class CleanupPage : SettingsPage
         var on = host is not null && CloudPolicy.HasConsent(s.Llm);
         _cloudOn.IsVisible = on;
         _cloudOff.IsVisible = !on;
-        _cloudState.Text = on ? $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step." : "";
+        _cloudState.Text = on ? $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}" : "";
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
     }
 
+    /// <summary>The preset chosen in the Service list; null for Anthropic, which is its own provider.</summary>
+    private CloudPreset? Preset => _provider.SelectedIndex > 0 ? CloudPresets.All[_provider.SelectedIndex - 1] : null;
+
+    /// <summary>Fills the fields for the chosen service: its address, its default model as the hint, its key. Nothing is saved here.</summary>
     private void DefaultsForProvider()
     {
-        var anthropic = _provider.SelectedIndex <= 0;
-        _baseUrl.Watermark = anthropic ? "(Anthropic's own address)" : "http://localhost:11434/v1";
-        _model.Watermark = anthropic ? LlmSettings.AnthropicDefaultModel : "the model name the server uses";
+        var preset = Preset;
+        _baseUrl.Text = preset?.BaseUrl;
+        _model.Text = null;
+        _baseUrl.Watermark = preset is null ? "(Anthropic's own address)" : preset.BaseUrl ?? "the server's OpenAI-compatible address";
+        _model.Watermark = preset is null ? LlmSettings.AnthropicDefaultModel : preset.DefaultModel ?? preset.ModelHint;
+        _key.Text = preset is null ? $"The key goes in .env in the settings folder: {SecretStore.AnthropicKey}=your Anthropic API key."
+            : preset.KeyVariable is null ? $"{preset.Name} needs no key."
+            : $"The key, if the service needs one, goes in .env in the settings folder: {preset.KeyVariable}=your key. It is one key for every OpenAI-compatible service.";
     }
 
+    /// <summary>A preset only filled the fields: switching on goes through the shell's consent step, as for a typed address.</summary>
     private void EnableCloud()
     {
-        var provider = Providers[Math.Max(0, _provider.SelectedIndex)];
-        var baseUrl = string.IsNullOrWhiteSpace(_baseUrl.Text) ? null : _baseUrl.Text.Trim();
-        var model = string.IsNullOrWhiteSpace(_model.Text) ? (provider == LlmSettings.Anthropic ? LlmSettings.AnthropicDefaultModel : null) : _model.Text.Trim();
+        var preset = Preset;
+        var provider = preset?.Provider ?? LlmSettings.Anthropic;
+        var baseUrl = string.IsNullOrWhiteSpace(_baseUrl.Text) ? preset?.BaseUrl : _baseUrl.Text.Trim();
+        var model = string.IsNullOrWhiteSpace(_model.Text) ? (preset is null ? LlmSettings.AnthropicDefaultModel : preset.DefaultModel) : _model.Text.Trim();
         if (model is null)
         {
             Say("Type the model name the server uses.");

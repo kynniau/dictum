@@ -28,13 +28,24 @@ public static class CloudPolicy
             ? $"llm.base_url {u.Host} uses http://, which would send dictations unencrypted; only a server on this PC may use http://"
             : null;
 
-    /// <summary>What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2).</summary>
+    /// <summary>What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2), then the warning paragraph.</summary>
     public static string ConsentText(LlmSettings s, string host) =>
         $"With cloud clean-up on, every dictation's text (never the audio) is sent to {host}" +
         (s.Provider == LlmSettings.Anthropic ? " (Anthropic)" : "") +
         " together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
         (s.Provider == LlmSettings.Anthropic
-            ? "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives. "
-            : "Whoever runs that server receives the text; its own terms apply. ") +
+            ? "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives."
+            : "Whoever runs that server receives the text; its own terms apply.") +
+        "\n\n" + ConsentWarning(host) + "\n\n" +
         "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it.";
+
+    /// <summary>
+    /// The consent dialog's warning paragraph for every provider that sends text off this PC (cloud clean-up is an advanced
+    /// option). Copy approved by the product owner on 16/10/2026 as written: never reword, shorten or soften it.
+    /// </summary>
+    public static string ConsentWarning(string host) =>
+        $"WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on {host}'s servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.";
+
+    /// <summary>Appended to the Settings > Clean-up state line while cloud clean-up is on. Approved on 16/10/2026 as written: never reword it.</summary>
+    public const string StateLineWarning = "Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.";
 }
