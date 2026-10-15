@@ -1,9 +1,10 @@
 namespace Dictum.Personal;
 
 /// <summary>
-/// dictionary.txt (SPEC §16.2): one term per line, '#' comments. Used twice: as whisper's initial prompt (a
-/// comma-separated vocabulary line within whisper's prompt budget, keeping the most recently added terms) and as a
-/// "Known names and terms" line in the cleanup prompt. An empty or missing file changes no prompt.
+/// dictionary.txt (SPEC §16.2): one term per line, '#' comments. Used as whisper's initial prompt (a comma-separated
+/// vocabulary line within whisper's prompt budget, keeping the most recently added terms), as a "Known names and terms"
+/// line in the cleanup prompt, and by the cleanup validator, which rejects a reply that adds a term the speaker did not
+/// say. An empty or missing file changes no prompt.
 /// </summary>
 public sealed class PersonalDictionary
 {

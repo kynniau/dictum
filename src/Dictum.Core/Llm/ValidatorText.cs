@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Dictum.Llm;
@@ -7,8 +9,8 @@ internal readonly record struct Retraction(IReadOnlyList<string> MinSpan, IReadO
 
 /// <summary>
 /// The text handling behind <see cref="CleanupValidator"/>: Unicode words (so a reply in another script or with curly
-/// apostrophes is measured, not skipped), whole-word phrase matching, "scratch that" spans, spoken commands, negations
-/// and numbers. Pure functions on lower-cased text.
+/// apostrophes is measured, not skipped), whole-word phrase matching, "scratch that" spans, spoken commands, negations,
+/// numbers and words that sound alike. Pure functions on lower-cased text.
 /// </summary>
 internal static partial class ValidatorText
 {
@@ -144,4 +146,43 @@ internal static partial class ValidatorText
         "could", "should", "its", "our", "their", "they", "them", "his", "her", "him", "she", "into", "onto", "than", "then",
         "there", "here", "what", "when", "where", "who", "why", "how", "all", "any", "some", "also", "just", "too", "very",
     };
+
+    /// <summary>
+    /// True when two words sound alike: the same word, or the same <see cref="SoundKey"/>. "kinney", "kinny", "kimmy" and
+    /// "Kynni" sound alike, and so do "dictim" and "Dictum"; "name" and "Kynni" do not.
+    /// </summary>
+    public static bool SoundsLike(string a, string b) => a == b || SoundKey(a) is { Length: > 0 } key && key == SoundKey(b);
+
+    /// <summary>A lower-case word's sound classes, or null when it has a character the classes do not cover.</summary>
+    // simplification: a spelling-based sound key in the manner of Soundex instead of a pronunciation dictionary or a full
+    // phonetic algorithm such as Double Metaphone. Each letter becomes its sound class (vowels and y; b f p v; c g k q;
+    // s x z; d t; m n; j; l; r), h and w are dropped, accents are removed and a run of one class counts once, so the
+    // vowels keep their places but not their spelling: "kinney", "kimmy" and "Kynni" are all k-vowel-n-vowel. Ceiling: a
+    // real word or name that sounds like a term passes as its misspelling ("canny" or "Ginny" for "Kynni", "Sarah" for
+    // "Xero"); a mishearing that adds or drops a sound ("kidney" for "Kynni") or splits the word ("kin knee") is not a
+    // near miss; a word with a digit or a letter outside a-z (after accents are removed) only matches itself. Trigger to
+    // retire: a typed reply that swapped a sound-alike word for a term, or a wanted dictionary fix rejected as an addition.
+    private static string? SoundKey(string word)
+    {
+        var key = new StringBuilder(word.Length);
+        foreach (var c in word.Normalize(NormalizationForm.FormD))
+        {
+            var sound = c switch
+            {
+                'a' or 'e' or 'i' or 'o' or 'u' or 'y' => 'a',
+                'b' or 'f' or 'p' or 'v' => 'p',
+                'c' or 'g' or 'k' or 'q' => 'k',
+                's' or 'x' or 'z' => 's',
+                'd' or 't' => 't',
+                'm' or 'n' => 'n',
+                'j' or 'l' or 'r' => c,
+                'h' or 'w' or '\'' => '\0',
+                _ when CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark => '\0', // an accent, after FormD
+                _ => '?',
+            };
+            if (sound == '?') return null;
+            if (sound != '\0' && (key.Length == 0 || key[^1] != sound)) key.Append(sound);
+        }
+        return key.ToString();
+    }
 }

@@ -96,7 +96,7 @@ public static class CliCommands
                 using (local)
                 {
                     var cleaner = TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, () => local, personal.Dictionary.CleanupLine,
-                        personal.WordsTheCleanupMustKeep(settings.Profanity));
+                        personal.WordsTheCleanupMustKeep(settings.Profanity), personal.Dictionary.Terms);
                     Console.Error.WriteLine($"cleanup: {cleaner.Status}{(settings.Llm.GrammarAssist ? "; grammar assist on" : "")}");
                     sw.Restart();
                     var cleaned = await cleaner.CleanAsync(raw, CancellationToken.None);

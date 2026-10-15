@@ -48,9 +48,9 @@ public static class BenchCleanupCommand
         Console.Out.WriteLine();
 
         // The prompt and the checks the tray app uses: base prompt, grammar assist when on, the personal dictionary line,
-        // and the words the profanity setting keeps (SPEC §16).
+        // the words the profanity setting keeps and the dictionary terms a reply may not add (SPEC §16).
         var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.Llm.PromptFile, log.Warn), settings.Llm.GrammarAssist, personal.Dictionary.CleanupLine);
-        var context = new ValidationContext(prompt, personal.WordsTheCleanupMustKeep(settings.Profanity));
+        var context = new ValidationContext(prompt, personal.WordsTheCleanupMustKeep(settings.Profanity), personal.Dictionary.Terms);
         DeterministicCleaner.Clean(raw); // first call pays regex start-up; time the second
         var sw = Stopwatch.StartNew();
         var tidy = DeterministicCleaner.Clean(raw);

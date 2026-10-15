@@ -27,15 +27,16 @@ public sealed class TranscriptCleaner
     /// <param name="timeout">llm.timeout_ms: the shortest deadline; longer dictations get longer (<see cref="Deadline"/>).</param>
     /// <param name="deadline">Tests replace the deadline rule; production uses <see cref="Deadline"/>.</param>
     /// <param name="mustKeepWords">Dictated words a reply may not drop: the profanity list unless profanity.mode = remove.</param>
+    /// <param name="dictionaryTerms">The personal dictionary's terms: a reply may not add one the speaker did not say.</param>
     public TranscriptCleaner(ILlmClient? client, string systemPrompt, TimeSpan timeout, ILog log, string status, Func<int, TimeSpan>? deadline = null,
-        IReadOnlyCollection<string>? mustKeepWords = null)
+        IReadOnlyCollection<string>? mustKeepWords = null, IReadOnlyCollection<string>? dictionaryTerms = null)
     {
         _client = client;
         _prompt = systemPrompt;
         _deadline = deadline ?? (words => Deadline(words, timeout));
         _log = log;
         Status = status;
-        _validation = new ValidationContext(systemPrompt, mustKeepWords);
+        _validation = new ValidationContext(systemPrompt, mustKeepWords, dictionaryTerms);
     }
 
     /// <summary>
@@ -182,8 +183,9 @@ public sealed class TranscriptCleaner
     /// <param name="local">The loaded local model, if any (null until it has loaded).</param>
     /// <param name="dictionaryLine">The personal dictionary's "Known names and terms" line (SPEC §16.2), or null.</param>
     /// <param name="mustKeepWords">Dictated words a reply may not drop (the profanity list unless profanity.mode = remove).</param>
+    /// <param name="dictionaryTerms">The personal dictionary's terms (every one, not only those in the line): a reply may not add one the speaker did not say.</param>
     public static TranscriptCleaner Create(LlmSettings settings, bool offlineOnly, SecretStore secrets, HttpClient http, ILog log, Func<ILocalLlmEngine?>? local = null,
-        string? dictionaryLine = null, IReadOnlyCollection<string>? mustKeepWords = null)
+        string? dictionaryLine = null, IReadOnlyCollection<string>? mustKeepWords = null, IReadOnlyCollection<string>? dictionaryTerms = null)
     {
         var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, log.Warn), settings.GrammarAssist, dictionaryLine);
         var timeout = TimeSpan.FromMilliseconds(settings.TimeoutMs);
@@ -211,7 +213,8 @@ public sealed class TranscriptCleaner
             case LlmSettings.Local:
                 var name = CleanupCatalog.DisplayName(settings.Model);
                 var client = new LocalLlmClient(local ?? (() => null), name);
-                return new TranscriptCleaner(client, prompt, timeout, log, $"local/{name} on this PC (nothing leaves it)", mustKeepWords: mustKeepWords);
+                return new TranscriptCleaner(client, prompt, timeout, log, $"local/{name} on this PC (nothing leaves it)",
+                    mustKeepWords: mustKeepWords, dictionaryTerms: dictionaryTerms);
 
             case LlmSettings.OpenAiCompatible:
                 if (settings.BaseUrl is null) return RulesOnly("rule-based tidy only: llm.base_url is required for openai-compatible");
@@ -225,7 +228,8 @@ public sealed class TranscriptCleaner
                 }
                 var oai = new OpenAiCompatibleLlmClient(http, settings.BaseUrl, settings.Model, key);
                 var keyState = service.KeyVariable is null ? "no key sent" : $"{service.KeyVariable} {(key is null ? "absent" : "present")}";
-                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})", mustKeepWords: mustKeepWords);
+                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})",
+                    mustKeepWords: mustKeepWords, dictionaryTerms: dictionaryTerms);
 
             default:
                 if (AnthropicRedirectWarning(settings) is { } redirect) log.Warn(redirect);
@@ -234,7 +238,8 @@ public sealed class TranscriptCleaner
                 // llm.model defaults to a local cleanup model; that is not an Anthropic model id.
                 var model = CleanupCatalog.IsValidSetting(settings.Model) ? LlmSettings.AnthropicDefaultModel : settings.Model;
                 var anthropic = new AnthropicLlmClient(apiKey, model, timeout, settings.BaseUrl, http); // the shared, offline-guarded client
-                return new TranscriptCleaner(anthropic, prompt, timeout, log, $"{anthropic.Name} (ANTHROPIC_API_KEY present)", mustKeepWords: mustKeepWords);
+                return new TranscriptCleaner(anthropic, prompt, timeout, log, $"{anthropic.Name} (ANTHROPIC_API_KEY present)",
+                    mustKeepWords: mustKeepWords, dictionaryTerms: dictionaryTerms);
         }
     }
 }

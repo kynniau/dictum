@@ -5,7 +5,9 @@ namespace Dictum.Llm;
 
 /// <param name="SystemPrompt">The prompt actually sent, so a reply that echoes a custom or dictionary prompt is caught.</param>
 /// <param name="MustKeepWords">Words the reply may not drop when dictated (the profanity list unless profanity.mode = remove).</param>
-public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection<string>? MustKeepWords = null);
+/// <param name="DictionaryTerms">The personal dictionary's terms (SPEC §16.2): the reply may not add one the speaker did not say.</param>
+public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection<string>? MustKeepWords = null,
+    IReadOnlyCollection<string>? DictionaryTerms = null);
 
 /// <summary>
 /// Decides whether a model's reply is the cleaned dictation (SPEC §5, applied to every provider). Rejected replies
@@ -14,9 +16,10 @@ public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection
 /// Spec rules: empty; word count outside 0.4×–1.6× of the input (8+ words, spoken commands and hesitations not counted);
 /// starts with commentary; contains the system prompt's own wording; contains a chat-template token. Beyond the spec:
 /// framing and labels the speaker did not say (whole words, curly quotes mapped), a script the dictation did not use, a
-/// final line or bracket the speaker did not say, the dictated "?" lost, too few shared words, a negation or a number
-/// dropped or changed, a kept word dropped (profanity), dropped content (overall and per sentence), and "scratch that"
-/// handled both ways round: the correction must be in the reply and the retracted words must not.
+/// final line or bracket the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
+/// few shared words, a negation or a number dropped or changed, a kept word dropped (profanity), dropped content (overall
+/// and per sentence), and "scratch that" handled both ways round: the correction must be in the reply and the retracted
+/// words must not.
 /// </summary>
 public static partial class CleanupValidator
 {
@@ -96,6 +99,8 @@ public static partial class CleanupValidator
         if (HasNonLatinLetters(text) && !HasNonLatinLetters(raw)) return (null, "reply is in a script the dictation did not use");
 
         if (Unsaid(textLower, rawSet) is { } unsaid) return (null, unsaid);
+        if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(rawWords, replyWords, terms))
+            return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -147,6 +152,55 @@ public static partial class CleanupValidator
             if (lines.Contains(example) && Comparable(Words(example)).Any(w => !rawSet.Contains(w))) return "reply contains a line from the built-in examples";
         }
         return null;
+    }
+
+    /// <summary>
+    /// A dictionary term the speaker did not say. Observed 16/10/2026: with the dictionary {Dictum, Kynni, Kynni Pty Ltd},
+    /// qwen2.5-1.5b turned "Add a name to the dictionary once. ... Dictum, by Kynni." into "Add Kynni Pty Ltd to the
+    /// dictionary once. ... Dictum, by Kynni Pty Ltd.", which every other rule accepted and which was typed; with {Dictum,
+    /// Kynni} it still wrote "Add Kynni to the dictionary once". Each term is counted whole, and so is each content word of
+    /// a multi-word term: when the reply has more of it than the dictation, and also more of it and the words that sound
+    /// like it together, it was added, not respelt. Writing "kinney" as "Kynni", the fix the dictionary exists for, swaps
+    /// one sound-alike for another, so the second count does not grow. "Sound like" is a spelling-based sound key (the same
+    /// consonant sounds in the same order, vowels in the same places); its measure and ceiling are documented at
+    /// <see cref="ValidatorText.SoundsLike"/>: a real word that sounds like a term ("canny" for "Kynni") passes as its
+    /// misspelling, and a mishearing that adds a sound ("kidney") is rejected as an addition and left to the tidy. Counted
+    /// against everything dictated, retracted clauses included: what "scratch that" retracts is ambiguous ("tell kynni it is
+    /// at 3, scratch that, at 4"), and a retracted word left in the reply is the retraction rule's to judge. A term that is
+    /// also an everyday word ("Will") is counted as the term, so a reply that adds the everyday word is rejected as well.
+    /// </summary>
+    private static bool AddsTerm(List<string> rawWords, List<string> replyWords, IEnumerable<string> terms)
+    {
+        var said = Comparable(rawWords.Select(WithoutPossessive));
+        var written = Comparable(replyWords.Select(WithoutPossessive));
+        foreach (var term in terms)
+        {
+            var words = Comparable(Words(MapQuotes(term).ToLowerInvariant()).Select(WithoutPossessive));
+            var units = new List<IReadOnlyList<string>> { words };
+            if (words.Count > 1) units.AddRange(words.Where(IsCorrectionWord).Select(w => new[] { w }));
+            foreach (var unit in units.Where(u => u.Count > 0))
+            {
+                if (Spans(written, unit, string.Equals) > Spans(said, unit, string.Equals) && Spans(written, unit, SoundsLike) > Spans(said, unit, SoundsLike))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>"Kynni's" counts as "Kynni".</summary>
+    private static string WithoutPossessive(string word) => word.EndsWith("'s", StringComparison.Ordinal) ? word[..^2] : word;
+
+    /// <summary>How many times the words spell the unit, compared word by word.</summary>
+    private static int Spans(List<string> words, IReadOnlyList<string> unit, Func<string, string, bool> same)
+    {
+        var count = 0;
+        for (var i = 0; i + unit.Count <= words.Count; i++)
+        {
+            var j = 0;
+            while (j < unit.Count && same(words[i + j], unit[j])) j++;
+            if (j == unit.Count) count++;
+        }
+        return count;
     }
 
     /// <summary>
