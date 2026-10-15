@@ -123,4 +123,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l release
-          gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "Dictum ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # The release already exists (for example created by hand): add or replace the built files.
+            gh release upload "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "Dictum ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
+          fi
