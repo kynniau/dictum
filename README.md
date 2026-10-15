@@ -159,6 +159,43 @@ Enter or Space pressed on their own, choose nothing in a box: with the keyboard 
 them (a chord such as `Ctrl+Shift+Space` still counts).
 `Dictum.exe --selftest` runs the same check from the command line: "Press your hotkey (…) now", watching for 5 s.
 
+### Other languages and translation
+
+Dictum can listen for any of Whisper's 100 languages and, if you want, write English whatever you speak: a Hindi
+speaker dictates in Hindi and English is pasted. Recognition and translation run on this PC; if cloud clean-up is on
+(Settings > Clean-up), the English text still goes to that provider, as every dictation does. Settings > Models >
+**Language**:
+
+- **Spoken language**: English, Hindi, Tagalog and the other Indian-subcontinent languages Whisper has (Bengali,
+  Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Malayalam, Punjabi, Assamese, Nepali, Sindhi, Sinhala) are listed
+  first, then the rest by name (Cantonese, `yue`, only with the large-v3 models), or **Detect automatically** (whisper
+  works it out from the first seconds of each dictation, useful for a mixed team). The code goes into
+  `whisper.language`.
+- **Translate to English** (`whisper.translate`): the text is written in English whatever was spoken, and the clean-up,
+  dictionary and corrections run on that English. With it off and a language other than English (or Detect
+  automatically), the text is written in the language spoken and the clean-up is skipped, because its rules and prompt
+  are written for English (the rule-based tidy would capitalise Polish "i", for one); only whitespace is tidied, while
+  corrections and the profanity filter still run. The About page and `--selftest` show "skipped" as the clean-up state.
+  A change of language or translation rebuilds the decoder in place; the model is not loaded again.
+- **The model must be multilingual.** The `.en` models hear English only. `small`, `medium`, `large-v3` and their
+  quantised files hear every language; the page refuses a language or the translate switch that the chosen model
+  cannot do, and `--selftest` prints a "language" line that fails for the same reasons. OpenAI's README (read
+  16/10/2026) says to use medium or large for the best translation and that `large-v3-turbo` "is not trained for
+  translation tasks" and returns the original language even when asked to translate, so turbo is refused for
+  translation. Medium needs a GPU or a fast desktop CPU (see the speed table below for its English twin). Choosing a
+  model that cannot do what the language settings ask, from the tray picker, a Mode preset, Choose file, calibration's
+  Use this or a hand edit, still loads it, with a warning balloon saying why it will not work.
+- **Not possible with Whisper:** Cebuano, Ilocano, Hiligaynon and the other Philippine languages apart from Tagalog
+  are not in Whisper's list (openai/whisper `tokenizer.py`, read 16/10/2026), so they cannot be transcribed or
+  translated; Tagalog is the Philippine language it has.
+- **Calibrate my voice** always listens in English (it reads English sentences), whatever language dictation uses.
+  The Light and Full presets in Mode write their own speech models (`base.en`; `small.en` on a CPU, `large-v3-turbo`
+  on a GPU): the Mode page names any preset whose model cannot hear your language or translate.
+- Mixed speech ("Hinglish", Taglish) has not been tested here: try the language you set first, then Detect
+  automatically with translation on, and judge by ear. Translation can lose nuance that transcription keeps, so for
+  staff who speak accented English a bigger multilingual model with the language left on English may read better;
+  test both on real recordings.
+
 ## Install
 
 Three routes, each per user and none needing administrator rights. Pick one: the Store build and a direct-download
@@ -276,8 +313,21 @@ check against: the CLI warns, and that file is loaded unchecked.
 | medium.en | 1,533,774,781 | high accuracy; wants a GPU or a fast desktop CPU; ~2.1 GB memory |
 | medium.en-q5_0 | 539,225,533 | medium.en quantised to 5-bit: about a third of the size |
 | medium.en-q8_0 | 823,382,461 | medium.en quantised to 8-bit: about half the size |
-| large-v3-turbo | 1,624,555,275 | best accuracy, multilingual; needs a GPU |
+| large-v3-turbo | 1,624,555,275 | multilingual, about 8× faster than large-v3 (OpenAI's table) but cannot translate; needs a GPU |
 | large-v3-turbo-q5_0 | 574,041,195 | large-v3-turbo quantised to 5-bit; still needs a GPU |
+| small | 487,601,967 | any language, translates to English; the smallest multilingual model, the same size as small.en |
+| small-q5_1 | 190,085,487 | small quantised to 5-bit: smallest multilingual download |
+| medium | 1,533,763,059 | any language, translates well to English; wants a GPU or a fast desktop CPU |
+| medium-q5_0 | 539,212,467 | medium quantised to 5-bit: about a third of the size |
+| large-v3 | 3,095,033,483 | the most accurate in any language and the best for translation; needs a GPU |
+| large-v3-q5_0 | 1,081,140,203 | large-v3 quantised to 5-bit; still needs a GPU |
+
+The six multilingual rows were added 16/10/2026 with sizes and SHA-256 hashes read from the Hugging Face API tree at
+the pinned commit; four existing rows (small.en, medium.en, large-v3-turbo and its q5_0) were read the same way as
+controls and matched the catalogue exactly. No HTTP HEAD was made for the six. Because they are catalogue names, any
+file named `ggml-small.bin`, `ggml-medium.bin`, `ggml-large-v3.bin` or one of their quantised names is now
+hash-checked before loading wherever it sits: a file of your own under one of those names must match the pinned bytes,
+or be renamed to load unchecked. See "Other languages and translation".
 
 Memory figures are the "Memory usage" table of the whisper.cpp README (https://github.com/ggml-org/whisper.cpp,
 fetched 15/10/2026) for the tiny/base/small/medium families; not measured here. That table gives no figures for
@@ -496,7 +546,8 @@ warning and the default is used; Dictum never fails to start because of settings
 | `audio.device` | `null` | `null` = Windows default microphone; else an endpoint ID or part of the device name (`--selftest` lists them). |
 | `whisper.model` | your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin` in `models_dir`, or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
 | `whisper.models_dir` | `null` | `null` = `%LOCALAPPDATA%\Dictum\models`; else an absolute folder. |
-| `whisper.language` | `"en"` | whisper language code. |
+| `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`hi`, `tl`, `bn`, `ta`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change reloads the model. |
+| `whisper.translate` | `false` | `true`: write English whatever language is spoken. Needs a multilingual model; `large-v3-turbo` cannot translate (OpenAI's README: the turbo model "is not trained for translation tasks"). |
 | `whisper.threads` | `0` | CPU threads; 0 = Whisper.net's default. |
 | `whisper.gpu` | `"auto"` | `auto` / `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `cpu`: CPU, then CPU-without-AVX. Needs a restart. |
 | `whisper.beam_size` | `0` | `0` = greedy decoding (fastest); `1`–`8` = beam search with that many beams (more accurate, slower). Calibration's **Use this** writes it. |

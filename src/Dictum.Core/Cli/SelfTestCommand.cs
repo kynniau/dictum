@@ -57,6 +57,8 @@ public static partial class SelfTestCommand
         var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(settings));
         Line("offline_only", settings.OfflineOnly ? "on: no network calls, downloads and cloud providers refused" : "off");
 
+        var whisper = settings.Whisper;
+
         if (HotkeyParser.TryParse(settings.Hotkey, out var spec, out var error))
         {
             var kind = spec.IsChord ? "chord" : "single key";
@@ -71,6 +73,10 @@ public static partial class SelfTestCommand
 
         // Speech model
         var modelPath = SettingsFile.EffectiveModelPath(settings, paths, Environment.GetEnvironmentVariable, options.Model);
+        // Judged against the model that will load (--model or DICTUM_MODEL_PATH included), not only whisper.model.
+        var languageProblem = WhisperLanguages.Problem(modelPath, whisper.Language, whisper.Translate);
+        Line("language", $"{WhisperLanguages.Describe(whisper.Language)}{(whisper.Translate ? ", translating to English" : "")}{(languageProblem is null ? "" : $": {languageProblem}")}", languageProblem is null);
+        ok &= languageProblem is null;
         var modelExists = File.Exists(modelPath);
         Line("speech model", modelExists ? $"{modelPath} ({new FileInfo(modelPath).Length:N0} bytes)" : $"{modelPath} missing", modelExists);
         ok &= modelExists;
@@ -78,7 +84,7 @@ public static partial class SelfTestCommand
         {
             try
             {
-                using var engine = WhisperEngine.Load(modelPath, settings.Whisper.Language, settings.Whisper.Threads, settings.Whisper.Gpu, log);
+                using var engine = WhisperEngine.Load(modelPath, settings.Whisper.Threads, settings.Whisper.Gpu, log, new DecodeOptions(null, 0, whisper.Language, whisper.Translate));
                 Line("whisper runtime", $"{WhisperEngine.LoadedRuntime} (whisper.gpu = {settings.Whisper.Gpu}; loaded in {engine.LoadTime.TotalSeconds:0.0} s)", true);
             }
             catch (Exception ex)
@@ -124,7 +130,8 @@ public static partial class SelfTestCommand
         using (local)
         using (var http = OfflineGuardHandler.CreateClient(() => settings.OfflineOnly))
         {
-            Line("cleanup", TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, () => local).Status);
+            Line("cleanup", TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, () => local,
+                englishText: WhisperLanguages.OutputIsEnglish(whisper.Language, whisper.Translate)).Status);
         }
         var (recommendedCleanup, cleanupWhy) = CleanupCatalog.Recommend(WhisperEngine.GpuMachine);
         Line("recommended cleanup", $"{recommendedCleanup} ({cleanupWhy})");

@@ -58,6 +58,31 @@ public sealed class ModelCoordinatorTests : IDisposable
             reload: () => { }, shutdown: () => _shutdowns++, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Add(text));
     }
 
+    /// <summary>SPEC §23: every speech load passes the language guard; a model that cannot do what is asked still loads, with a balloon saying why.</summary>
+    [Fact]
+    public void A_model_that_cannot_hear_the_language_still_loads_but_a_balloon_says_why()
+    {
+        var paths = new AppPaths(Path.Combine(_dir.FullName, "cfg"), Path.Combine(_dir.FullName, "local"), _dir.FullName);
+        var settings = new AppSettings { Whisper = new WhisperSettings { Model = "base.en", Language = "hi" } };
+        var file = Path.Combine(paths.ModelsDir(settings), "ggml-base.en.bin");
+        Directory.CreateDirectory(paths.ModelsDir(settings));
+        File.WriteAllBytes(file, new byte[16]); // present; the fake loader never reads it
+        using var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var coordinator = new ModelCoordinator(paths, models, _llm, _http, NullLog.Instance, () => settings, null, _prompts, _ => null,
+            reload: () => { }, shutdown: () => _shutdowns++, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Add(text));
+
+        coordinator.Ensure(previousPath: null, startup: true);
+        var balloon = Assert.Single(_balloons);
+        Assert.Contains("base.en is an English-only model", balloon);
+        Assert.Contains("\"hi\"", balloon);
+        Assert.Equal(file, models.ModelPath); // the load still began: the user keeps a working model, and the reason to change it
+
+        _balloons.Clear();
+        settings = settings with { Whisper = settings.Whisper with { Language = "en" } };
+        coordinator.Ensure(previousPath: null, startup: true);
+        Assert.Empty(_balloons);
+    }
+
     private static (string, System.Text.Json.Nodes.JsonNode?)[] FullOnCpu =>
         [("whisper.model", "small.en"), ("llm.provider", "local"), ("llm.model", "qwen2.5-1.5b"), ("whisper.beam_size", 5)];
 

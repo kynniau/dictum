@@ -338,7 +338,9 @@ Unknown keys and malformed values: log a warning, use the default, never crash.
 
 Model catalogue (one place in code, used by the tray, the first-run picker, the CLI and
 the download script): `tiny.en`, `base.en`, `small.en`, `small.en-q5_1`, `small.en-q8_0`,
-`medium.en`, `medium.en-q5_0`, `medium.en-q8_0`, `large-v3-turbo`, `large-v3-turbo-q5_0`.
+`medium.en`, `medium.en-q5_0`, `medium.en-q8_0`, `large-v3-turbo`, `large-v3-turbo-q5_0`,
+and (16/10/2026, §23) the multilingual `small`, `small-q5_1`, `medium`, `medium-q5_0`,
+`large-v3`, `large-v3-q5_0`.
 Each entry carries display name, file name, byte size, and a one-line trade-off
 ("fastest, lowest accuracy" … "best accuracy, needs a GPU or a fast CPU"). Sizes come from
 the Hugging Face listing verified 15/10/2026 (small.en 487,614,201; small.en-q5_1
@@ -816,3 +818,60 @@ These amend earlier sections; where they conflict, this section wins.
 - **§22 cloud consent (amended):** consent is recorded in a file written only by the
   in-app dialog (`%APPDATA%\Dictum\consent.json`: provider, timestamp, app version);
   `llm.cloud_consent` in settings.json is ignored and documented as such.
+
+## 23. Languages and translation (amendment, 16/10/2026)
+
+Asked for: offshore staff who speak Hindi or Cebuano should dictate in their own language
+and have English pasted, on device, with the models already in use; then "cover the most
+common Filipino and Indian languages".
+
+- **What Whisper can do** (openai/whisper `tokenizer.py` and README, read 16/10/2026):
+  100 languages, Hindi and Tagalog among them, and a speech-to-English translate task.
+  Cebuano, Ilocano, Hiligaynon and the other Philippine languages are absent, so they are
+  not possible; Tagalog is the Philippine language. The turbo model "is not trained for
+  translation tasks" and returns the original language even when asked to translate, so
+  `large-v3-turbo` is refused for translation; OpenAI recommends medium or large.
+- **Settings:** `whisper.language` accepts any code in Whisper's table (lower-cased) or
+  `auto` (language detection from the first seconds); an unknown code falls back to `en`
+  with a warning. `whisper.translate` (bool, default false) asks for English output. Both
+  are decoder options (`DecodeOptions.Language`/`Translate`, beside the dictionary prompt
+  and the beam size): a change goes through the existing `SetDecoding` → `Reconfigure`
+  path and rebuilds only the decoder (`WithLanguage`/`WithLanguageDetection`,
+  `WithTranslate` in Whisper.net 1.9.1); the model is not loaded again and dictation is
+  not blocked meanwhile. Calibration builds its own `DecodeOptions` (English, no
+  translation), so it always scores English sentences in English.
+- **Clean-up:** when the output is not English (`WhisperLanguages.OutputIsEnglish`:
+  translate off and a language other than `en`, `auto` included), the cleaner is
+  `TranscriptCleaner.Plain`: no model and no English rules, whitespace tidied only, status
+  "skipped: …" in About and `--selftest`. Corrections and the profanity filter still run.
+- **Catalogue:** the multilingual `small`, `small-q5_1`, `medium`, `medium-q5_0`,
+  `large-v3` and `large-v3-q5_0`, sizes and SHA-256 from the HF API tree at the pinned
+  commit (four existing entries, small.en, medium.en, large-v3-turbo and its q5_0, served
+  as controls and matched exactly); mirrored in `scripts/download-model.ps1` under the
+  existing sync test. Files named like these entries are now hash-checked wherever they
+  sit (the integrity rule for catalogue names).
+- **Guards, one function (`WhisperLanguages.Problem`):** a non-English language or the
+  translate switch with an `.en` model, translate with turbo, or Cantonese (`yue`) with
+  anything but a large-v3 model, is refused by Settings > Models > Language (the control
+  springs back and the reason is shown; judged against the model in use, a `--model`
+  override included), logged as a warning at engine load, fails the `language` line of
+  `--selftest` (judged against the model that will load), and every speech-model load
+  (`ModelCoordinator.BeginSpeechLoad`: tray picker, Mode preset, Choose file,
+  calibration's Use this, a hand edit, a finished download) shows a warning balloon when
+  the model cannot do what the settings ask. The Mode page names each preset whose model
+  would fail (`WhisperLanguages.ModeNote`: Light always writes base.en; Full writes
+  small.en on a CPU and large-v3-turbo on a GPU, which hears every language but cannot
+  translate).
+- **Picker order:** auto, English, Hindi, Tagalog, then Bengali, Telugu, Marathi, Tamil,
+  Urdu, Gujarati, Kannada, Malayalam, Punjabi, Assamese, Nepali, Sindhi, Sinhala, then the
+  rest by name, each labelled "Name (code)".
+- **Not changed:** the clean-up prompt still asks for Australian English spelling (the
+  text that reaches it is English whenever the cleaner runs at all).
+- Tests: the table (count, Hindi/Tagalog present, Cebuano absent, featured codes valid),
+  picker order, the guard matrix (names, paths, Cantonese, an unknown name trusted), the
+  output-language rule, the Mode note on CPU and GPU, loader round trip and fallback, the
+  decoder rebuilt with the new language without a second load, the plain cleaner against
+  the English rules on Polish text, the six catalogue entries against the values read from
+  the tree, the Models and Mode pages on the headless platform (refused changes spring back
+  before any reload; accepted ones reach settings and the clean-up status), and the
+  coordinator's balloon on a model that cannot do what the settings ask.

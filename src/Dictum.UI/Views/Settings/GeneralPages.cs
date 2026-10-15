@@ -188,6 +188,7 @@ internal sealed class ModePage : SettingsPage
     private readonly Segments _mode;
     private readonly TextBlock _custom = Ui.Text("", "caption");
     private readonly TextBlock _table = Ui.Text("");
+    private readonly TextBlock _languageNote = Ui.Text("", "caption");
 
     public ModePage(AppShell shell) : base(shell, "Mode")
     {
@@ -195,7 +196,7 @@ internal sealed class ModePage : SettingsPage
         _mode.HorizontalAlignment = HorizontalAlignment.Left;
         _mode.Width = 320;
         Compose(
-            Ui.Card(Ui.Stack(10, _mode, _custom, _table,
+            Ui.Card(Ui.Stack(10, _mode, _custom, _table, _languageNote,
                 Ui.Text("Choosing a mode writes its models into settings.json, where you can still change each one, and asks before downloading a model that is missing.", "caption")), "Light or Full"));
     }
 
@@ -205,6 +206,9 @@ internal sealed class ModePage : SettingsPage
         var preset = Shell.Personal.CurrentPreset;
         _mode.Select(preset switch { ModePreset.Light => 0, ModePreset.Full => 1, _ => -1 });
         _custom.Text = preset == ModePreset.Custom ? "Custom: your settings match neither mode." : $"In use: {preset}.";
+        var w = Shell.Settings.Whisper;
+        _languageNote.Text = Dictum.Transcribe.WhisperLanguages.ModeNote(w.Language, w.Translate, gpu) ?? "";
+        _languageNote.IsVisible = _languageNote.Text.Length > 0;
         _table.Text = $"On this PC ({(gpu ? "a GPU runtime is loaded" : "CPU only")}):\n" +
                       $"• {ModePresets.Label(ModePreset.Light, gpu)}: quickest, lightest on memory.\n" +
                       $"• {ModePresets.Label(ModePreset.Full, gpu)}: most accurate, with AI clean-up.";

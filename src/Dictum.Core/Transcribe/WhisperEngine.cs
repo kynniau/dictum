@@ -12,10 +12,16 @@ public interface ITranscriber
     Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken);
 }
 
-/// <summary>How whisper decodes (SPEC §16.2, §16.5): the initial prompt (the personal dictionary) and greedy or beam search.</summary>
+/// <summary>
+/// How whisper decodes (SPEC §16.2, §16.5, §23): the initial prompt (the personal dictionary), greedy or beam search, the
+/// language and whether to write English for it. All of these are decoder options: changing any rebuilds the decoder
+/// without loading the model again.
+/// </summary>
 /// <param name="Prompt">whisper's initial prompt, or null for none.</param>
 /// <param name="BeamSize">0 = greedy; 1 or more = beam search with that many beams (whisper.beam_size).</param>
-public sealed record DecodeOptions(string? Prompt, int BeamSize)
+/// <param name="Language">A Whisper language code, or <see cref="WhisperLanguages.Auto"/> to detect it per dictation (whisper.language).</param>
+/// <param name="Translate">Write English whatever was spoken (whisper.translate); needs a multilingual model other than turbo.</param>
+public sealed record DecodeOptions(string? Prompt, int BeamSize, string Language = WhisperLanguages.English, bool Translate = false)
 {
     public static readonly DecodeOptions Default = new(null, 0);
 
@@ -23,6 +29,9 @@ public sealed record DecodeOptions(string? Prompt, int BeamSize)
     public const int CalibrationBeamSize = 5;
 
     public string Describe() => BeamSize > 0 ? $"beam search ({BeamSize})" : "greedy";
+
+    /// <summary>"language hi (Hindi), translating to English" for the log and --selftest.</summary>
+    public string DescribeLanguage() => $"language {WhisperLanguages.Describe(Language)}{(Translate ? ", translating to English" : "")}";
 }
 
 /// <summary>A loaded speech model whose decoding can be changed without reloading it (dictionary edits, calibration).</summary>
@@ -53,17 +62,15 @@ public sealed partial class WhisperEngine : ISpeechEngine
     private readonly SemaphoreSlim _busy = new(1, 1);
     private int _disposed;
     private readonly WhisperFactory _factory;
-    private readonly string _language;
     private readonly int _threads;
     private WhisperProcessor _processor;
 
-    private WhisperEngine(WhisperFactory factory, string language, int threads, DecodeOptions decode, string modelPath, TimeSpan loadTime)
+    private WhisperEngine(WhisperFactory factory, int threads, DecodeOptions decode, string modelPath, TimeSpan loadTime)
     {
         _factory = factory;
-        _language = language;
         _threads = threads;
         Decode = decode;
-        _processor = Build(factory, language, threads, decode);
+        _processor = Build(factory, threads, decode);
         ModelPath = modelPath;
         LoadTime = loadTime;
     }
@@ -74,10 +81,13 @@ public sealed partial class WhisperEngine : ISpeechEngine
     /// Builder methods read in Whisper.net 1.9.1's source (WhisperProcessorBuilder.cs, BeamSearchSamplingStrategyBuilder.cs
     /// and WhisperProcessorOptions.cs at tag 1.9.1): WithPrompt sets whisper's initial prompt; without a sampling strategy
     /// the options default to greedy; WithBeamSearchSamplingStrategy(b => b.WithBeamSize(n)) switches to beam search.
+    /// WithLanguageDetection and WithTranslate (its XML docs: "translate the text to English") are the language options.
     /// </summary>
-    private static WhisperProcessor Build(WhisperFactory factory, string language, int threads, DecodeOptions decode)
+    private static WhisperProcessor Build(WhisperFactory factory, int threads, DecodeOptions decode)
     {
-        var builder = factory.CreateBuilder().WithLanguage(language);
+        var builder = factory.CreateBuilder();
+        builder = decode.Language == WhisperLanguages.Auto ? builder.WithLanguageDetection() : builder.WithLanguage(decode.Language);
+        if (decode.Translate) builder = builder.WithTranslate();
         if (threads > 0) builder = builder.WithThreads(threads);
         if (!string.IsNullOrWhiteSpace(decode.Prompt)) builder = builder.WithPrompt(decode.Prompt);
         if (decode.BeamSize > 0) builder = builder.WithBeamSearchSamplingStrategy(beam => beam.WithBeamSize(decode.BeamSize));
@@ -91,7 +101,7 @@ public sealed partial class WhisperEngine : ISpeechEngine
         {
             if (decode == Decode) return;
             var previous = _processor;
-            _processor = NativeLoadGate.Run(() => Build(_factory, _language, _threads, decode));
+            _processor = NativeLoadGate.Run(() => Build(_factory, _threads, decode));
             Decode = decode;
             Task.Run(() => previous.DisposeAsync().AsTask()).GetAwaiter().GetResult(); // see Dispose for why on the pool
         }
@@ -217,19 +227,23 @@ public sealed partial class WhisperEngine : ISpeechEngine
         return m.Success ? (int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), m.Groups[2].Value == "1") : null;
     }
 
-    public static WhisperEngine Load(string modelPath, string language, int threads, string gpuSetting, ILog log, DecodeOptions? decode = null)
+    /// <param name="decode">The decoder options, language and translate included (<see cref="DecodeOptions.Default"/>: English, greedy, no prompt).</param>
+    public static WhisperEngine Load(string modelPath, int threads, string gpuSetting, ILog log, DecodeOptions? decode = null)
     {
         if (!File.Exists(modelPath)) throw new FileNotFoundException("Whisper model file not found.", modelPath);
+        var options = decode ?? DecodeOptions.Default;
+        if (WhisperLanguages.Problem(modelPath, options.Language, options.Translate) is { } problem) log.Warn($"Whisper settings: {problem}");
         var sw = Stopwatch.StartNew();
         var engine = NativeLoadGate.Run(() =>
         {
             ConfigureRuntime(gpuSetting, log);
             var factory = WhisperFactory.FromPath(modelPath);
-            return new WhisperEngine(factory, language, threads, decode ?? DecodeOptions.Default, modelPath, TimeSpan.Zero);
+            return new WhisperEngine(factory, threads, options, modelPath, TimeSpan.Zero);
         });
         sw.Stop();
         engine.LoadTime = sw.Elapsed;
-        log.Info($"Whisper model {Path.GetFileName(modelPath)} loaded in {sw.Elapsed.TotalSeconds:0.0} s on runtime {LoadedRuntime} ({engine.Decode.Describe()}{(engine.Decode.Prompt is null ? "" : ", dictionary prompt")}).");
+        log.Info($"Whisper model {Path.GetFileName(modelPath)} loaded in {sw.Elapsed.TotalSeconds:0.0} s on runtime {LoadedRuntime} " +
+                 $"({options.DescribeLanguage()}, {options.Describe()}{(options.Prompt is null ? "" : ", dictionary prompt")}).");
         return engine;
     }
 

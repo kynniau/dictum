@@ -44,7 +44,7 @@ internal sealed record CalibrationHost(
         return new CalibrationEngine((path, decode) =>
         {
             Integrity.Verify(path);
-            return WhisperEngine.Load(path, s.Whisper.Language, s.Whisper.Threads, s.Whisper.Gpu, Log, decode);
+            return WhisperEngine.Load(path, s.Whisper.Threads, s.Whisper.Gpu, Log, decode);
         }, Log, () => WhisperEngine.VulkanActive, s.LogTranscripts);
     }
 }

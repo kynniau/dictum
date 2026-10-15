@@ -128,6 +128,18 @@ public sealed class ModelCoordinator(
     }
 
     /// <summary>
+    /// Every speech-model load goes through here (a settings change, the first-run picker, a finished download): the model
+    /// still loads, and a balloon says when it cannot do what whisper.language or whisper.translate ask (SPEC §23), whichever
+    /// way it was chosen (tray picker, Mode preset, Choose file, calibration's Use this, a hand edit).
+    /// </summary>
+    private void BeginSpeechLoad(string path)
+    {
+        var whisper = settings().Whisper;
+        if (WhisperLanguages.Problem(path, whisper.Language, whisper.Translate) is { } problem) balloon(problem, true);
+        models.BeginLoad(path, whisper);
+    }
+
+    /// <summary>
     /// Loads the configured speech model if it changed, or again if its last load failed (a re-download or tray > Reload
     /// settings is the retry). At startup a missing model gets the Download / Choose file… / Quit dialog (SPEC §10); on a
     /// reload it only gets a balloon and the loaded model stays in use.
@@ -139,7 +151,7 @@ public sealed class ModelCoordinator(
         if (!changed && models.ModelPath == path && !models.LoadFailed) return; // same model, already loading or loaded
         if (File.Exists(path))
         {
-            models.BeginLoad(path, settings().Whisper);
+            BeginSpeechLoad(path);
             return;
         }
         log.Warn($"Model file missing: {path}");
@@ -158,7 +170,7 @@ public sealed class ModelCoordinator(
         {
             _firstRunSpeechDownload = null;
             StartDownload(ModelCatalog.Find(configured)!.Download, ModelCatalog.ResolvePath(configured, paths.ModelsDir(settings())),
-                () => models.BeginLoad(ModelPath, settings().Whisper)); // picked in the first-run picker
+                () => BeginSpeechLoad(ModelPath)); // picked in the first-run picker
             return;
         }
         PromptMissing(configured);
@@ -200,7 +212,7 @@ public sealed class ModelCoordinator(
         {
             case MissingModelChoice.Download:
                 StartDownload(ModelCatalog.Find(configured)!.Download, ModelCatalog.ResolvePath(configured, paths.ModelsDir(settings())),
-                    () => models.BeginLoad(ModelPath, settings().Whisper));
+                    () => BeginSpeechLoad(ModelPath));
                 break;
             case MissingModelChoice.ChooseFile:
                 ChooseFile();

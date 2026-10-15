@@ -196,6 +196,13 @@ public class SettingsTests
             ["medium.en-q8_0"] = 823_382_461,
             ["large-v3-turbo"] = 1_624_555_275,
             ["large-v3-turbo-q5_0"] = 574_041_195,
+            // Multilingual (SPEC §23): HF API tree at ModelCatalog.Revision, read 16/10/2026.
+            ["small"] = 487_601_967,
+            ["small-q5_1"] = 190_085_487,
+            ["medium"] = 1_533_763_059,
+            ["medium-q5_0"] = 539_212_467,
+            ["large-v3"] = 3_095_033_483,
+            ["large-v3-q5_0"] = 1_081_140_203,
         };
         Assert.Equal(expected.Keys, ModelCatalog.Entries.Select(e => e.Name));
         foreach (var e in ModelCatalog.Entries)

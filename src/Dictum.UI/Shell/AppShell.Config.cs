@@ -31,9 +31,9 @@ public sealed partial class AppShell
         if (_fileLog is not null) _fileLog.MinLevel = LogExtensions.ParseLevel(_settings.LogLevel);
         var personal = Personal.Load(); // dictionary, corrections, profanity list (SPEC §16)
         _cleaner = TranscriptCleaner.Create(_settings.Llm, _settings.OfflineOnly, config.Secrets, _http, _log, () => _llm.Ready,
-            personal.ForCleanup(_settings.Profanity));
+            personal.ForCleanup(_settings.Profanity), WhisperLanguages.OutputIsEnglish(_settings.Whisper.Language, _settings.Whisper.Translate));
         _llm.SetPrompt(_cleaner.SystemPrompt); // a loaded model re-evaluates a changed prompt now, not during the next dictation
-        _models.SetDecoding(new DecodeOptions(personal.Dictionary.WhisperPrompt, _settings.Whisper.BeamSize));
+        _models.SetDecoding(new DecodeOptions(personal.Dictionary.WhisperPrompt, _settings.Whisper.BeamSize, _settings.Whisper.Language, _settings.Whisper.Translate));
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)
         {
             _offlineWarned = refusal; // once per distinct refusal

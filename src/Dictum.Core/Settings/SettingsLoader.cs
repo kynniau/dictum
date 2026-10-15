@@ -182,7 +182,8 @@ public static class SettingsLoader
         {
             Model = r.String("model", d.Model, v => ModelCatalog.IsValidModelSetting(v) ? null : "expected a model name like \"small.en\" or an absolute path to a .bin file"),
             ModelsDir = r.NullableString("models_dir", v => Path.IsPathFullyQualified(v) ? null : "expected an absolute folder path"),
-            Language = r.String("language", d.Language, v => v.Length is >= 2 and <= 8 && v.All(char.IsAsciiLetterLower) ? null : "expected a whisper language code such as \"en\""),
+            Language = r.String("language", d.Language, v => Transcribe.WhisperLanguages.IsValid(v.ToLowerInvariant()) ? null : "expected a whisper language code such as \"en\", \"hi\" or \"tl\" (openai/whisper's list), or \"auto\"").ToLowerInvariant(),
+            Translate = r.Bool("translate", d.Translate),
             Threads = r.Int("threads", d.Threads, 0, 64),
             Gpu = r.String("gpu", d.Gpu, OneOf("auto", "vulkan", "cpu")).ToLowerInvariant(),
             BeamSize = r.Int("beam_size", d.BeamSize, 0, 8),

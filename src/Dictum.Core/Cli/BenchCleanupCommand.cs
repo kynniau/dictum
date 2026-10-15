@@ -115,8 +115,8 @@ public static class BenchCleanupCommand
         var modelPath = SettingsFile.EffectiveModelPath(settings, paths, Environment.GetEnvironmentVariable, options.Model);
         if (!File.Exists(modelPath)) throw new InvalidOperationException($"speech model not found: {modelPath}");
         integrity.Verify(modelPath);
-        var decode = new DecodeOptions(personal.Dictionary.WhisperPrompt, settings.Whisper.BeamSize); // as dictation decodes
-        using var engine = WhisperEngine.Load(modelPath, settings.Whisper.Language, settings.Whisper.Threads, settings.Whisper.Gpu, log, decode);
+        var decode = new DecodeOptions(personal.Dictionary.WhisperPrompt, settings.Whisper.BeamSize, settings.Whisper.Language, settings.Whisper.Translate); // as dictation decodes
+        using var engine = WhisperEngine.Load(modelPath, settings.Whisper.Threads, settings.Whisper.Gpu, log, decode);
         var sw = Stopwatch.StartNew();
         var raw = await engine.TranscribeAsync(audio.Samples, CancellationToken.None);
         Console.Error.WriteLine($"transcribed {audio.Duration.TotalSeconds:0.0} s with {Path.GetFileName(modelPath)} on {WhisperEngine.LoadedRuntime} in {sw.ElapsedMilliseconds} ms");

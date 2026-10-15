@@ -31,7 +31,7 @@ public sealed class ModelManager : IDisposable
     {
         _log = log;
         _integrity = integrity;
-        _loader = loader ?? ((path, s, decode) => WhisperEngine.Load(path, s.Language, s.Threads, s.Gpu, log, decode));
+        _loader = loader ?? ((path, s, decode) => WhisperEngine.Load(path, s.Threads, s.Gpu, log, decode));
         _warmUp = warmUp ?? (() => WhisperEngine.VulkanActive);
     }
 

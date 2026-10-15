@@ -42,6 +42,7 @@ public sealed class TranscriptCleaner
     private readonly Func<int, TimeSpan> _deadline;
     private readonly ILog _log;
     private readonly ValidationContext _validation;
+    private readonly bool _plain;
 
     /// <param name="timeout">llm.timeout_ms: the shortest deadline; longer dictations get longer (<see cref="Deadline"/>).</param>
     /// <param name="deadline">Tests replace the deadline rule; production uses <see cref="Deadline"/>.</param>
@@ -49,8 +50,9 @@ public sealed class TranscriptCleaner
     /// The checks for each reply (<see cref="PersonalCleanup.Checks"/>); without them, the prompt only. Their prompt is always
     /// <paramref name="systemPrompt"/>, so the echo check runs against the prompt actually sent.
     /// </param>
+    /// <param name="plain">The text is not English (SPEC §23): no model and no English rules, whitespace tidied only.</param>
     public TranscriptCleaner(ILlmClient? client, string systemPrompt, TimeSpan timeout, ILog log, string status, Func<int, TimeSpan>? deadline = null,
-        ValidationContext? validation = null)
+        ValidationContext? validation = null, bool plain = false)
     {
         _client = client;
         _prompt = systemPrompt;
@@ -58,6 +60,7 @@ public sealed class TranscriptCleaner
         _log = log;
         Status = status;
         _validation = (validation ?? new ValidationContext(systemPrompt)) with { SystemPrompt = systemPrompt };
+        _plain = plain;
     }
 
     /// <summary>
@@ -75,6 +78,15 @@ public sealed class TranscriptCleaner
     /// <param name="missingKey">The key variable whose absence stopped the provider (<see cref="MissingKey"/>), or null.</param>
     public static TranscriptCleaner RulesOnly(string status, string? missingKey = null) =>
         new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, status) { MissingKey = missingKey };
+
+    /// <summary>
+    /// Whitespace only (SPEC §23): whisper is writing a language other than English, and the model prompt and the
+    /// rule-based tidy are written for English (the tidy would, for example, capitalise Polish "i").
+    /// </summary>
+    public static TranscriptCleaner Plain(string status) => new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, status, plain: true);
+
+    /// <summary>True when only whitespace is tidied (the text is not English).</summary>
+    public bool IsPlain => _plain;
 
     /// <summary>True when a model takes part (the pill shows "Polishing…").</summary>
     public bool UsesModel => _client is not null;
@@ -114,6 +126,7 @@ public sealed class TranscriptCleaner
     public async Task<CleanupResult> CleanAsync(string raw, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(raw)) return new CleanupResult("", false, null);
+        if (_plain) return new CleanupResult(DeterministicCleaner.WhitespaceOnly(raw), false, null);
         if (_client is null) return new CleanupResult(DeterministicCleaner.Clean(raw), false, null);
         if (SkipReason(raw) is { } skip)
         {
@@ -206,11 +219,17 @@ public sealed class TranscriptCleaner
     /// <summary>Builds the configured provider. A provider that cannot run becomes rules-only, with the reason.</summary>
     /// <param name="local">The loaded local model, if any (null until it has loaded).</param>
     /// <param name="personal">The dictionary line, kept words and dictionary terms (PersonalText.ForCleanup), or none.</param>
+    /// <param name="englishText">False when whisper writes a language other than English (<see cref="Transcribe.WhisperLanguages.OutputIsEnglish"/>): whitespace tidied only.</param>
     public static TranscriptCleaner Create(LlmSettings settings, bool offlineOnly, SecretStore secrets, HttpClient http, ILog log, Func<ILocalLlmEngine?>? local = null,
-        PersonalCleanup? personal = null)
+        PersonalCleanup? personal = null, bool englishText = true)
     {
         var (prompt, validation) = (personal ?? PersonalCleanup.None).Checks(settings, log.Warn);
         var timeout = TimeSpan.FromMilliseconds(settings.TimeoutMs);
+        if (!englishText)
+        {
+            log.Info("Clean-up skipped: whisper writes the language spoken, not English, and the clean-up is written for English; whitespace is tidied only.");
+            return Plain("skipped: the text is not English (whisper.language is not en and translate is off); whitespace tidied only");
+        }
         if (OfflineRefusal(settings, offlineOnly) is { } refusal)
         {
             log.Warn(refusal + "; the rule-based tidy is used instead.");

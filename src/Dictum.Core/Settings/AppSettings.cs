@@ -43,7 +43,13 @@ public sealed record WhisperSettings
 {
     public string Model { get; init; } = "medium.en";
     public string? ModelsDir { get; init; }
+
+    /// <summary>A Whisper language code ("en", "hi", "tl"…) or "auto" to detect it from the first seconds (needs a multilingual model).</summary>
     public string Language { get; init; } = "en";
+
+    /// <summary>Translate the speech to English instead of writing it down in its own language (multilingual model, not turbo).</summary>
+    public bool Translate { get; init; }
+
     public int Threads { get; init; }
     /// <summary>"auto" (Vulkan then CPU), "vulkan" (same order, Vulkan preferred) or "cpu".</summary>
     public string Gpu { get; init; } = "auto";
