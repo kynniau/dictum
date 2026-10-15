@@ -24,6 +24,10 @@ public class CloudWarningAndPresetsTests
 
     private const string ApprovedPolicySentence = "This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.";
 
+    // Approved by the product owner on 16/10/2026 for the privacy policy's OpenAI-compatible section, pinned word for word. The label
+    // ("OpenAI-compatible service (off by default)") is the <h3>, so the paragraph starts with a capital like its neighbours.
+    private const string ApprovedOpenAiCompatibleParagraph = "Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
+
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
 
     private static T Named<T>(ILogical root, string name) where T : Control => All<T>(root).Single(c => AutomationProperties.GetName(c) == name);
@@ -212,11 +216,37 @@ public class CloudWarningAndPresetsTests
         var count = 0;
         for (var at = html.IndexOf(ApprovedPolicySentence, StringComparison.Ordinal); at >= 0; at = html.IndexOf(ApprovedPolicySentence, at + 1, StringComparison.Ordinal)) count++;
         Assert.Equal(2, count);
-        foreach (var heading in new[] { "<h3>Cloud clean-up: <code>api.anthropic.com</code> (off by default)</h3>", "<h3>Your own server (off by default)</h3>" })
+        foreach (var heading in new[] { "<h3>Cloud clean-up: <code>api.anthropic.com</code> (off by default)</h3>", "<h3>OpenAI-compatible service (off by default)</h3>" })
         {
             var start = html.IndexOf(heading, StringComparison.Ordinal);
             Assert.True(start >= 0, $"privacy.html no longer has {heading}");
             Assert.Contains(ApprovedPolicySentence, html[start..html.IndexOf("</p>", start, StringComparison.Ordinal)]);
+        }
+    }
+
+    [Fact]
+    public void The_privacy_policy_carries_the_approved_OpenAI_compatible_wording_word_for_word()
+    {
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "privacy.html"));
+        const string heading = "<h3>OpenAI-compatible service (off by default)</h3>";
+        var start = html.IndexOf(heading, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"privacy.html no longer has {heading}");
+        var rest = html[(start + heading.Length)..].TrimStart();
+        Assert.StartsWith("<p>", rest);
+        // One paragraph with no markup inside: the approved text as written, then the advanced-option sentence.
+        Assert.Equal(ApprovedOpenAiCompatibleParagraph + " " + ApprovedPolicySentence, rest["<p>".Length..rest.IndexOf("</p>", StringComparison.Ordinal)]);
+    }
+
+    [Fact]
+    public void The_privacy_policy_and_the_landing_page_name_every_host_cloud_clean_up_can_send_text_to()
+    {
+        var anthropic = new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel };
+        var hosts = OffThePc.Select(p => new Uri(p.BaseUrl!).Host).Prepend(CloudPolicy.CloudHost(anthropic)!).ToList();
+        Assert.True(hosts.Count >= 3); // Anthropic and every preset off this PC; a new preset fails this test until both pages name its host
+        foreach (var page in new[] { "privacy.html", "index.html" })
+        {
+            var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page));
+            foreach (var host in hosts) Assert.Contains(host, html);
         }
     }
 

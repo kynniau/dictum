@@ -596,9 +596,10 @@ was cached this was 3.9 s).
 
 ### Optional cloud polish
 
-Off by default. Both send the raw transcript and the system prompt, which includes your dictionary terms, to another
-program after every dictation: Anthropic's cloud, or the server you name. `offline_only` refuses Anthropic and any
-server not on this machine.
+Off by default. Cloud clean-up can use Anthropic, OpenAI, Google Gemini or any OpenAI-compatible server with your own
+key, behind a consent step and a warning. Each sends the raw transcript and the system prompt, which includes your
+dictionary terms, to another program after every dictation. `offline_only` refuses Anthropic and any server not on this
+machine.
 
 **Switching it on takes an explicit consent step (SPEC §22).** Settings > Clean-up > Cloud clean-up: choose the
 service, the server address and the model, then **Use cloud clean-up…**. A dialog says what is sent (every
