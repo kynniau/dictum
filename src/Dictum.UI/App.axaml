@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Dictum.UI.App"
+             Name="Dictum"
+             RequestedThemeVariant="Default">
+  <!-- RequestedThemeVariant="Default" follows the system's light or dark setting (SPEC §21, docs/design/README.md). -->
+  <!-- Resources come first: the control styles below look the tokens up as static resources while they load. -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Dictum.UI/Theme/Tokens.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#2457E6" RegionColor="#F4F6FA" ErrorText="#E5484D" />
+        <ColorPaletteResources x:Key="Dark" Accent="#2457E6" RegionColor="#0B1220" ErrorText="#E5484D" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="avares://Dictum.UI/Theme/Controls.axaml" />
+  </Application.Styles>
+</Application>

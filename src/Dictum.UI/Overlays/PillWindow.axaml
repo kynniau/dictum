@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Dictum.UI.Overlays.PillWindow"
+        Title="Dictum"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        CanResize="False"
+        Focusable="False"
+        IsHitTestVisible="False"
+        SizeToContent="WidthAndHeight">
+  <!-- docs/design/Pill.dc.html: height 44, padding 0 18 0 14, radius 22, rgba(11,18,32,0.92), 13/600 white, shadow
+       0 8 24 rgba(0,0,0,.35). The window is larger than the pill by the shadow's reach. -->
+  <Border x:Name="Pill" Margin="18,10,18,26" Height="44" Padding="14,0,18,0" CornerRadius="22"
+          Background="{StaticResource OverlayBrush}" BoxShadow="0 8 24 0 #59000000">
+    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+      <Panel Width="16" Height="16" VerticalAlignment="Center">
+        <Ellipse x:Name="DotRing" Width="18" Height="18" Fill="#40E5484D" Margin="-1" />
+        <Ellipse x:Name="Dot" Width="10" Height="10" Fill="{StaticResource RecordingBrush}" />
+        <Canvas x:Name="Spinner" Width="16" Height="16" IsVisible="False">
+          <Ellipse x:Name="SpinnerTrack" Width="12" Height="12" Canvas.Left="2" Canvas.Top="2" StrokeThickness="2.5" Stroke="#592457E6" />
+          <Path x:Name="SpinnerArc" Data="M8,2 A6,6 0 0 1 14,8" StrokeThickness="2.5" StrokeLineCap="Round" Stroke="{StaticResource AccentBrush}"
+                RenderTransformOrigin="0,0" />
+        </Canvas>
+        <Panel x:Name="Badge" IsVisible="False">
+          <Ellipse x:Name="BadgeDisc" Width="16" Height="16" Fill="{StaticResource DoneBrush}" />
+          <Path x:Name="BadgeGlyph" Data="M4.5,8.5 L6.8,10.8 L11.5,6" Stroke="White" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" />
+        </Panel>
+      </Panel>
+      <StackPanel x:Name="Meter" Orientation="Horizontal" Spacing="2" Height="16" VerticalAlignment="Center">
+        <Rectangle Width="3" Height="6" RadiusX="1.5" RadiusY="1.5" Fill="White" VerticalAlignment="Bottom" />
+        <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="White" VerticalAlignment="Bottom" />
+        <Rectangle Width="3" Height="9" RadiusX="1.5" RadiusY="1.5" Fill="White" VerticalAlignment="Bottom" />
+        <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="White" VerticalAlignment="Bottom" />
+        <Rectangle Width="3" Height="5" RadiusX="1.5" RadiusY="1.5" Fill="White" VerticalAlignment="Bottom" />
+      </StackPanel>
+      <TextBlock x:Name="Label" FontSize="13" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
+      <TextBlock x:Name="Detail" FontSize="13" Foreground="{StaticResource OverlaySecondaryBrush}" VerticalAlignment="Center" IsVisible="False" />
+      <TextBlock x:Name="Hint" FontSize="11" Foreground="{StaticResource OverlayMutedBrush}" VerticalAlignment="Center" IsVisible="False" />
+    </StackPanel>
+  </Border>
+</Window>

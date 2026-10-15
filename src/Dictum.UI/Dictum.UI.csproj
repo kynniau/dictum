@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Every window, one codebase for Windows and macOS (SPEC §21): Avalonia 11 with the Fluent theme. Platform behaviour
+       (overlay window flags, the tray icon, the hook) comes through Dictum.Platform.IPlatform; a test asserts this
+       assembly references no platform assembly (no Avalonia.Win32 / Avalonia.Native here: the app project picks those). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Dictum.UI</RootNamespace>
+    <AssemblyName>Dictum.UI</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <Description>Dictum's windows: tray panel, pill, orb and edge indicators, Settings, first run, calibration and fix-last.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ILog and its Info/Warn/Error extensions are used in every window. -->
+    <Using Include="Dictum.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dictum.Tests" />
+    <InternalsVisibleTo Include="Dictum" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dictum.Core\Dictum.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+  </ItemGroup>
+
+</Project>

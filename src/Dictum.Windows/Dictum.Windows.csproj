@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dictum on Windows (SPEC §21): the IPlatform implementation and the entry point, Dictum.exe. The only project that
+       may reference a Windows API, Avalonia's Win32 backend or a native runtime package. The 10.0.19041 target brings the
+       Windows SDK projection used for the packaged build's StartupTask (SPEC §18.2). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>Dictum</AssemblyName>
+    <RootNamespace>Dictum.Windows</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The mark (site/dictum.svg) at 16 to 256 px, rendered by packaging/tools ("ico" verb). The tray's idle icon loads the same file. -->
+    <ApplicationIcon>Dictum.ico</ApplicationIcon>
+    <StartupObject>Dictum.Windows.Program</StartupObject>
+    <Description>System-wide voice dictation.</Description>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Dictum.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dictum.Tests" />
+    <Using Include="Dictum.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dictum.Core\Dictum.Core.csproj" />
+    <ProjectReference Include="..\Dictum.UI\Dictum.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Avalonia's Windows backend and renderer only (Avalonia.Desktop would also bring the macOS and X11 backends). -->
+    <PackageReference Include="Avalonia.Win32" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.22" />
+    <!-- Native whisper.cpp and llama.cpp runtimes for Windows x64: CPU (AVX and no-AVX) and Vulkan. -->
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime.NoAvx" Version="1.9.1" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.27.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="3.1.0" />
+  </ItemGroup>
+
+</Project>

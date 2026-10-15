@@ -1,0 +1,183 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace Dictum.Settings;
+
+/// <summary>Creates settings.json with documented defaults and updates single keys in place.</summary>
+public static class SettingsFile
+{
+    /// <summary>Environment override for the model file, used by the integration tests and CLI verification.</summary>
+    public const string ModelPathVariable = "DICTUM_MODEL_PATH";
+
+    /// <summary>The same override under the earlier name, still read (after <see cref="ModelPathVariable"/>) so existing scripts keep working.</summary>
+    public const string LegacyModelPathVariable = "DICTATE_MODEL_PATH";
+
+    private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
+    /// <summary>The model path override from the environment (DICTUM_MODEL_PATH, else DICTATE_MODEL_PATH), or null.</summary>
+    public static string? ModelPathOverride(Func<string, string?> environment) =>
+        new[] { ModelPathVariable, LegacyModelPathVariable }.Select(environment).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+    /// <summary>
+    /// The model file to load. Precedence: the --model launch override (name or path), then DICTUM_MODEL_PATH (or its
+    /// earlier name DICTATE_MODEL_PATH), then whisper.model resolved against models_dir.
+    /// </summary>
+    public static string EffectiveModelPath(AppSettings settings, AppPaths paths, Func<string, string?> environment, string? launchOverride = null)
+    {
+        if (!string.IsNullOrWhiteSpace(launchOverride)) return ModelCatalog.ResolvePath(launchOverride.Trim(), paths.ModelsDir(settings));
+        var overridePath = ModelPathOverride(environment);
+        if (!string.IsNullOrWhiteSpace(overridePath)) return Path.GetFullPath(overridePath.Trim().Trim('"'));
+        return ModelCatalog.ResolvePath(settings.Whisper.Model, paths.ModelsDir(settings));
+    }
+
+    /// <param name="model">whisper.model to write.</param>
+    /// <param name="cleanupProvider">llm.provider to write (local, or none for rules only).</param>
+    /// <param name="cleanupModel">llm.model to write for the local provider.</param>
+    /// <summary>The local cleanup model file: llm.model resolved against models_dir (catalogue name or absolute path).</summary>
+    public static string CleanupModelPath(AppSettings settings, AppPaths paths) =>
+        CleanupCatalog.ResolvePath(settings.Llm.Model, paths.ModelsDir(settings));
+
+    /// <summary>--cleanup-model: for this launch only, the local provider with that model.</summary>
+    public static AppSettings WithCleanupOverride(AppSettings settings, string? cleanupModel) => cleanupModel is null
+        ? settings
+        : settings with { Llm = settings.Llm with { Provider = LlmSettings.Local, Model = cleanupModel } };
+
+    public static string DefaultJson(string model, string? cleanupProvider = null, string? cleanupModel = null)
+    {
+        var d = new AppSettings();
+        var root = new JsonObject
+        {
+            ["_doc"] = new JsonObject
+            {
+                ["about"] = "Dictum settings. Save the file and changes are picked up automatically (or use Settings > About > Reload settings). Keys starting with _ are comments. Secrets (API keys) go in the .env file next to this one, never here. Full reference: README.md > Settings reference.",
+                ["enabled"] = "Master switch for the hotkey; the switch at the top of the tray panel writes this.",
+                ["hotkey"] = "Single key (RightCtrl, CapsLock, F9, Pause, RightAlt...) or modifiers+key (Ctrl+Win, Ctrl+Shift+Space). The Fn key cannot be used.",
+                ["suppress_hotkey"] = "true: the focused app does not see the hotkey. Chords only ever suppress their final non-modifier key.",
+                ["tap_ms"] = "A press shorter than this is a tap (start of a double-tap) rather than a hold.",
+                ["double_tap_ms"] = "Window for the second tap that starts hands-free mode.",
+                ["min_recording_ms"] = "Recordings shorter than this are discarded.",
+                ["hands_free_max_seconds"] = "Recording auto-stops and is transcribed after this many seconds.",
+                ["silence_threshold"] = "Recordings whose loudest 20 ms block (RMS, 0-1) stays below this are discarded as silence.",
+                ["audio.device"] = "null = the system's default microphone, or a device ID / part of its name (see Settings > Microphone or Dictum.exe --selftest).",
+                ["whisper"] = "model: short name (small.en, medium.en, medium.en-q5_0, large-v3-turbo...) resolved to ggml-<name>.bin in models_dir, or an absolute path. gpu: auto | vulkan | cpu (change needs a restart). threads: 0 = auto. beam_size: 0 = greedy decoding (fastest), 1-8 = beam search (Calibrate my voice can set it).",
+                ["llm"] = $"provider: local (default: a small model on this PC, nothing leaves it) | anthropic | openai-compatible | none (rule-based tidy only). model: for local a cleanup model name ({string.Join(", ", CleanupCatalog.Entries.Select(e => e.Name))}) or an absolute .gguf path; for cloud providers the model id. gpu (local): auto | vulkan | cpu, needs a restart. base_url is required for openai-compatible (e.g. http://localhost:11434/v1 for Ollama; plain http:// only for a server on this PC); for anthropic it is optional and replaces https://api.anthropic.com (the ANTHROPIC_BASE_URL environment variable is ignored). A cloud provider runs only after Settings > Clean-up's consent step, which records it in consent.json; settings.json cannot switch it on. prompt_file: absolute path to a custom system prompt. grammar_assist: true also fixes articles, tenses, prepositions and word order (for speakers whose first language is not English).",
+                ["insert"] = "method: paste (clipboard + Ctrl+V) or type (simulated typing for apps that block paste). restore_clipboard restores text formats only. clipboard_history false keeps transcripts out of Win+V history and cloud clipboard.",
+                ["indicator"] = "mode: off | orb | edge | both. The orb is a large badge in a corner (orb_corner: bottom-right | bottom-left | top-right | top-left); edge is a red glow round every screen while recording. Both are click-through and never take focus.",
+                ["sounds"] = "enabled: true plays a short sound when recording starts and stops.",
+                ["profanity"] = "mode: off | mask (first letter kept, rest asterisks) | remove. The word list is profanity.txt beside Dictum.exe; a profanity.txt next to this file replaces it.",
+                ["fix_hotkey"] = "null, or a second hotkey (same format as hotkey) that opens Fix last dictation.",
+                ["log_transcripts"] = "false: transcript text is never written to the log.",
+                ["offline_only"] = "true: no network call of any kind. Cloud providers and model downloads are refused; copy model files in instead.",
+            },
+            ["enabled"] = d.Enabled,
+            ["hotkey"] = d.Hotkey,
+            ["suppress_hotkey"] = d.SuppressHotkey,
+            ["tap_ms"] = d.TapMs,
+            ["double_tap_ms"] = d.DoubleTapMs,
+            ["min_recording_ms"] = d.MinRecordingMs,
+            ["hands_free_max_seconds"] = d.HandsFreeMaxSeconds,
+            ["silence_threshold"] = d.SilenceThreshold,
+            ["audio"] = new JsonObject { ["device"] = null },
+            ["whisper"] = new JsonObject
+            {
+                ["model"] = model,
+                ["models_dir"] = null,
+                ["language"] = d.Whisper.Language,
+                ["threads"] = d.Whisper.Threads,
+                ["gpu"] = d.Whisper.Gpu,
+                ["beam_size"] = d.Whisper.BeamSize,
+            },
+            ["llm"] = new JsonObject
+            {
+                ["provider"] = cleanupProvider ?? d.Llm.Provider,
+                ["model"] = cleanupModel ?? d.Llm.Model,
+                ["base_url"] = null,
+                ["timeout_ms"] = d.Llm.TimeoutMs,
+                ["prompt_file"] = null,
+                ["gpu"] = d.Llm.Gpu,
+                ["grammar_assist"] = d.Llm.GrammarAssist,
+            },
+            ["insert"] = new JsonObject
+            {
+                ["method"] = d.Insert.Method,
+                ["restore_clipboard"] = d.Insert.RestoreClipboard,
+                ["trailing_space"] = d.Insert.TrailingSpace,
+                ["paste_delay_ms"] = d.Insert.PasteDelayMs,
+                ["clipboard_history"] = d.Insert.ClipboardHistory,
+            },
+            ["pill"] = new JsonObject { ["enabled"] = d.Pill.Enabled },
+            ["indicator"] = new JsonObject { ["mode"] = d.Indicator.Mode, ["orb_corner"] = d.Indicator.OrbCorner },
+            ["sounds"] = new JsonObject { ["enabled"] = d.Sounds.Enabled },
+            ["profanity"] = new JsonObject { ["mode"] = d.Profanity.Mode },
+            ["fix_hotkey"] = null,
+            ["log_level"] = d.LogLevel,
+            ["log_transcripts"] = d.LogTranscripts,
+            ["offline_only"] = d.OfflineOnly,
+        };
+        return root.ToJsonString(WriteOptions);
+    }
+
+    /// <summary>Writes the default file if none exists. Returns true if it was created.</summary>
+    public static bool CreateIfMissing(string path, string model, string? cleanupProvider = null, string? cleanupModel = null)
+    {
+        if (File.Exists(path)) return false;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        WriteAtomic(path, DefaultJson(model, cleanupProvider, cleanupModel));
+        return true;
+    }
+
+    /// <summary>
+    /// Sets one key (dotted path, e.g. "whisper.model") in the existing file, keeping every other key. Returns false and
+    /// leaves the file as it was (and no settings.json.tmp behind) when it cannot be parsed, holds a key twice, or cannot
+    /// be written (read-only, locked). JSON comments are not preserved.
+    /// </summary>
+    public static bool SetValue(string path, string dottedKey, JsonNode? value)
+    {
+        try
+        {
+            var text = File.Exists(path) ? File.ReadAllText(path) : "{}";
+            var node = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            if (node is not JsonObject root) return false;
+            var parts = dottedKey.Split('.');
+            var target = root;
+            foreach (var part in parts[..^1])
+            {
+                if (target[part] is not JsonObject child)
+                {
+                    child = new JsonObject();
+                    target[part] = child;
+                }
+                target = child;
+            }
+            target[parts[^1]] = value;
+            WriteAtomic(path, root.ToJsonString(WriteOptions));
+            return true;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            return false; // ArgumentException: a key given twice ("An item with the same key has already been added")
+        }
+    }
+
+    private static void WriteAtomic(string path, string content)
+    {
+        var temp = path + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, content + Environment.NewLine);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+            {
+                // best effort; the original file is unchanged either way
+            }
+            throw;
+        }
+    }
+}

@@ -1,0 +1,56 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- docs/design/README.md and Main.dc.html: Ink #0B1220, Accent #2457E6, Recording #E5484D, Working #F5A524,
+       Done #30A46C, Surface #FFFFFF on #F4F6FA (light) and #141C2B on #0B1220 (dark), muted text #64748B.
+       Radius 8 on controls, 12 on cards, 22 on the pill. Brushes that differ by theme follow the system's setting. -->
+  <SolidColorBrush x:Key="InkBrush" Color="#0B1220" />
+  <SolidColorBrush x:Key="AccentBrush" Color="#2457E6" />
+  <SolidColorBrush x:Key="AccentHoverBrush" Color="#1A43B8" />
+  <SolidColorBrush x:Key="RecordingBrush" Color="#E5484D" />
+  <SolidColorBrush x:Key="WorkingBrush" Color="#F5A524" />
+  <SolidColorBrush x:Key="DoneBrush" Color="#30A46C" />
+  <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+
+  <CornerRadius x:Key="ControlRadius">8</CornerRadius>
+  <CornerRadius x:Key="CardRadius">12</CornerRadius>
+  <CornerRadius x:Key="PillRadius">22</CornerRadius>
+
+  <!-- The overlays (pill, orb, edge) are always on Ink, whatever the theme. -->
+  <SolidColorBrush x:Key="OverlayBrush" Color="#EB0B1220" />
+  <SolidColorBrush x:Key="OverlayTextBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="OverlaySecondaryBrush" Color="#C7D0E0" />
+  <SolidColorBrush x:Key="OverlayMutedBrush" Color="#9AA6BA" />
+
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="WindowBrush" Color="#F4F6FA" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ControlBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SegmentBrush" Color="#E9EDF3" />
+      <SolidColorBrush x:Key="SecondaryButtonBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="HairlineBrush" Color="#E2E8F0" />
+      <SolidColorBrush x:Key="ControlBorderBrush" Color="#CBD5E1" />
+      <SolidColorBrush x:Key="TextBrush" Color="#0F172A" />
+      <SolidColorBrush x:Key="SecondaryTextBrush" Color="#334155" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#64748B" />
+      <SolidColorBrush x:Key="FaintBrush" Color="#64748B" />
+      <SolidColorBrush x:Key="MeterOffBrush" Color="#CBD5E1" />
+      <SolidColorBrush x:Key="LinkBrush" Color="#2457E6" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="WindowBrush" Color="#0B1220" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#141C2B" />
+      <SolidColorBrush x:Key="ControlBrush" Color="#0B1220" />
+      <SolidColorBrush x:Key="SegmentBrush" Color="#0B1220" />
+      <SolidColorBrush x:Key="SecondaryButtonBrush" Color="#1F2A3F" />
+      <SolidColorBrush x:Key="HairlineBrush" Color="#14FFFFFF" />
+      <SolidColorBrush x:Key="ControlBorderBrush" Color="#1FFFFFFF" />
+      <SolidColorBrush x:Key="TextBrush" Color="#E6EAF2" />
+      <SolidColorBrush x:Key="SecondaryTextBrush" Color="#C7D0E0" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#9AA6BA" />
+      <SolidColorBrush x:Key="FaintBrush" Color="#7E8AA0" />
+      <SolidColorBrush x:Key="MeterOffBrush" Color="#2D3B52" />
+      <SolidColorBrush x:Key="LinkBrush" Color="#8AB4FF" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

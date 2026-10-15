@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dictum's MSIX manifest template (SPEC §18.1). scripts\package-msix.ps1 fills the {{...}} tokens and writes
+  packaging\AppxManifest.xml (generated: not in git). -Store fills in the Partner Center identity, -Test the
+  self-signed certificate's subject; Name and display names are the same in both.
+  Sources (Microsoft Learn, read 16/10/2026):
+  - Generating MSIX package components (manual packaging): Windows.Desktop, runFullTrust; below build 19041 the
+    Application uses EntryPoint="Windows.FullTrustApplication" instead of the uap10 attributes.
+  - MSIX features and supported platforms: Store installs need Windows 10 1809 or later, so MinVersion 10.0.17763.0,
+    which is also Dictum.exe's SupportedOSPlatformVersion.
+  - Grant package identity ... manually: MaxVersionTested 10.0.26100.0 (Windows 11 24H2).
+  - desktop:StartupTask: Enabled="false" keeps launch at login off until Dictum asks (RequestEnableAsync) after the
+    user turns it on. TaskId must match PackagedStartup.TaskId in src\Dictum.Windows\Shell\PackagedStartup.cs.
+  - Construct your Windows app's icon: logo names and sizes (packaging\tools renders them; resources.pri maps them).
+  - Integrate your desktop app with Windows by using packaging extensions: the app execution alias.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop rescap">
+
+  <Identity Name="{{IdentityName}}" Publisher="{{Publisher}}" Version="{{Version}}" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>{{DisplayName}}</DisplayName>
+    <PublisherDisplayName>{{PublisherDisplayName}}</PublisherDisplayName>
+    <Description>Voice dictation for Windows: hold a key, talk, let go, and your words appear in any app.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-AU" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <!-- Global hotkey (low-level keyboard hook) and SendInput into other apps: docs\STORE.md section 7. -->
+    <rescap:Capability Name="runFullTrust" />
+    <DeviceCapability Name="microphone" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="Dictum" Executable="Dictum.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="{{DisplayName}}"
+        Description="Voice dictation for Windows: hold a key, talk, let go, and your words appear in any app."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          ShortName="{{DisplayName}}"
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="Dictum.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="DictumStartup" Enabled="false" DisplayName="{{DisplayName}}" />
+        </desktop:Extension>
+        <!-- Lets a terminal run Dictum.exe and its command-line modes (such as the self-test) with the package identity. -->
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="Dictum.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="Dictum.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Everything that is not a window or a platform API (SPEC §21): it builds and tests on Windows and macOS alike.
+       Platform services come in through Dictum.Platform.IPlatform; a test asserts this assembly references no platform one. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Dictum</RootNamespace>
+    <AssemblyName>Dictum.Core</AssemblyName>
+    <Description>Dictum's platform-neutral core: dictation state machine, settings, models, clean-up, personal files, calibration and CLI commands.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dictum.Tests" />
+    <InternalsVisibleTo Include="Dictum.UI" />
+    <InternalsVisibleTo Include="Dictum" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shipped as plain text beside the executable (SPEC §16.4, §16.5); every app project that references Core gets them. -->
+    <Content Include="Data\profanity.txt" Link="profanity.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Data\calibration-sentences.txt" Link="calibration-sentences.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Managed bindings only: the native whisper.cpp and llama.cpp runtimes are platform packages, referenced by the app project. -->
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="LLamaSharp" Version="0.27.0" />
+    <PackageReference Include="Anthropic" Version="12.57.0" />
+    <!-- WAV reading/writing and the WDL resampler; managed (net9.0), no Windows API. NAudio.Wasapi stays in Dictum.Windows. -->
+    <PackageReference Include="NAudio.Core" Version="3.1.0" />
+  </ItemGroup>
+
+</Project>

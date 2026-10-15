@@ -1,0 +1,7 @@
+<Project>
+  <!-- Avalonia.BuildServices 11.3.2 (pulled in by Avalonia) runs an "AvaloniaStats" task before every compile that sends
+       anonymous build telemetry (its README; opt-out: AVALONIA_TELEMETRY_OPTOUT=1). Dictum promises no telemetry, so the
+       target is replaced by an empty one here: this file is imported after the package's targets, so this definition
+       wins. scripts/publish.ps1 also sets the opt-out variable for its own process. -->
+  <Target Name="AvaloniaStats" />
+</Project>

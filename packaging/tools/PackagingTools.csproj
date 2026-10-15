@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Build-time helper for scripts/package-msix.ps1; not part of Dictum.sln and never shipped.
+       1. Renders the MSIX logo PNGs from the SVG mark (Svg.Skia on SkiaSharp: no SVG rasteriser ships with Windows).
+       2. Its restore downloads Microsoft.Windows.SDK.BuildTools (MakeAppx, MakePri, SignTool) into packaging\out\packages,
+          so packaging needs no machine-wide Windows SDK. Versions and sources: docs/DECISIONS.md, "Packaging lane". -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RestorePackagesPath>$(MSBuildThisFileDirectory)..\out\packages</RestorePackagesPath>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Svg.Skia" Version="5.2.3" />
+    <!-- Downloaded, not referenced: package-msix.ps1 runs makeappx.exe, makepri.exe and signtool.exe from it. -->
+    <PackageDownload Include="Microsoft.Windows.SDK.BuildTools" Version="[10.0.28000.2705]" />
+  </ItemGroup>
+
+</Project>

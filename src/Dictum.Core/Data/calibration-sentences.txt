@@ -1,0 +1,13 @@
+# Dictate calibration sentences: read each one aloud at your normal pace when you record it.
+# Everyday business English with numbers, a date, an amount, an e-mail address and a few names; the names come back
+# in more than one sentence so a word whisper keeps getting wrong can be spotted. One sentence per line.
+Please send the quarterly invoice to Siobhan before Friday afternoon.
+The meeting with Kowalski Freight has moved to the fourteenth of March at ten thirty.
+Our budget for the new warehouse shelving is four thousand two hundred and fifty dollars.
+You can email the accounts team at billing at northwind dot com dot au.
+Siobhan thinks the shipment from Kowalski Freight will arrive on Tuesday morning.
+We sold twenty three units last month, which is twelve percent more than in June.
+Could you check whether the Parramatta office has enough chairs for the workshop?
+The architect revised the drawings twice, so the builders paused the job for a week.
+Remind Siobhan that the Parramatta lease renews in August for another three years.
+Thanks everyone, I'll circulate the minutes and the revised quote this evening.

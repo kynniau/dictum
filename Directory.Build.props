@@ -1,0 +1,19 @@
+<Project>
+  <!-- Shared by every project in Dictum.sln. -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Version>1.0.0</Version>
+    <Product>Dictum</Product>
+    <Company>Kynni Pty Ltd</Company>
+    <Copyright>© 2026 Kynni Pty Ltd</Copyright>
+    <!-- English UI only: keep the framework's localised resource folders out of the build and publish output. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+</Project>

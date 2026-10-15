@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dictum pill states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;color:#FFFFFF}
+a{color:#8AB4FF}a:hover{color:#B7D0FF}
+</style>
+</helmet>
+<div style="width: 900px; height: 500px; box-sizing: border-box; padding: 36px 48px; background: #3A4A63; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 36px; align-content: center">
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+    <div style="display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 14px; border-radius: 22px; background: rgba(11,18,32,0.92); box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 13px; font-weight: 600">
+      <span style="width: 10px; height: 10px; border-radius: 5px; background: #E5484D; box-shadow: 0 0 0 4px rgba(229,72,77,0.25); display: inline-block"></span>
+      <span style="display: inline-flex; align-items: flex-end; gap: 2px; height: 16px" aria-hidden="true"><span style="width: 3px; height: 6px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 14px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 9px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 16px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 5px; background: #FFFFFF; border-radius: 2px"></span></span>
+      <span>Recording · hold</span>
+    </div>
+    <div style="font-size: 12px; color: #C7D0E0">Key held. Dot breathes, bars follow the mic level.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+    <div style="display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 14px; border-radius: 22px; background: rgba(11,18,32,0.92); box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 13px; font-weight: 600">
+      <span style="width: 10px; height: 10px; border-radius: 5px; background: #E5484D; box-shadow: 0 0 0 4px rgba(229,72,77,0.25); display: inline-block"></span>
+      <span style="display: inline-flex; align-items: flex-end; gap: 2px; height: 16px" aria-hidden="true"><span style="width: 3px; height: 10px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 16px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 7px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 12px; background: #FFFFFF; border-radius: 2px"></span><span style="width: 3px; height: 8px; background: #FFFFFF; border-radius: 2px"></span></span>
+      <span>Hands-free</span>
+      <span style="font-variant-numeric: tabular-nums; color: #C7D0E0; font-weight: 400">0:42</span>
+      <span style="font-size: 11px; color: #9AA6BA; font-weight: 400">tap to stop · Esc cancels</span>
+    </div>
+    <div style="font-size: 12px; color: #C7D0E0">Double-tapped. Timer counts up; auto-stops at 5:00.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+    <div style="display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 14px; border-radius: 22px; background: rgba(11,18,32,0.92); box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 13px; font-weight: 600">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="rgba(36,87,230,0.35)" stroke-width="2.5"/><path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="#2457E6" stroke-width="2.5" stroke-linecap="round"/></svg>
+      <span>Transcribing…</span>
+    </div>
+    <div style="font-size: 12px; color: #C7D0E0">whisper is running, Esc still cancels.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+    <div style="display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 14px; border-radius: 22px; background: rgba(11,18,32,0.92); box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 13px; font-weight: 600">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="rgba(245,165,36,0.35)" stroke-width="2.5"/><path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="#F5A524" stroke-width="2.5" stroke-linecap="round"/></svg>
+      <span>Polishing…</span>
+    </div>
+    <div style="font-size: 12px; color: #C7D0E0">Local clean-up model, usually under half a second.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+    <div style="display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 14px; border-radius: 22px; background: rgba(11,18,32,0.92); box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 13px; font-weight: 600">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="#30A46C"/><path d="M4.5 8.5l2.3 2.3L11.5 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Pasted</span>
+      <span style="color: #C7D0E0; font-weight: 400">38 words</span>
+    </div>
+    <div style="font-size: 12px; color: #C7D0E0">Fades after a second.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+    <div style="display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px 0 14px; border-radius: 22px; background: rgba(11,18,32,0.92); box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 13px; font-weight: 600; color: #C7D0E0">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="#5B6B85"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Cancelled</span>
+    </div>
+    <div style="font-size: 12px; color: #C7D0E0">Esc. Nothing pasted, nothing kept.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":900,"height":500}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

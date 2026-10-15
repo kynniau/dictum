@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dictum calibration window</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;color:#0F172A}
+a{color:#2457E6}a:hover{color:#1A43B8}
+</style>
+</helmet>
+<div style="width: 780px; height: 660px; box-sizing: border-box; background: #F4F6FA; border: 1px solid #D5DCE6; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden">
+
+  <div style="height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: #FFFFFF; border-bottom: 1px solid #E2E8F0">
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="52" rx="14" fill="#0B1220"/><path d="M14 50 L14 63 L27 50 Z" fill="#0B1220"/><rect x="18" y="24" width="6" height="16" rx="3" fill="#FFFFFF"/><rect x="29" y="15" width="6" height="34" rx="3" fill="#FFFFFF"/><rect x="40" y="21" width="6" height="22" rx="3" fill="#FFFFFF"/></svg>
+    <span style="font-size: 13px; font-weight: 600">Calibrate my voice</span>
+    <span style="flex: 1"></span>
+    <button type="button" aria-label="Close" style="width: 32px; height: 32px; border: 0; background: transparent; font: inherit; font-size: 16px; color: #64748B; cursor: pointer">×</button>
+  </div>
+
+  <div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow: hidden">
+    <div style="font-size: 13px; line-height: 19px; color: #334155; padding: 10px 14px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px">Calibration measures which installed model hears you best and suggests words for your dictionary. It does not train or change the model. Recordings stay in your local Dictum folder.</div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #64748B"><span>Sentence 3 of 10</span><span style="display: inline-flex; gap: 4px" aria-hidden="true"><span style="width: 18px; height: 4px; border-radius: 2px; background: #30A46C"></span><span style="width: 18px; height: 4px; border-radius: 2px; background: #30A46C"></span><span style="width: 18px; height: 4px; border-radius: 2px; background: #2457E6"></span><span style="width: 18px; height: 4px; border-radius: 2px; background: #E2E8F0"></span><span style="width: 18px; height: 4px; border-radius: 2px; background: #E2E8F0"></span><span style="width: 18px; height: 4px; border-radius: 2px; background: #E2E8F0"></span><span style="width: 18px; height: 4px; border-radius: 2px; background: #E2E8F0"></span></span></div>
+        <div style="font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 22px; line-height: 30px; font-weight: 600; letter-spacing: -0.2px">"Please send the invoice for twenty thousand dollars by Friday the fourteenth."</div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px">
+          <button type="button" style="height: 44px; padding: 0 18px; border-radius: 8px; border: 0; background: #E5484D; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer"><span style="width: 10px; height: 10px; border-radius: 5px; background: #FFFFFF; display: inline-block"></span>Record</button>
+          <button type="button" style="height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 14px; cursor: pointer">Skip</button>
+          <span style="font-size: 12px; color: #64748B">or hold Right Ctrl</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px">
+        <div style="font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px">Results so far</div>
+        <div style="display: grid; grid-template-columns: 1.4fr 0.7fr 0.8fr 0.9fr; gap: 6px 10px; font-size: 13px; align-items: center">
+          <div style="font-size: 11px; color: #64748B">Model</div><div style="font-size: 11px; color: #64748B">Errors</div><div style="font-size: 11px; color: #64748B">Per clip</div><div></div>
+          <div style="font-weight: 600">large-v3-turbo</div><div>3%</div><div>0.6 s</div><button type="button" style="height: 30px; border-radius: 6px; border: 0; background: #2457E6; color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">Use this</button>
+          <div>medium.en</div><div>6%</div><div>0.7 s</div><button type="button" style="height: 30px; border-radius: 6px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 12px; cursor: pointer">Use this</button>
+          <div>small.en</div><div>11%</div><div>0.4 s</div><button type="button" style="height: 30px; border-radius: 6px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 12px; cursor: pointer">Use this</button>
+          <div style="color: #64748B">base.en</div><div style="color: #64748B">19%</div><div style="color: #64748B">0.3 s</div><div></div>
+        </div>
+        <div style="font-size: 11px; color: #64748B; margin-top: 4px">Recommended: lowest errors within 2.5 s per 10 s of speech on this PC.</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px">
+      <div style="font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px">Words it keeps missing</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-size: 13px">
+        <label style="display: flex; align-items: center; gap: 8px; height: 32px; cursor: pointer"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #2457E6; margin: 0">Add to dictionary: <span style="font-weight: 600">Kynni</span></label>
+        <label style="display: flex; align-items: center; gap: 8px; height: 32px; cursor: pointer"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #2457E6; margin: 0">Add correction: <span style="font-weight: 600">Kinny → Kynni</span></label>
+        <label style="display: flex; align-items: center; gap: 8px; height: 32px; cursor: pointer"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #2457E6; margin: 0">Add to dictionary: <span style="font-weight: 600">fourteenth</span></label>
+        <label style="display: flex; align-items: center; gap: 8px; height: 32px; cursor: pointer"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #2457E6; margin: 0">Grammar assist for this user</label>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 24px; background: #FFFFFF; border-top: 1px solid #E2E8F0">
+    <button type="button" style="height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 13px; cursor: pointer">Delete recordings</button>
+    <span style="flex: 1"></span>
+    <button type="button" style="height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 13px; cursor: pointer">Close</button>
+    <button type="button" style="height: 36px; padding: 0 16px; border-radius: 8px; border: 0; background: #2457E6; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":780,"height":660}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

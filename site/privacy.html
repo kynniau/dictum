@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy · Dictum by Kynni</title>
+<meta name="description" content="Dictum collects nothing. What it keeps on your PC, when it connects to the internet, and how to delete everything.">
+<meta name="color-scheme" content="light dark">
+<link rel="canonical" href="https://dictum.kynni.au/privacy">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="/">
+      <svg class="mark" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g class="mark-halo"><rect x="4" y="4" width="56" height="52" rx="14"/><path d="M14 50 L14 63 L27 50 Z"/></g><rect x="4" y="4" width="56" height="52" rx="14" fill="#0B1220"/><path d="M14 50 L14 63 L27 50 Z" fill="#0B1220"/><rect x="18" y="24" width="6" height="16" rx="3" fill="#FFFFFF"/><rect x="29" y="15" width="6" height="34" rx="3" fill="#FFFFFF"/><rect x="40" y="21" width="6" height="22" rx="3" fill="#FFFFFF"/></svg>
+      <span>Dictum</span>
+    </a>
+    <nav class="site-nav" aria-label="Site">
+      <ul>
+        <li><a href="/#how">How it works</a></li>
+        <li><a href="/#faq">FAQ</a></li>
+        <li><a href="https://github.com/kynniau/dictum">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap doc">
+  <h1>Privacy policy</h1>
+  <p class="updated">Dictum by Kynni. Last updated <time datetime="2026-10-15">15/10/2026</time>.</p>
+  <p>This policy covers the Dictum desktop app for Windows PCs, whether you install it from the Microsoft Store or as the direct download, and this website, dictum.kynni.au. A Mac version is coming soon and will be covered by this policy when it is released. Dictum is made by Kynni Pty Ltd (“we”).</p>
+
+  <section aria-labelledby="short">
+    <h2 id="short">The short version</h2>
+    <ul>
+      <li><strong>We collect nothing.</strong> Dictum has no account, no analytics, no telemetry and no crash reporting. We never receive your audio or your text.</li>
+      <li><strong>Your speech is turned into text on your PC</strong>, and the text is tidied on your PC.</li>
+      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or, if you switch it on, to send text to a cloud clean-up service or a server you choose, or to check for updates.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="collect">
+    <h2 id="collect">What we collect</h2>
+    <p>Nothing. Dictum sends us no data: no usage statistics, no crash reports, no device or user identifiers. We only know what you choose to tell us, for example if you email us.</p>
+  </section>
+
+  <section aria-labelledby="uses">
+    <h2 id="uses">What Dictum uses on your PC</h2>
+
+    <h3>Microphone</h3>
+    <p>Dictum opens the microphone only while you are dictating (holding the hotkey, or in hands-free mode) or recording a calibration sentence, and closes it afterwards, so the Windows microphone indicator is off the rest of the time. The audio is kept in memory while it is turned into text, then discarded. It is never written to disk, except the calibration recordings you make on purpose (below).</p>
+
+    <h3>Your words</h3>
+    <p>Transcripts are not stored. The last dictation is kept in memory so you can use Fix last dictation, and is gone when Dictum quits. Logs never contain what you said unless you turn on the <code>log_transcripts</code> setting.</p>
+
+    <h3>Keyboard</h3>
+    <p>Dictum watches for its hotkeys and the Esc key only. It does not record, store or send your keystrokes. When you choose a hotkey in Settings, the capture box shows the key you press, and only the name of the key you choose is saved.</p>
+
+    <h3>Clipboard</h3>
+    <p>To paste, Dictum puts the text on the clipboard and presses Ctrl+V for you. By default the text stays on the clipboard so you can paste it again; turn on <code>insert.restore_clipboard</code> to put your previous clipboard back (text only). Dictum marks the text so that Windows keeps it out of clipboard history (Win+V) and does not sync it to your other devices. Clipboard managers that ignore that marker can still see it. You can allow clipboard history with <code>insert.clipboard_history</code>, or set <code>insert.method</code> to <code>type</code> so the clipboard isn’t used at all.</p>
+
+    <h3>Calibration recordings</h3>
+    <p>If you use Calibrate my voice, you record ten sentences. Those ten WAV files stay on your PC so you can re-run the test later, are never uploaded, and are used only by the calibration window. Delete them any time with <strong>Delete recordings</strong>.</p>
+  </section>
+
+  <section aria-labelledby="where">
+    <h2 id="where">What Dictum keeps on your PC, and where</h2>
+    <div class="card">
+      <h3><code>%APPDATA%\Dictum</code></h3>
+      <ul>
+        <li><code>settings.json</code>: your settings.</li>
+        <li><code>dictionary.txt</code> and <code>corrections.txt</code>: your names, terms and fixes, if you add any.</li>
+        <li><code>profanity.txt</code>: only if you add your own word list.</li>
+        <li><code>.env</code>: an API key, only if you add one for cloud clean-up. (The direct download also reads a <code>.env</code> you place beside <code>Dictum.exe</code>.)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><code>%LOCALAPPDATA%\Dictum</code></h3>
+      <ul>
+        <li><code>models</code>: the speech and clean-up models you downloaded.</li>
+        <li><code>logs</code>: one file per day, the newest 14 kept.</li>
+        <li><code>calibration</code>: your calibration recordings, if you made any.</li>
+        <li><code>verified-models.json</code>: which model files passed the integrity check.</li>
+      </ul>
+    </div>
+    <p>In the Microsoft Store version, Windows keeps these files in Dictum’s private app folder under <code>%LOCALAPPDATA%\Packages\Kynni.Dictum_43s584kx66f64\LocalCache</code> and deletes them when you uninstall Dictum. <strong>Settings → Storage</strong> in Dictum shows the exact folders on your PC.</p>
+    <p>These are ordinary files, protected by your Windows account like the rest of your documents. You can open, read, edit and delete them. If you turn on launch at login, the direct download adds a Run entry for Dictum under your Windows account’s registry settings, and the Store version uses Windows’ own startup-app setting.</p>
+    <p>The logs record timings, character counts, device names, which models and runtimes loaded, which clean-up step ran and why, warnings and errors, and how many dictionary words and corrections were loaded (never the words themselves). Any API key that would appear in a log is replaced with <code>[redacted]</code>.</p>
+  </section>
+
+  <section aria-labelledby="network">
+    <h2 id="network">When Dictum connects to the internet</h2>
+    <p>Only in these cases, and only to these hosts. Nothing else: no telemetry, analytics or crash reports.</p>
+
+    <h3>Model downloads: <code>huggingface.co</code></h3>
+    <p>Only when you choose a model to download (in the first-run picker, the model menus, the missing-model prompt or on the command line). Dictum requests the model file and sends nothing about you or what you say. Hugging Face may hand the download over to its content network; on 15/10/2026 that was <code>us.aws.cdn.hf.co</code>, and the host can vary by region. Every file is checked against a SHA-256 fingerprint before Dictum uses it.</p>
+
+    <h3>Cloud clean-up: <code>api.anthropic.com</code> (off by default)</h3>
+    <p>Only if you set the clean-up provider to Anthropic and add your own API key. After each dictation Dictum then sends the text of that dictation, its clean-up instructions and your dictionary terms to Anthropic, with your key. Anthropic handles that data under its own terms and privacy policy. If you also set a custom address for this provider, the same data goes to that address instead.</p>
+
+    <h3>Your own server (off by default)</h3>
+    <p>Only if you set the clean-up provider to an OpenAI-compatible server, such as Ollama or LM Studio, at an address you enter. After each dictation Dictum sends that server the same data as above. If the server runs on your PC (for example <code>localhost</code>), nothing leaves your PC.</p>
+
+    <h3>Update check: <code>dictum.kynni.au</code> (direct download only, off by default)</h3>
+    <p>Only if you turn on the update check in the direct-download version. Dictum then reads one small file, <code>version.json</code>, from this website and sends nothing about you. The Microsoft Store version never checks; the Store updates it.</p>
+
+    <h3>Offline only</h3>
+    <p>With the <code>offline_only</code> setting turned on, Dictum never connects to anything outside your PC: downloads, cloud clean-up and servers that aren’t on your PC are all refused. A clean-up server running on your own PC still works. You can copy model files in instead of downloading them.</p>
+
+    <h3>What any connection reveals</h3>
+    <p>Like any internet connection, each of these reveals your IP address to the host you connect to. Hugging Face, Anthropic and any server you name handle that under their own policies. Model downloads, Anthropic requests and the update check all use HTTPS. A server you name yourself uses the address you give it, so use an <code>https://</code> address for anything that isn’t on your own PC.</p>
+  </section>
+
+  <section aria-labelledby="store">
+    <h2 id="store">If you install from the Microsoft Store</h2>
+    <p>Microsoft handles the download, licence and updates under the Microsoft Privacy Statement. Microsoft gives app publishers summary reports in Partner Center, such as how many people installed an app and in which markets, and reports of crashes and hangs taken from Windows diagnostic data (for example the app version, device model and Windows version where a crash happened). Dictum itself sends none of this. We use these reports only to find and fix problems.</p>
+  </section>
+
+  <section aria-labelledby="website">
+    <h2 id="website">This website</h2>
+    <p>dictum.kynni.au uses no cookies, no analytics, no tracking and no scripts. Our web host, Vercel, receives the standard information any website needs to deliver a page, such as your IP address and browser type. Links to GitHub, the Microsoft Store and the Kynni website take you to those sites, which have their own policies.</p>
+  </section>
+
+  <section aria-labelledby="delete">
+    <h2 id="delete">Deleting everything</h2>
+    <p>In Dictum, open <strong>Settings → Storage</strong>. You can delete calibration recordings, logs or individual models, or choose <strong>Remove Dictum completely</strong>. That deletes everything Dictum has stored (models, recordings, logs, settings, dictionary, corrections and <code>.env</code>), its Start menu shortcut and start-at-login entry, and the app itself. You see the full list of files and their sizes first and type DELETE to confirm; there is no undo. In the Microsoft Store version it deletes the data, then opens Windows Settings so you can uninstall the app.</p>
+    <p>By hand: search Start for “Add or remove programs”, find Dictum and choose Uninstall. For the direct download, then delete the folders <code>%APPDATA%\Dictum</code> and <code>%LOCALAPPDATA%\Dictum</code>. Uninstalling the Microsoft Store version also deletes the files Windows kept in Dictum’s private app folder.</p>
+  </section>
+
+  <section aria-labelledby="changes">
+    <h2 id="changes">Changes to this policy</h2>
+    <p>If a version of Dictum changes what it stores or sends, we will update this page and its date before that version is released, and say so in the release notes.</p>
+  </section>
+
+  <section aria-labelledby="contact">
+    <h2 id="contact">Contact</h2>
+    <p>Questions or concerns about privacy: <a href="mailto:hello@kynni.com.au">hello@kynni.com.au</a>. Kynni Pty Ltd, <a href="https://www.kynni.com.au">www.kynni.com.au</a>. Dictum’s source code is public on <a href="https://github.com/kynniau/dictum">GitHub</a>, so you can check everything above.</p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <p class="byline">
+      <svg class="mark" width="20" height="20" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g class="mark-halo"><rect x="4" y="4" width="56" height="52" rx="14"/><path d="M14 50 L14 63 L27 50 Z"/></g><rect x="4" y="4" width="56" height="52" rx="14" fill="#0B1220"/><path d="M14 50 L14 63 L27 50 Z" fill="#0B1220"/><rect x="18" y="24" width="6" height="16" rx="3" fill="#FFFFFF"/><rect x="29" y="15" width="6" height="34" rx="3" fill="#FFFFFF"/><rect x="40" y="21" width="6" height="22" rx="3" fill="#FFFFFF"/></svg>
+      <span>Dictum by <a href="https://www.kynni.com.au">Kynni</a></span>
+    </p>
+    <ul class="footer-links">
+      <li><a href="https://github.com/kynniau/dictum">Source on GitHub</a></li>
+      <li><a href="/privacy" aria-current="page">Privacy policy</a></li>
+      <li><a href="mailto:hello@kynni.com.au">hello@kynni.com.au</a></li>
+    </ul>
+  </div>
+  <div class="wrap">
+    <p class="legal">© 2026 Kynni Pty Ltd. Dictum is free software under the MIT licence.</p>
+  </div>
+</footer>
+</body>
+</html>

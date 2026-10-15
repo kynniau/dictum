@@ -1,0 +1,24 @@
+# Dependency update pull requests, grouped so each ecosystem opens at most one at a time.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      nuget:
+        patterns: ["*"]
+    ignore:
+      # SPEC section 21 specifies Avalonia 11; moving to 12 is an open decision (docs/DECISIONS.md, Polish lane).
+      - dependency-name: "Avalonia*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ["*"]

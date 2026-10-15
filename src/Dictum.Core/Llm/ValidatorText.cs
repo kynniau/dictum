@@ -1,0 +1,147 @@
+using System.Text.RegularExpressions;
+
+namespace Dictum.Llm;
+
+/// <summary>One "scratch that": the words it may retract at least (the end of the clause before it) and the correction after it.</summary>
+internal readonly record struct Retraction(IReadOnlyList<string> MinSpan, IReadOnlyList<string> Replacement);
+
+/// <summary>
+/// The text handling behind <see cref="CleanupValidator"/>: Unicode words (so a reply in another script or with curly
+/// apostrophes is measured, not skipped), whole-word phrase matching, "scratch that" spans, spoken commands, negations
+/// and numbers. Pure functions on lower-cased text.
+/// </summary>
+internal static partial class ValidatorText
+{
+    public static readonly char[] Marks = ['.', ',', ';', ':', '!', '?'];
+
+    [GeneratedRegex(@"[\p{L}\p{N}][\p{L}\p{N}']*")]
+    private static partial Regex Word();
+
+    [GeneratedRegex(@"\d+(?:[.,:]\d+)*")]
+    private static partial Regex Number();
+
+    [GeneratedRegex(@"\b(?:new line|new paragraph|full stop|question mark|open quote|close quote|scratch that|comma)\b|\b(?:umm?|uhh?|erm?|ah|hmm)\b")]
+    private static partial Regex Command();
+
+    /// <summary>Typographic quotes and apostrophes as their plain forms ("Here’s" is "here's").</summary>
+    public static string MapQuotes(string text) =>
+        text.Replace('’', '\'').Replace('‘', '\'').Replace('ʼ', '\'').Replace('“', '"').Replace('”', '"');
+
+    public static List<string> Words(string lower) => Word().Matches(lower).Select(m => m.Value).ToList();
+
+    public static List<string> Comparable(IEnumerable<string> words) => words.Select(SpellingVariants.Normalise).ToList();
+
+    /// <summary>Every run of five consecutive words.</summary>
+    public static HashSet<string> Shingles(string text)
+    {
+        var words = Words(MapQuotes(text).ToLowerInvariant());
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i + 5 <= words.Count; i++) set.Add(string.Join(' ', words.Skip(i).Take(5)));
+        return set;
+    }
+
+    /// <summary>Whole-word match of a phrase: "here is" is not inside "there is", nor "sure" inside "ensure".</summary>
+    public static bool ContainsPhrase(string lower, string phrase) =>
+        Regex.IsMatch(lower, $@"(?<![\p{{L}}\p{{N}}']){Regex.Escape(phrase)}(?![\p{{L}}\p{{N}}'])");
+
+    /// <summary>The dictation without spoken formatting commands and hesitations, which a correct reply drops.</summary>
+    public static string WithoutCommands(string lower) => Command().Replace(lower, " ");
+
+    /// <summary>"\n" or "\n\n" when the dictation ends with a spoken "new line" / "new paragraph", else null.</summary>
+    public static string? FinalBreak(string lower)
+    {
+        var end = lower.TrimEnd().TrimEnd(Marks).TrimEnd();
+        return end.EndsWith("new paragraph", StringComparison.Ordinal) ? "\n\n" : end.EndsWith("new line", StringComparison.Ordinal) ? "\n" : null;
+    }
+
+    /// <summary>The dictation with leading hesitations and punctuation removed, words single-spaced.</summary>
+    public static string Opening(string lower)
+    {
+        var words = Words(lower).SkipWhile(w => w is "um" or "umm" or "uh" or "uhh" or "er" or "erm" or "ah" or "hmm" or "so");
+        return string.Join(' ', words);
+    }
+
+    /// <summary>Letters outside Latin (Basic to Extended-B): a reply in a script the dictation did not use.</summary>
+    public static bool HasNonLatinLetters(string text) => text.Any(c => char.IsLetter(c) && c > 'ɏ');
+
+    // Negations, after n't and cannot are spelled out, so "don't" and "do not" count the same.
+    private static readonly HashSet<string> Negators = new(StringComparer.Ordinal)
+    {
+        "not", "no", "never", "nor", "none", "nothing", "nobody", "neither", "nowhere",
+    };
+
+    public static Dictionary<string, int> NegatorCounts(string lower)
+    {
+        var spelled = Regex.Replace(lower, @"\bcan't\b|\bcannot\b", "can not");
+        spelled = Regex.Replace(spelled, @"\bwon't\b", "will not");
+        spelled = Regex.Replace(spelled, @"n't\b", " not");
+        return Count(Words(spelled).Where(Negators.Contains));
+    }
+
+    /// <summary>Digit groups with their separators removed, so 10:30 and 10.30, $4,250 and 4250 count the same.</summary>
+    public static Dictionary<string, int> NumberCounts(string text) =>
+        Count(Number().Matches(text).Select(m => Regex.Replace(m.Value, "[.,:]", "")));
+
+    /// <summary>True when every item of <paramref name="needed"/> appears at least as often in <paramref name="have"/>.</summary>
+    public static bool Contains(Dictionary<string, int> have, Dictionary<string, int> needed) =>
+        needed.All(kv => have.TryGetValue(kv.Key, out var n) && n >= kv.Value);
+
+    private static Dictionary<string, int> Count(IEnumerable<string> items) =>
+        items.GroupBy(i => i, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+
+    /// <summary>The dictation with the clause before each "scratch that" (and the phrase) removed: the longest retraction.</summary>
+    public static string WithoutRetractedClauses(string lower)
+    {
+        const string phrase = "scratch that";
+        for (var i = lower.IndexOf(phrase, StringComparison.Ordinal); i >= 0; i = lower.IndexOf(phrase, StringComparison.Ordinal))
+        {
+            var left = lower[..i].TrimEnd().TrimEnd(Marks).TrimEnd(); // the retracted clause may end with its own mark
+            var boundary = left.LastIndexOfAny(Marks);
+            var kept = boundary >= 0 ? left[..(boundary + 1)] : "";
+            lower = kept + " " + lower[(i + phrase.Length)..].TrimStart().TrimStart(Marks).TrimStart();
+        }
+        return lower;
+    }
+
+    /// <summary>
+    /// Each "scratch that" with its shortest plausible retraction (the last words of the clause before it, as many as
+    /// the correction has plus one) and the correction (to the next punctuation mark). Without punctuation the longest
+    /// retraction runs back to the start of the dictation, so these two estimates bound what was meant.
+    /// </summary>
+    public static List<Retraction> Retractions(string lower)
+    {
+        const string phrase = "scratch that";
+        var result = new List<Retraction>();
+        for (var i = lower.IndexOf(phrase, StringComparison.Ordinal); i >= 0; i = lower.IndexOf(phrase, i + phrase.Length, StringComparison.Ordinal))
+        {
+            var left = lower[..i].TrimEnd().TrimEnd(Marks).TrimEnd();
+            var boundary = left.LastIndexOfAny(Marks);
+            var span = Words(boundary >= 0 ? left[(boundary + 1)..] : left);
+            var rest = lower[(i + phrase.Length)..].TrimStart().TrimStart(Marks).TrimStart();
+            var end = rest.IndexOfAny(Marks);
+            var replacement = Words(end >= 0 ? rest[..end] : rest);
+            result.Add(new Retraction(span.Skip(Math.Max(0, span.Count - (replacement.Count + 1))).ToList(), replacement));
+        }
+        return result;
+    }
+
+    /// <summary>A word that carries content: four letters or more, not a filler or a spoken command.</summary>
+    public static bool IsContent(string word) => word.Length >= 4 && !NotContent.Contains(word);
+
+    /// <summary>A shorter content word for the "scratch that" checks: three letters or more, not a function word.</summary>
+    public static bool IsCorrectionWord(string word) => word.Length >= 3 && !NotContent.Contains(word) && !FunctionWords.Contains(word);
+
+    // Words a correct cleanup may legitimately remove: fillers and spoken formatting commands.
+    private static readonly HashSet<string> NotContent = new(StringComparer.Ordinal)
+    {
+        "umm", "uhm", "erm", "hmm", "know", "mean", "sort", "kind", "like", "scratch", "that", "line", "paragraph",
+        "comma", "full", "stop", "question", "mark", "open", "close", "quote",
+    };
+
+    private static readonly HashSet<string> FunctionWords = new(StringComparer.Ordinal)
+    {
+        "the", "and", "for", "are", "but", "you", "with", "this", "from", "have", "has", "was", "were", "will", "would", "can",
+        "could", "should", "its", "our", "their", "they", "them", "his", "her", "him", "she", "into", "onto", "than", "then",
+        "there", "here", "what", "when", "where", "who", "why", "how", "all", "any", "some", "also", "just", "too", "very",
+    };
+}

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests for all three projects. Windows-specific tests (hook, SendInput, clipboard, Run key, mutex) reach
+       Dictum.Windows; window tests run on Avalonia's headless platform; the pill's no-activation check runs the real
+       Win32 backend in a child process (Dictum.UiProbe), because one process can host only one Avalonia platform. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Dictum.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Dictum.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="System.Speech" Version="10.0.13" />
+    <PackageReference Include="Avalonia.Headless" Version="11.3.22" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Dictum.Core\Dictum.Core.csproj" />
+    <ProjectReference Include="..\..\src\Dictum.UI\Dictum.UI.csproj" />
+    <ProjectReference Include="..\..\src\Dictum.Windows\Dictum.Windows.csproj" />
+    <!-- Built with the tests, never referenced: PillFocusTests runs it as a child process. -->
+    <ProjectReference Include="..\Dictum.UiProbe\Dictum.UiProbe.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
