@@ -41,8 +41,8 @@ public static class CloudPresets
         // Google recommends temperature 1.0 for Gemini 3 models (https://ai.google.dev/gemini-api/docs/gemini-3); this client sends 0.
         new("Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-3.8-flash", SecretStore.LlmKey),
 
-        // The local server's base_url from https://docs.ollama.com/api/openai-compatibility (read 16/10/2026), which also says the
-        // client "requires an API key value, but Ollama ignores it". No default model: it is whichever model the user pulled.
+        // The local server's base_url from https://docs.ollama.com/api/openai-compatibility (read 16/10/2026), which also says the local
+        // server ignores any API key. No default model: it is whichever model the user pulled.
         new("Ollama on this PC", "http://localhost:11434/v1/", null, null, "the name of a model you pulled in Ollama"),
 
         new("Custom server (OpenAI-compatible)", null, null, SecretStore.LlmKey, "the model name the server uses"),
