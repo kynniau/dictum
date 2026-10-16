@@ -31,28 +31,41 @@ namespace Dictum.Tests;
 /// reloading left consent.json and a settings.json naming the host for the next start; the hold also outlived a switch-off that
 /// was fully saved, so a hand edit naming a server on this PC was ignored until a restart. Every reload, and the quit, now try
 /// again and end a hold once its files keep it; the folder watcher reloads on consent.json and on clearing read-only.
+/// Lens on cb2290c (16/10/2026): CloudConsentFile.Delete set every attribute to Normal, so a consent.json whose access list denies
+/// write-attributes but allows delete was kept; "Allow" with settings.json unwritable let the exception of a failed delete reach
+/// the page, with the consent still on file; and the sentence for both files said the next start "sends dictations again", which
+/// is untrue when that start has offline only on or is waiting for a key. Delete now clears read-only alone, and only when it is
+/// set; a consent that cannot be deleted again stays withdrawn; the sentences are the fifth draft.
 /// </summary>
 public partial class CloudOffTakesEffectTests
 {
     // The write path's own failure text (ModelCoordinator.WriteFailed), pinned word for word, independently of the app's copy.
     private const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
 
-    // PROPOSED copy (16/10/2026, third draft), awaiting the product owner's review: pinned word for word as proposed,
+    // PROPOSED copy (16/10/2026, fifth draft), awaiting the product owner's review: pinned word for word as proposed,
     // independently of the app's copy (AppShell.OffNotSaved). Shown when consent.json could not be deleted but settings.json
-    // keeps cloud clean-up off.
+    // keeps cloud clean-up off. Unchanged since the third draft.
     private static string ConsentNotDeleted(string reason) =>
         $"Cloud clean-up is off, but consent.json could not be deleted ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is deleted, your consent stays on file.";
 
-    // PROPOSED copy (16/10/2026, second draft, kept in the third), as above: settings.json could not be saved; consent.json is
-    // gone or never was.
+    // PROPOSED copy (16/10/2026, fifth draft), as above: settings.json could not be saved; consent.json is gone or never was; and
+    // the file names a service off this PC (the next start refuses it without a consent on file) or cannot be read (that start is
+    // offline). Unchanged since the second draft.
     private static string SettingsNotSaved(string reason) =>
         $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
 
-    // PROPOSED copy (16/10/2026, fourth draft), as above: neither file could be changed.
-    private static string NeitherChanged(string consent, string settings) =>
-        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again, unless settings.json cannot be read, in which case Dictum starts offline.";
+    // PROPOSED copy (16/10/2026, fifth draft), as above: settings.json could not be saved, consent.json is gone or never was, and
+    // the file names a server on this PC, which the next start uses again. New in the fifth draft.
+    private static string SettingsNotSavedServerOnThisPc(string reason) =>
+        $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start uses that server again, unless settings.json cannot be read, in which case Dictum starts offline.";
 
-    // PROPOSED copy (16/10/2026, fourth draft), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
+    // PROPOSED copy (16/10/2026, fifth draft), as above: neither file could be changed. The fourth draft ended "the next start
+    // sends dictations again"; the fifth ends "the next start turns cloud clean-up back on".
+    private static string NeitherChanged(string consent, string settings) =>
+        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start turns cloud clean-up back on, unless settings.json cannot be read, in which case Dictum starts offline.";
+
+    // PROPOSED copy (16/10/2026, fifth draft), awaiting the product owner's review: pinned word for word as proposed,
+    // independently of the app's copy. Unchanged since the fourth draft.
     private static string OfflineOnlyNotSaved(string reason) =>
         $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only, unless settings.json cannot be read, in which case Dictum starts offline.";
 
@@ -357,7 +370,9 @@ public partial class CloudOffTakesEffectTests
             window.ShowPage("Clean-up");
             Click(window, "Switch cloud clean-up off");
 
-            Reason(VisibleLines(window), SettingsNotSaved);
+            // Not valid JSON: the file names nothing the next start could use. Read-only: it still names the server, which the next
+            // start uses again unless the switch-off is saved by then (the fifth draft's variant).
+            Reason(VisibleLines(window), readOnly ? SettingsNotSavedServerOnThisPc : SettingsNotSaved);
             AssertLocal(shell);
             Assert.DoesNotContain(PageLines(window, "Privacy"), l => l.Contains("127.0.0.1", StringComparison.Ordinal));
             shell.Reload(userRequested: false); // a later reload that reads the server from the file again: the switch holds

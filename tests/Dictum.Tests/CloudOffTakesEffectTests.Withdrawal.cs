@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Dictum.App;
 using Dictum.Settings;
 using Dictum.Storage;
@@ -167,7 +169,7 @@ public partial class CloudOffTakesEffectTests
         // Lens on eaa3a04 (P3a, P3aL): with nothing fixed, the quit's try failed too, and the next start sent again with no notice.
         // The switch-off lives in this session; a later start can only read the files. Read-only no longer keeps consent.json, so with
         // no consent on file nothing is sent. Held open past the quit, both files are as they were and the next start sends again:
-        // the limit, which the page now says ("if both are still unchanged then, the next start sends dictations again").
+        // the limit, which the page now says ("if both are still unchanged then, the next start turns cloud clean-up back on").
         using var scratch = new Scratch(CloudSettings);
         Consent(scratch);
         var (shell, _, _) = scratch.Shell();
@@ -388,6 +390,173 @@ public partial class CloudOffTakesEffectTests
             shell.Reload(userRequested: false); // the folder watcher, any other choice
             Assert.True(shell.Settings.OfflineOnly);
             Assert.True(shell.NothingLeaves);
+        }
+        finally
+        {
+            Normal(scratch.Paths.SettingsFile);
+            shell.Dispose();
+        }
+    });
+
+    // Lens on cb2290c (16/10/2026): CloudConsentFile.Delete wrote attributes it need not; "Allow" with settings.json unwritable
+    // let the exception of a consent that could not be deleted again reach the page; the sentences are the fifth draft.
+
+    /// <summary>The server on this PC of <see cref="LocalServerSettings"/>, for a shell that starts (see <see cref="StartingCloudSettings"/>).</summary>
+    private const string StartingLocalServerSettings = """
+        { "hotkey": "F24", "whisper": { "model": "base.en" }, "pill": { "enabled": false },
+          "llm": { "provider": "openai-compatible", "base_url": "http://127.0.0.1:9/v1", "model": "m" } }
+        """;
+
+    /// <summary>
+    /// Denies the current user write-attributes on a file made for the test, its access list otherwise as it was: SetAttributes
+    /// throws, delete still works. Disposing takes the entry off again, so the scratch folder can be deleted.
+    /// </summary>
+    private sealed class DeniedWriteAttributes : IDisposable
+    {
+        private readonly string _path;
+        private readonly FileSystemAccessRule _rule;
+
+        public DeniedWriteAttributes(string path)
+        {
+            using var user = WindowsIdentity.GetCurrent();
+            _path = path;
+            _rule = new FileSystemAccessRule(user.User!, FileSystemRights.WriteAttributes, AccessControlType.Deny);
+            var info = new FileInfo(path);
+            var security = info.GetAccessControl();
+            security.AddAccessRule(_rule);
+            info.SetAccessControl(security);
+        }
+
+        public void Dispose()
+        {
+            if (!File.Exists(_path)) return;
+            var info = new FileInfo(_path);
+            var security = info.GetAccessControl();
+            security.RemoveAccessRuleSpecific(_rule);
+            info.SetAccessControl(security);
+        }
+    }
+
+    /// <summary>
+    /// A log that also runs <paramref name="onLine"/> on the writing thread as each line is written: a fixed point inside an
+    /// action, such as "Allow" between the consent being written and being deleted again.
+    /// </summary>
+    private sealed class HookedLog(Action<string> onLine) : ILog
+    {
+        public RecordingLog Recorded { get; } = new();
+
+        public void Write(LogLevel level, string message)
+        {
+            Recorded.Write(level, message);
+            onLine(message);
+        }
+    }
+
+    [Fact]
+    public Task A_consent_json_whose_attributes_cannot_be_written_is_still_deleted_by_the_switch_off() => UiSession.Run(() =>
+    {
+        // Lens on cb2290c (R1): CloudConsentFile.Delete set the attributes to Normal whatever they were, so a consent.json whose access
+        // list denies write-attributes but allows delete was kept (the call threw before the delete), and Normal also cleared hidden,
+        // system and archive. It now clears read-only alone, and only when it is set. The deny is an access-list entry on a file made
+        // for this test, taken off again at the end: with no deny the file is deleted either way, so this is what tells them apart.
+        using var scratch = new Scratch(CloudSettings);
+        Consent(scratch);
+        var (shell, _, _) = scratch.Shell();
+        DeniedWriteAttributes? denied = null;
+        try
+        {
+            shell.Reload(userRequested: false);
+            var attributes = File.GetAttributes(scratch.Paths.ConsentFile);
+            Assert.True(attributes.HasFlag(FileAttributes.Archive) && !attributes.HasFlag(FileAttributes.ReadOnly), $"archive and not read-only: {attributes}");
+            denied = new DeniedWriteAttributes(scratch.Paths.ConsentFile);
+            Assert.Throws<UnauthorizedAccessException>(() => File.SetAttributes(scratch.Paths.ConsentFile, FileAttributes.Normal)); // the deny holds
+
+            Assert.Null(shell.DisableCloud()); // both files keep the switch
+            Assert.False(File.Exists(scratch.Paths.ConsentFile));
+            AssertLocal(shell);
+        }
+        finally
+        {
+            denied?.Dispose();
+            shell.Dispose();
+        }
+    });
+
+    [Fact]
+    public Task Allowing_cloud_clean_up_when_settings_json_cannot_be_written_and_the_consent_cannot_be_deleted_again_keeps_it_withdrawn() => UiSession.Run(() =>
+    {
+        // Lens on cb2290c (contract): the consent just recorded is deleted again when settings.json cannot be written, and when that
+        // delete threw (another program had consent.json open) the page said "That did not work: Access to the path ... is denied."
+        // with the full path, while the consent stayed on file and the doc said it was withdrawn again. The write failure is returned
+        // as for any unwritable settings.json; the consent on file is not used this session and is deleted at the next reload. The
+        // log line for "Allow" is the point between the consent being written and being deleted again, where the other program
+        // takes the file.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        FileStream? held = null;
+        var log = new HookedLog(line =>
+        {
+            if (held is null && line.StartsWith("Cloud clean-up agreed to in the consent dialog", StringComparison.Ordinal)) held = HoldOpen(scratch.Paths.ConsentFile);
+        });
+        var (shell, _, dialogs) = scratch.Shell(log: log);
+        try
+        {
+            shell.Reload(userRequested: false);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            dialogs.Answers.Enqueue(0); // Allow
+            var proposed = new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://llm.example.com/v1", Model = "m" };
+            Assert.Equal(WriteFailed, shell.EnableCloud(proposed)); // returned, not thrown: the page shows a thrown one as "That did not work: ..."
+            Assert.NotNull(held); // the other program took consent.json after it was written
+            Assert.True(File.Exists(scratch.Paths.ConsentFile)); // so the delete failed
+            AssertLocal(shell);
+            var warning = Assert.Single(log.Recorded.Lines, l => l.Message.StartsWith("Consent to llm.example.com could not be withdrawn again (", StringComparison.Ordinal));
+            Assert.Equal(LogLevel.Warning, warning.Level);
+            Assert.EndsWith("); it is not used this session, and deleting it is tried again at the next reload and at quit.", warning.Message);
+            PathFree(warning.Message);
+            Assert.DoesNotContain(log.Recorded.Lines, l => l.Message.StartsWith("Consent to llm.example.com withdrawn again", StringComparison.Ordinal));
+
+            // settings.json fixed by hand to name that host, with consent.json still there and still held: it is not used.
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal);
+            File.WriteAllText(scratch.Paths.SettingsFile, CloudSettings);
+            shell.Reload(userRequested: false);
+            AssertLocal(shell);
+            Assert.True(File.Exists(scratch.Paths.ConsentFile));
+
+            held!.Dispose(); // let go: the next reload deletes it
+            held = null;
+            shell.Reload(userRequested: false);
+            Assert.False(File.Exists(scratch.Paths.ConsentFile));
+            AssertLocal(shell); // the host, with no consent on file: refused at load
+            NextStart(scratch, AssertLocal);
+        }
+        finally
+        {
+            held?.Dispose();
+            Normal(scratch.Paths.SettingsFile);
+            Normal(scratch.Paths.ConsentFile);
+            shell.Dispose();
+        }
+    });
+
+    [Fact]
+    public Task With_settings_json_unsaved_through_the_quit_the_next_start_uses_the_server_on_this_PC_as_the_page_says() => UiSession.Run(() =>
+    {
+        // Lens on cb2290c (disclosure, probe J): settings.json read-only through the quit, naming a server on this PC. A server on
+        // this PC needs no consent, so unlike a service off this PC (refused at the next start without a consent on file) the next
+        // start uses it again, which the fifth draft's variant says ("the next start uses that server again").
+        using var scratch = new Scratch(StartingLocalServerSettings);
+        var (shell, _, _) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            Reason([shell.DisableCloud()!], SettingsNotSavedServerOnThisPc);
+            AssertLocal(shell);
+            shell.Quit(); // the last try: still read-only
+            NextRealStart(scratch, (next, _) =>
+            {
+                Assert.StartsWith("openai-compatible/m at 127.0.0.1", next.CleanupStatus);
+                Assert.False(next.NothingLeaves);
+            });
         }
         finally
         {

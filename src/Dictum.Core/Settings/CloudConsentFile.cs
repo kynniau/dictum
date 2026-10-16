@@ -43,16 +43,16 @@ public static class CloudConsentFile
 
     /// <summary>
     /// Withdraws consent (Settings > Clean-up > Switch cloud clean-up off). consent.json is Dictum's own record of the user's
-    /// agreement, so a read-only attribute on it is cleared to honour the withdrawal; a file another program holds open still
-    /// throws, and the caller tries again later.
+    /// agreement, so a read-only attribute on it is cleared to honour the withdrawal. That is the only attribute written, and
+    /// only when it is set: a file whose access list allows delete but not write-attributes is still deleted. A file another
+    /// program holds open still throws, and the caller tries again later.
     /// </summary>
     public static void Delete(string path)
     {
-        if (File.Exists(path))
-        {
-            File.SetAttributes(path, FileAttributes.Normal);
-            File.Delete(path);
-        }
+        if (!File.Exists(path)) return;
+        var attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.ReadOnly) != 0) File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+        File.Delete(path);
     }
 
     /// <summary>The settings with the consent on record applied: the host, only when it was given for this provider.</summary>

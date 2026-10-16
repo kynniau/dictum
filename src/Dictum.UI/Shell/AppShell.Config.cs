@@ -14,7 +14,7 @@ public sealed partial class AppShell
     private string? _offlineWarned;
     private string? _redirectWarned;
     private bool _cloudWithdrawn; // Switch cloud clean-up off, until both files keep it or cloud clean-up is switched on again (DisableCloud, SaveCloudOff, EnableCloud)
-    private bool _consentWithdrawn; // its consent withdrawal, until consent.json is gone or "Allow" records a new consent; a server on this PC switched on does not end it
+    private bool _consentWithdrawn; // its consent withdrawal (also set when EnableCloud cannot delete the consent it just recorded), until consent.json is gone or "Allow" records a new consent; a server on this PC switched on does not end it
     private (string? Consent, string? Settings) _cloudOffNotSaved; // why the last try could not delete consent.json or save settings.json (SaveCloudOff)
     private bool _offlineOnlyThisSession; // offline only switched on, until settings.json keeps it (SetOfflineOnly, SaveOfflineOnly)
     private string? _offlineOnlyNotSaved; // why the last try could not save it (SaveOfflineOnly)
@@ -240,11 +240,11 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, fourth draft), not yet approved: the product owner reviews it before release. Pinned word for
-    /// word in CloudOffTakesEffectTests; do not reword it until that review. Shown while offline only is on for this session
-    /// and settings.json does not have it on. No "Nothing is sent": offline only still allows a server on this PC. The last
-    /// clause names the start with a settings.json that still cannot be read (not valid JSON, say), which runs offline with
-    /// the defaults (ConfigLoader.BrokenAtStartup).
+    /// PROPOSED copy (16/10/2026, fifth draft; this sentence is unchanged since the fourth), not yet approved: the product
+    /// owner reviews it before release. Pinned word for word in CloudOffTakesEffectTests; do not reword it until that review.
+    /// Shown while offline only is on for this session and settings.json does not have it on. No "Nothing is sent": offline
+    /// only still allows a server on this PC. The last clause names the start with a settings.json that still cannot be read
+    /// (not valid JSON, say), which runs offline with the defaults (ConfigLoader.BrokenAtStartup).
     /// </summary>
     internal static string OfflineOnlyNotSaved(string reason) =>
         $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only, unless settings.json cannot be read, in which case Dictum starts offline.";
