@@ -106,7 +106,10 @@ public enum SoundCue { Start, Stop }
 /// <summary>A system-wide hotkey listener; calls its post action from its own thread, never blocking.</summary>
 public interface IHotkeyListener : IDisposable
 {
-    /// <summary>When false the hotkey passes through untouched and Esc is not watched.</summary>
+    /// <summary>
+    /// When false a new press of the hotkey passes through untouched and Esc is not watched; a press already under way
+    /// still finishes as it began, its release swallowed if its press was, and reported (HotkeyMatcher).
+    /// </summary>
     bool Enabled { get; set; }
 
     /// <summary>Installs the listener; false if the system refused. A hotkey change replaces the listener (AppShell).</summary>

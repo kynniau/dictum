@@ -133,7 +133,8 @@ arrive when you let go, in the middle of the dictation). So while Dictum is on a
 no longer reaches other apps at all, not even a quick click (no right-click menu, no middle-click, no Back); a side
 button you do not use is the best choice. Until a speech model is ready (none downloaded yet, one still
 loading, or one that failed to load) a mouse-button dictation hotkey leaves its button alone, so it keeps its normal
-job while there is nothing to dictate with. Each name means whichever physical button Windows reports as that button
+job while there is nothing to dictate with; a dictation already under way keeps it swallowed until that dictation
+ends, so the stop tap and Esc still work. Each name means whichever physical button Windows reports as that button
 (Dictum reads the button messages Windows sends, not the hardware). **The left button cannot be used**: holding it to
 dictate would swallow every click.
 Dictum watches the mouse (a WH_MOUSE_LL hook on the same thread as the keyboard hook) only while a hotkey names a mouse

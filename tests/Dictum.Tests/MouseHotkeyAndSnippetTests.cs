@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -103,6 +104,17 @@ public class MouseHotkeyTests
     }
 
     [Fact]
+    public void The_README_says_a_mouse_hotkey_stays_swallowed_through_a_dictation_under_way()
+    {
+        // SPEC §3 and AppShell.ApplyHookEnabled keep the button swallowed while a dictation is under way, model or no model;
+        // the README said only that it is let through until a model is ready (lens on dd2bef3, 16/10/2026).
+        var readme = Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md")), @"\s+", " ");
+        Assert.Contains("a mouse-button dictation hotkey leaves its button alone, so it keeps its normal job while there is nothing to " +
+                        "dictate with; a dictation already under way keeps it swallowed until that dictation ends, so the stop tap and Esc " +
+                        "still work.", readme, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Two_hotkeys_on_different_mouse_buttons_do_not_conflict_but_the_same_button_does()
     {
         Assert.False(HotkeyParser.Parse("RightMouse").CanFireTogether(HotkeyParser.Parse("Mouse5")));
@@ -148,6 +160,56 @@ public class MouseHotkeyTests
         Assert.Equal(new KeyDecision(true, HotkeySignal.Down, false), m.OnKey(Vk.XButton1, true, true));
         Assert.Equal(new KeyDecision(true, HotkeySignal.Up, false), m.OnKey(Vk.XButton1, false, true));
         Assert.Equal(KeyDecision.Pass, m.OnKey(Vk.LControl, false, true));
+    }
+
+    [Fact]
+    public void A_trigger_released_while_disabled_is_swallowed_and_reports_Up()
+    {
+        // The readiness gate closes as a dictation ends (AppShell.ApplyHookEnabled), which can be while its stop tap is still
+        // down: the lens on dd2bef3 removed the model mid-dictation, so the transcription failed at once. The release must stay
+        // swallowed (Back would reach the browser under the pointer) and must still report Up: until the state machine hears
+        // one it believes the button is held, and on dd2bef3 it took the first press once a model was ready for auto-repeat.
+        var m = new HotkeyMatcher(HotkeyParser.Parse("Mouse4"), suppress: true);
+        var machine = new DictationStateMachine(StateMachineOptions.Default);
+        IReadOnlyList<Effect> Post(KeyDecision d, long at) => d.Signal switch
+        {
+            HotkeySignal.Down => machine.HotkeyDown(at),
+            HotkeySignal.Up => machine.HotkeyUp(at),
+            _ => [],
+        };
+
+        foreach (var (down, at) in new[] { (true, 0L), (false, 50L), (true, 150L), (false, 200L) }) Post(m.OnKey(Vk.XButton1, down, true), at);
+        Assert.Equal(DictationState.RecordingHandsFree, machine.State);
+        var stop = m.OnKey(Vk.XButton1, true, true);
+        Assert.Contains(Post(stop, 1_000), e => e is BeginProcessingEffect);
+        machine.ProcessingFinished(machine.SessionId, ProcessingOutcome.Failed); // no model: the gate closes, the button still down
+
+        var release = m.OnKey(Vk.XButton1, false, enabled: false);
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Up, false), release);
+        Post(release, 1_100);
+
+        var next = m.OnKey(Vk.XButton1, true, true); // a model is ready again: the gate is open
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Down, false), next);
+        Assert.Contains(Post(next, 5_000), e => e is StartCaptureEffect);
+    }
+
+    [Fact]
+    public void A_trigger_still_held_when_the_listener_comes_back_reports_Up_once_on_release()
+    {
+        // Off and on again while the button is held (the gate closes as a dictation ends, then a model finishes loading), with
+        // typing in between: the release still reports Up. Only once, though: a chord whose modifier was let go first has
+        // reported its Up already, so the button's release, with the listener off, is swallowed with no second one.
+        var m = new HotkeyMatcher(HotkeyParser.Parse("Mouse4"), suppress: true);
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Down, false), m.OnKey(Vk.XButton1, true, true));
+        Assert.Equal(KeyDecision.Pass, m.OnKey('A', true, enabled: false));
+        Assert.Equal(KeyDecision.Pass, m.OnKey('A', false, enabled: false));
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Up, false), m.OnKey(Vk.XButton1, false, true));
+
+        var chord = new HotkeyMatcher(HotkeyParser.Parse("Ctrl+Mouse4"), suppress: true);
+        Assert.Equal(KeyDecision.Pass, chord.OnKey(Vk.LControl, true, true));
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Down, false), chord.OnKey(Vk.XButton1, true, true));
+        Assert.Equal(new KeyDecision(false, HotkeySignal.Up, false), chord.OnKey(Vk.LControl, false, true));
+        Assert.Equal(new KeyDecision(true, HotkeySignal.None, false), chord.OnKey(Vk.XButton1, false, enabled: false));
     }
 
     [Fact]

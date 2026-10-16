@@ -868,8 +868,11 @@ link" snippets.
   constructor instead of in `Start` (nothing loads before `Start`, so production behaviour is the same, and the rule
   holds from the first load). A keyboard hotkey keeps its old rule (the controller ignores a press while no model is
   ready), and so does the fix hotkey. The edge accepted here before lens 2 (a load starting mid-hold swallowed the
-  release with no Up signal, so the recording ran on to the next press or the `hands_free_max_seconds` auto-stop) is
-  gone with it.
+  release with no Up signal, so the recording ran on to the next press or the `hands_free_max_seconds` auto-stop) was
+  narrowed by it, not gone: the gate still closes as a dictation ends, which can be while its stop tap is down, and the
+  matcher then swallowed that release with no Up, so the next press was taken for auto-repeat and started nothing. The
+  lens on dd2bef3 (below) found it; since that fix a listener switched off stops new presses only, and a press under
+  way still has its release swallowed and reported.
 - The key monitor (capture box, `--selftest`) always installs the mouse hook: it is short-lived, and the box must be
   able to name a button when one is pressed. So the mouse is also watched while a capture box listens or `--selftest`
   runs, whatever the hotkey (the README said "only while a hotkey names a mouse button" until the review fixes). For
@@ -1009,3 +1012,59 @@ Not verified by the lens, and still not verified: whether Windows applies a butt
 Alt or Win + mouse-button chord can still open the menu bar or Start once its click is swallowed (the matcher sends no
 menu mask for a swallowed trigger); cursor latency and hook timeouts with the mouse hook installed; the 19 gated desktop
 and tray tests, skipped under Remote Desktop, were not re-run.
+
+**Lens on dd2bef3, 16/10/2026**
+
+No blockers or majors; two minors, both fixed:
+
+1. Minor: a release swallowed while the listener was off reported no Up. Since lens 2 the readiness gate closes as a
+   dictation ends, which can be while the hotkey button is still down. The lens, on a started shell with Mouse4,
+   deleted all app data mid-dictation (Settings > Storage, `ModelManager.Unload`) and tapped Mouse4 to stop; the
+   transcription failed, `Finished` closed the gate, and the tap's release was swallowed with no signal, so once a
+   model was ready the first press started nothing (the state machine still held the button down and read the press
+   as auto-repeat) and the second worked. A second path did the same: any key or button arriving while the listener
+   was off cleared the matcher's `_active`, so a release after the listener came back on was swallowed with no Up too.
+   The lens also found the swallow itself unpinned (the off branch returning `Pass` kept the suite green). Fix, in
+   `HotkeyMatcher.OnKey`: a listener switched off stops new presses only. The early return for an off listener is
+   gone; an off key-down passes untouched unless it is the auto-repeat of a swallowed trigger, and a release takes the
+   same path on or off, so the trigger's release is swallowed if its press was and reports Up if Down was reported and
+   Up was not yet. `_active` already meant exactly that everywhere but the old off branch, so it is the owed-Up flag
+   and there is no new state. The auto-repeat of a swallowed key held while off now stays swallowed too: it passed
+   before while its release was swallowed, which showed the app a key going down that never came up. Chosen over the
+   lens's one-line alternative (Up from the off branch's swallow), which leaves the second path open (observed: the
+   second pin below fails on it) and would report a second Up for a chord whose modifier was let go first. Who hears
+   the new Up: the state machine acts only on an Up for a key it holds (switched off, or reset by `SetEnabled`, it
+   ignores it); the fix-last listener acts on Down only (`AppShell.ApplyFixHotkey`); the calibration window
+   (`CalibrationWindow.OnHotkey`, through the shell's redirect) acts on Up only while a take is recording, so a take
+   started by holding the hotkey now ends on its release even if the listener went off mid-hold (a model load
+   starting), where before it ran on to Stop or the take limit, which drops it as too long; an Up while no take
+   records is ignored. That calibration path is read, not tested (its code is unchanged).
+2. Minor: the README said only that a mouse-button hotkey leaves its button alone until a speech model is ready. It now
+   adds that a dictation already under way keeps it swallowed until that dictation ends, so the stop tap and Esc still
+   work (as SPEC §3 says). The README had no test: the lens 2 record names
+   `Settings_says_a_mouse_button_hotkey_no_longer_reaches_other_apps` for "the README says both", but that test reads
+   the Settings window only.
+
+Pins, each observed failing on the reverted behaviour (dd2bef3's `HotkeyMatcher.cs`; for the last, dd2bef3's README),
+then passing with the fix restored:
+
+- `A_trigger_released_while_disabled_is_swallowed_and_reports_Up` (MouseHotkeyTests): the lens's sequence at matcher
+  and state machine level (Mouse4 hands-free, the stop tap, processing fails, the release with the listener off, the
+  next press). Reverted: "Expected ... Signal = Up ... Actual ... Signal = None"; with that check switched off for one
+  run, the next press returned no effects instead of starting a capture. It also failed with the release passed on
+  while off (Suppress False) and with the swallow kept but no Up.
+- `A_trigger_still_held_when_the_listener_comes_back_reports_Up_once_on_release` (MouseHotkeyTests): off and on again
+  with typing in between, then a chord whose modifier was let go first. Reverted: the release after the listener came
+  back reported None. It also failed with only the second path restored (an off event clearing `_active`), with the
+  lens's one-liner, and, in its chord half, with a variant that reports a second Up.
+- `A_swallowed_key_still_held_when_disabled_keeps_its_repeats_and_release_swallowed` (HotkeyMatcherTests, RightCtrl).
+  Reverted: the auto-repeat with the listener off passed through (Suppress False). It also failed with the off check
+  moved above the auto-repeat check, and with the swallow kept but no Up.
+- `The_README_says_a_mouse_hotkey_stays_swallowed_through_a_dictation_under_way` (reads README.md). Reverted:
+  "Sub-string not found".
+
+Full suite after these fixes: 795 tests, 776 passed, 19 skipped, 0 failed (before: 791, 772, 19, 0).
+
+Not verified here: the lens's started-shell scenario was not re-run (the shell tests' fake listener posts signals
+without the matcher, so the first pin drives the matcher and the state machine directly); the 19 gated desktop and tray
+tests stay skipped.
