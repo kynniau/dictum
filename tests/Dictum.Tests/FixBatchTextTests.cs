@@ -34,6 +34,24 @@ public class FixBatchTextTests
         Assert.Equal("Bill is due. Bill again.", bill.Apply("Bill is due. Bill again."));
     }
 
+    /// <summary>
+    /// The sentence start the corrections share with the profanity filter and the hands-free boundary rule (SentenceStart, merge
+    /// lens finding 9, 16/10/2026): after . ! ? … or a line break, past spaces, quotes and brackets of either kind.
+    /// </summary>
+    [Theory]
+    [InlineData("Paid! Bill is due.", "Paid! Bill is due.")]
+    [InlineData("Paid? Bill is due.", "Paid? Bill is due.")]
+    [InlineData("Paid.\nBill is due.", "Paid.\nBill is due.")]
+    [InlineData("Paid. \"Bill is due.\"", "Paid. \"Bill is due.\"")]
+    [InlineData("Paid. (Bill is due.)", "Paid. (Bill is due.)")]
+    [InlineData("Paid… Bill is due.", "Paid… Bill is due.")]                 // an ellipsis ends a sentence (aligned 16/10/2026)
+    [InlineData("“Bill is due,” she said.", "“Bill is due,” she said.")]     // a curly opening quote is passed over (aligned)
+    [InlineData("Paid (in full.) Bill is due.", "Paid (in full.) Bill is due.")] // so is a closing bracket (aligned)
+    [InlineData("Pay the “Bill” today.", "Pay the “bill” today.")]           // mid-sentence, inside quotes
+    [InlineData("Pay the (Bill) today.", "Pay the (bill) today.")]
+    public void A_correction_keeps_a_capital_wherever_a_sentence_starts(string text, string expected) =>
+        Assert.Equal(expected, Rules("Bill => bill").Apply(text));
+
     [Fact]
     public void A_correction_never_matches_the_stem_of_a_contraction()
     {

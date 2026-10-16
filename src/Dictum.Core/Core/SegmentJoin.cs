@@ -1,4 +1,5 @@
 using Dictum.Llm;
+using Dictum.Personal;
 
 namespace Dictum.Core;
 
@@ -53,16 +54,6 @@ public static class SegmentJoin
         return all.Length == 0 ? null : string.Join(' ', all[Math.Max(0, all.Length - words)..]);
     }
 
-    /// <summary>The text ends a sentence: past closing quotes and brackets, its last character is . ! ? or …</summary>
-    public static bool EndsSentence(string typed)
-    {
-        var end = typed.TrimEnd().TrimEnd('"', '\'', ')', ']', '”', '’', '»');
-        return end.Length > 0 && end[^1] is '.' or '!' or '?' or '…';
-    }
-
-    /// <summary>The text ends with a line break (a spoken "new line" or "new paragraph" closed the part).</summary>
-    public static bool EndsWithBreak(string typed) => typed.TrimEnd(' ', '\t').EndsWith('\n');
-
     /// <summary>
     /// "\n" or "\n\n" when the part opened with a spoken "new line" or "new paragraph" that the clean-up applied: a clean-up
     /// trims a break at the start of a text, so the break goes between the parts instead. Null when the part did not open with
@@ -78,9 +69,10 @@ public static class SegmentJoin
     }
 
     /// <summary>
-    /// What is typed between the last part and this one, and this part's text with its first letter in the boundary rule's case.
-    /// The separator is the opening break (<see cref="LeadingBreak"/>), else nothing after a line break or a space (the trailing
-    /// space insert.trailing_space adds included), else a space.
+    /// What is typed between the last part and this one, and this part's text with its first letter in the boundary rule's case:
+    /// its capital when the last part ended a sentence (<see cref="SentenceStart"/>: . ! ? … or a line break, past closing
+    /// quotes and brackets), else carrying on. The separator is the opening break (<see cref="LeadingBreak"/>), else nothing
+    /// after a line break or a space (the trailing space insert.trailing_space adds included), else a space.
     /// </summary>
     /// <param name="before">What the last part typed (not empty).</param>
     /// <param name="raw">This part's transcript, as whisper wrote it.</param>
@@ -91,7 +83,7 @@ public static class SegmentJoin
     {
         if (LeadingBreak(raw, cleaned) is { } spokenBreak) return (spokenBreak, Capitalised(cleaned));
         var separator = before.Length == 0 || char.IsWhiteSpace(before[^1]) || trailingSpace ? "" : " ";
-        return (separator, EndsSentence(before) || EndsWithBreak(before) ? Capitalised(cleaned) : Continued(cleaned, names));
+        return (separator, SentenceStart.At(before, before.Length) ? Capitalised(cleaned) : Continued(cleaned, names));
     }
 
     /// <summary>A plain lower-case first word gets its capital; anything else ("iPhone", "3pm", a quote) is left as it is.</summary>

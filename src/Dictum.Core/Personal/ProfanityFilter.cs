@@ -75,7 +75,7 @@ public sealed class ProfanityFilter
         foreach (Match m in matches)
         {
             sb.Append(text, at, m.Index - at);
-            var start = AtSentenceStart(sb);
+            var start = SentenceStart.AtEnd(sb);
             var next = m.Index + m.Length;
             next += SuffixLength(text, next); // "shit's" goes with its suffix: "The 's hitting…" is worse than "The hitting…"
             while (next < text.Length && text[next] is ' ' or '\t') next++;
@@ -119,16 +119,6 @@ public sealed class ProfanityFilter
                 return 1 + suffix.Length;
         }
         return 0;
-    }
-
-    private static bool AtSentenceStart(StringBuilder sb)
-    {
-        for (var i = sb.Length - 1; i >= 0; i--)
-        {
-            if (sb[i] is ' ' or '\t' or '"' or '\'' or '(') continue;
-            return sb[i] is '.' or '!' or '?' or '\n';
-        }
-        return true;
     }
 
     private static bool EndsWith(StringBuilder sb, char c)

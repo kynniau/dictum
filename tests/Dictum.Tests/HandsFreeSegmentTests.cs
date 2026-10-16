@@ -271,6 +271,34 @@ public class SegmentJoinTests
         Assert.Equal(("", "Then we left."), SegmentJoin.Join("We met at ten.", "then we left", "Then we left.", trailingSpace: true, NoNames));
     }
 
+    /// <summary>
+    /// The sentence end the boundary rule shares with the corrections and the profanity filter (SentenceStart, merge lens finding
+    /// 9, 16/10/2026): . ! ? … or a line break, past spaces, quotes and brackets of either kind.
+    /// </summary>
+    [Theory]
+    [InlineData("We met at ten!")]
+    [InlineData("Was it ten…")]
+    [InlineData("He said “stop.”")]
+    [InlineData("He said 'stop.'")]
+    [InlineData("We met (at ten.)")]
+    [InlineData("See [the notes.]")]
+    [InlineData("Il a dit «stop.»")]
+    [InlineData("Thanks.\r\n")]
+    [InlineData("Thanks,\n\"")] // a line break, then an opening quote (aligned 16/10/2026: it carried on before)
+    public void After_any_sentence_end_a_part_starts_with_its_capital(string before)
+    {
+        Assert.Equal("Then we left.", SegmentJoin.Join(before, "then we left", "then we left.", trailingSpace: false, NoNames).Text);
+    }
+
+    [Theory]
+    [InlineData("We met at ten,")]
+    [InlineData("We met at (")]
+    [InlineData("We met at “ten”")]
+    public void Without_a_sentence_end_a_part_carries_on(string before)
+    {
+        Assert.Equal("then we left.", SegmentJoin.Join(before, "then we left", "Then we left.", trailingSpace: false, NoNames).Text);
+    }
+
     [Fact]
     public void Without_terminal_punctuation_a_part_goes_on_in_lower_case_after_a_space()
     {
