@@ -34,18 +34,42 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
     /// <summary>The counts of the latest call that was cancelled (no text), for the speed estimate.</summary>
     public GenerationResult? Cancelled { get; private set; }
 
-    /// <summary>The prompt text up to the dictation, and the whole prompt with the dictation and the assistant start.</summary>
-    public (string Prefix, string Full) Render(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw)
+    /// <summary>
+    /// The chat turns of one clean-up, in order: the system prompt, each few-shot pair as a user and an assistant turn (these
+    /// first <c>Prefix</c> turns are the cached prefix), then for a hands-free part its <paramref name="carried"/> words in a
+    /// system turn of their own (CleanupPrompt.CarriedLine), then the dictation as the user turn. The carried words never go in
+    /// the user turn: the reply is checked against the dictation alone, and they are context, not words to clean. Pure, so the
+    /// order is tested without a model.
+    /// </summary>
+    internal static (IReadOnlyList<(string Role, string Text)> Turns, int Prefix) Turns(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples,
+        string raw, string? carried)
     {
-        var template = new LLamaTemplate(weights);
-        template.Add("system", systemPrompt);
+        var turns = new List<(string Role, string Text)> { ("system", systemPrompt) };
         foreach (var (exampleRaw, exampleClean) in examples)
         {
-            template.Add("user", exampleRaw);
-            template.Add("assistant", exampleClean);
+            turns.Add(("user", exampleRaw));
+            turns.Add(("assistant", exampleClean));
         }
+        var prefix = turns.Count;
+        if (carried is not null) turns.Add(("system", CleanupPrompt.CarriedLine(carried)));
+        turns.Add(("user", raw));
+        return (turns, prefix);
+    }
+
+    /// <summary>
+    /// The prompt text up to the dictation, and the whole prompt with the dictation and the assistant start, through the model's
+    /// chat template (<see cref="Turns"/>). A hands-free part's carried words come after the prefix, so the cached prefix still
+    /// matches and only the part's own tokens are evaluated. Not run against a model in this change: a template with no system
+    /// role (Gemma's, recalled from llama.cpp's source, not verified here) may fold the turn into the dictation's own, where the
+    /// reply checks still apply; a template whose full prompt stops starting with the prefix runs uncached, as before.
+    /// </summary>
+    public (string Prefix, string Full) Render(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string? carried = null)
+    {
+        var (turns, prefixTurns) = Turns(systemPrompt, examples, raw, carried);
+        var template = new LLamaTemplate(weights);
+        foreach (var (role, text) in turns.Take(prefixTurns)) template.Add(role, text);
         var prefix = Encoding.UTF8.GetString(template.Apply());
-        template.Add("user", raw);
+        foreach (var (role, text) in turns.Skip(prefixTurns)) template.Add(role, text);
         template.AddAssistant = true;
         return (prefix, Encoding.UTF8.GetString(template.Apply()));
     }
@@ -65,10 +89,10 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
         LastPrefix = (_prefixTokens, sw.Elapsed);
     }
 
-    public async Task<GenerationResult> GenerateAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, int maxTokens,
+    public async Task<GenerationResult> GenerateAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string? carried, int maxTokens,
         CancellationToken cancellationToken)
     {
-        var (prefix, full) = Render(systemPrompt, examples, raw);
+        var (prefix, full) = Render(systemPrompt, examples, raw, carried);
         await EnsurePrefixAsync(prefix).ConfigureAwait(false);
         var conversation = _conversation!;
         var executor = _executor!;

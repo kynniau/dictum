@@ -9,8 +9,14 @@ namespace Dictum.Llm;
 /// The personal dictionary's terms in the prompt's dictionary line (SPEC §16.2, PersonalDictionary.CleanupTerms): the reply
 /// may not add one the speaker did not say. Terms left out of the line are not checked: the model never saw them.
 /// </param>
+/// <param name="Carried">
+/// A hands-free part's context: the closing words of what the part before it said, before corrections, the profanity filter
+/// and snippets, sent as prompt text (and part of <paramref name="SystemPrompt"/> here). They are never counted as
+/// dictation, so every rule, the dictionary-term rule included, measures the reply against the part's own words; the reply
+/// may not repeat them either.
+/// </param>
 public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection<string>? MustKeepWords = null,
-    IReadOnlyCollection<string>? DictionaryTerms = null);
+    IReadOnlyCollection<string>? DictionaryTerms = null, string? Carried = null);
 
 /// <summary>
 /// Decides whether a model's reply is the cleaned dictation (SPEC §5, applied to every provider). Rejected replies
@@ -21,8 +27,8 @@ public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection
 /// framing and labels the speaker did not say (whole words, curly quotes mapped), a script the dictation did not use, a
 /// final line or bracket the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
 /// few shared words, a negation or a number dropped or changed, a kept word dropped (profanity), dropped content (overall
-/// and per sentence), and "scratch that" handled both ways round: the correction must be in the reply and the retracted
-/// words must not.
+/// and per sentence), "scratch that" handled both ways round: the correction must be in the reply and the retracted
+/// words must not, and, for a hands-free part, words repeated from the part typed before it.
 /// </summary>
 public static partial class CleanupValidator
 {
@@ -104,6 +110,8 @@ public static partial class CleanupValidator
         if (Unsaid(textLower, rawSet) is { } unsaid) return (null, unsaid);
         if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(raw, text, terms))
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
+        if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
+            return (null, "reply repeats words already typed before this part");
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -322,6 +330,51 @@ public static partial class CleanupValidator
             if (j == unit.Count) count++;
         }
         return count;
+    }
+
+    /// <summary>
+    /// A hands-free part's reply that repeats words already typed (SPEC §3 amendment, 16/10/2026): two words next to each other
+    /// in the reply that are next to each other in the carried words, one of them a content word (three letters or more, not a
+    /// function word), more often than the part said them. The part said a pair when its dictation has two adjacent words that
+    /// sound like them, word by word (<see cref="ValidatorText.SoundsLike"/>, so a homophone fixed or a dictionary term respelt
+    /// is still said), read without spoken commands and hesitations, once with and once without the fillers the prompt lists (so
+    /// "the like budget" says "the budget", while "I like budgets" still says "like budgets"). Counted as the term rule counts a
+    /// term's forms (<see cref="TermText.Allowance"/>): the reply may have as many pairs that sound like a carried pair as one
+    /// of those readings of the dictation has, so a pair the part said that only sounds like a carried one pays for one pair in
+    /// the reply, never for that pair again beside the part's own ("the meeting" added before "came to nothing").
+    /// Five or more such words are the system-prompt rule's too; this catches the shorter run a model writes when it "finishes"
+    /// a part with the words before it: "…we should move the meeting to" then "thursday" → "Move the meeting to Thursday.".
+    /// </summary>
+    // simplification: pairs of words, not an alignment of the reply with the dictation. Ceiling: a fix that changes a word's
+    // sound or adds a word between two dictated ones, joining a pair the way the carried words do, is still rejected and the
+    // tidy is typed instead (a false rejection costs polish only): "the shop" carried, "go to shop" → "Go to the shop."; "to
+    // buy" carried, "we need to buys the tickets" → "We need to buy the tickets.". Grammar assist makes such fixes on purpose.
+    // A dropped filler, a fixed homophone ("by" → "buy") and a dictionary respelling ("kinney" → "Kynni") no longer reject.
+    // The other way (a false acceptance, which types the wrong words): a reply that swaps a pair the part said for the carried
+    // pair it sounds like is accepted, since the part's pair pays for it once: "I spoke to the team" carried, "we went to
+    // town afterwards" → "We went to the team afterwards." Trigger to retire: such a rejection observed in the log, or a typed
+    // reply observed to have a carried pair in place of dictated words.
+    private static bool RepeatsCarried(string rawLower, string textLower, string carried)
+    {
+        var spoken = WithoutCommands(rawLower);
+        var readings = new[] { PairsOf(Comparable(Words(spoken))).ToList(), PairsOf(Comparable(Words(WithoutFillers(spoken)))).ToList() };
+        var before = PairsOf(Comparable(Words(MapQuotes(carried).ToLowerInvariant()))).ToHashSet();
+        var reply = PairsOf(Comparable(Words(textLower))).ToList();
+        foreach (var pair in reply)
+        {
+            if (!(IsCorrectionWord(pair.Item1) || IsCorrectionWord(pair.Item2)) || !before.Contains(pair)) continue;
+            var inReply = reply.Count(r => PairsSoundAlike(r, pair));
+            if (!readings.Any(said => said.Count(s => PairsSoundAlike(s, pair)) >= inReply)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Two pairs of adjacent words that sound alike, word by word.</summary>
+    private static bool PairsSoundAlike((string, string) a, (string, string) b) => SoundsLike(a.Item1, b.Item1) && SoundsLike(a.Item2, b.Item2);
+
+    private static IEnumerable<(string, string)> PairsOf(List<string> words)
+    {
+        for (var i = 0; i + 1 < words.Count; i++) yield return (words[i], words[i + 1]);
     }
 
     /// <summary>

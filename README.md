@@ -22,15 +22,26 @@ place: see "Choosing a hotkey". Every gesture below works the same with a mouse 
 | Gesture | What happens |
 |---|---|
 | Hold the hotkey, speak, release | Records while held; on release transcribes and pastes. |
-| Double-tap the hotkey (two taps within 0.4 s) | Hands-free: records until you press the hotkey again. No audio between the taps is lost. |
-| Press the hotkey during hands-free | Stops and transcribes. |
-| Esc while recording | Cancels: audio discarded, nothing pasted. Esc still reaches your app. |
-| Esc while transcribing/polishing | Cancels; nothing is pasted and Dictum is ready again at once. Esc still reaches your app. In the background the work stops at its next check: whisper after about 5 s on CPU and under 40 ms with Vulkan (small.en, a 62.8 s recording, cancelled 200 ms in); the cleanup model within a few ms on the GPU, but on a CPU llama.cpp cannot interrupt the step that reads the dictation, so it stays busy for about 1.5 s (qwen2.5-1.5b, measured long-dictation case). A dictation made in that window waits for it. |
+| Double-tap the hotkey (two taps within 0.4 s) | Hands-free: records until you press the hotkey again, and types each part as you pause (0.7 s of quiet after at least 2 s of speech; a part with no pause is cut at 30 s, at its quietest moment) while you keep talking. No audio between the taps or between the parts is lost. |
+| Press the hotkey during hands-free | Stops; what you said since the last pause is typed last. |
+| Esc while recording | Holding the key: cancels, audio discarded, nothing pasted. Hands-free: stops; the text already typed stays, and the parts not yet typed are dropped. Esc still reaches your app. |
+| Esc while transcribing/polishing | Cancels; nothing more is pasted (after hands-free, the parts already typed stay) and Dictum is ready again at once. Esc still reaches your app. In the background the work stops at its next check: whisper after about 5 s on CPU and under 40 ms with Vulkan (small.en, a 62.8 s recording, cancelled 200 ms in); the cleanup model within a few ms on the GPU, but on a CPU llama.cpp cannot interrupt the step that reads the dictation, so it stays busy for about 1.5 s (qwen2.5-1.5b, measured long-dictation case). A dictation made in that window waits for it. |
 | Hotkey while transcribing | Ignored (the pill shows "Busy"). |
 
 Recordings shorter than `min_recording_ms` (0.3 s) or quieter than `silence_threshold` are discarded, because
-whisper invents text on silence. A recording auto-stops and is **transcribed** (never discarded) after
-`hands_free_max_seconds` (5 minutes), including a stuck hold key.
+whisper invents text on silence. A hands-free recording auto-stops and is **transcribed** (never discarded) after
+`hands_free_max_seconds` (5 minutes unless changed in Settings > General > "Hands-free stops after", from 30 seconds
+to 60 minutes); a held key, a stuck one included, stops the same way after 5 minutes, whatever that setting says. In
+hands-free each part goes through the same steps; whisper and the clean-up also get the closing words of what you said
+in the last part as context (taken before corrections, the profanity filter and snippets, so never their text), and
+those words are never typed again. A clean-up set up since that part was cleaned, such as cloud clean-up switched on
+mid-session, is given none of them. A part that carries on a sentence (the last one did not end with . ! ? …, a
+Devanagari danda or a line break) starts with a small letter unless its first word is "I", has another capital in it,
+or is a dictionary term spelt with a capital; with the rule-based tidy, which ends a part with a full stop whenever it
+ends with a letter or a digit, nearly every part is typed as its own sentence. Text in a language other than English is
+not cleaned up (see "Other languages and translation"), so no letter changes case where its parts join: each part is
+typed as whisper wrote it. Stay in the window you are dictating into until the session stops: each part is typed into
+whichever window is in front when it is ready, so switching windows mid-session types the next parts there.
 
 ### The pill
 
@@ -40,12 +51,13 @@ A small dark pill appears bottom-centre of the monitor with the focused window, 
 | Pill | Meaning |
 |---|---|
 | Recording · hold | Recording while you hold the key (a breathing red dot and five bars following your voice). |
-| Hands-free  m:ss  tap to stop · Esc cancels | Hands-free recording with the elapsed time; it auto-stops (and transcribes) at `hands_free_max_seconds`. |
+| Hands-free  m:ss  typing as you pause · tap to stop · Esc stops and keeps what's typed | Hands-free recording with the elapsed time; each part is typed as you pause, and it auto-stops (typing the rest) at `hands_free_max_seconds`. |
 | Transcribing… | whisper is running (a turning blue ring). |
 | Polishing… | The cleanup model is running (amber; not shown for the rule-based tidy, which is instant). |
 | Polishing… skipped (long dictation) | The model would not finish before the deadline at its measured speed; the rule-based tidy is used. |
 | Pasted  N words | Text was inserted (a green tick, and how many words; fades after a second). |
 | Cancelled | Esc pressed. |
+| Stopped. Text already typed stays. | Esc pressed in hands-free: the parts already typed stay (a grey square). |
 | Busy | Hotkey pressed while still processing. |
 | Mic error | The microphone could not be opened (see Troubleshooting), or it was lost mid-recording (a headset unplugged or out of battery): what was captured until then is still transcribed and pasted. |
 
@@ -101,7 +113,7 @@ an edit made in the file is picked up within a second and shows in the window.
 
 | Page | What is there |
 |---|---|
-| General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
+| General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), **Hands-free stops after** (30 seconds to 60 minutes), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
 | Mode | Light or Full, with what each means on this PC. |
 | Models | Every speech and cleanup catalogue model with size, state and Use / Download, a file chooser for each, greedy or beam-search decoding. |
 | Storage | Where everything is, free space, every model file with its size and Delete, delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
@@ -544,7 +556,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `tap_ms` | `300` | A press shorter than this is a tap, not a hold (50–2000). |
 | `double_tap_ms` | `400` | Window for the second tap that starts hands-free (100–2000). |
 | `min_recording_ms` | `300` | Shorter recordings are discarded (0–10000). |
-| `hands_free_max_seconds` | `300` | Auto-stop and transcribe after this long (5–3600). |
+| `hands_free_max_seconds` | `300` | Auto-stop and type the rest after this long (30–3600; Settings > General > "Hands-free stops after"). A value from 5 to 29 left from an earlier version runs as 30, with a line in the log. Hands-free only: a held key stops after 5 minutes. |
 | `silence_threshold` | `0.01` | Discard if the loudest 20 ms block's RMS (0–1) stays below this. |
 | `audio.device` | `null` | `null` = Windows default microphone; else an endpoint ID or part of the device name (`--selftest` lists them). |
 | `whisper.model` | your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin` in `models_dir`, or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
@@ -643,7 +655,10 @@ checks exist because qwen2.5-0.5b and qwen2.5-1.5b both returned replies with wh
 other check accepted; they are measured against the dictation with each retracted clause removed, so a correct
 "scratch that" is not counted as a loss but the rest of the dictation is still protected. Dictated quotation marks
 and a final dictated line break are kept. British/Australian and US spellings of the same word (colour/color,
-analyse/analyze, centre/center, catalogue/catalog, licence/license) count as one.
+analyse/analyze, centre/center, catalogue/catalog, licence/license) count as one. In hands-free, the words carried from
+the last part are context, never dictation, and a reply is also rejected when it repeats two neighbouring carried words
+(one of them a content word) more often than this part said them; each pair of neighbouring words of this part that
+sounds like them counts as said once, with or without fillers such as "like" or "you know" between them.
 
 **Esc** during "Polishing…" cancels the cleanup and pastes nothing; Dictum is ready again at once. Measured with
 the long test dictation (184 tokens) and qwen2.5-1.5b, cancel 200 ms in: on Vulkan the model stopped 2 ms after
@@ -654,8 +669,8 @@ was cached this was 3.9 s).
 
 Off by default. Cloud clean-up can use Anthropic, OpenAI, Google Gemini or any OpenAI-compatible server with your own
 key, behind a consent step and a warning. Each sends the raw transcript and the system prompt, which includes your
-dictionary terms, to another program after every dictation. `offline_only` refuses Anthropic and any server not on this
-machine.
+dictionary terms (and in hands-free up to 10 words of what you said in the last part), to another program after every
+dictation. `offline_only` refuses Anthropic and any server not on this machine.
 
 **Switching it on takes an explicit consent step (SPEC §22).** Settings > Clean-up > Cloud clean-up: choose the
 service, the server address and the model, then **Use cloud clean-up…**. A dialog says what is sent (every
@@ -752,7 +767,8 @@ rewrite your phrase (for example "my e-mail"), add that form as a second line. S
 nothing attached, and keep it something you would not say by accident.
 
 **Fix last dictation** (tray, or an optional `fix_hotkey`). Opens a small always-on-top editor with the last text
-Dictum pasted (kept in memory only, never written to disk). **Copy**; **Paste fix** (switches back to the window the
+Dictum pasted (kept in memory only, never written to disk); in hands-free, Fix last dictation holds the last part typed.
+**Copy**; **Paste fix** (switches back to the window the
 dictation went to and pastes through the normal insert path: select the wrong text there first to replace it);
 **Save corrections** (compares your edit with the original word by word and lists each replaced phrase as "Add
 correction: X => Y", unticked; only the ones you tick are added). Added or deleted words and punctuation or
@@ -841,7 +857,7 @@ network connection only in these cases, and only to these hosts:
 |---|---|
 | Only when you ask for a model download (first-run picker, the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
 | Only when you click **Check for updates** in Settings > About (the direct download; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
-| After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
+| After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms and, in hands-free, up to 10 words of what you said in the last part: taken before corrections, the profanity filter and snippets, so never their text), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
 | After each dictation, only if you set up an `openai-compatible` server (one off this PC also needs the consent step and `https://`) | the host in `llm.base_url` (the same text). With `localhost`, Dictum's request stays on this PC; what that server does with it is up to the server. |
 
 Nothing else: no telemetry, analytics, crash reports or automatic update checks. Dictum configures no OpenTelemetry

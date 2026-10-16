@@ -85,3 +85,36 @@ public static class WholeWords
     public static string Key(string phrase) =>
         string.Join(' ', phrase.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
 }
+
+/// <summary>
+/// Where a sentence starts, read back from a point in the text past spaces, quotes and brackets (straight and curly, opening
+/// and closing): at the start of the text, after a line break, or after a mark that ends a sentence (<see cref="IsEndMark"/>).
+/// One rule for the corrections (a capital that belongs to the sentence, not the word), the profanity filter (a removed
+/// word's capital and comma, and the mark it takes with it) and the hands-free boundary rule (whether the last part ended a
+/// sentence), so the three agree.
+/// </summary>
+public static class SentenceStart
+{
+    /// <summary>
+    /// A mark that ends a sentence: . ! ? … and the Devanagari danda । and double danda ॥, which end a sentence in Hindi
+    /// dictation (orchestrator, 16/10/2026: the languages lens found "वह कमीना।" filtered to "वह ।").
+    /// </summary>
+    public static bool IsEndMark(char c) => c is '.' or '!' or '?' or '…' or '।' or '॥';
+
+    /// <summary>A sentence starts at <paramref name="index"/> of <paramref name="text"/> (at its length: whatever comes next).</summary>
+    public static bool At(string text, int index) => At(index, i => text[i]);
+
+    /// <summary>A sentence starts at the end of <paramref name="text"/>: whatever is appended next.</summary>
+    public static bool AtEnd(StringBuilder text) => At(text.Length, i => text[i]);
+
+    private static bool At(int index, Func<int, char> charAt)
+    {
+        for (var i = index - 1; i >= 0; i--)
+        {
+            var c = charAt(i);
+            if (IsEndMark(c) || c == '\n') return true;
+            if (!char.IsWhiteSpace(c) && c is not ('"' or '\'' or '“' or '”' or '‘' or '’' or '«' or '»' or '(' or ')' or '[' or ']')) return false;
+        }
+        return true;
+    }
+}

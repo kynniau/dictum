@@ -17,6 +17,7 @@ public static class PillText
         PillView.Cancelled => "Cancelled",
         PillView.Busy => "Busy",
         PillView.MicError => "Mic error",
+        PillView.HandsFreeStopped => HandsFreeStopped,
         _ => "",
     };
 
@@ -28,8 +29,15 @@ public static class PillText
         _ => null,
     };
 
-    /// <summary>The small hint after the hands-free timer.</summary>
-    public const string HandsFreeHint = "tap to stop · Esc cancels";
+    /// <summary>
+    /// The small hint after the hands-free timer: each part is typed as the speaker pauses, and Esc keeps what is typed.
+    /// PROPOSED 16/10/2026, awaiting the product owner's approval: with the label it reads "Hands-free · typing as you pause ·
+    /// tap to stop · Esc stops and keeps what's typed" (the timer sits between the label and this hint, as before).
+    /// </summary>
+    public const string HandsFreeHint = "typing as you pause · tap to stop · Esc stops and keeps what's typed";
+
+    /// <summary>Esc during hands-free: the parts already typed stay. PROPOSED 16/10/2026, awaiting the product owner's approval.</summary>
+    public const string HandsFreeStopped = "Stopped. Text already typed stays.";
 
     /// <summary>"0:42", "12:05": minutes and seconds since capture began.</summary>
     public static string Timer(TimeSpan elapsed) => $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}";
@@ -41,6 +49,7 @@ public static class PillText
         PillView.Cancelled => 900,
         PillView.Busy => 700,
         PillView.MicError => 1800,
+        PillView.HandsFreeStopped => 1800, // a sentence to read, like "Mic error"'s flash
         _ => null,
     };
 

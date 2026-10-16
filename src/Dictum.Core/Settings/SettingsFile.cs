@@ -56,7 +56,7 @@ public static class SettingsFile
                 ["tap_ms"] = "A press shorter than this is a tap (start of a double-tap) rather than a hold.",
                 ["double_tap_ms"] = "Window for the second tap that starts hands-free mode.",
                 ["min_recording_ms"] = "Recordings shorter than this are discarded.",
-                ["hands_free_max_seconds"] = "Recording auto-stops and is transcribed after this many seconds.",
+                ["hands_free_max_seconds"] = "Hands-free stops by itself after this many seconds (30-3600; Settings > General). Hands-free types each part as you pause, and what is left is typed at the stop. A held key always stops after 300 seconds, whatever this says.",
                 ["silence_threshold"] = "Recordings whose loudest 20 ms block (RMS, 0-1) stays below this are discarded as silence.",
                 ["audio.device"] = "null = the system's default microphone, or a device ID / part of its name (see Settings > Microphone or Dictum.exe --selftest).",
                 ["whisper"] = "model: short name (small.en, medium.en, medium.en-q5_0, large-v3-turbo, or the multilingual small, medium, large-v3...) resolved to ggml-<name>.bin in models_dir, or an absolute path. language: a whisper code (en, hi, tl, bn, ta...) or auto to detect it; anything but en needs a multilingual model (no .en). translate: true writes English whatever language is spoken (multilingual model; large-v3-turbo cannot translate). gpu: auto | vulkan | cpu (change needs a restart). threads: 0 = auto. beam_size: 0 = greedy decoding (fastest), 1-8 = beam search (Calibrate my voice can set it).",

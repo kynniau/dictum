@@ -2,8 +2,11 @@ namespace Dictum.Core;
 
 public enum DictationState { Idle, RecordingHold, PendingTap, RecordingHandsFree, Processing }
 
-/// <summary>What the pill should show. Cancelled, Busy and MicError are short flashes.</summary>
-public enum PillView { Hidden, RecordingHold, RecordingHandsFree, Transcribing, Polishing, Done, Cancelled, Busy, MicError, PolishingSkipped }
+/// <summary>
+/// What the pill should show. Cancelled, Busy, MicError and HandsFreeStopped are short flashes. HandsFreeStopped is Esc
+/// ending a hands-free session: the parts already typed stay.
+/// </summary>
+public enum PillView { Hidden, RecordingHold, RecordingHandsFree, Transcribing, Polishing, Done, Cancelled, Busy, MicError, PolishingSkipped, HandsFreeStopped }
 
 public enum ProcessingOutcome { Inserted, Discarded, Failed }
 
@@ -12,19 +15,34 @@ public abstract record Effect;
 /// <summary>Open the microphone and start buffering.</summary>
 public sealed record StartCaptureEffect(long SessionId) : Effect;
 
-/// <summary>Stop the microphone and throw the audio away.</summary>
+/// <summary>Stop the microphone and throw the audio away (in hands-free, what follows the last part cut).</summary>
 public sealed record DiscardCaptureEffect(long SessionId) : Effect;
+
+/// <summary>
+/// Hands-free began (SPEC §3 amendment, 16/10/2026): cut the recording at pauses and type each part, in order, under
+/// <paramref name="Token"/> while recording goes on. The same token covers the parts still to come at the stop.
+/// </summary>
+public sealed record BeginSegmentsEffect(long SessionId, CancellationToken Token) : Effect;
 
 /// <summary>Stop the microphone and run transcribe → clean up → insert under <paramref name="Token"/>.</summary>
 public sealed record BeginProcessingEffect(long SessionId, CancellationToken Token, bool AutoStopped) : Effect;
 
-/// <summary>The processing token for this session has been cancelled; nothing may be inserted.</summary>
-public sealed record CancelProcessingEffect(long SessionId) : Effect;
+/// <summary>The processing token for this session has been cancelled; nothing more may be inserted.</summary>
+/// <param name="KeepsTyped">A hands-free session: the parts already typed stay; those not yet typed are dropped.</param>
+public sealed record CancelProcessingEffect(long SessionId, bool KeepsTyped = false) : Effect;
 
 public sealed record PillEffect(PillView View) : Effect;
 
-public sealed record StateMachineOptions(int TapMs, int DoubleTapMs, int HandsFreeMaxSeconds)
+/// <param name="HandsFreeMaxSeconds">hands_free_max_seconds: a hands-free session stops by itself after this long.</param>
+/// <param name="HoldMaxSeconds">
+/// A held key stops by itself after this long, so a stuck key cannot record all afternoon. Not hands_free_max_seconds
+/// (orchestrator decision 7a, 16/10/2026): that field must neither cut a hold short nor let a stuck key record for an hour.
+/// </param>
+public sealed record StateMachineOptions(int TapMs, int DoubleTapMs, int HandsFreeMaxSeconds, int HoldMaxSeconds = StateMachineOptions.DefaultHoldMaxSeconds)
 {
+    /// <summary>The held key's limit: 5 minutes, what both limits were before the hands-free field.</summary>
+    public const int DefaultHoldMaxSeconds = 300;
+
     public static readonly StateMachineOptions Default = new(300, 400, 300);
 }
 
@@ -45,6 +63,7 @@ public sealed class DictationStateMachine
     private long _captureStartedAt;
     private long _pendingSince;
     private CancellationTokenSource? _processingCts;
+    private bool _handsFree;          // this session went hands-free: its parts are typed as it records, under _processingCts
 
     public DictationStateMachine(StateMachineOptions options, bool enabled = true)
     {
@@ -55,6 +74,9 @@ public sealed class DictationStateMachine
     public DictationState State { get; private set; } = DictationState.Idle;
     public bool Enabled { get; private set; }
     public long SessionId { get; private set; }
+
+    /// <summary>The options in use (the auto-stop's log line names the limit that fired).</summary>
+    public StateMachineOptions Options => _options;
 
     public void UpdateOptions(StateMachineOptions options) => _options = options;
 
@@ -80,14 +102,19 @@ public sealed class DictationStateMachine
                 SessionId++;
                 _captureStartedAt = nowMs;
                 _ignoreNextUp = false;
+                _handsFree = false;
                 State = DictationState.RecordingHold;
                 return Concat(expired, new StartCaptureEffect(SessionId), new PillEffect(PillView.RecordingHold));
 
             case DictationState.PendingTap:
-                // Second tap inside the window: hands-free. Capture keeps running, nothing is lost.
+                // Second tap inside the window: hands-free. Capture keeps running, nothing is lost, and from now on each part
+                // is typed when the speaker pauses (hold-to-talk stays one recording).
                 _ignoreNextUp = true;
+                _handsFree = true;
                 State = DictationState.RecordingHandsFree;
-                return [new PillEffect(PillView.RecordingHandsFree)];
+                ReleaseProcessingToken();
+                _processingCts = new CancellationTokenSource();
+                return [new BeginSegmentsEffect(SessionId, _processingCts.Token), new PillEffect(PillView.RecordingHandsFree)];
 
             case DictationState.RecordingHandsFree:
                 return BeginProcessing(autoStopped: false);
@@ -131,15 +158,24 @@ public sealed class DictationStateMachine
         {
             case DictationState.RecordingHold:
             case DictationState.PendingTap:
-            case DictationState.RecordingHandsFree:
                 State = DictationState.Idle;
                 _ignoreNextUp = false;
                 return [new DiscardCaptureEffect(SessionId), new PillEffect(PillView.Cancelled)];
 
-            case DictationState.Processing:
+            case DictationState.RecordingHandsFree:
+                // Stops recording; the parts already typed stay, the ones in flight or queued are dropped (the token).
                 CancelProcessingToken();
                 State = DictationState.Idle;
-                return [new CancelProcessingEffect(SessionId), new PillEffect(PillView.Cancelled)];
+                _ignoreNextUp = false;
+                _handsFree = false;
+                return [new DiscardCaptureEffect(SessionId), new CancelProcessingEffect(SessionId, KeepsTyped: true), new PillEffect(PillView.HandsFreeStopped)];
+
+            case DictationState.Processing:
+                var keepsTyped = _handsFree; // the rest of a hands-free session: what it already typed stays
+                CancelProcessingToken();
+                State = DictationState.Idle;
+                _handsFree = false;
+                return [new CancelProcessingEffect(SessionId, keepsTyped), new PillEffect(keepsTyped ? PillView.HandsFreeStopped : PillView.Cancelled)];
 
             default:
                 return None; // Esc does nothing when Idle
@@ -152,8 +188,8 @@ public sealed class DictationStateMachine
         var expired = ExpirePendingTap(nowMs);
         if (expired.Count > 0) return expired;
 
-        if ((State is DictationState.RecordingHold or DictationState.RecordingHandsFree)
-            && nowMs - _captureStartedAt >= _options.HandsFreeMaxSeconds * 1000L)
+        var limitSeconds = State == DictationState.RecordingHandsFree ? _options.HandsFreeMaxSeconds : _options.HoldMaxSeconds;
+        if ((State is DictationState.RecordingHold or DictationState.RecordingHandsFree) && nowMs - _captureStartedAt >= limitSeconds * 1000L)
         {
             // Auto-stop: a stuck key or a forgotten hands-free session is transcribed, never discarded. The key is
             // forgotten too: if its key-up was lost (secure desktop), the next press must start a recording.
@@ -169,12 +205,14 @@ public sealed class DictationStateMachine
         if (State != DictationState.Processing || sessionId != SessionId) return None;
         ReleaseProcessingToken();
         State = DictationState.Idle;
+        _handsFree = false;
         return [new PillEffect(outcome == ProcessingOutcome.Inserted ? PillView.Done : PillView.Hidden)];
     }
 
     /// <summary>
     /// The device failed mid-recording (unplugged, a headset battery died). What was captured is transcribed, as the
-    /// auto-stop does (never discarded), with the "Mic error" flash; a lone tap still waiting for its second tap is
+    /// auto-stop does (never discarded), with the "Mic error" flash: in hands-free the parts already typed stay and what
+    /// followed the last cut is typed last, under the session's token. A lone tap still waiting for its second tap is
     /// discarded as before, since it is not a dictation yet.
     /// </summary>
     public IReadOnlyList<Effect> CaptureLost(long sessionId)
@@ -183,7 +221,10 @@ public sealed class DictationStateMachine
         return [.. BeginProcessing(autoStopped: false).Where(e => e is not PillEffect), new PillEffect(PillView.MicError)];
     }
 
-    /// <summary>The microphone could not be opened or failed mid-recording.</summary>
+    /// <summary>
+    /// The microphone could not be opened (a new hold), or failed while a lone tap waited for its second: discarded, "Mic
+    /// error". Never reached in hands-free, where a lost microphone is <see cref="CaptureLost"/>'s.
+    /// </summary>
     public IReadOnlyList<Effect> CaptureFailed(long sessionId)
     {
         if (!IsRecording || sessionId != SessionId) return None;
@@ -197,13 +238,20 @@ public sealed class DictationStateMachine
         IReadOnlyList<Effect> effects = None;
         if (!enabled)
         {
-            if (IsRecording) effects = [new DiscardCaptureEffect(SessionId), new PillEffect(PillView.Hidden)];
+            if (IsRecording && _handsFree)
+            {
+                CancelProcessingToken(); // the parts not yet typed are dropped too
+                effects = [new DiscardCaptureEffect(SessionId), new CancelProcessingEffect(SessionId, KeepsTyped: true), new PillEffect(PillView.Hidden)];
+            }
+            else if (IsRecording) effects = [new DiscardCaptureEffect(SessionId), new PillEffect(PillView.Hidden)];
             else if (State == DictationState.Processing)
             {
+                var keepsTyped = _handsFree;
                 CancelProcessingToken();
-                effects = [new CancelProcessingEffect(SessionId), new PillEffect(PillView.Hidden)];
+                effects = [new CancelProcessingEffect(SessionId, keepsTyped), new PillEffect(PillView.Hidden)];
             }
             State = DictationState.Idle;
+            _handsFree = false;
         }
         Enabled = enabled;
         _keyDown = false;
@@ -220,8 +268,12 @@ public sealed class DictationStateMachine
 
     private IReadOnlyList<Effect> BeginProcessing(bool autoStopped)
     {
-        ReleaseProcessingToken();
-        _processingCts = new CancellationTokenSource();
+        // A hands-free session keeps the token its parts are already typed under, so one Esc stops them all.
+        if (!_handsFree || _processingCts is null)
+        {
+            ReleaseProcessingToken();
+            _processingCts = new CancellationTokenSource();
+        }
         State = DictationState.Processing;
         return [new BeginProcessingEffect(SessionId, _processingCts.Token, autoStopped), new PillEffect(PillView.Transcribing)];
     }

@@ -23,7 +23,9 @@ public interface IDictationUi
 /// <summary>
 /// Owns the state machine and runs it on a single consumer task fed by a channel: hook events, a 50 ms
 /// tick, pipeline completions and tray commands all arrive as messages, so the machine is never touched
-/// concurrently and the hook thread never waits for anything.
+/// concurrently and the hook thread never waits for anything. In hands-free (SPEC §3 amendment, 16/10/2026) the capture cuts
+/// the recording at pauses and each part goes through the pipeline while recording continues: one at a time, in order,
+/// the next one queued (<see cref="HandsFreeSession"/>).
 /// </summary>
 public sealed class DictationController : IDisposable
 {
@@ -40,6 +42,19 @@ public sealed class DictationController : IDisposable
     private long _captureStartTick;
     private long _lastKeyDownStamp; // Stopwatch timestamp of the key-down that started the recording
     private int _lastWords; // words of the dictation that just finished, for the "Pasted" pill
+    private HandsFreeSession? _handsFree; // the session whose parts are being typed while it records (loop thread only)
+
+    /// <summary>
+    /// One hands-free session's parts, queued in the order the capture cut them (the capture thread writes them under its
+    /// buffer's lock, so every part cut before the stop is queued before the rest the stop returns). One worker types them.
+    /// </summary>
+    private sealed class HandsFreeSession(long sessionId, CancellationToken token)
+    {
+        public long SessionId { get; } = sessionId;
+        public CancellationToken Token { get; } = token;
+        public Channel<(CapturedAudio Audio, CutReason Reason)> Parts { get; } =
+            Channel.CreateUnbounded<(CapturedAudio, CutReason)>(new UnboundedChannelOptions { SingleReader = true });
+    }
 
     private sealed record HookInput(HookEvent Event);
     private sealed record TickInput(long NowMs);
@@ -174,16 +189,23 @@ public sealed class DictationController : IDisposable
                 case StartCaptureEffect start:
                     StartCapture(start.SessionId);
                     break;
-                case DiscardCaptureEffect:
+                case BeginSegmentsEffect segments:
+                    BeginSegments(segments);
+                    break;
+                case DiscardCaptureEffect discard:
                     _capture.Stop();
+                    var handsFree = EndParts(discard.SessionId); // nothing after the last cut is typed
                     _ui.SetTrayState(_machine.Enabled ? TrayState.Idle : TrayState.Disabled);
-                    _log.Info("Recording discarded.");
+                    _log.Info(handsFree ? "Hands-free recording stopped; the audio after the last pause is discarded." : "Recording discarded.");
                     break;
                 case BeginProcessingEffect begin:
                     BeginProcessing(begin);
                     break;
                 case CancelProcessingEffect cancel:
-                    _log.Info($"Session {cancel.SessionId} cancelled during processing; nothing will be inserted.");
+                    EndParts(cancel.SessionId);
+                    _log.Info(cancel.KeepsTyped
+                        ? $"Session {cancel.SessionId} stopped: the text already typed stays; parts not yet typed are dropped."
+                        : $"Session {cancel.SessionId} cancelled during processing; nothing will be inserted.");
                     _ui.SetTrayState(_machine.Enabled ? TrayState.Idle : TrayState.Disabled);
                     break;
                 case PillEffect pill:
@@ -210,13 +232,105 @@ public sealed class DictationController : IDisposable
         }
     }
 
+    /// <summary>
+    /// Hands-free began: the capture cuts at pauses from now on and one worker types each part, in order, while recording
+    /// goes on. A capture that cannot cut (IAudioCapture's default) hands everything over at the stop, as one part.
+    /// </summary>
+    private void BeginSegments(BeginSegmentsEffect begin)
+    {
+        if (_handsFree is { } stale) stale.Parts.Writer.TryComplete();
+        var session = new HandsFreeSession(begin.SessionId, begin.Token);
+        _handsFree = session;
+        _ = Task.Run(() => TypePartsAsync(session));
+        var parts = session.Parts.Writer;
+        _capture.SegmentAtPauses(_settings().SilenceThreshold, (audio, reason) => parts.TryWrite((audio, reason)));
+        _log.Info("Hands-free: each part is typed when you pause.");
+    }
+
+    /// <summary>No more parts for this session (stop, Esc, disabled, the microphone gone): its worker types what is queued, or drops it once the token is cancelled.</summary>
+    private bool EndParts(long sessionId)
+    {
+        if (_handsFree is not { } session || session.SessionId != sessionId) return false;
+        session.Parts.Writer.TryComplete();
+        _handsFree = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Types one hands-free session's parts one at a time, in the order they were cut; a slow part delays the next and never
+    /// reorders it. Each part gets the last part that typed something: its typed text for the boundary rule, the closing words
+    /// of what it said for the context. After Esc (the token) the parts still queued are dropped and nothing more is reported:
+    /// the machine is already idle. Logs counts and timings only.
+    /// </summary>
+    // simplification: each part is typed into whatever window is in front when it is ready (TextInserter, SPEC §6), as a whole
+    // recording always was; but a session runs for minutes while the speaker may switch windows. Ceiling: after a window change
+    // mid-session the next parts are typed into the other app, and with insert.method = type a spoken "new line" there is the
+    // Enter key, which sends the message in some chat apps. The README tells the user to stay in the window until the session
+    // stops. Trigger to retire: the product owner's decision on holding parts while another window is in front, due 17/10/2026.
+    private async Task TypePartsAsync(HandsFreeSession session)
+    {
+        var (number, typed, dropped, failed, words) = (0, 0, 0, 0, 0);
+        HandsFreePart? last = null;
+        await foreach (var (audio, reason) in session.Parts.Reader.ReadAllAsync().ConfigureAwait(false))
+        {
+            number++;
+            if (session.Token.IsCancellationRequested)
+            {
+                dropped++;
+                continue;
+            }
+            _log.Info($"Segment {number}: {audio.Duration.TotalSeconds:0.0} s, {Describe(reason)}.");
+            var part = new HandsFreePart(number, last);
+            try
+            {
+                var outcome = await _pipeline.RunAsync(audio, session.Token, view =>
+                {
+                    if (view is PillView.Polishing or PillView.PolishingSkipped) ReportPolishing(session.SessionId, view);
+                }, inserted => words += inserted, part).ConfigureAwait(false);
+                if (outcome == ProcessingOutcome.Inserted) typed++;
+                if (part.Typed is not null) last = part;
+            }
+            catch (OperationCanceledException) when (session.Token.IsCancellationRequested)
+            {
+                dropped++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                _log.Error($"Segment {number} failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        _log.Info($"Hands-free session {session.SessionId}: {number} part(s), {typed} typed, {dropped} dropped, {failed} failed.");
+        if (session.Token.IsCancellationRequested) return; // Esc, disabled or quit: the machine is idle and has said so
+        var result = failed > 0 ? ProcessingOutcome.Failed : typed > 0 ? ProcessingOutcome.Inserted : ProcessingOutcome.Discarded;
+        _inbox.Writer.TryWrite(new DoneInput(session.SessionId, result, words)); // Finished sets the tray state
+    }
+
+    private static string Describe(CutReason reason) => reason switch
+    {
+        CutReason.Pause => "cut on quiet",
+        CutReason.Limit => $"cut at {SpeechSegmenter.LimitBlocks * SpeechSegmenter.BlockMs / 1000} s on the quietest block",
+        _ => "the rest at the stop",
+    };
+
     private void BeginProcessing(BeginProcessingEffect begin)
     {
         var audio = _capture.Stop();
         _ui.SetTrayState(TrayState.Processing);
+        var session = _handsFree is { } current && current.SessionId == begin.SessionId ? current : null;
         if (begin.AutoStopped)
         {
-            _log.Info($"Recording auto-stopped at hands_free_max_seconds ({_settings().HandsFreeMaxSeconds} s); transcribing what was captured.");
+            _log.Info(session is not null
+                ? $"Hands-free recording auto-stopped at hands_free_max_seconds ({_machine.Options.HandsFreeMaxSeconds} s); typing what followed the last cut."
+                : $"Held key auto-stopped at the hold limit ({_machine.Options.HoldMaxSeconds} s, not a setting); transcribing what was captured.");
+        }
+        if (session is not null)
+        {
+            // Every part cut before the stop is already queued (the capture hands parts over before Stop returns): the rest
+            // goes last, and the worker reports the session done once all are typed.
+            session.Parts.Writer.TryWrite((audio, CutReason.Stop));
+            EndParts(begin.SessionId);
+            return;
         }
         _ = Task.Run(async () =>
         {

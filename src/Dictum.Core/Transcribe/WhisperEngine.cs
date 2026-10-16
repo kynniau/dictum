@@ -10,6 +10,14 @@ namespace Dictum.Transcribe;
 public interface ITranscriber
 {
     Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A hands-free part (SPEC §3 amendment, 16/10/2026): <paramref name="carried"/>, the closing words of the part typed before
+    /// it, follow the dictionary terms in whisper's prompt (<see cref="DecodeOptions.WithCarried"/>), so the sentence carries
+    /// on across the cut. A transcriber without a prompt (this default) ignores them.
+    /// </summary>
+    Task<string> TranscribeAsync(float[] samples16kMono, string? carried, CancellationToken cancellationToken) =>
+        TranscribeAsync(samples16kMono, cancellationToken);
 }
 
 /// <summary>
@@ -32,6 +40,14 @@ public sealed record DecodeOptions(string? Prompt, int BeamSize, string Language
 
     /// <summary>"language hi (Hindi), translating to English" for the log and --selftest.</summary>
     public string DescribeLanguage() => $"language {WhisperLanguages.Describe(Language)}{(Translate ? ", translating to English" : "")}";
+
+    /// <summary>
+    /// These options with a hands-free part's carried words after the dictionary terms: whisper reads its prompt as the text
+    /// just before the audio, so the words that were typed last come last. Without terms the prompt is the words alone. Only
+    /// the prompt changes: the part keeps these options' beam size, language and translate.
+    /// </summary>
+    public DecodeOptions WithCarried(string carried) =>
+        this with { Prompt = string.IsNullOrWhiteSpace(Prompt) ? carried : $"{Prompt}. {carried}" };
 }
 
 /// <summary>A loaded speech model whose decoding can be changed without reloading it (dictionary edits, calibration).</summary>
@@ -63,12 +79,14 @@ public sealed partial class WhisperEngine : ISpeechEngine
     private int _disposed;
     private readonly WhisperFactory _factory;
     private readonly int _threads;
+    private readonly ILog _log;
     private WhisperProcessor _processor;
 
-    private WhisperEngine(WhisperFactory factory, int threads, DecodeOptions decode, string modelPath, TimeSpan loadTime)
+    private WhisperEngine(WhisperFactory factory, int threads, DecodeOptions decode, string modelPath, TimeSpan loadTime, ILog log)
     {
         _factory = factory;
         _threads = threads;
+        _log = log;
         Decode = decode;
         _processor = Build(factory, threads, decode);
         ModelPath = modelPath;
@@ -238,7 +256,7 @@ public sealed partial class WhisperEngine : ISpeechEngine
         {
             ConfigureRuntime(gpuSetting, log);
             var factory = WhisperFactory.FromPath(modelPath);
-            return new WhisperEngine(factory, threads, options, modelPath, TimeSpan.Zero);
+            return new WhisperEngine(factory, threads, options, modelPath, TimeSpan.Zero, log);
         });
         sw.Stop();
         engine.LoadTime = sw.Elapsed;
@@ -264,17 +282,57 @@ public sealed partial class WhisperEngine : ISpeechEngine
         await _busy.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var segments = new List<string>();
-            await foreach (var segment in _processor.ProcessAsync(samples16kMono, cancellationToken).ConfigureAwait(false))
-            {
-                segments.Add(segment.Text);
-            }
-            return TranscriptText.Normalise(segments);
+            return await RunAsync(_processor, samples16kMono, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             _busy.Release();
         }
+    }
+
+    /// <summary>
+    /// A hands-free part with the last part's closing words after the dictionary terms in the prompt. Whisper.net 1.9.1 sets
+    /// the prompt only when a processor is built (WithPrompt), so a processor with this prompt is built for the part and freed
+    /// after it; the decoder in use is left as it is. If that build fails the part is transcribed without the words.
+    /// </summary>
+    // simplification: one processor built and freed per part. Ceiling: each build allocates a second whisper state for the
+    // part's duration (its time is inside the part's "Transcribed … in N ms" line), and on Vulkan a prompt of a length not
+    // seen before can compile shaders on its first run (DECISIONS.md, 15/10/2026: 24-26 s for a longer dictionary prompt,
+    // under 0.7 s after). Trigger to retire: a per-call prompt in the binding, or parts logged waiting that long.
+    public async Task<string> TranscribeAsync(float[] samples16kMono, string? carried, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(carried)) return await TranscribeAsync(samples16kMono, cancellationToken).ConfigureAwait(false);
+        await _busy.WaitAsync(cancellationToken).ConfigureAwait(false);
+        WhisperProcessor? withCarried = null;
+        try
+        {
+            var decode = Decode.WithCarried(carried);
+            try
+            {
+                withCarried = NativeLoadGate.Run(() => Build(_factory, _threads, decode)); // the language and translate travel in decode
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"Whisper could not take the last part's words as context ({ex.GetType().Name}); transcribing the part without them.");
+            }
+            return await RunAsync(withCarried ?? _processor, samples16kMono, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // DisposeAsync waits for a native run a cancellation left going (see Dispose).
+            if (withCarried is not null) await withCarried.DisposeAsync().ConfigureAwait(false);
+            _busy.Release();
+        }
+    }
+
+    private static async Task<string> RunAsync(WhisperProcessor processor, float[] samples16kMono, CancellationToken cancellationToken)
+    {
+        var segments = new List<string>();
+        await foreach (var segment in processor.ProcessAsync(samples16kMono, cancellationToken).ConfigureAwait(false))
+        {
+            segments.Add(segment.Text);
+        }
+        return TranscriptText.Normalise(segments);
     }
 
     /// <summary>

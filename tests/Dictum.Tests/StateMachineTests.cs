@@ -122,14 +122,12 @@ public class StateMachineTests
 
     [Theory]
     [InlineData("hold")]
-    [InlineData("pending")]
-    [InlineData("handsfree")]
+    [InlineData("pending")] // hands-free: Esc stops and keeps what is typed (HandsFreeStateMachineTests)
     public void Esc_during_recording_discards(string where)
     {
         var m = NewMachine();
         m.HotkeyDown(0);
         if (where != "hold") m.HotkeyUp(100);
-        if (where == "handsfree") m.HotkeyDown(300);
 
         var effects = m.Escape(350);
         Assert.Equal(DictationState.Idle, m.State);

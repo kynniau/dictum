@@ -99,16 +99,8 @@ public sealed class Corrections
         return _pattern.Replace(text, m =>
         {
             var written = _written[WholeWords.Key(m.Value)];
-            return Verbatim ? written : Cased(m.Value, written, AtSentenceStart(text, m.Index));
+            return Verbatim ? written : Cased(m.Value, written, SentenceStart.At(text, m.Index)); // where a capital is the sentence's, not the word's
         });
-    }
-
-    /// <summary>The text start, or after ". ", "! ", "? " or a line break: where a capital is the sentence's, not the word's.</summary>
-    private static bool AtSentenceStart(string text, int index)
-    {
-        var i = index - 1;
-        while (i >= 0 && text[i] is ' ' or '\t' or '"' or '\'' or '(') i--;
-        return i < 0 || text[i] is '.' or '!' or '?' or '\n';
     }
 
     /// <summary>

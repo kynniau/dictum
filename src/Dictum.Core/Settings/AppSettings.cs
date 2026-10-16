@@ -3,12 +3,26 @@ namespace Dictum.Settings;
 /// <summary>settings.json, SPEC §9. Immutable snapshot; a reload produces a new instance.</summary>
 public sealed record AppSettings
 {
+    /// <summary>
+    /// hands_free_max_seconds' range since hands-free types each part as the speaker pauses (product owner, 16/10/2026): the
+    /// wait at the end is one part, not the whole session, so the auto-stop runs from 30 s to 60 minutes. A value from 5 to 29
+    /// left from earlier versions is raised to 30 at load (EffectiveSettings.HandsFree).
+    /// </summary>
+    public const int HandsFreeMinimumSeconds = 30;
+
+    public const int HandsFreeMaximumSeconds = 3600;
+
     public bool Enabled { get; init; } = true;
     public string Hotkey { get; init; } = "RightCtrl";
     public bool SuppressHotkey { get; init; } = true;
     public int TapMs { get; init; } = 300;
     public int DoubleTapMs { get; init; } = 400;
     public int MinRecordingMs { get; init; } = 300;
+
+    /// <summary>
+    /// Hands-free stops by itself after this long: Settings > General > "Hands-free stops after". A held key has its own fixed
+    /// limit, not this one (<see cref="Dictum.Core.StateMachineOptions.HoldMaxSeconds"/>).
+    /// </summary>
     public int HandsFreeMaxSeconds { get; init; } = 300;
     public double SilenceThreshold { get; init; } = 0.01;
     public AudioSettings Audio { get; init; } = new();

@@ -10,12 +10,14 @@ public sealed record CapturedAudio(float[] Samples, float PeakLevel)
 
 /// <summary>
 /// Accumulates decoded device audio as 16 kHz mono and meters it: RMS per 20 ms block drives the pill,
-/// and the loudest block RMS is the "peak level" compared with silence_threshold.
+/// and the loudest block RMS is the "peak level" compared with silence_threshold. In hands-free it also cuts the recording
+/// at pauses (<see cref="SegmentAtPauses"/>) and hands each finished part over, keeping only what follows the last cut.
 /// Thread-safe: written from the capture thread, read from the controller and UI.
 /// </summary>
 public sealed class CaptureBuffer
 {
-    private const int BlockSamples = MonoResampler.WhisperRate / 50; // 20 ms
+    /// <summary>Samples in one 20 ms block (<see cref="SpeechSegmenter.BlockMs"/>): the unit of metering and of every cut.</summary>
+    public const int BlockSamples = MonoResampler.WhisperRate * SpeechSegmenter.BlockMs / 1000;
 
     private readonly object _gate = new();
     private readonly List<float> _samples = new(MonoResampler.WhisperRate * 30);
@@ -29,6 +31,10 @@ public sealed class CaptureBuffer
     private float _peak;
     private float _level;
     private bool _sealed;
+    private long _blocks;          // whole blocks measured since the start
+    private long _firstBlock;      // the block _samples[0] starts (parts before it were handed over)
+    private SpeechSegmenter? _segmenter;
+    private Action<CapturedAudio, CutReason>? _onPart;
 
     public CaptureBuffer(SampleEncoding encoding, int channels, int sampleRate)
     {
@@ -70,6 +76,23 @@ public sealed class CaptureBuffer
         }
     }
 
+    /// <summary>
+    /// Hands-free (SPEC §3 amendment, 16/10/2026): from now on, cut the recording at pauses (<see cref="SpeechSegmenter"/>) and
+    /// hand each finished part to <paramref name="part"/>, in order, on the capture thread and under this buffer's lock, so
+    /// every part cut before <see cref="Seal"/> has been handed over by the time Seal returns what follows the last cut. The
+    /// audio already captured belongs to the first part. <paramref name="part"/> must not block or call back into the buffer.
+    /// A second call, or a call after Seal, does nothing.
+    /// </summary>
+    public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part)
+    {
+        lock (_gate)
+        {
+            if (_sealed || _segmenter is not null) return;
+            _segmenter = new SpeechSegmenter(silenceThreshold, _blocks, _peak);
+            _onPart = part;
+        }
+    }
+
     private void AddResampled(ReadOnlySpan<float> chunk)
     {
         foreach (var s in chunk)
@@ -82,17 +105,30 @@ public sealed class CaptureBuffer
             if (rms > _peak) _peak = rms;
             _blockSumSquares = 0;
             _blockCount = 0;
+            _blocks++;
+            if (_segmenter?.Add(rms) is { } cut) HandOver(cut);
         }
     }
 
-    /// <summary>Stops accepting audio and returns everything captured.</summary>
+    /// <summary>Hands over every sample before the cut's block (whole blocks) and keeps the rest, which starts the next part.</summary>
+    private void HandOver(SegmentCut cut)
+    {
+        var count = checked((int)((cut.Block - _firstBlock) * BlockSamples));
+        var part = new float[count];
+        _samples.CopyTo(0, part, 0, count);
+        _samples.RemoveRange(0, count);
+        _firstBlock = cut.Block;
+        _onPart!(new CapturedAudio(part, cut.Peak), cut.Reason);
+    }
+
+    /// <summary>Stops accepting audio and returns everything captured (in hands-free, what follows the last cut).</summary>
     public CapturedAudio Seal()
     {
         lock (_gate)
         {
             _sealed = true;
             Volatile.Write(ref _level, 0f);
-            return new CapturedAudio([.. _samples], _peak);
+            return new CapturedAudio([.. _samples], _segmenter?.TailPeak ?? _peak);
         }
     }
 }

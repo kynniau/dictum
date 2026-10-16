@@ -140,7 +140,13 @@ public sealed class TranscriptCleaner
             : null;
     }
 
-    public async Task<CleanupResult> CleanAsync(string raw, CancellationToken cancellationToken)
+    /// <param name="carried">
+    /// A hands-free part's context (SPEC §3 amendment, 16/10/2026): the closing words of what the part before it said, before
+    /// corrections, the profanity filter and snippets. The provider gets them beside the part, never as its dictation, and the
+    /// reply is checked against the part's own words with them as prompt text (a reply that repeats them is rejected). Null for
+    /// a whole recording.
+    /// </param>
+    public async Task<CleanupResult> CleanAsync(string raw, CancellationToken cancellationToken, string? carried = null)
     {
         if (string.IsNullOrWhiteSpace(raw)) return new CleanupResult("", false, null);
         if (_plain) return new CleanupResult(DeterministicCleaner.WhitespaceOnly(raw), false, null);
@@ -158,13 +164,14 @@ public sealed class TranscriptCleaner
         Task<LlmReply>? call = null;
         try
         {
-            call = _client.CompleteAsync(_prompt, raw, timeout.Token);
+            call = carried is null ? _client.CompleteAsync(_prompt, raw, timeout.Token) : _client.CompleteAsync(_prompt, raw, carried, timeout.Token);
             // This stops waiting at the deadline, or at a reload, even if the provider does not stop (llama.cpp cannot interrupt
             // a prompt half-way); the timeout path then cancels the provider's token itself.
             var reply = await call.WaitAsync(deadline, timeout.Token).ConfigureAwait(false);
             if (reply.IsRefusal) return Fallback(raw, $"provider refused (stop_reason {reply.StopReason})");
             if (reply.IsTruncated) return Fallback(raw, $"reply truncated (stop_reason {reply.StopReason})");
-            var (text, rejection) = CleanupValidator.Validate(raw, reply.Text, _validation);
+            var validation = carried is null ? _validation : _validation with { SystemPrompt = CleanupPrompt.WithCarried(_prompt, carried), Carried = carried };
+            var (text, rejection) = CleanupValidator.Validate(raw, reply.Text, validation);
             return text is null ? Fallback(raw, rejection!) : new CleanupResult(text, true, null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
