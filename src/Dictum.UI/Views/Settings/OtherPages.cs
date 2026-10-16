@@ -3,7 +3,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Dictum.Llm;
 using Dictum.Settings;
-using Dictum.Transcribe;
 using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views.Settings;
@@ -81,7 +80,7 @@ internal sealed class CleanupPage : SettingsPage
         _cloudState.Text = !on ? ""
             : server is not null && !Shell.NothingLeaves ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
             : Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
-            : OfflineOnlyIsWhyNothingIsSent(s) ? CloudPolicy.OfflineOnlyLine
+            : OfflineOnlyIsWhyNothingIsSent(Shell) ? CloudPolicy.OfflineOnlyLine
             : Shell.NothingLeaves ? CloudPolicy.NothingSentLine
             : $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}";
         _enable.IsEnabled = !s.OfflineOnly;
@@ -90,15 +89,12 @@ internal sealed class CleanupPage : SettingsPage
 
     /// <summary>
     /// True when offline only is why cloud clean-up sends nothing (<see cref="TranscriptCleaner.OfflineRefusal"/>) and switching it
-    /// off would change that. Not for text that is not English (SPEC §23): the plain cleaner never asks a provider, so nothing would
-    /// be sent either way, and the pages say that the clean-up in use runs on this PC. Settings > Privacy decides the same way.
+    /// off would change that. Not while the clean-up in use is the plain cleaner (text that is not English, SPEC §23): it never asks a
+    /// provider, so nothing would be sent either way, and the pages say that the clean-up in use runs on this PC. Settings > Privacy
+    /// decides the same way.
     /// </summary>
-    // simplification: the English test is recomputed from the settings, the same expression AppShell.LoadConfiguration gives
-    // TranscriptCleaner.Create, because AppShell does not expose whether the cleaner in use is plain. Ceiling: the page and the cleaner
-    // agree only while that one call decides. Retire it when AppShell exposes TranscriptCleaner.IsPlain (or the cleaner gains another
-    // reason to be plain): read it from the shell here and on the Privacy page.
-    internal static bool OfflineOnlyIsWhyNothingIsSent(AppSettings s) =>
-        TranscriptCleaner.OfflineRefusal(s.Llm, s.OfflineOnly) is not null && WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate);
+    internal static bool OfflineOnlyIsWhyNothingIsSent(AppShell shell) =>
+        !shell.Cleaner.IsPlain && TranscriptCleaner.OfflineRefusal(shell.Settings.Llm, shell.Settings.OfflineOnly) is not null;
 
     /// <summary>The preset chosen in the Service list; null for Anthropic, which is its own provider.</summary>
     private CloudPreset? Preset => _provider.SelectedIndex > 0 ? CloudPresets.All[_provider.SelectedIndex - 1] : null;
@@ -191,7 +187,7 @@ internal sealed class PrivacyPage : SettingsPage
         var server = CloudPolicy.LocalServerHost(s.Llm);
         // Cloud clean-up that is on but sends nothing says why first, decided as on the Clean-up page.
         _summary.Text = Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
-            : CleanupPage.OfflineOnlyIsWhyNothingIsSent(s) ? CloudPolicy.OfflineOnlyLine
+            : CleanupPage.OfflineOnlyIsWhyNothingIsSent(Shell) ? CloudPolicy.OfflineOnlyLine
             : Shell.NothingLeaves ? "Nothing leaves this PC: speech recognition and clean-up both run here."
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
             : $"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. {CloudPolicy.StateLineWarning}";

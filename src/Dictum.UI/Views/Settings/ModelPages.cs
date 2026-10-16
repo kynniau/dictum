@@ -46,9 +46,12 @@ internal sealed class ModelsPage : SettingsPage
             }
             Write(("whisper.language", Json(code)));
             if (Shell.Settings.Whisper.Language != code) return; // not written (a balloon said why); Redraw puts the picker back
+            var listens = code == WhisperLanguages.Auto
+                ? "Dictum works out the language from the first seconds of each dictation" // the card's own words for Detect automatically
+                : $"Dictum listens for {WhisperLanguages.Name(code)} ({code})";
             Say(code == WhisperLanguages.English
                 ? "Dictum listens for English again."
-                : $"Dictum listens for {WhisperLanguages.Name(code).ToLowerInvariant()}{(code == WhisperLanguages.Auto ? "" : $" ({code})")}{(w.Translate ? " and writes English" : "")}. The decoder switches now; the model stays loaded.");
+                : $"{listens}{(w.Translate ? " and writes English" : "")}. The decoder switches now; the model stays loaded.");
         };
         _translate = Ui.Switch(false, on =>
         {

@@ -1081,7 +1081,8 @@ without the matcher, so the first pin drives the matcher and the state machine d
 - One guard function rather than scattered checks: `WhisperLanguages.Problem(model, language, translate)` is the only
   place that knows an `.en` model is English-only and that turbo cannot translate; the Models page, the engine's load
   warning and `--selftest` all call it. English-only is read from the name (".en"), turbo from the "large-v3-turbo"
-  prefix, so a user's own file named like a catalogue entry is judged the same way and an unknown name is trusted.
+  prefix, so a user's own file named like a catalogue entry is judged the same way and an unknown name is trusted, except
+  for Cantonese, which is allowed only for names starting with large-v3 (see the Cantonese bullet below).
 - Language and translate are decoder options (`DecodeOptions`), rebuilt through the existing `SetDecoding` →
   `Reconfigure` path like the dictionary prompt, not a model reload. The first cut reloaded the model; the lens pointed
   out that a reload of large-v3 (3.1 GB plus the warm-up) leaves `IsReady` false and the hotkey dead meanwhile, that the
@@ -1093,6 +1094,18 @@ without the matcher, so the first pin drives the matcher and the state machine d
   capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on Hindi or
   Polish text would change it. Corrections and the profanity filter still run; they are whole-word matches the user
   wrote. Status "skipped: …" is visible in About and `--selftest`.
+- Combining marks are part of a word (lens, 16/10/2026). A Devanagari vowel sign, virama or anusvara is a combining mark
+  (`\p{M}`), not a letter, so the shared whole-word matcher (`WholeWords`: corrections, snippets, the profanity list)
+  treated it as a word boundary: `राम => श्याम` turned "विराम" into "विश्याम", a snippet on "कम" fired inside "कमाओ", Fix
+  last suggested nothing for "कम" to "काम" or "है" to "हैं", and mask wrote "क*ीना". The matcher's look-arounds now count
+  `\p{M}` as inside a word, and the Fix-last diff and the profanity mask and removal ask `WholeWords.IsWordChar` (a letter,
+  a digit, or a non-spacing or spacing combining mark). English matching (apostrophes, possessive "s", digits, hyphens) is
+  unchanged. This extends Batch 2's "a word character is a letter or a digit".
+- Known limitation: Detect automatically without translation always gets the plain cleaner, because the cleaner is built
+  when the settings load, before whisper has detected any dictation's language; English speech under `auto` is therefore
+  not tidied either, and the README tells an English speaker to choose English. Retire when the cleaner is chosen per
+  dictation from the language whisper detected: Whisper.net 1.9.1 reports it for each segment (`SegmentData.Language`,
+  "Gets the language of the current segment." in its XML docs in the NuGet cache, read 16/10/2026).
 - Settings > Clean-up and Privacy for text that is not English (16/10/2026): the page falls through to the approved "On, but
   nothing is sent: the clean-up in use runs on this PC." (Privacy: "Nothing leaves this PC: …") instead of the local-server
   line, and takes precedence over the offline-only line, because switching offline only off would still send nothing. For

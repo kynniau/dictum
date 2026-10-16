@@ -1,5 +1,7 @@
+using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.LogicalTree;
+using Dictum.Calibration;
 using Dictum.Core;
 using Dictum.Llm;
 using Dictum.Personal;
@@ -66,6 +68,7 @@ public class LanguageTests
     [InlineData("large-v3", "yue", false, null)]
     [InlineData("large-v3-turbo", "yue", false, null)]
     [InlineData("my-own-model", "hi", true, null)] // an unknown name is trusted
+    [InlineData(@"D:\models\ggml-my-large-v3-yue.bin", "yue", false, "Cantonese")] // but Cantonese is allowed only for names starting with large-v3
     public void The_model_is_checked_against_the_language_and_the_translate_switch(string model, string language, bool translate, string? fragment)
     {
         var problem = WhisperLanguages.Problem(model, language, translate);
@@ -82,6 +85,19 @@ public class LanguageTests
     [InlineData("auto", true, true)]
     public void The_output_is_english_with_translate_on_or_language_en(string language, bool translate, bool english) =>
         Assert.Equal(english, WhisperLanguages.OutputIsEnglish(language, translate));
+
+    /// <summary>
+    /// Detect automatically keeps the clean-up off even when the speech is English (the cleaner is chosen when the settings load,
+    /// before whisper has heard anything), so the README tells an English speaker to choose English.
+    /// </summary>
+    [Fact]
+    public void The_README_tells_an_English_speaker_to_choose_English_rather_than_detect_automatically()
+    {
+        Assert.False(WhisperLanguages.OutputIsEnglish(WhisperLanguages.Auto, translate: false)); // the rule the sentence describes
+        var readme = Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md")), @"\s+", " ");
+        Assert.Contains("Detect automatically also switches the clean-up off for English speech, so an English speaker should choose English.",
+            readme, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void The_mode_note_names_only_the_presets_whose_model_cannot_do_what_is_asked()
@@ -126,6 +142,22 @@ public class LanguageTests
         Assert.Equal(DecodeOptions.Default, new DecodeOptions(null, 0, "en", false));
     }
 
+    /// <summary>
+    /// The settings.json written at first run (<see cref="SettingsFile.DefaultJson"/>) names English without translation: a new
+    /// install dictates English, with the clean-up on, until someone chooses otherwise (decision 14, 16/10/2026: English the default).
+    /// </summary>
+    [Fact]
+    public void The_settings_file_written_at_first_run_says_english_without_translation()
+    {
+        var json = SettingsFile.DefaultJson("small.en");
+        var whisper = System.Text.Json.Nodes.JsonNode.Parse(json)!["whisper"]!;
+        Assert.Equal("en", whisper["language"]!.GetValue<string>());
+        Assert.False(whisper["translate"]!.GetValue<bool>());
+        var load = SettingsLoader.Parse(json);
+        Assert.Empty(load.Warnings);
+        Assert.Equal(("en", false), (load.Settings.Whisper.Language, load.Settings.Whisper.Translate));
+    }
+
     [Fact]
     public async Task A_language_or_translate_change_rebuilds_the_decoder_without_loading_the_model_again()
     {
@@ -145,6 +177,92 @@ public class LanguageTests
         Assert.True(await Eventually(() => engine.Decode.Language == "auto" && !engine.Decode.Translate));
         Assert.Equal(1, loads);
         models.Dispose();
+    }
+
+    /// <summary>
+    /// The dictionary (SPEC §16.2) is whisper's prompt whatever the language: the tray app gives the decoder the prompt with the
+    /// language (AppShell.LoadConfiguration), so names and terms are still spelled the user's way in Hindi dictation.
+    /// </summary>
+    [Fact]
+    public async Task The_dictionary_prompt_reaches_the_decoder_for_hindi()
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "medium", "language": "hi" } }""");
+        var modelsDir = scratch.Paths.ModelsDir(new AppSettings());
+        Directory.CreateDirectory(modelsDir);
+        File.WriteAllBytes(Path.Combine(modelsDir, "ggml-medium.bin"), new byte[16]); // present; the fake loader never reads it
+        File.WriteAllText(scratch.Paths.DictionaryFile, "Kynni\nParramatta\n");
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var shell = await UiSession.Run(() =>
+        {
+            var (s, _, _) = scratch.Shell(models);
+            s.Reload(userRequested: true);
+            return s;
+        });
+        try
+        {
+            var engine = Assert.IsType<FakeSpeechEngine>(await models.GetAsync(Ct));
+            Assert.Equal("hi", engine.Decode.Language);
+            Assert.False(engine.Decode.Translate);
+            Assert.Equal("Kynni, Parramatta", engine.Decode.Prompt);
+        }
+        finally
+        {
+            await UiSession.Run(() => shell.Dispose()); // disposes the model manager too
+        }
+    }
+
+    /// <summary>
+    /// The lens's case end to end (16/10/2026): a hand edit of whisper.language that the loaded model cannot hear keeps the model,
+    /// so the tray app's reload only rebuilds the decoder; the warning notice still comes, once, however many reloads follow.
+    /// </summary>
+    [Fact]
+    public Task A_hand_edited_language_the_loaded_model_cannot_hear_gets_one_notice() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "small.en", "language": "en" } }""");
+        var modelsDir = scratch.Paths.ModelsDir(new AppSettings());
+        Directory.CreateDirectory(modelsDir);
+        File.WriteAllBytes(Path.Combine(modelsDir, "ggml-small.en.bin"), new byte[16]); // present; the fake loader never reads it
+        var log = new RecordingLog();
+        var models = new ModelManager(log, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var shell = new AppShell(new FakePlatform(scratch.Paths), scratch.Paths, log, new SecretRedactor(), new ShellOptions(), new ScriptedDialogs(),
+            gpuMachine: () => false, speechModels: models);
+        shell.Reload(userRequested: true);
+        File.WriteAllText(scratch.Paths.SettingsFile, """{ "hotkey": "F24", "whisper": { "model": "small.en", "language": "hi" } }"""); // the hand edit
+        shell.Reload(userRequested: false);
+        shell.Reload(userRequested: false); // the next save of any setting
+        var notices = log.Lines.Count(l => l.Message.StartsWith("Notice: small.en is an English-only model, so language \"hi\" cannot be heard", StringComparison.Ordinal));
+        shell.Dispose();
+        Assert.Equal(1, notices);
+    });
+
+    /// <summary>
+    /// Calibration reads English sentences aloud, so it decodes English and never translates, whatever whisper.language and
+    /// whisper.translate say for dictation (SPEC §23): <see cref="CalibrationHost"/> hands the loader calibration's own options.
+    /// </summary>
+    [Fact]
+    public async Task Calibration_decodes_english_without_translation_whatever_dictation_uses()
+    {
+        using var scratch = new Scratch();
+        var hindiTranslated = new AppSettings { Whisper = new WhisperSettings { Model = "medium", Language = "hi", Translate = true } };
+        var loads = new List<DecodeOptions>();
+        FakeSpeechEngine? engine = null;
+        var host = new CalibrationHost(scratch.Paths, () => hindiTranslated, () => PersonalText.Empty,
+            new ModelIntegrity(Path.Combine(scratch.Root.FullName, "verified-models.json"), NullLog.Instance), NullLog.Instance,
+            Write: _ => { }, DownloadSpeechModel: (_, _, _) => { }, AddDictionaryTerms: _ => { }, AddCorrections: _ => { },
+            LoadSpeech: (path, _, decode) =>
+            {
+                loads.Add(decode);
+                return engine = new FakeSpeechEngine(path, decode);
+            });
+
+        var results = await host.CreateEngine().RunAsync([new CalibrationClip(1, "send it to Siobhan", new float[32000])],
+            [new SpeechCandidate("my-model", Path.Combine(scratch.Root.FullName, "my-model.bin"))], "Siobhan", null, Ct);
+
+        Assert.Equal(2, results.Count); // greedy, then beam search
+        var loaded = Assert.Single(loads);
+        Assert.Equal(("en", false), (loaded.Language, loaded.Translate));
+        Assert.Equal(DecodeOptions.CalibrationBeamSize, engine!.Decode.BeamSize); // the decoder was rebuilt for beam search…
+        Assert.Equal(("en", false), (engine.Decode.Language, engine.Decode.Translate)); // …in English too
     }
 
     private static async Task<bool> Eventually(Func<bool> condition)
@@ -175,6 +293,42 @@ public class LanguageTests
         Assert.True(skipped.IsPlain);
         Assert.Contains("skipped", skipped.Status);
         Assert.False(TranscriptCleaner.Create(rules, false, SecretStore.Empty, http, NullLog.Instance, englishText: true).IsPlain);
+    }
+
+    // Text that is not English still goes through the corrections, the profanity filter and the snippets (SPEC §23), so they must
+    // keep to whole words in its script. A Devanagari vowel sign, virama or anusvara is a combining mark, not a letter: it belongs
+    // to the word it is written in. Each case below changed the text, or suggested nothing, before marks counted (lens, 16/10/2026).
+
+    [Fact]
+    public void A_devanagari_correction_replaces_the_whole_word_and_never_the_inside_of_another_word()
+    {
+        var rules = new Corrections(Corrections.Parse(["राम => श्याम", "कम => काम"]));
+        Assert.Equal("श्याम आया", rules.Apply("राम आया"));
+        Assert.Equal("मुझे काम है", rules.Apply("मुझे कम है"));
+        Assert.Equal("यह विराम है", rules.Apply("यह विराम है")); // "विराम" holds "राम" after the vowel sign ि: it became "विश्याम"
+        Assert.Equal("पैसे कमाओ", rules.Apply("पैसे कमाओ")); // "कमाओ" starts with "कम" before the vowel sign ा
+    }
+
+    [Fact]
+    public void A_devanagari_snippet_fires_on_its_own_word_only()
+    {
+        var snippets = new Corrections(Corrections.Parse(["ईमेल => kyle@example.com"], null, "snippets.txt", lineBreaks: true), verbatim: true);
+        var personal = new PersonalText(PersonalDictionary.Empty, Corrections.Empty, ProfanityFilter.Empty, snippets);
+        Assert.Equal("मेरा kyle@example.com भेजो", personal.Finish("मेरा ईमेल भेजो", new ProfanitySettings()));
+        Assert.Equal("सारे ईमेलों को देखो", personal.Finish("सारे ईमेलों को देखो", new ProfanitySettings())); // "ईमेलों" (emails) is another word
+    }
+
+    [Theory]
+    [InlineData("मुझे कम है", "मुझे काम है", "कम => काम")] // only the vowel sign ा differs
+    [InlineData("वे यहाँ है", "वे यहाँ हैं", "है => हैं")] // only the anusvara differs: "is" to "are"
+    public void Fix_last_suggests_a_devanagari_correction_that_changes_only_a_mark(string pasted, string fixedText, string suggested) =>
+        Assert.Equal(suggested, Assert.Single(CorrectionSuggestions.Suggest(pasted, fixedText)).ToString());
+
+    [Fact]
+    public void A_devanagari_word_on_the_profanity_list_is_masked_after_its_first_letter()
+    {
+        var filter = new ProfanityFilter(["कमीना"], "test");
+        Assert.Equal("वह क**** है", filter.Apply("वह कमीना है", ProfanitySettings.Mask)); // it became "क*ीना"
     }
 
     [Fact]
@@ -266,9 +420,37 @@ public class LanguageUiTests
         shell.Write(("whisper.model", System.Text.Json.Nodes.JsonValue.Create("medium")));
         picker.SelectedIndex = IndexOf("hi");
         Assert.Equal("hi", shell.Settings.Whisper.Language); // the in-app write reloads at once
-        Assert.Contains("listens for hindi (hi)", Texts(window));
-        Assert.Contains("the model stays loaded", Texts(window));
+        Assert.Contains("Dictum listens for Hindi (hi). The decoder switches now; the model stays loaded.", Texts(window));
         Assert.Contains("skipped", shell.CleanupStatus); // Hindi written as Hindi: the English clean-up is off
+
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// The Language card's confirmation is a sentence for every choice: a language by its own name, capital included, and Detect
+    /// automatically in the card's own words, never "Dictum listens for detect automatically".
+    /// </summary>
+    [Fact]
+    public Task The_confirmation_names_the_language_or_says_how_detect_automatically_works() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "medium" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: true);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Models");
+        var picker = LanguagePicker(window);
+
+        picker.SelectedIndex = IndexOf("auto");
+        Assert.Equal("auto", shell.Settings.Whisper.Language);
+        Assert.Contains("Dictum works out the language from the first seconds of each dictation. The decoder switches now; the model stays loaded.", Texts(window));
+
+        shell.Write(("whisper.translate", System.Text.Json.Nodes.JsonValue.Create(true)));
+        picker.SelectedIndex = IndexOf("tl");
+        Assert.Contains("Dictum listens for Tagalog (tl) and writes English. The decoder switches now; the model stays loaded.", Texts(window));
+        picker.SelectedIndex = IndexOf("auto");
+        Assert.Contains("Dictum works out the language from the first seconds of each dictation and writes English. The decoder switches now; the model stays loaded.", Texts(window));
 
         window.Close();
         shell.Dispose();

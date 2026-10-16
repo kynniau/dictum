@@ -175,7 +175,8 @@ speaker dictates in Hindi and English is pasted. Recognition and translation run
   dictionary and corrections run on that English. With it off and a language other than English (or Detect
   automatically), the text is written in the language spoken and the clean-up is skipped, because its rules and prompt
   are written for English (the rule-based tidy would capitalise Polish "i", for one); only whitespace is tidied, while
-  corrections, the profanity filter and snippets still run. The About page and `--selftest` show "skipped" as the
+  corrections, the profanity filter and snippets still run. Detect automatically also switches the clean-up off for
+  English speech, so an English speaker should choose English. The About page and `--selftest` show "skipped" as the
   clean-up state. A change of language or translation rebuilds the decoder in place; the model is not loaded again.
 - **The model must be multilingual.** The `.en` models hear English only. `small`, `medium`, `large-v3` and their
   quantised files hear every language; the page refuses a language or the translate switch that the chosen model

@@ -76,11 +76,53 @@ public sealed class ModelCoordinatorTests : IDisposable
         Assert.Contains("base.en is an English-only model", balloon);
         Assert.Contains("\"hi\"", balloon);
         Assert.Equal(file, models.ModelPath); // the load still began: the user keeps a working model, and the reason to change it
+        coordinator.Ensure(previousPath: coordinator.ModelPath, startup: false); // the next reload keeps the model
+        Assert.Single(_balloons); // and does not say it again
 
         _balloons.Clear();
         settings = settings with { Whisper = settings.Whisper with { Language = "en" } };
         coordinator.Ensure(previousPath: null, startup: true);
         Assert.Empty(_balloons);
+    }
+
+    /// <summary>
+    /// A hand edit (or a seeded settings.json) that changes whisper.language or whisper.translate keeps the model, so no load runs
+    /// and AppShell only rebuilds the decoder: the reload itself says, once per distinct problem, that the model cannot do it
+    /// (SPEC §23; lens, 16/10/2026: small.en with "hi" wrote English with the clean-up skipped and no notice).
+    /// </summary>
+    [Fact]
+    public async Task A_language_the_loaded_model_cannot_hear_is_ballooned_once_by_the_reload_that_keeps_the_model()
+    {
+        var paths = new AppPaths(Path.Combine(_dir.FullName, "cfg"), Path.Combine(_dir.FullName, "local"), _dir.FullName);
+        var settings = new AppSettings { Whisper = new WhisperSettings { Model = "small.en", Language = "en" } };
+        Directory.CreateDirectory(paths.ModelsDir(settings));
+        File.WriteAllBytes(Path.Combine(paths.ModelsDir(settings), "ggml-small.en.bin"), new byte[16]); // the fake loader never reads it
+        var loads = 0;
+        using var models = new ModelManager(NullLog.Instance, loader: (p, _, d) =>
+        {
+            Interlocked.Increment(ref loads);
+            return new FakeSpeechEngine(p, d);
+        }, warmUp: () => false);
+        var coordinator = new ModelCoordinator(paths, models, _llm, _http, NullLog.Instance, () => settings, null, _prompts, _ => null,
+            reload: () => { }, shutdown: () => _shutdowns++, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Add(text));
+        coordinator.Ensure(previousPath: null, startup: true);
+        await models.GetAsync(TestContext.Current.CancellationToken);
+        Assert.Empty(_balloons);
+
+        settings = settings with { Whisper = settings.Whisper with { Language = "hi" } }; // the hand edit: the same model
+        coordinator.Ensure(previousPath: coordinator.ModelPath, startup: false); // as AppShell.Reload calls it
+        Assert.Equal("small.en is an English-only model, so language \"hi\" cannot be heard: choose a multilingual model (small, medium or large-v3) in Settings > Models.",
+            Assert.Single(_balloons));
+
+        coordinator.Ensure(previousPath: coordinator.ModelPath, startup: false); // later reloads: any other setting saved
+        coordinator.Ensure(previousPath: coordinator.ModelPath, startup: false);
+        Assert.Single(_balloons);
+
+        settings = settings with { Whisper = settings.Whisper with { Language = "en", Translate = true } }; // a different problem
+        coordinator.Ensure(previousPath: coordinator.ModelPath, startup: false);
+        Assert.Equal(2, _balloons.Count);
+        Assert.Equal("small.en is an English-only model and cannot translate: turn Translate off, or choose medium or large-v3 in Settings > Models.", _balloons[1]);
+        Assert.Equal(1, loads); // the model was never loaded again
     }
 
     private static (string, System.Text.Json.Nodes.JsonNode?)[] FullOnCpu =>

@@ -81,12 +81,14 @@ public static class CorrectionSuggestions
         text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Take(MaxTokens).ToList();
 
     /// <summary>
-    /// Words compare on their letters and digits only, in any case, so "kinney," and "Kinney" are the same word and so are
-    /// "its"/"it's", "10.30"/"10:30" and "e-mail"/"email": punctuation inside a word is not a correction (README, DECISIONS).
+    /// Words compare on their letters, digits and combining marks only (<see cref="WholeWords.IsWordChar"/>), in any case, so
+    /// "kinney," and "Kinney" are the same word and so are "its"/"it's", "10.30"/"10:30" and "e-mail"/"email": punctuation
+    /// inside a word is not a correction (README, DECISIONS). A Devanagari vowel sign or anusvara is part of the word, so
+    /// "कम"/"काम" and "है"/"हैं" are different words.
     /// </summary>
     private static bool Same(string a, string b) => string.Equals(Core(a), Core(b), StringComparison.OrdinalIgnoreCase);
 
-    private static string Core(string token) => new(token.Where(char.IsLetterOrDigit).ToArray());
+    private static string Core(string token) => new(token.Where(WholeWords.IsWordChar).ToArray());
 
     private static readonly char[] Edge = ['.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '“', '”', '‘', '’'];
 

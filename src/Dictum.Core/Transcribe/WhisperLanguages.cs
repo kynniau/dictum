@@ -103,8 +103,9 @@ public static class WhisperLanguages
 
     /// <summary>
     /// Why this model cannot do what the language settings ask, in one sentence for Settings, the warning balloon, the
-    /// log and --selftest; null when it can. Judged from the model's name (a catalogue name, or a file named like one),
-    /// so an unknown file is trusted.
+    /// log and --selftest; null when it can. Judged from the model's name (a catalogue name, or a file named like one), so
+    /// an unknown file is trusted for every language but Cantonese, which is allowed only for names starting with large-v3
+    /// (<see cref="Cantonese"/>).
     /// </summary>
     public static string? Problem(string model, string language, bool translate)
     {

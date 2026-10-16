@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -48,8 +49,9 @@ public static class TextList
 }
 
 /// <summary>
-/// Whole-word, case-insensitive matching of literal phrases, shared by corrections and the profanity filter (SPEC
-/// §16.3, §16.4). A word character is a letter or a digit: "ER" never matches inside "her", "ass" never inside "class".
+/// Whole-word, case-insensitive matching of literal phrases, shared by corrections, snippets and the profanity filter (SPEC
+/// §16.3, §16.4, §16.6). A word character is a letter, a digit or a combining mark: "ER" never matches inside "her", "ass"
+/// never inside "class", and "राम" never inside "विराम", whose vowel sign (a mark, not a letter) belongs to the word.
 /// An apostrophe joins letters, except before a possessive "s": "Kinney's" contains Kinney, but "don't", "won't" and
 /// "o'clock" contain no "don", "won" or "clock". Longer phrases are tried first, so overlapping entries resolve
 /// longest-first; whitespace inside a phrase matches any run of whitespace.
@@ -67,9 +69,17 @@ public static class WholeWords
             .Select(p => string.Join(@"\s+", p.Split(' ').Select(Regex.Escape)))
             .ToList();
         if (alternatives.Count == 0) return null;
-        return new Regex($@"(?<![\p{{L}}\p{{N}}]|\p{{L}}['’])(?:{string.Join("|", alternatives)})(?![\p{{L}}\p{{N}}]|['’](?!s\b)\p{{L}})",
+        return new Regex($@"(?<![\p{{L}}\p{{M}}\p{{N}}]|\p{{L}}['’])(?:{string.Join("|", alternatives)})(?![\p{{L}}\p{{M}}\p{{N}}]|['’](?!s\b)\p{{L}})",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
+
+    /// <summary>
+    /// Part of a word, for the checks that walk a word one character at a time (the Fix-last diff, the profanity mask and
+    /// removal): a letter, a digit, or a combining mark such as a Devanagari vowel sign, virama or anusvara ("काम" is not
+    /// "कम"; "हैं" is not "है").
+    /// </summary>
+    public static bool IsWordChar(char c) =>
+        char.IsLetterOrDigit(c) || char.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark;
 
     /// <summary>The lookup key for a phrase or a matched span: lower-case, single spaces.</summary>
     public static string Key(string phrase) =>
