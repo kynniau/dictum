@@ -10,6 +10,7 @@ namespace Dictum.Tests;
 /// builds a throwaway repository that carries the real hooks and drives them through git itself, so a change to a rule
 /// fails here. Invented words only. The real denylist is never read: the denylist always lives inside the scratch folder.
 /// </summary>
+[Collection("Process-wide state")] // starts many git and shell processes: never beside the timing-based download tests
 public sealed partial class PrivateMaterialHooksTests : IDisposable
 {
     private const string Word = "zebrafish-7";
