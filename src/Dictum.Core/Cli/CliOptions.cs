@@ -79,7 +79,7 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
                     break;
                 case "--download-model":
                     download = Next();
-                    if (download is null || !ModelCatalog.IsShortName(download)) return (null, "--download-model needs a model name such as base.en (see --help).");
+                    if (download is null || !ModelCatalog.IsShortName(download)) return (null, "--download-model needs a model name such as small.en (see --help).");
                     if (Use(CliMode.DownloadModel, "--download-model") is { } clashD) return (null, clashD);
                     break;
                 case "--download-cleanup-model":

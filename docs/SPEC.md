@@ -671,7 +671,9 @@ Users must be able to remove what the app has put on disk, from inside the app.
   is in, and the models that come with Dictum (read-only) have no Delete. After the lens
   (17/10/2026, §24): the switch offered for a model in use can be to the bundled base.en,
   "Delete all app data" leaves a chosen folder outside the user's profile alone, and a
-  deletion that fails says "in use or not permitted".
+  deletion that fails says "in use or not permitted". After the re-lens (§24): that switch
+  is offered only to a model the tray app's lookup loads, and a downloaded copy of the
+  model in use can be deleted when the same model is next in the lookup.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
   the integrity record, and reports freed bytes; "Delete all app data" never touches
   `.env` or the program folder.
@@ -1009,27 +1011,38 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   Delete. All new sentences are PROPOSED for the product owner.
 - **Recommended layout for shared virtual desktops:** one local folder per VM shared by its users, on a persistent data
   disk, readable by every user and writable only by administrators, seeded as `models.folder` for every user and filled by
-  an administrator with `install.ps1 -ModelsFrom`; a user who wants another model uses **Use default**. Not an Azure file
-  share (slow loading; not measured).
+  an administrator with `install.ps1 -ModelsFrom`; a user who wants another model uses **Use default**. Dictum then looks
+  only in their own folder and the models that come with it, no longer in the shared folder, so the models they use from it
+  are downloaded again. Not an Azure file share (slow loading; not measured).
 - **A folder other users may reach (lens, 17/10/2026):** verified-models.json is trusted, so a model is not hashed again,
   only in the user's own folders (the per-user one and the bundled one); any other file (the chosen folder, a file chosen
   by path) is hashed at its first load in each session. "Delete all app data" leaves a chosen folder outside the user's
   profile alone (its own category in the path registry, §17) and its question names it; Storage's Delete still removes one
   of its models, and "Remove Dictum completely" still lists each one. A deletion that fails reports "in use or not
   permitted".
-- **The bundled folder by any name:** a chosen folder is compared with the bundled one by final path (links followed, 8.3
-  names and `\\?\` prefixes normalised; not a subst drive, and not on a network folder), is ignored with a log line when it
-  is the bundled one, and model deletion and the removal plan refuse any file whose final path is inside the bundled
-  folder. Deleting the model in use offers the bundled base.en as its replacement (by name, so a second copy of the model
-  in use never is), switched to and never deleted.
+- **The bundled folder by another name:** a chosen folder is compared with the bundled one by final path (links followed,
+  8.3 names and a `\\?\C:\` path normalised; not a subst drive or a mounted volume, and not on a network folder), is
+  ignored with a log line when it is the bundled one, and model deletion and the removal plan refuse any file whose final
+  path is inside the bundled folder. A device path other than `\\?\C:\` and `\\?\UNC\` (`\\?\Volume{...}`, `\\?\GLOBALROOT`, `\\.\`,
+  `\??\`, either slash) is refused as models.folder with the usual warning (re-lens, 17/10/2026). Deleting the model in
+  use offers the bundled base.en as its replacement (by name, so a second copy of the model in use never is), switched to
+  and never deleted.
 - **One lookup:** calibration uses the tray app's lookup (a bundled file held to its SHA-256), and `--download-model` and
   `--bench-cleanup` look in every model folder, so `--download-model base.en` with base.en in the package downloads
   nothing. A mismatch's advice follows the folder: Dictum's folders "Delete it and download it again", the bundled one
   "It came with Dictum: reinstall Dictum, or download <name> in Settings > Models", anywhere else "rename it". Settings >
   Models looks every catalogue model up again only after a settings load, a download that ended or a deletion.
+- **Re-lens (17/10/2026, on fa73e02):** the replacement offered for a model in use must be one the tray app's lookup
+  loads (a bundled base.en failing its SHA-256 is not offered). A downloaded copy of the model in use can be deleted when
+  the same model is next in the lookup and passes the tray app's check: it asks "Delete this copy of base.en (<size>)?
+  Dictum then uses the copy that came with it." (for a next copy in another of Dictum's folders, "Dictum then uses the
+  other copy, in <folder>."), releases the model, deletes the file and reloads; if the deletion fails the model is loaded
+  again. With a model loaded, a progress tick makes no folder lookup at all (the language note judges the model in use).
+  All new sentences are PROPOSED for the product owner.
 - Tests (`ModelFolderTests`): the setting's validation and documentation, the earlier name, the lookup order for both kinds
   with a wrong-size copy passed over, the bundled folder never a download destination, a failing bundled file passed over
   and logged once, the first run with and without base.en (the written file compared byte for byte with the pickers'),
   a seeded folder at first run, the free-space rule at each site, a kept `.part`, the network test on UNC strings, the
   Models and Storage pages on the headless platform, the Light preset and calibration using the bundled base.en, and a
-  first start end to end. `ModelFolderSafetyTests` pins the lens fixes above, a junction to the bundled folder included.
+  first start end to end. `ModelFolderSafetyTests` pins the lens fixes above, a junction to the bundled folder included,
+  and the re-lens fixes.

@@ -569,8 +569,10 @@ copy whose size matches the catalogue:
 2. **Your own folder**, `%LOCALAPPDATA%\Dictum\models`. Downloads go here while no folder is chosen (**Use default**).
 3. **The models that come with Dictum**: the `models` folder beside `Dictum.exe` (inside the package for the Store
    build), which holds `base.en`. Dictum never downloads into it, changes it or deletes anything in it, and it cannot be
-   chosen as the model folder, under any other name for it either (a junction or symbolic link, an 8.3 short name, a
-   `\\?\` path): such a setting is ignored and the log says so.
+   chosen as the model folder, under another name for it either (a junction or symbolic link, an 8.3 short name, a
+   `\\?\C:\` path; not a subst drive or a mounted volume): such a setting is ignored and the log says so. Of the
+   device paths, only the `\\?\C:\` and `\\?\UNC\` forms are accepted as the model folder; any other (a `\\?\Volume{...}` name,
+   say) is refused with a warning in the log, and the default folder is used.
 
 Every model is still checked against the catalogue's size and SHA-256 before it is loaded, wherever it was found. A
 copy of the wrong size is passed over for the next folder; a model that came with Dictum and fails its check is passed
@@ -994,10 +996,12 @@ Every deletion says how much it frees and asks once; sizes are read from the dis
 
 - **Delete** beside a model removes the `.bin` or `.gguf`, its unfinished `.part` and its verified record. The model
   in use cannot be deleted: the dialog offers to switch to the recommended other model on this PC first (base.en, which
-  comes with Dictum, counts: it is switched to, never deleted). A model you chose
-  by path from elsewhere is never deleted, only forgotten, and the models that come with Dictum have no Delete: they
-  are part of the program. A download that would leave under 2 GB free warns first; one that would leave under 200 MB
-  is refused.
+  comes with Dictum, counts while it passes its check: it is switched to, never deleted). When Dictum has another copy of
+  the same model to go on with (a base.en downloaded by version 1.0.x, beside the one that comes with Dictum), the copy in
+  use can be deleted: it asks "Delete this copy of base.en (<size>)? Dictum then uses the copy that came with it.", then
+  loads the other copy. A model you chose by path from elsewhere is never deleted, only forgotten, and the models that
+  come with Dictum have no Delete: they are part of the program. A download that would leave under 2 GB free warns
+  first; one that would leave under 200 MB is refused.
 - **Delete calibration recordings**, **Delete logs**, **Delete all app data** (models, recordings, logs and the
   verified record; settings, dictionary and corrections are kept unless "Including settings, dictionary and
   corrections" is ticked). None of them touches `.env` or the program folder. A model folder you chose outside your
@@ -1083,7 +1087,7 @@ Dictum.exe --transcribe <file.wav> [--no-llm] print "raw: ..." (and, unless --no
 Dictum.exe --selftest                        speech and cleanup models with their runtimes, recommendations, the
                                               active Mode preset, decoding, personal file counts, offline_only,
                                               microphones, hotkey, key presence (never values); exit 0/1
-Dictum.exe --download-model <name>           download a speech model (e.g. base.en), verify size and SHA-256; exit 0/1
+Dictum.exe --download-model <name>           download a speech model (e.g. small.en), verify size and SHA-256; exit 0/1
 Dictum.exe --download-cleanup-model <name>   the same for a cleanup model (e.g. qwen2.5-1.5b)
 Dictum.exe --bench-cleanup <file.wav|file.txt> every downloaded cleanup model (and --cleanup-model's file) over the
                                               same input: output, time, validator verdict, side by side (a .wav is
@@ -1239,10 +1243,11 @@ folder for each user (`-Settings` with `{ "models": { "folder": "E:\\Dictum mode
 with `install.ps1 -ModelsFrom` (a file already there with the same size is skipped, so a user's install with the same
 `-ModelsFrom` copies nothing). Users then keep no large file on C:, and base.en needs nothing at all: it comes with
 Dictum. A user who wants a model the folder does not hold chooses **Use default** in Settings > Models > Model folder,
-so downloads go to their own folder. Dictum hashes a model in a chosen folder again the first time it loads it in each
-session, and **Delete all app data** leaves a chosen folder outside the user's own folder alone. An Azure file share,
-cool tier especially, is not recommended: models would load across the network at every start (Settings > Models warns
-about any network folder; not measured here). See "Model folder".
+so downloads go to their own folder. Dictum then looks only in their own folder and the models that come with it, no
+longer in the shared folder, so the models they use from it are downloaded again. Dictum hashes a model in a chosen
+folder again the first time it loads it in each session, and **Delete all app data** leaves a chosen folder outside the
+user's own folder alone. An Azure file share, cool tier especially, is not recommended: models would load across the
+network at every start (Settings > Models warns about any network folder; not measured here). See "Model folder".
 
 **SmartScreen and Smart App Control:** the files are unsigned, so the first launch may show "Windows protected your
 PC" (More info > Run anyway), enterprise policy can prevent continuing, and Smart App Control blocks unsigned files

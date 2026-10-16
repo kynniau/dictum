@@ -297,8 +297,8 @@ SPEC §2, §3 and §20; README "Permissions on Windows".
 
 Update the date line when you submit. Microsoft asks for the date, no-account status, and steps to
 reach anything not obvious. The "no download is needed" lines (Decision 16, 17/10/2026) hold only for a package built
-after the app change that reads the bundled model from `<program folder>\models` (a separate lane, not in
-fix/vc-runtime) has merged: without it the package carries the file but the first run still asks for a download.
+after the app change that reads the bundled model from `<program folder>\models` has merged together with the
+model-folder change (PR #11): without it the package carries the file but the first run still asks for a download.
 
 ```text
 Notes written 17/10/2026 for Dictum 1.0.0.
@@ -343,7 +343,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 |---|---|---|---|---|
 | 1 | Incomplete app, placeholder text, links to unfinished pages | CF #1 | Ship only finished features. Every in-app link must resolve: the site and /privacy were 404 and the repo empty on 15/10/2026 (section 1). | Blocker until deployed |
 | 2 | Fails the Windows App Certification Kit | CF #2, certification process | Microsoft now calls the kit (WACK) "deprecated and no longer maintained" and certifies on submission ("Package a desktop or UWP app in Visual Studio", retrieved 16/10/2026), so a local run is optional. Not run here: no part of the kit is in the Microsoft.Windows.SDK.BuildTools package the scripts use (searched 16/10/2026). | Optional |
-| 3 | Crashes or hangs without a network connection | CF #4, Store Policies 10.4.2 | Offline is a degraded mode, never a failure (SPEC §1). base.en is in the package, so a first run with the network off asks no model question and starts ready; test that, and that a download asked for offline is refused with a message (amended 17/10/2026). | Test |
+| 3 | Crashes or hangs without a network connection | CF #4, Store Policies 10.4.2 | Offline is a degraded mode, never a failure (SPEC §1). base.en is in the package, so a first run with the network off asks no model question and starts ready; test that, and that with offline_only on a download asked for is refused with a message, and that with the network off (offline_only off) a download fails after its retries, with a message (amended 17/10/2026). | Test |
 | 4 | Testers cannot test it | CF #5, Store Policies 10.3 | No account. Section 7 notes give the dictation steps, that no download is needed (base.en is in the package) and the offline path. | Done |
 | 5 | Missing or inadequate privacy policy | CF #6, Store Policies 10.5.1 | /privacy lists what is accessed (microphone audio, text, clipboard, hotkey), where it is stored, every host and when, who receives what, user controls and deletion. Microsoft's FAQ also says to "include a privacy policy URL and display it in the app": add a Privacy link in About or Settings. | Page written; in-app link to do |
 | 6 | Description does not match the app | CF #7, Store Policies 10.1, 10.1.1 | The description states English only, microphone required, base.en included with the bigger models optional downloads, the administrator-window limit and the Fn key. Screenshots come from the real app. | Done; re-check against release |
