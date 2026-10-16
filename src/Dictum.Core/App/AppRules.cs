@@ -17,9 +17,18 @@ public static class AppRules
 
     public static StateMachineOptions Options(AppSettings s) => new(s.TapMs, s.DoubleTapMs, s.HandsFreeMaxSeconds);
 
-    /// <summary>The cleanup-provider and model-download clients: each refuses any off-machine request while offline_only is on (read per request).</summary>
-    public static (HttpClient Providers, HttpClient Downloads) CreateClients(Func<bool> offlineOnly) =>
-        (OfflineGuardHandler.CreateClient(offlineOnly), ModelDownloader.CreateHttpClient(offlineOnly));
+    /// <summary>
+    /// The cleanup-provider, model-download and Check for updates clients: each refuses any off-machine request while
+    /// offline_only is on (read per request). The update client is built like the download client (TLS 1.2, no proxy for
+    /// this machine) but follows no redirect: a redirect is followed inside the socket handler, after the guard, so any host
+    /// could answer for dictum.kynni.au (lens probe, 16/10/2026); a 3xx is a failed check instead. The download client keeps
+    /// following them (huggingface.co redirects to its CDN). <paramref name="downloadHandler"/> and
+    /// <paramref name="updateHandler"/> replace those two clients' socket handlers under their guards (tests).
+    /// </summary>
+    public static (HttpClient Providers, HttpClient Downloads, HttpClient Updates) CreateClients(Func<bool> offlineOnly,
+        HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null) =>
+        (OfflineGuardHandler.CreateClient(offlineOnly), ModelDownloader.CreateHttpClient(offlineOnly, inner: downloadHandler),
+            ModelDownloader.CreateHttpClient(offlineOnly, inner: updateHandler ?? ModelDownloader.CreateDownloadHandler(followRedirects: false)));
 
     /// <summary>Only these two settings shape the hotkey listener; anything else leaves the running one (and its key state) alone.</summary>
     public static bool HotkeyChanged(AppSettings before, AppSettings after) =>

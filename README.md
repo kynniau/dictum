@@ -4,7 +4,8 @@ System-wide voice dictation for Windows 10/11 (x64), in the style of Wispr Flow.
 your speech is transcribed **on this PC** with whisper.cpp, tidied by a small language model that also runs **on this
 PC** (llama.cpp), and pasted at the cursor of whatever app has focus.
 
-- **Nothing leaves the machine by default.** No accounts, telemetry, analytics, crash reporting or update checks.
+- **Nothing leaves the machine by default.** No accounts, telemetry, analytics, crash reporting or automatic update
+  checks: the direct download checks only when you click Check for updates.
 - Works fully offline; with `offline_only: true` Dictum itself connects to no other machine. A cleanup server on
   this PC is still allowed; what such a server does with the text is up to it (see "Privacy").
 - If the cleanup model is missing, slow or gives a bad answer, a rule-based tidy is pasted instead: never a failure.
@@ -107,7 +108,7 @@ an edit made in the file is picked up within a second and shows in the window.
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
-| About | Version, runtime and models, **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
+| About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
 
 The windows follow Windows' light or dark setting.
 
@@ -172,7 +173,8 @@ Dictate: see "Moving from Dictate".
    https://github.com/kynniau/dictum/releases (none published yet on 16/10/2026). It installs into
    `%LOCALAPPDATA%\Programs\Dictum` with a Start menu entry, offers a desktop shortcut and launch at login (both off
    unless you tick them), and appears in Settings > Apps for uninstalling. Upgrading keeps your settings and models,
-   which live outside the program folder; quit Dictum first (the installer asks you to). The installer is **not
+   which live outside the program folder; quit Dictum first (the installer asks you to). Settings > About > **Check for
+   updates** says whether a newer version is out; it checks only when you click it. The installer is **not
    code-signed yet**, so Windows SmartScreen may say "Windows protected your PC": choose **More info**, then **Run
    anyway**, but only for a file you downloaded from the release page, and check it against the release's
    `SHA256SUMS.txt` first (`Get-FileHash .\Dictum-Setup-<version>.exe`). Uninstalling asks whether to delete your
@@ -521,7 +523,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `fix_hotkey` | `null` | A second hotkey, same format as `hotkey`, that opens Fix last dictation. Ignored (with a warning) if one press could complete both hotkeys: the same key, a chord containing the other (`Ctrl+Space` and `Ctrl+Shift+Space`), or a key group containing the other's key (`Ctrl+Shift+F` with the default `RightCtrl`, when pressed with the right-hand Ctrl). Use keys the hotkey does not use, for example `LeftCtrl+Shift+F`. Follows `enabled`. |
 | `log_level` | `"info"` | `debug`, `info`, `warning`, `error`. |
 | `log_transcripts` | `false` | `true` writes transcript text to the log. Off by default. |
-| `offline_only` | `false` | `true`: Dictum itself connects to no other machine. Model downloads and the `anthropic` provider are refused with a clear message; `openai-compatible` is allowed only to a server on this machine (`localhost`, `127.0.0.1`, `::1`), and that request goes to it directly, never through a proxy; what that server does with the text is up to it (a local proxy or gateway may forward it). Any value other than `true` or `false` counts as `true` (with a warning). A settings.json that cannot be read at startup runs with the defaults and `offline_only` on until it is fixed; one that breaks while Dictum runs keeps the previous settings. Copy models in with `install.ps1 -ModelsFrom`. Settings > About says "Offline only". |
+| `offline_only` | `false` | `true`: Dictum itself connects to no other machine. Model downloads, Check for updates and the `anthropic` provider are refused with a clear message; `openai-compatible` is allowed only to a server on this machine (`localhost`, `127.0.0.1`, `::1`), and that request goes to it directly, never through a proxy; what that server does with the text is up to it (a local proxy or gateway may forward it). Any value other than `true` or `false` counts as `true` (with a warning). A settings.json that cannot be read at startup runs with the defaults and `offline_only` on until it is fixed; one that breaks while Dictum runs keeps the previous settings. Copy models in with `install.ps1 -ModelsFrom`. Settings > About says "Offline only". |
 
 
 Model overrides, strongest first: `--model <name|path>` (this launch only; a tray choice replaces it), then the
@@ -786,16 +788,18 @@ network connection only in these cases, and only to these hosts:
 | When | Host |
 |---|---|
 | Only when you ask for a model download (first-run picker, the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
+| Only when you click **Check for updates** in Settings > About (the direct download; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
 | After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
 | After each dictation, only if you set up an `openai-compatible` server (one off this PC also needs the consent step and `https://`) | the host in `llm.base_url` (the same text). With `localhost`, Dictum's request stays on this PC; what that server does with it is up to the server. |
 
-Nothing else: no telemetry, analytics, crash reports or update checks. Dictum configures no OpenTelemetry
+Nothing else: no telemetry, analytics, crash reports or automatic update checks. Dictum configures no OpenTelemetry
 exporter, and turns off the Anthropic SDK's own tracing, so transcripts cannot reach a tracing exporter configured for
 other programs.
 
 **`offline_only: true` stops Dictum itself from connecting to any other machine.** With it set, Dictum refuses
-every download, in the app and on the command line, with a message saying why, and refuses the `anthropic` provider
-and any `openai-compatible` server that is not on this machine, falling back to the rule-based tidy with a notification.
+every download, in the app and on the command line, with a message saying why, refuses Check for updates without
+sending anything, and refuses the `anthropic` provider and any `openai-compatible` server that is not on this
+machine, falling back to the rule-based tidy with a notification.
 Settings > Privacy shows the switch, Settings > About says "Offline only", and the tray panel's privacy line says "Nothing leaves this PC" (unless an OpenAI-compatible server on this PC does the clean-up: it may forward the text, which Dictum cannot see). Install models on such machines with `install.ps1 -ModelsFrom <folder>`.
 Behind those messages, every HTTP client in Dictum sends through one guard that refuses any request to a host off
 this machine while `offline_only` is on (read per request, so it follows a settings change), and a download in
@@ -907,7 +911,8 @@ The test variables accept their old `DICTATE_` names, and `DICTATE_MODEL_PATH` s
 ### Store and direct-download builds
 
 Dictum detects whether it runs as an installed package (`GetCurrentPackageFullName`, SPEC §18.2): Settings > About
-says which. Packaged, launch at login uses the package's startup task (it can also be turned off in Task Manager >
+says which. Packaged, Settings > About has no Check for updates button and says "Updates come from the Microsoft
+Store." Packaged, launch at login uses the package's startup task (it can also be turned off in Task Manager >
 Startup apps, which then wins: Microsoft Learn, "Integrate your desktop app with Windows by using packaging extensions", read 16/10/2026, says a task the user disables there cannot be re-enabled by the app; not yet seen on a package); Settings > Storage shows the real on-disk folders, because Windows redirects a
 package's app-data writes to a per-package folder (`%LOCALAPPDATA%\Packages\<family>\LocalCache\…`: the layout is
 recalled, not verified); "Remove Dictum completely" deletes the data it owns, never Dictate's folders, and then opens

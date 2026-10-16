@@ -42,7 +42,7 @@ public class OfflineGuardTests
     }
 
     /// <summary>A one-shot HTTP server on 127.0.0.1 that answers every request with <paramref name="response"/>.</summary>
-    private static (int Port, Func<int> Connections, Task Serving) Serve(string response, CancellationToken ct)
+    internal static (int Port, Func<int> Connections, Task Serving) Serve(string response, CancellationToken ct)
     {
         var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -92,6 +92,28 @@ public class OfflineGuardTests
         Assert.Equal(0, target.Connections()); // the redirect was not followed
         Assert.Equal("Hello there.", result.Text); // fell back to the rule-based tidy
         Assert.Contains("HTTP 307", result.FallbackReason);
+        cts.Cancel();
+    }
+
+    [Fact]
+    public async Task The_download_client_still_follows_a_redirect_as_the_model_CDN_needs()
+    {
+        // huggingface.co redirects model requests to its CDN (README, "Privacy"). The provider and Check for updates clients
+        // follow no redirect; this pins that the download client still does. Both servers are listeners on this PC.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var cdn = Serve("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 5\r\nConnection: close\r\n\r\nmodel", cts.Token);
+        var hub = Serve($"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{cdn.Port}/model.bin\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", cts.Token);
+        var (providers, downloads, updates) = Dictum.App.AppRules.CreateClients(() => false);
+        using (providers)
+        using (downloads)
+        using (updates)
+        {
+            using var response = await downloads.GetAsync($"http://127.0.0.1:{hub.Port}/model.bin", cts.Token);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("model", await response.Content.ReadAsStringAsync(cts.Token));
+        }
+        Assert.Equal(1, hub.Connections());
+        Assert.Equal(1, cdn.Connections()); // the redirect was followed
         cts.Cancel();
     }
 

@@ -186,6 +186,7 @@ internal sealed class ScriptedDialogs : IShellDialogs
 {
     public Queue<int> Answers { get; } = new();
     public bool ConfirmWord { get; set; }
+    public bool ConfirmDownloads { get; set; } // the answer to the download question: no, until a test says yes
     public List<(string Title, string Text)> Asked { get; } = [];
     public List<string> Told { get; } = [];
 
@@ -207,7 +208,7 @@ internal sealed class ScriptedDialogs : IShellDialogs
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir) => new(recommended, null, false);
     public CleanupPick CleanupPicker(string recommended, string reason, Func<CleanupModelInfo, bool> isDownloaded, string modelsDir) => new(null, null, true, false);
     public MissingModelChoice MissingModel(string shortName, bool canDownload) => MissingModelChoice.Quit;
-    public bool ConfirmDownload(string fileName, string sizeText, string note) => false;
+    public bool ConfirmDownload(string fileName, string sizeText, string note) => ConfirmDownloads;
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;
 }
 
@@ -229,12 +230,15 @@ internal sealed class Scratch : IDisposable
     /// <summary>A shell over a fake platform with scripted dialogs, not started (no tray, no hook, no models).</summary>
     /// <param name="speechModels">A speech model manager with a fake loader, for tests that make a model ready; else the real one.</param>
     /// <param name="options">Launch options (a --model override, say); none by default.</param>
-    public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null)
+    /// <param name="downloadHandler">A fake server under the model-download client's real offline_only guard; the network otherwise.</param>
+    /// <param name="updateHandler">The same for the Check for updates client.</param>
+    public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null,
+        HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
         var shell = new AppShell(platform, Paths, NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs, gpuMachine: () => false,
-            speechModels: speechModels);
+            speechModels: speechModels, downloadHandler: downloadHandler, updateHandler: updateHandler);
         return (shell, platform, dialogs);
     }
 
