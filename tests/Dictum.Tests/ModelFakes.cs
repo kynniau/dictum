@@ -27,8 +27,8 @@ internal sealed class FakeSpeechEngine(string path, DecodeOptions decode, bool w
     public void Dispose() => Volatile.Write(ref _disposed, 1);
 }
 
-/// <summary>A loaded cleanup model stand-in; its warm-up can wait for its token (up to 5 s).</summary>
-internal sealed class FakeLocalEngine(string path, bool waitForCancel = false) : ILocalLlmEngine
+/// <summary>A loaded cleanup model stand-in that echoes the dictation, or gives a set reply; its warm-up can wait for its token (up to 5 s).</summary>
+internal sealed class FakeLocalEngine(string path, bool waitForCancel = false, string? reply = null) : ILocalLlmEngine
 {
     private int _disposed;
 
@@ -47,7 +47,7 @@ internal sealed class FakeLocalEngine(string path, bool waitForCancel = false) :
     public TimeSpan? Predict(int dictationTokens) => null;
 
     public Task<GenerationResult> CompleteAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, int maxTokens,
-        CancellationToken cancellationToken) => Task.FromResult(new GenerationResult(raw, true, 0, TimeSpan.Zero, 0, TimeSpan.Zero));
+        CancellationToken cancellationToken) => Task.FromResult(new GenerationResult(reply ?? raw, true, 0, TimeSpan.Zero, 0, TimeSpan.Zero));
 
     public void Dispose() => Volatile.Write(ref _disposed, 1);
 }

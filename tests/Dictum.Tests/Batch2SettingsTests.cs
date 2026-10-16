@@ -103,7 +103,7 @@ public class GrammarAssistTests
 {
     private static TranscriptCleaner Local(bool grammarAssist, string? dictionaryLine = null) =>
         TranscriptCleaner.Create(new LlmSettings { Provider = LlmSettings.Local, GrammarAssist = grammarAssist }, offlineOnly: false,
-            SecretStore.Empty, new HttpClient(new CountingHandler()), NullLog.Instance, () => null, dictionaryLine);
+            SecretStore.Empty, new HttpClient(new CountingHandler()), NullLog.Instance, () => null, new PersonalCleanup(dictionaryLine, null, null));
 
     [Fact]
     public void The_prompt_gains_the_grammar_sentence_only_when_the_setting_is_on()

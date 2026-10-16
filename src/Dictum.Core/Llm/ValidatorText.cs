@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Dictum.Llm;
@@ -7,8 +9,8 @@ internal readonly record struct Retraction(IReadOnlyList<string> MinSpan, IReadO
 
 /// <summary>
 /// The text handling behind <see cref="CleanupValidator"/>: Unicode words (so a reply in another script or with curly
-/// apostrophes is measured, not skipped), whole-word phrase matching, "scratch that" spans, spoken commands, negations
-/// and numbers. Pure functions on lower-cased text.
+/// apostrophes is measured, not skipped), whole-word phrase matching, "scratch that" spans, spoken commands, negations,
+/// numbers and words that sound alike. Pure functions on lower-cased text.
 /// </summary>
 internal static partial class ValidatorText
 {
@@ -20,14 +22,30 @@ internal static partial class ValidatorText
     [GeneratedRegex(@"\d+(?:[.,:]\d+)*")]
     private static partial Regex Number();
 
-    [GeneratedRegex(@"\b(?:new line|new paragraph|full stop|question mark|open quote|close quote|scratch that|comma)\b|\b(?:umm?|uhh?|erm?|ah|hmm)\b")]
+    [GeneratedRegex(@"\b(?:new line|new paragraph|full stop|question mark|open quote|close quote|scratch that|comma)\b|\b(?:umm?|uhh?|erm?|ah|hmm)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Command();
 
     /// <summary>Typographic quotes and apostrophes as their plain forms ("Here’s" is "here's").</summary>
     public static string MapQuotes(string text) =>
         text.Replace('’', '\'').Replace('‘', '\'').Replace('ʼ', '\'').Replace('“', '"').Replace('”', '"');
 
-    public static List<string> Words(string lower) => Word().Matches(lower).Select(m => m.Value).ToList();
+    /// <summary>
+    /// The words of a text, read in composed Unicode (NFC): "Zoë" saved as "e" plus a combining accent is the same word as
+    /// "Zoë" typed with the single letter, in a term, the dictation and the reply alike.
+    /// </summary>
+    public static List<string> Words(string lower) => Word().Matches(Composed(lower)).Select(m => m.Value).ToList();
+
+    private static string Composed(string text)
+    {
+        try
+        {
+            return text.Normalize(NormalizationForm.FormC);
+        }
+        catch (ArgumentException)
+        {
+            return text; // an unpaired surrogate cannot be normalised; the text is read as it is
+        }
+    }
 
     public static List<string> Comparable(IEnumerable<string> words) => words.Select(SpellingVariants.Normalise).ToList();
 
@@ -44,8 +62,8 @@ internal static partial class ValidatorText
     public static bool ContainsPhrase(string lower, string phrase) =>
         Regex.IsMatch(lower, $@"(?<![\p{{L}}\p{{N}}']){Regex.Escape(phrase)}(?![\p{{L}}\p{{N}}'])");
 
-    /// <summary>The dictation without spoken formatting commands and hesitations, which a correct reply drops.</summary>
-    public static string WithoutCommands(string lower) => Command().Replace(lower, " ");
+    /// <summary>The text without spoken formatting commands and hesitations (in any case), which a correct reply drops.</summary>
+    public static string WithoutCommands(string text) => Command().Replace(text, " ");
 
     /// <summary>"\n" or "\n\n" when the dictation ends with a spoken "new line" / "new paragraph", else null.</summary>
     public static string? FinalBreak(string lower)
@@ -144,4 +162,66 @@ internal static partial class ValidatorText
         "could", "should", "its", "our", "their", "they", "them", "his", "her", "him", "she", "into", "onto", "than", "then",
         "there", "here", "what", "when", "where", "who", "why", "how", "all", "any", "some", "also", "just", "too", "very",
     };
+
+    /// <summary>
+    /// True when two words sound alike: the same word, or the same <see cref="SoundKey"/>. "kinney", "kinny", "kimmy" and
+    /// "Kynni" sound alike, and so do "dictim" and "Dictum"; "name" and "Kynni" do not.
+    /// </summary>
+    public static bool SoundsLike(string a, string b) => a == b || SoundKey(a) is { Length: > 0 } key && key == SoundKey(b);
+
+    /// <summary>A lower-case word's sound classes, or null when it has a character the classes do not cover.</summary>
+    // simplification: a spelling-based sound key in the manner of Soundex instead of a pronunciation dictionary or a full
+    // phonetic algorithm such as Double Metaphone. Each letter becomes its sound class (vowels and y; b f p v; c g k q;
+    // s z; d t; m n; j; l; r), x is s as the first letter ("Xero" and "zero") and k then s after it ("laxmi" and
+    // "Lakshmi", "dixon" and "dickson"), h and w are dropped, accents are removed and a run of one class counts once, so
+    // the vowels keep their places but not their spelling: "kinney", "kimmy" and "Kynni" are all k-vowel-n-vowel.
+    // Ceiling: a real word or name that sounds like a term passes as its misspelling. Measured 16/10/2026 against the
+    // 49,823 stems of LibreOffice's en_AU.dic: Kynni's key is also the key of 73 of them (come, game, gonna, canny, Kenny,
+    // Connie...), Xero's of 37 (zero, sorry, Sarah...), Priya's of 29 (free, pray...), Dictum's of 3 (diction, tighten,
+    // touchdown) and Parramatta's of none. A mishearing that adds or drops a sound ("kidney" for "Kynni") or splits the
+    // word ("kin knee") is not a near miss; a word with a digit or a letter outside a-z (after accents are removed) only
+    // matches itself. Trigger to retire: a typed reply that swapped a sound-alike word for a term, or a wanted dictionary
+    // fix rejected as an addition.
+    // The dictionary-term rule built on it (CleanupValidator.AddsTerm) counts a term's forms on each side instead of pairing
+    // each reply word with the dictated word it came from, which adds three ceilings. Real words whose letters spell a term
+    // pass as its respelling: {PowerPoint} "the power point in the kitchen is broken" (a wall socket) → "The PowerPoint in
+    // the kitchen is broken." is accepted; trigger to retire: a typed reply that turned dictated words into a term with
+    // another meaning. A sound-alike the reply rewrites pays for an insertion elsewhere: "i'm gonna add a name to the
+    // dictionary" → "I'm going to add Kynni to the dictionary." and {Xero} "put zero on the invoice" → "Put 0 on the Xero
+    // invoice." are accepted; trigger to retire: a typed reply that added a term while rewriting a sound-alike of it. A
+    // term with a spoken command or hesitation in it is counted with those kept, so one the speaker dictated pays for it:
+    // {ER} "er the patient was seen this morning" → "The patient was seen in the ER this morning." and {Comma} "yes comma
+    // i agree" → "Yes, Comma, I agree." are accepted; trigger to retire: a typed reply that turned a dictated command or
+    // hesitation into a term.
+    private static string? SoundKey(string word)
+    {
+        var key = new StringBuilder(word.Length + 1);
+        var letters = word.Normalize(NormalizationForm.FormD);
+        for (var i = 0; i < letters.Length; i++)
+        {
+            var c = letters[i];
+            if (c == 'x' && i > 0) Add(key, 'k'); // then its s below
+            var sound = c switch
+            {
+                'a' or 'e' or 'i' or 'o' or 'u' or 'y' => 'a',
+                'b' or 'f' or 'p' or 'v' => 'p',
+                'c' or 'g' or 'k' or 'q' => 'k',
+                's' or 'x' or 'z' => 's',
+                'd' or 't' => 't',
+                'm' or 'n' => 'n',
+                'j' or 'l' or 'r' => c,
+                'h' or 'w' or '\'' => '\0',
+                _ when CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark => '\0', // an accent, after FormD
+                _ => '?',
+            };
+            if (sound == '?') return null;
+            Add(key, sound);
+        }
+        return key.ToString();
+
+        static void Add(StringBuilder key, char sound)
+        {
+            if (sound != '\0' && (key.Length == 0 || key[^1] != sound)) key.Append(sound);
+        }
+    }
 }

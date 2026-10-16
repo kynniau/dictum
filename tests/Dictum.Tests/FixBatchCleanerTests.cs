@@ -70,7 +70,7 @@ public class FixBatchCleanerTests
     {
         var log = new RecordingLog();
         var cleaner = new TranscriptCleaner(FakeLlmClient.Replying(reply, stop), CleanupPrompt.Default, TimeSpan.FromSeconds(2), log, "test",
-            deadline: _ => TimeSpan.FromSeconds(2), mustKeepWords: ["damn"]);
+            deadline: _ => TimeSpan.FromSeconds(2), validation: new ValidationContext(CleanupPrompt.Default, ["damn"]));
         var result = await cleaner.CleanAsync(raw, TestContext.Current.CancellationToken);
         Assert.False(result.Cleaned);
         Assert.DoesNotContain(Marker, result.FallbackReason, StringComparison.OrdinalIgnoreCase);

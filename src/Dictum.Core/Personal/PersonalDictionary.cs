@@ -1,9 +1,10 @@
 namespace Dictum.Personal;
 
 /// <summary>
-/// dictionary.txt (SPEC §16.2): one term per line, '#' comments. Used twice: as whisper's initial prompt (a
-/// comma-separated vocabulary line within whisper's prompt budget, keeping the most recently added terms) and as a
-/// "Known names and terms" line in the cleanup prompt. An empty or missing file changes no prompt.
+/// dictionary.txt (SPEC §16.2): one term per line, '#' comments. Used as whisper's initial prompt (a comma-separated
+/// vocabulary line within whisper's prompt budget, keeping the most recently added terms), as a "Known names and terms"
+/// line in the cleanup prompt, and by the cleanup validator, which rejects a reply that adds a term of that line the
+/// speaker did not say. An empty or missing file changes no prompt.
 /// </summary>
 public sealed class PersonalDictionary
 {
@@ -39,6 +40,7 @@ public sealed class PersonalDictionary
         SkippedTerms = skipped;
         WhisperPrompt = prompt.Count == 0 ? null : string.Join(", ", prompt);
         var kept = FitTerms(list, t => t.Length + 2, CleanupLineChars - CleanupLinePrefix.Length, out _);
+        CleanupTerms = kept;
         CleanupLine = kept.Count == 0 ? null : CleanupLinePrefix + string.Join(", ", kept) + ".";
     }
 
@@ -65,6 +67,12 @@ public sealed class PersonalDictionary
 
     /// <summary>The line added to the cleanup system prompt, or null when there are no terms.</summary>
     public string? CleanupLine { get; }
+
+    /// <summary>
+    /// The terms in <see cref="CleanupLine"/>, oldest first: the newest that fit its 1,000 characters. The cleanup validator
+    /// checks only these; a term the model was never shown cannot have been copied from the prompt.
+    /// </summary>
+    public IReadOnlyList<string> CleanupTerms { get; }
 
     public bool Contains(string term) => Terms.Any(t => string.Equals(t, term.Trim(), StringComparison.OrdinalIgnoreCase));
 
