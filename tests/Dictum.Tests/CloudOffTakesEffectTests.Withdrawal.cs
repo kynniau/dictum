@@ -564,4 +564,35 @@ public partial class CloudOffTakesEffectTests
             shell.Dispose();
         }
     });
+
+    /// <summary>
+    /// Lens pin (17/10/2026): <see cref="CloudConsentFile.Delete"/> clears the read-only bit alone. When the delete still
+    /// fails (another program holds the file open), hidden and archive survive; a regression to FileAttributes.Normal
+    /// would strip them.
+    /// </summary>
+    [Fact]
+    public Task A_read_only_consent_json_that_cannot_be_deleted_keeps_its_other_attributes() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(CloudSettings);
+        Consent(scratch);
+        var (shell, _, _) = scratch.Shell();
+        FileStream? held = null;
+        try
+        {
+            shell.Reload(userRequested: false);
+            File.SetAttributes(scratch.Paths.ConsentFile, FileAttributes.ReadOnly | FileAttributes.Hidden | FileAttributes.Archive);
+            held = HoldOpen(scratch.Paths.ConsentFile);
+            var said = shell.DisableCloud();
+            Assert.NotNull(said); // consent.json could not be deleted: another program holds it open
+            Assert.True(File.Exists(scratch.Paths.ConsentFile));
+            Assert.Equal(FileAttributes.Hidden | FileAttributes.Archive, File.GetAttributes(scratch.Paths.ConsentFile)); // read-only cleared, nothing else
+            AssertLocal(shell);
+        }
+        finally
+        {
+            held?.Dispose();
+            Normal(scratch.Paths.ConsentFile);
+            shell.Dispose();
+        }
+    });
 }
