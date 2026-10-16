@@ -187,7 +187,11 @@ public static class SettingsFile
         return reason.Length > 1 && char.IsUpper(reason[0]) && char.IsLower(reason[1]) ? char.ToLowerInvariant(reason[0]) + reason[1..] : reason;
     }
 
-    private static void WriteAtomic(string path, string content)
+    /// <summary>
+    /// Writes <paramref name="content"/> beside <paramref name="path"/>, then moves it over, so a half-written file is never
+    /// read. When either step fails the file is as it was, no .tmp is left behind, and the exception is thrown on.
+    /// </summary>
+    internal static void WriteAtomic(string path, string content)
     {
         var temp = path + ".tmp";
         try

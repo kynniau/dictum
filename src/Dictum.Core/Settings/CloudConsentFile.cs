@@ -31,13 +31,14 @@ public static class CloudConsentFile
         }
     }
 
-    /// <summary>Records the dialog's "Allow" (written beside, then moved over, so a half-written file is never read).</summary>
+    /// <summary>
+    /// Records the dialog's "Allow" (written beside, then moved over, so a half-written file is never read). When it cannot be
+    /// written (a read-only consent.json) it throws, and no consent.json.tmp is left behind.
+    /// </summary>
     public static void Write(string path, CloudConsentRecord record)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(record, Options));
-        File.Move(temp, path, overwrite: true);
+        SettingsFile.WriteAtomic(path, JsonSerializer.Serialize(record, Options));
     }
 
     /// <summary>Withdraws consent (Settings > Clean-up > Switch cloud clean-up off).</summary>

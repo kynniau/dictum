@@ -27,19 +27,33 @@ namespace Dictum.Tests;
 /// stopped it before anything else ran; a reload that could read settings.json brought back a server on this PC, or a consent still
 /// on file; and offline only switched on with settings.json unwritable was not on at all. Both now apply in memory first and hold
 /// for the session, the page names the file that could not be changed, and a reload stops only a clean-up that sends text.
+/// Lens on f69457d (16/10/2026): those holds lived only in memory, and nothing tried the files again, so clearing read-only and
+/// reloading left consent.json and a settings.json naming the host for the next start; the hold also outlived a switch-off that
+/// was fully saved, so a hand edit naming a server on this PC was ignored until a restart. Every reload, and the quit, now try
+/// again and end a hold once its files keep it; the folder watcher reloads on consent.json and on clearing read-only.
 /// </summary>
-public class CloudOffTakesEffectTests
+public partial class CloudOffTakesEffectTests
 {
     // The write path's own failure text (ModelCoordinator.WriteFailed), pinned word for word, independently of the app's copy.
     private const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
 
-    // PROPOSED copy (16/10/2026), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
-    private static string OffNotSaved(string file, string reason) =>
-        $"Cloud clean-up is off for this session and your consent is withdrawn, but {file} could not be changed ({reason}). Nothing is sent. Fix the file so the setting is kept after a restart.";
+    // PROPOSED copy (16/10/2026, second draft), awaiting the product owner's review: pinned word for word as proposed,
+    // independently of the app's copy (AppShell.OffNotSaved). Shown when consent.json could not be deleted but settings.json
+    // keeps cloud clean-up off.
+    private static string ConsentNotDeleted(string reason) =>
+        $"Cloud clean-up is off, but consent.json could not be deleted ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
 
-    // PROPOSED copy (16/10/2026), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
+    // PROPOSED copy (16/10/2026, second draft), as above: settings.json could not be saved; consent.json is gone or never was.
+    private static string SettingsNotSaved(string reason) =>
+        $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
+
+    // PROPOSED copy (16/10/2026, second draft), as above: neither file could be changed.
+    private static string NeitherChanged(string consent, string settings) =>
+        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
+
+    // PROPOSED copy (16/10/2026, second draft), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
     private static string OfflineOnlyNotSaved(string reason) =>
-        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Fix the file so it stays on after a restart.";
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits.";
 
     private const string CloudSettings = """{ "hotkey": "F24", "llm": { "provider": "openai-compatible", "base_url": "https://llm.example.com/v1", "model": "m" } }""";
 
@@ -95,7 +109,25 @@ public class CloudOffTakesEffectTests
         var at = marked.IndexOf('\u0001');
         var (head, tail) = (marked[..at], marked[(at + 1)..]);
         var line = Assert.Single(lines, l => l.StartsWith(head, StringComparison.Ordinal) && l.EndsWith(tail, StringComparison.Ordinal));
-        var reason = line[head.Length..^tail.Length];
+        return PathFree(line[head.Length..^tail.Length]);
+    }
+
+    /// <summary>As <see cref="Reason"/>, for a sentence with two reasons; returns both, in order.</summary>
+    private static (string First, string Second) Reasons(IEnumerable<string> lines, Func<string, string, string> sentence)
+    {
+        var marked = sentence("\u0001", "\u0002");
+        var (first, second) = (marked.IndexOf('\u0001'), marked.IndexOf('\u0002'));
+        var (head, middle, tail) = (marked[..first], marked[(first + 1)..second], marked[(second + 1)..]);
+        var line = Assert.Single(lines, l => l.StartsWith(head, StringComparison.Ordinal) && l.EndsWith(tail, StringComparison.Ordinal)
+                                             && l.Contains(middle, StringComparison.Ordinal));
+        var body = line[head.Length..^tail.Length];
+        var at = body.IndexOf(middle, StringComparison.Ordinal);
+        return (PathFree(body[..at]), PathFree(body[(at + middle.Length)..]));
+    }
+
+    /// <summary>A reason, checked to be there and to name no path (the page names the settings folder elsewhere).</summary>
+    private static string PathFree(string reason)
+    {
         Assert.NotEmpty(reason);
         Assert.DoesNotContain(":\\", reason, StringComparison.Ordinal);
         Assert.DoesNotContain(Path.GetTempPath().TrimEnd('\\'), reason, StringComparison.OrdinalIgnoreCase);
@@ -153,7 +185,7 @@ public class CloudOffTakesEffectTests
             // The page says the switch took effect for this session and names the file that could not be changed, with the reason;
             // never that it failed and must be chosen again, never plain "off" (the lens on 31d01f3: "Fix it, then choose again.").
             var said = VisibleLines(window);
-            Reason(said, reason => OffNotSaved("settings.json", reason));
+            Reason(said, SettingsNotSaved);
             Assert.DoesNotContain(WriteFailed, said);
             Assert.DoesNotContain("Cloud clean-up is off; the local model tidies your dictations again.", said);
             Assert.Equal(before, File.ReadAllText(scratch.Paths.SettingsFile)); // the write really was refused
@@ -174,17 +206,64 @@ public class CloudOffTakesEffectTests
             shell.Reload(userRequested: false); // a later reload (the file watcher, any other choice): the switch holds
             AssertLocal(shell);
 
-            // settings.json fixed by hand, still naming the host: the consent stays withdrawn, so nothing is sent there.
+            // settings.json fixed by hand, still naming the host: the consent stays withdrawn, so nothing is sent there, and that
+            // reload saves the switch-off over the host (SaveCloudOff), so the next start reads the local model too.
             File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal);
             File.WriteAllText(scratch.Paths.SettingsFile, CloudSettings);
             shell.Reload(userRequested: false);
             Assert.Equal(LlmSettings.Local, shell.Settings.Llm.Provider);
             Assert.True(shell.NothingLeaves);
+            Assert.Equal(LlmSettings.Local, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Llm.Provider);
             window.Close();
         }
         finally
         {
             Normal(scratch.Paths.SettingsFile);
+            shell.Dispose();
+        }
+    });
+
+    [Theory]
+    [InlineData(false)] // not valid JSON
+    [InlineData(true)] // read-only
+    public Task Allowing_cloud_clean_up_when_settings_json_cannot_be_written_records_no_consent_and_sends_nothing(bool readOnly) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, dialogs) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            MakeUnwritable(scratch, shell, readOnly);
+            var window = new SettingsWindow(shell);
+            window.Show();
+            window.ShowPage("Clean-up");
+            Named<ComboBox>(window, "Service").SelectedIndex = CloudPresets.All.ToList().FindIndex(p => p.BaseUrl is null) + 1; // the custom server
+            Named<TextBox>(window, "Server address").Text = "https://llm.example.com/v1";
+            Named<TextBox>(window, "Model").Text = "m";
+            Dispatcher.UIThread.RunJobs(); // TextBox raises TextChanged through the dispatcher
+            dialogs.Answers.Enqueue(0); // Allow
+            Click(window, "Use cloud clean-up…");
+            Assert.Equal("Send dictations to a cloud service?", Assert.Single(dialogs.Asked).Title); // asked, and agreed to
+
+            var said = VisibleLines(window);
+            Assert.Contains(WriteFailed, said);
+            Assert.DoesNotContain("Cloud clean-up is on.", said);
+            Assert.False(File.Exists(scratch.Paths.ConsentFile)); // no consent stands for a host the settings could not be switched to
+            Assert.Equal(LlmSettings.Local, shell.Settings.Llm.Provider);
+            Assert.StartsWith("local/", shell.CleanupStatus);
+            Assert.True(shell.NothingLeaves);
+
+            // settings.json fixed by hand to name that host: no consent is on record, so nothing is sent there.
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal);
+            File.WriteAllText(scratch.Paths.SettingsFile, CloudSettings);
+            shell.Reload(userRequested: false);
+            Assert.Equal(LlmSettings.Local, shell.Settings.Llm.Provider); // repaired at load: llm.example.com was not agreed to
+            Assert.True(shell.NothingLeaves);
+            window.Close();
+        }
+        finally
+        {
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal);
             shell.Dispose();
         }
     });
@@ -217,7 +296,8 @@ public class CloudOffTakesEffectTests
             Click(window, "Switch cloud clean-up off");
 
             var said = VisibleLines(window);
-            Reason(said, reason => OffNotSaved("consent.json", reason));
+            if (mode == "both read-only") Reasons(said, NeitherChanged);
+            else Reason(said, ConsentNotDeleted);
             Assert.DoesNotContain(said, l => l.StartsWith("That did not work", StringComparison.Ordinal));
             Assert.True(File.Exists(scratch.Paths.ConsentFile)); // the delete really failed
             AssertLocal(shell);
@@ -234,6 +314,7 @@ public class CloudOffTakesEffectTests
             Assert.Equal("llm.example.com", CloudConsentFile.Read(scratch.Paths.ConsentFile)?.Host);
             shell.Reload(userRequested: false);
             AssertLocal(shell);
+            Assert.Equal(mode != "consent.json locked", File.Exists(scratch.Paths.ConsentFile)); // unlocked, that reload deleted it; read-only, it is tried again later
             window.Close();
         }
         finally
@@ -265,7 +346,7 @@ public class CloudOffTakesEffectTests
             window.ShowPage("Clean-up");
             Click(window, "Switch cloud clean-up off");
 
-            Reason(VisibleLines(window), reason => OffNotSaved("settings.json", reason));
+            Reason(VisibleLines(window), SettingsNotSaved);
             AssertLocal(shell);
             Assert.DoesNotContain(PageLines(window, "Privacy"), l => l.Contains("127.0.0.1", StringComparison.Ordinal));
             shell.Reload(userRequested: false); // a later reload that reads the server from the file again: the switch holds
@@ -280,7 +361,7 @@ public class CloudOffTakesEffectTests
     });
 
     [Fact]
-    public Task Only_switching_cloud_clean_up_on_again_ends_the_off_switch() => UiSession.Run(() =>
+    public Task A_failed_switch_on_leaves_the_off_switch_in_force_and_a_saved_one_ends_it() => UiSession.Run(() =>
     {
         using var scratch = new Scratch(LocalServerSettings);
         var (shell, _, _) = scratch.Shell();

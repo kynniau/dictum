@@ -232,12 +232,13 @@ internal sealed class Scratch : IDisposable
     /// <param name="options">Launch options (a --model override, say); none by default.</param>
     /// <param name="downloadHandler">A fake server under the model-download client's real offline_only guard; the network otherwise.</param>
     /// <param name="updateHandler">The same for the Check for updates client.</param>
+    /// <param name="log">Where the shell logs (a <see cref="RecordingLog"/>, say); nowhere by default.</param>
     public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null,
-        HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null)
+        HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null, ILog? log = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
-        var shell = new AppShell(platform, Paths, NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs, gpuMachine: () => false,
+        var shell = new AppShell(platform, Paths, log ?? NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs, gpuMachine: () => false,
             speechModels: speechModels, downloadHandler: downloadHandler, updateHandler: updateHandler);
         return (shell, platform, dialogs);
     }

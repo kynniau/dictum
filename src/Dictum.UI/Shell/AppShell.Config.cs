@@ -13,8 +13,10 @@ public sealed partial class AppShell
 {
     private string? _offlineWarned;
     private string? _redirectWarned;
-    private bool _cloudWithdrawn; // Switch cloud clean-up off, until cloud clean-up is switched on again (DisableCloud, EnableCloud)
-    private bool _offlineOnlyThisSession; // offline only switched on but not saved to settings.json (SetOfflineOnly)
+    private bool _cloudWithdrawn; // Switch cloud clean-up off, until both files keep it or cloud clean-up is switched on again (DisableCloud, SaveCloudOff, EnableCloud)
+    private (string? Consent, string? Settings) _cloudOffNotSaved; // why the last try could not delete consent.json or save settings.json (SaveCloudOff)
+    private bool _offlineOnlyThisSession; // offline only switched on, until settings.json keeps it (SetOfflineOnly, SaveOfflineOnly)
+    private string? _offlineOnlyNotSaved; // why the last try could not save it (SaveOfflineOnly)
 
     private void LoadConfiguration(bool isReload)
     {
@@ -54,16 +56,86 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// What this session's choices keep in force over the files, applied after every load: once cloud clean-up is switched off
-    /// (<see cref="DisableCloud"/>) no server is used, on this PC or not, and no consent applies, whatever settings.json and
-    /// consent.json still say; offline only switched on stays on when settings.json could not save it (<see cref="SetOfflineOnly"/>).
+    /// What this session's choices keep in force over the files, applied after every load until the files keep them
+    /// (<see cref="SaveSessionChoices"/>): once cloud clean-up is switched off (<see cref="DisableCloud"/>) no server is used,
+    /// on this PC or not, and no consent applies, whatever settings.json and consent.json still say; offline only switched on
+    /// stays on (<see cref="SetOfflineOnly"/>). Each time a choice overrides the settings loaded, the log says so in one line.
     /// </summary>
     private AppSettings SessionChoices(AppSettings settings, SecretStore secrets)
     {
-        if (_offlineOnlyThisSession) settings = settings with { OfflineOnly = true };
+        if (_offlineOnlyThisSession && !settings.OfflineOnly)
+        {
+            _log.Info("Offline only is on for this session: the settings loaded have it off, because settings.json does not keep it yet.");
+            settings = settings with { OfflineOnly = true };
+        }
         if (!_cloudWithdrawn || settings.Llm.Provider is not (LlmSettings.Anthropic or LlmSettings.OpenAiCompatible)) return settings;
+        var host = CloudPolicy.CloudHost(settings.Llm) ?? CloudPolicy.LocalServerHost(settings.Llm);
+        _log.Info($"Cloud clean-up is off for this session: the settings loaded name {settings.Llm.Provider}{(host is null ? "" : $" at {host}")}, which is not used, because the switch-off is not saved yet.");
         var local = settings with { Llm = settings.Llm with { Provider = LlmSettings.Local, CloudConsent = null } };
         return EffectiveSettings.Cleanup(local, secrets.Get(SecretStore.AnthropicKey) is not null, () => ProbeGpu(local), _log.Warn);
+    }
+
+    /// <summary>
+    /// Saves what this session holds over the files (<see cref="SessionChoices"/>) to the files the next start reads: after
+    /// every reload, once the load has put the choices in effect (so clearing read-only or fixing a file by hand is enough: the
+    /// folder watcher reloads on both), and once at quit (<see cref="Dispose"/>). A hold ends when its files keep it. A file
+    /// that already keeps a choice is not written again, so the reload the watcher makes after a write finds nothing to do.
+    /// No balloon: the page that made the choice said what could not be saved.
+    /// </summary>
+    private void SaveSessionChoices()
+    {
+        if (_cloudWithdrawn) SaveCloudOff();
+        if (_offlineOnlyThisSession) SaveOfflineOnly();
+    }
+
+    /// <summary>
+    /// Cloud clean-up off (<see cref="DisableCloud"/>): deletes consent.json if it is there, and writes the local model to
+    /// settings.json (llm.provider, and the recommended llm.model) while that file names anthropic or openai-compatible, or
+    /// cannot be read. A missing settings.json loads as the defaults, which name the local model, so it is never created: the
+    /// next start then asks the first-run questions and uses no server. One log line per try.
+    /// </summary>
+    private void SaveCloudOff()
+    {
+        string? consent = null, settings = null;
+        try
+        {
+            CloudConsentFile.Delete(Paths.ConsentFile);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            consent = SettingsFile.ShortReason(ex, Paths.ConsentFile);
+        }
+        var file = SettingsLoader.LoadFile(Paths.SettingsFile);
+        if (!file.Usable || file.Settings.Llm.Provider is LlmSettings.Anthropic or LlmSettings.OpenAiCompatible)
+        {
+            Models.TryWrite(out settings, reloadAfter: false,
+                ("llm.provider", JsonValue.Create(LlmSettings.Local)), ("llm.model", JsonValue.Create(CleanupCatalog.Recommend(GpuMachine).Model)));
+        }
+        _cloudOffNotSaved = (consent, settings);
+        _cloudWithdrawn = consent is not null || settings is not null;
+        if (!_cloudWithdrawn)
+        {
+            _log.Info("Cloud clean-up off is saved: there is no consent.json, and settings.json names no cloud service.");
+            return;
+        }
+        var why = new[] { consent is null ? null : $"consent.json could not be deleted: {consent}", settings is null ? null : $"settings.json could not be saved: {settings}" };
+        _log.Warn($"Cloud clean-up off is not saved yet ({string.Join("; ", why.OfType<string>())}); it stays off for this session, and saving it is tried again at the next reload and at quit.");
+    }
+
+    /// <summary>
+    /// Offline only switched on (<see cref="SetOfflineOnly"/>): writes offline_only = true to settings.json unless the file can
+    /// be read and has it on. That is the switch's own write, so it creates a missing settings.json as the switch does. One log
+    /// line per try.
+    /// </summary>
+    private void SaveOfflineOnly()
+    {
+        var file = SettingsLoader.LoadFile(Paths.SettingsFile);
+        string? failure = null;
+        if (!(file.Usable && file.Settings.OfflineOnly)) Models.TryWrite(out failure, reloadAfter: false, ("offline_only", JsonValue.Create(true)));
+        _offlineOnlyNotSaved = failure;
+        _offlineOnlyThisSession = failure is not null;
+        if (failure is null) _log.Info("Offline only is saved: settings.json has it on.");
+        else _log.Warn($"Offline only is not saved yet (settings.json could not be saved: {failure}); it stays on for this session, and saving it is tried again at the next reload and at quit.");
     }
 
     private bool ProbeGpu(AppSettings settings)
@@ -85,6 +157,7 @@ public sealed partial class AppShell
         var previousPath = Models.ModelPath;
         var previous = _settings;
         LoadConfiguration(isReload: true);
+        SaveSessionChoices(); // after the load: what this session holds is in effect before either file is changed
         _controller?.UpdateOptions(AppRules.Options(_settings));
         ApplyEnabled(_settings.Enabled, persist: false);
         if (userRequested || AppRules.HotkeyChanged(previous, _settings))
@@ -116,36 +189,38 @@ public sealed partial class AppShell
     public void SetEnabled(bool enabled) => ApplyEnabled(enabled, persist: true);
 
     /// <summary>
-    /// Settings > Privacy > Offline only, saved as "offline_only". Switched on, it takes effect even when settings.json cannot be
-    /// saved: it then stays on until Dictum quits (<see cref="SessionChoices"/>) and <see cref="OfflineOnlyNotSaved"/> says why.
-    /// Switched off, nothing changes unless the file is saved (<see cref="ModelCoordinator.WriteFailed"/>). Null: saved.
+    /// Settings > Privacy > Offline only, saved as "offline_only". Switched on, it takes effect in memory first, before
+    /// settings.json is written (<see cref="SessionChoices"/>), and the reload then saves it (<see cref="SaveSessionChoices"/>).
+    /// When it cannot be saved it stays on, <see cref="OfflineOnlyNotSaved"/> says why, and saving it is tried again at every
+    /// reload and once at quit. Switched off, nothing changes unless the file is saved (<see cref="ModelCoordinator.WriteFailed"/>).
+    /// Null: saved.
     /// </summary>
     public string? SetOfflineOnly(bool on)
     {
-        if (SettingsFile.SetValue(Paths.SettingsFile, "offline_only", JsonValue.Create(on), out var failure))
+        if (on)
+        {
+            _offlineOnlyThisSession = true;
+            Reload(userRequested: false);
+            return _offlineOnlyNotSaved is { } why ? OfflineOnlyNotSaved(why) : null;
+        }
+        if (Models.TryWrite(out var failure, reloadAfter: false, ("offline_only", JsonValue.Create(false))))
         {
             _offlineOnlyThisSession = false; // the file holds the choice now
-            _log.Info($"Set from the app: offline_only = {(on ? "true" : "false")}.");
             Reload(userRequested: false);
             return null;
         }
         _log.Warn($"Could not write \"offline_only\" to settings.json ({failure}).");
-        if (!on)
-        {
-            StatusChanged(); // the switch shows the settings in use again: offline only stays on
-            return ModelCoordinator.WriteFailed;
-        }
-        _offlineOnlyThisSession = true;
-        Reload(userRequested: false);
-        return OfflineOnlyNotSaved(failure!);
+        StatusChanged(); // the switch shows the settings in use again: offline only stays on
+        return ModelCoordinator.WriteFailed;
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026), not yet approved: the product owner reviews it before release. Pinned word for word in
-    /// CloudOffTakesEffectTests; do not reword it until that review.
+    /// PROPOSED copy (16/10/2026, second draft), not yet approved: the product owner reviews it before release. Pinned word for
+    /// word in CloudOffTakesEffectTests; do not reword it until that review. Shown while offline only is on for this session
+    /// and settings.json does not have it on. No "Nothing is sent": offline only still allows a server on this PC.
     /// </summary>
     internal static string OfflineOnlyNotSaved(string reason) =>
-        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Fix the file so it stays on after a restart.";
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits.";
 
     private void ApplyEnabled(bool enabled, bool persist)
     {
@@ -269,7 +344,8 @@ public sealed partial class AppShell
         Directory.CreateDirectory(Paths.ConfigDir);
         _watcher = new FileSystemWatcher(Paths.ConfigDir)
         {
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+            // Attributes: clearing read-only is a change that reloads, so the reload can save what this session holds (SaveSessionChoices).
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.Attributes,
             IncludeSubdirectories = false,
         };
         void Changed(object? _, FileSystemEventArgs e)

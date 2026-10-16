@@ -325,15 +325,28 @@ public sealed class ModelCoordinator(
     /// </summary>
     public bool Write(params (string Key, JsonNode? Value)[] values)
     {
-        if (values.Length == 0) return true;
-        if (values.All(v => SettingsFile.SetValue(paths.SettingsFile, v.Key, v.Value?.DeepClone())))
-        {
-            log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
-            reload(); // re-reads settings and hot-swaps the model (hotkey ignored while a speech model loads)
-            return true;
-        }
+        if (TryWrite(out _, reloadAfter: true, values)) return true;
         balloon(WriteFailed, true);
         return false;
+    }
+
+    /// <summary>
+    /// <see cref="Write"/> without the balloon, for a caller that says itself why the file could not be written: writes the
+    /// keys in order and, when <paramref name="reloadAfter"/>, reloads. False when a key could not be written (those before it
+    /// stay written, as in <see cref="Write"/>); <paramref name="failure"/> then says why (<see cref="SettingsFile.ShortReason"/>)
+    /// and nothing reloads.
+    /// </summary>
+    public bool TryWrite(out string? failure, bool reloadAfter, params (string Key, JsonNode? Value)[] values)
+    {
+        failure = null;
+        if (values.Length == 0) return true;
+        foreach (var (key, value) in values)
+        {
+            if (!SettingsFile.SetValue(paths.SettingsFile, key, value?.DeepClone(), out failure)) return false;
+        }
+        log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
+        if (reloadAfter) reload(); // re-reads settings and hot-swaps the model (hotkey ignored while a speech model loads)
+        return true;
     }
 
     /// <summary>
