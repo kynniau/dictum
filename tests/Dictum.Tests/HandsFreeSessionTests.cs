@@ -581,6 +581,17 @@ public class HandsFreeSettingsTests
     }
 
     [Fact]
+    public void The_README_privacy_table_says_a_hands_free_cloud_request_carries_the_last_parts_words()
+    {
+        // Rebase lane, 16/10/2026: a cloud provider gets a part's carried words in its system prompt (ILlmClient's default
+        // CompleteAsync sends CleanupPrompt.WithCarried), so the table of what leaves the PC says so, with the count in the code.
+        var lines = File.ReadAllLines(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md"));
+        var row = Assert.Single(lines, line => line.StartsWith("| After each dictation, only if you switch cloud clean-up on", StringComparison.Ordinal));
+        Assert.Contains($"which includes your dictionary terms and, in hands-free, up to {SegmentJoin.CarriedWords} words of what you said in " +
+                        "the last part: taken before corrections, the profanity filter and snippets, so never their text", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public Task The_pill_says_what_Esc_kept() => UiSession.Run(() =>
     {
         var pill = new PillWindow(null);
