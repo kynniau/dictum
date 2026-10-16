@@ -50,7 +50,7 @@ public sealed class FixBatchModelTests : IDisposable
     private string Model(string file) => Path.Combine(_paths.DefaultModelsDir, file);
 
     private ModelCoordinator Make(ModelManager? models = null, LocalLlmManager? llm = null, Action? reload = null) =>
-        new(_paths, models ?? new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false),
+        new(_paths, models ?? new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false),
             llm ?? new LocalLlmManager(NullLog.Instance, loader: (p, _) => new FakeLocalEngine(p)), _client, NullLog.Instance, () => _settings, null, _prompts, _ => null,
             reload: reload ?? (() => _settings = SettingsLoader.LoadFile(_paths.SettingsFile).Settings), shutdown: () => { }, refreshTooltip: () => { },
             balloon: (text, _) => _balloons.Enqueue(text), gpuMachine: () => false);
@@ -59,7 +59,7 @@ public sealed class FixBatchModelTests : IDisposable
     public async Task Overlapping_speech_loads_install_the_last_choice_and_release_the_other()
     {
         var loads = new GatedLoads();
-        var models = new ModelManager(NullLog.Instance, loader: loads.LoadSpeech, warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: loads.LoadSpeech, gpuInUse: () => false);
         var (small, @base) = (Model("ggml-small.en.bin"), Model("ggml-base.en.bin"));
         models.BeginLoad(small, new WhisperSettings());
         Assert.True(await Eventually(() => loads.Started.Contains(small)));
@@ -117,7 +117,7 @@ public sealed class FixBatchModelTests : IDisposable
     public async Task Quit_stops_a_speech_warm_up_and_releases_its_engine()
     {
         FakeSpeechEngine? engine = null;
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => engine = new FakeSpeechEngine(p, d, waitForCancel: true), warmUp: () => true);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => engine = new FakeSpeechEngine(p, d, waitForCancel: true), gpuInUse: () => true);
         models.BeginLoad(Model("ggml-small.en.bin"), new WhisperSettings());
         Assert.True(await Eventually(() => engine is not null));
         await Task.Delay(100, Ct); // the warm-up is running
@@ -143,7 +143,7 @@ public sealed class FixBatchModelTests : IDisposable
         var calls = 0;
         var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => Interlocked.Increment(ref calls) == 1
             ? throw new ModelIntegrityException("ggml-tiny.en.bin is 1,000 bytes but the catalogue says 77,704,715")
-            : new FakeSpeechEngine(p, d), warmUp: () => false);
+            : new FakeSpeechEngine(p, d), gpuInUse: () => false);
         File.WriteAllBytes(Model("ggml-tiny.en.bin"), Payload);
         _settings = new AppSettings { Whisper = new WhisperSettings { Model = "tiny.en" } };
         var coordinator = Make(models);

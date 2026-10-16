@@ -93,6 +93,10 @@ public static class BenchCleanupCommand
         try
         {
             integrity.Verify(path);
+            // simplification: the bench never sets whisper's runtime order, so llm.gpu = auto keeps Vulkan here even where the tray
+            // app would use the CPU build (every GPU integrated graphics, LocalLlmEngine.UseVulkan). Ceiling: on such a PC the bench
+            // times Vulkan, not what dictation uses. Trigger to retire: a bench figure quoted for an integrated-graphics PC; then set
+            // the order first (WhisperEngine.ConfigureRuntime with whisper.gpu) or pass llm.gpu = cpu.
             using var engine = LocalLlmEngine.Load(path, settings.Llm.Gpu, log);
             await engine.WarmUpAsync(prompt); // as the tray app does after loading: evaluates the prompt prefix (and compiles GPU shaders)
             var max = CleanupExamples.LocalMaxTokens(engine.CountTokens(raw));

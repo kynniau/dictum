@@ -207,6 +207,12 @@ public sealed partial class WhisperEngine : ISpeechEngine
     /// Whether the recommendations and the Mode presets treat this PC as a GPU machine: Vulkan is in use and
     /// <see cref="IsGpuMachine"/> holds for the devices it described.
     /// </summary>
+    // simplification: a fact about the runtime, not about where the speech model runs. Ceiling: after the retry on the CPU
+    // (ModelManager.RunsOnCpu, Notice GpuFailed) Vulkan is still in use, so Full still offers large-v3-turbo and the
+    // recommendations stay GPU-sized on a PC whose GPU just failed; a start after the GPU ended Dictum sets the CPU-only order
+    // (when nothing set an order before it), which this already reads as a CPU machine. Trigger to retire: the shell's
+    // GPU-machine question taking the speech model's RunsOnCpu into account (AppShell.cs:77, outside the resilience lane), or a
+    // report of Full choosing a model the GPU cannot run.
     public static bool GpuMachine => VulkanActive && IsGpuMachine(VulkanDevices, Devices.Count(d => !d.Value), Devices.Count(d => d.Value));
 
     /// <summary>
@@ -227,7 +233,11 @@ public sealed partial class WhisperEngine : ISpeechEngine
     /// </summary>
     public static (int Found, int Discrete, int Integrated)? VulkanDevicesForCleanup(ILog log)
     {
-        if (Volatile.Read(ref _configuredGpu) is null or "cpu") return null;
+        // simplification: no order set, or the CPU order, answers null, and the clean-up's auto then keeps Vulkan. Ceiling: on a PC
+        // whose only GPU is integrated graphics, whisper.gpu = cpu (which Try on the CPU writes, and which a start after the GPU
+        // ended Dictum on the speech model also sets) or a clean-up load asked before any speech load puts the clean-up on
+        // Vulkan, the slower choice there (LocalLlmEngine.UseVulkan). Trigger to retire: as LocalLlmEngine.ConfigureBackend's note.
+        if (!ProbeAllowed(Volatile.Read(ref _configuredGpu))) return null;
         NativeLoadGate.Run(() =>
         {
             try
@@ -242,6 +252,13 @@ public sealed partial class WhisperEngine : ISpeechEngine
         });
         return RuntimeOptions.LoadedLibrary == RuntimeLibrary.Vulkan ? (VulkanDevices, Devices.Count(d => !d.Value), Devices.Count(d => d.Value)) : null;
     }
+
+    /// <summary>
+    /// Whether the clean-up's backend choice may load whisper's runtime to read its devices: only once a speech load has set the
+    /// runtime order (<paramref name="configuredGpu"/>, the whisper.gpu value it was set from), and never against whisper.gpu =
+    /// cpu, whose order leaves whisper's Vulkan runtime out (it is never loaded just to look).
+    /// </summary>
+    internal static bool ProbeAllowed(string? configuredGpu) => configuredGpu is not (null or "cpu");
 
     /// <summary>"2 (1 discrete, 1 integrated)" for the log and --selftest.</summary>
     public static string DeviceSummary =>

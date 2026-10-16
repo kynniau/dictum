@@ -66,6 +66,11 @@ public sealed class LocalLlmEngine : ILocalLlmEngine
         {
             if (_backendConfigured) return;
             _backendConfigured = true;
+            // simplification: the devices come only from whisper's runtime. Ceiling: with whisper.gpu = cpu (Try on the CPU writes
+            // it, and a start after the GPU ended Dictum on the speech model sets the same CPU order), or before any speech load is
+            // asked for, they are never described, so auto keeps Vulkan on a PC whose only GPU is integrated graphics. Trigger to
+            // retire: a report of a slow clean-up on such a PC with the speech model on the CPU; then enumerate Vulkan devices
+            // without loading whisper's runtime.
             var vulkan = UseVulkan(gpuSetting, gpuSetting == "auto" ? Transcribe.WhisperEngine.VulkanDevicesForCleanup(log) : null);
             NativeLibraryConfig.All
                 .WithVulkan(vulkan)
@@ -84,6 +89,9 @@ public sealed class LocalLlmEngine : ILocalLlmEngine
     /// build, and a warm-up of 12-21 s against 3-5 s. A discrete GPU keeps Vulkan, and so do devices never described (null) or
     /// none found, as before.
     /// </summary>
+    // simplification: one integrated GPU measured (the UHD P630 beside a 6-core Xeon) decides for every integrated GPU. Ceiling: a
+    // newer integrated GPU (Iris Xe, Arc, Radeon graphics) may run the clean-up faster on Vulkan than on its CPU, and auto then
+    // leaves that speed unused. Trigger to retire: a measurement on such a GPU where Vulkan wins; then decide by measured speed.
     internal static bool UseVulkan(string gpuSetting, (int Found, int Discrete, int Integrated)? devices) => gpuSetting switch
     {
         "cpu" => false,
@@ -130,20 +138,22 @@ public sealed class LocalLlmEngine : ILocalLlmEngine
         ConfigureBackend(gpuSetting, log);
         if (!File.Exists(path)) throw new FileNotFoundException("Cleanup model file not found.", path);
         var sw = Stopwatch.StartNew();
-        var cpu = gpuSetting == "cpu";
-        var parameters = new ModelParams(path)
-        {
-            ContextSize = ContextSize,
-            GpuLayerCount = cpu ? 0 : 999, // all layers on the GPU when the Vulkan build loaded
-            // "cpu" inside the Vulkan build (a changed setting, or the retry after the GPU failed): no work goes to the GPU. With
-            // llama.cpp's default op offload the retry still asked Vulkan for prompt buffers (DECISIONS, 17/10/2026).
-            OpOffload = cpu ? false : null,
-        };
+        var (gpuLayers, opOffload) = Parameters(gpuSetting);
+        var parameters = new ModelParams(path) { ContextSize = ContextSize, GpuLayerCount = gpuLayers, OpOffload = opOffload };
         var weights = NativeLoadGate.Run(() => LLamaWeights.LoadFromFile(parameters));
         sw.Stop();
-        log.Info($"Cleanup model {Path.GetFileName(path)} loaded in {sw.Elapsed.TotalSeconds:0.0} s on {Backend}{(cpu && Backend == "Vulkan" ? ", on the CPU" : "")} ({LoadedLibrary}).");
+        log.Info($"Cleanup model {Path.GetFileName(path)} loaded in {sw.Elapsed.TotalSeconds:0.0} s on {Backend}{(gpuSetting == "cpu" && Backend == "Vulkan" ? ", on the CPU" : "")} ({LoadedLibrary}).");
         return new LocalLlmEngine(weights, parameters, path, sw.Elapsed);
     }
+
+    /// <summary>
+    /// Where the model's work goes for this llm.gpu value: all layers on the GPU when the Vulkan build loaded (999) and llama.cpp's
+    /// own op offload (null); for "cpu" inside the Vulkan build (a changed setting, or the retry after the GPU failed) no layers
+    /// and op offload off, so no work goes to the GPU: with llama.cpp's default op offload the retry still asked Vulkan for prompt
+    /// buffers (DECISIONS, 17/10/2026). Two values, not LLamaSharp's ModelParams: constructing that loads llama.cpp's native
+    /// library (seen in the test host, 17/10/2026: the Vulkan build's DLLs, before any model).
+    /// </summary>
+    internal static (int GpuLayerCount, bool? OpOffload) Parameters(string gpuSetting) => gpuSetting == "cpu" ? (0, false) : (999, null);
 
     /// <summary>
     /// Evaluates the default prefix into the KV cache and runs one short cleanup, right after loading: the prefix is paid

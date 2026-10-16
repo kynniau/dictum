@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Dictum.Llm;
@@ -217,10 +218,17 @@ internal sealed class AboutPage : SettingsPage
     public AboutPage(AppShell shell) : base(shell, "About")
     {
         var version = typeof(AboutPage).Assembly.GetName().Version?.ToString(3) ?? "?";
-        var title = new TextBlock { Text = "Dictum", FontSize = 22, FontWeight = FontWeight.SemiBold };
+        // Focusable but not a tab stop: where keyboard focus goes when Try on the CPU hides itself (below).
+        var title = new TextBlock { Text = "Dictum", FontSize = 22, FontWeight = FontWeight.SemiBold, Focusable = true };
+        KeyboardNavigation.SetIsTabStop(title, false);
         _downloadPage = Ui.Button(UpdateCheck.DownloadPageLabel, "primary", () => Run(() => Shell.Platform.Open(UpdateCheck.DownloadPageUrl)));
         _downloadPage.HorizontalAlignment = HorizontalAlignment.Left;
-        _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "secondary", () => Run(() => Shell.TryOnCpu()));
+        _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "secondary", () =>
+        {
+            // The reload hides this button and the problem line while the model loads: keyboard focus goes first to the heading.
+            if (_tryCpu!.IsFocused) title.Focus(NavigationMethod.Tab); // set by then: the button exists before it can be pressed
+            Run(() => Shell.TryOnCpu());
+        });
         _tryCpu.HorizontalAlignment = HorizontalAlignment.Left;
         Avalonia.Automation.AutomationProperties.SetLiveSetting(_problem, Avalonia.Automation.AutomationLiveSetting.Polite);
         Avalonia.Automation.AutomationProperties.SetLiveSetting(_update, Avalonia.Automation.AutomationLiveSetting.Polite);
@@ -269,8 +277,9 @@ internal sealed class AboutPage : SettingsPage
     {
         var packaged = Shell.Platform.Package.IsPackaged ? "installed from a package" : "installed from the download";
         var status = Shell.Status;
-        // The clean-up in use says "on this PC" while its model failed to load; the tidy is what runs then.
-        var cleanup = Shell.Settings.Llm.Provider == LlmSettings.Local && Shell.CleanupError is not null && !Shell.CleanupLoading
+        // The clean-up in use says "on this PC" while its model failed to load; the tidy is what runs then. Text that is not
+        // English has the plain cleaner (SPEC §23), whose own line already says what runs.
+        var cleanup = Shell.Settings.Llm.Provider == LlmSettings.Local && Shell.CleanupError is not null && !Shell.CleanupLoading && !Shell.Cleaner.IsPlain
             ? CleanupFailedLine(Shell.Models.CurrentCleanupName)
             : $"Clean-up: {Shell.CleanupStatus}.";
         _runtime.Text = $"On {Shell.Platform.Name}, {packaged}.\nModels: {status.Models}.\n{cleanup}";

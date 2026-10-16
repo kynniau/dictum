@@ -104,15 +104,27 @@ public sealed partial class AppShell
 
     private static string Sentence(string reason) => reason.EndsWith('.') ? reason : reason + ".";
 
-    /// <summary>Whether <see cref="TryOnCpu"/> has anything to do: a model failed inside a GPU runtime in a way the CPU might get past, and its gpu setting is not cpu.</summary>
+    /// <summary>
+    /// The load balloon for a model's new failure: the reason and where to choose another model, except a missing Visual C++
+    /// runtime, which no model choice fixes: that reason alone, and one balloon when both models carry it.
+    /// </summary>
+    /// <param name="what">"Speech model" or "Clean-up model".</param>
+    /// <param name="bothShown">The other model's last balloon reason is this one too.</param>
+    internal static string? LoadBalloon(string error, string what, bool bothShown) =>
+        error != ModelFailure.RuntimeMissing ? $"{error} ({what}: Settings > Models)" : bothShown ? null : error;
+
+    /// <summary>
+    /// Whether <see cref="TryOnCpu"/> has anything to do: a model failed inside a GPU runtime in a way the CPU might get past, its gpu
+    /// setting is not cpu, and no retry on the CPU ran for that failure (<see cref="ModelFailure.Assess"/>).
+    /// </summary>
     internal bool TryCpuOffered => CpuSettings().Count > 0;
 
     /// <summary>
-    /// "Try on the CPU" beside a model problem: writes whisper.gpu and/or llm.gpu = "cpu" for each model that failed inside a GPU
-    /// runtime in a way the CPU might get past, through the settings writer. Its reload loads the model again off the GPU at once
-    /// (<see cref="WhisperEngine.Load"/>, <see cref="LocalLlmEngine.Load"/>); the CPU-only runtime itself loads at the next start,
-    /// and if the model fails again the problem line asks for that restart (<see cref="RestartForCpuHint"/>). False when
-    /// settings.json could not be written (the writer's balloon says so).
+    /// "Try on the CPU" beside a model problem: writes whisper.gpu and/or llm.gpu = "cpu" for each model <see cref="TryCpuOffered"/>
+    /// names, through the settings writer. Its reload loads the model again off the GPU at once (<see cref="WhisperEngine.Load"/>,
+    /// <see cref="LocalLlmEngine.Load"/>); the CPU-only runtime itself loads at the next start, and if the model fails again the
+    /// problem line asks for that restart (<see cref="RestartForCpuHint"/>). False when settings.json could not be written (the
+    /// writer's balloon says so).
     /// </summary>
     public bool TryOnCpu()
     {

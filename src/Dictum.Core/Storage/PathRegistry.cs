@@ -24,7 +24,7 @@ public enum DataCategory
     /// </summary>
     SharedModels,
 
-    /// <summary>verified-models.json: which model files already passed their SHA-256 check.</summary>
+    /// <summary>verified-models.json: which model files already passed their SHA-256 check; and the GPU-load markers (a model the GPU could not load).</summary>
     ModelVerification,
 
     CalibrationRecordings,
@@ -78,6 +78,8 @@ public static class PathRegistry
             new(paths.ExeEnvFile, DataCategory.Secrets, "API keys beside the program (.env)"),
             new(paths.VerifiedModelsFile, DataCategory.ModelVerification, "record of verified model files"),
             new(paths.VerifiedModelsFile + ".tmp", DataCategory.ModelVerification, "record being saved"),
+            new(paths.SpeechGpuMarkerFile, DataCategory.ModelVerification, "speech model the GPU could not load"),
+            new(paths.CleanupGpuMarkerFile, DataCategory.ModelVerification, "clean-up model the GPU could not load"),
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration recordings", "clip-*"),
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration take list", "takes.txt"),
             new(paths.LogsDir, DataCategory.Logs, "logs", "*.log"),

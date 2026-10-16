@@ -2197,7 +2197,7 @@ investigation's 10.74 s WAV; the clean-up input is its 23-word sentence.
 
 ### F2: a model that cannot load is named
 
-- `ModelFailure` (in `ModelManager.cs`) turns the two messages the investigation saw in Windows Sandbox into "The Microsoft
+- `ModelFailure` (in `ModelManager.cs`; in its own file since the lens fixes below) turns the two messages the investigation saw in Windows Sandbox into "The Microsoft
   Visual C++ runtime is missing; install it from Microsoft, then restart Dictum" when the runtime is not on the PC:
   Whisper.net's "Failed to load native whisper library…" and LLamaSharp's failed `LLama.Native.NativeApi` type initialiser
   (both texts read in the two libraries' binaries in the NuGet cache, 17/10/2026), and a `DllNotFoundException`. The runtime
@@ -2210,6 +2210,7 @@ investigation's 10.74 s WAV; the clean-up input is its 23-word sentence.
   keeps the engine's own words, since its cause is not known.
 - `LastError` carries the plain words, so the existing load balloon (`AppShell.cs`, outside this lane) shows them too. It
   still ends "(Speech model: Settings > Models)", which does not fit the runtime case: left for the owner of `AppShell.cs`.
+  (Done in the lens fixes below.)
 - The tray panel shows a line under its header, and About under its models line: "Speech model: …", "Clean-up model: …",
   or one "Speech and clean-up models: …" when both share the reason (a missing runtime stops both). Beside it in the panel,
   "Open log folder" (About has its own under Files) and, when it can help, "Try on the CPU". The line also explains a model
@@ -2218,7 +2219,8 @@ investigation's 10.74 s WAV; the clean-up input is its 23-word sentence.
   says "Clean-up: {model} could not be loaded, so the rule-based tidy is used." until a load succeeds or starts.
 - "Try on the CPU" appears when a model failed inside a GPU runtime (whisper's Vulkan runtime, llama.cpp's Vulkan build) in
   a way the CPU-only runtime might get past (not a missing engine library, model file or catalogue match) and its gpu
-  setting is not `cpu`. With F3 in place that means the retry on the CPU inside that runtime has failed too. It writes
+  setting is not `cpu`. With F3 in place that means the retry on the CPU inside that runtime has failed too (the lens
+  showed that this offers the button exactly when the CPU has failed already: changed in the lens fixes below). It writes
   `whisper.gpu` and/or `llm.gpu` = `cpu` through the settings writer (`AppShell.Write`); the reload loads the model again off
   the GPU at once (`WhisperEngine.Load` now passes Whisper.net's `UseGpu = false` for `cpu`, and `LocalLlmEngine.Load` gives
   no layers to the GPU and turns op offload off), and if that fails as well the line adds "Restart Dictum to use the CPU.",
@@ -2236,15 +2238,16 @@ investigation's 10.74 s WAV; the clean-up input is its 23-word sentence.
   - "Open log folder" is About's existing label, reused in the panel.
 - Not done, outside this lane's files: every hotkey press still flashes "Busy" while no speech model is ready
   (`DictationController.cs`, `PillText.cs`); the problem report's "Models:" line (`AppShell.Actions.cs`) does not carry the
-  reason; the balloon suffix above.
+  reason; the balloon suffix above (done in the lens fixes below).
 
 ### F3: one more try on the CPU after a GPU failure
 
 - `ModelManager.Load` and `LocalLlmManager.LoadAsync`: a load or warm-up that throws while the GPU is in use (whisper:
   `WhisperEngine.VulkanActive`; llama.cpp: its Vulkan build loaded) is tried once more with gpu `cpu`, unless
   `ModelFailure.WorthCpuRetry` says the CPU cannot help (a missing engine library, model file or catalogue match, a load
-  stopped by quit). One warning line names the GPU failure; `Notice` then holds the GPU-failed sentence and `RunsOnCpu` is
-  true. If the CPU fails too, `LastError` is the CPU's own failure.
+  stopped by quit). One warning line names the GPU failure (since the lens fixes: "failed while the GPU was in use");
+  `Notice` then holds the GPU-failed sentence and `RunsOnCpu` is true. If the CPU fails too, `LastError` is the CPU's own
+  failure.
 - Leak fix: an engine whose warm-up throws is disposed before the failure goes on (before, `ModelManager.Load` lines
   144-146 left it loaded); `WhisperEngine.Load` also frees its factory when the processor cannot be built.
 - Measured here, a GPU failure provoked with `GGML_VK_FORCE_MAX_BUFFER_SIZE=16777216`, which makes ggml-vulkan refuse any
@@ -2263,7 +2266,8 @@ investigation's 10.74 s WAV; the clean-up input is its 23-word sentence.
   - Speech, base.en on the P630, the same variable: whisper.cpp stopped at `GGML_ASSERT(buffer) failed`
     (ggml-backend.cpp:194) and the process ended with 0xC0000409; no .NET exception reached Dictum. No in-process retry can
     catch that case; it needs a crash marker (an unclean exit during a GPU load, so the next start goes to the CPU), not
-    built here. The speech retry is pinned with stand-ins only. README, Troubleshooting, says what to do.
+    built here (built in the lens fixes below). The speech retry is pinned with stand-ins only. README, Troubleshooting,
+    says what to do.
 - Not covered: a warm-up that fails after a decoding change (`ModelManager.Reconfigure`) is logged, as before, not retried.
 
 ### F4: the clean-up model stays off integrated graphics
@@ -2369,3 +2373,87 @@ skipped, 0 failed (the 22 new tests included), twice. Before the rebase, on c0aa
 passed, 19 skipped, 0 failed without these changes; 1,150, 1,131, 19, 0 with the first 20 of the new tests. Not run: the
 desktop-, tray- and model-gated tests (the 19 skipped), Dictum.exe itself (the running copy was left alone), and any run
 on a PC without the Visual C++ runtime (the investigation's Windows Sandbox evidence stands in for it).
+
+### Lens fixes (17/10/2026, the opus lens on ece0d1c: Needs changes, 3 majors and 6 minors)
+
+The orchestrator's decision on the lens's open question: a start after the GPU ended Dictum switches that model to the CPU
+automatically, with no click, and says so. The lens's probes and its real run R1 (a base.en cut to its first 60 MiB,
+through the production loader on the P630, `whisper.gpu = auto`) are in that session's scratchpad (`lens-res`), not here.
+
+- **The GPU ending Dictum (major).** whisper.cpp ends the process when the GPU refuses a model's memory (F3's run above:
+  "ggml_vulkan: Device memory allocation of size 147365888 failed … ErrorOutOfDeviceMemory … GGML_ASSERT(buffer) failed",
+  exit 0xC0000409), so the next start tried the GPU again and ended again, at every sign-in. Any discrete GPU counts as a
+  GPU machine whatever its memory, and a GPU machine is recommended medium.en (1,533,774,781 bytes) at the first run and
+  given large-v3-turbo by Full, so a small card meets this. `GpuLoadMarker` (new, `Transcribe/GpuLoadMarker.cs`): each
+  manager writes `gpu-load-speech.txt` or `gpu-load-cleanup.txt` naming the model (its full path) just before a load
+  with its gpu setting not `cpu` (the load and its warm-up), and deletes it in a finally around that attempt and at
+  Dispose (only a file this run wrote: quitting is not the GPU ending Dictum). The first load of a run reads the file:
+  when it names that model and its gpu setting is not `cpu`, the model loads with `cpu` for the rest of the run (speech:
+  `ConfigureRuntime("cpu")` before the load, so whisper's Vulkan runtime is never loaded; clean-up: `LocalLlmEngine.Load`
+  with `cpu`, whose first call sets llama.cpp's CPU build), `Notice` is the new proposed line "The graphics driver could
+  not run the model last time; Dictum is using the CPU", and the file stays, so starts do not alternate between the GPU
+  and the CPU. Another model at a first load tries the GPU: its own GPU load replaces the file, and its finally deletes it.
+  The folder: both managers already hold `ModelIntegrity`, whose `verified-models.json` lives in `AppPaths.LocalDir` (under
+  MSIX the package's LocalCache), so the marker sits beside it (`ModelIntegrity.Folder`) and `AppShell.cs` needed no change
+  for it. `AppPaths` names both files and `PathRegistry` lists them under `ModelVerification`, so Delete all app data and
+  Remove Dictum completely delete them; StorageTests writes them through `GpuLoadMarker`. Limits: a load and its warm-up
+  are covered, not a dictation or a decoding change on the GPU after the load (the `// simplification:` note in
+  `ModelManager.Load`); and when something set whisper's runtime order before the first speech load (the first-run probe,
+  or the clean-up repair's probe when `llm.model` is not valid), `ConfigureRuntime("cpu")` changes nothing and the model
+  loads on the CPU inside the Vulkan runtime (Whisper.net's `UseGpu = false`; R1's log shows `use gpu = 0` and
+  "CPU total size = 147.37 MB" for that path).
+- **Try on the CPU's gating (major).** `CpuMightHelp` came from the CPU retry's own failure, so the button appeared
+  exactly when the CPU had failed already: in R1 the GPU and then the CPU failed ("ERROR not all tensors loaded from model
+  file - expected 245, got 14" both times), `CpuMightHelp` was true, and pressing the button would repeat that attempt and
+  write `whisper.gpu = cpu` for good. Now the retry's failure is marked (`ModelFailure.CpuTried`, in the exception's
+  `Data`) and `ModelFailure.Assess` offers the button only when no retry on the CPU ran for that failure; the line shows
+  the CPU attempt's error, with Open log folder. The case left: a start that loaded the model with `cpu` because of the
+  marker, inside a GPU runtime set before it, where that load fails: the CPU-only runtime has not been tried, so the
+  button is offered, once (pressing it writes `cpu`; the reload's failure then asks for a restart). In production a
+  marker start sets the CPU-only order itself, so that case needs one of the earlier probes above. The warning line says
+  "failed while the GPU was in use", since the GPU is not known to be the cause (R1's was the file).
+- **About's clean-up line (major, a regression).** For text that is not English the cleaner in use is SPEC §23's plain
+  one (whitespace only), and with a failed local model About said "Clean-up: {model} could not be loaded, so the
+  rule-based tidy is used." The line now also needs `!Shell.Cleaner.IsPlain`, so the plain cleaner's own status (it says
+  "whitespace tidied only") stays, as on main (the lens's P5b passes on main 23acf35 and failed on ece0d1c).
+- **Pins the lens found missing (minor).** A later model that loads on the GPU clears the GPU-failed notice (the lens's
+  P1); About offers Try on the CPU when the panel does (P2, now on the marker start, the one case left that offers it);
+  the clean-up models line says `CPU` after the retry, through a new `cleanupModels` parameter on `AppShell` like
+  `speechModels` (`AppShell.cs`: a doc line, the signature and line 81); op offload off only for `cpu`, through
+  `LocalLlmEngine.Parameters(gpuSetting)`, which returns the two values (layers, op offload) rather than LLamaSharp's
+  `ModelParams`: constructing a `ModelParams` loads llama.cpp's native library (seen in this lane's test host,
+  17/10/2026: the Vulkan build's ggml-base, ggml-vulkan, ggml and llama DLLs and the avx2 ggml-cpu appeared among the
+  process's modules right after it, with no model), so a pin on it would load the GPU stack in every test run; and the
+  clean-up's device probe never loads whisper's runtime against `whisper.gpu = cpu` (`WhisperEngine.ProbeAllowed`).
+- **Simplification notes (minor)**, each with its ceiling and trigger: `WhisperEngine.VulkanDevicesForCleanup` and
+  `LocalLlmEngine.ConfigureBackend` (with `whisper.gpu = cpu`, a marker start or no speech load yet, `auto` keeps Vulkan on
+  a PC with integrated graphics only; Try on the CPU makes that likelier); `BenchCleanupCommand.RunOneAsync` (the bench
+  never sets whisper's order, so it times Vulkan there; the note only, the file is outside this lane); `UseVulkan` (one
+  integrated GPU measured decides for all); `LocalLlmClient` (the pill and the clean-up matched by string instance);
+  `ModelManager.Load` (no retry survives a native abort; the marker covers loads only); `WhisperEngine.GpuMachine` (below).
+  README's `llm.gpu` row names the exceptions.
+- **Keyboard focus (minor).** Try on the CPU hides itself and its line while the reload loads the model, and focus went
+  nowhere (the lens's headless probe P3). Pressing it now moves focus first to a control that stays: the tray panel's
+  Dictation on switch, and About's "Dictum" heading (focusable, not a tab stop), both with `NavigationMethod.Tab`, so the
+  focus ring shows. Only when the button had focus.
+- **Structure (minor).** `ModelFailure` moved to its own file; one `ModelFailure.Assess(error, gpuInUse, gpuSetting,
+  runtimePresent)` gives both managers `LastError`, `CpuMightHelp` and `RestartForCpu` (each manager keeps one
+  `Assessment` field behind its three properties); one `ModelFailure.RetryOnCpu` holds the retry rule both managers used;
+  `ModelManager`'s `warmUp` parameter is `gpuInUse`, as `LocalLlmManager`'s (13 callers in 6 other test files renamed).
+- **Runtime check (minor).** `VisualCppRuntimePresent()` is true off Windows (Dictum.Core also targets macOS, where no such
+  runtime exists), and an `msvcp140.dll` older than 14.51 counts as missing: the floor is a copy of `$MinVcRuntime` in
+  `scripts/build-common.ps1` on fix/vc-runtime (PR #10, 5584935, read 17/10/2026), which records Microsoft's rule and the
+  newest linker among the native DLLs. The version is read from the file the process loads by name, or from a copy beside
+  the engines; a version that cannot be read counts as present, as before. A guard test compares the two floors once PR
+  #10's script is on the branch (skipped until then).
+- **One-line gaps (minor).** The load balloon (`AppShell.cs` line 200, one line, with `AppShell.LoadBalloon` in
+  `AppShell.Status.cs`) drops "(Speech model: Settings > Models)" for a missing runtime, which no model choice fixes, and
+  shows it once when both models carry it. `GpuMachine` is unchanged: it is a fact about the runtime, so after the retry
+  on the CPU (Vulkan still loaded) Full still offers large-v3-turbo; a marker start sets the CPU-only order, which already
+  reads as a CPU machine. The fix is one line in `AppShell.cs` (line 77: `_gpuMachine = gpuMachine ?? (() =>
+  WhisperEngine.GpuMachine && !_models.RunsOnCpu);`), outside this lane's files, so it is a `// simplification:` note on
+  `GpuMachine` and is left for the owner of `AppShell.cs`.
+- Proposed string (17/10/2026, awaiting the product owner's review; pinned word for word in `RuntimeResilienceTests`):
+  "The graphics driver could not run the model last time; Dictum is using the CPU" (the brief's wording). No other
+  user-facing copy is new; log lines: "… failed while the GPU was in use (…); loading it again on the CPU." and
+  `GpuLoadMarker`'s warnings (a marker that names the model, or that could not be read, written or deleted).

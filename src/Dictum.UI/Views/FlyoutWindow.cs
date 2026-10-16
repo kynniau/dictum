@@ -81,7 +81,12 @@ internal sealed class FlyoutWindow : Window
         AutomationProperties.SetName(_mic, "Microphone");
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => shell.Models.CancelDownload()));
         // Why a model could not load or runs on the CPU, under the header, with what to do about it (Store investigation, 16/10/2026).
-        _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "link", () => Act(() => shell.TryOnCpu()));
+        _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "link", () =>
+        {
+            // The reload hides this button and its box while the model loads: keyboard focus goes first to the panel's first control.
+            if (_tryCpu!.IsFocused) _enabled.Focus(NavigationMethod.Tab); // set by then: the button exists before it can be pressed
+            Act(() => shell.TryOnCpu());
+        });
         var openLogs = Ui.Button("Open log folder", "link", () => Act(() =>
         {
             if (shell.OpenPath(shell.RealPath(shell.Paths.LogsDir), folder: true) is { } why) shell.Notify("Dictum", why, warning: true);

@@ -494,7 +494,7 @@ public class MouseHotkeyAndSnippetUiTests
     public Task A_mouse_hotkey_lets_its_button_through_until_a_speech_model_is_ready() => UiSession.Run(() =>
     {
         using var scratch = new Scratch("""{ "hotkey": "RightMouse" }""");
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var (shell, platform, _) = scratch.Shell(models);
         shell.Reload(userRequested: true); // no model file: nothing loads (the first-run download, a failed load)
         var mouse = platform.LastListener!;
@@ -538,7 +538,7 @@ public class MouseHotkeyAndSnippetUiTests
         {
             loads.Wait();
             return new FakeSpeechEngine(p, d);
-        }, warmUp: () => false);
+        }, gpuInUse: () => false);
         var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model));
         try
         {

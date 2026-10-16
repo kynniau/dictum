@@ -8,7 +8,8 @@ namespace Dictum.Llm;
 /// falls back to the deterministic tidy instead of making the user wait. As in <see cref="Transcribe.ModelManager"/>, every
 /// load belongs to a generation that a newer choice, <see cref="Unload"/> or quit makes stale: a stale load releases its
 /// engine, so <see cref="Ready"/> is always the user's last choice. Swapping disposes the old engine after it is idle. A load
-/// or warm-up that fails while the GPU is in use is tried once more on the CPU (<see cref="Notice"/>).
+/// or warm-up that fails while the GPU is in use is tried once more on the CPU (<see cref="Notice"/>). A GPU load is recorded in
+/// a <see cref="GpuLoadMarker"/> while it runs, so a start after the GPU ended Dictum loads that model on the CPU.
 /// </summary>
 public sealed class LocalLlmManager : IDisposable
 {
@@ -19,13 +20,17 @@ public sealed class LocalLlmManager : IDisposable
     private readonly Func<string, string, ILocalLlmEngine> _loader;
     private readonly Func<bool> _gpu;
     private readonly Func<bool> _visualCppRuntime;
+    private readonly GpuLoadMarker _marker;
     private Task<ILocalLlmEngine>? _loading; // the latest choice's load; null after Unload
     private Task _tail = Task.CompletedTask; // the last load started: the next one waits for it
     private long _generation; // bumped by every BeginLoad, Unload and Dispose
     private ILocalLlmEngine? _engine;
-    private bool _engineOnCpu; // the engine in use was loaded with llm.gpu "cpu": by the setting, or after its GPU load failed
+    private bool _engineOnCpu; // the engine in use was loaded with llm.gpu "cpu": by the setting, after its GPU load failed, or by the marker
+    private ModelFailure.Assessment? _failure; // why the latest load failed; null while it loads or once it loaded
     private string _prompt = CleanupPrompt.Default;
 
+    /// <param name="integrity">Checks catalogue files before they load; its folder (the per-user local data folder in the app) holds
+    /// the <see cref="GpuLoadMarker"/>. Without it no marker is read or written.</param>
     /// <param name="loader">Tests load fakes; production loads llama.cpp through <see cref="LocalLlmEngine.Load"/>.</param>
     /// <param name="gpuInUse">Whether the GPU is in use (tests decide; production: the Vulkan build of llama.cpp loaded). A load or
     /// warm-up that fails on it is tried once more on the CPU.</param>
@@ -39,6 +44,7 @@ public sealed class LocalLlmManager : IDisposable
         _loader = loader ?? ((path, gpu) => LocalLlmEngine.Load(path, gpu, log));
         _gpu = gpuInUse ?? (() => LocalLlmEngine.Backend == "Vulkan");
         _visualCppRuntime = visualCppRuntime ?? ModelFailure.VisualCppRuntimePresent;
+        _marker = new GpuLoadMarker(integrity is null ? null : Path.Combine(integrity.Folder, GpuLoadMarker.CleanupFile), log);
     }
 
     /// <summary>
@@ -84,23 +90,19 @@ public sealed class LocalLlmManager : IDisposable
     public string? ModelPath { get; private set; }
     public bool IsLoading => _loading is { IsCompleted: false };
 
-    /// <summary>Why the latest load failed, in plain words when the cause is known (<see cref="ModelFailure.Describe"/>); null otherwise.</summary>
-    public string? LastError { get; private set; }
+    /// <summary>Why the latest load failed, in plain words when the cause is known (<see cref="ModelFailure.Assess"/>); null otherwise.</summary>
+    public string? LastError => _failure?.LastError;
+
+    /// <summary>The tray panel and About offer "Try on the CPU" for the latest load's failure (<see cref="ModelFailure.Assess"/>).</summary>
+    public bool CpuMightHelp => _failure?.CpuMightHelp == true;
+
+    /// <summary>Only a restart can put the latest load's model on llama.cpp's CPU build, and the problem line says so (<see cref="ModelFailure.Assess"/>).</summary>
+    public bool RestartForCpu => _failure?.RestartForCpu == true;
 
     /// <summary>
-    /// The latest load failed inside llama.cpp's Vulkan build with llm.gpu not cpu, in a way the CPU build might get past (not a
-    /// missing engine library, file or catalogue match): even once the retry on the CPU inside that build has failed, the next
-    /// start can load the CPU build instead. The tray panel and About then offer "Try on the CPU".
+    /// The engine in use runs on the CPU: llm.gpu is cpu, its load failed on the GPU and was made again on the CPU, or the GPU ended
+    /// Dictum while it loaded last time (<see cref="GpuLoadMarker"/>).
     /// </summary>
-    public bool CpuMightHelp { get; private set; }
-
-    /// <summary>
-    /// The latest load failed on the CPU inside the Vulkan build with llm.gpu = cpu: only a restart loads the CPU build, and the
-    /// problem line says so.
-    /// </summary>
-    public bool RestartForCpu { get; private set; }
-
-    /// <summary>The engine in use runs on the CPU: llm.gpu is cpu, or its load failed on the GPU and was made again on the CPU.</summary>
     public bool RunsOnCpu
     {
         get
@@ -109,7 +111,10 @@ public sealed class LocalLlmManager : IDisposable
         }
     }
 
-    /// <summary><see cref="ModelFailure.GpuFailed"/> while the engine in use runs on the CPU because its GPU load failed; null otherwise.</summary>
+    /// <summary>
+    /// While the engine in use runs on the CPU because the GPU failed: <see cref="ModelFailure.GpuFailed"/> after this run's retry,
+    /// <see cref="ModelFailure.GpuFailedLastTime"/> after the GPU ended Dictum last time; null otherwise.
+    /// </summary>
     public string? Notice { get; private set; }
 
     /// <summary>The engine if one is loaded and no load is in progress; otherwise null.</summary>
@@ -123,19 +128,20 @@ public sealed class LocalLlmManager : IDisposable
 
     public void BeginLoad(string path, string gpuSetting)
     {
+        // The first BeginLoad of a run is never for the path already loading, so the marker is read before any early return.
+        var cpuForThisRun = _marker.CpuForThisRun(path, gpuSetting);
         lock (_gate)
         {
             if (ModelPath == path && _loading is { IsFaulted: false }) return;
             var generation = ++_generation;
             ModelPath = path;
-            LastError = null;
-            CpuMightHelp = RestartForCpu = false;
+            _failure = null;
             var before = _tail;
             var load = Task.Run(async () =>
             {
                 await before.ContinueWith(static _ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)
                     .ConfigureAwait(false); // two models never load at once
-                return await LoadAsync(path, gpuSetting, generation).ConfigureAwait(false);
+                return await LoadAsync(path, gpuSetting, generation, cpuForThisRun).ConfigureAwait(false);
             });
             _loading = load;
             _tail = load;
@@ -144,19 +150,38 @@ public sealed class LocalLlmManager : IDisposable
         Changed?.Invoke();
     }
 
-    private async Task<ILocalLlmEngine> LoadAsync(string path, string gpuSetting, long generation)
+    private async Task<ILocalLlmEngine> LoadAsync(string path, string gpuSetting, long generation, bool cpuForThisRun)
     {
         if (IsStale(generation)) return Overtaken(path, loaded: false); // chosen and replaced before its turn
         _integrity?.Verify(path); // a catalogue file that fails its size or SHA-256 check is never loaded
+        // The GPU ended Dictum on this model last time: llm.gpu = cpu for this run, so llama.cpp's CPU build is the one configured.
+        if (cpuForThisRun || gpuSetting == "cpu")
+            return await LoadOnAsync(path, "cpu", generation, cpuForThisRun ? ModelFailure.GpuFailedLastTime : null).ConfigureAwait(false);
         try
         {
-            return await LoadOnAsync(path, gpuSetting, generation, notice: null).ConfigureAwait(false);
+            _marker.Begin(path);
+            try
+            {
+                return await LoadOnAsync(path, gpuSetting, generation, notice: null).ConfigureAwait(false);
+            }
+            finally
+            {
+                _marker.End();
+            }
         }
-        catch (Exception ex) when (gpuSetting != "cpu" && _gpu() && ModelFailure.WorthCpuRetry(ex) && !_shutdown.IsCancellationRequested)
+        catch (Exception ex) when (ModelFailure.RetryOnCpu(ex, _gpu(), _shutdown.Token))
         {
             if (IsStale(generation)) return Overtaken(path, loaded: false); // a newer choice came in while this one failed
-            _log.Warn($"Cleanup model {Path.GetFileName(path)} failed on the GPU ({ex.GetType().Name}: {ex.Message}); loading it again on the CPU.");
-            return await LoadOnAsync(path, "cpu", generation, ModelFailure.GpuFailed).ConfigureAwait(false);
+            _log.Warn($"Cleanup model {Path.GetFileName(path)} failed while the GPU was in use ({ex.GetType().Name}: {ex.Message}); loading it again on the CPU.");
+            try
+            {
+                return await LoadOnAsync(path, "cpu", generation, ModelFailure.GpuFailed).ConfigureAwait(false);
+            }
+            catch (Exception cpu)
+            {
+                ModelFailure.CpuTried(cpu); // its own failure is the reason now, and Try on the CPU would only repeat it
+                throw;
+            }
         }
     }
 
@@ -224,18 +249,12 @@ public sealed class LocalLlmManager : IDisposable
         if (load.IsFaulted)
         {
             var error = load.Exception!.GetBaseException();
-            var described = IsStale(generation) ? null : ModelFailure.Describe(load.Exception!, _visualCppRuntime); // may look for DLLs: not under the lock
-            var cpuBuildMightHelp = _gpu() && ModelFailure.WorthCpuRetry(load.Exception!); // failed inside the Vulkan build
+            var failure = IsStale(generation) ? null : ModelFailure.Assess(load.Exception!, _gpu(), gpuSetting, _visualCppRuntime); // may look for DLLs: not under the lock
             bool current;
             lock (_gate)
             {
                 current = generation == _generation;
-                if (current)
-                {
-                    LastError = described ?? error.Message;
-                    CpuMightHelp = cpuBuildMightHelp && gpuSetting != "cpu";
-                    RestartForCpu = cpuBuildMightHelp && gpuSetting == "cpu";
-                }
+                if (current) _failure = failure;
             }
             if (current) _log.Error($"Cleanup model load failed for {path}: {error.GetType().Name}: {error.Message}");
             else _log.Warn($"Cleanup model load failed for {path} after a newer choice: {error.GetType().Name}: {error.Message}");
@@ -271,6 +290,7 @@ public sealed class LocalLlmManager : IDisposable
             _engine = null;
         }
         _shutdown.Cancel(); // a warm-up stops between tokens
+        _marker.Close(); // a GPU load still under way at quit did not end Dictum
         if (engine is null) return;
         engine.Dispose();
         _log.Info($"Cleanup model disposed ({Path.GetFileName(engine.ModelPath)}).");
@@ -291,6 +311,11 @@ public sealed class LocalLlmClient(Func<ILocalLlmEngine?> engine, string name) :
     internal const int MostSkipsBeforeRemeasure = 24;
 
     private readonly object _gate = new();
+    // simplification: the pill's question and the clean-up's are matched as one dictation by string instance (Predict's
+    // ReferenceEquals), held weakly. Ceiling: a caller that hands the clean-up a copy of the pill's string (a Trim, a join) counts
+    // that dictation twice and re-measures sooner, and a pill question with no clean-up question after it (a settings reload
+    // retires the cleaner in between) still counts as estimated. Trigger to retire: any change between the pill's text and the
+    // clean-up's in DictationPipeline, or a dictation id passed with each call.
     private WeakReference<string>? _lastDictation; // the pill asks first, then the clean-up, with the same string; held weakly
     private TimeSpan? _lastEstimate;
     private int _estimatedSinceRun;

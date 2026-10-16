@@ -568,7 +568,7 @@ public partial class CloudOffTakesEffectTests
             """);
         var model = Path.Combine(scratch.Root.FullName, "fake-model.bin"); // the fake engine transcribes every recording as this name
         File.WriteAllText(model, "");
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model));
         try
         {

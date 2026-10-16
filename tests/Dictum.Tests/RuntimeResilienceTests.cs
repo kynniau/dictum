@@ -19,9 +19,10 @@ namespace Dictum.Tests;
 /// Runtime resilience (17/10/2026, after the Store certification investigation): a model that cannot load is named in plain
 /// words (F2), a load or warm-up that fails on the GPU is tried once more on the CPU and never leaks its engine (F3), the
 /// clean-up model stays off integrated graphics (F4), and the speed estimate neither keeps the first warm-up's figures nor
-/// stays wrong when it skips every dictation (F5).
+/// stays wrong when it skips every dictation (F5). The lens's fixes (the GPU-load marker, Try on the CPU's gating and the rest)
+/// are in RuntimeResilienceTests.Marker.cs.
 /// </summary>
-public sealed class RuntimeResilienceTests
+public sealed partial class RuntimeResilienceTests
 {
     /// <summary>Whisper.net 1.9.1's message, as the Windows Sandbox self-test printed it (investigation, 16/10/2026).</summary>
     private const string WhisperNativeFailure =
@@ -69,6 +70,7 @@ public sealed class RuntimeResilienceTests
         // PROPOSED copy (17/10/2026), awaiting the product owner's review: pinned word for word.
         Assert.Equal("The Microsoft Visual C++ runtime is missing; install it from Microsoft, then restart Dictum", ModelFailure.RuntimeMissing);
         Assert.Equal("The graphics driver could not run the model; Dictum will use the CPU", ModelFailure.GpuFailed);
+        Assert.Equal("The graphics driver could not run the model last time; Dictum is using the CPU", ModelFailure.GpuFailedLastTime);
         Assert.Equal("Try on the CPU", AppShell.TryOnCpuLabel);
         Assert.Equal("Restart Dictum to use the CPU.", AppShell.RestartForCpuHint);
         Assert.Equal("Clean-up: qwen2.5-1.5b could not be loaded, so the rule-based tidy is used.", AboutPage.CleanupFailedLine("qwen2.5-1.5b"));
@@ -106,6 +108,9 @@ public sealed class RuntimeResilienceTests
         Assert.True(ModelFailure.WorthCpuRetry(new InvalidOperationException("llama.cpp decode failed: Error")));
     }
 
+    /// <summary>No version resource: the version is not known, so the file counts, as before the version floor.</summary>
+    private static Version? NoVersion(string path) => null;
+
     [Fact]
     public void The_runtime_counts_as_present_when_each_DLL_loads_or_sits_beside_the_engines()
     {
@@ -113,13 +118,13 @@ public sealed class RuntimeResilienceTests
         try
         {
             string[] none = [];
-            Assert.True(ModelFailure.VisualCppRuntimePresent(_ => true, none));
-            Assert.False(ModelFailure.VisualCppRuntimePresent(_ => false, none));
-            Assert.False(ModelFailure.VisualCppRuntimePresent(dll => dll != "vcomp140.dll", none)); // one of the four missing
+            Assert.True(ModelFailure.VisualCppRuntimePresent(dll => dll, none, NoVersion));
+            Assert.False(ModelFailure.VisualCppRuntimePresent(_ => null, none, NoVersion));
+            Assert.False(ModelFailure.VisualCppRuntimePresent(dll => dll == "vcomp140.dll" ? null : dll, none, NoVersion)); // one of the four missing
             foreach (var dll in ModelFailure.RuntimeDlls) File.WriteAllBytes(Path.Combine(folder.FullName, dll), [0]);
-            Assert.True(ModelFailure.VisualCppRuntimePresent(_ => false, [folder.FullName])); // copies beside the engines (publish -VcRuntimeDir)
+            Assert.True(ModelFailure.VisualCppRuntimePresent(_ => null, [folder.FullName], NoVersion)); // copies beside the engines (publish -VcRuntimeDir)
             File.Delete(Path.Combine(folder.FullName, "msvcp140.dll"));
-            Assert.False(ModelFailure.VisualCppRuntimePresent(_ => false, [folder.FullName]));
+            Assert.False(ModelFailure.VisualCppRuntimePresent(_ => null, [folder.FullName], NoVersion));
         }
         finally
         {
@@ -153,7 +158,7 @@ public sealed class RuntimeResilienceTests
     {
         var (scratch, _) = SpeechScratch();
         using var _scratch = scratch;
-        var models = new ModelManager(NullLog.Instance, loader: (_, _, _) => throw new Exception(WhisperNativeFailure), warmUp: () => false,
+        var models = new ModelManager(NullLog.Instance, loader: (_, _, _) => throw new Exception(WhisperNativeFailure), gpuInUse: () => false,
             visualCppRuntime: () => false);
         var (shell, platform, _) = scratch.Shell(models);
         shell.Reload(userRequested: false);
@@ -177,8 +182,10 @@ public sealed class RuntimeResilienceTests
     });
 
     [Fact]
-    public Task Try_on_the_CPU_saves_cpu_and_asks_for_a_restart_when_the_GPU_runtime_fails_on_the_CPU_too() => UiSession.Run(() =>
+    public Task When_the_GPU_and_the_retry_on_the_CPU_both_fail_the_panel_shows_the_CPU_error_with_the_log_folder_and_no_Try_on_the_CPU() => UiSession.Run(() =>
     {
+        // The lens's real run R1 (17/10/2026) with stand-ins: a truncated model failed on the GPU and on the CPU, and the button
+        // was offered; pressing it repeated the failed attempt and wrote whisper.gpu = cpu for good.
         var (scratch, _) = SpeechScratch();
         using var _scratch = scratch;
         var asked = new ConcurrentQueue<string>();
@@ -186,27 +193,20 @@ public sealed class RuntimeResilienceTests
         {
             asked.Enqueue(s.Gpu);
             throw new InvalidOperationException(s.Gpu == "cpu" ? "out of memory" : "ggml_vulkan: device lost");
-        }, warmUp: () => true); // inside a GPU runtime: the GPU load fails, and so does the retry on the CPU inside it
+        }, gpuInUse: () => true); // inside a GPU runtime: the GPU load fails, and so does the retry on the CPU inside it
         var (shell, _, _) = scratch.Shell(models);
         shell.Reload(userRequested: false);
         Assert.True(EventuallyOnUi(() => shell.SpeechError is not null), "the load never failed");
         Assert.Equal(new[] { "auto", "cpu" }, asked.ToArray());
-        Assert.Equal("Speech model: out of memory.", shell.Status.Problem);
-        Assert.True(shell.Status.TryCpu); // the CPU-only runtime, at the next start, might still get past it
+        Assert.Equal("Speech model: out of memory.", shell.Status.Problem); // the CPU attempt's own error
+        Assert.False(shell.Status.TryCpu); // the CPU was tried already
 
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
-        var tryCpu = VisibleButton(flyout, AppShell.TryOnCpuLabel);
-        Assert.NotNull(tryCpu);
-        tryCpu.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-
-        // The panel redraws when the shell hears the reload's load fail.
-        Assert.True(EventuallyOnUi(() => VisibleTexts(flyout).Contains(AppShell.RestartForCpuHint, StringComparison.Ordinal)), "the panel never asked for a restart");
-        Assert.Equal(new[] { "auto", "cpu", "cpu" }, asked.ToArray()); // the reload asked for the CPU at once
-        Assert.Equal("cpu", SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Whisper.Gpu);
-        Assert.Equal($"Speech model: out of memory. {AppShell.RestartForCpuHint}", shell.Status.Problem);
-        Assert.False(shell.Status.TryCpu);
+        Assert.Contains("Speech model: out of memory.", VisibleTexts(flyout));
         Assert.Null(VisibleButton(flyout, AppShell.TryOnCpuLabel));
+        Assert.NotNull(VisibleButton(flyout, "Open log folder"));
+        Assert.Equal("auto", SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Whisper.Gpu); // nothing written
         flyout.Close();
         shell.Dispose();
     });
@@ -217,7 +217,7 @@ public sealed class RuntimeResilienceTests
         var (scratch, _) = SpeechScratch();
         using var _scratch = scratch;
         var models = new ModelManager(NullLog.Instance, loader: (_, _, _) => throw new InvalidOperationException("ggml_vulkan: device lost"),
-            warmUp: () => false); // no GPU runtime in use: the model already ran on the CPU, so the CPU cannot help
+            gpuInUse: () => false); // no GPU runtime in use: the model already ran on the CPU, so the CPU cannot help
         var (shell, _, _) = scratch.Shell(models);
         shell.Reload(userRequested: false);
         Assert.True(EventuallyOnUi(() => shell.SpeechError is not null), "the load never failed");
@@ -232,7 +232,7 @@ public sealed class RuntimeResilienceTests
         var (scratch, _) = SpeechScratch();
         using var _scratch = scratch;
         var models = new ModelManager(NullLog.Instance, loader: (p, s, d) =>
-            s.Gpu == "cpu" ? new FakeSpeechEngine(p, d) : throw new InvalidOperationException("Failed to load the whisper model."), warmUp: () => true);
+            s.Gpu == "cpu" ? new FakeSpeechEngine(p, d) : throw new InvalidOperationException("Failed to load the whisper model."), gpuInUse: () => true);
         var (shell, _, _) = scratch.Shell(models);
         shell.Reload(userRequested: false);
         Assert.True(EventuallyOnUi(() => shell.SpeechReady), "the model was not loaded on the CPU");
@@ -300,7 +300,7 @@ public sealed class RuntimeResilienceTests
         {
             asked.Enqueue(s.Gpu);
             return s.Gpu == "cpu" ? new FakeSpeechEngine(p, d) : throw new InvalidOperationException("Failed to load the whisper model.");
-        }, warmUp: () => true);
+        }, gpuInUse: () => true);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
 
         Assert.True(await Eventually(() => models.IsReady || models.LoadFailed));
@@ -309,7 +309,7 @@ public sealed class RuntimeResilienceTests
         Assert.Null(models.LastError);
         Assert.True(models.RunsOnCpu);
         Assert.Equal(ModelFailure.GpuFailed, models.Notice);
-        Assert.Single(log.Lines, l => l.Message.Contains("failed on the GPU", StringComparison.Ordinal)); // one line says so
+        Assert.Single(log.Lines, l => l.Message.Contains("failed while the GPU was in use", StringComparison.Ordinal)); // one line says so
     }
 
     [Fact]
@@ -321,7 +321,7 @@ public sealed class RuntimeResilienceTests
             ISpeechEngine engine = s.Gpu == "cpu" ? new FakeSpeechEngine(p, d) : new FailingSpeechEngine(p, d);
             made.Enqueue((s.Gpu, engine));
             return engine;
-        }, warmUp: () => true);
+        }, gpuInUse: () => true);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
 
         Assert.True(await Eventually(() => models.IsReady || models.LoadFailed));
@@ -337,12 +337,12 @@ public sealed class RuntimeResilienceTests
     {
         FailingSpeechEngine? onGpu = null;
         using var models = new ModelManager(NullLog.Instance, loader: (p, s, d) =>
-            s.Gpu == "cpu" ? throw new InvalidOperationException("out of memory") : onGpu = new FailingSpeechEngine(p, d), warmUp: () => true);
+            s.Gpu == "cpu" ? throw new InvalidOperationException("out of memory") : onGpu = new FailingSpeechEngine(p, d), gpuInUse: () => true);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
         Assert.True(await Eventually(() => models.LoadFailed));
         Assert.True(onGpu!.Disposed, "the engine whose warm-up failed was left loaded");
         Assert.Equal("out of memory", models.LastError); // the CPU's own failure
-        Assert.True(models.CpuMightHelp); // inside the GPU runtime: the CPU-only runtime, at the next start, might get past it
+        Assert.False(models.CpuMightHelp); // the CPU was tried for this failure: Try on the CPU would only repeat it
         Assert.False(models.RestartForCpu);
         Assert.False(models.RunsOnCpu);
         Assert.Null(models.Notice);
@@ -356,7 +356,7 @@ public sealed class RuntimeResilienceTests
         {
             Interlocked.Increment(ref calls);
             throw new InvalidOperationException("ggml_vulkan: device lost");
-        }, warmUp: () => false);
+        }, gpuInUse: () => false);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
         Assert.True(await Eventually(() => models.LoadFailed));
         Assert.Equal(1, calls);
@@ -364,7 +364,7 @@ public sealed class RuntimeResilienceTests
         Assert.False(models.CpuMightHelp); // the model already ran on the CPU
         Assert.False(models.RestartForCpu);
 
-        using var onCpu = new ModelManager(NullLog.Instance, loader: (_, _, _) => throw new InvalidOperationException("bad file"), warmUp: () => true);
+        using var onCpu = new ModelManager(NullLog.Instance, loader: (_, _, _) => throw new InvalidOperationException("bad file"), gpuInUse: () => true);
         onCpu.BeginLoad("ggml-small.en.bin", new WhisperSettings { Gpu = "cpu" }); // on the CPU inside a GPU runtime
         Assert.True(await Eventually(() => onCpu.LoadFailed));
         Assert.False(onCpu.CpuMightHelp); // whisper.gpu is cpu already
@@ -379,7 +379,7 @@ public sealed class RuntimeResilienceTests
         {
             Interlocked.Increment(ref calls);
             throw new Exception(WhisperNativeFailure);
-        }, warmUp: () => true, visualCppRuntime: () => false);
+        }, gpuInUse: () => true, visualCppRuntime: () => false);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
         Assert.True(await Eventually(() => models.LoadFailed));
         Assert.Equal(1, calls);

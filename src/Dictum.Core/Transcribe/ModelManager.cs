@@ -1,115 +1,8 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Dictum.Core;
 using Dictum.Settings;
 
 namespace Dictum.Transcribe;
-
-/// <summary>
-/// Plain words for a model that could not load, shared by the speech and clean-up models, for the tray panel, Settings > About
-/// and the load balloon. The Store certification investigation (16/10/2026) saw the engines' own words reach the user:
-/// Whisper.net's "Failed to load native whisper library. Error: Cannot load the library on this platform using NativeLibrary.
-/// PInvokeError: The operation completed successfully." and LLamaSharp's "The type initializer for 'LLama.Native.NativeApi'
-/// threw an exception.", in Windows Sandbox without the Visual C++ runtime.
-/// </summary>
-public static class ModelFailure
-{
-    /// <summary>
-    /// An engine's native library cannot load because the Visual C++ runtime it imports is not on this PC. PROPOSED copy
-    /// (17/10/2026), awaiting the product owner's review: pinned word for word; do not reword.
-    /// </summary>
-    public const string RuntimeMissing = "The Microsoft Visual C++ runtime is missing; install it from Microsoft, then restart Dictum";
-
-    /// <summary>
-    /// The model failed on the GPU and was loaded again on the CPU, where it runs now. PROPOSED copy (17/10/2026), awaiting the
-    /// product owner's review: pinned word for word; do not reword.
-    /// </summary>
-    public const string GpuFailed = "The graphics driver could not run the model; Dictum will use the CPU";
-
-    /// <summary>
-    /// The Visual C++ runtime DLLs the engines import: all 54 whisper.cpp and llama.cpp DLLs under the build's runtimes folder
-    /// import MSVCP140 and VCRUNTIME140, 38 also VCRUNTIME140_1 and 14 (ggml's CPU and base builds) VCOMP140 (their import
-    /// tables, read 17/10/2026; the other 9 DLLs there are Avalonia's and import none).
-    /// </summary>
-    internal static readonly string[] RuntimeDlls = ["vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "vcomp140.dll"];
-
-    /// <summary>
-    /// True when an engine's native library could not load at all, so no retry in this process can help: Whisper.net's "Failed to
-    /// load native whisper library" (a string in Whisper.net 1.9.1, read 17/10/2026), LLamaSharp's failed NativeApi type
-    /// initialiser or its own native-library errors (strings in LLamaSharp 0.27.0, read 17/10/2026), or a DLL not found.
-    /// </summary>
-    public static bool IsNativeLibraryFailure(Exception error) => Chain(error).Any(e =>
-        e is DllNotFoundException
-        || e is TypeInitializationException { TypeName: { } type } && type.StartsWith("LLama.Native.", StringComparison.Ordinal)
-        || e.Message.StartsWith("Failed to load native whisper library", StringComparison.Ordinal)
-        || e.Message.StartsWith("The native library cannot be correctly loaded", StringComparison.Ordinal)
-        || e.Message.StartsWith("Failed to load the native library", StringComparison.Ordinal));
-
-    /// <summary>
-    /// What the user is told about a failed load (<see cref="ModelManager.LastError"/> and the clean-up model's): plain words when
-    /// the cause is known, else the engine's own message, as before.
-    /// </summary>
-    /// <param name="runtimePresent">Whether the Visual C++ runtime is on this PC; asked only after a native library failed to load.</param>
-    public static string Describe(Exception error, Func<bool> runtimePresent) =>
-        IsNativeLibraryFailure(error) && !runtimePresent() ? RuntimeMissing : error.GetBaseException().Message;
-
-    /// <summary>
-    /// Whether a load or warm-up that failed is worth one more try on the CPU: not when an engine library could not load (the CPU
-    /// build needs the same runtime), the file is missing or fails its catalogue check, or the load was stopped.
-    /// </summary>
-    public static bool WorthCpuRetry(Exception error) =>
-        !IsNativeLibraryFailure(error)
-        && !Chain(error).Any(e => e is OperationCanceledException or FileNotFoundException or ModelIntegrityException or ObjectDisposedException);
-
-    /// <summary>
-    /// The Visual C++ runtime counts as present when each of its DLLs loads by name (System32, the program's folder, a packaged
-    /// app's framework dependency) or sits in one of the program's native runtime folders (a copy beside the engines).
-    /// </summary>
-    public static bool VisualCppRuntimePresent() => VisualCppRuntimePresent(Loads, AppLocalFolders());
-
-    internal static bool VisualCppRuntimePresent(Func<string, bool> loads, IReadOnlyCollection<string> appLocalFolders) =>
-        RuntimeDlls.All(dll => loads(dll) || appLocalFolders.Any(folder => File.Exists(Path.Combine(folder, dll))));
-
-    private static bool Loads(string dll)
-    {
-        if (!NativeLibrary.TryLoad(dll, out var handle)) return false;
-        NativeLibrary.Free(handle);
-        return true;
-    }
-
-    private static string[] AppLocalFolders()
-    {
-        var runtimes = Path.Combine(AppContext.BaseDirectory, "runtimes");
-        try
-        {
-            return Directory.Exists(runtimes) ? Directory.GetDirectories(runtimes, "*", SearchOption.AllDirectories) : [];
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return [];
-        }
-    }
-
-    /// <summary>The exception and every exception inside it (inner exceptions, and each of an aggregate's).</summary>
-    private static IEnumerable<Exception> Chain(Exception error)
-    {
-        var pending = new Stack<Exception>();
-        pending.Push(error);
-        while (pending.Count > 0)
-        {
-            var e = pending.Pop();
-            yield return e;
-            if (e is AggregateException aggregate)
-            {
-                foreach (var inner in aggregate.InnerExceptions) pending.Push(inner);
-            }
-            else if (e.InnerException is { } inner)
-            {
-                pending.Push(inner);
-            }
-        }
-    }
-}
 
 /// <summary>
 /// Owns the loaded whisper engine. Loads happen in the background, one at a time; a recording that finishes while a
@@ -117,7 +10,8 @@ public static class ModelFailure
 /// and a stale load releases the engine it made instead of installing it, so the engine dictation uses, the one decoder
 /// changes reach and the one quit releases are always the user's last choice. Swapping models disposes the old engine
 /// only after any in-flight transcription. A load or warm-up that fails while the GPU is in use is tried once more on the
-/// CPU (<see cref="Notice"/>), and an engine whose warm-up fails is released, never left loaded.
+/// CPU (<see cref="Notice"/>), and an engine whose warm-up fails is released, never left loaded. A GPU load is recorded in
+/// a <see cref="GpuLoadMarker"/> while it runs, so a start after the GPU ended Dictum loads that model on the CPU.
 /// </summary>
 public sealed class ModelManager : IDisposable
 {
@@ -129,20 +23,24 @@ public sealed class ModelManager : IDisposable
     private readonly Func<bool> _gpu;
     private readonly Action<string> _configureRuntime;
     private readonly Func<bool> _visualCppRuntime;
+    private readonly GpuLoadMarker _marker;
     private Task<ISpeechEngine>? _loading; // the latest choice's load
     private Task _tail = Task.CompletedTask; // the last load started: the next one waits for it
     private long _generation; // bumped by every BeginLoad and by Dispose
     private ISpeechEngine? _engine;
-    private bool _engineOnCpu; // the engine in use was loaded off the GPU: whisper.gpu = cpu, or its GPU load failed
+    private bool _engineOnCpu; // the engine in use was loaded off the GPU: whisper.gpu = cpu, its GPU load failed, or the marker
+    private ModelFailure.Assessment? _failure; // why the latest load failed; null while it loads or once it loaded
     private DecodeOptions _decode = DecodeOptions.Default;
 
+    /// <param name="integrity">Checks catalogue files before they load; its folder (the per-user local data folder in the app) holds
+    /// the <see cref="GpuLoadMarker"/>. Without it no marker is read or written.</param>
     /// <param name="loader">Tests load fakes; production loads whisper.cpp through <see cref="WhisperEngine.Load"/>.</param>
-    /// <param name="warmUp">Whether the GPU is in use (tests decide; production: Vulkan is). On it, loads and decoder changes run a
+    /// <param name="gpuInUse">Whether the GPU is in use (tests decide; production: Vulkan is). On it, loads and decoder changes run a
     /// warm-up, and a load or warm-up that fails is tried once more on the CPU.</param>
     /// <param name="visualCppRuntime">Whether the Visual C++ runtime is on this PC (tests decide; production looks:
     /// <see cref="ModelFailure.VisualCppRuntimePresent()"/>).</param>
     public ModelManager(ILog log, ModelIntegrity? integrity = null, Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? loader = null,
-        Func<bool>? warmUp = null, Func<bool>? visualCppRuntime = null)
+        Func<bool>? gpuInUse = null, Func<bool>? visualCppRuntime = null)
     {
         _log = log;
         _integrity = integrity;
@@ -150,8 +48,9 @@ public sealed class ModelManager : IDisposable
         // The production loader fixes whisper's runtime order when a load is asked for, not when it runs, so the clean-up
         // model's backend choice can read the GPUs that runtime finds (WhisperEngine.VulkanDevicesForCleanup).
         _configureRuntime = loader is null ? gpu => WhisperEngine.ConfigureRuntime(gpu, log) : _ => { };
-        _gpu = warmUp ?? (() => WhisperEngine.VulkanActive);
+        _gpu = gpuInUse ?? (() => WhisperEngine.VulkanActive);
         _visualCppRuntime = visualCppRuntime ?? ModelFailure.VisualCppRuntimePresent;
+        _marker = new GpuLoadMarker(integrity is null ? null : Path.Combine(integrity.Folder, GpuLoadMarker.SpeechFile), log);
     }
 
     /// <summary>The latest load failed (the model it replaced, if any, stays in use); a same-path Ensure then retries it.</summary>
@@ -237,23 +136,19 @@ public sealed class ModelManager : IDisposable
         }
     }
 
-    /// <summary>Why the latest load failed, in plain words when the cause is known (<see cref="ModelFailure.Describe"/>); null otherwise.</summary>
-    public string? LastError { get; private set; }
+    /// <summary>Why the latest load failed, in plain words when the cause is known (<see cref="ModelFailure.Assess"/>); null otherwise.</summary>
+    public string? LastError => _failure?.LastError;
+
+    /// <summary>The tray panel and About offer "Try on the CPU" for the latest load's failure (<see cref="ModelFailure.Assess"/>).</summary>
+    public bool CpuMightHelp => _failure?.CpuMightHelp == true;
+
+    /// <summary>Only a restart can put the latest load's model on the CPU-only runtime, and the problem line says so (<see cref="ModelFailure.Assess"/>).</summary>
+    public bool RestartForCpu => _failure?.RestartForCpu == true;
 
     /// <summary>
-    /// The latest load failed inside a GPU runtime with whisper.gpu not cpu, in a way the CPU-only runtime might get past (not a
-    /// missing engine library, file or catalogue match): even once the retry on the CPU inside that runtime has failed, the next
-    /// start can load the CPU runtime instead. The tray panel and About then offer "Try on the CPU".
+    /// The engine in use runs on the CPU: whisper.gpu is cpu, its load failed on the GPU and was made again on the CPU, or the GPU
+    /// ended Dictum while it loaded last time (<see cref="GpuLoadMarker"/>).
     /// </summary>
-    public bool CpuMightHelp { get; private set; }
-
-    /// <summary>
-    /// The latest load failed on the CPU inside a GPU runtime with whisper.gpu = cpu: only a restart loads the CPU runtime, and the
-    /// problem line says so.
-    /// </summary>
-    public bool RestartForCpu { get; private set; }
-
-    /// <summary>The engine in use runs on the CPU: whisper.gpu is cpu, or its load failed on the GPU and was made again on the CPU.</summary>
     public bool RunsOnCpu
     {
         get
@@ -262,24 +157,27 @@ public sealed class ModelManager : IDisposable
         }
     }
 
-    /// <summary><see cref="ModelFailure.GpuFailed"/> while the engine in use runs on the CPU because its GPU load failed; null otherwise.</summary>
+    /// <summary>
+    /// While the engine in use runs on the CPU because the GPU failed: <see cref="ModelFailure.GpuFailed"/> after this run's retry,
+    /// <see cref="ModelFailure.GpuFailedLastTime"/> after the GPU ended Dictum last time; null otherwise.
+    /// </summary>
     public string? Notice { get; private set; }
 
     public void BeginLoad(string modelPath, WhisperSettings settings)
     {
-        _configureRuntime(settings.Gpu);
+        var cpuForThisRun = _marker.CpuForThisRun(modelPath, settings.Gpu);
+        _configureRuntime(cpuForThisRun ? "cpu" : settings.Gpu); // the GPU ended Dictum on this model: whisper's Vulkan runtime never loads
         lock (_gate)
         {
             var generation = ++_generation;
             ModelPath = modelPath;
-            LastError = null;
-            CpuMightHelp = RestartForCpu = false;
+            _failure = null;
             var before = _tail;
             var load = Task.Run(async () =>
             {
                 await before.ContinueWith(static _ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)
                     .ConfigureAwait(false); // two models never load at once
-                return Load(modelPath, settings, generation);
+                return Load(modelPath, settings, generation, cpuForThisRun);
             });
             _loading = load;
             _tail = load;
@@ -288,26 +186,54 @@ public sealed class ModelManager : IDisposable
         Changed?.Invoke();
     }
 
-    private ISpeechEngine Load(string modelPath, WhisperSettings settings, long generation)
+    private ISpeechEngine Load(string modelPath, WhisperSettings settings, long generation, bool cpuForThisRun)
     {
         if (IsStale(generation)) return Overtaken(modelPath, loaded: false); // chosen and replaced before its turn
         _integrity?.Verify(modelPath); // a catalogue file that fails its size or SHA-256 check is never loaded
         DecodeOptions decode;
         lock (_gate) decode = _decode;
-        var onCpu = settings.Gpu == "cpu";
-        string? notice = null;
+        var onCpu = cpuForThisRun || settings.Gpu == "cpu";
+        var notice = cpuForThisRun ? ModelFailure.GpuFailedLastTime : null;
         ISpeechEngine engine;
-        try
+        if (onCpu)
         {
-            engine = LoadAndWarm(modelPath, settings, decode, onCpu);
-        }
-        catch (Exception ex) when (!onCpu && _gpu() && ModelFailure.WorthCpuRetry(ex) && !_shutdown.IsCancellationRequested)
-        {
-            if (IsStale(generation)) return Overtaken(modelPath, loaded: false); // a newer choice came in while this one failed
-            _log.Warn($"Speech model {Path.GetFileName(modelPath)} failed on the GPU ({ex.GetType().Name}: {ex.Message}); loading it again on the CPU.");
-            onCpu = true;
             engine = LoadAndWarm(modelPath, settings with { Gpu = "cpu" }, decode, onCpu);
-            notice = ModelFailure.GpuFailed;
+        }
+        else
+        {
+            // simplification: the retry below catches only failures whisper.cpp reports. Ceiling: when the GPU refuses a model's
+            // memory whisper.cpp can end the program instead (GGML_ASSERT, 17/10/2026), which no retry survives; the marker then
+            // puts that model on the CPU at the next start, but an end during a later dictation or decoding change is not
+            // recorded. Trigger to retire: whisper.cpp reporting allocation failures as errors, or a report of Dictum ending
+            // after a model had loaded on the GPU.
+            try
+            {
+                _marker.Begin(modelPath);
+                try
+                {
+                    engine = LoadAndWarm(modelPath, settings, decode, onCpu);
+                }
+                finally
+                {
+                    _marker.End();
+                }
+            }
+            catch (Exception ex) when (ModelFailure.RetryOnCpu(ex, _gpu(), _shutdown.Token))
+            {
+                if (IsStale(generation)) return Overtaken(modelPath, loaded: false); // a newer choice came in while this one failed
+                _log.Warn($"Speech model {Path.GetFileName(modelPath)} failed while the GPU was in use ({ex.GetType().Name}: {ex.Message}); loading it again on the CPU.");
+                onCpu = true;
+                try
+                {
+                    engine = LoadAndWarm(modelPath, settings with { Gpu = "cpu" }, decode, onCpu);
+                }
+                catch (Exception cpu)
+                {
+                    ModelFailure.CpuTried(cpu); // its own failure is the reason now, and Try on the CPU would only repeat it
+                    throw;
+                }
+                notice = ModelFailure.GpuFailed;
+            }
         }
         ISpeechEngine? replaced = null;
         var stale = false;
@@ -368,18 +294,12 @@ public sealed class ModelManager : IDisposable
         if (load.IsFaulted)
         {
             var error = load.Exception!.GetBaseException();
-            var described = IsStale(generation) ? null : ModelFailure.Describe(load.Exception!, _visualCppRuntime); // may look for DLLs: not under the lock
-            var cpuRuntimeMightHelp = _gpu() && ModelFailure.WorthCpuRetry(load.Exception!); // failed inside a GPU runtime
+            var failure = IsStale(generation) ? null : ModelFailure.Assess(load.Exception!, _gpu(), settings.Gpu, _visualCppRuntime); // may look for DLLs: not under the lock
             bool current;
             lock (_gate)
             {
                 current = generation == _generation;
-                if (current)
-                {
-                    LastError = described ?? error.Message;
-                    CpuMightHelp = cpuRuntimeMightHelp && settings.Gpu != "cpu";
-                    RestartForCpu = cpuRuntimeMightHelp && settings.Gpu == "cpu";
-                }
+                if (current) _failure = failure;
             }
             if (current) _log.Error($"Model load failed for {modelPath}: {error}");
             else _log.Warn($"Model load failed for {modelPath} after a newer choice: {error.GetType().Name}: {error.Message}");
@@ -447,6 +367,7 @@ public sealed class ModelManager : IDisposable
             _engine = null;
         }
         _shutdown.Cancel(); // a warm-up stops at whisper.cpp's next abort check
+        _marker.Close(); // a GPU load still under way at quit did not end Dictum
         if (engine is null) return;
         var sw = Stopwatch.StartNew();
         engine.Dispose();
