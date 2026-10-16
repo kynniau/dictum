@@ -843,7 +843,8 @@ common Filipino and Indian languages".
 - **Clean-up:** when the output is not English (`WhisperLanguages.OutputIsEnglish`:
   translate off and a language other than `en`, `auto` included), the cleaner is
   `TranscriptCleaner.Plain`: no model and no English rules, whitespace tidied only, status
-  "skipped: …" in About and `--selftest`. Corrections and the profanity filter still run.
+  "skipped: …" in About and `--selftest`. Corrections, the profanity filter and snippets
+  (§16.6) still run.
 - **Catalogue:** the multilingual `small`, `small-q5_1`, `medium`, `medium-q5_0`,
   `large-v3` and `large-v3-q5_0`, sizes and SHA-256 from the HF API tree at the pinned
   commit (four existing entries, small.en, medium.en, large-v3-turbo and its q5_0, served

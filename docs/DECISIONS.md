@@ -1130,3 +1130,19 @@ without the matcher, so the first pin drives the matcher and the state machine d
   translating to English [OK]` for medium + hi + translate, and for small.en + hi without translate the `language` line
   fails with the English-only reason and the `cleanup` line reads "skipped: the text is not English … whitespace tidied
   only".
+- Rebased onto main 79bffb7 on 16/10/2026, after #1 (mouse hotkeys, snippets), #3 (cloud presets, one key per service),
+  #5 (site) and #4 (the dictionary-term rule), for the product owner's decision 14 of the same day: merge now, with
+  English the default. Git conflicted in `TranscriptCleaner`, `AppShell.Config`, `CliCommands` and this file only. The
+  cleaner's constructor takes #4's `validation` and then `plain`; `Create` takes #4's `PersonalCleanup` and then
+  `englishText`; the tray app and `CliCommands.Cleaner` (`--transcribe`) pass both, and `--selftest` passes `englishText`
+  as before. Text that is not English gets `TranscriptCleaner.Plain`, which returns before any model is asked, so no
+  validator rule runs on it, the dictionary-term rule included; English text keeps #3's key routing and #4's checks as
+  on main, whose tests for both pass unchanged. Snippets (#1) run in `PersonalText.Finish` after the plain clean-up as
+  after any other, so SPEC §23 and the README now name them beside corrections and the profanity filter. The README's
+  settings row for `whisper.language` said a change reloads the model; it rebuilds the decoder, as the section above it
+  says, and the row now says so.
+- A new test pins `--transcribe`'s language rule (`CliCommands.Cleaner`: plain for Hindi without translation, the model
+  and the dictionary-term check with it). Observed failing with `englishText` removed from `CliCommands.Cleaner`; the two
+  Models-page tests failed with it removed from `AppShell.Config`; the new test and the plain-text test failed with the
+  constructor's `_plain = plain` removed. Full suite on the rebased head (this lane's run): build 0 warnings, 0 errors;
+  1,015 tests, 996 passed, 19 skipped, 0 failed.

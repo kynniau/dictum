@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Dictum.Core;
 using Dictum.Llm;
+using Dictum.Personal;
 using Dictum.Settings;
 using Dictum.Transcribe;
 using Dictum.UI.Shell;
@@ -200,6 +201,34 @@ public class LanguageTests
         }
         Assert.Equal(ModelCatalog.Entries.Count, ModelCatalog.Entries.Select(e => e.Name).Distinct().Count());
         Assert.All(ModelCatalog.Entries.Where(e => e.Name.Contains(".en", StringComparison.Ordinal)), e => Assert.True(WhisperLanguages.IsEnglishOnlyModel(e.Name)));
+    }
+
+    /// <summary>
+    /// --transcribe builds its clean-up in CliCommands.Cleaner with the tray app's checks (PersonalText.ForCleanup) and the
+    /// tray app's language rule. Hindi written as Hindi gets the plain cleaner: no model is asked, so no validator rule runs
+    /// on the text, the dictionary-term rule included. The same settings with translation on are English again: the model
+    /// and every check, the dictionary terms included.
+    /// </summary>
+    [Fact]
+    public async Task The_transcribe_clean_up_follows_the_language_as_the_tray_app_does()
+    {
+        var personal = new PersonalText(new PersonalDictionary(["Dictum", "Kynni"]), Corrections.Empty, ProfanityFilter.Empty);
+        var engine = new FakeLocalEngine("qwen2.5-1.5b-instruct-q4_k_m.gguf", reply: "Add Kynni to the dictionary once."); // adds a term
+        using var http = new HttpClient();
+        var hindi = new AppSettings { Whisper = new WhisperSettings { Model = "medium", Language = "hi" } }; // llm.provider local, the default
+
+        var plain = Dictum.Cli.CliCommands.Cleaner(hindi, SecretStore.Empty, http, NullLog.Instance, () => engine, personal);
+        Assert.True(plain.IsPlain);
+        Assert.False(plain.UsesModel);
+        Assert.Contains("skipped", plain.Status);
+        Assert.Equal(new CleanupResult("नाम एक बार", false, null), await plain.CleanAsync("नाम  एक बार ", Ct)); // whitespace only: no full stop
+
+        var english = Dictum.Cli.CliCommands.Cleaner(hindi with { Whisper = hindi.Whisper with { Translate = true } }, SecretStore.Empty, http,
+            NullLog.Instance, () => engine, personal);
+        Assert.False(english.IsPlain);
+        Assert.True(english.UsesModel);
+        Assert.Equal(personal.Dictionary.CleanupTerms, english.Validation.DictionaryTerms!);
+        Assert.Equal("reply adds a dictionary term the speaker did not say", (await english.CleanAsync("add a name to the dictionary once", Ct)).FallbackReason);
     }
 }
 

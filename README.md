@@ -175,8 +175,8 @@ speaker dictates in Hindi and English is pasted. Recognition and translation run
   dictionary and corrections run on that English. With it off and a language other than English (or Detect
   automatically), the text is written in the language spoken and the clean-up is skipped, because its rules and prompt
   are written for English (the rule-based tidy would capitalise Polish "i", for one); only whitespace is tidied, while
-  corrections and the profanity filter still run. The About page and `--selftest` show "skipped" as the clean-up state.
-  A change of language or translation rebuilds the decoder in place; the model is not loaded again.
+  corrections, the profanity filter and snippets still run. The About page and `--selftest` show "skipped" as the
+  clean-up state. A change of language or translation rebuilds the decoder in place; the model is not loaded again.
 - **The model must be multilingual.** The `.en` models hear English only. `small`, `medium`, `large-v3` and their
   quantised files hear every language; the page refuses a language or the translate switch that the chosen model
   cannot do, and `--selftest` prints a "language" line that fails for the same reasons. OpenAI's README (read
@@ -546,7 +546,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `audio.device` | `null` | `null` = Windows default microphone; else an endpoint ID or part of the device name (`--selftest` lists them). |
 | `whisper.model` | your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin` in `models_dir`, or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
 | `whisper.models_dir` | `null` | `null` = `%LOCALAPPDATA%\Dictum\models`; else an absolute folder. |
-| `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`hi`, `tl`, `bn`, `ta`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change reloads the model. |
+| `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`hi`, `tl`, `bn`, `ta`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change rebuilds the decoder and does not load the model again. |
 | `whisper.translate` | `false` | `true`: write English whatever language is spoken. Needs a multilingual model; `large-v3-turbo` cannot translate (OpenAI's README: the turbo model "is not trained for translation tasks"). |
 | `whisper.threads` | `0` | CPU threads; 0 = Whisper.net's default. |
 | `whisper.gpu` | `"auto"` | `auto` / `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `cpu`: CPU, then CPU-without-AVX. Needs a restart. |
