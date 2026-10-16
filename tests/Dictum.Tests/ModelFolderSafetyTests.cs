@@ -346,6 +346,43 @@ public sealed class ModelFolderSafetyTests
     }
 
     /// <summary>
+    /// Pin (lens, 17/10/2026; inverted from its probe A1): a copy named by its absolute path in whisper.model (what Settings >
+    /// Models > "Choose model file..." writes) has no other copy to fall back to, even with the copy that came with Dictum present
+    /// and passing its check: deleting it would leave the setting naming a missing file and nothing loaded. So Delete does not ask
+    /// the delete-a-copy question ("Dictum then uses the copy that came with it" would be false); the plain in-use refusal
+    /// applies, the file stays and the model stays loaded.
+    /// </summary>
+    [Fact]
+    public async Task A_copy_named_by_its_path_in_the_setting_is_not_deleted_as_a_copy()
+    {
+        var (said, asked, model, loaded, ownLeft, bundledLeft, own) = await UiSession.RunAsync(async () =>
+        {
+            using var scratch = new Scratch();
+            var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
+            var own = Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes);
+            new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled); // the other copy passes its check
+            File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = own }, llm = new { provider = "none" } }));
+            var models = HoldingModels();
+            var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
+            shell.Reload(userRequested: false);
+            Assert.Equal(own, models.ModelPath);
+            Assert.True(await Eventually(() => models.IsReady)); // loaded, and holding its file
+            dialogs.Answers.Enqueue(0); // Delete, were it asked
+            var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en" && m.Folder == ModelFolderKind.Default));
+            await Eventually(() => models.IsReady);
+            var result = (said, dialogs.Asked.ToList(), shell.Settings.Whisper.Model, models.ModelPath, File.Exists(own), File.Exists(bundled), own);
+            shell.Dispose();
+            return result;
+        });
+        Assert.Empty(asked); // no "Delete this copy of base.en ... Dictum then uses the copy that came with it."
+        Assert.Equal("base.en is in use and no other model is downloaded. Download or choose another model first.", said);
+        Assert.True(ownLeft);
+        Assert.True(bundledLeft);
+        Assert.Equal(own, model); // whisper.model untouched
+        Assert.Equal(own, loaded); // and still loaded
+    }
+
+    /// <summary>
     /// Pin: when the copy in use cannot be deleted (a read-only file: Windows refuses), the model that was released is loaded
     /// again, whatever happens to the file, so dictation is never left without a model.
     /// </summary>

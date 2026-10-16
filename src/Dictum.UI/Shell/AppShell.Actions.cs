@@ -85,7 +85,7 @@ public sealed partial class AppShell
     /// </summary>
     private (string Path, ModelFolderKind Kind)? NextCopy(StoredModel model)
     {
-        if (model.Partial) return null;
+        if (model.Partial || Path.IsPathFullyQualified(model.IsCleanup ? _settings.Llm.Model : _settings.Whisper.Model)) return null; // a setting that names the file by its path has no other copy to fall back to
         var (fileName, bytes) = model.IsCleanup
             ? (CleanupCatalog.FileNameFor(model.Name), CleanupCatalog.Find(model.Name)?.Bytes)
             : (ModelCatalog.FileName(model.Name), ModelCatalog.KnownSize(model.Name));
