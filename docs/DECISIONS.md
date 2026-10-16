@@ -1066,5 +1066,5 @@ then passing with the fix restored:
 Full suite after these fixes: 795 tests, 776 passed, 19 skipped, 0 failed (before: 791, 772, 19, 0).
 
 Not verified here: the lens's started-shell scenario was not re-run (the shell tests' fake listener posts signals
-without the matcher, so the first pin drives the matcher and the state machine directly); the 19 gated desktop and tray
-tests stay skipped.
+without the matcher, so the first pin drives the matcher and the state machine directly); the 19 env-gated tests
+(12 model/LLM/download, 4 desktop, 1 audio, 1 tray, 1 setup) stay skipped.
