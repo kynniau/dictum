@@ -44,6 +44,7 @@ internal sealed class FlyoutWindow : Window
     private readonly TextBlock _downloadText = Ui.Text("", "caption");
     private readonly StackPanel _download;
     private readonly TextBlock _privacy = Ui.Text("", "caption");
+    private readonly Control _lock = Ui.Icon(Ui.LockIcon, 14);
     private readonly DispatcherTimer _meterTimer;
     private List<string?> _micIds = [];
     private bool _refreshing;
@@ -103,7 +104,7 @@ internal sealed class FlyoutWindow : Window
         Grid.SetColumnSpan(settings, 2); // the odd one out takes the whole last row
 
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        footer.Children.Add(Ui.Row(6, Ui.Icon(Ui.LockIcon, 14), _privacy));
+        footer.Children.Add(Ui.Row(6, _lock, _privacy));
         var quit = Ui.Button("Quit", "quiet", shell.Quit);
         Grid.SetColumn(quit, 1);
         footer.Children.Add(quit);
@@ -216,7 +217,12 @@ internal sealed class FlyoutWindow : Window
             Ui.SetQuietly(_profanity, s.Profanity.Mode != ProfanitySettings.Off);
             Ui.SetQuietly(_grammar, s.Llm.GrammarAssist);
             Ui.SetQuietly(_sounds, s.Sounds.Enabled);
-            _privacy.Text = _shell.NothingLeaves ? "Nothing leaves this PC" : $"Clean-up sends text to {Dictum.Llm.CloudPolicy.CloudHost(s.Llm)}";
+            // Each line after "Nothing leaves this PC": Approved by the product owner on 16/10/2026 as written: never reword it.
+            var nothingLeaves = _shell.NothingLeaves;
+            _lock.IsVisible = nothingLeaves; // the lock stands only beside "Nothing leaves this PC"
+            _privacy.Text = nothingLeaves ? "Nothing leaves this PC"
+                : Dictum.Llm.CloudPolicy.LocalServerHost(s.Llm) is not null ? "Clean-up via a server on this PC"
+                : "Cloud clean-up on · text leaves this PC";
         }
         finally
         {

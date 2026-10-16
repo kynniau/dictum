@@ -85,7 +85,7 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   Clean-up), **Grammar assist**, **Start and stop sounds** (`sounds.enabled`, off by default).
 - **Calibrate my voice**, **Dictionary** (add a word, open the dictionary or corrections file), **Snippets** (a phrase
   you say and the text pasted in its place, see "Snippets"), **Fix last dictation**, **Settings**.
-- The privacy line ("Nothing leaves this PC", or the host cloud clean-up sends to) and **Quit**.
+- The privacy line ("Nothing leaves this PC", or that clean-up uses a server on this PC or sends text off it) and **Quit**.
 
 The icon's tooltip reads `Dictum · <speech model> · <runtime> · <cleanup model> · <runtime> · <hotkey>`. Notices
 (a model missing, a second copy started, settings.json unreadable) appear as Windows notifications from the icon.
@@ -250,7 +250,7 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
    cleanup model produces one notification and the rule-based tidy until you download it (tray panel > Clean-up, or
    Settings > Models).
 3. Check everything with `.\Dictum.exe --selftest | Out-Host`.
-4. Optional, off by default: cloud polish with Anthropic or your own server (see "Optional cloud polish").
+4. Optional, off by default: cloud polish with Anthropic, OpenAI, Google Gemini or your own server (see "Optional cloud polish").
 
 ### Speech models
 
@@ -539,7 +539,9 @@ at all. See `.env.example`.
 | Key | Used by |
 |---|---|
 | `ANTHROPIC_API_KEY` | `llm.provider = "anthropic"`. Missing key → the local cleanup model is used (logged), or the rule-based tidy if that model is not downloaded. |
-| `LLM_API_KEY` | `llm.provider = "openai-compatible"`, sent as `Authorization: Bearer`. Optional for local servers. |
+| `OPENAI_API_KEY` | The OpenAI preset (`openai-compatible` at `api.openai.com`), sent as `Authorization: Bearer` to that host only. Required: without it nothing is sent and the rule-based tidy is used. |
+| `GEMINI_API_KEY` | The Google Gemini preset (`openai-compatible` at `generativelanguage.googleapis.com`), sent as `Authorization: Bearer` to that host only. Required, as for OpenAI. |
+| `LLM_API_KEY` | `llm.provider = "openai-compatible"` at any other address (a custom server), sent as `Authorization: Bearer` when set. Optional for local servers. Never sent to the OpenAI, Google Gemini or Ollama preset servers. |
 
 ## Cleanup
 
@@ -596,9 +598,10 @@ was cached this was 3.9 s).
 
 ### Optional cloud polish
 
-Off by default. Both send the raw transcript and the system prompt, which includes your dictionary terms, to another
-program after every dictation: Anthropic's cloud, or the server you name. `offline_only` refuses Anthropic and any
-server not on this machine.
+Off by default. Cloud clean-up can use Anthropic, OpenAI, Google Gemini or any OpenAI-compatible server with your own
+key, behind a consent step and a warning. Each sends the raw transcript and the system prompt, which includes your
+dictionary terms, to another program after every dictation. `offline_only` refuses Anthropic and any server not on this
+machine.
 
 **Switching it on takes an explicit consent step (SPEC §22).** Settings > Clean-up > Cloud clean-up: choose the
 service, the server address and the model, then **Use cloud clean-up…**. A dialog says what is sent (every
@@ -616,7 +619,7 @@ the consent step is done in the app.
 Model `claude-haiku-5-5` (or another Anthropic model id), thinking off, effort low. Missing key → the local cleanup
 model is used (logged), or the rule-based tidy if that model is not downloaded.
 
-**Your own server (Ollama, LM Studio, a company gateway):** choose "OpenAI-compatible server", for example
+**Your own server (Ollama, LM Studio, a company gateway):** choose "Ollama on this PC" or "Custom server (OpenAI-compatible)", for example
 
 ```json
 "llm": { "provider": "openai-compatible", "model": "llama3.2", "base_url": "http://localhost:11434/v1" }
@@ -624,11 +627,15 @@ model is used (logged), or the rule-based tidy if that model is not downloaded.
 
 A server on this PC (`localhost`, `127.0.0.1`, `::1`) needs no consent step, because Dictum's own request does not
 leave the PC; a server elsewhere needs `https://` and the consent step. Any OpenAI-compatible
-`POST {base_url}/chat/completions` endpoint works; LM Studio's server is typically `http://localhost:1234/v1` and
-Ollama's `http://localhost:11434/v1` (both recalled, not verified). A server on this machine is allowed under
-`offline_only` too: the request goes to the server directly, never through a proxy, and redirects are not followed.
-Whether the transcript stays on this PC then depends on that server: a proxy or company gateway running on this
-machine may forward it elsewhere. `LLM_API_KEY` is sent as a bearer token when set.
+`POST {base_url}/chat/completions` endpoint works; LM Studio's server is typically `http://localhost:1234/v1`
+(recalled, not verified) and Ollama's is `http://localhost:11434/v1` (docs.ollama.com, read 16/10/2026). A server on
+this machine is allowed under `offline_only` too: the request goes to the server directly, never through a proxy, and
+redirects are not followed. Whether the transcript stays on this PC then depends on that server: a proxy or company
+gateway running on this machine may forward it elsewhere, and Ollama can serve its cloud models once you sign in to
+it. So the tray panel and Settings never say "Nothing leaves this PC" while such a server does the clean-up. Each key
+goes as a bearer token to its own service only: `OPENAI_API_KEY` to OpenAI's server and `GEMINI_API_KEY` to Google
+Gemini's (required there: without it nothing is sent), none to Ollama on this PC, and `LLM_API_KEY`, when set, to any
+other address.
 
 ## Mode presets
 
@@ -789,7 +796,7 @@ other programs.
 **`offline_only: true` stops Dictum itself from connecting to any other machine.** With it set, Dictum refuses
 every download, in the app and on the command line, with a message saying why, and refuses the `anthropic` provider
 and any `openai-compatible` server that is not on this machine, falling back to the rule-based tidy with a notification.
-Settings > Privacy shows the switch, Settings > About says "Offline only", and the tray panel's privacy line says "Nothing leaves this PC". Install models on such machines with `install.ps1 -ModelsFrom <folder>`.
+Settings > Privacy shows the switch, Settings > About says "Offline only", and the tray panel's privacy line says "Nothing leaves this PC" (unless an OpenAI-compatible server on this PC does the clean-up: it may forward the text, which Dictum cannot see). Install models on such machines with `install.ps1 -ModelsFrom <folder>`.
 Behind those messages, every HTTP client in Dictum sends through one guard that refuses any request to a host off
 this machine while `offline_only` is on (read per request, so it follows a settings change), and a download in
 progress stops at its next chunk when the setting is turned on. A request to a server on this machine never goes

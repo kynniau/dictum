@@ -85,4 +85,10 @@ public static partial class SelfTestCommand
         }
         return ok;
     }
+
+    /// <summary>SPEC §11: every key Dictum reads (<see cref="SecretStore.KeyNames"/>), present and from where, or absent; never a value.</summary>
+    internal static void KeyLines(SecretStore secrets, Action<string, string, bool?> line)
+    {
+        foreach (var name in SecretStore.KeyNames) line(name, secrets.Describe(name), null);
+    }
 }

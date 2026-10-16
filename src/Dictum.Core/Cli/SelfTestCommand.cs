@@ -142,8 +142,7 @@ public static partial class SelfTestCommand
             ok = false;
         }
 
-        Line(SecretStore.AnthropicKey, secrets.Describe(SecretStore.AnthropicKey));
-        Line(SecretStore.LlmKey, secrets.Describe(SecretStore.LlmKey));
+        KeyLines(secrets, Line);
         Console.Out.WriteLine(ok ? "result: PASS" : "result: FAIL");
         Console.Out.Flush();
         return ok ? 0 : 1;

@@ -110,6 +110,12 @@ public sealed partial class AppShell : IDisposable
     /// <summary>The clean-up step's own description ("local/qwen2.5-1.5b on this PC (nothing leaves it)").</summary>
     public string CleanupStatus => _cleaner.Status;
 
+    /// <summary>
+    /// The key the clean-up in use is waiting for (OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY), or null: the cleaner built at the last
+    /// load found none, so nothing is sent until a reload finds it (<see cref="TranscriptCleaner.MissingKey"/>).
+    /// </summary>
+    public string? CleanupWaitingForKey => _cleaner.MissingKey;
+
     /// <summary>A speech model is loaded and no load is in progress (the hotkey works).</summary>
     public bool SpeechReady => _models.IsReady;
 
