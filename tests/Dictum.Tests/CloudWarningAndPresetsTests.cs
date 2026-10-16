@@ -51,7 +51,7 @@ public class CloudWarningAndPresetsTests
     private static string ApprovedLocalServerLine(string host, string model) =>
         $"On: a server on this PC ({host}, model {model}) tidies each dictation. Dictum cannot see whether that server forwards your text elsewhere.";
 
-    // Proposed by the orchestrator to the product owner on 16/10/2026 and awaiting confirmation: pinned word for word, so any change is
+    // Approved by the product owner on 16/10/2026 as written: pinned word for word, so any change is
     // deliberate. Settings > Clean-up and Settings > Privacy say it while cloud clean-up is on and offline only refuses it.
     private const string ProposedOfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
 

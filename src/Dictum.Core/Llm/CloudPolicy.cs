@@ -97,8 +97,8 @@ public static class CloudPolicy
 
     /// <summary>
     /// The Settings > Clean-up state line and the Settings > Privacy summary while cloud clean-up is on but offline only
-    /// refuses it (<see cref="TranscriptCleaner.OfflineRefusal"/>), so nothing is sent. Proposed to the product owner on
-    /// 16/10/2026 and awaiting confirmation: never reword it; only the product owner's replacement may change it.
+    /// refuses it (<see cref="TranscriptCleaner.OfflineRefusal"/>), so nothing is sent. Approved by the product owner on 16/10/2026
+    /// as written: never reword it; only the product owner's replacement may change it.
     /// </summary>
     public const string OfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
 }
