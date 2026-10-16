@@ -3,7 +3,11 @@ using System.Diagnostics;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.LogicalTree;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Dictum.App;
 using Dictum.Audio;
 using Dictum.Core;
@@ -575,6 +579,14 @@ public class HandsFreeSettingsTests
     private static ToggleButton Preset(ILogical window, string label) =>
         All<ToggleButton>(window).Single(b => AutomationProperties.GetName(b) == $"{GeneralPage.HandsFreeLabel}: {label}");
 
+    /// <summary>Presses Enter in the number box, as a user does to finish typing a value.</summary>
+    private static void PressEnterIn(Window window, NumericUpDown box)
+    {
+        box.GetVisualDescendants().OfType<TextBox>().Single().Focus();
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     [Fact]
     public Task The_field_writes_hands_free_max_seconds_clamped_to_its_range() => UiSession.Run(() =>
     {
@@ -586,14 +598,61 @@ public class HandsFreeSettingsTests
         Assert.Equal((5m, 0), (box.Value, unit.SelectedIndex)); // the default: 5 minutes
 
         box.Value = 12m;
+        PressEnterIn(window, box);
         Assert.Equal(720, Saved());
         Assert.Equal(720, shell.Settings.HandsFreeMaxSeconds); // reloaded: the state machine gets it (AppRules.Options)
         unit.SelectedIndex = 1;
         Assert.Equal(720m, box.Value); // the same time in seconds; nothing new to write
         box.Value = 10m;
+        PressEnterIn(window, box);
         Assert.Equal(30, Saved());     // under 30 s: 30 s
         box.Value = 99_999m;
+        PressEnterIn(window, box);
         Assert.Equal(3600, Saved());   // over 60 minutes: 60 minutes
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Theory]
+    [InlineData("Enter")]
+    [InlineData("focus leaves the box")]
+    [InlineData("the page is left")]
+    public Task Typing_a_value_writes_it_once_never_the_digits_on_the_way(string finish) => UiSession.Run(() =>
+    {
+        // Merge lens P7, 16/10/2026: typing "1", "2", "0" wrote 30 (the "1", clamped) and then 120, and a reload hands each
+        // write to the state machine. The box now writes once it settles, or on Enter, when it loses focus or the page is left.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (window, shell) = OpenGeneral(scratch);
+        var box = All<NumericUpDown>(window).Single();
+        UnitOf(window).SelectedIndex = 1; // seconds
+        Dispatcher.UIThread.RunJobs();
+        var text = box.GetVisualDescendants().OfType<TextBox>().Single();
+        var before = File.ReadAllText(scratch.Paths.SettingsFile);
+        text.Focus();
+        text.SelectAll();
+        foreach (var key in new[] { "1", "2", "0" })
+        {
+            window.KeyTextInput(key);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(before, File.ReadAllText(scratch.Paths.SettingsFile)); // nothing written while typing: no 30, no 12
+        }
+        Assert.Equal("120", text.Text);
+
+        switch (finish)
+        {
+            case "Enter":
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+                break;
+            case "focus leaves the box":
+                All<Slider>(window).Single().Focus();
+                break;
+            default:
+                window.ShowPage("Mode");
+                break;
+        }
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(120, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.HandsFreeMaxSeconds);
+        Assert.Equal(120, shell.Settings.HandsFreeMaxSeconds); // the state machine gets 120, and only 120
         window.Close();
         shell.Dispose();
     });

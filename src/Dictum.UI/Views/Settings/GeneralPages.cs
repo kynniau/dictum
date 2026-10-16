@@ -1,6 +1,8 @@
 using System.Globalization;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using Dictum.Hotkey;
@@ -143,7 +145,7 @@ internal sealed class GeneralPage : SettingsPage
     {
         _capture.Stop();
         _fixCapture.Stop();
-        _handsFreeLimit.Flush(); // a slider value still settling is written, not lost
+        _handsFreeLimit.Flush(); // a slider or typed value still settling is written, not lost
     }
 
     private async Task SetLoginAsync(bool on)
@@ -207,9 +209,11 @@ internal sealed class GeneralPage : SettingsPage
 /// <summary>
 /// Settings → General → Hands-free (product owner decisions 3 and 5, 16/10/2026): "Hands-free stops after" as a number with
 /// its unit, a slider from 30 s to 60 min and quick picks of 1, 2, 5, 10, 30 and 60 min, all showing one value in seconds
-/// (hands_free_max_seconds). Every control is reached and used from the keyboard and has a name for screen readers. A typed
-/// value or a pick is reported at once, clamped to 30 s–60 min; the slider reports once it settles, so a drag writes
-/// settings.json once, not at every step. Changing the unit shows the same time and reports nothing.
+/// (hands_free_max_seconds). Every control is reached and used from the keyboard and has a name for screen readers. A pick
+/// is reported at once. The slider and the number box report once they settle (<see cref="SettleMs"/> without a change), the
+/// box also on Enter or when it loses focus, and leaving the page reports a value still settling; all clamped to 30 s–60
+/// min. So a drag, or typing "120", writes settings.json once: never each step, nor the 30 s that "1" is clamped to on the
+/// way (a reload hands every write to the state machine). Changing the unit shows the same time and reports nothing.
 /// </summary>
 internal sealed class HandsFreeLimit
 {
@@ -218,7 +222,7 @@ internal sealed class HandsFreeLimit
     public static readonly int[] PresetMinutes = [1, 2, 5, 10, 30, 60];
     public static readonly string[] Units = ["minutes", "seconds"];
 
-    /// <summary>How long the slider stays still before its value is reported.</summary>
+    /// <summary>How long the slider or the number box stays unchanged before its value is reported.</summary>
     public const int SettleMs = 400;
 
     private const int Min = AppSettings.HandsFreeMinimumSeconds;
@@ -249,8 +253,17 @@ internal sealed class HandsFreeLimit
 
         Box.ValueChanged += (_, e) =>
         {
-            if (!_quiet && e.NewValue is decimal value) Choose((int)Math.Round(value * UnitSeconds, MidpointRounding.AwayFromZero));
+            if (_quiet || e.NewValue is not decimal value) return;
+            // Typed or stepped: the box is left as the user has it, and the value is reported once it settles (Flush).
+            Seconds = (int)Math.Round(value * UnitSeconds, MidpointRounding.AwayFromZero);
+            _settle.Stop();
+            _settle.Start();
         };
+        Box.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Key.Enter) Flush(); // after the box's own Enter handling has committed the text
+        }, RoutingStrategies.Bubble, handledEventsToo: true);
+        Box.LostFocus += (_, _) => Flush();
         Unit.SelectionChanged += (_, _) =>
         {
             if (!_quiet && Unit.SelectedIndex >= 0) Display(Seconds, keepUnit: true);
@@ -279,18 +292,18 @@ internal sealed class HandsFreeLimit
     /// <summary>The time the controls show, in seconds.</summary>
     public int Seconds { get; private set; }
 
-    /// <summary>A slider value is waiting to be reported.</summary>
+    /// <summary>A slider or typed value is waiting to be reported.</summary>
     public bool Settling => _settle.IsEnabled;
 
     private int UnitSeconds => Unit.SelectedIndex == 1 ? 1 : 60;
 
-    /// <summary>Shows the value in use (settings.json), unless a slider value is still settling: that one is newer.</summary>
+    /// <summary>Shows the value in use (settings.json), unless a slider or typed value is still settling: that one is newer.</summary>
     public void Show(int seconds)
     {
         if (!Settling) Display(seconds, keepUnit: false);
     }
 
-    /// <summary>Reports a slider value still settling now (the page is being left).</summary>
+    /// <summary>Reports a value still settling now (the timer, Enter or focus leaving the box, the page being left).</summary>
     public void Flush()
     {
         if (!_settle.IsEnabled) return;
