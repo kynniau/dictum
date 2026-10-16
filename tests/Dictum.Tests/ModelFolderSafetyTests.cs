@@ -289,6 +289,7 @@ public sealed class ModelFolderSafetyTests
             Assert.True(await Eventually(() => models.IsReady)); // loaded, and holding its file: the deletion has to release it first
             dialogs.Answers.Enqueue(0); // Delete
             var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en"));
+            await Eventually(() => models.IsReady); // the reloaded model has finished loading: it holds its file until the shell is disposed
             var result = (said, dialogs.Asked.ToList(), shell.Settings.Whisper.Model, models.ModelPath, File.Exists(own), File.Exists(bundled), own, bundled);
             shell.Dispose();
             return result;
@@ -332,6 +333,7 @@ public sealed class ModelFolderSafetyTests
             Assert.True(await Eventually(() => models.IsReady)); // loaded, and holding its file
             dialogs.Answers.Enqueue(0); // Delete
             var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en" && m.Folder == ModelFolderKind.Chosen));
+            await Eventually(() => models.IsReady); // the reloaded model has finished loading: it holds its file until the shell is disposed
             var result = (said, dialogs.Asked.ToList(), models.ModelPath, File.Exists(chosen), File.Exists(own), own, scratch.Paths.DefaultModelsDir);
             shell.Dispose();
             return result;
