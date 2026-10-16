@@ -10,7 +10,7 @@ namespace Dictum.Tests;
 /// builds a throwaway repository that carries the real hooks and drives them through git itself, so a change to a rule
 /// fails here. Invented words only. The real denylist is never read: the denylist always lives inside the scratch folder.
 /// </summary>
-public sealed class PrivateMaterialHooksTests : IDisposable
+public sealed partial class PrivateMaterialHooksTests : IDisposable
 {
     private const string Word = "zebrafish-7";
 
@@ -93,13 +93,19 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         return repo;
     }
 
+    /// <summary>A bare repository called <paramref name="name"/>, next to the work folders and registered as a remote of <paramref name="repo"/>.</summary>
+    private void AddRemote(string repo, string name)
+    {
+        Ok(Git(_dir.FullName, ["init", "-q", "--bare", $"{name}.git"]));
+        File.AppendAllText(Path.Combine(repo, ".git", "config"),
+            $"[remote \"{name}\"]\n\turl = {Path.Combine(_dir.FullName, $"{name}.git").Replace('\\', '/')}\n\tfetch = +refs/heads/*:refs/remotes/{name}/*\n");
+    }
+
     /// <summary>A repository with a bare remote called origin, and one clean commit already pushed.</summary>
     private string NewRepoWithRemote()
     {
         var repo = NewRepo();
-        Ok(Git(_dir.FullName, ["init", "-q", "--bare", "remote.git"]));
-        File.AppendAllText(Path.Combine(repo, ".git", "config"),
-            $"[remote \"origin\"]\n\turl = {Path.Combine(_dir.FullName, "remote.git").Replace('\\', '/')}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n");
+        AddRemote(repo, "origin");
         Write(repo, "readme.txt", "hello\n");
         Stage(repo, "readme.txt");
         Assert.Equal((0, ""), Commit(repo, "first"));
@@ -130,12 +136,19 @@ public sealed class PrivateMaterialHooksTests : IDisposable
 
     private static Dictionary<string, string?> NoVariable() => new() { ["DICTUM_PRIVATE_DENYLIST"] = null };
 
+    /// <summary>A path with forward slashes, which git config and git remotes accept on every system.</summary>
+    private static string Slashes(string path) => path.Replace(Path.DirectorySeparatorChar, '/');
+
     /// <summary>Commits through git's editor flow (git commit -v): a stand-in editor puts <paramref name="message"/> above the template git wrote.</summary>
-    private (int Exit, string Output) CommitWithEditor(string repo, string message)
+    private (int Exit, string Output) CommitWithEditor(string repo, string message, string? cleanup = null, bool noVerify = false, string? cleanupFlag = null)
     {
         var editor = Path.Combine(_dir.FullName, "editor.sh");
         File.WriteAllText(editor, "#!/bin/sh\n{ printf '%s\\n' \"$EDITOR_MESSAGE\"; cat \"$1\"; } > \"$1.new\" && mv \"$1.new\" \"$1\"\n");
-        return Git(repo, ["commit", "-q", "-v"], new() { ["GIT_EDITOR"] = $"sh \"{editor.Replace('\\', '/')}\"", ["EDITOR_MESSAGE"] = message });
+        List<string> args = cleanup is null ? [] : ["-c", $"commit.cleanup={cleanup}"]; // the config key is visible to a hook; the --cleanup flag is not
+        args.AddRange(["commit", "-q", "-v"]);
+        if (noVerify) args.Add("--no-verify");
+        if (cleanupFlag is not null) args.Add($"--cleanup={cleanupFlag}");
+        return Git(repo, [.. args], new() { ["GIT_EDITOR"] = $"sh \"{editor.Replace('\\', '/')}\"", ["EDITOR_MESSAGE"] = message });
     }
 
     /// <summary>True when the hook output names exactly this path (as a whole token at the end of a line).</summary>
@@ -160,9 +173,13 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         string[] refused =
         [
             "memo.m4a", "RECORDING.M4A", "Aufnahme für María.mp3", "a/b/clip.WebM", "tone.wav", "tests/fixtures/tone.wav", "tests/fixtures/sub/tone.wav",
-            "private/a.txt", "docs/Recordings/a.txt", "x/y/TRANSCRIPTS/z/a.txt",
+            "private/a.txt", "docs/Recordings/a.txt", "x/y/TRANSCRIPTS/z/a.txt", "recording/a.txt", "docs/Transcript/b.txt",
         ];
-        string[] allowed = ["notes.txt", "my-private-notes.txt", "src/Private.cs", "Privateer/a.txt", "recordings.txt"];
+        string[] allowed =
+        [
+            "notes.txt", "my-private-notes.txt", "src/Private.cs", "Privateer/a.txt", "recordings.txt", "transcript.txt", "recorded/a.txt",
+            "notes.pdf.txt", "archive.zipx", "docs/pdf/readme.txt",
+        ];
         foreach (var path in refused.Concat(allowed)) Write(repo, path);
         Stage(repo, [.. refused, .. allowed]);
 
@@ -175,7 +192,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
     }
 
     [Fact]
-    public void A_file_over_5_MB_is_refused_and_one_of_exactly_5_MiB_is_not()
+    public void A_file_over_5_MiB_is_refused_and_one_of_exactly_5_MiB_is_not()
     {
         var repo = NewRepo();
         WriteBytes(repo, "exact.dat", 5 * 1024 * 1024);
@@ -190,6 +207,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Assert.Equal(1, exit);
         Assert.True(Lists(output, "over.dat") && Lists(output, "six.dat"), output);
         Assert.False(Lists(output, "exact.dat"), output);
+        Assert.Contains("over 5 MiB", output); // the label says the unit the limit is in
     }
 
     [Fact]
@@ -213,18 +231,19 @@ public sealed class PrivateMaterialHooksTests : IDisposable
     }
 
     [Fact]
-    public void A_denylist_word_in_a_file_name_is_refused_and_binary_content_is_not_scanned()
+    public void A_denylist_word_in_a_file_name_is_refused_and_a_file_git_calls_binary_is_read_as_text()
     {
         var repo = NewRepo();
         File.WriteAllBytes(Path.Combine(repo, $"{Word}.dat"), [0, 1, 2]);
         File.WriteAllBytes(Path.Combine(repo, "data.dat"), [0, .. Encoding.ASCII.GetBytes(Word), 0]);
-        Stage(repo, $"{Word}.dat", "data.dat");
+        File.WriteAllBytes(Path.Combine(repo, $"empty-{Word}.dat"), []); // an empty file has no +++ line in the patch, so only its name can give it away
+        Stage(repo, $"{Word}.dat", "data.dat", $"empty-{Word}.dat");
 
         var (exit, output) = Commit(repo);
 
         Assert.Equal(1, exit);
-        Assert.True(Lists(output, $"{Word}.dat"), output);
-        Assert.False(Lists(output, "data.dat"), output); // the documented gap: a binary file is checked by name, type and size only
+        Assert.True(Lists(output, $"{Word}.dat") && Lists(output, $"empty-{Word}.dat"), output);
+        Assert.True(Lists(output, "data.dat"), output); // a NUL byte makes git call it binary, and the guard reads it as text all the same
     }
 
     [Fact]
@@ -266,16 +285,9 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Write(repo, "leak.md", $"about {Word}\n");
         Stage(repo, "leak.md");
 
-        var (exit, output) = Commit(repo, "about " + Word, env: Denylist(Path.Combine(_dir.FullName, "missing", "denylist.txt"))); // a path with no file
+        var (exit, output) = Commit(repo, "about " + Word, env: NoVariable()); // neither the variable nor the config key
         Assert.Equal(0, exit);
         var line = Assert.Single(output.Split('\n', StringSplitOptions.RemoveEmptyEntries)); // pre-commit says so; commit-msg stays quiet
-        Assert.Contains("no denylist at", line);
-
-        Write(repo, "leak2.md", $"about {Word}\n");
-        Stage(repo, "leak2.md");
-        (exit, output) = Commit(repo, "second", env: NoVariable()); // neither the variable nor the config key
-        Assert.Equal(0, exit);
-        line = Assert.Single(output.Split('\n', StringSplitOptions.RemoveEmptyEntries));
         Assert.Contains("no denylist is set", line);
     }
 
@@ -299,11 +311,15 @@ public sealed class PrivateMaterialHooksTests : IDisposable
             File.Delete(Path.Combine(repo, "leak.md"));
         }
 
+        var other = Path.Combine(_dir.FullName, "other-denylist.txt");
+        File.WriteAllText(other, "some-other-word-3\n");
         Write(main, "leak.md", $"about {Word}\n");
         Stage(main, "leak.md");
-        var wins = Commit(main, "leak", env: Denylist(Path.Combine(_dir.FullName, "missing", "denylist.txt"))); // the variable names no file, so nothing is checked
-        Assert.Equal(0, wins.Exit);
-        Assert.Contains("no denylist at", wins.Output);
+        Assert.Equal((0, ""), Commit(main, "leak", env: Denylist(other))); // the variable wins: the key's list, which holds the word, is not consulted
+        Write(main, "other.md", "about some-other-word-3\n");
+        Stage(main, "other.md");
+        var inForce = Commit(main, "other", env: Denylist(other)); // and the variable's list is the one in force
+        Assert.True(inForce.Exit == 1 && Lists(inForce.Output, "other.md"), inForce.Output);
     }
 
     [Fact]
@@ -312,7 +328,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         var repo = NewRepo();
         Write(repo, "old.md", $"an old line about {Word}\n");
         Stage(repo, "old.md");
-        Assert.Equal(0, Commit(repo, "old", env: Denylist(Path.Combine(_dir.FullName, "none.txt"))).Exit); // committed while no denylist existed
+        Assert.Equal(0, Commit(repo, "old", env: NoVariable()).Exit); // committed while no denylist was set
 
         File.AppendAllText(Path.Combine(repo, "old.md"), "a harmless new line\n");
         Stage(repo, "old.md");
@@ -368,7 +384,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         var repo = NewRepo();
         Write(repo, "old.md", $"keep\nan old line about {Word}\n");
         Stage(repo, "old.md");
-        Assert.Equal(0, Commit(repo, "old", env: Denylist(Path.Combine(_dir.FullName, "none.txt"))).Exit); // committed while no denylist existed
+        Assert.Equal(0, Commit(repo, "old", env: NoVariable()).Exit); // committed while no denylist was set
         Write(repo, "old.md", "keep\n"); // this commit removes that line, so the diff git shows under the scissors line holds the word
         Stage(repo, "old.md");
         Write(repo, $"untracked-{Word}.txt"); // and git's template lists this untracked file by name
@@ -533,13 +549,14 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Write(repo, "Private/a.txt");
         WriteBytes(repo, "big.dat", 6 * 1024 * 1024);
         Write(repo, "tests/fixtures/tone.wav"); // no exception for test audio: it is made at test time
-        Stage(repo, "call.M4A", "Private/a.txt", "big.dat", "tests/fixtures/tone.wav");
+        Write(repo, "docs/Minutes.PDF");
+        Stage(repo, "call.M4A", "Private/a.txt", "big.dat", "tests/fixtures/tone.wav", "docs/Minutes.PDF");
         Assert.Equal(0, Commit(repo, "oops", noVerify: true).Exit);
 
         var (exit, output) = Git(repo, audit);
 
         Assert.Equal(1, exit);
-        Assert.True(Lists(output, "call.M4A") && Lists(output, "Private/a.txt") && Lists(output, "big.dat") && Lists(output, "tests/fixtures/tone.wav"), output);
+        Assert.True(Lists(output, "call.M4A") && Lists(output, "Private/a.txt") && Lists(output, "big.dat") && Lists(output, "tests/fixtures/tone.wav") && Lists(output, "docs/Minutes.PDF"), output);
         Assert.False(Lists(output, "readme.txt"), output);
     }
 
@@ -573,7 +590,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Assert.Equal(ignoredExtensions, hookExtensions);
         Assert.DoesNotContain(block, line => line.StartsWith('!')); // no exception: a .wav is refused wherever it is (test audio is made at test time)
         Assert.DoesNotContain("tests/fixtures", lib);
-        Assert.All(new[] { "private", "recordings", "transcripts" }, folder =>
+        Assert.All(new[] { "private", "recording", "recordings", "transcript", "transcripts" }, folder =>
         {
             Assert.Contains($"{folder}/", block);
             Assert.Contains(folder, lib);
@@ -589,15 +606,14 @@ public sealed class PrivateMaterialHooksTests : IDisposable
     }
 
     [Fact]
-    public void No_committed_file_names_the_folder_that_holds_the_private_word_list_and_the_docs_name_the_variable_and_the_config_key()
+    public void No_tracked_file_names_the_folder_that_holds_the_private_word_list_and_the_docs_name_the_variable_and_the_config_key()
     {
         var root = FixBatchDownloadTests.RepoRoot();
         var folder = string.Join(' ', "Dictum", "private"); // not spelled out in one piece: this file is committed too
-        var files = Directory.GetFiles(Path.Combine(root, ".githooks")).Concat(
-        [
-            Path.Combine(root, ".gitignore"), Path.Combine(root, ".gitattributes"),
-            Path.Combine(root, ".github", "SECURITY.md"), Path.Combine(root, ".github", "CONTRIBUTING.md"), Path.Combine(root, ".github", "workflows", "ci.yml"),
-        ]);
+        var (exit, listing) = Git(root, ["ls-files", "-z"]);
+        Assert.SkipWhen(exit != 0, "Not a git checkout.");
+        var files = listing.Split('\0', StringSplitOptions.RemoveEmptyEntries).Select(path => Path.Combine(root, path)).Where(File.Exists).ToArray();
+        Assert.NotEmpty(files);
         Assert.All(files, file => Assert.DoesNotContain(folder, File.ReadAllText(file), StringComparison.OrdinalIgnoreCase));
 
         foreach (var doc in new[] { "SECURITY.md", "CONTRIBUTING.md" })

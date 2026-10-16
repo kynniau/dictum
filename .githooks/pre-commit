@@ -1,6 +1,7 @@
 #!/bin/sh
-# Refuses a commit that would add private material to this public repository (recordings, private folders, large files,
-# text from a local denylist). The rules and the checks are in private-guard.sh. Turn on: git config core.hooksPath .githooks
+# Refuses a commit that would add private material to this public repository (recordings and other blocked file types,
+# private folders, large files, text from a local denylist). The rules and the checks are in private-guard.sh.
+# Turn on: git config core.hooksPath .githooks
 . "$(dirname "$0")/private-guard.sh"
 
 # What to inspect: the staged changes.
