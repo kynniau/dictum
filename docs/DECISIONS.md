@@ -1093,6 +1093,11 @@ without the matcher, so the first pin drives the matcher and the state machine d
   capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on Hindi or
   Polish text would change it. Corrections and the profanity filter still run; they are whole-word matches the user
   wrote. Status "skipped: …" is visible in About and `--selftest`.
+- Settings > Clean-up and Privacy for text that is not English (16/10/2026): the page falls through to the approved "On, but
+  nothing is sent: the clean-up in use runs on this PC." (Privacy: "Nothing leaves this PC: …") instead of the local-server
+  line, and takes precedence over the offline-only line, because switching offline only off would still send nothing. For
+  English text the offline-only line keeps its precedence, since it tells the user why nothing is sent
+  (`CleanupPage.OfflineOnlyIsWhyNothingIsSent`).
 - The Mode presets were left on English-only models (no multilingual twin of Light/Full), because choosing which
   multilingual model a preset should write needs measurements on the staff's actual machines that do not exist yet.
   The Mode page's note is computed per preset from the one guard (`WhisperLanguages.ModeNote`): on a GPU, Full writes

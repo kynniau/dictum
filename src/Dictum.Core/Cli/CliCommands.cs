@@ -101,7 +101,7 @@ public static class CliCommands
                     var cleaned = await cleaner.CleanAsync(raw, CancellationToken.None);
                     var cleanupMs = sw.ElapsedMilliseconds;
                     if (cleaned.FallbackReason is not null) Console.Error.WriteLine($"cleanup fallback: {cleaned.FallbackReason}");
-                    Console.Error.WriteLine($"cleanup by {(cleaned.Cleaned ? "the model" : "the rule-based tidy")} in {cleanupMs} ms; transcribe + cleanup {transcribeMs + cleanupMs} ms");
+                    Console.Error.WriteLine($"cleanup by {(cleaned.Cleaned ? "the model" : cleaner.IsPlain ? "the whitespace-only tidy" : "the rule-based tidy")} in {cleanupMs} ms; transcribe + cleanup {transcribeMs + cleanupMs} ms");
                     Console.Out.WriteLine($"cleaned: {cleaned.Text}");
                     // What the tray app would paste: the corrections, then the profanity filter (SPEC §22 order: raw, clean-up, corrections, profanity).
                     Console.Out.WriteLine($"final: {personal.Finish(cleaned.Text, settings.Profanity)}");

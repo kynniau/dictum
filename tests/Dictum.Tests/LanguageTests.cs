@@ -232,7 +232,10 @@ public class LanguageTests
     }
 }
 
-/// <summary>The Language card on Settings → Models and the Mode page's note, on Avalonia's headless platform.</summary>
+/// <summary>
+/// The Language card on Settings → Models, the Mode page's note, and the Clean-up and Privacy state lines while the text is
+/// not English (SPEC §23), on Avalonia's headless platform.
+/// </summary>
 public class LanguageUiTests
 {
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
@@ -325,4 +328,109 @@ public class LanguageUiTests
         gpuWindow.Close();
         gpuShell.Dispose();
     });
+
+    // The product owner's lines, approved 16/10/2026 as written: pinned word for word, independently of the app's copy
+    // (CloudWarningAndPresetsTests pins the first three for English text, and the fourth only by its first words).
+    private static string ApprovedLocalServerLine(string host, string model) =>
+        $"On: a server on this PC ({host}, model {model}) tidies each dictation. Dictum cannot see whether that server forwards your text elsewhere.";
+
+    private const string ApprovedOfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
+    private const string ApprovedNothingSentLine = "On, but nothing is sent: the clean-up in use runs on this PC.";
+    private const string ApprovedNothingLeavesLine = "Nothing leaves this PC: speech recognition and clean-up both run here.";
+
+    /// <summary>Every visible line of a Settings page, drawn afresh from the settings and the clean-up in use as they are now.</summary>
+    private static IReadOnlyList<string> PageLines(SettingsWindow window, string page)
+    {
+        window.ShowPage(page == "Clean-up" ? "Privacy" : "Clean-up"); // a page is redrawn when it is moved to
+        window.ShowPage(page);
+        return All<TextBlock>(window).Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+    }
+
+    /// <summary>The Clean-up card's state line ("On: …" or "On, but …").</summary>
+    private static string StateLine(SettingsWindow window) =>
+        Assert.Single(PageLines(window, "Clean-up"), l => l.StartsWith("On: ", StringComparison.Ordinal) || l.StartsWith("On, ", StringComparison.Ordinal));
+
+    /// <summary>
+    /// A server on this PC (an OpenAI-compatible llm.base_url on localhost) tidies each dictation only while the clean-up in use asks
+    /// it. Text that is not English gets the plain cleaner, which asks no server (SPEC §23), so Settings > Clean-up must not say a
+    /// server tidies each dictation while Settings > Privacy says nothing leaves this PC (rebase lane, 7b0a809, 16/10/2026).
+    /// </summary>
+    [Theory]
+    [InlineData("hi", false, false)]   // Hindi written as Hindi
+    [InlineData("auto", false, false)] // detected per dictation, written as spoken
+    [InlineData("hi", true, true)]     // translated: English comes out, so the server tidies it
+    [InlineData("en", false, true)]
+    public Task The_clean_up_page_says_a_server_on_this_PC_tidies_each_dictation_only_while_it_does(string language, bool translate, bool serverTidies) => UiSession.Run(() =>
+    {
+        var translateJson = translate ? "true" : "false";
+        using var scratch = new Scratch($$"""{ "hotkey": "F24", "llm": { "provider": "openai-compatible", "base_url": "http://localhost:11434/v1", "model": "llama3.2" }, "whisper": { "model": "medium", "language": "{{language}}", "translate": {{translateJson}} } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Assert.Equal("localhost", CloudPolicy.LocalServerHost(shell.Settings.Llm)); // a server on this PC is configured in every row
+        Assert.Equal(serverTidies, !shell.NothingLeaves); // and the clean-up in use asks it only when the text comes out English
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var cleanUp = StateLine(window);
+        var privacy = PageLines(window, "Privacy");
+        if (serverTidies)
+        {
+            Assert.Equal(ApprovedLocalServerLine("localhost", "llama3.2"), cleanUp);
+            Assert.Contains(ApprovedLocalServerLine("localhost", "llama3.2"), privacy);
+            Assert.DoesNotContain(ApprovedNothingLeavesLine, privacy);
+        }
+        else
+        {
+            Assert.Equal(ApprovedNothingSentLine, cleanUp);
+            Assert.DoesNotContain(PageLines(window, "Clean-up"), l => l.Contains("server on this PC", StringComparison.Ordinal));
+            Assert.Contains(ApprovedNothingLeavesLine, privacy);
+            Assert.DoesNotContain(privacy, l => l.Contains("server on this PC", StringComparison.Ordinal));
+        }
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// The Clean-up card's state line and Privacy's lines for cloud clean-up agreed to at a host off this PC while offline only is on:
+    /// the provider is refused, so nothing is sent whatever the language.
+    /// </summary>
+    private static Task<(string CleanUp, IReadOnlyList<string> Privacy)> OfflineOnlyPages(string language) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch($$"""{ "hotkey": "F24", "offline_only": true, "llm": { "provider": "openai-compatible", "base_url": "https://llm.example.com/v1", "model": "m" }, "whisper": { "model": "medium", "language": "{{language}}" } }""");
+        CloudConsentFile.Write(scratch.Paths.ConsentFile, new CloudConsentRecord(LlmSettings.OpenAiCompatible, "llm.example.com", DateTimeOffset.UtcNow, "test"));
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Assert.True(CloudPolicy.HasConsent(shell.Settings.Llm)); // agreed to, so the load leaves cloud clean-up as it is
+        Assert.NotNull(TranscriptCleaner.OfflineRefusal(shell.Settings.Llm, shell.Settings.OfflineOnly)); // and offline only refuses it
+        Assert.True(shell.NothingLeaves);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var pages = (StateLine(window), PageLines(window, "Privacy"));
+        window.Close();
+        shell.Dispose();
+        return pages;
+    });
+
+    /// <summary>
+    /// With English text offline only is why nothing is sent, and the approved line says so. Text that is not English never reaches the
+    /// provider whatever offline only says, so switching it off would send nothing: the line must not promise that it would.
+    /// </summary>
+    [Theory]
+    [InlineData("hi", ApprovedNothingSentLine)]
+    [InlineData("en", ApprovedOfflineOnlyLine)]
+    public async Task The_clean_up_page_names_offline_only_as_the_reason_only_for_English_text(string language, string expected)
+    {
+        var (cleanUp, _) = await OfflineOnlyPages(language);
+        Assert.Equal(expected, cleanUp);
+    }
+
+    /// <summary>Settings > Privacy decides as Settings > Clean-up does (its own comment says so): the two pages must not disagree.</summary>
+    [Theory]
+    [InlineData("hi", ApprovedNothingLeavesLine, ApprovedOfflineOnlyLine)]
+    [InlineData("en", ApprovedOfflineOnlyLine, ApprovedNothingLeavesLine)]
+    public async Task The_privacy_page_names_offline_only_as_the_reason_only_for_English_text(string language, string said, string notSaid)
+    {
+        var (_, privacy) = await OfflineOnlyPages(language);
+        Assert.Contains(said, privacy);
+        Assert.DoesNotContain(notSaid, privacy);
+    }
 }

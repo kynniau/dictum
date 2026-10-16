@@ -166,7 +166,7 @@ speaker dictates in Hindi and English is pasted. Recognition and translation run
 (Settings > Clean-up), the English text still goes to that provider, as every dictation does. Settings > Models >
 **Language**:
 
-- **Spoken language**: English, Hindi, Tagalog and the other Indian-subcontinent languages Whisper has (Bengali,
+- **Spoken language**: English, Hindi, Tagalog and other languages Whisper has (Bengali,
   Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Malayalam, Punjabi, Assamese, Nepali, Sindhi, Sinhala) are listed
   first, then the rest by name (Cantonese, `yue`, only with the large-v3 models), or **Detect automatically** (whisper
   works it out from the first seconds of each dictation, useful for a mixed team). The code goes into
