@@ -102,7 +102,7 @@ public static partial class CleanupValidator
         if (HasNonLatinLetters(text) && !HasNonLatinLetters(raw)) return (null, "reply is in a script the dictation did not use");
 
         if (Unsaid(textLower, rawSet) is { } unsaid) return (null, unsaid);
-        if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(TermText.Of(raw), TermText.Of(text), terms))
+        if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(raw, text, terms))
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
@@ -170,16 +170,22 @@ public static partial class CleanupValidator
     /// removed, on both sides (the dictation's capitals are whisper's); a term with no capital matches any case. So the
     /// everyday words a grammar fix adds or changes are not the term ("will" is not "Will", "it" not "IT", "loan" not "Loan
     /// Market"), and a dictated "will" does not cover an added "Will". Spoken formatting commands and hesitations ("comma",
-    /// "question mark", "open quote", "new line", "um") are instructions, not words, and are left out of the allowance on
-    /// both sides: "comma" never pays for "Kynni", whose sound key it shares, and a "comma" the reply keeps as a word is not
-    /// counted against it. Counted against everything dictated, retracted clauses included: what "scratch that" retracts is
-    /// ambiguous ("tell kynni it is at 3, scratch that, at 4"), and a retracted word left in the reply is the retraction
-    /// rule's to judge.
+    /// "question mark", "open quote", "new line", "um") are instructions, not words, and are left out of both counts on both
+    /// sides, in any case: "comma" never pays for "Kynni", whose sound key it shares, whisper's "Question Mark" never pays
+    /// for an added "Mark", and a "comma" the reply keeps as a word is not counted against it. A term with a command or
+    /// hesitation in it ("ER", "ERM", "Comma", "New Line Cinema") is counted with them kept on both sides: left out, that
+    /// word would be on neither side and adding it would never be caught. Counted against everything dictated, retracted
+    /// clauses included: what "scratch that" retracts is ambiguous ("tell kynni it is at 3, scratch that, at 4"), and a
+    /// retracted word left in the reply is the retraction rule's to judge.
     /// Ceilings: a term inserted in other capitals than its own ("Add kynni to the dictionary once.") is not counted. An
     /// everyday word the reply adds at the start of a sentence is counted when it spells a capitalised term ("Will you"), and
     /// so is one whisper wrote in lower case when a grammar fix adds the word again: "will you come tomorrow i see you then"
     /// → "Will you come tomorrow? I will see you then." is rejected, and accepted with whisper's own capitals (a false
-    /// rejection costs polish only). "Sounds like" is a spelling-based sound key whose measure and ceiling are documented at
+    /// rejection costs polish only). Commands are read in any case, so a capitalised word whisper wrote right after
+    /// "question", "full", "new", "open" or "close" with no punctuation between is read as part of the command: {Mark} "I
+    /// have a question Mark can you help" → "I have a question, Mark, can you help?" is rejected, as it already was with
+    /// whisper's lower-case "mark", and accepted with whisper's own commas. Trigger to retire: a wanted reply observed
+    /// rejected that way. "Sounds like" is a spelling-based sound key whose measure and ceiling are documented at
     /// <see cref="ValidatorText.SoundsLike"/>: a real word that sounds like a term ("canny" for "Kynni") passes as its
     /// misspelling, and a mishearing that adds a sound ("kidney") or splits the word ("kin knee") is rejected as an addition
     /// and left to the tidy and the corrections. Each side's forms are counted rather than each reply word paired with the
@@ -187,15 +193,23 @@ public static partial class CleanupValidator
     /// point in the kitchen is broken", a wall socket → "The PowerPoint in the kitchen is broken."), and one paid for by a
     /// sound-alike the reply rewrites ("i'm gonna add a name to the dictionary" → "I'm going to add Kynni to the
     /// dictionary.", {Xero} "put zero on the invoice" → "Put 0 on the Xero invoice."). Trigger to retire those two: a typed
-    /// reply observed adding a term either way.
+    /// reply observed adding a term either way. A command or hesitation the speaker dictated pays for a term spelt like it,
+    /// since they are kept for that term: {ER} "er the patient was seen this morning" → "The patient was seen in the ER this
+    /// morning." and {Comma} "yes comma i agree" → "Yes, Comma, I agree." are accepted. Trigger to retire: a typed reply
+    /// observed turning a dictated command or hesitation into a term.
     /// </summary>
-    private static bool AddsTerm(TermText dictated, TermText reply, IEnumerable<string> terms)
+    private static bool AddsTerm(string raw, string text, IEnumerable<string> terms)
     {
+        var commandsLeftOut = (TermText.Of(raw), TermText.Of(text));
+        (TermText, TermText)? commandsKept = null; // read once, for the first term with a command or hesitation in it
         foreach (var term in terms)
         {
             var whole = TermUnit.Of(Words(MapQuotes(term)).Select(WithoutPossessive).ToList());
             if (whole.Spelt.Count == 0) continue;
             var caseMatters = term.Any(char.IsUpper);
+            var (dictated, reply) = whole.HasCommand
+                ? (commandsKept ??= (TermText.Of(raw, withoutCommands: false), TermText.Of(text, withoutCommands: false)))
+                : commandsLeftOut;
             int? wholeSaid = null; // a part of the term is covered wherever the whole was said in another form; counted when needed
             foreach (var unit in whole.WithParts())
             {
@@ -209,8 +223,8 @@ public static partial class CleanupValidator
 
     /// <summary>
     /// The dictation or the reply as the term rule reads it: its words as written, after the possessive is removed (where a
-    /// term with a capital is counted), and as spoken: lower case, without spoken formatting commands and hesitations (where
-    /// a term without capitals is counted, and every allowance).
+    /// term with a capital is counted), and as spoken: lower case (where a term without capitals is counted, and every
+    /// allowance). Both without spoken formatting commands and hesitations, in any case, unless the term has one in it.
     /// </summary>
     private sealed class TermText
     {
@@ -225,10 +239,11 @@ public static partial class CleanupValidator
             _compared = Comparable(spoken);
         }
 
-        public static TermText Of(string text)
+        public static TermText Of(string text, bool withoutCommands = true)
         {
-            var mapped = MapQuotes(text);
-            return new(Words(mapped).Select(WithoutPossessive).ToList(), Words(WithoutCommands(mapped.ToLowerInvariant())).Select(WithoutPossessive).ToList());
+            var read = MapQuotes(text);
+            if (withoutCommands) read = WithoutCommands(read); // in any case: whisper's "Question Mark" is the command too
+            return new(Words(read).Select(WithoutPossessive).ToList(), Words(read.ToLowerInvariant()).Select(WithoutPossessive).ToList());
         }
 
         /// <summary>How often the text spells the unit: capitals included when the term has any, else in any case.</summary>
@@ -251,6 +266,9 @@ public static partial class CleanupValidator
             var lower = spelt.Select(w => w.ToLowerInvariant()).ToList();
             return new TermUnit(spelt, Comparable(lower), string.Concat(lower).Replace("'", ""));
         }
+
+        /// <summary>The unit has a spoken command or hesitation in it ("ER", "Comma", "New Line Cinema").</summary>
+        public bool HasCommand => string.Join(' ', Spelt) is var words && WithoutCommands(words) != words;
 
         /// <summary>The term, then each content word of a multi-word term on its own.</summary>
         public IEnumerable<TermUnit> WithParts() =>

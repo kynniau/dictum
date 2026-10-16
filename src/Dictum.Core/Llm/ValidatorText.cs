@@ -22,7 +22,7 @@ internal static partial class ValidatorText
     [GeneratedRegex(@"\d+(?:[.,:]\d+)*")]
     private static partial Regex Number();
 
-    [GeneratedRegex(@"\b(?:new line|new paragraph|full stop|question mark|open quote|close quote|scratch that|comma)\b|\b(?:umm?|uhh?|erm?|ah|hmm)\b")]
+    [GeneratedRegex(@"\b(?:new line|new paragraph|full stop|question mark|open quote|close quote|scratch that|comma)\b|\b(?:umm?|uhh?|erm?|ah|hmm)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Command();
 
     /// <summary>Typographic quotes and apostrophes as their plain forms ("Here’s" is "here's").</summary>
@@ -62,8 +62,8 @@ internal static partial class ValidatorText
     public static bool ContainsPhrase(string lower, string phrase) =>
         Regex.IsMatch(lower, $@"(?<![\p{{L}}\p{{N}}']){Regex.Escape(phrase)}(?![\p{{L}}\p{{N}}'])");
 
-    /// <summary>The dictation without spoken formatting commands and hesitations, which a correct reply drops.</summary>
-    public static string WithoutCommands(string lower) => Command().Replace(lower, " ");
+    /// <summary>The text without spoken formatting commands and hesitations (in any case), which a correct reply drops.</summary>
+    public static string WithoutCommands(string text) => Command().Replace(text, " ");
 
     /// <summary>"\n" or "\n\n" when the dictation ends with a spoken "new line" / "new paragraph", else null.</summary>
     public static string? FinalBreak(string lower)
@@ -183,12 +183,16 @@ internal static partial class ValidatorText
     // matches itself. Trigger to retire: a typed reply that swapped a sound-alike word for a term, or a wanted dictionary
     // fix rejected as an addition.
     // The dictionary-term rule built on it (CleanupValidator.AddsTerm) counts a term's forms on each side instead of pairing
-    // each reply word with the dictated word it came from, which adds two ceilings. Real words whose letters spell a term
+    // each reply word with the dictated word it came from, which adds three ceilings. Real words whose letters spell a term
     // pass as its respelling: {PowerPoint} "the power point in the kitchen is broken" (a wall socket) → "The PowerPoint in
     // the kitchen is broken." is accepted; trigger to retire: a typed reply that turned dictated words into a term with
     // another meaning. A sound-alike the reply rewrites pays for an insertion elsewhere: "i'm gonna add a name to the
     // dictionary" → "I'm going to add Kynni to the dictionary." and {Xero} "put zero on the invoice" → "Put 0 on the Xero
-    // invoice." are accepted; trigger to retire: a typed reply that added a term while rewriting a sound-alike of it.
+    // invoice." are accepted; trigger to retire: a typed reply that added a term while rewriting a sound-alike of it. A
+    // term with a spoken command or hesitation in it is counted with those kept, so one the speaker dictated pays for it:
+    // {ER} "er the patient was seen this morning" → "The patient was seen in the ER this morning." and {Comma} "yes comma
+    // i agree" → "Yes, Comma, I agree." are accepted; trigger to retire: a typed reply that turned a dictated command or
+    // hesitation into a term.
     private static string? SoundKey(string word)
     {
         var key = new StringBuilder(word.Length + 1);

@@ -182,6 +182,58 @@ public class DictionaryInsertionValidatorTests
     public void A_spoken_command_is_counted_on_neither_side(string terms, string raw, string reply) =>
         Assert.Null(Reject(raw, reply, terms.Split('|')));
 
+    // Lens on 8e5a28c (16/10/2026): a term spelt like a spoken command or hesitation was left out on both sides, so adding
+    // it was never caught (the fix's probes found the same for that word of a multi-word term). A term with one in it is
+    // counted with them kept.
+    [Theory]
+    [InlineData("ER", "the patient was seen this morning and sent home", "The patient was seen in the ER this morning and sent home.")]
+    [InlineData("ERM", "we need to update the risk register before the audit", "We need to update the ERM risk register before the audit.")]
+    [InlineData("UM", "the students from the university arrive on monday", "The UM students from the university arrive on Monday.")]
+    [InlineData("Comma", "send the invoice to the agency today", "Send the invoice to the Comma agency today.")]
+    [InlineData("ER", "she went to the er last night", "She went to the ER last night and the ER sent them home.")] // said once, added once
+    [InlineData("ER Department", "go to the department now", "Go to the ER Department now.")]
+    [InlineData("New Line Cinema", "send it to cinema today", "Send it to New Line Cinema today.")]
+    public void A_term_spelt_like_a_spoken_command_is_counted(string term, string raw, string reply) =>
+        Assert.Equal(Added, Reject(raw, reply, [term]));
+
+    // Lens on 8e5a28c (16/10/2026): whisper writes some commands in capitals ("Question Mark"), and the capitalised word
+    // paid for an added term spelt like it. Commands are left out in any case.
+    [Theory]
+    [InlineData("Mark", "can you send the report today Question Mark", "Mark, can you send the report today?")]
+    [InlineData("Stop", "please hold the payment Full Stop", "Please hold the payment. Stop.")]
+    [InlineData("Line", "thanks for the update New Line regards", "Thanks for the update, Line.\nRegards")]
+    [InlineData("Paragraph", "thanks for that New Paragraph see you soon", "Thanks for that.\n\nParagraph, see you soon.")]
+    [InlineData("Quote", "she said Open Quote send it today Close Quote", "Quote said \"send it today\".")]
+    public void A_spoken_command_in_capitals_does_not_pay_for_an_added_term(string term, string raw, string reply) =>
+        Assert.Equal(Added, Reject(raw, reply, [term]));
+
+    // The documented cost of reading commands in any case: a word whisper capitalised right after "question" or "full", with
+    // no punctuation between, is read as the command, so a reply that punctuates them adds that word (as it already did when
+    // whisper wrote it in lower case). With whisper's own punctuation the same reply is accepted.
+    [Theory]
+    [InlineData("Mark", "I have a question Mark can you help", "I have a question, Mark, can you help?", Added)]
+    [InlineData("Mark", "I have a question, Mark, can you help?", "I have a question, Mark, can you help?", null)]
+    [InlineData("Stop", "The tank is full Stop the pump", "The tank is full. Stop the pump.", Added)]
+    [InlineData("Stop", "The tank is full. Stop the pump.", "The tank is full. Stop the pump.", null)]
+    public void A_capitalised_word_after_a_command_word_needs_whisper_punctuation(string term, string raw, string reply, string? rejection) =>
+        Assert.Equal(rejection, Reject(raw, reply, [term]));
+
+    // Saying such a term still pays for it, and so does saying a term beside whisper's capitalised command.
+    [Theory]
+    [InlineData("Comma", "the comma agency called", "The Comma agency called.")]
+    [InlineData("ER", "she went to the er last night", "She went to the ER last night.")]
+    [InlineData("New Line Cinema", "send it to new line cinema today", "Send it to New Line Cinema today.")]
+    [InlineData("Mark", "Mark is it done Question Mark", "Mark, is it done?")]
+    public void A_term_spelt_like_a_spoken_command_is_accepted_when_said(string term, string raw, string reply) =>
+        Assert.Null(Reject(raw, reply, [term]));
+
+    // The documented cost of keeping commands and hesitations for such a term: one the speaker dictated pays for it.
+    [Theory]
+    [InlineData("ER", "er the patient was seen this morning", "The patient was seen in the ER this morning.")]
+    [InlineData("Comma", "yes comma i agree", "Yes, Comma, I agree.")]
+    public void A_dictated_command_or_hesitation_pays_for_a_term_spelt_like_it(string term, string raw, string reply) =>
+        Assert.Null(Reject(raw, reply, [term]));
+
     // Respellings that join or split words (lens, 16/10/2026: rejected on ad38c63, accepted before the rule existed).
     [Theory]
     [InlineData("PayPal", "Pay the invoice with pay pal before Friday.", "Pay the invoice with PayPal before Friday.")] // bench: all three models
