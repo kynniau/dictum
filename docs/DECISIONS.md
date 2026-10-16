@@ -2155,8 +2155,8 @@ Strings, PROPOSED in code comments for the product owner (17/10/2026):
 **Verification** (17/10/2026, this machine). Release `--no-incremental` builds, 0 warnings, 0 errors. Filtered suite
 (`FullyQualifiedName!~Install_copies_models`): fa73e02, run first, 1,348 total, 1,327 passed, 21 skipped, 0 failed (the
 numbers recorded above); the code and pins (26a727d) 1,368 / 1,347 / 21 / 0 (the 21 skips are the gated integration
-tests and the desktop ones, none of the junction or volume-name pins); the head (the docs and the `--download-model`
-error text on top, after the mutation checks) 1,368 total, 1,347 passed, 21 skipped, 0 failed. The two counters (the
+tests and the desktop ones, none of the junction or volume-name pins); the head (the docs, the `--download-model` error
+text and one doc comment on top, after the mutation checks) 1,368 total, 1,347 passed, 21 skipped, 0 failed. The two counters (the
 `ModelFolders.Locate` one of item 4 and the `PathRegistry.FinalPath` one below) were temporary instrumentation, never
 committed. Not run: the built app (`Dictum.exe`), a real network share, a subst drive, a volume mounted in a folder, a
 package, `--download-model` against the network.

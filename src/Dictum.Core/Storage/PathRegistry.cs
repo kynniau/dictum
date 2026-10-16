@@ -161,7 +161,8 @@ public static class PathRegistry
     /// True for a path in the device namespace that <see cref="FinalPath"/> cannot see through (re-lens, 17/10/2026: through
     /// \\?\Volume{GUID}\ a models.folder named the bundled folder by a name that no comparison took for it, and the bundled
     /// base.en was deleted): one that starts with \\?\, \\.\ or \??\ (either slash) other than \\?\X:\ and \\?\UNC\, the two
-    /// forms <see cref="Plain"/> unwraps. The settings load refuses such a models.folder (SettingsLoader).
+    /// forms <see cref="Plain"/> unwraps (it unwraps them behind \\.\ too; those are refused all the same, so only the
+    /// \\?\ forms are taken). The settings load refuses such a models.folder (SettingsLoader).
     /// </summary>
     internal static bool IsUnsupportedDevicePath(string path)
     {
