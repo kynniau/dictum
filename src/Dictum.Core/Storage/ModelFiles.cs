@@ -60,7 +60,7 @@ public static class ModelFiles
 
     /// <summary>
     /// Deletes one catalogue model: the file, its .part and its verified record. Refuses a file that came with Dictum (in the
-    /// bundled folder by any name: <see cref="AppPaths.IsBundled"/>), a path outside the models folders, a file the catalogue
+    /// bundled folder, also by a name <see cref="AppPaths.IsBundled"/> sees through), a path outside the models folders, a file the catalogue
     /// does not know, and the model in use (<paramref name="inUse"/>).
     /// </summary>
     public static ModelDeletion Delete(string path, AppPaths paths, AppSettings settings, IEnumerable<string?> inUse, ModelIntegrity integrity)

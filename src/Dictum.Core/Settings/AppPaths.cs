@@ -56,7 +56,7 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
 
     /// <summary>
     /// models.folder, else its earlier name whisper.models_dir; null when neither is set. A folder that is the bundled one or
-    /// inside it, by any name (<see cref="IsBundled"/>), is never used (null): that folder is never written, so no download can
+    /// inside it, by a name <see cref="IsBundled"/> sees through, is never used (null): that folder is never written, so no download can
     /// land there, and the settings load logs that it is ignored (ConfigLoader).
     /// </summary>
     public string? ChosenModelsDir(AppSettings settings) =>
@@ -64,7 +64,9 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
 
     /// <summary>
     /// True for <see cref="BundledModelsDir"/> and any folder or file inside it, also by another name for it: a junction or
-    /// symbolic link, an 8.3 short name, a \\?\ prefix (<see cref="Storage.PathRegistry.FinalPath"/>; lens, 17/10/2026).
+    /// symbolic link, an 8.3 short name, a \\?\C:\ prefix (<see cref="Storage.PathRegistry.FinalPath"/>; lens, 17/10/2026). Not a
+    /// subst drive or a mounted volume, and a \\?\Volume{...} or other device path is refused where models.folder is read
+    /// (<see cref="Storage.PathRegistry.IsUnsupportedDevicePath"/>).
     /// </summary>
     public bool IsBundled(string path) =>
         Within(path, BundledModelsDir) || Within(Storage.PathRegistry.FinalPath(path), Storage.PathRegistry.FinalPath(BundledModelsDir));

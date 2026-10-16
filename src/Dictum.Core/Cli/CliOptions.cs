@@ -19,7 +19,7 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
           Dictum.exe --selftest                       load the models, report their runtimes, list
                                                        microphones, the data folders and the .env keys (never their
                                                        values), give you 5 s to press the hotkey; exit 0/1
-          Dictum.exe --download-model <name>          download a model (e.g. base.en) to the models folder with
+          Dictum.exe --download-model <name>          download a model (e.g. small.en) to the models folder with
                                                        a progress line; exit 0/1
           Dictum.exe --download-cleanup-model <name>  download a cleanup model (e.g. qwen2.5-1.5b) the same way
           Dictum.exe --bench-cleanup <file.txt|file.wav>

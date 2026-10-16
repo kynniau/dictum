@@ -15,8 +15,11 @@ namespace Dictum.Tests;
 /// The lens on PR #11 (17/10/2026), its findings fixed and pinned: a chosen models folder that other users may share (its files
 /// hashed again in each session, and "Delete all app data" leaving it alone), the bundled base.en as the replacement for a model
 /// in use, a seeded clean-up provider kept at first run, the bundled folder by another name, the advice for a damaged file in
-/// each folder, one lookup for calibration and the command line, and Settings > Models' lookups. Model files of the catalogue's
-/// size are made with SetLength (zeros), so a SHA-256 check of one fails unless a record says it passed.
+/// each folder, one lookup for calibration and the command line, and Settings > Models' lookups. The re-lens on fa73e02
+/// (17/10/2026) adds the bundled folder by its volume name, a replacement the tray app's lookup would load, a copy of the model
+/// in use deleted when another is next, a junction out of or into the profile, the models page's lookups with a model loaded, and
+/// --bench-cleanup's lookup. Model files of the catalogue's size are made with SetLength (zeros), so a SHA-256 check of one
+/// fails unless a record says it passed.
 /// </summary>
 public sealed class ModelFolderSafetyTests
 {
@@ -57,6 +60,30 @@ public sealed class ModelFolderSafetyTests
         process.StandardError.ReadToEnd();
         process.WaitForExit(10_000);
         return Directory.Exists(link) && new DirectoryInfo(link).Attributes.HasFlag(FileAttributes.ReparsePoint);
+    }
+
+    private const string NoVolumeName = "mountvol could not give this machine's temporary drive a volume name, so a volume-name path cannot be tested here.";
+
+    /// <summary>
+    /// <paramref name="folder"/> by its volume name (\\?\Volume{GUID}\...), as mountvol prints the drive's: the same folder, which no
+    /// comparison took for it; null when this machine gives the drive none.
+    /// </summary>
+    private static string? ByVolumeName(string folder)
+    {
+        if (SystemPrograms.Find(SystemPrograms.Root, @"System32\mountvol.exe") is not { } mountvol) return null;
+        var root = Path.GetPathRoot(folder)!;
+        using var process = Process.Start(new ProcessStartInfo(mountvol, $"{root} /L")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        })!;
+        var volume = process.StandardOutput.ReadToEnd().Trim();
+        process.StandardError.ReadToEnd();
+        process.WaitForExit(10_000);
+        var alias = volume + folder[root.Length..];
+        return volume.StartsWith(@"\\?\Volume{", StringComparison.Ordinal) && Directory.Exists(alias) ? alias : null;
     }
 
     private static async Task<bool> Eventually(Func<bool> condition)
@@ -159,6 +186,38 @@ public sealed class ModelFolderSafetyTests
         }
     });
 
+    /// <summary>
+    /// Pin (re-lens probe R12): InProfile follows links. A chosen folder that is a junction inside the profile pointing out of it
+    /// counts as outside (its models are shared: "Delete all app data" leaves them alone), and one outside the profile pointing
+    /// into it as inside (emptied, as before): the category follows where the files are, not what the folder is called.
+    /// </summary>
+    [Fact]
+    public void A_chosen_folder_reached_through_a_junction_is_inside_or_outside_the_profile_by_where_its_files_are()
+    {
+        using var scratch = new Scratch();
+        var profile = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "profile")).FullName;
+        var outside = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "outside")).FullName;
+        var inside = Directory.CreateDirectory(Path.Combine(profile, "models-here")).FullName;
+        var paths = scratch.Paths with { ProfileDir = profile };
+        var (toOutside, toInside) = (Path.Combine(profile, "to-outside"), Path.Combine(scratch.Root.FullName, "to-inside"));
+        try
+        {
+            if (!Junction(toOutside, outside) || !Junction(toInside, inside)) Assert.Skip(NoJunction);
+            Assert.False(paths.InProfile(toOutside)); // inside the profile by its name, outside it by its files
+            Assert.True(paths.InProfile(toInside)); // outside the profile by its name, inside it by its files
+            Assert.Equal(DataCategory.SharedModels, Category(toOutside));
+            Assert.Equal(DataCategory.Models, Category(toInside));
+        }
+        finally
+        {
+            foreach (var link in new[] { toOutside, toInside }) if (Directory.Exists(link)) Directory.Delete(link); // the link only
+        }
+
+        DataCategory Category(string chosen) =>
+            PathRegistry.Locations(paths, new AppSettings { Models = new ModelsSettings { Folder = chosen } })
+                .Single(l => l.Pattern == ModelFiles.Pattern && PathRegistry.SamePath(l.Path, chosen)).Category;
+    }
+
     // ---- 2. The bundled base.en replaces a model in use ----
 
     /// <summary>Pin (lens probe P2, inverted): deleting the model in use offers the bundled base.en, switches to it, and never deletes it.</summary>
@@ -188,27 +247,165 @@ public sealed class ModelFolderSafetyTests
         Assert.False(tinyLeft);
     }
 
-    /// <summary>Pin: two copies of one model (the user's and the bundled one) never make the second the first's replacement.</summary>
-    [Fact]
-    public async Task A_second_copy_of_the_model_in_use_is_never_its_replacement()
+    /// <summary>
+    /// Pin (re-lens F3, inverted from "a second copy of the model in use is never its replacement", which still holds: no model
+    /// is switched to): a downloaded copy of the model in use, the copy that came with Dictum next in the lookup, is deleted
+    /// after a question of its own. The model is released, the file deleted and the settings reloaded, so Dictum goes on with
+    /// the bundled copy. When that copy fails its SHA-256 the tray app's lookup would pass over it, there is nothing to go on
+    /// with, and the model in use cannot be deleted, as before.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_downloaded_copy_of_the_model_in_use_is_deleted_when_the_copy_that_came_with_Dictum_is_next(bool bundledPasses)
     {
-        var (said, asked, bothLeft) = await UiSession.RunAsync(async () =>
+        var (said, asked, model, loaded, ownLeft, bundledLeft, own, bundled) = await UiSession.RunAsync(async () =>
         {
             using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
             var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
             var own = Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes); // found first
+            if (bundledPasses) new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled); // as if hashed once already
             var models = FakeModels();
             var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
             shell.Reload(userRequested: false);
             Assert.Equal(own, models.ModelPath);
+            dialogs.Answers.Enqueue(0); // Delete
             var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en"));
-            var result = (said, dialogs.Asked.Count, File.Exists(own) && File.Exists(bundled));
+            var result = (said, dialogs.Asked.ToList(), shell.Settings.Whisper.Model, models.ModelPath, File.Exists(own), File.Exists(bundled), own, bundled);
             shell.Dispose();
             return result;
         });
-        Assert.Equal("base.en is in use and no other model is downloaded. Download or choose another model first.", said);
-        Assert.Equal(0, asked); // no "switch to base.en" for base.en
-        Assert.True(bothLeft);
+        Assert.Equal("base.en", model); // whisper.model untouched: no other model was switched to
+        Assert.True(bundledLeft); // never deleted
+        if (bundledPasses)
+        {
+            Assert.Equal([("Delete a model", "Delete this copy of base.en (147 MB)? Dictum then uses the copy that came with it.")], asked);
+            Assert.Equal("Deleted ggml-base.en.bin (147 MB freed).", said);
+            Assert.False(ownLeft);
+            Assert.Equal(bundled, loaded); // the reload loaded the copy that came with Dictum
+        }
+        else
+        {
+            Assert.Equal("base.en is in use and no other model is downloaded. Download or choose another model first.", said);
+            Assert.Empty(asked);
+            Assert.True(ownLeft);
+            Assert.Equal(own, loaded);
+        }
+    }
+
+    /// <summary>
+    /// Pin: the same when the next copy is in another of Dictum's folders (the chosen folder's copy in use, the per-user one next):
+    /// the question names that folder instead of "the copy that came with it".
+    /// </summary>
+    [Fact]
+    public async Task A_copy_in_the_chosen_folder_is_deleted_when_the_per_user_copy_is_next()
+    {
+        var (said, asked, loaded, chosenLeft, ownLeft, own, ownFolder) = await UiSession.RunAsync(async () =>
+        {
+            using var scratch = new Scratch();
+            var chosenFolder = Path.Combine(scratch.Root.FullName, "E-drive models");
+            File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = "base.en" }, llm = new { provider = "none" }, models = new { folder = chosenFolder } }));
+            var chosen = Create(chosenFolder, "ggml-base.en.bin", BaseEnBytes); // found first
+            var own = Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes);
+            var models = FakeModels();
+            var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
+            shell.Reload(userRequested: false);
+            Assert.Equal(chosen, models.ModelPath);
+            dialogs.Answers.Enqueue(0); // Delete
+            var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en" && m.Folder == ModelFolderKind.Chosen));
+            var result = (said, dialogs.Asked.ToList(), models.ModelPath, File.Exists(chosen), File.Exists(own), own, scratch.Paths.DefaultModelsDir);
+            shell.Dispose();
+            return result;
+        });
+        Assert.Equal([("Delete a model", $"Delete this copy of base.en (147 MB)? Dictum then uses the other copy, in {ownFolder}.")], asked);
+        Assert.Equal("Deleted ggml-base.en.bin (147 MB freed).", said);
+        Assert.False(chosenLeft);
+        Assert.True(ownLeft);
+        Assert.Equal(own, loaded);
+    }
+
+    /// <summary>
+    /// Pin: when the copy in use cannot be deleted (a read-only file: Windows refuses), the model that was released is loaded
+    /// again, whatever happens to the file, so dictation is never left without a model.
+    /// </summary>
+    [Fact]
+    public async Task A_copy_in_use_that_cannot_be_deleted_leaves_its_model_loaded_again()
+    {
+        var (loaded, own, ownLeft) = await UiSession.RunAsync(async () =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
+            var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
+            var own = Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes);
+            new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled); // the copy that came with Dictum is next
+            var models = FakeModels();
+            var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
+            shell.Reload(userRequested: false);
+            File.SetAttributes(own, FileAttributes.ReadOnly); // Windows refuses to delete a read-only file
+            try
+            {
+                dialogs.Answers.Enqueue(0); // Delete
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() => shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en")));
+                return (models.ModelPath, own, File.Exists(own));
+            }
+            finally
+            {
+                File.SetAttributes(own, FileAttributes.Normal);
+                shell.Dispose();
+            }
+        });
+        Assert.True(ownLeft);
+        Assert.Equal(own, loaded); // released for the deletion, loaded again when it failed
+    }
+
+    /// <summary>
+    /// Pin (re-lens probe R13, inverted): a bundled base.en that fails its SHA-256 is not offered as the replacement. The tray
+    /// app's lookup passes over it (Storage shows base.en as not on this PC), so switching to it would leave whisper.model naming
+    /// a file that is not loaded; with nothing else downloaded, the model in use cannot be deleted and nothing is asked.
+    /// </summary>
+    [Fact]
+    public async Task A_bundled_base_en_that_fails_its_check_is_not_offered_as_the_replacement()
+    {
+        var (said, asked, model, tinyLeft, onThisPc) = await UiSession.RunAsync(async () =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en" }, "llm": { "provider": "none" } }""");
+            Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes); // zeros, no record: fails the SHA-256
+            var tiny = Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
+            new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(tiny);
+            var (shell, _, dialogs) = scratch.Shell(FakeModels(), downloadHandler: new CountingHandler());
+            shell.Reload(userRequested: false);
+            var onThisPc = shell.Models.IsDownloaded(ModelCatalog.Find("base.en")!);
+            var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "tiny.en"));
+            var result = (said, dialogs.Asked.ToList(), shell.Settings.Whisper.Model, File.Exists(tiny), onThisPc);
+            shell.Dispose();
+            return result;
+        });
+        Assert.False(onThisPc); // the tray app passes the failing bundled base.en over
+        Assert.Equal("tiny.en is in use and no other model is downloaded. Download or choose another model first.", said);
+        Assert.Empty(asked); // so it is not offered
+        Assert.Equal("tiny.en", model);
+        Assert.True(tinyLeft);
+    }
+
+    /// <summary>Pin: the same for a clean-up model whose file the tray app's lookup passes over (here the wrong size): it is not offered as the replacement.</summary>
+    [Fact]
+    public async Task A_cleanup_model_the_lookup_would_not_load_is_not_offered_as_the_replacement()
+    {
+        var (said, asked, inUseLeft) = await UiSession.RunAsync(async () =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "local", "model": "qwen2.5-1.5b" } }""");
+            var (shell, _, dialogs) = scratch.Shell(FakeModels(), downloadHandler: new CountingHandler());
+            shell.Reload(userRequested: false); // before the files exist, so no clean-up model is loaded
+            var inUse = CleanupCatalog.Find("qwen2.5-1.5b")!;
+            var inUseFile = Create(scratch.Paths.DefaultModelsDir, inUse.FileName, inUse.Bytes);
+            Create(scratch.Paths.DefaultModelsDir, CleanupCatalog.Find("qwen2.5-0.5b")!.FileName, 10); // the wrong size: the lookup passes over it
+            var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "qwen2.5-1.5b"));
+            var result = (said, dialogs.Asked.ToList(), File.Exists(inUseFile));
+            shell.Dispose();
+            return result;
+        });
+        Assert.Equal("qwen2.5-1.5b is in use and no other model is downloaded. Download or choose another model first.", said);
+        Assert.Empty(asked);
+        Assert.True(inUseLeft);
     }
 
     // ---- 3. A seeded clean-up provider ----
@@ -280,6 +477,64 @@ public sealed class ModelFolderSafetyTests
         {
             if (Directory.Exists(alias)) Directory.Delete(alias); // the link only, never what it points to
         }
+    }
+
+    /// <summary>
+    /// Pin (re-lens probe R9, inverted): the bundled folder by its volume name (\\?\Volume{GUID}\...) can not be the chosen folder. No
+    /// comparison took that name for the bundled folder, so models.folder was accepted, --print-models-dir printed the bundled
+    /// folder, Storage listed its base.en with a Delete, and ModelFiles.Delete deleted it. The settings load refuses the value
+    /// with the usual warning, and the per-user folder is used.
+    /// </summary>
+    [Fact]
+    public void The_bundled_folder_by_its_volume_name_is_refused_as_the_chosen_folder_and_nothing_in_it_is_deleted()
+    {
+        using var scratch = new Scratch();
+        var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", 10);
+        var alias = ByVolumeName(scratch.Paths.BundledModelsDir) ?? "";
+        if (alias.Length == 0) Assert.Skip(NoVolumeName);
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { models = new { folder = alias } }));
+
+        var load = SettingsLoader.LoadFile(scratch.Paths.SettingsFile);
+        var warning = Assert.Single(load.Warnings);
+        Assert.Contains("models.folder", warning, StringComparison.Ordinal);
+        Assert.Contains("expected an absolute folder path", warning, StringComparison.Ordinal);
+        Assert.Null(load.Settings.Models.Folder);
+        Assert.Equal(scratch.Paths.DefaultModelsDir, scratch.Paths.ModelsDir(load.Settings)); // no download lands in the bundled folder
+        using var printed = new StringWriter();
+        Assert.Equal(0, CliCommands.PrintModelsDir(scratch.Paths, printed, TextWriter.Null));
+        Assert.Equal(scratch.Paths.DefaultModelsDir, printed.ToString().Trim()); // not the bundled folder
+        Assert.DoesNotContain(ModelFiles.List(scratch.Paths, load.Settings), m => m.Name == "base.en"); // Storage offers no Delete
+        foreach (var scope in new[] { RemovalScope.AllData, RemovalScope.Everything })
+            Assert.DoesNotContain(RemovalPlan.Build(scratch.Paths, load.Settings, scope).Items, i => i.Path.EndsWith("ggml-base.en.bin", StringComparison.OrdinalIgnoreCase));
+        Assert.True(File.Exists(bundled)); // the file that came with Dictum is still there
+    }
+
+    /// <summary>
+    /// Pin (re-lens): models.folder and its earlier name whisper.models_dir take a device path only as \\?\X:\ or \\?\UNC\, the two
+    /// forms PathRegistry.FinalPath unwraps; every other (a volume or GLOBALROOT name, \\.\, \??\, either slash, a bare
+    /// drive) is refused with the usual warning and the default folder is used.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\\?\C:\Dictum models", true)]
+    [InlineData(@"\\?\c:\Dictum models", true)]
+    [InlineData(@"\\?\UNC\fileserver\dictum\models", true)]
+    [InlineData(@"\\?\unc\fileserver\dictum\models", true)]
+    [InlineData(@"\\?\Volume{00000000-0000-0000-0000-000000000000}\Dictum models", false)]
+    [InlineData(@"\\?\GLOBALROOT\Device\HarddiskVolume3\Dictum models", false)]
+    [InlineData(@"\\.\C:\Dictum models", false)]
+    [InlineData(@"\\.\Volume{00000000-0000-0000-0000-000000000000}\Dictum models", false)]
+    [InlineData(@"\??\C:\Dictum models", false)]
+    [InlineData("//?/C:/Dictum models", false)]
+    [InlineData("//?/Volume{00000000-0000-0000-0000-000000000000}/Dictum models", false)]
+    [InlineData(@"\\?\C:", false)]
+    public void A_device_path_is_taken_as_the_models_folder_only_as_a_drive_or_a_share(string folder, bool taken)
+    {
+        var load = SettingsLoader.Parse(JsonSerializer.Serialize(new { models = new { folder } }));
+        var earlier = SettingsLoader.Parse(JsonSerializer.Serialize(new { whisper = new { models_dir = folder } }));
+        Assert.Equal(taken ? folder : null, load.Settings.Models.Folder);
+        Assert.Equal(taken ? folder : null, earlier.Settings.Whisper.ModelsDir);
+        Assert.Equal(taken ? 0 : 1, load.Warnings.Count);
+        Assert.Equal(taken ? 0 : 1, earlier.Warnings.Count);
     }
 
     /// <summary>
@@ -404,11 +659,34 @@ public sealed class ModelFolderSafetyTests
         Assert.False(Directory.Exists(scratch.Paths.DefaultModelsDir) && Directory.EnumerateFiles(scratch.Paths.DefaultModelsDir).Any()); // no second copy, not even a .part
     }
 
+    /// <summary>
+    /// Pin: --bench-cleanup finds a clean-up model through the app's lookup (chosen, per-user, bundled), not in the download
+    /// folder alone: with another folder chosen, a model in the per-user folder is run (here its SHA-256 fails, which is logged)
+    /// instead of being skipped as "not downloaded".
+    /// </summary>
+    [Fact]
+    public async Task Bench_cleanup_looks_in_every_model_folder_not_only_the_download_folder()
+    {
+        using var scratch = new Scratch();
+        var chosen = Path.Combine(scratch.Root.FullName, "E-drive models");
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { llm = new { provider = "local", model = "qwen2.5-1.5b" }, models = new { folder = chosen } }));
+        var small = CleanupCatalog.Find("qwen2.5-0.5b")!;
+        Create(scratch.Paths.DefaultModelsDir, small.FileName, small.Bytes); // zeros: found by its size, then refused by its SHA-256
+        var input = Path.Combine(scratch.Root.FullName, "input.txt");
+        File.WriteAllText(input, "um so this is a short test");
+        var log = new RecordingLog();
+        var options = CliOptions.Parse(["--bench-cleanup", input]).Options!;
+        Assert.Equal(0, await BenchCleanupCommand.RunAsync(options, scratch.Paths, log, new SecretRedactor()));
+        Assert.Contains(log.Lines, l => l.Level == LogLevel.Error && l.Message.StartsWith(small.FileName + ": SHA-256 ", StringComparison.Ordinal));
+    }
+
     // ---- 8. Settings > Models' lookups ----
 
     /// <summary>
     /// Pin: Settings > Models looks the catalogue up again only after a settings load, a download that ended, a deletion, or when
-    /// it is shown again; a download's progress ticks (every open page redraws on each) make no lookup.
+    /// it is shown again; a download's progress ticks (every open page redraws on each) make no lookup, with a model loaded not
+    /// even the model in use's own (re-lens F4: the language note used to resolve it through the folders on every tick). The
+    /// coordinator counts every way it reaches the folders, ModelPath included.
     /// </summary>
     [Fact]
     public async Task The_models_page_looks_the_catalogue_up_only_after_a_load_a_download_or_a_deletion()
@@ -419,8 +697,10 @@ public sealed class ModelFolderSafetyTests
             using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
             Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes);
             Create(scratch.Paths.DefaultModelsDir, "ggml-small.en.bin", 10); // a model to delete
-            var (shell, _, dialogs) = scratch.Shell(FakeModels(), downloadHandler: new CountingHandler());
+            var models = FakeModels();
+            var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
             shell.Reload(userRequested: false);
+            Assert.NotNull(models.ModelPath); // a model is loaded: a redraw reads it from memory
             var window = new SettingsWindow(shell);
             window.Show();
             window.ShowPage("Models");

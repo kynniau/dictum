@@ -46,11 +46,17 @@ public static class ModelFolders
     /// Replaces the size check for a file in the bundled folder (the tray app's: size and SHA-256, said once in the log when it
     /// fails); null: the size check, as for the other folders.
     /// </param>
-    public static (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppPaths paths, AppSettings settings, Func<string, bool>? bundledCheck = null)
+    /// <param name="except">
+    /// A file to pass over as if it were not there: finds the copy that would be used once this one is deleted (re-lens,
+    /// 17/10/2026: deleting a downloaded copy of the model in use, the one that came with Dictum being the next).
+    /// </param>
+    public static (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppPaths paths, AppSettings settings, Func<string, bool>? bundledCheck = null,
+        string? except = null)
     {
         foreach (var folder in LookupOrder(paths, settings))
         {
             var path = Path.Combine(folder.Path, fileName);
+            if (except is not null && Storage.PathRegistry.SamePath(path, except)) continue;
             var file = new FileInfo(path);
             if (!file.Exists) continue;
             // simplification: in the chosen and per-user folders only the size is checked here; the SHA-256 comes at load, as

@@ -126,9 +126,11 @@ public static class PathRegistry
     /// The parts that do not exist are kept as written.
     /// </summary>
     // simplification: links are followed only on this PC's own drives (on a network folder each step would be a round trip to
-    // the server), and a drive letter made with subst is not followed (that needs a native call, which this assembly does not
-    // make: ArchitectureTests). Ceiling: a subst drive, or a share that points back at a folder on this PC, is not seen as the
-    // folder it names. Trigger to retire: a report of either; then ask the platform for the final path (GetFinalPathNameByHandle).
+    // the server), and a drive letter made with subst, or a volume mounted in a folder, is not followed (that needs a native
+    // call, which this assembly does not make: ArchitectureTests). Ceiling: a subst drive, a mounted volume, or a share that
+    // points back at a folder on this PC is not seen as the folder it names (a \\?\Volume{...} name for a folder is refused
+    // where models.folder is read: SettingsLoader). Trigger to retire: a report of any of them; then ask the platform for the
+    // final path (GetFinalPathNameByHandle).
     public static string FinalPath(string path) => FinalPath(path, 0);
 
     private static string FinalPath(string path, int depth)
@@ -153,6 +155,21 @@ public static class PathRegistry
             if (target is not null) return FinalPath(Path.Combine([target.FullName, .. parts[(i + 1)..]]), depth + 1);
         }
         return current;
+    }
+
+    /// <summary>
+    /// True for a path in the device namespace that <see cref="FinalPath"/> cannot see through (re-lens, 17/10/2026: through
+    /// \\?\Volume{GUID}\ a models.folder named the bundled folder by a name that no comparison took for it, and the bundled
+    /// base.en was deleted): one that starts with \\?\, \\.\ or \??\ (either slash) other than \\?\X:\ and \\?\UNC\, the two
+    /// forms <see cref="Plain"/> unwraps. The settings load refuses such a models.folder (SettingsLoader).
+    /// </summary>
+    internal static bool IsUnsupportedDevicePath(string path)
+    {
+        var slashes = path.Replace('/', '\\'); // //?/ and //./ are device paths too; only the backslash forms below are unwrapped
+        if (!(slashes.StartsWith(@"\\?\", StringComparison.Ordinal) || slashes.StartsWith(@"\\.\", StringComparison.Ordinal) || slashes.StartsWith(@"\??\", StringComparison.Ordinal)))
+            return false;
+        var drive = path.Length >= 7 && path.StartsWith(@"\\?\", StringComparison.Ordinal) && char.IsAsciiLetter(path[4]) && path[5] == ':' && path[6] == '\\';
+        return !drive && !path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Full (8.3 short names expanded), without a \\?\ or \\.\ prefix before a drive or UNC path and without a trailing separator.</summary>

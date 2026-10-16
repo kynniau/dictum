@@ -142,7 +142,8 @@ internal sealed class ModelsPage : SettingsPage
         for (var i = 0; i < Languages.Count && languageIndex < 0; i++) if (Languages[i].Code == s.Whisper.Language) languageIndex = i;
         _language.SelectedIndex = languageIndex;
         Ui.SetQuietly(_translate, s.Whisper.Translate);
-        _languageNote.Text = WhisperLanguages.Problem(Shell.Models.ModelPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
+        // Judged against the model in use, which a redraw reads from memory (a progress tick looks in no folder; re-lens, 17/10/2026).
+        _languageNote.Text = WhisperLanguages.Problem(Shell.Models.CurrentPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
         _languageNote.IsVisible = _languageNote.Text.Length > 0;
         var folder = Shell.ModelsDir;
         _folder.Text = Shell.RealPath(folder);
@@ -181,7 +182,7 @@ internal sealed class ModelsPage : SettingsPage
                 inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.Select(e.Name))));
         }
         if (ModelCatalog.Find(Shell.Models.CurrentName) is null)
-            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.ModelPath}", null, () => { }));
+            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.CurrentPath}", null, () => { }));
 
         _cleanup.Children.Clear();
         var current = s.Llm.Provider == LlmSettings.Local ? CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model : null;

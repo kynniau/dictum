@@ -66,9 +66,23 @@ public sealed class ModelCoordinator(
     private string WithSpaceWarning(string note, long? bytes) =>
         bytes is long b && Storage.DiskSpace.DownloadWarning(paths.ModelsDir(settings()), b, _freeBytes) is { } warning ? $"{note}. {warning}" : note;
 
-    public string ModelPath => SettingsFile.EffectiveModelPath(settings(), paths, environment, _launchOverride, BundledCheck);
+    /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
+    public string ModelPath
+    {
+        get
+        {
+            Interlocked.Increment(ref _lookups); // a name is looked up in up to three folders; a path or the environment names the file at no cost, counted all the same
+            return SettingsFile.EffectiveModelPath(settings(), paths, environment, _launchOverride, BundledCheck);
+        }
+    }
 
-    public string CurrentName => ModelCatalog.DisplayName(models.ModelPath ?? ModelPath);
+    /// <summary>
+    /// The speech model file in use: the one loaded or loading, else <see cref="ModelPath"/>. What a page that redraws on every
+    /// progress tick asks (re-lens, 17/10/2026): with a model loaded it looks in no folder.
+    /// </summary>
+    public string CurrentPath => models.ModelPath ?? ModelPath;
+
+    public string CurrentName => ModelCatalog.DisplayName(CurrentPath);
 
     /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, or the cloud provider.</summary>
     public string CurrentCleanupName => settings().Llm.Provider switch
@@ -89,18 +103,24 @@ public sealed class ModelCoordinator(
     /// <summary>The file the model is used from (the first in the lookup order that passes), or null when it is not on this PC.</summary>
     public string? Find(ModelInfo info) => Locate(info.FileName, info.Bytes)?.Path;
 
+    /// <summary>
+    /// The copy that would be used if <paramref name="gone"/> were deleted: the next file named <paramref name="fileName"/> in the
+    /// lookup order that passes (the bundled one held to its SHA-256, as for every lookup), with the folder it is in; null when none.
+    /// </summary>
+    public (string Path, ModelFolderKind Kind)? FindBesides(string fileName, long? bytes, string gone) => Locate(fileName, bytes, except: gone);
+
     private int _lookups;
 
-    /// <summary>How many catalogue lookups this coordinator has made (each reads up to three folders): tests count them.</summary>
+    /// <summary>How many folder lookups this coordinator has made (each reads up to three folders, a name resolved by <see cref="ModelPath"/> included): tests count them.</summary>
     internal int Lookups => Volatile.Read(ref _lookups);
 
     /// <summary>How many downloads have ended (arrived, failed or cancelled): Settings > Models looks the catalogue up again after one.</summary>
     public int DownloadsEnded => _downloads.Ended;
 
-    private (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppSettings? lookIn = null)
+    private (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppSettings? lookIn = null, string? except = null)
     {
         Interlocked.Increment(ref _lookups);
-        return ModelFolders.Locate(fileName, bytes, paths, lookIn ?? settings(), BundledCheck);
+        return ModelFolders.Locate(fileName, bytes, paths, lookIn ?? settings(), BundledCheck, except);
     }
 
     /// <summary>The full catalogue check for a file in the bundled folder, when there is an integrity record to check with.</summary>

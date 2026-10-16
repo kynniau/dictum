@@ -121,9 +121,16 @@ public static class SettingsLoader
         return settings;
     }
 
-    /// <summary>models.folder and its earlier name whisper.models_dir: an absolute folder (a drive or a network share), or empty for the default.</summary>
+    /// <summary>
+    /// models.folder and its earlier name whisper.models_dir: an absolute folder (a drive or a network share), or empty for the
+    /// default. A device path is refused unless it is \\?\X:\ or \\?\UNC\ (re-lens, 17/10/2026: \\?\Volume{GUID}\ names the
+    /// bundled folder by a name that no comparison takes for it, and the bundled base.en was deleted through it): the usual
+    /// warning and the default follow.
+    /// </summary>
     private static string? FolderProblem(string value) =>
-        Path.IsPathFullyQualified(value) && value.IndexOfAny(Path.GetInvalidPathChars()) < 0 ? null : "expected an absolute folder path";
+        Path.IsPathFullyQualified(value) && value.IndexOfAny(Path.GetInvalidPathChars()) < 0 && !Storage.PathRegistry.IsUnsupportedDevicePath(value)
+            ? null
+            : "expected an absolute folder path";
 
     private static ModelsSettings BindModels(ObjectReader? r)
     {
