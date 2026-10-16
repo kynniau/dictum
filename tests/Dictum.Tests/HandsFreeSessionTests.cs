@@ -794,6 +794,62 @@ public class HandsFreeSettingsTests
         return true;
     });
 
+    [Fact]
+    public Task After_Enter_an_outside_edit_shows_in_the_box_and_the_next_blur_does_not_write_the_old_value_back() => UiSession.Run(() =>
+    {
+        // Narrow re-lens on 3119f6d (before the rebase onto main c0aa989), 17/10/2026: Choose clears _typed, the flag that says a
+        // typed value is waiting. Left set after Enter, Show skipped every later reload, so the box kept the 120 while settings.json
+        // said 600, and the next blur wrote that 120 back over the edit. Nothing pinned the line: with it removed, every other
+        // test still passed.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (window, shell) = OpenGeneral(scratch);
+        int Saved() => SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.HandsFreeMaxSeconds;
+        var box = All<NumericUpDown>(window).Single();
+        UnitOf(window).SelectedIndex = 1; // seconds
+        Dispatcher.UIThread.RunJobs();
+        box.Value = 120m;
+        PressEnterIn(window, box);
+        Assert.Equal(120, Saved());
+
+        // settings.json changes from outside the field (written through the shell, which reloads as the file watcher's reload does)
+        shell.Write(("hands_free_max_seconds", System.Text.Json.Nodes.JsonValue.Create(600)));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(600, shell.Settings.HandsFreeMaxSeconds);
+        Assert.Equal(600m, box.Value); // the field follows the file again once its own value was written
+
+        box.GetVisualDescendants().OfType<TextBox>().Single().Focus();
+        All<Slider>(window).Single().Focus(); // focus passes through the box and leaves it
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(600, Saved()); // the file keeps the outside edit: nothing is waiting for the blur to write
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public async Task Typing_in_the_box_while_the_slider_is_settling_never_writes_the_digits() => await UiSession.RunAsync(async () =>
+    {
+        // Narrow re-lens on 3119f6d (before the rebase onto main c0aa989), 17/10/2026: a value the box takes stops the slider's
+        // settle timer, because the box's value is the newer one. Left running, the timer fired 400 ms after the drag and wrote the
+        // 30 s that a typed "1" clamps to, before any Enter. Nothing pinned the line: with it removed, every other test still passed.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (window, shell) = OpenGeneral(scratch);
+        int Saved() => SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.HandsFreeMaxSeconds;
+        var box = All<NumericUpDown>(window).Single();
+        UnitOf(window).SelectedIndex = 1; // seconds
+        Dispatcher.UIThread.RunJobs();
+        All<Slider>(window).Single().Value = 840; // the drag: the slider's settle timer starts
+        var text = box.GetVisualDescendants().OfType<TextBox>().Single();
+        text.Focus();
+        text.SelectAll();
+        window.KeyTextInput("1"); // inside the settling time: the box takes a digit, 30 s once clamped
+        Dispatcher.UIThread.RunJobs();
+        await Task.Delay(HandsFreeLimit.SettleMs + 600); // long enough for the slider's timer to have fired
+        Assert.Equal(300, Saved()); // nothing is written, neither the drag's 840 nor the 30: the box waits for Enter
+        window.Close();
+        shell.Dispose();
+        return true;
+    });
+
     /// <summary>Waits on the UI thread, whose timers keep running, until the condition holds or the timeout passes.</summary>
     private static async Task<bool> Eventually(Func<bool> condition, int timeoutMs = 5000)
     {
