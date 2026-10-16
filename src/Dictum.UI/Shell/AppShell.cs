@@ -166,7 +166,8 @@ public sealed partial class AppShell : IDisposable
         _tray = Platform.CreateTray(point => Dispatcher.UIThread.Post(() => ToggleFlyout(point)), _log);
 
         var machine = new DictationStateMachine(AppRules.Options(_settings), _settings.Enabled);
-        var pipeline = new DictationPipeline(_models.GetAsync, () => _cleaner, InsertAsync, () => _settings, _log, Personal.Finish, RememberPasted);
+        var pipeline = new DictationPipeline(_models.GetAsync, () => _cleaner, InsertAsync, () => _settings, _log, Personal.Finish, RememberPasted,
+            names: () => Personal.Text.Dictionary.Terms);
         _controller = new DictationController(machine, _capture, pipeline, new UiBridge(this), () => _settings, _log, hotkeyBlocked: () => !_models.IsReady);
         StartHook();
         ApplyFixHotkey(_settings, reinstall: false);

@@ -9,8 +9,13 @@ namespace Dictum.Llm;
 /// The personal dictionary's terms in the prompt's dictionary line (SPEC §16.2, PersonalDictionary.CleanupTerms): the reply
 /// may not add one the speaker did not say. Terms left out of the line are not checked: the model never saw them.
 /// </param>
+/// <param name="Carried">
+/// A hands-free part's context: the closing words of the part typed before it, sent as prompt text (and part of
+/// <paramref name="SystemPrompt"/> here). They are never counted as dictation, so every rule, the dictionary-term rule
+/// included, measures the reply against the part's own words; the reply may not repeat them either.
+/// </param>
 public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection<string>? MustKeepWords = null,
-    IReadOnlyCollection<string>? DictionaryTerms = null);
+    IReadOnlyCollection<string>? DictionaryTerms = null, string? Carried = null);
 
 /// <summary>
 /// Decides whether a model's reply is the cleaned dictation (SPEC §5, applied to every provider). Rejected replies
@@ -21,8 +26,8 @@ public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection
 /// framing and labels the speaker did not say (whole words, curly quotes mapped), a script the dictation did not use, a
 /// final line or bracket the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
 /// few shared words, a negation or a number dropped or changed, a kept word dropped (profanity), dropped content (overall
-/// and per sentence), and "scratch that" handled both ways round: the correction must be in the reply and the retracted
-/// words must not.
+/// and per sentence), "scratch that" handled both ways round: the correction must be in the reply and the retracted
+/// words must not, and, for a hands-free part, words repeated from the part typed before it.
 /// </summary>
 public static partial class CleanupValidator
 {
@@ -104,6 +109,8 @@ public static partial class CleanupValidator
         if (Unsaid(textLower, rawSet) is { } unsaid) return (null, unsaid);
         if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(raw, text, terms))
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
+        if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
+            return (null, "reply repeats words already typed before this part");
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -322,6 +329,37 @@ public static partial class CleanupValidator
             if (j == unit.Count) count++;
         }
         return count;
+    }
+
+    /// <summary>
+    /// A hands-free part's reply that repeats words already typed (SPEC §3 amendment, 16/10/2026): two words next to each other
+    /// in the reply that are next to each other in the carried words, one of them a content word (three letters or more, not a
+    /// function word), and not next to each other in the part's own dictation (hesitations and spoken commands left out).
+    /// Five or more such words are the system-prompt rule's too; this catches the shorter run a model writes when it "finishes"
+    /// a part with the words before it: "…we should move the meeting to" then "thursday" → "Move the meeting to Thursday.".
+    /// </summary>
+    // simplification: pairs of words, not an alignment of the reply with the dictation. Ceiling: a grammar fix that happens to
+    // join two words the way the carried words do ("the shop" carried, "go to shop" → "Go to the shop.") is rejected, and the
+    // tidy is typed instead (a false rejection costs polish only). Trigger to retire: such a rejection observed in the log.
+    private static bool RepeatsCarried(string rawLower, string textLower, string carried)
+    {
+        var said = Pairs(Comparable(Words(WithoutCommands(rawLower))));
+        var before = Pairs(Comparable(Words(MapQuotes(carried).ToLowerInvariant())));
+        var reply = Comparable(Words(textLower));
+        for (var i = 0; i + 1 < reply.Count; i++)
+        {
+            if ((IsCorrectionWord(reply[i]) || IsCorrectionWord(reply[i + 1])) && before.Contains(reply[i] + " " + reply[i + 1])
+                && !said.Contains(reply[i] + " " + reply[i + 1]))
+                return true;
+        }
+        return false;
+    }
+
+    private static HashSet<string> Pairs(List<string> words)
+    {
+        var pairs = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i + 1 < words.Count; i++) pairs.Add(words[i] + " " + words[i + 1]);
+        return pairs;
     }
 
     /// <summary>

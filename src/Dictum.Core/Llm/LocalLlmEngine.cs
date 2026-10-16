@@ -163,12 +163,24 @@ public sealed class LocalLlmEngine : ILocalLlmEngine
     /// Runs one cleanup: system prompt, few-shot pairs, then the raw transcript, through the model's chat template.
     /// The prefix up to the transcript stays evaluated in the KV cache between calls (<see cref="CleanupSession"/>).
     /// </summary>
-    public async Task<GenerationResult> CompleteAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, int maxTokens, CancellationToken cancellationToken)
+    public Task<GenerationResult> CompleteAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, int maxTokens, CancellationToken cancellationToken) =>
+        CompleteCoreAsync(systemPrompt, examples, raw, null, maxTokens, cancellationToken);
+
+    /// <summary>
+    /// A hands-free part: <paramref name="carried"/> (the last part's closing words) goes after the cached prefix as a system
+    /// turn of its own (<see cref="CleanupSession.Render"/>), so the prefix stays evaluated and only the part's tokens are new.
+    /// </summary>
+    public Task<GenerationResult> CompleteAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string carried, int maxTokens,
+        CancellationToken cancellationToken) =>
+        CompleteCoreAsync(systemPrompt, examples, raw, carried, maxTokens, cancellationToken);
+
+    private async Task<GenerationResult> CompleteCoreAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string? carried, int maxTokens,
+        CancellationToken cancellationToken)
     {
         await _busy.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var result = await _session.GenerateAsync(systemPrompt, examples, raw, maxTokens, cancellationToken).ConfigureAwait(false);
+            var result = await _session.GenerateAsync(systemPrompt, examples, raw, carried, maxTokens, cancellationToken).ConfigureAwait(false);
             var prefix = _session.LastPrefix;
             if (prefix.Tokens >= 32 && prefix.Time > TimeSpan.Zero && Volatile.Read(ref _promptRate) <= 0) Volatile.Write(ref _promptRate, prefix.Tokens / prefix.Time.TotalSeconds);
             Record(result);

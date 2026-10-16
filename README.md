@@ -22,15 +22,19 @@ place: see "Choosing a hotkey". Every gesture below works the same with a mouse 
 | Gesture | What happens |
 |---|---|
 | Hold the hotkey, speak, release | Records while held; on release transcribes and pastes. |
-| Double-tap the hotkey (two taps within 0.4 s) | Hands-free: records until you press the hotkey again. No audio between the taps is lost. |
-| Press the hotkey during hands-free | Stops and transcribes. |
-| Esc while recording | Cancels: audio discarded, nothing pasted. Esc still reaches your app. |
-| Esc while transcribing/polishing | Cancels; nothing is pasted and Dictum is ready again at once. Esc still reaches your app. In the background the work stops at its next check: whisper after about 5 s on CPU and under 40 ms with Vulkan (small.en, a 62.8 s recording, cancelled 200 ms in); the cleanup model within a few ms on the GPU, but on a CPU llama.cpp cannot interrupt the step that reads the dictation, so it stays busy for about 1.5 s (qwen2.5-1.5b, measured long-dictation case). A dictation made in that window waits for it. |
+| Double-tap the hotkey (two taps within 0.4 s) | Hands-free: records until you press the hotkey again, and types each part as you pause (0.7 s of quiet after at least 2 s of speech; a part with no pause is cut at 30 s, at its quietest moment) while you keep talking. No audio between the taps or between the parts is lost. |
+| Press the hotkey during hands-free | Stops; what you said since the last pause is typed last. |
+| Esc while recording | Holding the key: cancels, audio discarded, nothing pasted. Hands-free: stops; the text already typed stays, and the parts not yet typed are dropped. Esc still reaches your app. |
+| Esc while transcribing/polishing | Cancels; nothing more is pasted (after hands-free, the parts already typed stay) and Dictum is ready again at once. Esc still reaches your app. In the background the work stops at its next check: whisper after about 5 s on CPU and under 40 ms with Vulkan (small.en, a 62.8 s recording, cancelled 200 ms in); the cleanup model within a few ms on the GPU, but on a CPU llama.cpp cannot interrupt the step that reads the dictation, so it stays busy for about 1.5 s (qwen2.5-1.5b, measured long-dictation case). A dictation made in that window waits for it. |
 | Hotkey while transcribing | Ignored (the pill shows "Busy"). |
 
 Recordings shorter than `min_recording_ms` (0.3 s) or quieter than `silence_threshold` are discarded, because
 whisper invents text on silence. A recording auto-stops and is **transcribed** (never discarded) after
-`hands_free_max_seconds` (5 minutes), including a stuck hold key.
+`hands_free_max_seconds` (5 minutes unless changed in Settings > General > "Hands-free stops after", from 30 seconds
+to 60 minutes), including a stuck hold key. In hands-free each part goes through the same steps; whisper and the
+clean-up also get the last part's closing words as context, which are never typed again, and a part that carries on a
+sentence (the last one did not end with . ! or ?) starts with a small letter unless its first word is "I", has another
+capital in it, or is a dictionary term spelt with a capital.
 
 ### The pill
 
@@ -40,12 +44,13 @@ A small dark pill appears bottom-centre of the monitor with the focused window, 
 | Pill | Meaning |
 |---|---|
 | Recording · hold | Recording while you hold the key (a breathing red dot and five bars following your voice). |
-| Hands-free  m:ss  tap to stop · Esc cancels | Hands-free recording with the elapsed time; it auto-stops (and transcribes) at `hands_free_max_seconds`. |
+| Hands-free  m:ss  typing as you pause · tap to stop · Esc stops and keeps what's typed | Hands-free recording with the elapsed time; each part is typed as you pause, and it auto-stops (typing the rest) at `hands_free_max_seconds`. |
 | Transcribing… | whisper is running (a turning blue ring). |
 | Polishing… | The cleanup model is running (amber; not shown for the rule-based tidy, which is instant). |
 | Polishing… skipped (long dictation) | The model would not finish before the deadline at its measured speed; the rule-based tidy is used. |
 | Pasted  N words | Text was inserted (a green tick, and how many words; fades after a second). |
 | Cancelled | Esc pressed. |
+| Stopped. Text already typed stays. | Esc pressed in hands-free: the parts already typed stay (a grey square). |
 | Busy | Hotkey pressed while still processing. |
 | Mic error | The microphone could not be opened (see Troubleshooting), or it was lost mid-recording (a headset unplugged or out of battery): what was captured until then is still transcribed and pasted. |
 
@@ -544,7 +549,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `tap_ms` | `300` | A press shorter than this is a tap, not a hold (50–2000). |
 | `double_tap_ms` | `400` | Window for the second tap that starts hands-free (100–2000). |
 | `min_recording_ms` | `300` | Shorter recordings are discarded (0–10000). |
-| `hands_free_max_seconds` | `300` | Auto-stop and transcribe after this long (5–3600). |
+| `hands_free_max_seconds` | `300` | Auto-stop and type the rest after this long (30–3600; Settings > General > "Hands-free stops after"). A value from 5 to 29 left from an earlier version runs as 30, with a line in the log. |
 | `silence_threshold` | `0.01` | Discard if the loudest 20 ms block's RMS (0–1) stays below this. |
 | `audio.device` | `null` | `null` = Windows default microphone; else an endpoint ID or part of the device name (`--selftest` lists them). |
 | `whisper.model` | your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin` in `models_dir`, or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |

@@ -7,7 +7,9 @@ using Dictum.Transcribe;
 namespace Dictum.Core;
 
 /// <summary>
-/// One recording's journey (SPEC §4): gate → transcribe → optional cleanup → insert.
+/// One recording's journey (SPEC §4): gate → transcribe → optional cleanup → insert. In hands-free each part of the
+/// recording takes the same journey (<see cref="HandsFreePart"/>): whisper and the clean-up also hear the last part's closing
+/// words as context, and the part is typed after the last one by the boundary rule (<see cref="SegmentJoin"/>).
 /// Everything honours the session's CancellationToken; a cancelled session inserts nothing.
 /// </summary>
 public sealed class DictationPipeline
@@ -19,12 +21,14 @@ public sealed class DictationPipeline
     private readonly ILog _log;
     private readonly Func<string, string> _finish;
     private readonly Action<string> _inserted;
+    private readonly Func<IEnumerable<string>> _names;
 
     /// <param name="transcriber">Returns the loaded engine, waiting for a model load still in progress.</param>
     /// <param name="cleaner">Current cleanup configuration (rebuilt on settings reload).</param>
     /// <param name="insert">Inserts text at the cursor; checks the token before the first keystroke.</param>
     /// <param name="finish">The last step before the paste (SPEC §22 order: corrections, the profanity filter, then snippets); identity if null.</param>
-    /// <param name="inserted">Told the text that was pasted (kept in memory for "Fix last dictation").</param>
+    /// <param name="inserted">Told the text that was pasted (kept in memory for "Fix last dictation"; in hands-free, each part's own text).</param>
+    /// <param name="names">The personal dictionary's terms: a hands-free part that goes on with a sentence keeps the capital of one spelt with a capital; none if null.</param>
     public DictationPipeline(
         Func<CancellationToken, Task<ITranscriber>> transcriber,
         Func<TranscriptCleaner> cleaner,
@@ -32,7 +36,8 @@ public sealed class DictationPipeline
         Func<AppSettings> settings,
         ILog log,
         Func<string, string>? finish = null,
-        Action<string>? inserted = null)
+        Action<string>? inserted = null,
+        Func<IEnumerable<string>>? names = null)
     {
         _transcriber = transcriber;
         _cleaner = cleaner;
@@ -41,22 +46,28 @@ public sealed class DictationPipeline
         _log = log;
         _finish = finish ?? (text => text);
         _inserted = inserted ?? (_ => { });
+        _names = names ?? (() => []);
     }
 
     /// <param name="insertedWords">Told how many words were pasted (for the "Pasted · 38 words" pill).</param>
-    public async Task<ProcessingOutcome> RunAsync(CapturedAudio audio, CancellationToken token, Action<PillView> showPill, Action<int>? insertedWords = null)
+    /// <param name="part">A hands-free part (its context and the boundary with the last part typed), or null for a whole recording.</param>
+    public async Task<ProcessingOutcome> RunAsync(CapturedAudio audio, CancellationToken token, Action<PillView> showPill, Action<int>? insertedWords = null,
+        HandsFreePart? part = null)
     {
         var settings = _settings();
         var reject = RecordingGate.RejectReason(audio, settings.MinRecordingMs, settings.SilenceThreshold);
         if (reject is not null)
         {
-            _log.Info($"Recording discarded: {reject}.");
+            _log.Info(part is null ? $"Recording discarded: {reject}." : $"Segment {part.Number} discarded: {reject}.");
             return ProcessingOutcome.Discarded;
         }
 
         var sw = Stopwatch.StartNew();
         var engine = await _transcriber(token).ConfigureAwait(false);
-        var raw = await engine.TranscribeAsync(audio.Samples, token).ConfigureAwait(false);
+        var carried = part?.Carried; // the last part's closing words: context for whisper and the clean-up, never typed again
+        var raw = carried is null
+            ? await engine.TranscribeAsync(audio.Samples, token).ConfigureAwait(false)
+            : await engine.TranscribeAsync(audio.Samples, carried, token).ConfigureAwait(false);
         var transcribeMs = sw.ElapsedMilliseconds;
         token.ThrowIfCancellationRequested();
         if (raw.Length == 0)
@@ -70,10 +81,17 @@ public sealed class DictationPipeline
         var cleaner = _cleaner();
         if (cleaner.UsesModel && !token.IsCancellationRequested) showPill(cleaner.SkipReason(raw) is null ? PillView.Polishing : PillView.PolishingSkipped);
         sw.Restart();
-        var cleaned = await cleaner.CleanAsync(raw, token).ConfigureAwait(false);
+        var cleaned = await cleaner.CleanAsync(raw, token, carried).ConfigureAwait(false);
         var text = cleaned.Text;
         _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : "the rule-based tidy")} in {sw.ElapsedMilliseconds} ms.");
         if (settings.LogTranscripts) _log.Info($"Cleaned transcript: {text}");
+        // The boundary rule decides the first letter before corrections, the profanity filter and snippets run, so a snippet
+        // is still pasted exactly as written; the separator goes in front of the finished text.
+        var separator = "";
+        if (part?.Before is { } before && text.Length > 0)
+        {
+            (separator, text) = SegmentJoin.Join(before, raw, text, settings.Insert.TrailingSpace, _names());
+        }
         var finished = _finish(text);
         if (finished != text)
         {
@@ -84,9 +102,10 @@ public sealed class DictationPipeline
 
         token.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(text)) return ProcessingOutcome.Discarded;
-        await _insert(text, token).ConfigureAwait(false);
-        _log.Info($"Inserted {text.Length} chars via {settings.Insert.Method}.");
+        await _insert(separator + text, token).ConfigureAwait(false);
+        _log.Info($"Inserted {separator.Length + text.Length} chars via {settings.Insert.Method}.");
         _inserted(text);
+        if (part is not null) part.Typed = text;
         insertedWords?.Invoke(text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
         return ProcessingOutcome.Inserted;
     }

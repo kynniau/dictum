@@ -42,7 +42,7 @@ public static class ConfigLoader
         }
         // Consent to cloud clean-up comes only from consent.json, which only the in-app dialog writes (SPEC §22).
         var loaded = CloudConsentFile.Apply(file.Usable ? file.Settings : new AppSettings { OfflineOnly = true }, CloudConsentFile.Read(paths.ConsentFile));
-        var repaired = EffectiveSettings.Cleanup(loaded, secrets.Get(SecretStore.AnthropicKey) is not null, () => gpuRuntime(loaded), warn);
+        var repaired = EffectiveSettings.HandsFree(EffectiveSettings.Cleanup(loaded, secrets.Get(SecretStore.AnthropicKey) is not null, () => gpuRuntime(loaded), warn), warn);
         var settings = SettingsFile.WithCleanupOverride(repaired, cleanupOverride);
         return file.Usable
             ? new ConfigLoadResult(settings, secrets, file, null)

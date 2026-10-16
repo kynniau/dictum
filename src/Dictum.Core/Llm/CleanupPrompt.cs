@@ -31,6 +31,18 @@ public static class CleanupPrompt
         "The speaker may not be a native English speaker: also fix articles, tenses, prepositions and word order " +
         "while keeping every fact and name exactly as dictated.";
 
+    /// <summary>The start of a hands-free part's context line (<see cref="CarriedLine"/>).</summary>
+    public const string CarriedLinePrefix = "The dictation continues text that is already typed; use it only as context and do not repeat it: ";
+
+    /// <summary>
+    /// A hands-free part's context (SPEC §3 amendment, 16/10/2026): the closing words of the part typed before it, sent with the
+    /// part but never as its dictation, so the reply is checked against the part's own words (CleanupValidator).
+    /// </summary>
+    public static string CarriedLine(string carried) => CarriedLinePrefix + "\"" + carried + "\"";
+
+    /// <summary>The system prompt with a hands-free part's context line after it (the cloud providers', and the checks', reading).</summary>
+    public static string WithCarried(string systemPrompt, string carried) => systemPrompt + "\n" + CarriedLine(carried);
+
     /// <summary>
     /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the grammar-assist sentence
     /// when llm.grammar_assist is on, then the personal dictionary's "Known names and terms" line when it has terms.

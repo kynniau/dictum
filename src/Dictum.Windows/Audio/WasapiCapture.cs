@@ -113,6 +113,12 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
         }
     }
 
+    /// <summary>Hands-free: the recording's buffer cuts at pauses from now on (CaptureBuffer.SegmentAtPauses); nothing when not recording.</summary>
+    public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part)
+    {
+        lock (_gate) Volatile.Read(ref _buffer)?.SegmentAtPauses(silenceThreshold, part);
+    }
+
     private void ReleaseDevice()
     {
         var recorder = _recorder;

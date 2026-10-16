@@ -35,4 +35,16 @@ public static class EffectiveSettings
         }
         return ReferenceEquals(llm, settings.Llm) ? settings : settings with { Llm = llm };
     }
+
+    /// <summary>
+    /// hands_free_max_seconds from 5 to 29 (accepted before hands-free typed each part as you pause, 16/10/2026) is raised to
+    /// <see cref="AppSettings.HandsFreeMinimumSeconds"/>, with one line for the log; the file itself is not rewritten (the
+    /// Settings field writes the new value when it is next changed).
+    /// </summary>
+    public static AppSettings HandsFree(AppSettings settings, Action<string> warn)
+    {
+        if (settings.HandsFreeMaxSeconds >= AppSettings.HandsFreeMinimumSeconds) return settings;
+        warn($"hands_free_max_seconds {settings.HandsFreeMaxSeconds} is under the {AppSettings.HandsFreeMinimumSeconds} s minimum now that hands-free types as you pause: using {AppSettings.HandsFreeMinimumSeconds} s.");
+        return settings with { HandsFreeMaxSeconds = AppSettings.HandsFreeMinimumSeconds };
+    }
 }

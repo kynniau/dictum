@@ -214,11 +214,20 @@ public sealed class LocalLlmClient(Func<ILocalLlmEngine?> engine, string name) :
 {
     public string Name => $"local/{name}";
 
-    public async Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, CancellationToken cancellationToken)
+    public Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, CancellationToken cancellationToken) =>
+        CompleteCoreAsync(systemPrompt, rawTranscript, null, cancellationToken);
+
+    /// <summary>A hands-free part: the carried words go after the cached prompt prefix, so the prefix stays evaluated (CleanupSession.Render).</summary>
+    public Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, string carried, CancellationToken cancellationToken) =>
+        CompleteCoreAsync(systemPrompt, rawTranscript, carried, cancellationToken);
+
+    private async Task<LlmReply> CompleteCoreAsync(string systemPrompt, string rawTranscript, string? carried, CancellationToken cancellationToken)
     {
         var loaded = engine() ?? throw new InvalidOperationException("the cleanup model is not loaded yet");
         var maxTokens = CleanupExamples.LocalMaxTokens(loaded.CountTokens(rawTranscript));
-        var result = await loaded.CompleteAsync(systemPrompt, CleanupExamples.Pairs, rawTranscript, maxTokens, cancellationToken).ConfigureAwait(false);
+        var result = carried is null
+            ? await loaded.CompleteAsync(systemPrompt, CleanupExamples.Pairs, rawTranscript, maxTokens, cancellationToken).ConfigureAwait(false)
+            : await loaded.CompleteAsync(systemPrompt, CleanupExamples.Pairs, rawTranscript, carried, maxTokens, cancellationToken).ConfigureAwait(false);
         return new LlmReply(result.Text, result.Finished ? "end_turn" : "max_tokens");
     }
 

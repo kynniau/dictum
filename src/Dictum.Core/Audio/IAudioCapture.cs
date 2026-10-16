@@ -15,6 +15,16 @@ public interface IAudioCapture
     /// <summary>Stops, releases the device (the system's microphone indicator goes off) and returns the audio.</summary>
     CapturedAudio Stop();
 
+    /// <summary>
+    /// Hands-free (SPEC §3 amendment, 16/10/2026): from now until <see cref="Stop"/>, cut the recording at pauses and hand each
+    /// finished part to <paramref name="part"/>, in order, on the capture thread (<see cref="CaptureBuffer.SegmentAtPauses"/>);
+    /// <see cref="Stop"/> then returns only what follows the last cut. <paramref name="part"/> must not block. A capture that
+    /// cannot cut (this default) keeps the whole recording for <see cref="Stop"/>, which is then typed as one part.
+    /// </summary>
+    void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part)
+    {
+    }
+
     /// <summary>Raised from the capture thread if the device fails mid-recording.</summary>
     event Action<Exception>? Failed;
 }

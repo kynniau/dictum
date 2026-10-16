@@ -34,8 +34,15 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
     /// <summary>The counts of the latest call that was cancelled (no text), for the speed estimate.</summary>
     public GenerationResult? Cancelled { get; private set; }
 
-    /// <summary>The prompt text up to the dictation, and the whole prompt with the dictation and the assistant start.</summary>
-    public (string Prefix, string Full) Render(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw)
+    /// <summary>
+    /// The prompt text up to the dictation, and the whole prompt with the dictation and the assistant start. A hands-free part's
+    /// <paramref name="carried"/> words go in a system turn of their own after the prefix (CleanupPrompt.CarriedLine), so the
+    /// cached prefix still matches and only the part's own tokens are evaluated. Not run against a model in this change: a
+    /// template with no system role (Gemma's, recalled from llama.cpp's source, not verified here) may fold the turn into the
+    /// dictation's own, where the reply checks still apply; a template whose full prompt stops starting with the prefix runs
+    /// uncached, as before.
+    /// </summary>
+    public (string Prefix, string Full) Render(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string? carried = null)
     {
         var template = new LLamaTemplate(weights);
         template.Add("system", systemPrompt);
@@ -45,6 +52,7 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
             template.Add("assistant", exampleClean);
         }
         var prefix = Encoding.UTF8.GetString(template.Apply());
+        if (carried is not null) template.Add("system", CleanupPrompt.CarriedLine(carried));
         template.Add("user", raw);
         template.AddAssistant = true;
         return (prefix, Encoding.UTF8.GetString(template.Apply()));
@@ -65,10 +73,10 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
         LastPrefix = (_prefixTokens, sw.Elapsed);
     }
 
-    public async Task<GenerationResult> GenerateAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, int maxTokens,
+    public async Task<GenerationResult> GenerateAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string? carried, int maxTokens,
         CancellationToken cancellationToken)
     {
-        var (prefix, full) = Render(systemPrompt, examples, raw);
+        var (prefix, full) = Render(systemPrompt, examples, raw, carried);
         await EnsurePrefixAsync(prefix).ConfigureAwait(false);
         var conversation = _conversation!;
         var executor = _executor!;

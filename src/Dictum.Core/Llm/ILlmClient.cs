@@ -16,6 +16,14 @@ public interface ILlmClient
 
     Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A hands-free part (SPEC §3 amendment, 16/10/2026): <paramref name="carried"/>, the closing words of the part typed before
+    /// it, go with the request as context, never as the dictation. This default sends them as a line after the system prompt
+    /// (<see cref="CleanupPrompt.WithCarried"/>); the local model puts them after its cached prompt prefix instead.
+    /// </summary>
+    Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, string carried, CancellationToken cancellationToken) =>
+        CompleteAsync(CleanupPrompt.WithCarried(systemPrompt, carried), rawTranscript, cancellationToken);
+
     /// <summary>Estimated time for this dictation, when the provider can tell (the local model); null otherwise.</summary>
     TimeSpan? Predict(string rawTranscript) => null;
 }
@@ -37,4 +45,12 @@ public interface ILocalLlmEngine : IDisposable
 
     Task<GenerationResult> CompleteAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, int maxTokens,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A hands-free part with <paramref name="carried"/> as context. <see cref="LocalLlmEngine"/> puts it after the cached
+    /// prompt prefix, so the prefix stays evaluated; this default (for stand-ins) puts it after the system prompt.
+    /// </summary>
+    Task<GenerationResult> CompleteAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string carried, int maxTokens,
+        CancellationToken cancellationToken) =>
+        CompleteAsync(CleanupPrompt.WithCarried(systemPrompt, carried), examples, raw, maxTokens, cancellationToken);
 }
