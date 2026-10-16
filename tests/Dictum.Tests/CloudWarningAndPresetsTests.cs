@@ -39,13 +39,15 @@ public class CloudWarningAndPresetsTests
     // The landing page's card for a server you name ends with the policy's approved clause (the end of the paragraph above).
     private const string ApprovedLocalServerClause = "If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
 
-    // The tray panel's privacy line while a server on this PC, or a host off it, does the clean-up. Each line: Approved by the product
-    // owner on 16/10/2026 as written: never reword it. Pinned word for word, independently of the app's copy.
+    // The tray panel's privacy line while a server on this PC, or a host off it, does the clean-up. Each line:
+    // Approved by the product owner on 16/10/2026 as written: never reword it.
+    // Pinned word for word, independently of the app's copy.
     private const string ApprovedFlyoutLocalServer = "Clean-up via a server on this PC";
     private const string ApprovedFlyoutCloud = "Cloud clean-up on · text leaves this PC";
 
-    // Settings > Privacy and the Settings > Clean-up state line for a server on this PC. Approved by the product owner on 16/10/2026 as
-    // written: never reword it. Pinned word for word, independently of the app's copy.
+    // Settings > Privacy and the Settings > Clean-up state line for a server on this PC.
+    // Approved by the product owner on 16/10/2026 as written: never reword it.
+    // Pinned word for word, independently of the app's copy.
     private static string ApprovedLocalServerLine(string host, string model) =>
         $"On: a server on this PC ({host}, model {model}) tidies each dictation. Dictum cannot see whether that server forwards your text elsewhere.";
 
