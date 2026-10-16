@@ -35,7 +35,8 @@ push and pull request; a pull request needs it green. A behaviour change comes w
 - Never commit secrets, models or personal data: `.env` files, `*.pfx`, model files (`*.bin`, `*.gguf`) and build
   output are in `.gitignore`. Test text uses made-up names, never real client details.
 - Recordings, transcripts and personal test material stay outside the repository. Turn on the guard rails once per clone
-  with `git config core.hooksPath .githooks` (`.github/SECURITY.md`, "Private material").
+  with `git config core.hooksPath .githooks`, and name your private word list with the `DICTUM_PRIVATE_DENYLIST`
+  environment variable or `git config dictum.privateDenylist <path>` (`.github/SECURITY.md`, "Private material").
 
 ## Licence
 

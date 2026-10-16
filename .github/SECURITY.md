@@ -45,14 +45,16 @@ This repository is public, so anything pushed to it is published. Recordings, tr
 
 `.githooks` stops them being committed or pushed:
 
-- `pre-commit` and `pre-push` refuse media files (audio and video, apart from a `.wav` directly in `tests/fixtures`),
-  anything under a `private/`, `recordings/` or `transcripts/` folder, any file over 5 MB, and any file name or added
-  line that contains an entry from a denylist you keep outside the repository. They print file names only, never the
-  text that matched. Binary files are checked by name, type and size, not for text.
+- `pre-commit` and `pre-push` refuse media files (audio and video, wherever they are), anything under a `private/`,
+  `recordings/` or `transcripts/` folder, any file over 5 MB, and any file name or added line that contains an entry
+  from a denylist you keep outside the repository. `commit-msg` refuses a commit message that contains an entry, and
+  `pre-push` also reads the message of every commit being pushed and the name of every branch and tag being pushed.
+  They say where something was found (a file name, "commit message", "branch name"), never the text that matched.
+  Binary files are checked by name, type and size, not for text.
 - The denylist is a plain text file with one case-insensitive string per line (blank lines and `#` comments are
-  ignored). Point the `DICTUM_PRIVATE_DENYLIST` environment variable at it; the comment at the top of
-  `.githooks/private-guard.sh` says where the hooks look when it is not set. Without the file they skip that one check
-  and say so.
+  ignored). Name it with the `DICTUM_PRIVATE_DENYLIST` environment variable or, once for every worktree of a clone, with
+  `git config dictum.privateDenylist <path>`; the variable wins. With neither, or without the file, the hooks skip that
+  one check and say so.
 - Turn the hooks on once per clone, for every worktree: `git config core.hooksPath .githooks`.
 - `--no-verify` skips them, and a clone without them has no guard. The `private-material` job in
   `.github/workflows/ci.yml` therefore also fails a push or pull request that tracks a media file, a private folder or

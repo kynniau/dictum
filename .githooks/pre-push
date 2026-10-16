@@ -1,6 +1,7 @@
 #!/bin/sh
-# Refuses a push that would send private material to a public remote (recordings, private folders, large files, text from
-# a local denylist). The rules and the checks are in private-guard.sh. Turn on: git config core.hooksPath .githooks
+# Refuses a push that would send private material to a public remote (recordings, private folders, large files, and text
+# from a local denylist in file names, added lines, commit messages and branch or tag names). The rules and the checks
+# are in private-guard.sh. Turn on: git config core.hooksPath .githooks
 # Git passes the name (or URL) of the remote as $1, and one line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>.
 . "$(dirname "$0")/private-guard.sh"
 
@@ -16,6 +17,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   case $remote_sha in *[!0]*) git cat-file -e "$remote_sha^{commit}" 2>/dev/null && exclude=$remote_sha ;; esac
   # Every commit is read, not just the final difference, so a file added in one commit and deleted in the next is still caught.
   changes() { git -c core.quotePath=false -c log.showSignature=false log --no-color --no-ext-diff --no-textconv --no-renames --root --format= "$local_sha" --not "$exclude" "$@"; }
-  pg_run push
+  pg_run push                    # files: path, size, and the denylist on names and added lines
+  pg_check_messages              # the message of every commit being pushed
+  pg_check_ref "$remote_ref"     # the name the branch or tag will have on the remote
+  pg_refuse_if_flagged push
 done < "$PG_TMP/refs"
 exit 0

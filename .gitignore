@@ -37,7 +37,6 @@ private/
 recordings/
 transcripts/
 *.wav
-!tests/fixtures/*.wav
 *.mp4
 *.m4a
 *.mp3

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Refuses a commit whose message contains text from the local denylist (a name, a phrase or a test scenario can end up
+# in a message as easily as in a file). The rules and the checks are in private-guard.sh. Git passes the path of the
+# message file as $1. Turn on: git config core.hooksPath .githooks
+. "$(dirname "$0")/private-guard.sh"
+
+pg_setup
+pg_load_denylist quiet   # pre-commit has just said if there is no denylist
+[ -n "$PG_DENY" ] || exit 0
+[ -r "$1" ] || pg_die "cannot read the commit message at $1"
+pg_message_text "$1" > "$PG_TMP/message" || pg_die "cannot read the commit message at $1"
+pg_flag_text "commit message" "$PG_TMP/message" || true
+pg_refuse_if_flagged message
+exit 0

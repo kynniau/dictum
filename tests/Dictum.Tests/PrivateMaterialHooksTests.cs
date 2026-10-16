@@ -6,9 +6,9 @@ namespace Dictum.Tests;
 
 /// <summary>
 /// The guard rails that keep recordings, transcripts and personal test words out of this public repository:
-/// .githooks/pre-commit, .githooks/pre-push and the shared .githooks/private-guard.sh. Each test builds a throwaway
-/// repository that carries the real hooks and drives them through git itself, so a change to a rule fails here.
-/// Invented words only. The real denylist is never read: DICTUM_PRIVATE_DENYLIST always points inside the scratch folder.
+/// .githooks/pre-commit, .githooks/commit-msg, .githooks/pre-push and the shared .githooks/private-guard.sh. Each test
+/// builds a throwaway repository that carries the real hooks and drives them through git itself, so a change to a rule
+/// fails here. Invented words only. The real denylist is never read: the denylist always lives inside the scratch folder.
 /// </summary>
 public sealed class PrivateMaterialHooksTests : IDisposable
 {
@@ -128,6 +128,16 @@ public sealed class PrivateMaterialHooksTests : IDisposable
 
     private static Dictionary<string, string?> Denylist(string path) => new() { ["DICTUM_PRIVATE_DENYLIST"] = path };
 
+    private static Dictionary<string, string?> NoVariable() => new() { ["DICTUM_PRIVATE_DENYLIST"] = null };
+
+    /// <summary>Commits through git's editor flow (git commit -v): a stand-in editor puts <paramref name="message"/> above the template git wrote.</summary>
+    private (int Exit, string Output) CommitWithEditor(string repo, string message)
+    {
+        var editor = Path.Combine(_dir.FullName, "editor.sh");
+        File.WriteAllText(editor, "#!/bin/sh\n{ printf '%s\\n' \"$EDITOR_MESSAGE\"; cat \"$1\"; } > \"$1.new\" && mv \"$1.new\" \"$1\"\n");
+        return Git(repo, ["commit", "-q", "-v"], new() { ["GIT_EDITOR"] = $"sh \"{editor.Replace('\\', '/')}\"", ["EDITOR_MESSAGE"] = message });
+    }
+
     /// <summary>True when the hook output names exactly this path (as a whole token at the end of a line).</summary>
     private static bool Lists(string output, string path) => Regex.IsMatch(output, $@"\s{Regex.Escape(path)}\r?$", RegexOptions.Multiline);
 
@@ -149,10 +159,10 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         var repo = NewRepo();
         string[] refused =
         [
-            "memo.m4a", "RECORDING.M4A", "Aufnahme für María.mp3", "a/b/clip.WebM", "tone.wav", "tests/fixtures/sub/tone.wav",
+            "memo.m4a", "RECORDING.M4A", "Aufnahme für María.mp3", "a/b/clip.WebM", "tone.wav", "tests/fixtures/tone.wav", "tests/fixtures/sub/tone.wav",
             "private/a.txt", "docs/Recordings/a.txt", "x/y/TRANSCRIPTS/z/a.txt",
         ];
-        string[] allowed = ["tests/fixtures/tone.wav", "notes.txt", "my-private-notes.txt", "src/Private.cs", "Privateer/a.txt", "recordings.txt"];
+        string[] allowed = ["notes.txt", "my-private-notes.txt", "src/Private.cs", "Privateer/a.txt", "recordings.txt"];
         foreach (var path in refused.Concat(allowed)) Write(repo, path);
         Stage(repo, [.. refused, .. allowed]);
 
@@ -256,11 +266,44 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Write(repo, "leak.md", $"about {Word}\n");
         Stage(repo, "leak.md");
 
-        var (exit, output) = Commit(repo, env: Denylist(Path.Combine(_dir.FullName, "missing", "denylist.txt")));
-
+        var (exit, output) = Commit(repo, "about " + Word, env: Denylist(Path.Combine(_dir.FullName, "missing", "denylist.txt"))); // a path with no file
         Assert.Equal(0, exit);
-        var line = Assert.Single(output.Split('\n', StringSplitOptions.RemoveEmptyEntries));
-        Assert.Contains("no denylist", line);
+        var line = Assert.Single(output.Split('\n', StringSplitOptions.RemoveEmptyEntries)); // pre-commit says so; commit-msg stays quiet
+        Assert.Contains("no denylist at", line);
+
+        Write(repo, "leak2.md", $"about {Word}\n");
+        Stage(repo, "leak2.md");
+        (exit, output) = Commit(repo, "second", env: NoVariable()); // neither the variable nor the config key
+        Assert.Equal(0, exit);
+        line = Assert.Single(output.Split('\n', StringSplitOptions.RemoveEmptyEntries));
+        Assert.Contains("no denylist is set", line);
+    }
+
+    [Fact]
+    public void The_denylist_may_be_named_by_the_shared_config_key_and_the_variable_wins()
+    {
+        var main = NewRepo();
+        Ok(Git(main, ["config", "dictum.privateDenylist", _denylist.Replace('\\', '/')]));
+        Ok(Git(main, ["add", ".githooks"]));
+        Assert.Equal((0, ""), Commit(main, "install the hooks", env: NoVariable()));
+        var lane = Path.Combine(main, ".worktrees", "lane");
+        Ok(Git(main, ["worktree", "add", "-q", "-b", "lane", lane]));
+
+        foreach (var repo in new[] { main, lane }) // the key is in the shared config, so a linked worktree sees it too
+        {
+            Write(repo, "leak.md", $"about {Word}\n");
+            Stage(repo, "leak.md");
+            var (exit, output) = Commit(repo, "leak", env: NoVariable());
+            Assert.True(exit == 1 && Lists(output, "leak.md"), $"{repo}: {output}");
+            Ok(Git(repo, ["reset", "-q"]));
+            File.Delete(Path.Combine(repo, "leak.md"));
+        }
+
+        Write(main, "leak.md", $"about {Word}\n");
+        Stage(main, "leak.md");
+        var wins = Commit(main, "leak", env: Denylist(Path.Combine(_dir.FullName, "missing", "denylist.txt"))); // the variable names no file, so nothing is checked
+        Assert.Equal(0, wins.Exit);
+        Assert.Contains("no denylist at", wins.Output);
     }
 
     [Fact]
@@ -293,6 +336,51 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Ok(Git(repo, ["rm", "-q", "memo.m4a", $"{Word}.txt"]));
 
         Assert.Equal((0, ""), Commit(repo, "remove them"));
+    }
+
+    // ---- commit-msg ----
+
+    [Fact]
+    public void A_commit_message_with_a_denylist_word_is_refused_without_printing_it()
+    {
+        var repo = NewRepo();
+        Write(repo, "fine.md");
+        Stage(repo, "fine.md");
+
+        var (exit, output) = Commit(repo, "call about ZebraFish-7 on Monday");
+        Assert.Equal(1, exit);
+        Assert.Contains("commit refused", output);
+        Assert.True(Lists(output, "commit message"), output);
+        Assert.DoesNotContain(Word, output, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(0, Git(repo, ["rev-parse", "--verify", "-q", "HEAD"]).Exit); // nothing was committed
+
+        (exit, output) = Commit(repo, "# QUOKKA MEETING 42"); // with -m, a line that starts with # is part of the message
+        Assert.Equal(1, exit);
+        Assert.True(Lists(output, "commit message"), output);
+        Assert.DoesNotContain("quokka", output, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal((0, ""), Commit(repo, "an ordinary message"));
+    }
+
+    [Fact]
+    public void In_the_editor_flow_the_template_comments_and_the_diff_under_the_scissors_line_are_not_the_message()
+    {
+        var repo = NewRepo();
+        Write(repo, "old.md", $"keep\nan old line about {Word}\n");
+        Stage(repo, "old.md");
+        Assert.Equal(0, Commit(repo, "old", env: Denylist(Path.Combine(_dir.FullName, "none.txt"))).Exit); // committed while no denylist existed
+        Write(repo, "old.md", "keep\n"); // this commit removes that line, so the diff git shows under the scissors line holds the word
+        Stage(repo, "old.md");
+        Write(repo, $"untracked-{Word}.txt"); // and git's template lists this untracked file by name
+
+        Assert.Equal((0, ""), CommitWithEditor(repo, "tidy up"));
+
+        Write(repo, "next.md");
+        Stage(repo, "next.md");
+        var (exit, output) = CommitWithEditor(repo, $"mention {Word} here"); // a word the editor really typed into the message
+        Assert.Equal(1, exit);
+        Assert.True(Lists(output, "commit message"), output);
+        Assert.DoesNotContain(Word, output, StringComparison.OrdinalIgnoreCase);
     }
 
     // ---- pre-push ----
@@ -349,6 +437,54 @@ public sealed class PrivateMaterialHooksTests : IDisposable
     }
 
     [Fact]
+    public void Pre_push_catches_a_message_whose_commit_skipped_the_commit_msg_hook()
+    {
+        var repo = NewRepoWithRemote();
+        var before = Git(repo, ["ls-remote", "origin", "refs/heads/main"]).Output;
+        Write(repo, "fine.md");
+        Stage(repo, "fine.md");
+        Assert.Equal(0, Commit(repo, "call about ZebraFish-7 on Monday", noVerify: true).Exit);
+        var bad = Git(repo, ["rev-parse", "--short=7", "HEAD"]).Output.Trim();
+        Write(repo, "fine2.md");
+        Stage(repo, "fine2.md");
+        Assert.Equal((0, ""), Commit(repo, "a clean message after it"));
+        var clean = Git(repo, ["rev-parse", "--short=7", "HEAD"]).Output.Trim();
+
+        var (exit, output) = Git(repo, ["push", "origin", "main"]);
+
+        Assert.NotEqual(0, exit);
+        Assert.Contains("push refused", output);
+        Assert.True(Lists(output, $"commit message ({bad})"), output); // names the commit, never the text
+        Assert.False(Lists(output, $"commit message ({clean})"), output);
+        Assert.DoesNotContain(Word, output, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, Git(repo, ["ls-remote", "origin", "refs/heads/main"]).Output);
+    }
+
+    [Fact]
+    public void Pre_push_refuses_a_branch_or_tag_name_holding_a_denylist_word_but_allows_deleting_one()
+    {
+        var repo = NewRepoWithRemote();
+        Ok(Git(repo, ["branch", $"topic-{Word}"]));
+        Ok(Git(repo, ["tag", $"v-{Word}"]));
+
+        var (exit, output) = Git(repo, ["push", "origin", $"topic-{Word}"]);
+        Assert.NotEqual(0, exit);
+        Assert.True(Lists(output, $"branch name (topic-{Word})"), output);
+
+        (exit, output) = Git(repo, ["push", "origin", $"v-{Word}"]);
+        Assert.NotEqual(0, exit);
+        Assert.True(Lists(output, $"tag name (v-{Word})"), output);
+
+        Assert.Equal((0, ""), Git(repo, ["push", "-q", "origin", $"topic-{Word}:renamed"])); // only the name on the remote is published, so the local name is not judged
+        (exit, output) = Git(repo, ["push", "origin", $"main:other-{Word}"]);
+        Assert.NotEqual(0, exit);
+        Assert.True(Lists(output, $"branch name (other-{Word})"), output);
+
+        Ok(Git(repo, ["push", "-q", "--no-verify", "origin", $"topic-{Word}"])); // it got to the remote past the hook ...
+        Assert.Equal((0, ""), Git(repo, ["push", "-q", "origin", "--delete", $"topic-{Word}"])); // ... and taking it down is always allowed
+    }
+
+    [Fact]
     public void Pre_push_lets_clean_work_through_including_a_new_branch_a_tag_and_a_deletion()
     {
         var repo = NewRepoWithRemote();
@@ -384,29 +520,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Assert.Equal((0, ""), Git(repo, ["push", "-q", "origin", "later"])); // only what the remote lacks is judged
     }
 
-    // ---- where the denylist is found, and the CI audit ----
-
-    [Fact]
-    public void Without_the_variable_every_worktree_finds_the_denylist_beside_the_main_checkout()
-    {
-        var layout = Directory.CreateDirectory(Path.Combine(_dir.FullName, "layout")).FullName;
-        Directory.CreateDirectory(Path.Combine(layout, "Dictum private"));
-        File.WriteAllText(Path.Combine(layout, "Dictum private", "denylist.txt"), Word + "\n");
-        var main = NewRepo(Path.Combine(layout, "main"));
-        Ok(Git(main, ["add", ".githooks"]));
-        Assert.Equal((0, ""), Commit(main, "install the hooks"));
-        var lane = Path.Combine(main, ".worktrees", "lane");
-        Ok(Git(main, ["worktree", "add", "-q", "-b", "lane", lane]));
-        var unset = new Dictionary<string, string?> { ["DICTUM_PRIVATE_DENYLIST"] = null };
-
-        foreach (var repo in new[] { main, lane })
-        {
-            Write(repo, "leak.md", $"about {Word}\n");
-            Stage(repo, "leak.md");
-            var (exit, output) = Commit(repo, "leak", env: unset);
-            Assert.True(exit == 1 && Lists(output, "leak.md"), $"{repo}: {output}");
-        }
-    }
+    // ---- the CI audit ----
 
     [Fact]
     public void The_CI_audit_lists_tracked_recordings_private_folders_and_large_files_and_passes_a_clean_tree()
@@ -418,15 +532,15 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Write(repo, "call.M4A");
         Write(repo, "Private/a.txt");
         WriteBytes(repo, "big.dat", 6 * 1024 * 1024);
-        Write(repo, "tests/fixtures/tone.wav");
+        Write(repo, "tests/fixtures/tone.wav"); // no exception for test audio: it is made at test time
         Stage(repo, "call.M4A", "Private/a.txt", "big.dat", "tests/fixtures/tone.wav");
         Assert.Equal(0, Commit(repo, "oops", noVerify: true).Exit);
 
         var (exit, output) = Git(repo, audit);
 
         Assert.Equal(1, exit);
-        Assert.True(Lists(output, "call.M4A") && Lists(output, "Private/a.txt") && Lists(output, "big.dat"), output);
-        Assert.False(Lists(output, "tests/fixtures/tone.wav") || Lists(output, "readme.txt"), output);
+        Assert.True(Lists(output, "call.M4A") && Lists(output, "Private/a.txt") && Lists(output, "big.dat") && Lists(output, "tests/fixtures/tone.wav"), output);
+        Assert.False(Lists(output, "readme.txt"), output);
     }
 
     // ---- the committed files themselves ----
@@ -438,14 +552,15 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         var (exit, modes) = Git(root, ["ls-files", "-s", ".githooks"]);
         Assert.SkipWhen(exit != 0, "Not a git checkout.");
         Assert.Matches(@"(?m)^100755 \S+ 0\t\.githooks/pre-commit\r?$", modes);
+        Assert.Matches(@"(?m)^100755 \S+ 0\t\.githooks/commit-msg\r?$", modes);
         Assert.Matches(@"(?m)^100755 \S+ 0\t\.githooks/pre-push\r?$", modes);
         var eol = Git(root, ["ls-files", "--eol", ".githooks"]).Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal(3, eol.Length);
+        Assert.Equal(4, eol.Length);
         Assert.All(eol, line => Assert.StartsWith("i/lf", line));
     }
 
     [Fact]
-    public void The_media_list_the_folders_and_the_fixture_exception_agree_across_gitignore_the_hooks_the_CI_job_and_SECURITY()
+    public void The_media_list_and_the_folders_agree_across_gitignore_the_hooks_the_CI_job_and_SECURITY_with_no_exception()
     {
         var root = FixBatchDownloadTests.RepoRoot();
         var lib = File.ReadAllText(Path.Combine(root, ".githooks", "private-guard.sh"));
@@ -456,8 +571,8 @@ public sealed class PrivateMaterialHooksTests : IDisposable
 
         Assert.NotEmpty(hookExtensions);
         Assert.Equal(ignoredExtensions, hookExtensions);
-        Assert.Contains("!tests/fixtures/*.wav", block);
-        Assert.Contains("tests/fixtures/[^/]+[.]wav", lib);
+        Assert.DoesNotContain(block, line => line.StartsWith('!')); // no exception: a .wav is refused wherever it is (test audio is made at test time)
+        Assert.DoesNotContain("tests/fixtures", lib);
         Assert.All(new[] { "private", "recordings", "transcripts" }, folder =>
         {
             Assert.Contains($"{folder}/", block);
@@ -468,6 +583,28 @@ public sealed class PrivateMaterialHooksTests : IDisposable
         Assert.Contains("\n  private-material:\n", ci);
         Assert.Contains(". .githooks/private-guard.sh", ci);
         Assert.Contains("pg_audit_tracked_files", ci);
-        Assert.Contains("## Private material", File.ReadAllText(Path.Combine(root, ".github", "SECURITY.md")));
+        var security = File.ReadAllText(Path.Combine(root, ".github", "SECURITY.md"));
+        Assert.Contains("## Private material", security);
+        Assert.DoesNotContain("tests/fixtures", security);
+    }
+
+    [Fact]
+    public void No_committed_file_names_the_folder_that_holds_the_private_word_list_and_the_docs_name_the_variable_and_the_config_key()
+    {
+        var root = FixBatchDownloadTests.RepoRoot();
+        var folder = string.Join(' ', "Dictum", "private"); // not spelled out in one piece: this file is committed too
+        var files = Directory.GetFiles(Path.Combine(root, ".githooks")).Concat(
+        [
+            Path.Combine(root, ".gitignore"), Path.Combine(root, ".gitattributes"),
+            Path.Combine(root, ".github", "SECURITY.md"), Path.Combine(root, ".github", "CONTRIBUTING.md"), Path.Combine(root, ".github", "workflows", "ci.yml"),
+        ]);
+        Assert.All(files, file => Assert.DoesNotContain(folder, File.ReadAllText(file), StringComparison.OrdinalIgnoreCase));
+
+        foreach (var doc in new[] { "SECURITY.md", "CONTRIBUTING.md" })
+        {
+            var text = File.ReadAllText(Path.Combine(root, ".github", doc));
+            Assert.Contains("DICTUM_PRIVATE_DENYLIST", text);
+            Assert.Contains("dictum.privateDenylist", text);
+        }
     }
 }
