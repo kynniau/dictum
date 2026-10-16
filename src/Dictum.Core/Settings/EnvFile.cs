@@ -67,7 +67,18 @@ public static class EnvFile
 public sealed class SecretStore
 {
     public const string AnthropicKey = "ANTHROPIC_API_KEY";
+
+    /// <summary>Sent only to OpenAI's server (the OpenAI preset's address); see CloudPresets.</summary>
+    public const string OpenAiKey = "OPENAI_API_KEY";
+
+    /// <summary>Sent only to Google's Gemini server (the Google Gemini preset's address); see CloudPresets.</summary>
+    public const string GeminiKey = "GEMINI_API_KEY";
+
+    /// <summary>Sent only to an OpenAI-compatible server at an address that is not a preset's own (a custom server).</summary>
     public const string LlmKey = "LLM_API_KEY";
+
+    /// <summary>Every key Dictum reads: each is registered with the log redactor and listed (present or absent) by the self-test.</summary>
+    public static IReadOnlyList<string> KeyNames { get; } = [AnthropicKey, OpenAiKey, GeminiKey, LlmKey];
 
     private readonly Dictionary<string, (string Value, string Source)> _values = new(StringComparer.Ordinal);
     private readonly Func<string, string?> _environment;

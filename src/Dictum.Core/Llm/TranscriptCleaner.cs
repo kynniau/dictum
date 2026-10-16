@@ -206,9 +206,18 @@ public sealed class TranscriptCleaner
 
             case LlmSettings.OpenAiCompatible:
                 if (settings.BaseUrl is null) return RulesOnly("rule-based tidy only: llm.base_url is required for openai-compatible");
-                var key = secrets.Get(SecretStore.LlmKey);
+                // The server base_url names decides the key: a preset's own only to its own server, LLM_API_KEY only to a custom
+                // address, none to Ollama on this PC. A service that needs its key gets nothing at all without it.
+                var service = CloudPresets.ForAddress(settings.BaseUrl);
+                var key = service.KeyVariable is { } variable ? secrets.Get(variable) : null;
+                if (key is null && service.KeyRequired)
+                {
+                    log.Warn($"{service.KeyVariable} is not set (environment or .env), so nothing is sent to {new Uri(settings.BaseUrl).Host}; the rule-based tidy is used instead.");
+                    return RulesOnly($"rule-based tidy only: {service.KeyVariable} is not set (environment or .env)");
+                }
                 var oai = new OpenAiCompatibleLlmClient(http, settings.BaseUrl, settings.Model, key);
-                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} (LLM_API_KEY {(key is null ? "absent" : "present")})", mustKeepWords: mustKeepWords);
+                var keyState = service.KeyVariable is null ? "no key sent" : $"{service.KeyVariable} {(key is null ? "absent" : "present")}";
+                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})", mustKeepWords: mustKeepWords);
 
             default:
                 if (AnthropicRedirectWarning(settings) is { } redirect) log.Warn(redirect);

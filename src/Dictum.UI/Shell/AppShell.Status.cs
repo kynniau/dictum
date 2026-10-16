@@ -52,8 +52,11 @@ public sealed partial class AppShell
         return $"{name} · {state}";
     }
 
-    /// <summary>The privacy line at the foot of the tray panel: true when no dictation leaves this PC.</summary>
-    public bool NothingLeaves => CloudPolicy.CloudHost(_settings.Llm) is null || _settings.OfflineOnly || !_cleaner.UsesModel;
+    /// <summary>
+    /// The privacy line at the foot of the tray panel: true when no dictation's text goes to another program. An
+    /// OpenAI-compatible server on this PC is not "nothing leaves" (<see cref="CloudPolicy.NothingLeaves"/>).
+    /// </summary>
+    public bool NothingLeaves => CloudPolicy.NothingLeaves(_settings.Llm, _cleaner.UsesModel);
 
     /// <summary>Recomputes the tooltip and tells the open windows to refresh. Safe from any thread.</summary>
     internal void StatusChanged()

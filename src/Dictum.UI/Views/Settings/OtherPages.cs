@@ -34,6 +34,7 @@ internal sealed class CleanupPage : SettingsPage
         _profanity.HorizontalAlignment = HorizontalAlignment.Left;
         _grammar = Ui.Switch(false, on => Write(("llm.grammar_assist", Json(on))));
         _provider.SelectionChanged += (_, _) => DefaultsForProvider();
+        _baseUrl.TextChanged += (_, _) => ShowAddressHints();
         DefaultsForProvider();
         _enable = Ui.Button("Use cloud clean-up…", "primary", EnableCloud);
         _cloudOff.Children.AddRange([
@@ -64,11 +65,15 @@ internal sealed class CleanupPage : SettingsPage
         _now.Text = Shell.CleanupStatus;
         _profanity.Select(Math.Max(0, Array.IndexOf([ProfanitySettings.Off, ProfanitySettings.Mask, ProfanitySettings.Remove], s.Profanity.Mode)));
         Ui.SetQuietly(_grammar, s.Llm.GrammarAssist);
+        // On for anthropic or openai-compatible: a host off this PC the user agreed to, or a server on this PC (no consent step).
         var host = CloudPolicy.CloudHost(s.Llm);
-        var on = host is not null && CloudPolicy.HasConsent(s.Llm);
+        var server = CloudPolicy.LocalServerHost(s.Llm);
+        var on = (host is not null && CloudPolicy.HasConsent(s.Llm)) || server is not null;
         _cloudOn.IsVisible = on;
         _cloudOff.IsVisible = !on;
-        _cloudState.Text = on ? $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}" : "";
+        _cloudState.Text = !on ? ""
+            : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
+            : $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}";
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
     }
@@ -76,17 +81,38 @@ internal sealed class CleanupPage : SettingsPage
     /// <summary>The preset chosen in the Service list; null for Anthropic, which is its own provider.</summary>
     private CloudPreset? Preset => _provider.SelectedIndex > 0 ? CloudPresets.All[_provider.SelectedIndex - 1] : null;
 
-    /// <summary>Fills the fields for the chosen service: its address, its default model as the hint, its key. Nothing is saved here.</summary>
+    /// <summary>Fills the fields for the chosen service: its address, then the hints that follow it. Nothing is saved here.</summary>
     private void DefaultsForProvider()
     {
         var preset = Preset;
         _baseUrl.Text = preset?.BaseUrl;
         _model.Text = null;
         _baseUrl.Watermark = preset is null ? "(Anthropic's own address)" : preset.BaseUrl ?? "the server's OpenAI-compatible address";
-        _model.Watermark = preset is null ? LlmSettings.AnthropicDefaultModel : preset.DefaultModel ?? preset.ModelHint;
-        _key.Text = preset is null ? $"The key goes in .env in the settings folder: {SecretStore.AnthropicKey}=your Anthropic API key."
-            : preset.KeyVariable is null ? $"{preset.Name} needs no key."
-            : $"The key, if the service needs one, goes in .env in the settings folder: {preset.KeyVariable}=your key. It is one key for every OpenAI-compatible service.";
+        ShowAddressHints();
+    }
+
+    /// <summary>The address switching on would use: the one typed, else the chosen preset's own.</summary>
+    private string? Address(CloudPreset? preset) => string.IsNullOrWhiteSpace(_baseUrl.Text) ? preset?.BaseUrl : _baseUrl.Text.Trim();
+
+    /// <summary>
+    /// The Model hint and the key line follow the address, not just the Service list: an address typed over a preset's is
+    /// another server, which gets neither that preset's default model nor its key (<see cref="CloudPresets.ForAddress"/>).
+    /// </summary>
+    private void ShowAddressHints()
+    {
+        var preset = Preset;
+        if (preset is null)
+        {
+            _model.Watermark = LlmSettings.AnthropicDefaultModel;
+            _key.Text = $"The key goes in .env in the settings folder: {SecretStore.AnthropicKey}=your Anthropic API key.";
+            return;
+        }
+        var address = Address(preset);
+        _model.Watermark = CloudPresets.IsPresetAddress(preset, address) ? preset.DefaultModel ?? preset.ModelHint : "the model name the server uses";
+        var service = CloudPresets.ForAddress(address);
+        _key.Text = service.KeyVariable is null ? $"{service.Name} needs no key."
+            : service.KeyRequired ? $"The key goes in .env in the settings folder: {service.KeyVariable}=your {service.Name} API key. Without it nothing is sent."
+            : $"If the server needs a key, it goes in .env in the settings folder: {service.KeyVariable}=your key.";
     }
 
     /// <summary>A preset only filled the fields: switching on goes through the shell's consent step, as for a typed address.</summary>
@@ -94,8 +120,10 @@ internal sealed class CleanupPage : SettingsPage
     {
         var preset = Preset;
         var provider = preset?.Provider ?? LlmSettings.Anthropic;
-        var baseUrl = string.IsNullOrWhiteSpace(_baseUrl.Text) ? preset?.BaseUrl : _baseUrl.Text.Trim();
-        var model = string.IsNullOrWhiteSpace(_model.Text) ? (preset is null ? LlmSettings.AnthropicDefaultModel : preset.DefaultModel) : _model.Text.Trim();
+        var baseUrl = Address(preset);
+        var model = !string.IsNullOrWhiteSpace(_model.Text) ? _model.Text.Trim()
+            : preset is null ? LlmSettings.AnthropicDefaultModel
+            : CloudPresets.DefaultModelFor(preset, baseUrl); // a typed-over address is another server: no preset default there
         if (model is null)
         {
             Say("Type the model name the server uses.");
@@ -138,9 +166,10 @@ internal sealed class PrivacyPage : SettingsPage
     protected override void Redraw()
     {
         var s = Shell.Settings;
-        _summary.Text = Shell.NothingLeaves
-            ? "Nothing leaves this PC: speech recognition and clean-up both run here."
-            : $"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC.";
+        var server = CloudPolicy.LocalServerHost(s.Llm);
+        _summary.Text = Shell.NothingLeaves ? "Nothing leaves this PC: speech recognition and clean-up both run here."
+            : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
+            : $"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. {CloudPolicy.StateLineWarning}";
         Ui.SetQuietly(_offline, s.OfflineOnly);
         Ui.SetQuietly(_history, !s.Insert.ClipboardHistory);
         Ui.SetQuietly(_transcripts, s.LogTranscripts);

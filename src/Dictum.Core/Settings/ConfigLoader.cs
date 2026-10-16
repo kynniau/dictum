@@ -32,8 +32,7 @@ public static class ConfigLoader
         var file = SettingsLoader.LoadFile(paths.SettingsFile);
         foreach (var warning in file.Warnings) warn(warning);
         var secrets = SecretStore.Load(paths, environment);
-        redactor.Register(secrets.Get(SecretStore.AnthropicKey));
-        redactor.Register(secrets.Get(SecretStore.LlmKey));
+        foreach (var name in SecretStore.KeyNames) redactor.Register(secrets.Get(name));
 
         // A file that cannot be read fails closed: its values are unknown, so neither a stray comma nor a locked file may
         // turn a suppressed hotkey back on or drop offline_only.
