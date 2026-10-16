@@ -23,6 +23,9 @@ public static class SettingsLoader
         AllowTrailingCommas = true,
     };
 
+    /// <summary>The warning for a file whose top level is not an object; also why <see cref="SettingsFile.SetValue(string, string, System.Text.Json.Nodes.JsonNode?, out string?)"/> refuses one.</summary>
+    internal const string NotAnObject = "settings.json must contain a JSON object.";
+
     public static SettingsLoadResult LoadFile(string path)
     {
         if (!File.Exists(path)) return new SettingsLoadResult(new AppSettings(), [], false, NamesSpeechModel: false, NamesCleanupModel: false);
@@ -62,7 +65,7 @@ public static class SettingsLoader
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
             {
-                warnings.Add("settings.json must contain a JSON object.");
+                warnings.Add(NotAnObject);
                 return new SettingsLoadResult(new AppSettings(), warnings, true, Usable: false);
             }
             var settings = Bind(new ObjectReader(root, "", warnings));

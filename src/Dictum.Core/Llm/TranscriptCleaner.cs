@@ -43,6 +43,10 @@ public sealed class TranscriptCleaner
     private readonly ILog _log;
     private readonly ValidationContext _validation;
     private readonly bool _plain;
+    private readonly CancellationTokenSource _retired = new();
+
+    /// <summary>The fallback reason for a dictation whose clean-up a settings reload stopped (<see cref="Retire"/>); for the log.</summary>
+    internal const string Reloaded = "settings reloaded during the dictation";
 
     /// <param name="timeout">llm.timeout_ms: the shortest deadline; longer dictations get longer (<see cref="Deadline"/>).</param>
     /// <param name="deadline">Tests replace the deadline rule; production uses <see cref="Deadline"/>.</param>
@@ -92,6 +96,12 @@ public sealed class TranscriptCleaner
     public bool UsesModel => _client is not null;
 
     /// <summary>
+    /// True when the clean-up sends each dictation's text to another program (a cloud service, or a server on this PC); false
+    /// for the local model and the rule-based tidy. A settings reload retires only such a cleaner (<see cref="Retire"/>).
+    /// </summary>
+    public bool SendsText => _client is not (null or LocalLlmClient);
+
+    /// <summary>
     /// The key variable (OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY) whose absence stopped the configured service when this cleaner was
     /// built, or null. Settings > Clean-up and Privacy read it from the cleaner in use, never from the .env files, so they
     /// say "waiting" exactly while that is why nothing is sent, until a reload builds the next cleaner.
@@ -106,6 +116,13 @@ public sealed class TranscriptCleaner
 
     /// <summary>The checks every reply gets: the prompt, the words it may not drop and the dictionary terms it may not add.</summary>
     internal ValidationContext Validation => _validation;
+
+    /// <summary>
+    /// A settings reload replaced this cleaner: a request it still has under way is cancelled and it starts no other, so that
+    /// dictation gets the rule-based tidy and nothing more goes out on settings the pages no longer show (switched off,
+    /// consent withdrawn, offline only on). The provider's token carries it, so an Anthropic retry is not made either.
+    /// </summary>
+    public void Retire() => _retired.Cancel();
 
     private static int WordCount(string raw) => raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 
@@ -128,6 +145,7 @@ public sealed class TranscriptCleaner
         if (string.IsNullOrWhiteSpace(raw)) return new CleanupResult("", false, null);
         if (_plain) return new CleanupResult(DeterministicCleaner.WhitespaceOnly(raw), false, null);
         if (_client is null) return new CleanupResult(DeterministicCleaner.Clean(raw), false, null);
+        if (_retired.IsCancellationRequested) return Fallback(raw, Reloaded);
         if (SkipReason(raw) is { } skip)
         {
             _log.Info($"Cleanup via {_client.Name} {skip}; the rule-based tidy is used.");
@@ -135,14 +153,15 @@ public sealed class TranscriptCleaner
         }
 
         var deadline = _deadline(WordCount(raw));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); // the provider's token: Esc, or the deadline below
+        // The provider's token: Esc, a settings reload (Retire), or the deadline below.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _retired.Token);
         Task<LlmReply>? call = null;
         try
         {
             call = _client.CompleteAsync(_prompt, raw, timeout.Token);
-            // This stops waiting at the deadline even if the provider does not stop (llama.cpp cannot interrupt a prompt
-            // half-way); the timeout path then cancels the provider's token itself.
-            var reply = await call.WaitAsync(deadline, cancellationToken).ConfigureAwait(false);
+            // This stops waiting at the deadline, or at a reload, even if the provider does not stop (llama.cpp cannot interrupt
+            // a prompt half-way); the timeout path then cancels the provider's token itself.
+            var reply = await call.WaitAsync(deadline, timeout.Token).ConfigureAwait(false);
             if (reply.IsRefusal) return Fallback(raw, $"provider refused (stop_reason {reply.StopReason})");
             if (reply.IsTruncated) return Fallback(raw, $"reply truncated (stop_reason {reply.StopReason})");
             var (text, rejection) = CleanupValidator.Validate(raw, reply.Text, _validation);
@@ -155,7 +174,7 @@ public sealed class TranscriptCleaner
         }
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
         {
-            // The deadline passed: tell the provider to stop, before the using disposes the source. This is the only place the
+            // The deadline passed (or a reload retired this cleaner): tell the provider to stop, before the using disposes the source. This is the only place the
             // provider's token is cancelled for a timeout (the source has no timer of its own any more), so a call past its
             // deadline is always cancelled. Lens probe, 15/10/2026: with a CancelAfter timer racing the dispose, the provider
             // ran on in 21 of 400 timeouts, 396 with busy cores, holding the local model's lock and stalling the next dictation.
@@ -167,7 +186,7 @@ public sealed class TranscriptCleaner
             {
             }
             if (call is not null) Observe(call);
-            return Fallback(raw, $"timed out after {deadline.TotalMilliseconds:0} ms");
+            return Fallback(raw, _retired.IsCancellationRequested ? Reloaded : $"timed out after {deadline.TotalMilliseconds:0} ms");
         }
         catch (Exception ex)
         {

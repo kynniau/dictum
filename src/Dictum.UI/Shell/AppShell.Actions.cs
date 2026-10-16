@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using Dictum.App;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.Storage;
@@ -94,6 +95,7 @@ public sealed partial class AppShell
         var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use); see the log." : "");
         foreach (var failure in result.Failures) _log.Warn($"Not deleted: {failure}");
         _log.Info($"Storage: {scope} {message}");
+        if (scope is RemovalScope.AllDataIncludingSettings && !File.Exists(Paths.SettingsFile)) _offlineOnlyThisSession = false; // deleted on request: no new settings.json (SaveSessionChoices)
         if (scope is RemovalScope.AllData or RemovalScope.AllDataIncludingSettings) Reload(userRequested: false);
         StatusChanged();
         return message;
@@ -134,6 +136,7 @@ public sealed partial class AppShell
         _watcher = null;
         _fileLog?.Stop(); // the logs folder is deleted next; nothing may write it again
         var result = plan.Execute();
+        _offlineOnlyThisSession = false; // nothing is kept: the quit must not write settings.json again (SaveSessionChoices)
         var problems = result.Failures.Concat(Platform.Removal.RemoveShortcutAndStartup()).ToList();
         if (packaged) Platform.Removal.OpenUninstallSettings();
         else if (!Platform.Removal.ScheduleProgramFolderRemoval(Paths.ExeDir, out var reason)) problems.Add(reason ?? "the program folder was not removed");
@@ -160,7 +163,13 @@ public sealed partial class AppShell
     /// <summary>
     /// SPEC §22: before any cloud clean-up is switched on, the consent dialog says what is sent and to whom; only "Allow"
     /// records the consent in consent.json (provider, host, time, app version), then writes the provider to settings.json.
-    /// A plain http:// server off this PC is refused outright.
+    /// A plain http:// server off this PC is refused outright. When settings.json cannot be written, the consent just recorded
+    /// is withdrawn again, since the settings do not name that host, and the write failure is returned. When consent.json
+    /// cannot be deleted either (another program holds it open), the consent withdrawal holds instead
+    /// (<see cref="DisableCloud"/>): the consent on file is not used this session, deleting it is tried again at every reload
+    /// and at quit, and the delete's exception never reaches the page. A successful write ends the off switch's hold
+    /// (<see cref="DisableCloud"/>); a failed one leaves it in force. Only "Allow" ends the switch's consent withdrawal: a
+    /// server on this PC switched on leaves a consent.json that could not be deleted unused.
     /// </summary>
     public string? EnableCloud(LlmSettings proposed)
     {
@@ -172,7 +181,8 @@ public sealed partial class AppShell
             ("llm.base_url", proposed.BaseUrl is null ? null : JsonValue.Create(proposed.BaseUrl)),
             ("llm.model", JsonValue.Create(proposed.Model)),
         };
-        if (CloudPolicy.CloudHost(proposed) is { } host)
+        var host = CloudPolicy.CloudHost(proposed);
+        if (host is not null)
         {
             if (Dialogs.Ask("Send dictations to a cloud service?", CloudPolicy.ConsentText(proposed, host),
                     new DialogChoice("Allow cloud clean-up"), new DialogChoice("Cancel", IsDefault: true)) != 0)
@@ -180,18 +190,80 @@ public sealed partial class AppShell
                 return "Cloud clean-up was not switched on; nothing is sent.";
             }
             CloudConsentFile.Write(Paths.ConsentFile, new CloudConsentRecord(proposed.Provider, host, DateTimeOffset.UtcNow, AppVersion));
+            _consentWithdrawn = false; // a new consent is on record
             _log.Info($"Cloud clean-up agreed to in the consent dialog: {proposed.Provider} at {host}.");
         }
-        Write([.. values]);
-        return null;
+        var withdrawn = _cloudWithdrawn;
+        _cloudWithdrawn = false; // before the write: its reload must load the service just agreed to
+        if (Write([.. values])) return null;
+        _cloudWithdrawn = withdrawn;
+        if (host is not null)
+        {
+            try
+            {
+                CloudConsentFile.Delete(Paths.ConsentFile);
+                _log.Info($"Consent to {host} withdrawn again: settings.json could not be written, so cloud clean-up was not switched on.");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _consentWithdrawn = true; // not used this session; SaveCloudOff deletes it at the next reload and at quit
+                _log.Warn($"Consent to {host} could not be withdrawn again ({SettingsFile.ShortReason(ex, Paths.ConsentFile)}); it is not used this session, and deleting it is tried again at the next reload and at quit.");
+            }
+        }
+        return ModelCoordinator.WriteFailed;
     }
 
-    /// <summary>Switches cloud clean-up off: the consent withdrawn (consent.json deleted), back to the local model.</summary>
-    public void DisableCloud()
+    /// <summary>
+    /// Switches cloud clean-up off, in memory first, before either file is changed (<see cref="SessionChoices"/>): from this
+    /// call until both files keep it, or cloud clean-up is switched on again (<see cref="EnableCloud"/>), no server tidies a
+    /// dictation, on this PC or not, whatever settings.json says; and until consent.json is gone, or "Allow" records a new
+    /// consent, no consent applies, whatever consent.json says, also after a server on this PC is switched on. The reload
+    /// replaces the clean-up in use with the local model, so a request it has under way is cancelled and nothing more is
+    /// sent; then it deletes consent.json and writes the local model to settings.json (<see cref="SaveCloudOff"/>). Returns
+    /// null when both files keep the switch, else <see cref="OffNotSaved"/>: the switch then holds, and saving it is tried
+    /// again at every reload and once at quit.
+    /// </summary>
+    public string? DisableCloud()
     {
-        CloudConsentFile.Delete(Paths.ConsentFile);
+        _cloudWithdrawn = true;
+        _consentWithdrawn = true;
         _log.Info("Cloud clean-up switched off; consent withdrawn.");
-        Write(("llm.provider", JsonValue.Create(LlmSettings.Local)), ("llm.model", JsonValue.Create(CleanupCatalog.Recommend(GpuMachine).Model)));
+        Reload(userRequested: false);
+        return _cloudOffNotSaved is (null, null) ? null : OffNotSaved(_cloudOffNotSaved.Consent, _cloudOffNotSaved.Settings, SettingsNameAServerOnThisPc());
+    }
+
+    /// <summary>
+    /// PROPOSED copy (16/10/2026, fifth draft), not yet approved: the product owner reviews it before release. Pinned word for
+    /// word in CloudOffTakesEffectTests; do not reword it until that review. What Switch cloud clean-up off says when a file
+    /// could not be changed: consent.json still there (<paramref name="consent"/>, why it could not be deleted), settings.json
+    /// not saved (<paramref name="settings"/>), or both. Only the first says plain "off": settings.json was saved, or names no
+    /// cloud service. The first, the one for both files and the variant for a server on this PC say what the files mean if the
+    /// last try, at quit, fails too; the last two also name the start with a settings.json that still cannot be read (not valid
+    /// JSON, say), which runs offline with the defaults (ConfigLoader.BrokenAtStartup). settings.json alone says nothing of
+    /// the next start when the file names a service off this PC (it is refused without a consent on file) or cannot be read
+    /// (the start is offline): nothing is sent either way. Changed in the fifth draft: the sentence for both files ends "turns
+    /// cloud clean-up back on" (the fourth draft's "sends dictations again" is untrue when the next start has offline only on
+    /// or is waiting for a key: CloudPolicy.OfflineOnlyLine, WaitingForKeyLine), and settings.json alone has a variant when the
+    /// file names a server on this PC (<paramref name="serverOnThisPc"/>), which the next start uses again. Unchanged:
+    /// consent.json alone (third draft) and settings.json alone otherwise (second draft).
+    /// </summary>
+    internal static string OffNotSaved(string? consent, string? settings, bool serverOnThisPc) => (consent, settings) switch
+    {
+        ({ } c, null) => $"Cloud clean-up is off, but consent.json could not be deleted ({c}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is deleted, your consent stays on file.",
+        (null, { } s) when serverOnThisPc => $"Cloud clean-up is off for this session, but settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start uses that server again, unless settings.json cannot be read, in which case Dictum starts offline.",
+        (null, { } s) => $"Cloud clean-up is off for this session, but settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits.",
+        ({ } c, { } s) => $"Cloud clean-up is off for this session, but consent.json could not be deleted ({c}) and settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start turns cloud clean-up back on, unless settings.json cannot be read, in which case Dictum starts offline.",
+        _ => throw new ArgumentException("Both files keep the switch: there is nothing to say."),
+    };
+
+    /// <summary>
+    /// settings.json can be read and names a server on this PC (a loopback llm.base_url), which the next start uses again unless
+    /// the switch-off has been saved by then. Read afresh, after the try that could not save it, so it is what the file says now.
+    /// </summary>
+    private bool SettingsNameAServerOnThisPc()
+    {
+        var file = SettingsLoader.LoadFile(Paths.SettingsFile);
+        return file.Usable && CloudPolicy.LocalServerHost(file.Settings.Llm) is not null;
     }
 
     /// <summary>"1.0.0": what the consent record, Report a problem and Check for updates name.</summary>

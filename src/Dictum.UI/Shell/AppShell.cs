@@ -271,6 +271,7 @@ public sealed partial class AppShell : IDisposable
         _disposed = true;
         Models.CancelDownload(); // a download still running at quit stops and deletes its .part
         _watcher?.Dispose();
+        SaveSessionChoices(); // once at quit, the last try to keep this session's choices; with the watcher gone, nothing reloads
         _otherLaunches?.Dispose();
         _hook?.Dispose();
         _fixHook?.Dispose();

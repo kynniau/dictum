@@ -33,6 +33,9 @@ public sealed class ModelCoordinator(
     /// <summary>Added to the download question when the download ends in a model switch.</summary>
     public const string SwitchNote = "Dictum switches to it when the download finishes";
 
+    /// <summary>What the balloon, and a page whose choice it was, say when settings.json cannot be written (<see cref="Write"/>).</summary>
+    public const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
+
     private readonly HashSet<string> _warnedMissing = [];
     private readonly ModelDownloads _downloads = new(http, log, settings, integrity, refreshTooltip, balloon);
     private string? _launchOverride = launchOverride;
@@ -316,19 +319,34 @@ public sealed class ModelCoordinator(
 
     private void SetValues(params (string Key, string Value)[] values) => Write([.. values.Select(v => (v.Key, (JsonNode?)JsonValue.Create(v.Value)))]);
 
-    /// <summary>Writes settings.json keys chosen in the tray or a window, then reloads (and hot-swaps a changed model).</summary>
-    public void Write(params (string Key, JsonNode? Value)[] values)
+    /// <summary>
+    /// Writes settings.json keys chosen in the tray or a window, then reloads (and hot-swaps a changed model). Returns false when
+    /// the file could not be written (the balloon says <see cref="WriteFailed"/>); nothing reloads then.
+    /// </summary>
+    public bool Write(params (string Key, JsonNode? Value)[] values)
     {
-        if (values.Length == 0) return;
-        if (values.All(v => SettingsFile.SetValue(paths.SettingsFile, v.Key, v.Value?.DeepClone())))
+        if (TryWrite(out _, reloadAfter: true, values)) return true;
+        balloon(WriteFailed, true);
+        return false;
+    }
+
+    /// <summary>
+    /// <see cref="Write"/> without the balloon, for a caller that says itself why the file could not be written: writes the
+    /// keys in order and, when <paramref name="reloadAfter"/>, reloads. False when a key could not be written (those before it
+    /// stay written, as in <see cref="Write"/>); <paramref name="failure"/> then says why (<see cref="SettingsFile.ShortReason"/>)
+    /// and nothing reloads.
+    /// </summary>
+    public bool TryWrite(out string? failure, bool reloadAfter, params (string Key, JsonNode? Value)[] values)
+    {
+        failure = null;
+        if (values.Length == 0) return true;
+        foreach (var (key, value) in values)
         {
-            log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
-            reload(); // re-reads settings and hot-swaps the model (hotkey ignored while a speech model loads)
+            if (!SettingsFile.SetValue(paths.SettingsFile, key, value?.DeepClone(), out failure)) return false;
         }
-        else
-        {
-            balloon("settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.", true);
-        }
+        log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
+        if (reloadAfter) reload(); // re-reads settings and hot-swaps the model (hotkey ignored while a speech model loads)
+        return true;
     }
 
     /// <summary>

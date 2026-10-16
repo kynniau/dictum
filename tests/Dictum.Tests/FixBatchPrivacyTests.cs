@@ -145,6 +145,10 @@ public class FixBatchPrivacyTests
     [InlineData(WatcherChangeTypes.Changed, "snippets.txt", null, true)]
     [InlineData(WatcherChangeTypes.Deleted, "snippets.txt", null, true)] // deleting it switches snippets off at once
     [InlineData(WatcherChangeTypes.Deleted, "settings.json", null, false)] // documented: the settings in use stay
+    [InlineData(WatcherChangeTypes.Changed, "consent.json", null, true)] // read-only cleared: the reload saves the switch-off (lens on f69457d)
+    [InlineData(WatcherChangeTypes.Deleted, "consent.json", null, true)] // deleting it withdraws the consent at once
+    [InlineData(WatcherChangeTypes.Renamed, "consent.json", "consent.json.tmp", true)] // the consent dialog's write
+    [InlineData(WatcherChangeTypes.Changed, "consent.json.tmp", null, false)]
     [InlineData(WatcherChangeTypes.Changed, "notes.txt", null, false)]
     public void The_config_folder_watcher_reloads_on_the_right_changes(WatcherChangeTypes change, string name, string? oldName, bool reloads) =>
         Assert.Equal(reloads, AppRules.ReloadsOn(change, name, oldName));
