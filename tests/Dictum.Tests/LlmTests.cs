@@ -264,6 +264,19 @@ public class ProviderParsingTests
     }
 
     [Fact]
+    public async Task Disposing_an_Anthropic_client_leaves_the_shared_http_client_open()
+    {
+        // Lens P13 (16/10/2026): Dispose disposed the SDK client, and with it the HttpClient it was given, which in production is the
+        // app's one shared, offline-guarded client that every later clean-up request goes through.
+        var handler = new RecordingHandler(EndTurnMessage);
+        using var http = new HttpClient(handler);
+        new AnthropicLlmClient("k", "claude-haiku-5-5", TimeSpan.FromSeconds(5), http: http).Dispose();
+        using var next = new AnthropicLlmClient("k", "claude-haiku-5-5", TimeSpan.FromSeconds(5), http: http);
+        var reply = await next.CompleteAsync("s", "u", TestContext.Current.CancellationToken);
+        Assert.Equal("end_turn", reply.StopReason);
+    }
+
+    [Fact]
     public async Task Anthropic_uses_llm_base_url_from_settings_when_set()
     {
         var handler = new RecordingHandler(EndTurnMessage);

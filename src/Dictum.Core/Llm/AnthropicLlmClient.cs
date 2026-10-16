@@ -18,12 +18,15 @@ public sealed class AnthropicLlmClient : ILlmClient, IDisposable
 
     private readonly AnthropicClient _client;
     private readonly string _model;
+    private readonly bool _ownsHttp;
 
     /// <param name="baseUrl">llm.base_url from settings.json, or null for https://api.anthropic.com.</param>
-    /// <param name="http">Production passes the app's offline-guarded HttpClient; tests pass one over a recording handler.</param>
+    /// <param name="http">Production passes the app's offline-guarded HttpClient; tests pass one over a recording handler. It is
+    /// shared: <see cref="Dispose"/> leaves it open.</param>
     public AnthropicLlmClient(string apiKey, string model, TimeSpan timeout, string? baseUrl = null, HttpClient? http = null)
     {
         _model = model;
+        _ownsHttp = http is null;
         BaseUrl = baseUrl ?? DefaultBaseUrl;
         // OpenTelemetry = false: the SDK then reads none of its ANTHROPIC_OPEN_TELEMETRY* variables (12.57.0 XML docs).
         _client = http is null
@@ -60,5 +63,9 @@ public sealed class AnthropicLlmClient : ILlmClient, IDisposable
         return new LlmReply(text, stopReason);
     }
 
-    public void Dispose() => (_client as IDisposable)?.Dispose();
+    /// <summary>Disposes the SDK client only when it made its own HttpClient: disposing it disposes the HttpClient it was given too.</summary>
+    public void Dispose()
+    {
+        if (_ownsHttp) (_client as IDisposable)?.Dispose();
+    }
 }

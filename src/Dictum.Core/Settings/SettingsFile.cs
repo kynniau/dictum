@@ -132,13 +132,22 @@ public static class SettingsFile
     /// leaves the file as it was (and no settings.json.tmp behind) when it cannot be parsed, holds a key twice, or cannot
     /// be written (read-only, locked). JSON comments are not preserved.
     /// </summary>
-    public static bool SetValue(string path, string dottedKey, JsonNode? value)
+    public static bool SetValue(string path, string dottedKey, JsonNode? value) => SetValue(path, dottedKey, value, out _);
+
+    /// <inheritdoc cref="SetValue(string, string, JsonNode?)"/>
+    /// <param name="failure">Why the file was left as it was (<see cref="ShortReason"/>), or null when the key was written.</param>
+    public static bool SetValue(string path, string dottedKey, JsonNode? value, out string? failure)
     {
+        failure = null;
         try
         {
             var text = File.Exists(path) ? File.ReadAllText(path) : "{}";
             var node = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-            if (node is not JsonObject root) return false;
+            if (node is not JsonObject root)
+            {
+                failure = Short(SettingsLoader.NotAnObject, path);
+                return false;
+            }
             var parts = dottedKey.Split('.');
             var target = root;
             foreach (var part in parts[..^1])
@@ -156,8 +165,26 @@ public static class SettingsFile
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
+            failure = ShortReason(ex, path);
             return false; // ArgumentException: a key given twice ("An item with the same key has already been added")
         }
+    }
+
+    /// <summary>
+    /// Why a file in the settings folder could not be changed, for a sentence that names the file itself: the exception's
+    /// first sentence without the file's path (or the .tmp written beside it) and without the full stop, starting lower case
+    /// unless it opens with an acronym ("access to the path is denied").
+    /// </summary>
+    internal static string ShortReason(Exception ex, string path) => Short(ex.Message, path) is { Length: > 0 } reason ? reason : ex.GetType().Name;
+
+    private static string Short(string message, string path)
+    {
+        var full = Path.GetFullPath(path);
+        foreach (var named in new[] { full + ".tmp", full }) // the .tmp first: it contains the file's own path
+            message = message.Replace($"'{named}'", "", StringComparison.OrdinalIgnoreCase).Replace(named, "", StringComparison.OrdinalIgnoreCase);
+        var end = message.IndexOf(". ", StringComparison.Ordinal);
+        var reason = string.Join(' ', (end >= 0 ? message[..end] : message).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).Replace(" .", ".").TrimEnd('.');
+        return reason.Length > 1 && char.IsUpper(reason[0]) && char.IsLower(reason[1]) ? char.ToLowerInvariant(reason[0]) + reason[1..] : reason;
     }
 
     private static void WriteAtomic(string path, string content)

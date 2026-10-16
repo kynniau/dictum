@@ -13,6 +13,8 @@ public sealed partial class AppShell
 {
     private string? _offlineWarned;
     private string? _redirectWarned;
+    private bool _cloudWithdrawn; // Switch cloud clean-up off, until cloud clean-up is switched on again (DisableCloud, EnableCloud)
+    private bool _offlineOnlyThisSession; // offline only switched on but not saved to settings.json (SetOfflineOnly)
 
     private void LoadConfiguration(bool isReload)
     {
@@ -27,13 +29,15 @@ public sealed partial class AppShell
         {
             Notify("Dictum settings", $"{config.File.Warnings.Count} setting(s) were invalid and use defaults. Details are in the log.", warning: true);
         }
-        _settings = config.Settings;
+        _settings = SessionChoices(config.Settings, config.Secrets);
         if (_fileLog is not null) _fileLog.MinLevel = LogExtensions.ParseLevel(_settings.LogLevel);
         var personal = Personal.Load(); // dictionary, corrections, profanity list (SPEC §16)
         var outgoing = _cleaner;
         _cleaner = TranscriptCleaner.Create(_settings.Llm, _settings.OfflineOnly, config.Secrets, _http, _log, () => _llm.Ready,
             personal.ForCleanup(_settings.Profanity), WhisperLanguages.OutputIsEnglish(_settings.Whisper.Language, _settings.Whisper.Translate));
-        outgoing.Retire(); // a request it still has under way is cancelled: that dictation gets the rule-based tidy, nothing waits on the old settings
+        // A request it still sends is cancelled: that dictation gets the rule-based tidy and nothing more goes out on the old
+        // settings. The local model sends nothing, so its clean-up under way finishes (a dictionary word, a finished download).
+        if (outgoing.SendsText) outgoing.Retire();
         _llm.SetPrompt(_cleaner.SystemPrompt); // a loaded model re-evaluates a changed prompt now, not during the next dictation
         _models.SetDecoding(new DecodeOptions(personal.Dictionary.WhisperPrompt, _settings.Whisper.BeamSize, _settings.Whisper.Language, _settings.Whisper.Translate));
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)
@@ -47,6 +51,19 @@ public sealed partial class AppShell
             Dispatcher.UIThread.Post(() => Notify("Dictum", $"Anthropic requests will go to {new Uri(_settings.Llm.BaseUrl!).Host} (llm.base_url).", warning: true));
         }
         _log.Info($"{(isReload ? "Settings reloaded" : "Settings loaded")}: hotkey {_settings.Hotkey}, model {_settings.Whisper.Model}, insert {_settings.Insert.Method}, cleanup {_cleaner.Status}.");
+    }
+
+    /// <summary>
+    /// What this session's choices keep in force over the files, applied after every load: once cloud clean-up is switched off
+    /// (<see cref="DisableCloud"/>) no server is used, on this PC or not, and no consent applies, whatever settings.json and
+    /// consent.json still say; offline only switched on stays on when settings.json could not save it (<see cref="SetOfflineOnly"/>).
+    /// </summary>
+    private AppSettings SessionChoices(AppSettings settings, SecretStore secrets)
+    {
+        if (_offlineOnlyThisSession) settings = settings with { OfflineOnly = true };
+        if (!_cloudWithdrawn || settings.Llm.Provider is not (LlmSettings.Anthropic or LlmSettings.OpenAiCompatible)) return settings;
+        var local = settings with { Llm = settings.Llm with { Provider = LlmSettings.Local, CloudConsent = null } };
+        return EffectiveSettings.Cleanup(local, secrets.Get(SecretStore.AnthropicKey) is not null, () => ProbeGpu(local), _log.Warn);
     }
 
     private bool ProbeGpu(AppSettings settings)
@@ -97,6 +114,38 @@ public sealed partial class AppShell
 
     /// <summary>The switch at the top of the tray panel: dictation on or off, saved as "enabled".</summary>
     public void SetEnabled(bool enabled) => ApplyEnabled(enabled, persist: true);
+
+    /// <summary>
+    /// Settings > Privacy > Offline only, saved as "offline_only". Switched on, it takes effect even when settings.json cannot be
+    /// saved: it then stays on until Dictum quits (<see cref="SessionChoices"/>) and <see cref="OfflineOnlyNotSaved"/> says why.
+    /// Switched off, nothing changes unless the file is saved (<see cref="ModelCoordinator.WriteFailed"/>). Null: saved.
+    /// </summary>
+    public string? SetOfflineOnly(bool on)
+    {
+        if (SettingsFile.SetValue(Paths.SettingsFile, "offline_only", JsonValue.Create(on), out var failure))
+        {
+            _offlineOnlyThisSession = false; // the file holds the choice now
+            _log.Info($"Set from the app: offline_only = {(on ? "true" : "false")}.");
+            Reload(userRequested: false);
+            return null;
+        }
+        _log.Warn($"Could not write \"offline_only\" to settings.json ({failure}).");
+        if (!on)
+        {
+            StatusChanged(); // the switch shows the settings in use again: offline only stays on
+            return ModelCoordinator.WriteFailed;
+        }
+        _offlineOnlyThisSession = true;
+        Reload(userRequested: false);
+        return OfflineOnlyNotSaved(failure!);
+    }
+
+    /// <summary>
+    /// PROPOSED copy (16/10/2026), not yet approved: the product owner reviews it before release. Pinned word for word in
+    /// CloudOffTakesEffectTests; do not reword it until that review.
+    /// </summary>
+    internal static string OfflineOnlyNotSaved(string reason) =>
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Fix the file so it stays on after a restart.";
 
     private void ApplyEnabled(bool enabled, bool persist)
     {

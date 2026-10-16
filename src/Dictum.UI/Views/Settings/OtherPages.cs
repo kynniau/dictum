@@ -164,7 +164,10 @@ internal sealed class PrivacyPage : SettingsPage
 
     public PrivacyPage(AppShell shell) : base(shell, "Privacy")
     {
-        _offline = Ui.Switch(false, on => Write(("offline_only", Json(on))));
+        _offline = Ui.Switch(false, on =>
+        {
+            if (!Refreshing) Run(() => Say(Shell.SetOfflineOnly(on) ?? "")); // on even when it cannot be saved; the switch follows the settings in use
+        });
         _history = Ui.Switch(true, on => Write(("insert.clipboard_history", Json(!on))));
         _transcripts = Ui.Switch(false, on => Write(("log_transcripts", Json(on))));
         Compose(

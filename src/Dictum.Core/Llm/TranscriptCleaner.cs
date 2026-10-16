@@ -96,6 +96,12 @@ public sealed class TranscriptCleaner
     public bool UsesModel => _client is not null;
 
     /// <summary>
+    /// True when the clean-up sends each dictation's text to another program (a cloud service, or a server on this PC); false
+    /// for the local model and the rule-based tidy. A settings reload retires only such a cleaner (<see cref="Retire"/>).
+    /// </summary>
+    public bool SendsText => _client is not (null or LocalLlmClient);
+
+    /// <summary>
     /// The key variable (OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY) whose absence stopped the configured service when this cleaner was
     /// built, or null. Settings > Clean-up and Privacy read it from the cleaner in use, never from the .env files, so they
     /// say "waiting" exactly while that is why nothing is sent, until a reload builds the next cleaner.
