@@ -21,6 +21,16 @@
 #ifndef OutputDir
   #define OutputDir "..\dist"
 #endif
+; CheckVcRedist: the build carries no Visual C++ runtime (publish.ps1 without -VcRuntimeDir), so Setup checks for the
+; Microsoft Visual C++ Redistributable at the end. build-installer.ps1 defines it, with MinVcMajor and MinVcMinor.
+#ifdef CheckVcRedist
+  #ifndef MinVcMajor
+    #error Build with scripts\build-installer.ps1: MinVcMajor is not defined.
+  #endif
+  #ifndef MinVcMinor
+    #error Build with scripts\build-installer.ps1: MinVcMinor is not defined.
+  #endif
+#endif
 
 [Setup]
 ; AppId ties every version together (an upgrade replaces the previous one; Apps & features finds the uninstaller).
@@ -107,6 +117,40 @@ begin
       'uninstall.ps1 -KeepData before you start Dictum: Dictum then moves Dictate''s settings, models and ' +
       'recordings across on its first start.', mbInformation, MB_OK, IDOK);
 end;
+
+#ifdef CheckVcRedist
+{ whisper.cpp and llama.cpp need the Microsoft Visual C++ Redistributable (x64) {#MinVcMajor}.{#MinVcMinor} or later
+  (docs\DECISIONS.md, "Visual C++ runtime"); its version is in this key ("Redistribute Visual C++ files", Microsoft
+  Learn, read 17/10/2026). Setup is per user and cannot install it, so it offers Microsoft's download instead. }
+const
+  VcRuntimeKey = 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
+  VcRedistUrl = 'https://aka.ms/vc14/vc_redist.x64.exe';
+
+function VcRuntimeAt(RootKey: Integer): Boolean;
+var
+  Installed, Major, Minor: Cardinal;
+begin
+  Result := RegQueryDWordValue(RootKey, VcRuntimeKey, 'Installed', Installed) and (Installed = 1) and
+    RegQueryDWordValue(RootKey, VcRuntimeKey, 'Major', Major) and
+    RegQueryDWordValue(RootKey, VcRuntimeKey, 'Minor', Minor) and
+    ((Major > {#MinVcMajor}) or ((Major = {#MinVcMajor}) and (Minor >= {#MinVcMinor})));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ErrorCode: Integer;
+begin
+  if (CurStep = ssPostInstall) and not (VcRuntimeAt(HKLM64) or VcRuntimeAt(HKLM32)) then
+  begin
+    Log('The Microsoft Visual C++ Redistributable (x64) {#MinVcMajor}.{#MinVcMinor} or later is not installed.');
+    if SuppressibleMsgBox('Dictum''s speech recognition and AI clean-up need the Microsoft Visual C++ ' +
+      'Redistributable (x64), version {#MinVcMajor}.{#MinVcMinor} or later, and this PC does not have it. Installing it ' +
+      'needs administrator rights.' + #13#10#13#10 + 'Download it from Microsoft now? Run the downloaded ' +
+      'vc_redist.x64.exe, then start Dictum.' + #13#10#13#10 + VcRedistUrl, mbConfirmation, MB_YESNO, IDNO) = IDYES then
+      ShellExecAsOriginalUser('open', VcRedistUrl, '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+  end;
+end;
+#endif
 
 function UserDataFolders(): String;
 begin

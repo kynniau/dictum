@@ -1403,3 +1403,177 @@ measured). The re-run failed only the pin.
 (`FullyQualifiedName!~Install_copies_models`; CI runs that test): 93e7e72 1,202 total, 1,183 passed, 19 skipped, 0 failed;
 with these changes 1,212, 1,193, 19, 0 (ten more test cases). Not run in this lane: any real model or GPU, Dictum.exe, and the
 desktop- and tray-gated tests (the 19 skipped). No on-screen string changed.
+
+## Visual C++ runtime (Store certification fix, 17/10/2026, branch fix/vc-runtime)
+
+**The finding** (investigation lane, 16/10/2026; evidence in that session's scratchpad: `sbx\vcrt-check.wsb`,
+`sbx\in\run.ps1`, `sbx\out\*`, `pe-imports.ps1`, `vcrt-exports-check.ps1`, `logs\vclibs-*`). The first Store submission
+failed certification; the tester's screenshot showed "model error" and "error". Every whisper.cpp and llama.cpp DLL
+imports `MSVCP140.dll`, `VCRUNTIME140.dll` and `VCRUNTIME140_1.dll`, and the ggml CPU builds also `VCOMP140.DLL`; the
+.NET runtime and Avalonia's native libraries import none of them. The Store package carried none and declared only
+`TargetDeviceFamily`. In Windows Sandbox 10.0.26100 (no VC++ DLLs in System32, no redistributable registry key, no
+VCLibs packages) `--selftest` printed `whisper runtime … model load failed: Exception: Failed to load native whisper
+library …` and `cleanup backend … load failed: TypeInitializationException: The type initializer for
+'LLama.Native.NativeApi' threw an exception.` while the UI ran. With the four VC++ 14.40.33728 DLLs beside each native
+runtime folder both engines loaded and `--transcribe` transcribed a 10.74 s clip. Whisper.net also found a runtime DLL
+beside Dictum.exe; LLamaSharp did not.
+
+Measured again on this branch (17/10/2026): the published layout has 38 native DLLs in 8 folders under `runtimes\`; all
+38 import the VC++ runtime and 10 of them `vcomp140.dll`. Their PE headers name MSVC linker 14.44 (Whisper.net.Runtime
+and .Vulkan 1.9.1, LLamaSharp.Backend.Cpu and .Vulkan.Windows 0.27.0) and 14.51 (Whisper.net.Runtime.NoAvx 1.9.1).
+The investigation's export check, re-run against the 14.40.33728 framework DLLs: 1,977 imported VC++ functions across
+the five packages, 0 missing.
+
+**Sources** (Microsoft Learn, read 17/10/2026, unless marked):
+- "C++ Runtime framework packages for Desktop Bridge" (KB 3176696): desktop apps that depend on the C++ runtime "must
+  specify the corresponding version of the C++ Runtime framework package" instead of redistributing the runtime, with the
+  `PackageDependency` for `Microsoft.VCLibs.140.00.UWPDesktop` and Publisher
+  `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`.
+- "MSIX troubleshooting guide", Missing dependencies: through the Store "framework dependencies are automatically
+  downloaded and installed"; a sideload installs https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx first.
+- "Basic troubleshooting for Windows App" lists `Microsoft.VCLibs.140.00.UWPDesktop_14.0.33728.0` as a current framework
+  file. The build PC has 14.0.33728.0 (x64 and x86) from the Store, Publisher as above, its DLLs 14.40.33728.0 signed
+  Microsoft Corporation (`Get-AppxPackage`, `Get-AuthenticodeSignature`, 17/10/2026). MinVersion is that version, the one
+  tested.
+- "Dynamic-link library search order": a packaged process searches its package dependency graph for a DLL's
+  dependencies "even if the first DLL was loaded by specifying a full path".
+- "Redistribute Visual C++ files" and "Distributable Code for Visual Studio 2022": distribution of the redistributable
+  package, merge modules and individual binaries "is limited to licensed Visual Studio users"; the files come from
+  `[VisualStudioFolder]\VC\redist`; app-local copies are not recommended for servicing reasons; the redistributable's
+  registry key and its `/install /quiet /norestart` switches; run unelevated, it asks for UAC.
+- "Microsoft Visual C++ Redistributable latest supported downloads": https://aka.ms/vc14/vc_redist.x64.exe;
+  "Redistribution is permitted only for licensed Visual Studio users"; the installed redistributable "must be the same
+  or later than the version of the MSVC Build Tools used to create your application".
+- Whisper.net 1.9.1's readme (in its NuGet package): "Microsoft Visual C++ Redistributable for at least Visual Studio
+  2022 (x64)" and "Windows 11 or Windows Server 2022 (or newer) is required".
+
+**Fix, Store package.** `packaging/AppxManifest.template.xml` declares
+`<PackageDependency Name="Microsoft.VCLibs.140.00.UWPDesktop" MinVersion="14.0.33728.0" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />`.
+`package-msix.ps1` leaves any app-local VC++ DLL out of the layout (observed: "Left out 32 app-local Visual C++ runtime
+DLLs" when packaging a `-VcRuntimeDir` publish) and ends by naming the dependency. Rebuilt on 17/10/2026 from this
+branch with `package-msix.ps1 -Store -NoPublish` over a plain publish: `dist\Dictum-1.0.0-store.msix`, 105,953,677
+bytes, unsigned, 350 files; rebuilt again with the bundled model (below), 239,909,521 bytes, 352 files. In both, the
+`AppxManifest.xml` read back out of the .msix carries the element, and the .msix holds no VC++ DLL.
+
+**Fix, direct download: the route taken, and why.**
+- No licensed app-local source is on the build PC: no Visual Studio or Build Tools (no `Microsoft Visual Studio` folder
+  under either Program Files, no vswhere), no Windows SDK, no `Microsoft.VC14*.CRT` folder under `C:\Program Files*`,
+  `C:\ProgramData`, `D:\`, `G:\` or `E:\` (the private data folder excluded), and no VCLibs `.appx` in the NuGet cache or
+  anywhere else searched. The only copies are the installed redistributable in System32 (14.51.36247) and the installed
+  framework package (14.40.33728); neither is a documented source to redistribute from.
+- Microsoft limits redistribution of the runtime in every form, the vc_redist package included, to licensed Visual
+  Studio users, so bundling vc_redist.x64.exe into Setup needs the same licence as app-local DLLs. Setup is also per user
+  (`PrivilegesRequired=lowest`): it never runs elevated, so it could not run vc_redist silently.
+- So this branch redistributes nothing. `publish.ps1 -VcRuntimeDir <Visual Studio or Build Tools VC\Redist\MSVC\<version>\x64>`
+  copies the four DLLs beside each of the 8 native runtime folders and refuses a DLL that is not Microsoft-signed or is
+  older than 14.51 (`$MinVcRuntime` in `scripts/build-common.ps1`: the newest linker above); without it, publish warns.
+  A Setup built from such a layout carries the runtime. Any other Setup reads
+  `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` (Installed, Major, Minor) at the end and offers to open
+  https://aka.ms/vc14/vc_redist.x64.exe. README: Install (both direct-download routes), Build from source, Troubleshooting
+  and staff deployment.
+- **For Kyle to decide:** whether Kynni installs Visual Studio or Build Tools whose redistributable is 14.51 or later on
+  the build PC, under a licence it holds, and builds releases with `-VcRuntimeDir`. Staff without administrator rights
+  need that, since the redistributable needs an administrator. The first such release must carry whatever notice the
+  Visual Studio licence asks for (the licence text was not read here), which is why no third-party notice was added:
+  nothing is redistributed yet. CI does not pass `-VcRuntimeDir`; whether Kynni may redistribute DLLs from GitHub's
+  runner image is a licence question this branch does not settle.
+
+**Test.** `tests/Dictum.Tests/VcRuntimeTests.cs`: a C# port of `pe-imports.ps1` (import and delay-import tables,
+machine, linker version) and 7 tests, one a theory of 3. Every whisper and llama engine imports the runtime and nothing
+beyond `$VcRuntimeDlls`; the template declares the tested framework from Microsoft and the layout carries no copy; a
+manifest without the element, with an older MinVersion or with another publisher is refused; a Store layout with its
+own `vcruntime140.dll` is refused; a direct-download layout needs the DLLs beside every DLL that imports them (one
+missing, named); `$MinVcRuntime` is no older than the newest linker; and, gated on `DICTUM_PUBLISHED_DIR`, a real layout
+(the Store check when it holds an `AppxManifest.xml`, else app-local). Observed failing on the reverted behaviour, each
+then restored:
+- the template's PackageDependency line deleted: 4 of the 9 failed (the Store test, "Collection was not empty", and the
+  three theory cases);
+- `$MinVcRuntime` set to 14.44: 1 failed, "accepts a Visual C++ runtime from 14.44, but a native DLL was linked by MSVC
+  14.51";
+- `vcomp140.dll` dropped from `$VcRuntimeDlls`: 2 failed;
+- one shipped DLL removed from a `-VcRuntimeDir` publish (`runtimes\win-x64\native\avx2\vcomp140.dll`): the gated test
+  failed, naming `runtimes\win-x64\native\avx2\ggml-cpu.dll imports vcomp140.dll`;
+- the plain publish fails the gated test too, by design; the Store layout passes it, also when packaged from a
+  `-VcRuntimeDir` publish.
+
+**Clean-PC check** (`scripts/sandbox-check.ps1`, `scripts/sandbox-check.wsb`, `scripts/sandbox-check-inside.ps1`;
+Windows Sandbox 10.0.26100 with no VC++ DLLs in System32, no redistributable key and no VCLibs packages; ggml-base.en and
+qwen2.5-0.5b mapped read-only; 17/10/2026 from 00:32 AEDT; microphone lines fail in every run, as there is no audio, and
+do not count):
+- (these layouts were built before the base.en model was bundled, below; the model file does not change which DLLs
+  load)
+- the rebuilt zip layout (`publish.ps1` without `-VcRuntimeDir`), gpu auto and cpu: `whisper runtime … model load
+  failed: Exception: Failed to load native whisper library … [FAIL]` and `cleanup backend … load failed:
+  TypeInitializationException … [FAIL]`. The README's redistributable step is required for it.
+- a `-VcRuntimeDir` layout built only for this check from the build PC's System32 copies (14.51.36247; never shipped,
+  kept in the session scratchpad): auto `whisper runtime … Vulkan (whisper.gpu = auto; loaded in 4.1 s) [OK]` and
+  `cleanup backend … Vulkan (llm.gpu = auto; loaded in 4.4 s; …native/vulkan/llama.dll) [OK]`; cpu `CPU (whisper.gpu =
+  cpu; loaded in 0.7 s) [OK]` and `CPU (llm.gpu = cpu; loaded in 3.5 s; …native/avx2/llama.dll) [OK]`.
+- the Store layout: Windows refused it without the framework, `0x80073CF3`, "Windows cannot install package
+  Kynni.Dictum_1.0.0.0_x64__43s584kx66f64 because this package depends on a framework that could not be found. Provide the
+  framework "Microsoft.VCLibs.140.00.UWPDesktop" published by "CN=Microsoft Corporation, O=Microsoft Corporation,
+  L=Redmond, S=Washington, C=US", with neutral or x64 processor architecture and minimum version 14.0.33728.0": the
+  declared dependency is read and enforced as written. Registering the framework from a copy of the build PC's installed
+  folder failed both ways (Developer Mode: "DevelopmentMode is not allowed when registering framework or resource
+  packages"; without it: "the manifest is not in the package root"), so the packaged self-test did not run. It needs
+  Microsoft's signed `.appx`, which is not on the build PC; docs/TESTING-MSIX.md has the command.
+
+**Risks, and what is not verified.**
+- The packaged app loading both engines from the framework: inferred, not observed. Premises: the manifest declares the
+  framework (read back from the .msix, and enforced by Windows above); a packaged process searches its dependency graph
+  for the dependencies of a DLL loaded by full path ("Dynamic-link library search order"); the framework's 14.40.33728
+  DLLs export every import and loaded both engines' Vulkan builds (investigation).
+- The framework's runtime (14.40.33728) is older than the build tools of the native DLLs (14.44 and 14.51), and
+  Microsoft's rule is a runtime at least as recent as the build tools. No newer UWPDesktop framework was seen: 14.0.33728.0
+  is what Learn's Windows App page names and what the build PC's Store-updated install has. Every import is exported by
+  14.40; the CPU and no-AVX builds were not exercised on 14.40.
+- Setup's runtime check compiled (Inno Setup 7.1.0); its behaviour at install time is not verified here.
+- Windows 10 (F6): Whisper.net's readme says Windows 11 or Server 2022, the manifest allows 10.0.17763, and nothing has
+  run on Windows 10 (docs/STORE.md, section 4). No change made.
+- Partner Center and a package version it has already seen: recalled, not verified, that it refuses one; STORE.md's
+  go-live list gives `-Version 1.0.1` as the fallback.
+
+**Also on this branch, F7.** `ModelDownloader.LoginRequired` ends the balloon for a model behind a Hugging Face login
+(and the 401/403 error). Before: "requires a Hugging Face login to download; use install.ps1 -ModelsFrom or
+download-model.ps1 with a token" (scripts the Store package does not ship). After: "requires a Hugging Face login to
+download; download it in your browser, then choose it in Settings > Models". The Models page's buttons are "Choose model
+file…" and "Choose .gguf file…", so the text names the page, which every build has. A balloon: it joins the morning
+batch. `A_login_wall_points_at_Settings_not_at_scripts_the_Store_package_lacks` pins it (observed failing with the old
+text). Not changed: `OfflineOnlyException` also names `install.ps1 -ModelsFrom`.
+
+**Also on this branch: the bundled base.en model (Decision 16, Kyle, 17/10/2026, through the orchestrator).** Every
+package layout carries the base.en speech model, so first use and Store testing need no download.
+- `scripts/publish.ps1` puts `models\ggml-base.en.bin` and `THIRD-PARTY-NOTICES.txt` beside Dictum.exe in
+  `dist\Dictum`, and both are in its required-file list. Every layout takes that folder whole: the zip
+  (`Compress-Archive` of the folder), the installer (`[Files]` `{#PublishDir}\*` with `recursesubdirs`), `install.ps1`
+  (copies the whole build) and both MSIX flavours (the layout is a copy of `dist\Dictum`). The model comes from
+  `dist\model-cache`, else from a copy of `%LOCALAPPDATA%\Dictum\models\ggml-base.en.bin` (read only), else from
+  huggingface.co at commit `5359861c739e955e79d9a303bcbc70fb988958b1`. In every case
+  `download-model.ps1 -Model base.en -ModelsDir dist\model-cache` checks the size and SHA-256 against its table (the
+  catalogue's values, kept in sync by an existing unit test) and throws on a mismatch, which stops the publish and, in
+  CI, the job; the tag build packs the installer and the test MSIX from that same `dist\Dictum`.
+- Observed 17/10/2026 on the build PC (reused copy): "…\dist\model-cache\ggml-base.en.bin already exists and matches
+  (147964211 bytes). Nothing to do."; the copy in `dist\Dictum\models` and the entry inside the .msix both 147,964,211
+  bytes, SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002` (`Get-FileHash`; SHA-256 of the zip
+  entry). The download path was not run here; CI runs it on every push.
+- Sizes, 17/10/2026, before and after: `dist\Dictum` 275 files, 292,416,648 bytes, then 277 files, 440,383,016 bytes
+  (each plus manifest.txt); zip 103,208,176 then 236,986,310 bytes; Setup 55,248,402 then 184,530,924 bytes; Store MSIX
+  105,953,677 then 239,909,521 bytes (350 then 352 files; SHA-256 of the new one
+  `cda44d16b58b3ca30c7f845362146a2dc138615ca5ff96c54376c38912a9a526`).
+- Licence, verified 17/10/2026: the Hugging Face API for ggerganov/whisper.cpp gives `license: mit`, at sha
+  `5359861c…` (the pinned commit is the current one); openai/whisper's README says "Whisper's code and model weights are
+  released under the MIT License", and its LICENSE reads "Copyright (c) 2022 OpenAI"; ggml-org/whisper.cpp's LICENSE
+  reads "Copyright (c) 2023-2026 The ggml authors". `THIRD-PARTY-NOTICES.txt` carries both copyright lines and the MIT
+  text, and ships beside Dictum.exe. The brief asked for the entry "as the repo's notices already do for other
+  components", but there were none: no notices file in the repository, and no licence or notice file in `dist\Dictum`
+  for the libraries it bundles (whisper.cpp, llama.cpp, Whisper.net, LLamaSharp, Avalonia and others; their licences are
+  recalled as MIT-style, not verified here). Flagged, not fixed on this branch.
+- Tests: `tests/Dictum.Tests/BundledModelTests.cs` pins publish.ps1's `$bundledModel` to base.en in the catalogue, and
+  the notice to the catalogue's file, commit, size and SHA-256 and to both copyright lines; gated on
+  `DICTUM_PUBLISHED_DIR`, a layout must carry the model byte for byte and the notice. Observed failing: the gated test on
+  the layout built before this change ("…\models\ggml-base.en.bin is missing"), and the notice test with the OpenAI line
+  removed. Both gated layout tests pass on the Store layout; on `dist\Dictum` the model test passes and the VC runtime
+  test fails, by design (no `-VcRuntimeDir`).
+- Not on this branch: the app reading the bundled file. A separate lane makes the app look in `<exe dir>\models` as a
+  read-only fallback; until that merges, every build carries the file and the first run still offers a download. Build
+  the Store package after both have merged.

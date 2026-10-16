@@ -50,6 +50,28 @@ local machine store affects certificate trust for every user of the PC, which is
 
 ## 3. Install and check (normal PowerShell)
 
+**First, Microsoft's Visual C++ runtime framework package.** Since 17/10/2026 the package declares
+`Microsoft.VCLibs.140.00.UWPDesktop` (14.0.33728.0 or later) as a dependency: whisper.cpp and llama.cpp need the Visual
+C++ runtime, and a packaged app takes it from that framework package instead of carrying its own copy (docs/DECISIONS.md,
+"Visual C++ runtime"). The Store installs it with Dictum; a sideload does not, and without it installation fails with a
+dependency error naming `Microsoft.VCLibs` ("MSIX troubleshooting guide", Microsoft Learn, read 17/10/2026). Many PCs
+already have it:
+
+```powershell
+Get-AppxPackage -Name Microsoft.VCLibs.140.00.UWPDesktop | Select-Object Name, Version, Architecture
+```
+
+If no x64 entry of 14.0.33728.0 or later is listed, install Microsoft's framework package first. The troubleshooting
+guide names `Microsoft.VCLibs.x64.14.00.Desktop.appx` at https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx (a
+Microsoft-signed file: check that its signer is Microsoft Corporation before installing it):
+
+```powershell
+Get-AuthenticodeSignature "C:\path\to\Microsoft.VCLibs.x64.14.00.Desktop.appx" | Select-Object Status, SignerCertificate
+Add-AppxPackage -Path "C:\path\to\Microsoft.VCLibs.x64.14.00.Desktop.appx"
+```
+
+Then Dictum:
+
 ```powershell
 Add-AppxPackage -Path "C:\path\to\Dictum-1.0.0-test.msix"     # or double-click the .msix and choose Install
 Get-AppxPackage -Name Kynni.Dictum | Select-Object Name, Version, Publisher, PackageFamilyName, InstallLocation
@@ -64,7 +86,9 @@ Then:
 1. Start **Dictum** from the Start menu. Settings > About says whether it runs as an installed package.
 2. Self-test from a terminal through the package's alias, with package identity: `Dictum.exe --selftest | Out-Host`
    (the alias lives in `%LOCALAPPDATA%\Microsoft\WindowsApps`, which is on PATH). Its `build` line should read
-   `packaged (Kynni.Dictum_<id>)`, not `unpackaged (direct download)`.
+   `packaged (Kynni.Dictum_<id>)`, not `unpackaged (direct download)`, and its `whisper runtime` and `cleanup backend`
+   lines should end in `[OK]` once a model is downloaded (`model load failed` there is the certification failure of
+   16/10/2026).
 3. Dictate once into Notepad (hold the hotkey, speak, let go).
 4. Settings > General > Launch at login: turn it on, then check Task Manager > Startup apps lists Dictum; turn it off.
 5. Settings > Storage shows the real folders (the package's private copies under
@@ -98,4 +122,30 @@ Microsoft recommends removing such certificates when they are no longer needed.
 
 A developer alternative that needs no certificate, Developer Mode's `Add-AppxPackage -Register` of the unpacked
 layout (`packaging\out\msix-test\layout\AppxManifest.xml`), tests the app with package identity but not the signed
-package or the install path, and the same Dictate-data warning applies.
+package or the install path, and the same Dictate-data warning applies. The framework package must be installed first
+there too, from its `.appx` (step 3).
+
+## Windows Sandbox: the clean-PC check
+
+A development PC nearly always has the Visual C++ runtime, so the certification failure of 16/10/2026 only shows on a
+clean Windows. `scripts\sandbox-check.ps1` runs `--selftest` inside Windows Sandbox (a clean Windows, discarded when it
+closes) and passes only when the speech engine loads, and the clean-up engine when `-CleanupModel` is given:
+
+```powershell
+# A published folder (publish.ps1 output, or an unzipped release):
+powershell -ExecutionPolicy Bypass -File scripts\sandbox-check.ps1 -Published dist\Dictum
+# A package layout, registered in the sandbox's Developer Mode after Microsoft's framework .appx (step 3 above):
+powershell -ExecutionPolicy Bypass -File scripts\sandbox-check.ps1 -Package packaging\out\msix-store\layout -Framework C:\path\to\Microsoft.VCLibs.x64.14.00.Desktop.appx
+```
+
+The sandbox cannot reach the Store, so it never gets the framework on its own: it is a PC without the framework.
+`-Framework` must be Microsoft's signed `.appx` file. Windows registers a framework package from no loose folder
+(observed 17/10/2026 with a copy of the build PC's installed framework: in Developer Mode "DevelopmentMode is not
+allowed when registering framework or resource packages"; without it "the manifest is not in the package root").
+Without the framework, registering the package fails on the dependency, as Microsoft's guide says a sideload does: on
+17/10/2026 the sandbox answered
+`0x80073CF3`, "Windows cannot install package Kynni.Dictum_1.0.0.0_x64__43s584kx66f64 because this package depends on
+a framework that could not be found. Provide the framework "Microsoft.VCLibs.140.00.UWPDesktop" published by "CN=Microsoft
+Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US", with neutral or x64 processor architecture and
+minimum version 14.0.33728.0". The packaged self-test has not run yet: no copy of the framework `.appx` was on the
+build PC. The results of 17/10/2026 are in docs/DECISIONS.md, "Visual C++ runtime".

@@ -52,7 +52,7 @@ public class CleanupCatalogTests
         var http = new HttpClient(new CountingHandler());
         var ex = await Assert.ThrowsAsync<Dictum.Transcribe.DownloadFailedException>(() => Dictum.Transcribe.ModelDownloader.DownloadAsync(
             http, spec, Path.Combine(Path.GetTempPath(), "dictate-never", spec.FileName), false, new Progress<(long, long?)>(), TestContext.Current.CancellationToken));
-        Assert.Contains("requires a Hugging Face login to download; use install.ps1 -ModelsFrom or download-model.ps1 with a token", ex.Message);
+        Assert.Contains("requires a Hugging Face login to download; download it in your browser, then choose it in Settings > Models", ex.Message);
         Assert.Equal(0, CountingHandler.Requests);
     }
 

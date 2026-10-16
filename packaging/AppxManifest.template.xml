@@ -13,6 +13,11 @@
     user turns it on. TaskId must match PackagedStartup.TaskId in src\Dictum.Windows\Shell\PackagedStartup.cs.
   - Construct your Windows app's icon: logo names and sizes (packaging\tools renders them; resources.pri maps them).
   - Integrate your desktop app with Windows by using packaging extensions: the app execution alias.
+  - C++ Runtime framework packages for Desktop Bridge (KB 3176696, read 17/10/2026): whisper.cpp and llama.cpp import
+    the Visual C++ runtime, and a packaged desktop app must declare Microsoft.VCLibs.140.00.UWPDesktop instead of
+    carrying its own copy. The Store installs it with Dictum; a sideload needs it installed first (docs\TESTING-MSIX.md).
+    MinVersion is the version tested (docs\DECISIONS.md, "Visual C++ runtime"); tests\Dictum.Tests\VcRuntimeTests.cs
+    pins the element.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -37,6 +42,7 @@
 
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+    <PackageDependency Name="Microsoft.VCLibs.140.00.UWPDesktop" MinVersion="14.0.33728.0" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />
   </Dependencies>
 
   <Capabilities>

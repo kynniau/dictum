@@ -159,7 +159,7 @@ public sealed class ModelCoordinatorTests : IDisposable
     {
         Make("base.en").SelectCleanup("gemma-3-1b");
         Assert.Equal(0, _prompts.ConfirmCalls);
-        Assert.Equal("gemma-3-1b requires a Hugging Face login to download; use install.ps1 -ModelsFrom or download-model.ps1 with a token.", Assert.Single(_balloons));
+        Assert.Equal("gemma-3-1b requires a Hugging Face login to download; download it in your browser, then choose it in Settings > Models.", Assert.Single(_balloons));
     }
 
     [Fact]

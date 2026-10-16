@@ -303,6 +303,13 @@ public sealed class OfflineAndDownloadTests : IDisposable
     }
 
     [Fact]
+    public void A_login_wall_points_at_Settings_not_at_scripts_the_Store_package_lacks()
+    {
+        Assert.Contains("Settings > Models", ModelDownloader.LoginRequired);
+        Assert.DoesNotContain(".ps1", ModelDownloader.LoginRequired);
+    }
+
+    [Fact]
     public async Task A_server_error_is_retried()
     {
         var (content, spec) = Sample();

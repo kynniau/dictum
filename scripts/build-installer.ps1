@@ -62,13 +62,25 @@ if ($parts.Count -gt 4 -or ($parts | Where-Object { $_ -notmatch '^\d{1,5}$' }))
 while ($parts.Count -lt 4) { $parts += "0" }
 $numericVersion = $parts -join '.'
 
+# The Visual C++ runtime (docs\DECISIONS.md, "Visual C++ runtime"): a publish.ps1 -VcRuntimeDir build carries it beside
+# every native runtime folder; any other build gets Setup's check for the Microsoft Visual C++ Redistributable.
+$defines = @("/DAppVersion=$appVersion", "/DNumericVersion=$numericVersion", "/DPublishDir=$published", "/DOutputDir=$dist")
+$nativeFolders = @(Get-NativeRuntimeFolders $published)
+$withoutVc = @($nativeFolders | Where-Object { $folder = $_; @($VcRuntimeDlls | Where-Object { -not (Test-Path -LiteralPath (Join-Path $folder $_)) }).Count -gt 0 })
+if ($nativeFolders.Count -gt 0 -and $withoutVc.Count -eq 0) {
+    Write-Host "dist\Dictum carries the Visual C++ runtime beside all $($nativeFolders.Count) native runtime folders."
+} else {
+    $defines += @("/DCheckVcRedist", "/DMinVcMajor=$($MinVcRuntime.Major)", "/DMinVcMinor=$($MinVcRuntime.Minor)")
+    Write-Host "dist\Dictum carries no Visual C++ runtime: Setup checks for the Microsoft Visual C++ Redistributable (x64) $MinVcRuntime or later and offers Microsoft's download."
+}
+
 # Compile. Windows PowerShell 5.1 turns a native program's stderr lines (ISCC's warnings) into errors under 2>&1,
 # which "Stop" would make fatal: relax it for the call and check the exit code.
 Write-Host "Compiling $script with $Iscc..."
 $previousPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $lines = @(& $Iscc "/DAppVersion=$appVersion" "/DNumericVersion=$numericVersion" "/DPublishDir=$published" "/DOutputDir=$dist" $script 2>&1 | ForEach-Object { "$_" })
+    $lines = @(& $Iscc @defines $script 2>&1 | ForEach-Object { "$_" })
     $code = $LASTEXITCODE
 } finally {
     $ErrorActionPreference = $previousPreference

@@ -49,7 +49,10 @@ jobs:
         # set (README, "Build from source"); none is set here.
         run: dotnet test --solution Dictum.sln -c Release --no-build
 
-      - name: Publish (self-contained win-x64 zip)
+      - name: Publish (self-contained win-x64 zip, with the base.en speech model)
+        # publish.ps1 fetches ggml-base.en.bin from huggingface.co at the commit scripts/download-model.ps1 pins, and
+        # fails this job on a size or SHA-256 mismatch (Decision 16, docs/DECISIONS.md "Visual C++ runtime"). The zip,
+        # and on a tag the installer and the test MSIX packed from the same dist\Dictum, carry it.
         run: ./scripts/publish.ps1
 
       - name: Upload the zip

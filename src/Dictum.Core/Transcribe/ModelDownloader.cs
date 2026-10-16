@@ -43,7 +43,11 @@ public sealed record DownloadPolicy(int MaxAttempts, Func<int, TimeSpan> Backoff
 /// </summary>
 public static partial class ModelDownloader
 {
-    public const string LoginRequired = "requires a Hugging Face login to download; use install.ps1 -ModelsFrom or download-model.ps1 with a token";
+    /// <summary>
+    /// Ends the balloon and error for a file behind a login (a gated catalogue entry, or HTTP 401/403). It names the Settings
+    /// page every build has: the Store package ships neither install.ps1 nor download-model.ps1.
+    /// </summary>
+    public const string LoginRequired = "requires a Hugging Face login to download; download it in your browser, then choose it in Settings > Models";
 
     /// <summary>
     /// TLS for model downloads. Measured 15/10/2026 on this network, ggml-large-v3-turbo.bin (1.62 GB) six times each:

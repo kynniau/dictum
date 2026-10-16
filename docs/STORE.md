@@ -23,6 +23,7 @@ re-check every line against the release build before submitting.
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
 | Package version (added 16/10/2026) | `<Version>` 1.0.0, so the package is 1.0.0.0 | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, so `package-msix.ps1 -Store` builds. |
+| Visual C++ runtime (added 17/10/2026) | The first submission failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fixed: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6). Rebuild with `package-msix.ps1 -Store` and upload that file (section 10). |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
 
@@ -203,6 +204,12 @@ Sizes: tiny.en 77,704,715 bytes, large-v3-turbo 1,624,555,275, base.en 147,964,2
 qwen2.5-1.5b 1,117,320,736 (README, verified by HTTP HEAD 15/10/2026), shown here in decimal MB/GB.
 The Vulkan requirement for the GPU runtime is from the README's troubleshooting section.
 
+**Windows 10: untested, and upstream does not claim it (noted 17/10/2026; no change made).** Whisper.net's readme
+(1.9.1, in its NuGet package, read 17/10/2026) lists "Windows 11 or Windows Server 2022 (or newer)" as a prerequisite,
+while the package allows Windows 10 1809 (`MinVersion="10.0.17763.0"`) and the listing above says "Windows 10 or
+Windows 11". Every clean-PC run so far was Windows 11 24H2 (10.0.26100, Windows Sandbox). Test on Windows 10 before
+relying on it, or raise MinVersion and say Windows 11.
+
 ## 5. Age ratings (IARC questionnaire)
 
 Source: "Generate age ratings for MSIX app" (Microsoft Learn, retrieved 15/10/2026). The
@@ -236,6 +243,20 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
   retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.0.0 (set 16/10/2026), so
   `package-msix.ps1 -Store` builds.
+- **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
+  `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
+  `<PackageDependency Name="Microsoft.VCLibs.140.00.UWPDesktop" MinVersion="14.0.33728.0" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />`;
+  "Windows desktop applications that have a dependency on the C++ Runtime libraries must specify the corresponding
+  version of the C++ Runtime framework package" instead of redistributing the runtime ("C++ Runtime framework packages
+  for Desktop Bridge", KB 3176696), and the Store installs framework dependencies automatically ("MSIX troubleshooting
+  guide"; both Microsoft Learn, read 17/10/2026). So `package-msix.ps1` leaves any app-local copy out, and
+  `tests\Dictum.Tests\VcRuntimeTests.cs` pins the element. The publisher string and version were also checked against
+  the framework package installed on the build PC (14.0.33728.0, the version tested).
+- **The base.en speech model ships inside (Decision 16, 17/10/2026).** `scripts\publish.ps1` puts
+  `models\ggml-base.en.bin` (147,964,211 bytes, SHA-256 checked by `download-model.ps1` against the catalogue's pin) and
+  `THIRD-PARTY-NOTICES.txt` (its MIT notices) beside Dictum.exe, so the zip, the installer and both MSIX flavours carry
+  them. Measured 17/10/2026: the Store package grew from 105,953,677 to 239,909,521 bytes (352 files). The app reads
+  the file only once the separate app-side change (the exe folder's `models` as a read-only fallback) has merged.
 - Capabilities: `runFullTrust` (restricted) and `microphone` (device). Extensions: `windows.startupTask`
   and an app execution alias, `Dictum.exe`, so the command-line modes (such as `--selftest`) run from
   a terminal with the package identity; the alias is a packaging decision recorded in docs/DECISIONS.md,
@@ -275,16 +296,20 @@ SPEC §2, §3 and §20; README "Permissions on Windows".
 ### Notes for certification
 
 Update the date line when you submit. Microsoft asks for the date, no-account status, and steps to
-reach anything not obvious.
+reach anything not obvious. The "no download is needed" lines (Decision 16, 17/10/2026) hold only for a package built
+after the app change that reads the bundled model from `<program folder>\models` (a separate lane, not in
+fix/vc-runtime) has merged: without it the package carries the file but the first run still asks for a download.
 
 ```text
-Notes written 15/10/2026 for Dictum 1.0.0.
+Notes written 17/10/2026 for Dictum 1.0.0.
+
+CHANGED SINCE THE LAST SUBMISSION: the speech engine could not load on a PC without the Microsoft Visual C++ runtime, which showed as "model error". The package now declares Microsoft's framework package for that runtime, Microsoft.VCLibs.140.00.UWPDesktop, which the Store installs with Dictum. No download is needed to test: the base.en speech model ships inside the package.
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the menu.
 
-FIRST RUN DOWNLOADS A SPEECH MODEL. Dictum asks which speech model to download from huggingface.co. On a PC without a graphics card it recommends base.en (147,964,211 bytes, about 150 MB). It then offers an optional clean-up model, qwen2.5-1.5b (1,117,320,736 bytes, about 1.1 GB); choose "No AI cleanup (rule-based tidy)" to skip that download. Every file is checked against a pinned SHA-256 before use. Model files are data (ggml and GGUF weights read by whisper.cpp and llama.cpp), not executable code: Dictum never downloads or runs code.
+SPEECH MODELS: NO DOWNLOAD IS NEEDED TO TEST. The base.en speech model (147,964,211 bytes) ships inside the package. Dictum can also download larger speech models from huggingface.co, and offers an optional clean-up model, qwen2.5-1.5b (1,117,320,736 bytes, about 1.1 GB); choose "No AI cleanup (rule-based tidy)" to skip that download. Every file is checked against a pinned SHA-256 before use. Model files are data (ggml and GGUF weights read by whisper.cpp and llama.cpp), not executable code: Dictum never downloads or runs code.
 
-TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json and copy the model files (ggml-base.en.bin, and optionally qwen2.5-1.5b-instruct-q4_k_m.gguf) into Dictum's models folder. Settings > Storage shows both folders. Dictum then connects to nothing outside the PC, and download requests are refused with a message.
+TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json. base.en is already inside the package; to test AI clean-up offline too, copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder (Settings > Storage shows it). Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
 TO DICTATE: click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels at any time and nothing is pasted. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
@@ -337,6 +362,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |
 | 21 | Listing language does not match the package | Store Policies 10.7 | Use the language the manifest declares (section 4). | Decide |
+| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the first submission) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fixed 17/10/2026 |
 
 ## 10. Go-live
 
@@ -346,12 +372,18 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 2. Check https://dictum.kynni.au/privacy returns HTTP 200 and that the response carries the headers
    in `site/vercel.json`. `cleanUrls` serves `privacy.html` at `/privacy` (Vercel docs, retrieved
    15/10/2026).
-3. Submit (sections 3 to 7).
-4. When the listing is live (https://apps.microsoft.com/detail/9N0DG1DHTR57 returns 200): in
+3. Build the package from a checkout that has the Visual C++ runtime fix and the bundled model (fix/vc-runtime,
+   17/10/2026) and the app change that reads that model: `package-msix.ps1 -Store` must print "Bundled speech model:
+   models\ggml-base.en.bin" and end with "Depends on Microsoft.VCLibs.140.00.UWPDesktop". Upload that file; an earlier
+   `Dictum-1.0.0-store.msix` lacks the dependency and is the build that failed certification. If Partner Center
+   refuses a package version it has already seen (recalled, not verified that it does), build with `-Version 1.0.1`,
+   which also stamps Dictum.exe 1.0.1.
+4. Submit (sections 3 to 7), with the certification notes of section 7 as they now read.
+5. When the listing is live (https://apps.microsoft.com/detail/9N0DG1DHTR57 returns 200): in
    `site/index.html`, replace the pending Store link and its "Coming soon" note with
    `<a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>`,
    change the Direct download button to `btn-secondary`, then redeploy. The HTML comment beside the
    button says the same.
-5. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`;
+6. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`;
    an ISO date such as `2026-10-15` is easiest for the app to parse) in the same deployment as the
    GitHub release.
