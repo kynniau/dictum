@@ -19,7 +19,10 @@ public sealed record AppSettings
     public int DoubleTapMs { get; init; } = 400;
     public int MinRecordingMs { get; init; } = 300;
 
-    /// <summary>Hands-free (and a held key) stops by itself after this long: Settings > General > "Hands-free stops after".</summary>
+    /// <summary>
+    /// Hands-free stops by itself after this long: Settings > General > "Hands-free stops after". A held key has its own fixed
+    /// limit, not this one (<see cref="Dictum.Core.StateMachineOptions.HoldMaxSeconds"/>).
+    /// </summary>
     public int HandsFreeMaxSeconds { get; init; } = 300;
     public double SilenceThreshold { get; init; } = 0.01;
     public AudioSettings Audio { get; init; } = new();

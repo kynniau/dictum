@@ -15,7 +15,7 @@ public static class AppRules
     public static (bool AskSpeech, bool AskCleanup) FirstRunQuestions(SettingsLoadResult file) =>
         file.Usable ? (!file.NamesSpeechModel, !file.NamesCleanupModel) : (false, false);
 
-    public static StateMachineOptions Options(AppSettings s) => new(s.TapMs, s.DoubleTapMs, s.HandsFreeMaxSeconds);
+    public static StateMachineOptions Options(AppSettings s) => new(s.TapMs, s.DoubleTapMs, s.HandsFreeMaxSeconds, StateMachineOptions.DefaultHoldMaxSeconds);
 
     /// <summary>
     /// The cleanup-provider, model-download and Check for updates clients: each refuses any off-machine request while

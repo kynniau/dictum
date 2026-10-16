@@ -421,6 +421,28 @@ public class HandsFreeStateMachineTests
         Assert.Empty(m.Tick(1_799_999));
         Assert.True(Assert.Single(m.Tick(1_800_000).OfType<BeginProcessingEffect>()).AutoStopped);
     }
+
+    [Fact]
+    public void A_short_hands_free_limit_does_not_cut_a_hold_short()
+    {
+        // Merge lens P3b, 16/10/2026: with the field at 30 s a 45 s hold was stopped at 30 s. The hold has its own limit.
+        var m = new DictationStateMachine(AppRules.Options(new AppSettings { HandsFreeMaxSeconds = 30 }));
+        m.HotkeyDown(0);
+        Assert.Empty(m.Tick(45_000));
+        Assert.Equal(DictationState.RecordingHold, m.State);
+        Assert.False(Assert.Single(m.HotkeyUp(45_100).OfType<BeginProcessingEffect>()).AutoStopped); // the release ends it
+    }
+
+    [Fact]
+    public void A_long_hands_free_limit_does_not_let_a_stuck_key_record_for_an_hour()
+    {
+        // Merge lens P3, 16/10/2026: with the field at 60 minutes a stuck key recorded for an hour. A hold still stops at 5 minutes.
+        var m = new DictationStateMachine(AppRules.Options(new AppSettings { HandsFreeMaxSeconds = 3600 }));
+        m.HotkeyDown(0);
+        Assert.Empty(m.Tick(299_999));
+        Assert.True(Assert.Single(m.Tick(300_000).OfType<BeginProcessingEffect>()).AutoStopped);
+        Assert.Equal(DictationState.Processing, m.State);
+    }
 }
 
 /// <summary>hands_free_max_seconds: the range, a legacy value, and Settings > General's field (decision 3, 16/10/2026).</summary>

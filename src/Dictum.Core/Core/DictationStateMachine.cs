@@ -33,8 +33,16 @@ public sealed record CancelProcessingEffect(long SessionId, bool KeepsTyped = fa
 
 public sealed record PillEffect(PillView View) : Effect;
 
-public sealed record StateMachineOptions(int TapMs, int DoubleTapMs, int HandsFreeMaxSeconds)
+/// <param name="HandsFreeMaxSeconds">hands_free_max_seconds: a hands-free session stops by itself after this long.</param>
+/// <param name="HoldMaxSeconds">
+/// A held key stops by itself after this long, so a stuck key cannot record all afternoon. Not hands_free_max_seconds
+/// (orchestrator decision 7a, 16/10/2026): that field must neither cut a hold short nor let a stuck key record for an hour.
+/// </param>
+public sealed record StateMachineOptions(int TapMs, int DoubleTapMs, int HandsFreeMaxSeconds, int HoldMaxSeconds = StateMachineOptions.DefaultHoldMaxSeconds)
 {
+    /// <summary>The held key's limit: 5 minutes, what both limits were before the hands-free field.</summary>
+    public const int DefaultHoldMaxSeconds = 300;
+
     public static readonly StateMachineOptions Default = new(300, 400, 300);
 }
 
@@ -66,6 +74,9 @@ public sealed class DictationStateMachine
     public DictationState State { get; private set; } = DictationState.Idle;
     public bool Enabled { get; private set; }
     public long SessionId { get; private set; }
+
+    /// <summary>The options in use (the auto-stop's log line names the limit that fired).</summary>
+    public StateMachineOptions Options => _options;
 
     public void UpdateOptions(StateMachineOptions options) => _options = options;
 
@@ -177,8 +188,8 @@ public sealed class DictationStateMachine
         var expired = ExpirePendingTap(nowMs);
         if (expired.Count > 0) return expired;
 
-        if ((State is DictationState.RecordingHold or DictationState.RecordingHandsFree)
-            && nowMs - _captureStartedAt >= _options.HandsFreeMaxSeconds * 1000L)
+        var limitSeconds = State == DictationState.RecordingHandsFree ? _options.HandsFreeMaxSeconds : _options.HoldMaxSeconds;
+        if ((State is DictationState.RecordingHold or DictationState.RecordingHandsFree) && nowMs - _captureStartedAt >= limitSeconds * 1000L)
         {
             // Auto-stop: a stuck key or a forgotten hands-free session is transcribed, never discarded. The key is
             // forgotten too: if its key-up was lost (secure desktop), the next press must start a recording.

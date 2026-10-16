@@ -93,7 +93,7 @@ public sealed class FixBatchCoverageTests : IDisposable
     [Fact]
     public async Task A_held_key_is_auto_stopped_and_transcribed_at_the_limit()
     {
-        var (controller, capture, inserted) = Rig(new StateMachineOptions(300, 400, HandsFreeMaxSeconds: 1));
+        var (controller, capture, inserted) = Rig(new StateMachineOptions(300, 400, HandsFreeMaxSeconds: 300, HoldMaxSeconds: 1));
         using var _ = controller;
         controller.Post(new HookEvent(HotkeySignal.Down, Environment.TickCount64)); // and never released
         Assert.True(await Eventually(() => !inserted.IsEmpty, 5000), "auto-stop never fired");

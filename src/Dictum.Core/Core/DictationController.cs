@@ -312,11 +312,14 @@ public sealed class DictationController : IDisposable
     {
         var audio = _capture.Stop();
         _ui.SetTrayState(TrayState.Processing);
+        var session = _handsFree is { } current && current.SessionId == begin.SessionId ? current : null;
         if (begin.AutoStopped)
         {
-            _log.Info($"Recording auto-stopped at hands_free_max_seconds ({_settings().HandsFreeMaxSeconds} s); transcribing what was captured.");
+            _log.Info(session is not null
+                ? $"Hands-free recording auto-stopped at hands_free_max_seconds ({_machine.Options.HandsFreeMaxSeconds} s); typing what followed the last cut."
+                : $"Held key auto-stopped at the hold limit ({_machine.Options.HoldMaxSeconds} s, not a setting); transcribing what was captured.");
         }
-        if (_handsFree is { } session && session.SessionId == begin.SessionId)
+        if (session is not null)
         {
             // Every part cut before the stop is already queued (the capture hands parts over before Stop returns): the rest
             // goes last, and the worker reports the session done once all are typed.
