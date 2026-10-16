@@ -1,12 +1,15 @@
 #!/bin/sh
 # Private-material guard. Sourced by .githooks/pre-commit, .githooks/commit-msg and .githooks/pre-push, and by the CI job
 # "private-material" (.github/workflows/ci.yml); never run on its own. This repository is public, so a recording, a
-# transcript or a personal test phrase is published the moment it is pushed. Turn the hooks on once per clone, for
-# every worktree:
+# transcript or a personal test phrase is published the moment it is pushed. Turn the hooks on once per clone:
 #   git config core.hooksPath .githooks
+# The path is read from the top of each worktree, so a worktree whose branch was made before the hooks existed runs none,
+# and git does not say so. With linked worktrees, run this once in the main worktree:
+#   git config core.hooksPath "$(git rev-parse --show-toplevel)/.githooks"
+# Or bring each branch up to main first.
 #
-# Three checks. Output says where something was found (a file name, "commit message", "branch name"), never a line of a
-# file or message, or a denylist entry; a name that itself holds an entry is shown as is.
+# Three checks. Output says where something was found (a file name, "commit message", "tag message", "branch name"),
+# never a line of a file or message, or a denylist entry; a name that itself holds an entry is shown as is.
 #
 #   1. Path      A blocked file type (list below: audio, video, subtitles, documents, archives, mail exports), or
 #                anything under a private/, recording(s)/ or transcript(s)/ folder. Matched case-insensitively.
@@ -15,10 +18,11 @@
 #   3. Denylist  Text containing a string from a local denylist file that is never committed: one case-insensitive
 #                fixed string per line; blank lines and lines starting with # are ignored. Entries and text are both
 #                normalised before they are compared (pg_normalise), so a no-break space, a tab, a run of spaces, a
-#                soft hyphen or a zero-width character cannot hide an entry. The text checked is a file name or an
-#                ADDED line (pre-commit, pre-push; every file is read as text, binary or not), a commit message
-#                (commit-msg; pre-push, for every commit being pushed), and the name of a branch or tag being pushed
-#                (pre-push). The file is named by $DICTUM_PRIVATE_DENYLIST, else by the git config key
+#                soft hyphen, a zero-width character or a NUL byte (UTF-16 text) cannot hide an entry. The text checked
+#                is a file name or an ADDED line (pre-commit, pre-push; every file is read as text, binary or not), a
+#                commit message (commit-msg; pre-push, for every commit being pushed), and the name of a branch or tag
+#                being pushed and the message of an annotated tag being pushed (pre-push). The file is named by
+#                $DICTUM_PRIVATE_DENYLIST, else by the git config key
 #                dictum.privateDenylist (set once, for every worktree of a clone: git config dictum.privateDenylist
 #                <path>; read as a path, so ~/ works, and a relative path is relative to the root of the worktree git
 #                is working in). With neither set, the check is skipped and one line says so. If either names a file
@@ -35,12 +39,14 @@ PG_MEDIA_EXTS='wav|mp4|m4a|mp3|ogg|oga|opus|flac|aac|wma|webm|3gp|amr|mov|mkv|av
 
 pg_die() { echo "private-guard: $*" >&2; exit 1; }
 
-# A scratch folder, removed on exit. GIT_LITERAL_PATHSPECS: a file name is never read as a glob.
+# A scratch folder, removed on exit. GIT_LITERAL_PATHSPECS: a file name is never read as a glob. GIT_NO_REPLACE_OBJECTS: a
+# replace ref (git replace) would show these checks one commit where the push sends another.
 pg_setup() {
   PG_TMP=$(mktemp -d) || pg_die "cannot make a temporary folder"
   trap 'rm -rf "$PG_TMP"' EXIT
   trap 'exit 1' HUP INT TERM
   GIT_LITERAL_PATHSPECS=1; export GIT_LITERAL_PATHSPECS
+  GIT_NO_REPLACE_OBJECTS=1; export GIT_NO_REPLACE_OBJECTS
   : > "$PG_TMP/flagged"
 }
 
@@ -63,7 +69,9 @@ pg_flag_blobs() {
     }' "$PG_TMP/sizes" >> "$PG_TMP/flagged" || pg_die "could not check the file names and sizes"
 }
 
-# Checks 1 and 2 on what changes() selects. Deleted files are skipped: removing a bad file is always allowed.
+# Checks 1 and 2 on what changes() selects. Deleted files are skipped: removing a bad file is always allowed. The awk reads
+# one path per line, so changes() must not detect renames (--no-renames in both hooks): a rename lists the old path and the
+# new one, and only the old one would be read.
 pg_check_files() {
   changes --raw --no-abbrev --diff-filter=d > "$PG_TMP/raw" || pg_die "git could not list the changed files"
   awk -F'\t' '/^:/ { split($1, m, " "); print m[4], $2 }' "$PG_TMP/raw" > "$PG_TMP/blobs" || pg_die "could not read the changed files"
@@ -79,12 +87,20 @@ $(printf '\302\240 \302\255 \342\200\213 \342\200\214 \342\200\215')
 PG_EOF
 }
 
-# Writes the files $@ with those characters dealt with: a no-break space, a tab or a run of spaces becomes one space, and
-# the soft hyphen and the zero-width characters are deleted. Bytes, in the C locale, so it behaves the same on every
-# system and binary input passes through. Lines are never joined: an entry broken across two lines is not found.
+# Writes the files $@ with those characters dealt with: NUL bytes are deleted first (UTF-16 text is each letter and a NUL,
+# so this makes it plain text), then a no-break space, a tab or a run of spaces becomes one space, and the soft hyphen and
+# the zero-width characters are deleted. Bytes, in the C locale, so it behaves the same on every system and binary input
+# passes through. Lines are never joined: an entry broken across two lines is not found, and each file is followed by a
+# newline so the last line of one is not joined to the first of the next. A file that cannot be read fails the function
+# (return 2), as it did when sed read the files itself: tr writes to a file, not into a pipe that would hide its status.
 pg_normalise() {
+  : > "$PG_TMP/joined"
+  for pg_file in "$@"; do
+    LC_ALL=C tr -d '\000' < "$pg_file" >> "$PG_TMP/joined" || return 2
+    echo >> "$PG_TMP/joined"
+  done
   LC_ALL=C sed -e "s/$PG_NBSP/ /g" -e "s/$PG_SHY//g" -e "s/$PG_ZWSP//g" -e "s/$PG_ZWNJ//g" -e "s/$PG_ZWJ//g" \
-    -e 's/[[:blank:]][[:blank:]]*/ /g' "$@"
+    -e 's/[[:blank:]][[:blank:]]*/ /g' "$PG_TMP/joined"
 }
 
 # Check 3's matcher: is any denylist entry in the files $@? Entries were normalised when they were loaded; the text is
@@ -190,6 +206,22 @@ pg_check_messages() {
   [ -n "$found" ] || printf 'local denylist\t(a commit message; no single commit found)\n' >> "$PG_TMP/flagged"
 }
 
+# What the destination already holds (pre-push), as ^<id> lines in $PG_TMP/held for git log --stdin. A push uploads what the
+# destination does not already hold, and the destination says what it holds: every ref it lists, and everything those refs
+# reach. $1 is the URL being pushed to, which is the push URL when there is one (git ls-remote on the remote's name would
+# ask its fetch URL). Only that is left out. Not the remote-tracking branches: they go stale (a branch deleted on the
+# remote from elsewhere would still hide its commits). Not just the old tip of a branch the remote already has: a rebase
+# onto, or a merge of, the remote main would then judge every public commit it brings in. An object the destination lists
+# that this clone lacks cannot be reached from here, and a tree or a file reaches no commit, so only commits and tags are
+# kept. A destination that cannot list its refs refuses the push: what it holds is not known. A push that only deletes
+# never gets here: it sends nothing, and taking something down must not wait on a listing. git ls-remote is given /dev/null
+# as its input, so nothing it starts can read the ref list that pre-push is looping over.
+pg_list_held() {
+  git ls-remote "$1" > "$PG_TMP/advertised" < /dev/null || pg_die "cannot list what the push destination holds (git ls-remote failed)"
+  awk '{ print $1 }' "$PG_TMP/advertised" | sort -u | git cat-file --batch-check='%(objectname) %(objecttype)' |
+    awk '$2 == "commit" || $2 == "tag" { print "^" $1 }' > "$PG_TMP/held" || pg_die "cannot read what the push destination holds"
+}
+
 # Merges of three or more parents (pre-push). git can remerge a two-parent merge to show what the merge itself added, but
 # not an octopus merge (it prints a warning where the diff would be), so what one adds on its own would reach no other
 # check: refuse it, by short id. --diff-merges=off here and in the two listings above keeps that warning out of the output.
@@ -210,6 +242,20 @@ pg_check_ref() {
   esac
   printf '%s\n' "$pg_name" > "$PG_TMP/ref"
   pg_flag_text "$pg_kind ($pg_name)" "$PG_TMP/ref" || true
+}
+
+# Check 3 on the message of an annotated tag being pushed (pre-push). $1 is the id being pushed, $2 the full ref name. The
+# message is part of the tag object, which is uploaded with it, and git log does not show it. Anything that is not a tag
+# object (a branch tip, a lightweight tag) has no message of its own, and is left alone.
+# simplification: only the tag being pushed is read, not a tag that it points at (a tag of a tag). Retire it if tags of tags
+# turn up in this repository.
+pg_check_tag_message() {
+  [ -n "$PG_DENY" ] || return 0
+  pg_type=$(git cat-file -t "$1") || pg_die "git could not read $1"
+  [ "$pg_type" = tag ] || return 0
+  git cat-file tag "$1" > "$PG_TMP/tagobject" || pg_die "git could not read the tag $2"
+  sed '1,/^$/d' "$PG_TMP/tagobject" > "$PG_TMP/tagmessage" || pg_die "could not read the tag $2"   # past the headers
+  pg_flag_text "tag message (${2#refs/tags/})" "$PG_TMP/tagmessage" || true
 }
 
 # The text of the commit message file $1 as git will commit it. Written without an editor (-m, -F, --no-edit, a merge:
@@ -240,7 +286,7 @@ pg_refuse_if_flagged() {
     message) pg_head="commit refused. This text must not go into a public repository:"
              pg_foot="Reword the commit message without it, then commit again." ;;
     push)    pg_head="push refused. These must not go into a public repository:"
-             pg_foot="They are in commits, branch names or tag names that would be pushed, or cannot be read (a ref that is not a commit, an octopus merge). Take them out (reword, rebase, rename), then push again." ;;
+             pg_foot="They are in commits, tag messages, branch names or tag names that would be pushed, or cannot be read (a ref that is not a commit, an octopus merge). Take them out (reword, rebase, rename, tag again), then push again." ;;
     *)       pg_head="these tracked files must not be in a public repository:"
              pg_foot="Remove them from the repository, and treat anything already pushed as published." ;;
   esac

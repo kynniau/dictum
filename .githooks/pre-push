@@ -1,32 +1,37 @@
 #!/bin/sh
 # Refuses a push that would send private material to a public remote (recordings, documents, private folders, large files,
-# and text from a local denylist in file names, added lines, commit messages and branch or tag names). The rules and the
-# checks are in private-guard.sh. Turn on: git config core.hooksPath .githooks
-# Git passes the name (or URL) of the remote as $1, and one line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>.
+# and text from a local denylist in file names, added lines, commit messages, annotated tag messages and branch or tag
+# names). The rules and the checks are in private-guard.sh.
+# Turn on once per clone: git config core.hooksPath .githooks. The path is read from the top of each worktree, so a
+# worktree whose branch was made before the hooks existed runs none, and git does not say so. With linked worktrees, run
+# this once in the main worktree: git config core.hooksPath "$(git rev-parse --show-toplevel)/.githooks". Or bring each
+# branch up to main first.
+# Git passes the name (or URL) of the remote as $1, the URL being pushed to as $2 (the push URL, when one is set), and one
+# line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>.
 # Needs Git 2.36 or newer, for git log --diff-merges=remerge. An older Git fails that command, and every use of it below
 # stops the hook, so the push is refused rather than waved through.
 . "$(dirname "$0")/private-guard.sh"
 
-remote=$1
 pg_setup
 pg_load_denylist
 cat > "$PG_TMP/refs"   # read it all first, so nothing run below can swallow the list
+held_known=            # what the destination holds is listed once, for the first ref that sends anything (pg_list_held)
 while read -r local_ref local_sha remote_ref remote_sha; do
   case $local_sha in *[!0]*) ;; *) continue ;; esac   # all zeros: deleting a branch or tag sends no files
   # A ref that does not lead to a commit (a tag on a tree or on a file) has no history to read, so it cannot be judged.
   git cat-file -e "$local_sha^{commit}" 2>/dev/null || { printf 'not a commit\t%s\n' "$remote_ref" >> "$PG_TMP/flagged"; pg_refuse_if_flagged push; }
-  # What the remote lacks: an existing branch gets the commits after its current tip; a new branch, or a tip this clone
-  # does not have, gets whatever the remote tracking branches do not already hold (everything, if there are none).
-  exclude=--remotes=$remote
-  case $remote_sha in *[!0]*) git cat-file -e "$remote_sha^{commit}" 2>/dev/null && exclude=$remote_sha ;; esac
+  [ -n "$held_known" ] || { pg_list_held "$2"; held_known=1; }   # $2: the URL being pushed to
   # Every commit is read, not just the final difference, so a file added in one commit and deleted in the next is still caught.
   # A merge shows only what it changed on top of its two sides (--diff-merges=remerge); the sides are commits of their own.
-  changes() { git -c core.quotePath=false -c log.showSignature=false log --no-color --no-ext-diff --no-textconv --no-renames --root --diff-merges=remerge --format= "$local_sha" --not "$exclude" "$@"; }
+  # As in pre-commit, the text is what is committed (--no-textconv) and a renamed file counts as added (--no-renames).
+  # What the destination holds is the one thing read from stdin (--stdin), as ^<id> lines.
+  changes() { git -c core.quotePath=false -c log.showSignature=false log --no-color --no-ext-diff --no-textconv --no-renames --root --diff-merges=remerge --stdin --format= "$local_sha" "$@" < "$PG_TMP/held"; }
   pg_check_octopus               # remerge skips a merge of three or more parents, so refuse those
   pg_refuse_if_flagged push
   pg_run push                    # files: path, size, and the denylist on names and added lines
   pg_check_messages              # the message of every commit being pushed
   pg_check_ref "$remote_ref"     # the name the branch or tag will have on the remote
+  pg_check_tag_message "$local_sha" "$remote_ref"   # the message of an annotated tag being pushed
   pg_refuse_if_flagged push
 done < "$PG_TMP/refs"
 exit 0

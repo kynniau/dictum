@@ -1,10 +1,14 @@
 #!/bin/sh
 # Refuses a commit that would add private material to this public repository (recordings and other blocked file types,
 # private folders, large files, text from a local denylist). The rules and the checks are in private-guard.sh.
-# Turn on: git config core.hooksPath .githooks
+# Turn on once per clone: git config core.hooksPath .githooks. The path is read from the top of each worktree, so a
+# worktree whose branch was made before the hooks existed runs none, and git does not say so. With linked worktrees, run
+# this once in the main worktree: git config core.hooksPath "$(git rev-parse --show-toplevel)/.githooks". Or bring each
+# branch up to main first.
 . "$(dirname "$0")/private-guard.sh"
 
-# What to inspect: the staged changes.
+# What to inspect: the staged changes, as they are committed: no text conversion filter (--no-textconv), no external diff
+# driver, and no rename detection (--no-renames): a renamed file counts as added.
 changes() { git -c core.quotePath=false diff --cached --no-color --no-ext-diff --no-textconv --no-renames "$@"; }
 
 pg_setup

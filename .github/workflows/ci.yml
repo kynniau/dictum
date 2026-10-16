@@ -132,12 +132,15 @@ jobs:
 
   private-material:
     # An after-the-fact detector, not a gate: this repository is public from the moment a push lands, so the real gate is
-    # the pair of hooks in .githooks (pre-commit and pre-push; turn them on with `git config core.hooksPath .githooks`).
-    # This job catches what got past them, such as a commit made with --no-verify or a clone without the hooks. It fails
-    # when a tracked file is a recording or other blocked type (audio, video, subtitles, documents, archives, mail exports),
-    # sits under a private/, recording(s)/ or transcript(s)/ folder, or is over 5 MiB, using the same rules as the hooks
-    # (.githooks/private-guard.sh). It reads the tracked files at the tip, not history, and never the denylist (that is
-    # local). Independent of the build job.
+    # the hooks in .githooks (pre-commit, commit-msg and pre-push). Turn them on once per clone:
+    # `git config core.hooksPath .githooks`. The path is read from the top of each worktree, so a worktree whose branch was
+    # made before the hooks existed runs none, and git does not say so. With linked worktrees, run this once in the main
+    # worktree: `git config core.hooksPath "$(git rev-parse --show-toplevel)/.githooks"`. Or bring each branch up to main
+    # first. This job catches what got past them, such as a commit made with --no-verify or a clone without the hooks. It
+    # fails when a tracked file is a recording or other blocked type (audio, video, subtitles, documents, archives, mail
+    # exports), sits under a private/, recording(s)/ or transcript(s)/ folder, or is over 5 MiB, using the same rules as
+    # the hooks (.githooks/private-guard.sh). It reads the tracked files at the tip, not history, and never the denylist
+    # (that is local). Independent of the build job.
     name: Private material
     runs-on: ubuntu-latest
     timeout-minutes: 5

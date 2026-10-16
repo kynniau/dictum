@@ -34,11 +34,13 @@ push and pull request; a pull request needs it green. A behaviour change comes w
   "observed" (measured here), as DECISIONS.md does.
 - Never commit secrets, models or personal data: `.env` files, `*.pfx`, model files (`*.bin`, `*.gguf`) and build
   output are in `.gitignore`. Test text uses made-up names, never real client details.
-- Recordings, transcripts and personal test material stay outside the repository. Turn on the guard rails once per clone
-  with `git config core.hooksPath .githooks` (the push check needs Git 2.36 or newer), and name your private word
-  list with the `DICTUM_PRIVATE_DENYLIST` environment variable or `git config dictum.privateDenylist <path>`. A name
-  that points at a file that is not there is refused, and `DICTUM_PRIVATE_DENYLIST=none` skips the check on purpose
-  (`.github/SECURITY.md`, "Private material").
+- Recordings, transcripts and personal test material stay outside the repository. Turn the hooks on once per clone:
+  `git config core.hooksPath .githooks` (the push check needs Git 2.36 or newer). The path is read from the top of each
+  worktree, so a worktree whose branch was made before the hooks existed runs none, and git does not say so. With linked
+  worktrees, run this once in the main worktree: `git config core.hooksPath "$(git rev-parse --show-toplevel)/.githooks"`.
+  Or bring each branch up to main first. Name your private word list with the `DICTUM_PRIVATE_DENYLIST` environment
+  variable or `git config dictum.privateDenylist <path>`. A name that points at a file that is not there is refused, and
+  `DICTUM_PRIVATE_DENYLIST=none` skips the check on purpose (`.github/SECURITY.md`, "Private material").
 
 ## Licence
 

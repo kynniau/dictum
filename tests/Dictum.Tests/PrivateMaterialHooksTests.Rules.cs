@@ -316,4 +316,93 @@ public sealed partial class PrivateMaterialHooksTests
         Assert.True(Lists(output, $"commit message ({id})"), output);
         Assert.DoesNotContain(Word, output, StringComparison.OrdinalIgnoreCase);
     }
+
+    // ---- ways round a plain read of the diff ----
+
+    [Fact]
+    public void A_rename_is_judged_by_its_new_name_and_counts_as_added_at_commit_and_at_push()
+    {
+        var repo = NewRepoWithRemote();
+        Directory.CreateDirectory(Path.Combine(repo, "recordings"));
+        Write(repo, "notes.txt", "notes\n");
+        Write(repo, "clip.txt", "clip\n");
+        Write(repo, "old.md", $"an old line about {Word}\n");
+        Stage(repo, "notes.txt", "clip.txt", "old.md");
+        Assert.Equal(0, Commit(repo, "plain files", env: NoVariable()).Exit); // old.md went in while no denylist was set
+        Ok(Git(repo, ["push", "-q", "--no-verify", "origin", "main"])); // and the remote has all three, so only the renames are new
+
+        Ok(Git(repo, ["mv", "notes.txt", "recordings/notes.txt"]));
+        Ok(Git(repo, ["mv", "clip.txt", "clip.m4a"]));
+        var (exit, output) = Commit(repo, "move"); // git sees two renames; the guard must see two new names
+        Assert.Equal(1, exit);
+        Assert.True(Lists(output, "recordings/notes.txt") && Lists(output, "clip.m4a"), output);
+        Assert.Equal(0, Commit(repo, "move", noVerify: true).Exit);
+        (exit, output) = Git(repo, ["push", "origin", "main"]);
+        Assert.NotEqual(0, exit);
+        Assert.True(Lists(output, "recordings/notes.txt") && Lists(output, "clip.m4a"), output);
+
+        Ok(Git(repo, ["reset", "-q", "--hard", "origin/main"]));
+        Ok(Git(repo, ["mv", "old.md", "renamed.md"])); // a renamed file counts as added, so its old line is read again
+        (exit, output) = Commit(repo, "rename");
+        Assert.True(exit == 1 && Lists(output, "renamed.md"), output);
+        Assert.Equal(0, Commit(repo, "rename", noVerify: true).Exit);
+        (exit, output) = Git(repo, ["push", "origin", "main"]);
+        Assert.NotEqual(0, exit);
+        Assert.True(Lists(output, "renamed.md"), output);
+        Assert.False(Lists(output, "old.md"), output);
+    }
+
+    [Fact]
+    public void A_text_conversion_filter_cannot_show_the_checks_something_other_than_what_is_committed()
+    {
+        var repo = NewRepoWithRemote();
+        Write(repo, ".gitattributes", "*.md diff=hide\n");
+        Ok(Git(repo, ["config", "diff.hide.textconv", "echo clean"])); // git is shown "clean" whatever the file holds
+        Write(repo, "notes.md", $"about {Word}\n");
+        Stage(repo, ".gitattributes", "notes.md");
+        var shown = Git(repo, ["diff", "--cached", "-p"]).Output; // the premise: a plain git diff is fooled
+        Assert.Contains("clean", shown);
+        Assert.DoesNotContain(Word, shown, StringComparison.OrdinalIgnoreCase);
+
+        var (exit, output) = Commit(repo);
+        Assert.True(exit == 1 && Lists(output, "notes.md"), output);
+
+        Assert.Equal(0, Commit(repo, "past the hook", noVerify: true).Exit);
+        (exit, output) = Git(repo, ["push", "origin", "main"]);
+        Assert.NotEqual(0, exit);
+        Assert.True(Lists(output, "notes.md"), output);
+    }
+
+    [Fact]
+    public void UTF_16_text_is_read_as_text_and_a_clean_binary_still_commits()
+    {
+        var repo = NewRepo();
+        var little = new UnicodeEncoding(bigEndian: false, byteOrderMark: true);
+        var big = new UnicodeEncoding(bigEndian: true, byteOrderMark: true);
+        File.WriteAllText(Path.Combine(repo, "little.txt"), $"about {Word}\r\n", little);
+        File.WriteAllText(Path.Combine(repo, "big.txt"), "call about QUOKKA MEETING 42\n", big);
+        File.WriteAllText(Path.Combine(repo, "clean16.txt"), "nothing private here\r\n", little);
+        var random = new byte[3 * 1024 * 1024];
+        new Random(11).NextBytes(random);
+        File.WriteAllBytes(Path.Combine(repo, "random.bin"), random);
+        Stage(repo, "little.txt", "big.txt", "clean16.txt", "random.bin");
+
+        var (exit, output) = Commit(repo);
+
+        Assert.Equal(1, exit);
+        Assert.True(Lists(output, "little.txt") && Lists(output, "big.txt"), output); // either byte order, with its byte-order mark
+        Assert.False(Lists(output, "clean16.txt") || Lists(output, "random.bin"), output);
+        Ok(Git(repo, ["reset", "-q", "--", "little.txt", "big.txt"]));
+        Assert.Equal((0, ""), Commit(repo, "the clean ones"));
+    }
+
+    [Fact]
+    public void Text_that_cannot_be_read_fails_the_normaliser_instead_of_passing_as_clean()
+    {
+        var repo = NewRepo();
+        string[] Normalise(string file) => ["-c", $"alias.norm=!. .githooks/private-guard.sh; pg_setup; pg_init_normaliser; pg_normalise {file} > /dev/null; echo \"status $?\"", "norm"]; // run by the sh that git itself uses
+
+        Assert.Contains("status 0", Git(repo, Normalise(".githooks/pre-commit")).Output); // a file that is there
+        Assert.Contains("status 2", Git(repo, Normalise("no-such-file.txt")).Output); // a file that is not: the callers read this as a hit, not as clean
+    }
 }

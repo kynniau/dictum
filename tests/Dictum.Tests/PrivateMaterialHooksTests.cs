@@ -624,4 +624,46 @@ public sealed partial class PrivateMaterialHooksTests : IDisposable
             Assert.Contains("dictum.privateDenylist", text);
         }
     }
+
+    // ---- turning the hooks on ----
+
+    [Fact]
+    public void The_absolute_hooks_path_guards_a_linked_worktree_on_a_branch_made_before_the_hooks_existed_and_the_relative_one_does_not()
+    {
+        var main = NewRepo(Path.Combine(_dir.FullName, "Zoë main worktree")); // a space and a non-ASCII letter, as a real path can have
+        Write(main, "readme.txt");
+        Stage(main, "readme.txt");
+        Assert.Equal((0, ""), Commit(main, "before the hooks existed"));
+        Ok(Git(main, ["branch", "old"]));
+        Ok(Git(main, ["add", ".githooks"]));
+        Assert.Equal((0, ""), Commit(main, "install the hooks"));
+        var lane = Path.Combine(main, ".worktrees", "lane");
+        Ok(Git(main, ["worktree", "add", "-q", lane, "old"]));
+        Assert.False(Directory.Exists(Path.Combine(lane, ".githooks"))); // the premise: that branch has no hooks to find
+
+        Write(lane, "first.m4a");
+        Stage(lane, "first.m4a");
+        Assert.Equal((0, ""), Commit(lane, "unguarded")); // the relative path finds none here: nothing runs, and git says nothing
+
+        var top = Git(main, ["rev-parse", "--show-toplevel"]).Output.Trim();
+        Ok(Git(main, ["config", "core.hooksPath", $"{top}/.githooks"])); // the documented command, run once in the main worktree
+        Write(lane, "second.m4a");
+        Stage(lane, "second.m4a");
+        var (exit, output) = Commit(lane, "guarded");
+
+        Assert.Equal(1, exit);
+        Assert.True(Lists(output, "second.m4a"), output);
+    }
+
+    [Fact]
+    public void Every_place_that_says_how_to_turn_the_hooks_on_also_gives_the_absolute_form_for_linked_worktrees()
+    {
+        var root = FixBatchDownloadTests.RepoRoot();
+        string[] places =
+        [
+            ".github/SECURITY.md", ".github/CONTRIBUTING.md", ".github/workflows/ci.yml",
+            ".githooks/private-guard.sh", ".githooks/pre-commit", ".githooks/commit-msg", ".githooks/pre-push",
+        ];
+        Assert.All(places, place => Assert.Contains("git config core.hooksPath \"$(git rev-parse --show-toplevel)/.githooks\"", File.ReadAllText(Path.Combine(root, place))));
+    }
 }
