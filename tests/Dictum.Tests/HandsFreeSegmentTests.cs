@@ -440,6 +440,24 @@ public class CarriedContextCleanupTests
     }
 
     [Fact]
+    public void The_local_model_hears_the_carried_words_in_a_system_turn_of_their_own_after_the_cached_prefix()
+    {
+        // Merge lens, finding 4, 16/10/2026: folding the carried words into the user turn failed no test.
+        (string, string)[] examples = [("um raw one", "Raw one."), ("raw two", "Raw two.")];
+        var (turns, prefix) = CleanupSession.Turns("the prompt", examples, "thursday", "so we should move the meeting to");
+        Assert.Equal(
+        [
+            ("system", "the prompt"), ("user", "um raw one"), ("assistant", "Raw one."), ("user", "raw two"), ("assistant", "Raw two."),
+            ("system", CleanupPrompt.CarriedLine("so we should move the meeting to")), ("user", "thursday"),
+        ], turns);
+        Assert.Equal(5, prefix); // the system prompt and the examples: the turns the cache keeps
+
+        var (whole, wholePrefix) = CleanupSession.Turns("the prompt", examples, "hello there", null);
+        Assert.Equal([("system", "the prompt"), ("user", "um raw one"), ("assistant", "Raw one."), ("user", "raw two"), ("assistant", "Raw two."), ("user", "hello there")], whole);
+        Assert.Equal(5, wholePrefix);
+    }
+
+    [Fact]
     public async Task The_local_model_gets_the_carried_words_after_its_cached_prompt_not_in_it()
     {
         var engine = new RecordingLocalEngine();

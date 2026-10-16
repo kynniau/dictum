@@ -26,7 +26,7 @@ public class HandsFreeSessionTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    /// <summary>A microphone that cuts when told and hands back a set rest at the stop.</summary>
+    /// <summary>A microphone that cuts when told, hands back a set rest at the stop, and can be lost.</summary>
     private sealed class CuttingCapture : IAudioCapture
     {
         private Action<CapturedAudio, CutReason>? _part;
@@ -39,7 +39,10 @@ public class HandsFreeSessionTests
         public bool Cutting => Volatile.Read(ref _part) is not null;
         public float CurrentLevel => 0f;
 
-        public event Action<Exception>? Failed { add { } remove { } }
+        public event Action<Exception>? Failed;
+
+        /// <summary>The device goes, as when a headset is unplugged: raised as the capture thread would.</summary>
+        public void Lose() => Failed?.Invoke(new InvalidOperationException("the headset went flat"));
 
         public void Start(string? deviceSetting, long keyDownStamp) { }
 
@@ -62,11 +65,12 @@ public class HandsFreeSessionTests
     /// <summary>Part n of a session: 2 s plus n tenths, so whisper's stand-in knows which part it was given.</summary>
     private static CapturedAudio Part(int n) => new(new float[32000 + n * 1600], 0.2f);
 
-    /// <summary>Whisper stand-in: each part's words by its length; records the carried words it was given; a part can be held.</summary>
+    /// <summary>Whisper stand-in: each part's words by its length; records the carried words it was given; a part can be held or fail.</summary>
     private sealed class PartTranscriber(params string[] words) : ITranscriber
     {
         public ConcurrentQueue<(string Words, string? Carried)> Heard { get; } = new();
         public ConcurrentDictionary<int, TaskCompletionSource> Holds { get; } = new();
+        public ConcurrentDictionary<int, bool> Fails { get; } = new();
 
         public Task<string> TranscribeAsync(float[] samples, CancellationToken cancellationToken) => TranscribeAsync(samples, null, cancellationToken);
 
@@ -75,6 +79,7 @@ public class HandsFreeSessionTests
             var n = (samples.Length - 32000) / 1600;
             Heard.Enqueue((words[n], carried));
             if (Holds.TryGetValue(n, out var hold)) await hold.Task.WaitAsync(cancellationToken);
+            if (Fails.ContainsKey(n)) throw new InvalidOperationException("whisper failed on this part");
             return words[n];
         }
     }
@@ -329,6 +334,44 @@ public class HandsFreeSessionTests
     }
 
     [Fact]
+    public async Task A_microphone_lost_mid_session_keeps_what_is_typed_and_types_what_it_captured()
+    {
+        // Merge lens P5, 16/10/2026: sending a hands-free session down the drop path when the microphone goes failed no test.
+        using var rig = Make(new PartTranscriber("typed before the headset went", "and the rest it captured"));
+        await StartHandsFree(rig);
+        rig.Capture.Cut(Part(0));
+        await WaitUntil(() => rig.Pasted.Count == 1, "the first part");
+        rig.Capture.Rest = Part(1);
+        rig.Capture.Lose();
+        await WaitUntil(() => rig.Ui.Pills.Contains(PillView.Done), "the Done pill");
+
+        Assert.Equal(["Typed before the headset went.", " And the rest it captured."], rig.Pasted);
+        Assert.Contains(PillView.MicError, rig.Ui.Pills);
+        Assert.DoesNotContain(PillView.HandsFreeStopped, rig.Ui.Pills);
+        Assert.Equal(1, rig.Capture.Stops);
+    }
+
+    [Fact]
+    public async Task A_part_that_fails_does_not_end_the_session()
+    {
+        // Merge lens P6, 16/10/2026: stopping the worker at the first failed part failed no test.
+        var whisper = new PartTranscriber("this part fails", "the next part is typed", "and so is the rest");
+        whisper.Fails[0] = true;
+        using var rig = Make(whisper);
+        await StartHandsFree(rig);
+        rig.Capture.Cut(Part(0));
+        rig.Capture.Cut(Part(1));
+        await WaitUntil(() => rig.Pasted.Count == 1, "the part after the failed one");
+        rig.Capture.Rest = Part(2);
+        StopTap(rig);
+        await WaitUntil(() => rig.Pasted.Count == 2, "the rest at the stop");
+        await WaitUntil(() => rig.Machine.State == DictationState.Idle, "the session to end");
+
+        Assert.Equal(["The next part is typed.", " And so is the rest."], rig.Pasted);
+        Assert.Equal(3, rig.Whisper.Heard.Count);
+    }
+
+    [Fact]
     public async Task A_microphone_that_cannot_cut_types_the_whole_session_at_the_stop()
     {
         var settings = new AppSettings();
@@ -401,6 +444,19 @@ public class HandsFreeStateMachineTests
         Assert.True(token.IsCancellationRequested);
         Assert.False(Assert.Single(esc.OfType<CancelProcessingEffect>()).KeepsTyped);
         Assert.Contains(new PillEffect(PillView.Cancelled), esc);
+    }
+
+    [Fact]
+    public void A_lost_microphone_types_the_rest_under_the_sessions_token()
+    {
+        // Merge lens P5 at the state machine: the rest goes after the parts already typed, which nothing cancels.
+        var m = HandsFree(out var token);
+        var lost = m.CaptureLost(m.SessionId);
+        Assert.Equal(token, Assert.Single(lost.OfType<BeginProcessingEffect>()).Token);
+        Assert.False(token.IsCancellationRequested);
+        Assert.Contains(new PillEffect(PillView.MicError), lost);
+        Assert.DoesNotContain(lost, e => e is DiscardCaptureEffect or CancelProcessingEffect);
+        Assert.Equal(DictationState.Processing, m.State);
     }
 
     [Fact]

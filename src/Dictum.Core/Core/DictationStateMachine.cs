@@ -211,7 +211,8 @@ public sealed class DictationStateMachine
 
     /// <summary>
     /// The device failed mid-recording (unplugged, a headset battery died). What was captured is transcribed, as the
-    /// auto-stop does (never discarded), with the "Mic error" flash; a lone tap still waiting for its second tap is
+    /// auto-stop does (never discarded), with the "Mic error" flash: in hands-free the parts already typed stay and what
+    /// followed the last cut is typed last, under the session's token. A lone tap still waiting for its second tap is
     /// discarded as before, since it is not a dictation yet.
     /// </summary>
     public IReadOnlyList<Effect> CaptureLost(long sessionId)
@@ -220,15 +221,15 @@ public sealed class DictationStateMachine
         return [.. BeginProcessing(autoStopped: false).Where(e => e is not PillEffect), new PillEffect(PillView.MicError)];
     }
 
-    /// <summary>The microphone could not be opened or failed mid-recording.</summary>
+    /// <summary>
+    /// The microphone could not be opened (a new hold), or failed while a lone tap waited for its second: discarded, "Mic
+    /// error". Never reached in hands-free, where a lost microphone is <see cref="CaptureLost"/>'s.
+    /// </summary>
     public IReadOnlyList<Effect> CaptureFailed(long sessionId)
     {
         if (!IsRecording || sessionId != SessionId) return None;
         State = DictationState.Idle;
-        if (!_handsFree) return [new DiscardCaptureEffect(SessionId), new PillEffect(PillView.MicError)];
-        CancelProcessingToken(); // no session's parts may go on being typed once it has ended
-        _handsFree = false;
-        return [new DiscardCaptureEffect(SessionId), new CancelProcessingEffect(SessionId, KeepsTyped: true), new PillEffect(PillView.MicError)];
+        return [new DiscardCaptureEffect(SessionId), new PillEffect(PillView.MicError)];
     }
 
     public IReadOnlyList<Effect> SetEnabled(bool enabled)
