@@ -61,8 +61,8 @@ public static class CliCommands
         {
             var personal = LoadPersonal(paths, log);
             Console.Error.WriteLine($"personal files: {personal.Summary(settings.Profanity)}");
-            var decode = new DecodeOptions(personal.Dictionary.WhisperPrompt, settings.Whisper.BeamSize);
-            using var engine = WhisperEngine.Load(modelPath, settings.Whisper.Language, settings.Whisper.Threads, settings.Whisper.Gpu, log, decode);
+            var decode = new DecodeOptions(personal.Dictionary.WhisperPrompt, settings.Whisper.BeamSize, settings.Whisper.Language, settings.Whisper.Translate);
+            using var engine = WhisperEngine.Load(modelPath, settings.Whisper.Threads, settings.Whisper.Gpu, log, decode);
             Console.Error.WriteLine($"model: {modelPath}");
             Console.Error.WriteLine($"whisper runtime: {WhisperEngine.LoadedRuntime} (loaded in {engine.LoadTime.TotalSeconds:0.0} s; {decode.Describe()}; " +
                                     $"{(decode.Prompt is null ? "no dictionary prompt" : $"dictionary prompt with {personal.Dictionary.WhisperPromptTerms} term(s)")})");
@@ -101,7 +101,7 @@ public static class CliCommands
                     var cleaned = await cleaner.CleanAsync(raw, CancellationToken.None);
                     var cleanupMs = sw.ElapsedMilliseconds;
                     if (cleaned.FallbackReason is not null) Console.Error.WriteLine($"cleanup fallback: {cleaned.FallbackReason}");
-                    Console.Error.WriteLine($"cleanup by {(cleaned.Cleaned ? "the model" : "the rule-based tidy")} in {cleanupMs} ms; transcribe + cleanup {transcribeMs + cleanupMs} ms");
+                    Console.Error.WriteLine($"cleanup by {(cleaned.Cleaned ? "the model" : cleaner.IsPlain ? "the whitespace-only tidy" : "the rule-based tidy")} in {cleanupMs} ms; transcribe + cleanup {transcribeMs + cleanupMs} ms");
                     Console.Out.WriteLine($"cleaned: {cleaned.Text}");
                     // What the tray app would paste: the corrections, then the profanity filter (SPEC §22 order: raw, clean-up, corrections, profanity).
                     Console.Out.WriteLine($"final: {personal.Finish(cleaned.Text, settings.Profanity)}");
@@ -120,9 +120,10 @@ public static class CliCommands
         }
     }
 
-    /// <summary>The clean-up --transcribe runs: the configured provider with the tray app's prompt and checks.</summary>
+    /// <summary>The clean-up --transcribe runs: the configured provider with the tray app's prompt and checks, or whitespace only when the text is not English (SPEC §23).</summary>
     internal static TranscriptCleaner Cleaner(AppSettings settings, SecretStore secrets, HttpClient http, ILog log, Func<ILocalLlmEngine?> local, PersonalText personal) =>
-        TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, local, personal.ForCleanup(settings.Profanity));
+        TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, local, personal.ForCleanup(settings.Profanity),
+            WhisperLanguages.OutputIsEnglish(settings.Whisper.Language, settings.Whisper.Translate));
 
     /// <summary>The user's dictionary, corrections and profanity list from the config folder (honours --config).</summary>
     internal static PersonalText LoadPersonal(AppPaths paths, ILog log) =>

@@ -55,6 +55,10 @@ public static partial class DeterministicCleaner
     [GeneratedRegex(@",(?=\s*[.!?])")]
     private static partial Regex CommaBeforeStop();
 
+    /// <summary>Whitespace only, for text in a language the rules below are not written for (SPEC §23): no case, punctuation or word changes.</summary>
+    public static string WhitespaceOnly(string raw) =>
+        string.IsNullOrWhiteSpace(raw) ? "" : Spaces().Replace(raw.Replace('\r', ' ').Replace('\n', ' '), " ").Trim();
+
     public static string Clean(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return "";

@@ -46,6 +46,12 @@ $speech = [ordered]@{
     "medium.en-q8_0"      = @(823382461, "43fa2cd084de5a04399a896a9a7a786064e221365c01700cea4666005218f11c")
     "large-v3-turbo"      = @(1624555275, "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69")
     "large-v3-turbo-q5_0" = @(574041195, "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2")
+    "small"               = @(487601967, "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b")
+    "small-q5_1"          = @(190085487, "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb")
+    "medium"              = @(1533763059, "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208")
+    "medium-q5_0"         = @(539212467, "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f")
+    "large-v3"            = @(3095033483, "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2")
+    "large-v3-q5_0"       = @(1081140203, "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1")
 }
 
 # Cleanup models (vendor organisations): name = repo, file, bytes, sha256 ($null where the API masks it), gated, commit

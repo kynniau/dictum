@@ -2,17 +2,23 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Dictum.Settings;
 using Dictum.Storage;
+using Dictum.Transcribe;
 using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views.Settings;
 
-/// <summary>Settings → Models: the speech and clean-up catalogues with their state, a file chooser for each, and decoding.</summary>
+/// <summary>Settings → Models: the speech and clean-up catalogues with their state, a file chooser for each, decoding, and the language.</summary>
 internal sealed class ModelsPage : SettingsPage
 {
+    private static readonly IReadOnlyList<(string Code, string Label)> Languages = WhisperLanguages.PickerItems();
+
     private readonly SettingsWindow _window;
     private readonly StackPanel _speech = new() { Spacing = 8 };
     private readonly StackPanel _cleanup = new() { Spacing = 8 };
     private readonly ComboBox _decoding = new() { ItemsSource = new[] { "Greedy (fastest)", "Beam search, 5 beams (more accurate, slower)" }, Width = 320 };
+    private readonly ComboBox _language = new() { ItemsSource = Languages.Select(l => l.Label).ToList(), Width = 320 };
+    private readonly ToggleSwitch _translate;
+    private readonly TextBlock _languageNote = Ui.Text("", "caption");
     private readonly TextBlock _downloadText = Ui.Text("", "caption");
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, Height = 4 };
     private readonly StackPanel _download;
@@ -25,12 +31,53 @@ internal sealed class ModelsPage : SettingsPage
         {
             if (_decoding.SelectedIndex >= 0) Write(("whisper.beam_size", Json(_decoding.SelectedIndex == 0 ? 0 : 5)));
         };
+        _language.SelectionChanged += (_, _) =>
+        {
+            if (Refreshing || _language.SelectedIndex < 0) return;
+            var code = Languages[_language.SelectedIndex].Code;
+            var w = Shell.Settings.Whisper;
+            if (code == w.Language) return;
+            // Judged against the model in use (a --model override included), not only whisper.model.
+            if (WhisperLanguages.Problem(Shell.Models.ModelPath, code, w.Translate) is { } problem)
+            {
+                Say(problem);
+                Refresh();
+                return;
+            }
+            Write(("whisper.language", Json(code)));
+            if (Shell.Settings.Whisper.Language != code) return; // not written (a balloon said why); Redraw puts the picker back
+            var listens = code == WhisperLanguages.Auto
+                ? "Dictum works out the language from the first seconds of each dictation" // the card's own words for Detect automatically
+                : $"Dictum listens for {WhisperLanguages.Name(code)} ({code})";
+            Say(code == WhisperLanguages.English
+                ? "Dictum listens for English again."
+                : $"{listens}{(w.Translate ? " and writes English" : "")}. The decoder switches now; the model stays loaded.");
+        };
+        _translate = Ui.Switch(false, on =>
+        {
+            var w = Shell.Settings.Whisper;
+            if (on && WhisperLanguages.Problem(Shell.Models.ModelPath, w.Language, translate: true) is { } problem)
+            {
+                Say(problem);
+                Refresh();
+                return;
+            }
+            Write(("whisper.translate", Json(on)));
+            if (Shell.Settings.Whisper.Translate != on) return; // not written (a balloon said why)
+            Say(on ? "Dictum writes English whatever language you speak." : "Dictum writes what you say in the language you spoke.");
+        });
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload()));
         Compose(
             _download,
             Ui.Card(Ui.Stack(10, Ui.Text("Turns your voice into words, on this PC. Bigger is more accurate and slower."), _speech,
                 Ui.Row(8, Ui.Button("Choose model file…", "secondary", () => Run(Shell.Models.ChooseFile))),
                 Ui.Line("Decoding", _decoding, "Beam search tries several readings of each phrase.")), "Speech model"),
+            Ui.Card(Ui.Stack(10,
+                Ui.Text("The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
+                        "Hindi, Tagalog and other languages are listed first. Whisper has no Cebuano or other Philippine language apart from Tagalog."),
+                Ui.Line("Spoken language", _language, "Detect automatically works it out from the first seconds of each dictation."),
+                Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
+                _languageNote), "Language"),
             Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _cleanup,
                 Ui.Row(8,
                     Ui.Button("Rule-based tidy only", "secondary", () => Run(Shell.Models.SelectRulesOnly)),
@@ -48,6 +95,12 @@ internal sealed class ModelsPage : SettingsPage
         _progress.Value = status.DownloadFraction ?? 0;
         var s = Shell.Settings;
         _decoding.SelectedIndex = s.Whisper.BeamSize > 0 ? 1 : 0;
+        var languageIndex = -1;
+        for (var i = 0; i < Languages.Count && languageIndex < 0; i++) if (Languages[i].Code == s.Whisper.Language) languageIndex = i;
+        _language.SelectedIndex = languageIndex;
+        Ui.SetQuietly(_translate, s.Whisper.Translate);
+        _languageNote.Text = WhisperLanguages.Problem(Shell.Models.ModelPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
+        _languageNote.IsVisible = _languageNote.Text.Length > 0;
 
         // The lists are rebuilt only when what they show changes, not on every download-progress tick.
         var downloaded = string.Join(",", ModelCatalog.Entries.Where(Shell.Models.IsDownloaded).Select(e => e.Name)) + "|" +

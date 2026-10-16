@@ -49,14 +49,17 @@ public sealed class ProfanityFilter
         };
     }
 
-    /// <summary>"fucking" → "f******": the first letter of each word kept, every other letter starred.</summary>
+    /// <summary>
+    /// "fucking" → "f******": the first letter of each word kept, every other letter starred, and so every combining mark
+    /// (<see cref="WholeWords.IsWordChar"/>): "कमीना" → "क****", never "क*ीना".
+    /// </summary>
     private static string Mask(string match)
     {
         var sb = new StringBuilder(match.Length);
         var wordStart = true;
         foreach (var c in match)
         {
-            var letter = char.IsLetterOrDigit(c);
+            var letter = WholeWords.IsWordChar(c);
             sb.Append(letter && !wordStart ? '*' : c);
             wordStart = !letter;
         }
@@ -96,7 +99,7 @@ public sealed class ProfanityFilter
                 if (sb.Length > 0 && sb[^1] is not '\n') sb.Append(' '); // "Done. Shit, it…" → "Done. It…"
                 if (char.IsUpper(m.Value[0])) capitalise.Add(sb.Length);
             }
-            else if (sb.Length > 0 && sb[^1] is not (' ' or '\t' or '\n') && next < text.Length && char.IsLetterOrDigit(text[next])) sb.Append(' ');
+            else if (sb.Length > 0 && sb[^1] is not (' ' or '\t' or '\n') && next < text.Length && WholeWords.IsWordChar(text[next])) sb.Append(' ');
             at = next;
         }
         sb.Append(text, at, text.Length - at);
@@ -112,7 +115,7 @@ public sealed class ProfanityFilter
         {
             var end = at + 1 + suffix.Length;
             if (end <= text.Length && string.Compare(text, at + 1, suffix, 0, suffix.Length, StringComparison.OrdinalIgnoreCase) == 0
-                && (end == text.Length || !char.IsLetterOrDigit(text[end])))
+                && (end == text.Length || !WholeWords.IsWordChar(text[end])))
                 return 1 + suffix.Length;
         }
         return 0;

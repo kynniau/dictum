@@ -35,7 +35,7 @@ public class WhisperIntegrationTests(ITestOutputHelper output)
         {
             var audio = AudioFiles.ReadWav(wav);
             Assert.True(audio.Duration.TotalSeconds > 1);
-            using var engine = WhisperEngine.Load(modelPath!, "en", 0, "auto", NullLog.Instance);
+            using var engine = WhisperEngine.Load(modelPath!, 0, "auto", NullLog.Instance);
             var text = await engine.TranscribeAsync(audio.Samples, TestContext.Current.CancellationToken);
             output.WriteLine($"runtime {WhisperEngine.LoadedRuntime}; transcript: {text}");
 
@@ -71,7 +71,7 @@ public class WhisperIntegrationTests(ITestOutputHelper output)
             File.Delete(wav);
         }
         var minute = Enumerable.Repeat(clip, 6).SelectMany(s => s).ToArray();
-        var engine = WhisperEngine.Load(modelPath!, "en", 0, "auto", NullLog.Instance);
+        var engine = WhisperEngine.Load(modelPath!, 0, "auto", NullLog.Instance);
         await engine.TranscribeAsync(clip, ct); // warm-up
         var sw = System.Diagnostics.Stopwatch.StartNew();
         await engine.TranscribeAsync(minute, ct);

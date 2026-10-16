@@ -3,8 +3,8 @@ using System.Text.RegularExpressions;
 namespace Dictum.Settings;
 
 /// <param name="Name">Short name used in settings ("small.en").</param>
-/// <param name="Bytes">Exact file size, verified by HTTP HEAD (X-Linked-Size) on 15/10/2026.</param>
-/// <param name="Sha256">LFS SHA-256 from https://huggingface.co/api/models/ggerganov/whisper.cpp/tree/main, read 15/10/2026; the same at <see cref="ModelCatalog.Revision"/>.</param>
+/// <param name="Bytes">Exact file size: the ten original entries verified by HTTP HEAD (X-Linked-Size) on 15/10/2026; the six multilingual entries from the HF API tree at <see cref="ModelCatalog.Revision"/>, read 16/10/2026.</param>
+/// <param name="Sha256">LFS SHA-256 from https://huggingface.co/api/models/ggerganov/whisper.cpp/tree/main, read 15/10/2026 (the same at <see cref="ModelCatalog.Revision"/>); the multilingual entries from the tree at Revision, 16/10/2026.</param>
 /// <param name="TradeOff">One line for the tray, the first-run picker and the README.</param>
 public sealed record ModelInfo(string Name, long Bytes, string Sha256, string TradeOff)
 {
@@ -28,8 +28,10 @@ public static partial class ModelCatalog
     /// <summary>
     /// The ggerganov/whisper.cpp commit every speech download is pinned to, so the URL keeps serving the bytes the hashes
     /// below describe even if the repository's main branch changes. Read on <see cref="RevisionRead"/>: the HF API tree at
-    /// this commit lists every file below with the same size and LFS SHA-256, and a HEAD of each pinned URL answered 302
-    /// with a matching X-Linked-Size and X-Linked-ETag (redirecting to the same CDN host as resolve/main).
+    /// this commit lists every file below with the same size and LFS SHA-256, and a HEAD of each of the ten original pinned
+    /// URLs answered 302 with a matching X-Linked-Size and X-Linked-ETag (redirecting to the same CDN host as resolve/main).
+    /// The six multilingual entries were read from the same tree at this commit on 16/10/2026, with four of the original
+    /// entries re-read as controls; no HEAD was made for them.
     /// </summary>
     public const string Revision = "5359861c739e955e79d9a303bcbc70fb988958b1";
 
@@ -45,8 +47,16 @@ public static partial class ModelCatalog
         new("medium.en", 1_533_774_781, "cc37e93478338ec7700281a7ac30a10128929eb8f427dda2e865faa8f6da4356", "high accuracy; wants a GPU or a fast desktop CPU"),
         new("medium.en-q5_0", 539_225_533, "76733e26ad8fe1c7a5bf7531a9d41917b2adc0f20f2e4f5531688a8c6cd88eb0", "medium.en quantised to 5-bit: about a third of the size"),
         new("medium.en-q8_0", 823_382_461, "43fa2cd084de5a04399a896a9a7a786064e221365c01700cea4666005218f11c", "medium.en quantised to 8-bit: about half the size"),
-        new("large-v3-turbo", 1_624_555_275, "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", "best accuracy, multilingual; needs a GPU"),
+        new("large-v3-turbo", 1_624_555_275, "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", "multilingual, about 8× faster than large-v3 (OpenAI's table) but cannot translate; needs a GPU"),
         new("large-v3-turbo-q5_0", 574_041_195, "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", "large-v3-turbo quantised to 5-bit; still needs a GPU"),
+        // Multilingual models (sizes and hashes from the HF API tree at Revision, read 16/10/2026): any Whisper language, and
+        // speech-to-English translation. OpenAI's README: "Use medium or large for the best translation results".
+        new("small", 487_601_967, "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", "any language, translates to English; the smallest multilingual model, the same size as small.en"),
+        new("small-q5_1", 190_085_487, "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb", "small quantised to 5-bit: smallest multilingual download"),
+        new("medium", 1_533_763_059, "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208", "any language, translates well to English; wants a GPU or a fast desktop CPU"),
+        new("medium-q5_0", 539_212_467, "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f", "medium quantised to 5-bit: about a third of the size"),
+        new("large-v3", 3_095_033_483, "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2", "the most accurate in any language and the best for translation; needs a GPU"),
+        new("large-v3-q5_0", 1_081_140_203, "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1", "large-v3 quantised to 5-bit; still needs a GPU"),
     ];
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")]

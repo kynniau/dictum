@@ -44,7 +44,7 @@ public class CalibrationIntegrationTests(ITestOutputHelper output)
         // DICTUM_CALIBRATION_GPU=cpu forces the CPU runtime (the runtime is chosen once per process: run this class alone).
         var gpu = TestEnv.Get("CALIBRATION_GPU") == "cpu" ? "cpu" : "auto";
         var log = new RecordingLog();
-        var engine = new CalibrationEngine((path, decode) => WhisperEngine.Load(path, "en", 0, gpu, NullLog.Instance, decode), log, () => WhisperEngine.VulkanActive);
+        var engine = new CalibrationEngine((path, decode) => WhisperEngine.Load(path, 0, gpu, NullLog.Instance, decode), log, () => WhisperEngine.VulkanActive);
         var results = await engine.RunAsync(clips, [new("tiny.en", tiny), new("small.en", small)], prompt: null, null, TestContext.Current.CancellationToken);
         Assert.SkipWhen(gpu == "cpu" && WhisperEngine.VulkanActive, "A GPU runtime was already loaded in this process; run this class on its own.");
 

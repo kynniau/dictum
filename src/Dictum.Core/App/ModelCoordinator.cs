@@ -38,6 +38,7 @@ public sealed class ModelCoordinator(
     private string? _launchOverride = launchOverride;
     private string? _firstRunSpeechDownload;
     private string? _firstRunCleanupDownload;
+    private string? _languageProblemShown; // the last WhisperLanguages.Problem ballooned, so a reload does not repeat it
 
     /// <summary>True while a model download runs or waits its turn (the tray panel then shows "Cancel download").</summary>
     public bool IsDownloading => _downloads.IsDownloading;
@@ -128,18 +129,43 @@ public sealed class ModelCoordinator(
     }
 
     /// <summary>
+    /// Every speech-model load goes through here (a settings change, the first-run picker, a finished download): the model
+    /// still loads, and a balloon says when it cannot do what whisper.language or whisper.translate ask (SPEC §23), whichever
+    /// way it was chosen (tray picker, Mode preset, Choose file, calibration's Use this, a hand edit).
+    /// </summary>
+    private void BeginSpeechLoad(string path)
+    {
+        var whisper = settings().Whisper;
+        if (WhisperLanguages.Problem(path, whisper.Language, whisper.Translate) is { } problem) ShowLanguageProblem(problem);
+        models.BeginLoad(path, whisper);
+    }
+
+    private void ShowLanguageProblem(string problem)
+    {
+        _languageProblemShown = problem;
+        balloon(problem, true);
+    }
+
+    /// <summary>
     /// Loads the configured speech model if it changed, or again if its last load failed (a re-download or tray > Reload
     /// settings is the retry). At startup a missing model gets the Download / Choose file… / Quit dialog (SPEC §10); on a
-    /// reload it only gets a balloon and the loaded model stays in use.
+    /// reload it only gets a balloon and the loaded model stays in use. With the same model, a change of whisper.language or
+    /// whisper.translate only rebuilds its decoder (AppShell.Reload), so no load is there to say the model cannot do it
+    /// (SPEC §23): the reload says it, once per distinct problem.
     /// </summary>
     public void Ensure(string? previousPath, bool startup)
     {
         var path = ModelPath;
         var changed = previousPath is null || path != previousPath;
-        if (!changed && models.ModelPath == path && !models.LoadFailed) return; // same model, already loading or loaded
+        if (!changed && models.ModelPath == path && !models.LoadFailed) // same model, already loading or loaded
+        {
+            var whisper = settings().Whisper;
+            if (WhisperLanguages.Problem(path, whisper.Language, whisper.Translate) is { } problem && problem != _languageProblemShown) ShowLanguageProblem(problem);
+            return;
+        }
         if (File.Exists(path))
         {
-            models.BeginLoad(path, settings().Whisper);
+            BeginSpeechLoad(path);
             return;
         }
         log.Warn($"Model file missing: {path}");
@@ -158,7 +184,7 @@ public sealed class ModelCoordinator(
         {
             _firstRunSpeechDownload = null;
             StartDownload(ModelCatalog.Find(configured)!.Download, ModelCatalog.ResolvePath(configured, paths.ModelsDir(settings())),
-                () => models.BeginLoad(ModelPath, settings().Whisper)); // picked in the first-run picker
+                () => BeginSpeechLoad(ModelPath)); // picked in the first-run picker
             return;
         }
         PromptMissing(configured);
@@ -200,7 +226,7 @@ public sealed class ModelCoordinator(
         {
             case MissingModelChoice.Download:
                 StartDownload(ModelCatalog.Find(configured)!.Download, ModelCatalog.ResolvePath(configured, paths.ModelsDir(settings())),
-                    () => models.BeginLoad(ModelPath, settings().Whisper));
+                    () => BeginSpeechLoad(ModelPath));
                 break;
             case MissingModelChoice.ChooseFile:
                 ChooseFile();

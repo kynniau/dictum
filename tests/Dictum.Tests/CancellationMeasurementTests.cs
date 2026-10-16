@@ -35,7 +35,7 @@ public class CancellationMeasurementTests(ITestOutputHelper output)
 
         // DICTUM_CANCEL_RUNTIME=cpu (default) forces the CPU runtime; "auto" lets Vulkan load (the GPU figure).
         var runtime = TestEnv.Get("CANCEL_RUNTIME") == "auto" ? "auto" : "cpu";
-        using var engine = WhisperEngine.Load(modelPath!, "en", 0, runtime, NullLog.Instance);
+        using var engine = WhisperEngine.Load(modelPath!, 0, runtime, NullLog.Instance);
         Assert.SkipUnless(runtime == "auto" || WhisperEngine.LoadedRuntime == "CPU", $"CPU runtime not loaded in this process ({WhisperEngine.LoadedRuntime}); run the class alone.");
         var ct = TestContext.Current.CancellationToken;
         var process = Process.GetCurrentProcess();

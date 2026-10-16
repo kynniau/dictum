@@ -1068,3 +1068,99 @@ Full suite after these fixes: 795 tests, 776 passed, 19 skipped, 0 failed (befor
 Not verified here: the lens's started-shell scenario was not re-run (the shell tests' fake listener posts signals
 without the matcher, so the first pin drives the matcher and the state machine directly); the 19 env-gated tests
 (12 model/LLM/download, 4 desktop, 1 audio, 1 tray, 1 setup) stay skipped.
+
+## Languages and translation (16/10/2026, branch feature/languages, worktree .worktrees/languages)
+
+- Built from main in its own worktree while `feature/mouse-hotkey-snippets` was under review in the main tree, so the two
+  lanes never edited one file at the same time. Merge order is Kyle's call; both touch README.md, docs/SPEC.md and this
+  file only in separate sections.
+- Facts, all fetched 16/10/2026 and recorded in SPEC §23: Whisper's 100-language table (Hindi and Tagalog in, Cebuano and
+  Filipino out), the README's words on the turbo model and translation, Whisper.net 1.9.1's `WithTranslate` and
+  `WithLanguageDetection` (its XML docs in the NuGet cache), and the HF API tree at the pinned commit for the six
+  multilingual files (controls: small.en, medium.en, large-v3-turbo and its q5_0 matched the catalogue byte for byte).
+- One guard function rather than scattered checks: `WhisperLanguages.Problem(model, language, translate)` is the only
+  place that knows an `.en` model is English-only and that turbo cannot translate; the Models page, the engine's load
+  warning and `--selftest` all call it. English-only is read from the name (".en"), turbo from the "large-v3-turbo"
+  prefix, so a user's own file named like a catalogue entry is judged the same way and an unknown name is trusted, except
+  for Cantonese, which is allowed only for names starting with large-v3 (see the Cantonese bullet below).
+- Language and translate are decoder options (`DecodeOptions`), rebuilt through the existing `SetDecoding` →
+  `Reconfigure` path like the dictionary prompt, not a model reload. The first cut reloaded the model; the lens pointed
+  out that a reload of large-v3 (3.1 GB plus the warm-up) leaves `IsReady` false and the hotkey dead meanwhile, that the
+  extra reload rule and the trailing optional `translate` parameter were a second mechanism for something the decoder
+  rebuild already does, and that calibration inheriting the dictation language would score English sentences decoded
+  as Hindi. With the options in `DecodeOptions`, calibration's own `DecodeOptions(prompt, beam)` is English by
+  construction, so the calibration notes were retired.
+- The clean-up is skipped (`TranscriptCleaner.Plain`, whitespace only) whenever the output is not English: the rules
+  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on Hindi or
+  Polish text would change it. Corrections and the profanity filter still run; they are whole-word matches the user
+  wrote. Status "skipped: …" is visible in About and `--selftest`.
+- Combining marks are part of a word (lens, 16/10/2026). A Devanagari vowel sign, virama or anusvara is a combining mark
+  (`\p{M}`), not a letter, so the shared whole-word matcher (`WholeWords`: corrections, snippets, the profanity list)
+  treated it as a word boundary: `राम => श्याम` turned "विराम" into "विश्याम", a snippet on "कम" fired inside "कमाओ", Fix
+  last suggested nothing for "कम" to "काम" or "है" to "हैं", and mask wrote "क*ीना". The matcher's look-arounds now count
+  `\p{M}` as inside a word, and the Fix-last diff and the profanity mask and removal ask `WholeWords.IsWordChar` (a letter,
+  a digit, or a non-spacing or spacing combining mark). English matching (apostrophes, possessive "s", digits, hyphens) is
+  unchanged. This extends Batch 2's "a word character is a letter or a digit".
+- Known limitation: Detect automatically without translation always gets the plain cleaner, because the cleaner is built
+  when the settings load, before whisper has detected any dictation's language; English speech under `auto` is therefore
+  not tidied either, and the README tells an English speaker to choose English. Retire when the cleaner is chosen per
+  dictation from the language whisper detected: Whisper.net 1.9.1 reports it for each segment (`SegmentData.Language`,
+  "Gets the language of the current segment." in its XML docs in the NuGet cache, read 16/10/2026).
+- Settings > Clean-up and Privacy for text that is not English (16/10/2026): the page falls through to the approved "On, but
+  nothing is sent: the clean-up in use runs on this PC." (Privacy: "Nothing leaves this PC: …") instead of the local-server
+  line, and takes precedence over the offline-only line, because switching offline only off would still send nothing. For
+  English text the offline-only line keeps its precedence, since it tells the user why nothing is sent
+  (`CleanupPage.OfflineOnlyIsWhyNothingIsSent`).
+- The Mode presets were left on English-only models (no multilingual twin of Light/Full), because choosing which
+  multilingual model a preset should write needs measurements on the staff's actual machines that do not exist yet.
+  The Mode page's note is computed per preset from the one guard (`WhisperLanguages.ModeNote`): on a GPU, Full writes
+  large-v3-turbo, which hears Hindi, so only Light is named unless translation is on.
+- Every speech-model load passes through `ModelCoordinator.BeginSpeechLoad`, which shows a warning balloon (and still
+  loads) when the model cannot do what the language settings ask: the Settings page refuses only its own two controls,
+  and a model chosen from the tray picker, a Mode preset, Choose file, calibration's Use this or a hand edit used to
+  get a log line nobody reads.
+- Cantonese (`yue`) is refused unless the model name starts with "large-v3": openai/whisper's tokenizer takes the first
+  `num_languages` entries of its table (99 by default; read in tokenizer.py 16/10/2026) and `yue` is the 100th; which
+  models carry the 100th token (the large-v3 family) is recalled from openai/whisper's model loading, not re-read.
+- Observed with the first cut (the small.en runs below): an English-only model given `translate: true` or
+  `language: auto` loads and transcribes English after the guard's warning, so whisper.cpp proceeds rather than fails;
+  the combination is now refused in Settings and `--selftest`, and ballooned on every other path.
+- Recalled, not verified: whisper's handling of code-switched speech (Hinglish) under a fixed language (the README now
+  says "not tested here"); CPU timings for the multilingual `medium` (the README table has only the `.en` twins).
+- Not updated on this branch, for Kyle to settle before the Store submission: docs/STORE.md says "Dictum dictates in
+  English" (and its Policy 10.1 row), and site/index.html says "English dictation." Both are outward-facing copy.
+- Not measured here: no Hindi or Tagalog audio was available in this session. Kyle will test with staff recordings;
+  that result decides whether translation or accented English with a larger model reads better.
+- Observed 16/10/2026 with the published build from this worktree (`dist\Dictum\Dictum.exe`, scratch APPDATA,
+  LOCALAPPDATA and `--config`):
+  - `--selftest` with `small.en` + `language: hi` prints `language hi (Hindi): small.en is an English-only model … [FAIL]`;
+    with `medium` + `hi` + `translate: true` it prints `language hi (Hindi), translating to English [OK]` (the model file
+    was absent in the scratch profile, so that line failed as expected).
+  - `--transcribe` of a 6.37 s synthesised English clip on `ggml-small.en.bin` with `translate: true` and again with
+    `language: auto`: both loaded (log "loaded … (language en (English), translating to English, greedy)" and "(language
+    auto (detected per dictation), greedy)"), each preceded by the guard's WARN line, and both transcribed the clip
+    correctly; so `WithTranslate` and `WithLanguageDetection` on an English-only model warn rather than fail. 9.5 s and
+    13.2 s per clip on Vulkan here, first use of the runtime in each fresh process (shader compilation, see the polish
+    lane), not a figure for the feature.
+  - No Hindi or Tagalog audio was available: translation quality is unmeasured and is Kyle's test.
+- After the lens round (16/10/2026, same day): build 0 warnings, 0 errors; 743 tests, 725 passed, 18 skipped, 0 failed
+  (the orchestrator's own run, not the lane's report). The re-published build's `--selftest` prints `language hi (Hindi),
+  translating to English [OK]` for medium + hi + translate, and for small.en + hi without translate the `language` line
+  fails with the English-only reason and the `cleanup` line reads "skipped: the text is not English … whitespace tidied
+  only".
+- Rebased onto main 79bffb7 on 16/10/2026, after #1 (mouse hotkeys, snippets), #3 (cloud presets, one key per service),
+  #5 (site) and #4 (the dictionary-term rule), for the product owner's decision 14 of the same day: merge now, with
+  English the default. Git conflicted in `TranscriptCleaner`, `AppShell.Config`, `CliCommands` and this file only. The
+  cleaner's constructor takes #4's `validation` and then `plain`; `Create` takes #4's `PersonalCleanup` and then
+  `englishText`; the tray app and `CliCommands.Cleaner` (`--transcribe`) pass both, and `--selftest` passes `englishText`
+  as before. Text that is not English gets `TranscriptCleaner.Plain`, which returns before any model is asked, so no
+  validator rule runs on it, the dictionary-term rule included; English text keeps #3's key routing and #4's checks as
+  on main, whose tests for both pass unchanged. Snippets (#1) run in `PersonalText.Finish` after the plain clean-up as
+  after any other, so SPEC §23 and the README now name them beside corrections and the profanity filter. The README's
+  settings row for `whisper.language` said a change reloads the model; it rebuilds the decoder, as the section above it
+  says, and the row now says so.
+- A new test pins `--transcribe`'s language rule (`CliCommands.Cleaner`: plain for Hindi without translation, the model
+  and the dictionary-term check with it). Observed failing with `englishText` removed from `CliCommands.Cleaner`; the two
+  Models-page tests failed with it removed from `AppShell.Config`; the new test and the plain-text test failed with the
+  constructor's `_plain = plain` removed. Full suite on the rebased head (this lane's run): build 0 warnings, 0 errors;
+  1,015 tests, 996 passed, 19 skipped, 0 failed.

@@ -10,6 +10,7 @@ namespace Dictum.Calibration;
 /// <param name="Write">Writes settings.json keys through the tray's writer (which reloads and hot-swaps the model).</param>
 /// <param name="DownloadSpeechModel">Asks, downloads through the app's downloader (refused under offline_only), then calls back; the
 /// last callback says whether it arrived (false when declined, refused, failed or cancelled).</param>
+/// <param name="LoadSpeech">Tests load fakes; production loads whisper.cpp through <see cref="WhisperEngine.Load"/>.</param>
 internal sealed record CalibrationHost(
     AppPaths Paths,
     Func<AppSettings> Settings,
@@ -19,7 +20,8 @@ internal sealed record CalibrationHost(
     Action<(string Key, JsonNode? Value)[]> Write,
     Action<string, Action, Action<bool>> DownloadSpeechModel,
     Action<IReadOnlyList<string>> AddDictionaryTerms,
-    Action<IReadOnlyList<CorrectionRule>> AddCorrections)
+    Action<IReadOnlyList<CorrectionRule>> AddCorrections,
+    Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null)
 {
     /// <summary>Catalogue models whose file is in the models folder.</summary>
     public IReadOnlyList<SpeechCandidate> InstalledModels()
@@ -37,14 +39,19 @@ internal sealed record CalibrationHost(
         return ModelCatalog.Entries.Where(e => !File.Exists(ModelCatalog.ResolvePath(e.Name, dir))).ToList();
     }
 
-    /// <summary>The engine over real whisper models: each file is size/SHA-256 checked before it is loaded, as everywhere else.</summary>
+    /// <summary>
+    /// The engine over real whisper models: each file is size/SHA-256 checked before it is loaded, as everywhere else. It decodes
+    /// with calibration's own options (English, no translation), never whisper.language or whisper.translate: the sentences
+    /// read aloud are English (SPEC §23).
+    /// </summary>
     public CalibrationEngine CreateEngine()
     {
         var s = Settings();
+        var load = LoadSpeech ?? ((path, whisper, decode) => WhisperEngine.Load(path, whisper.Threads, whisper.Gpu, Log, decode));
         return new CalibrationEngine((path, decode) =>
         {
             Integrity.Verify(path);
-            return WhisperEngine.Load(path, s.Whisper.Language, s.Whisper.Threads, s.Whisper.Gpu, Log, decode);
+            return load(path, s.Whisper, decode);
         }, Log, () => WhisperEngine.VulkanActive, s.LogTranscripts);
     }
 }
