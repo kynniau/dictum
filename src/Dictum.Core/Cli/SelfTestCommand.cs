@@ -142,7 +142,7 @@ public static partial class SelfTestCommand
             ok = false;
         }
 
-        foreach (var name in SecretStore.KeyNames) Line(name, secrets.Describe(name));
+        KeyLines(secrets, Line);
         Console.Out.WriteLine(ok ? "result: PASS" : "result: FAIL");
         Console.Out.Flush();
         return ok ? 0 : 1;

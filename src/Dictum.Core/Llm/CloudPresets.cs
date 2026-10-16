@@ -17,8 +17,9 @@ public sealed record CloudPreset(string Name, string? BaseUrl, string? DefaultMo
     /// <summary>
     /// This service's key from <paramref name="secrets"/> (null when it has none to send: Ollama, or a custom server with no
     /// LLM_API_KEY). False only when the service needs its key and none is set (environment or .env): nothing is sent to it
-    /// then. The one place that decides this: TranscriptCleaner.Create stops on it, and Settings > Clean-up and Privacy
-    /// name the key they are waiting for from it.
+    /// then. TranscriptCleaner.Create asks it with the keys read at each load and records a key it stops on as
+    /// <see cref="TranscriptCleaner.MissingKey"/>; Settings > Clean-up and Privacy read that from the cleaner in use and never
+    /// look at the .env files themselves, so they cannot disagree with what is sent.
     /// </summary>
     public bool TryGetKey(SecretStore secrets, out string? key)
     {

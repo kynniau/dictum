@@ -217,7 +217,7 @@ internal sealed class FlyoutWindow : Window
             Ui.SetQuietly(_profanity, s.Profanity.Mode != ProfanitySettings.Off);
             Ui.SetQuietly(_grammar, s.Llm.GrammarAssist);
             Ui.SetQuietly(_sounds, s.Sounds.Enabled);
-            // The two lines after "Nothing leaves this PC" are proposed copy (16/10/2026), awaiting the product owner's confirmation.
+            // Each line after "Nothing leaves this PC": Approved by the product owner on 16/10/2026 as written: never reword it.
             var nothingLeaves = _shell.NothingLeaves;
             _lock.IsVisible = nothingLeaves; // the lock stands only beside "Nothing leaves this PC"
             _privacy.Text = nothingLeaves ? "Nothing leaves this PC"

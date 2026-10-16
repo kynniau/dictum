@@ -5,6 +5,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
+using Dictum.Cli;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.UI.Views;
@@ -38,14 +39,19 @@ public class CloudWarningAndPresetsTests
     // The landing page's card for a server you name ends with the policy's approved clause (the end of the paragraph above).
     private const string ApprovedLocalServerClause = "If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
 
-    // Proposed by the orchestrator on 16/10/2026 and awaiting the product owner's confirmation: pinned word for word, so any change to
-    // them is deliberate. The tray panel's privacy line while a server on this PC, or a host off it, does the clean-up.
-    private const string ProposedFlyoutLocalServer = "Clean-up via a server on this PC";
-    private const string ProposedFlyoutCloud = "Cloud clean-up on · text leaves this PC";
+    // The tray panel's privacy line while a server on this PC, or a host off it, does the clean-up. Each line: Approved by the product
+    // owner on 16/10/2026 as written: never reword it. Pinned word for word, independently of the app's copy.
+    private const string ApprovedFlyoutLocalServer = "Clean-up via a server on this PC";
+    private const string ApprovedFlyoutCloud = "Cloud clean-up on · text leaves this PC";
 
-    // Proposed with the two lines above: Settings > Privacy and the Settings > Clean-up state line for a server on this PC.
-    private static string ProposedLocalServerLine(string host, string model) =>
+    // Settings > Privacy and the Settings > Clean-up state line for a server on this PC. Approved by the product owner on 16/10/2026 as
+    // written: never reword it. Pinned word for word, independently of the app's copy.
+    private static string ApprovedLocalServerLine(string host, string model) =>
         $"On: a server on this PC ({host}, model {model}) tidies each dictation. Dictum cannot see whether that server forwards your text elsewhere.";
+
+    // Proposed by the orchestrator to the product owner on 16/10/2026 and awaiting confirmation: pinned word for word, so any change is
+    // deliberate. Settings > Clean-up and Settings > Privacy say it while cloud clean-up is on and offline only refuses it.
+    private const string ProposedOfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
 
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
 
@@ -70,6 +76,25 @@ public class CloudWarningAndPresetsTests
     /// <summary>The icon in the same row as the tray panel's privacy line.</summary>
     private static Control IconBeside(ILogical root, string line) =>
         ((Panel)All<TextBlock>(root).Single(t => t.Text == line).Parent!).Children.OfType<Viewbox>().Single();
+
+    /// <summary>
+    /// The Clean-up card's state line ("On: …" or "On, but …"). Every read follows a move from another page, so the page is drawn
+    /// from the settings and the clean-up in use as they are now.
+    /// </summary>
+    private static string CleanUpStateLine(SettingsWindow window)
+    {
+        window.ShowPage("Privacy");
+        window.ShowPage("Clean-up");
+        return All<TextBlock>(window).Single(t => t.IsEffectivelyVisible && t.Text is { } x && (x.StartsWith("On: ", StringComparison.Ordinal) || x.StartsWith("On, ", StringComparison.Ordinal))).Text!;
+    }
+
+    /// <summary>Every visible line of Settings > Privacy, drawn afresh in the same way.</summary>
+    private static IReadOnlyList<string> PrivacyPageLines(SettingsWindow window)
+    {
+        window.ShowPage("Clean-up");
+        window.ShowPage("Privacy");
+        return All<TextBlock>(window).Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+    }
 
     /// <summary>A page of the site without its HTML comments: a host named only inside a comment is not named to the reader.</summary>
     private static string VisibleHtml(string page) =>
@@ -220,6 +245,7 @@ public class CloudWarningAndPresetsTests
     [InlineData("https://api.openai.com/v1", "OpenAI")]
     [InlineData(" https://API.OpenAI.com/v1/ ", "OpenAI")]
     [InlineData("https://api.openai.com:443/v2", "OpenAI")] // the same server at another path: still OpenAI's key, and only there
+    [InlineData("https://api.openai.com:8443/v1", "Custom server (OpenAI-compatible)")] // the same host at another port is another server, off this PC too
     [InlineData("https://generativelanguage.googleapis.com/v1beta/openai", "Google Gemini")]
     [InlineData("http://localhost:11434/v1", "Ollama on this PC")]
     [InlineData("http://127.0.0.1:11434/v1", "Ollama on this PC")] // the same server written another way: still no key
@@ -241,6 +267,7 @@ public class CloudWarningAndPresetsTests
     [InlineData("http://localhost:11434/v1/", null)]
     [InlineData("http://127.0.0.1:11434/v1", null)]
     [InlineData("https://llm.example.net/v1", "Bearer k-custom-test")]
+    [InlineData("https://api.openai.com:8443/v1", "Bearer k-custom-test")] // OpenAI's host at another port: not OpenAI's server, so not its key
     [InlineData("http://localhost:1234/v1", "Bearer k-custom-test")]
     public async Task Each_key_goes_only_to_its_own_service(string baseUrl, string? authorization)
     {
@@ -306,23 +333,12 @@ public class CloudWarningAndPresetsTests
             Assert.Null(shell.EnableCloud(Proposed(Preset(name))));
             var window = new SettingsWindow(shell);
             window.Show();
-            // Every read follows a move from the other page, so the page is drawn from the settings and keys as they are now.
-            string CleanUpLine()
-            {
-                window.ShowPage("Clean-up");
-                return All<TextBlock>(window).Single(t => t.IsEffectivelyVisible && t.Text is { } x && (x.StartsWith("On: ", StringComparison.Ordinal) || x.StartsWith("On, ", StringComparison.Ordinal))).Text!;
-            }
-            IReadOnlyList<string> PrivacyLines()
-            {
-                window.ShowPage("Privacy");
-                return All<TextBlock>(window).Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
-            }
 
             // No key: nothing is sent, and both pages say which key they wait for, in the approved words and no others.
             Assert.Equal($"rule-based tidy only: {variable} is not set (environment or .env)", shell.CleanupStatus);
             Assert.True(shell.NothingLeaves);
-            Assert.Equal(ApprovedWaitingLine(variable), CleanUpLine());
-            var waiting = PrivacyLines();
+            Assert.Equal(ApprovedWaitingLine(variable), CleanUpStateLine(window));
+            var waiting = PrivacyPageLines(window);
             Assert.Contains(ApprovedWaitingLine(variable), waiting);
             Assert.DoesNotContain(waiting, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal) || l.Contains(ApprovedStateLine, StringComparison.Ordinal));
 
@@ -331,20 +347,106 @@ public class CloudWarningAndPresetsTests
             shell.Reload(userRequested: false);
             Assert.EndsWith($"({variable} present)", shell.CleanupStatus);
             Assert.False(shell.NothingLeaves);
-            var cleanUp = CleanUpLine();
+            var cleanUp = CleanUpStateLine(window);
             Assert.StartsWith("On: the text of each dictation is sent to ", cleanUp);
             Assert.EndsWith("You agreed to this host in the consent step. " + ApprovedStateLine, cleanUp);
             Assert.DoesNotContain("waiting", cleanUp);
-            var privacy = Assert.Single(PrivacyLines(), l => l.StartsWith("The text of each dictation goes to ", StringComparison.Ordinal));
+            var privacy = Assert.Single(PrivacyPageLines(window), l => l.StartsWith("The text of each dictation goes to ", StringComparison.Ordinal));
             Assert.EndsWith("Audio never leaves this PC. " + ApprovedStateLine, privacy);
             Assert.DoesNotContain("waiting", privacy);
 
-            // Offline only refuses the clean-up before the key is looked at, so the key is not what stops it: neither page says it is waiting.
+            // Offline only refuses the clean-up before the key is looked at, so the key is not what stops it: neither page says it is
+            // waiting, and both say offline only stops it.
             File.Delete(scratch.Paths.EnvFile);
             shell.Write(("offline_only", System.Text.Json.Nodes.JsonValue.Create(true)));
             Assert.Contains("offline_only", shell.CleanupStatus);
-            Assert.DoesNotContain("waiting", CleanUpLine());
-            Assert.DoesNotContain(PrivacyLines(), l => l.Contains("waiting", StringComparison.Ordinal));
+            Assert.Equal(ProposedOfflineOnlyLine, CleanUpStateLine(window));
+            var offline = PrivacyPageLines(window);
+            Assert.Contains(ProposedOfflineOnlyLine, offline);
+            Assert.DoesNotContain(offline, l => l.Contains("waiting", StringComparison.Ordinal));
+            window.Close();
+            shell.Dispose();
+        });
+    }
+
+    [Theory]
+    [InlineData(true)] // the key leaves the .env beside the exe after the load
+    [InlineData(false)] // the key arrives in the .env beside the exe after the load
+    public Task The_pages_follow_the_clean_up_in_use_not_the_env_files_on_disk(bool keyAtLoad)
+    {
+        // Lens probe on a56b436 (16/10/2026): the pages re-read .env at every redraw while the clean-up in use kept the keys read at the
+        // last load. With the key taken out of the .env beside the exe and no reload, every dictation still went to api.openai.com while
+        // both pages said nothing is sent; with the key put in and no reload, the card said the text is sent while nothing was.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SecretStore.OpenAiKey)), "OPENAI_API_KEY is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+            if (keyAtLoad) File.WriteAllText(scratch.Paths.ExeEnvFile, "OPENAI_API_KEY=k-test\n");
+            var (shell, _, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            dialogs.Answers.Enqueue(0); // Allow
+            Assert.Null(shell.EnableCloud(Proposed(Preset("OpenAI"))));
+            var status = shell.CleanupStatus;
+            Assert.Equal(keyAtLoad, status.EndsWith("(OPENAI_API_KEY present)", StringComparison.Ordinal));
+            var window = new SettingsWindow(shell);
+            window.Show();
+
+            // The .env beside the exe changes and nothing reloads: the clean-up in use is the one built at the load.
+            if (keyAtLoad) File.Delete(scratch.Paths.ExeEnvFile);
+            else File.WriteAllText(scratch.Paths.ExeEnvFile, "OPENAI_API_KEY=k-test\n");
+            Assert.Equal(status, shell.CleanupStatus);
+            Assert.Equal(!keyAtLoad, shell.NothingLeaves);
+            var cleanUp = CleanUpStateLine(window);
+            var privacy = PrivacyPageLines(window);
+            if (keyAtLoad)
+            {
+                // It still sends the text with the key it read, so neither page may say it is waiting.
+                Assert.StartsWith("On: the text of each dictation is sent to api.openai.com (", cleanUp);
+                Assert.DoesNotContain(privacy, l => l.Contains("waiting", StringComparison.Ordinal));
+                Assert.Contains(privacy, l => l.StartsWith("The text of each dictation goes to api.openai.com for clean-up", StringComparison.Ordinal));
+            }
+            else
+            {
+                // It has no key and sends nothing, so both pages still wait for it.
+                Assert.Equal(ApprovedWaitingLine(SecretStore.OpenAiKey), cleanUp);
+                Assert.Contains(ApprovedWaitingLine(SecretStore.OpenAiKey), privacy);
+                Assert.DoesNotContain(privacy, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal));
+            }
+            window.Close();
+            shell.Dispose();
+        });
+    }
+
+    [Theory]
+    [InlineData("OpenAI", "OPENAI_API_KEY")]
+    [InlineData("Google Gemini", "GEMINI_API_KEY")]
+    [InlineData("Anthropic", "ANTHROPIC_API_KEY")]
+    public Task With_offline_only_on_cloud_clean_up_that_is_on_says_on_both_pages_that_nothing_is_sent(string service, string variable)
+    {
+        // Lens finding on a56b436 (16/10/2026): with a cloud preset agreed to, its key set and offline only on, the status said offline_only
+        // refused it and nothing was sent, while the Clean-up card still said the text of each dictation is sent to the host. Anthropic,
+        // agreed to with its key, took the same path.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)), $"{variable} is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+            File.WriteAllText(scratch.Paths.EnvFile, $"{variable}=k-test\n");
+            var (shell, _, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            dialogs.Answers.Enqueue(0); // Allow
+            var proposed = service == "Anthropic" ? new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel } : Proposed(Preset(service));
+            Assert.Null(shell.EnableCloud(proposed));
+            Assert.EndsWith($"({variable} present)", shell.CleanupStatus);
+
+            shell.Write(("offline_only", System.Text.Json.Nodes.JsonValue.Create(true)));
+            Assert.StartsWith("offline_only is on: ", shell.CleanupStatus);
+            Assert.True(shell.NothingLeaves);
+            var window = new SettingsWindow(shell);
+            window.Show();
+            Assert.Equal(ProposedOfflineOnlyLine, CleanUpStateLine(window));
+            var privacy = PrivacyPageLines(window);
+            Assert.Contains(ProposedOfflineOnlyLine, privacy);
+            Assert.DoesNotContain(privacy, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal) || l.Contains(ApprovedStateLine, StringComparison.Ordinal));
             window.Close();
             shell.Dispose();
         });
@@ -405,6 +507,24 @@ public class CloudWarningAndPresetsTests
     }
 
     [Fact]
+    public void The_self_test_lists_every_key_Dictum_reads_and_never_a_value()
+    {
+        // Lens note (16/10/2026): the self-test listed only ANTHROPIC_API_KEY and LLM_API_KEY before the preset keys; nothing pinned the four.
+        var secrets = SecretStore.FromContents("OPENAI_API_KEY=k-openai-test\n", "GEMINI_API_KEY=k-gemini-test\n", _ => null);
+        var lines = new List<(string Label, string Value, bool? Pass)>();
+        SelfTestCommand.KeyLines(secrets, (label, value, pass) => lines.Add((label, value, pass)));
+        Assert.Equal(
+            new (string, string, bool?)[]
+            {
+                ("ANTHROPIC_API_KEY", "absent", null),
+                ("OPENAI_API_KEY", "present (config-folder .env)", null),
+                ("GEMINI_API_KEY", "present (exe-folder .env)", null),
+                ("LLM_API_KEY", "absent", null),
+            },
+            lines);
+    }
+
+    [Fact]
     public void A_server_on_this_PC_never_counts_as_nothing_leaving()
     {
         // Lens probe P5 (16/10/2026): Ollama with a cloud model name, and the app said nothing leaves this PC. Ollama can serve its
@@ -440,8 +560,8 @@ public class CloudWarningAndPresetsTests
         Assert.False(shell.NothingLeaves);
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
-        Assert.Contains(All<TextBlock>(flyout), t => t.Text == ProposedFlyoutLocalServer);
-        Assert.False(IconBeside(flyout, ProposedFlyoutLocalServer).IsVisible); // no lock beside it
+        Assert.Contains(All<TextBlock>(flyout), t => t.Text == ApprovedFlyoutLocalServer);
+        Assert.False(IconBeside(flyout, ApprovedFlyoutLocalServer).IsVisible); // no lock beside it
         Assert.DoesNotContain(All<TextBlock>(flyout), t => t.Text == "Nothing leaves this PC");
         flyout.Close();
 
@@ -450,7 +570,7 @@ public class CloudWarningAndPresetsTests
         foreach (var page in new[] { "Privacy", "Clean-up" })
         {
             window.ShowPage(page);
-            Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text == ProposedLocalServerLine("localhost", "gemma4:cloud"));
+            Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text == ApprovedLocalServerLine("localhost", "gemma4:cloud"));
         }
         window.Close();
         shell.Dispose();
@@ -466,8 +586,8 @@ public class CloudWarningAndPresetsTests
         Assert.False(shell.NothingLeaves);
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
-        Assert.Contains(All<TextBlock>(flyout), t => t.Text == ProposedFlyoutCloud);
-        Assert.False(IconBeside(flyout, ProposedFlyoutCloud).IsVisible); // no lock beside it
+        Assert.Contains(All<TextBlock>(flyout), t => t.Text == ApprovedFlyoutCloud);
+        Assert.False(IconBeside(flyout, ApprovedFlyoutCloud).IsVisible); // no lock beside it
         flyout.Close();
 
         var window = new SettingsWindow(shell);
@@ -561,7 +681,7 @@ public class CloudWarningAndPresetsTests
         Click(window, "Use cloud clean-up…");
         Assert.Empty(dialogs.Asked); // a server on this PC: no consent step
         window.ShowPage("Clean-up"); // redraw from the saved settings
-        Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text == ProposedLocalServerLine("localhost", "llama3.2"));
+        Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text == ApprovedLocalServerLine("localhost", "llama3.2"));
         Assert.DoesNotContain(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text?.Contains(ApprovedStateLine, StringComparison.Ordinal) == true); // for hosts off this PC
         Assert.DoesNotContain(All<Button>(window), b => b.IsEffectivelyVisible && b.Content as string == "Use cloud clean-up…");
         Assert.Contains(All<Button>(window), b => b.IsEffectivelyVisible && b.Content as string == "Switch cloud clean-up off");

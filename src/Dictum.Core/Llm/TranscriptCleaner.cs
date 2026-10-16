@@ -50,10 +50,19 @@ public sealed class TranscriptCleaner
     }
 
     /// <summary>The deterministic tidy only (provider none, or a provider that cannot run).</summary>
-    public static TranscriptCleaner RulesOnly(string status) => new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, status);
+    /// <param name="missingKey">The key variable whose absence stopped the provider (<see cref="MissingKey"/>), or null.</param>
+    public static TranscriptCleaner RulesOnly(string status, string? missingKey = null) =>
+        new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, status) { MissingKey = missingKey };
 
     /// <summary>True when a model takes part (the pill shows "Polishing…").</summary>
     public bool UsesModel => _client is not null;
+
+    /// <summary>
+    /// The key variable (OPENAI_API_KEY, GEMINI_API_KEY) whose absence stopped the configured service when this cleaner was
+    /// built, or null. Settings > Clean-up and Privacy read it from the cleaner in use, never from the .env files, so they
+    /// say "waiting" exactly while that is why nothing is sent, until a reload builds the next cleaner.
+    /// </summary>
+    public string? MissingKey { get; private init; }
 
     /// <summary>Human-readable provider state for the self-test and About box (never contains a key).</summary>
     public string Status { get; }
@@ -212,7 +221,7 @@ public sealed class TranscriptCleaner
                 if (!service.TryGetKey(secrets, out var key))
                 {
                     log.Warn($"{service.KeyVariable} is not set (environment or .env), so nothing is sent to {new Uri(settings.BaseUrl).Host}; the rule-based tidy is used instead.");
-                    return RulesOnly($"rule-based tidy only: {service.KeyVariable} is not set (environment or .env)");
+                    return RulesOnly($"rule-based tidy only: {service.KeyVariable} is not set (environment or .env)", missingKey: service.KeyVariable);
                 }
                 var oai = new OpenAiCompatibleLlmClient(http, settings.BaseUrl, settings.Model, key);
                 var keyState = service.KeyVariable is null ? "no key sent" : $"{service.KeyVariable} {(key is null ? "absent" : "present")}";

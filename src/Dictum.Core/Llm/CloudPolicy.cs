@@ -34,7 +34,7 @@ public static class CloudPolicy
 
     /// <summary>
     /// Settings > Privacy and the Settings > Clean-up state line while an OpenAI-compatible server on this PC does the
-    /// clean-up. Proposed copy (16/10/2026), awaiting the product owner's confirmation before it ships.
+    /// clean-up. Approved by the product owner on 16/10/2026 as written: never reword it.
     /// </summary>
     public static string LocalServerLine(string host, string model) =>
         $"On: a server on this PC ({host}, model {model}) tidies each dictation. Dictum cannot see whether that server forwards your text elsewhere.";
@@ -87,4 +87,18 @@ public static class CloudPolicy
     /// host off this PC. Approved on 16/10/2026 as written: never reword it.
     /// </summary>
     public const string StateLineWarning = "Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.";
+
+    /// <summary>
+    /// The Settings > Clean-up state line and the Settings > Privacy summary while cloud clean-up is on for a service that
+    /// needs its own key and the clean-up in use found none (<see cref="TranscriptCleaner.MissingKey"/>), so nothing is sent.
+    /// Approved by the product owner on 16/10/2026 as written: never reword it.
+    /// </summary>
+    public static string WaitingForKeyLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add it to .env.";
+
+    /// <summary>
+    /// The Settings > Clean-up state line and the Settings > Privacy summary while cloud clean-up is on but offline only
+    /// refuses it (<see cref="TranscriptCleaner.OfflineRefusal"/>), so nothing is sent. Proposed to the product owner on
+    /// 16/10/2026 and awaiting confirmation: never reword it; only the product owner's replacement may change it.
+    /// </summary>
+    public const string OfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
 }
