@@ -244,10 +244,11 @@ public sealed class ModelFolderSafetyTests
 
     // ---- 4. The bundled folder by another name ----
 
+    private const string NoJunction = "mklink /J could not make a junction on this machine, so a junction to the bundled folder cannot be tested here.";
+
     /// <summary>
     /// Pin (lens probe P1, inverted): a junction to the bundled folder is that folder: never the chosen folder (the settings load
-    /// says it is ignored), never listed for deletion, never deleted through; and the backstop refuses a bundled file reached
-    /// through a per-user folder that is itself a junction to the bundled one, which no setting refuses.
+    /// says it is ignored), never listed for deletion, never deleted through.
     /// </summary>
     [Fact]
     public void A_junction_to_the_bundled_folder_is_never_the_chosen_folder_and_nothing_in_it_is_deleted()
@@ -255,11 +256,9 @@ public sealed class ModelFolderSafetyTests
         using var scratch = new Scratch();
         var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", 10);
         var alias = Path.Combine(scratch.Root.FullName, "alias");
-        var links = new List<string>();
         try
         {
-            if (!Junction(alias, scratch.Paths.BundledModelsDir)) Assert.Skip("mklink /J could not make a junction on this machine, so a junction to the bundled folder cannot be tested here.");
-            links.Add(alias);
+            if (!Junction(alias, scratch.Paths.BundledModelsDir)) Assert.Skip(NoJunction);
             var settings = new AppSettings { Models = new ModelsSettings { Folder = alias } };
             Assert.True(scratch.Paths.IsBundled(alias));
             Assert.True(scratch.Paths.IsBundled(@"\\?\" + Path.Combine(alias, "more"))); // a \\?\ prefix, and a folder inside it
@@ -275,20 +274,39 @@ public sealed class ModelFolderSafetyTests
             var warnings = new List<string>();
             ConfigLoader.Load(scratch.Paths, new SecretRedactor(), _ => null, _ => false, warnings.Add);
             Assert.Contains(ConfigLoader.BundledFolderIgnored("models.folder", alias, scratch.Paths.DefaultModelsDir), warnings);
-
-            Directory.CreateDirectory(scratch.Paths.LocalDir);
-            if (!Junction(scratch.Paths.DefaultModelsDir, scratch.Paths.BundledModelsDir)) Assert.Skip("mklink /J could not make the second junction on this machine.");
-            links.Add(scratch.Paths.DefaultModelsDir);
-            var none = new AppSettings();
-            var listed = ModelFiles.List(scratch.Paths, none).Single(m => m.Name == "base.en"); // seen as the per-user folder's
-            var refused = ModelFiles.Delete(listed.Path, scratch.Paths, none, [], integrity);
-            Assert.Equal((false, ModelFiles.BundledNotDeleted("ggml-base.en.bin")), (refused.Deleted, refused.Message));
-            Assert.DoesNotContain(RemovalPlan.Build(scratch.Paths, none, RemovalScope.AllData).Items, i => i.Path.EndsWith("ggml-base.en.bin", StringComparison.OrdinalIgnoreCase));
             Assert.True(File.Exists(bundled)); // the file that came with Dictum is still there
         }
         finally
         {
-            foreach (var link in links) if (Directory.Exists(link)) Directory.Delete(link); // the links only, never what they point to
+            if (Directory.Exists(alias)) Directory.Delete(alias); // the link only, never what it points to
+        }
+    }
+
+    /// <summary>
+    /// Pin, the backstop: with the per-user models folder itself a junction to the bundled folder (which no setting refuses), the
+    /// bundled file is listed as the per-user folder's, yet Storage's Delete and "Delete all app data" never reach it.
+    /// </summary>
+    [Fact]
+    public void The_backstop_never_deletes_a_bundled_file_reached_through_the_per_user_folder()
+    {
+        using var scratch = new Scratch();
+        var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", 10);
+        Directory.CreateDirectory(scratch.Paths.LocalDir);
+        try
+        {
+            if (!Junction(scratch.Paths.DefaultModelsDir, scratch.Paths.BundledModelsDir)) Assert.Skip(NoJunction);
+            var settings = new AppSettings();
+            var listed = ModelFiles.List(scratch.Paths, settings).Single(m => m.Name == "base.en");
+            Assert.Equal(ModelFolderKind.Default, listed.Folder); // so Storage offers its Delete
+            var refused = ModelFiles.Delete(listed.Path, scratch.Paths, settings, [], new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance));
+            Assert.False(refused.Deleted);
+            Assert.True(File.Exists(bundled)); // the file that came with Dictum is still there
+            Assert.Equal(ModelFiles.BundledNotDeleted("ggml-base.en.bin"), refused.Message);
+            Assert.DoesNotContain(RemovalPlan.Build(scratch.Paths, settings, RemovalScope.AllData).Items, i => i.Path.EndsWith("ggml-base.en.bin", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            if (Directory.Exists(scratch.Paths.DefaultModelsDir)) Directory.Delete(scratch.Paths.DefaultModelsDir); // the link only
         }
     }
 
