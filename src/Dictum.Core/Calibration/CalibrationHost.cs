@@ -23,20 +23,20 @@ internal sealed record CalibrationHost(
     Action<IReadOnlyList<CorrectionRule>> AddCorrections,
     Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null)
 {
-    /// <summary>Catalogue models whose file is in the models folder.</summary>
+    /// <summary>Catalogue models on this PC: the file each name resolves to in the model folders (ModelFolders; the one that came with Dictum included).</summary>
     public IReadOnlyList<SpeechCandidate> InstalledModels()
     {
-        var dir = Paths.ModelsDir(Settings());
-        return ModelCatalog.Entries
-            .Select(e => new SpeechCandidate(e.Name, ModelCatalog.ResolvePath(e.Name, dir)))
-            .Where(c => File.Exists(c.Path))
-            .ToList();
+        var settings = Settings();
+        return [.. ModelCatalog.Entries
+            .Select(e => (e.Name, Path: ModelFolders.Find(e.FileName, e.Bytes, Paths, settings)))
+            .Where(c => c.Path is not null)
+            .Select(c => new SpeechCandidate(c.Name, c.Path!))];
     }
 
     public IReadOnlyList<ModelInfo> MissingModels()
     {
-        var dir = Paths.ModelsDir(Settings());
-        return ModelCatalog.Entries.Where(e => !File.Exists(ModelCatalog.ResolvePath(e.Name, dir))).ToList();
+        var settings = Settings();
+        return ModelCatalog.Entries.Where(e => ModelFolders.Find(e.FileName, e.Bytes, Paths, settings) is null).ToList();
     }
 
     /// <summary>

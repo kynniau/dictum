@@ -23,4 +23,7 @@ public interface IShellDialogs : IModelPrompts
 
     /// <summary>The first-run hotkey check (SPEC §20): the capture box, defaulting to the current hotkey. Returns the hotkey to keep.</summary>
     string HotkeyCheck(AppShell shell, string current);
+
+    /// <summary>Settings > Models > Model folder > Browse…: the system's folder chooser. Returns the folder picked, or null.</summary>
+    string? ChooseFolder(string initialDir);
 }

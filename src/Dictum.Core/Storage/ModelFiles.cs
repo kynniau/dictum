@@ -6,7 +6,12 @@ namespace Dictum.Storage;
 /// <summary>A model file on disk, for Settings → Storage.</summary>
 /// <param name="Name">Catalogue name ("small.en", "qwen2.5-1.5b"), or the file name for a partial download.</param>
 /// <param name="Partial">An unfinished download (.part).</param>
-public sealed record StoredModel(string Name, string Path, long Bytes, bool IsCleanup, bool Partial);
+/// <param name="Folder">Which model folder it is in (<see cref="ModelFolders.LookupOrder"/>).</param>
+public sealed record StoredModel(string Name, string Path, long Bytes, bool IsCleanup, bool Partial, ModelFolderKind Folder = ModelFolderKind.Default)
+{
+    /// <summary>It came with Dictum (the bundled folder): read-only, so it has no Delete.</summary>
+    public bool ReadOnly => Folder == ModelFolderKind.Bundled;
+}
 
 /// <summary>What a model deletion did.</summary>
 public sealed record ModelDeletion(bool Deleted, long FreedBytes, string Message);
@@ -28,19 +33,23 @@ public static class ModelFiles
         return ModelCatalog.FindByFile(name) is not null || CleanupCatalog.FindByFile(name) is not null;
     }
 
-    /// <summary>Every catalogue model file and partial download in the models folders, with sizes read from the file system.</summary>
-    public static IReadOnlyList<StoredModel> List(AppPaths paths, AppSettings settings)
+    /// <summary>
+    /// Every catalogue model file and partial download in Dictum's own models folders (the chosen one and the default), in
+    /// lookup order, with sizes read from the file system; with <paramref name="withBundled"/>, the read-only files that came
+    /// with Dictum too (Settings → Storage shows them; nothing that deletes or replaces a model sees them).
+    /// </summary>
+    public static IReadOnlyList<StoredModel> List(AppPaths paths, AppSettings settings, bool withBundled = false)
     {
         var models = new List<StoredModel>();
-        foreach (var dir in PathRegistry.ModelFolders(paths, settings).Where(Directory.Exists))
+        foreach (var folder in ModelFolders.LookupOrder(paths, settings).Where(f => (withBundled || f.Kind != ModelFolderKind.Bundled) && Directory.Exists(f.Path)))
         {
-            foreach (var file in new DirectoryInfo(dir).EnumerateFiles().Where(f => IsModelFile(f.Name)).OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var file in new DirectoryInfo(folder.Path).EnumerateFiles().Where(f => IsModelFile(f.Name)).OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
             {
                 var partial = file.Name.EndsWith(".part", StringComparison.OrdinalIgnoreCase);
                 var finalName = partial ? file.Name[..^5] : file.Name;
                 var speech = ModelCatalog.FindByFile(finalName);
                 var name = partial ? file.Name : speech?.Name ?? CleanupCatalog.FindByFile(finalName)!.Name;
-                models.Add(new StoredModel(name, file.FullName, file.Length, speech is null, partial));
+                models.Add(new StoredModel(name, file.FullName, file.Length, speech is null, partial, folder.Kind));
             }
         }
         return models;

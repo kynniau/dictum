@@ -87,7 +87,10 @@ public static class PathRegistry
         return list;
     }
 
-    /// <summary>The default models folder, plus whisper.models_dir when it points elsewhere (only catalogue files are touched there).</summary>
+    /// <summary>
+    /// The default models folder, plus the chosen one (models.folder, or its earlier name whisper.models_dir) when it is elsewhere:
+    /// only catalogue files are touched there. Never the bundled folder beside Dictum.exe, whose models came with Dictum.
+    /// </summary>
     public static IEnumerable<string> ModelFolders(AppPaths paths, AppSettings settings)
     {
         yield return paths.DefaultModelsDir;

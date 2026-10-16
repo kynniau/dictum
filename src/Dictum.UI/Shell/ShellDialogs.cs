@@ -89,24 +89,45 @@ public sealed class ShellDialogs : IShellDialogs
     public bool ConfirmDownload(string fileName, string sizeText, string note) =>
         Ask("Download a model", ModelPromptText.ConfirmText(fileName, sizeText, note), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
 
-    /// <summary>The system's file chooser. A tray app has no window to own it, so a window that is never shown lends its handle.</summary>
-    public string? ChooseFile(string initialDir, bool cleanupModel) => Modal.OnUi(() =>
+    /// <summary>The system's file chooser.</summary>
+    public string? ChooseFile(string initialDir, bool cleanupModel) => WithStorage(initialDir, (storage, start) =>
+    {
+        var files = Modal.Wait(storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = cleanupModel ? "Choose a GGUF clean-up model" : "Choose a whisper.cpp ggml model",
+            AllowMultiple = false,
+            SuggestedStartLocation = start,
+            FileTypeFilter = cleanupModel
+                ? [new FilePickerFileType("GGUF models") { Patterns = ["*.gguf"] }]
+                : [new FilePickerFileType("Whisper ggml models") { Patterns = ["*.bin"] }, FilePickerFileTypes.All],
+        }));
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    });
+
+    /// <summary>The system's folder chooser (Avalonia's, which is Windows' own; PROPOSED title, 17/10/2026).</summary>
+    public string? ChooseFolder(string initialDir) => WithStorage(initialDir, (storage, start) =>
+    {
+        var folders = Modal.Wait(storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choose a folder for Dictum's models",
+            AllowMultiple = false,
+            SuggestedStartLocation = start,
+        }));
+        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    });
+
+    /// <summary>
+    /// Runs a system chooser on the UI thread, starting in <paramref name="initialDir"/> when it exists. A tray app has no window
+    /// to own it, so a window that is never shown lends its handle.
+    /// </summary>
+    private static string? WithStorage(string initialDir, Func<IStorageProvider, IStorageFolder?, string?> choose) => Modal.OnUi(() =>
     {
         var owner = new Window { Title = "Dictum", ShowInTaskbar = false };
         try
         {
             var storage = owner.StorageProvider;
             var start = Directory.Exists(initialDir) ? Modal.Wait(storage.TryGetFolderFromPathAsync(initialDir)) : null;
-            var files = Modal.Wait(storage.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = cleanupModel ? "Choose a GGUF clean-up model" : "Choose a whisper.cpp ggml model",
-                AllowMultiple = false,
-                SuggestedStartLocation = start,
-                FileTypeFilter = cleanupModel
-                    ? [new FilePickerFileType("GGUF models") { Patterns = ["*.gguf"] }]
-                    : [new FilePickerFileType("Whisper ggml models") { Patterns = ["*.bin"] }, FilePickerFileTypes.All],
-            }));
-            return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+            return choose(storage, start);
         }
         finally
         {

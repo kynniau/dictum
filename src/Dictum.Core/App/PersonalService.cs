@@ -122,12 +122,12 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
     {
         var gpu = gpuMachine();
         var values = ModePresets.For(preset, gpu);
-        var dir = paths.ModelsDir(settings());
+        var dir = paths.ModelsDir(settings()); // where a missing one is downloaded; on this PC means in any model folder (ModelFolders)
         var missing = new List<(DownloadSpec, string)>();
-        var speechPath = ModelCatalog.ResolvePath(values.SpeechModel, dir);
-        if (!File.Exists(speechPath)) missing.Add((ModelCatalog.Find(values.SpeechModel)!.Download, speechPath));
-        if (values.CleanupModel is { } cleanup && CleanupCatalog.ResolvePath(cleanup, dir) is var cleanupPath && !File.Exists(cleanupPath))
-            missing.Add((CleanupCatalog.Find(cleanup)!.Download, cleanupPath));
+        var speech = ModelCatalog.Find(values.SpeechModel)!;
+        if (!models.IsDownloaded(speech)) missing.Add((speech.Download, ModelCatalog.ResolvePath(speech.Name, dir)));
+        if (values.CleanupModel is { } cleanup && CleanupCatalog.Find(cleanup) is { } cleanupInfo && !models.IsCleanupDownloaded(cleanupInfo))
+            missing.Add((cleanupInfo.Download, CleanupCatalog.ResolvePath(cleanup, dir)));
         log.Info($"Mode preset {preset} chosen ({(gpu ? "GPU" : "CPU")}): {values.SpeechModel} + {values.CleanupModel ?? "rule-based tidy"}, {missing.Count} model(s) to download.");
         models.ApplyWithDownloads($"Needed for {preset} mode. {ModelCoordinator.SwitchNote}", missing,
             [.. ModePresets.SettingsValues(values).Select(v => (v.Key, (JsonNode?)JsonValue.Create(v.Value)))]);

@@ -149,10 +149,12 @@ public sealed partial class AppShell : IDisposable
     public bool Start(IClassicDesktopStyleApplicationLifetime? lifetime)
     {
         _lifetime = lifetime;
-        var (askSpeech, askCleanup) = AppRules.FirstRunQuestions(SettingsLoader.LoadFile(Paths.SettingsFile));
+        var file = SettingsLoader.LoadFile(Paths.SettingsFile);
+        var (askSpeech, askCleanup) = AppRules.FirstRunQuestions(file);
         if (askSpeech || askCleanup)
         {
-            if (!Models.FirstRun(askSpeech, askCleanup))
+            // With base.en on this PC (it comes with Dictum) no model question is asked; the hotkey check below stays.
+            if (!Models.FirstRun(askSpeech, askCleanup, file.Settings))
             {
                 _log.Info("First-run picker: user chose Quit.");
                 Quit();

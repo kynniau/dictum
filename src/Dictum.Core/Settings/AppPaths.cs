@@ -42,7 +42,28 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
     /// <summary>The user's calibration recordings, kept so the test can be re-run when a model is added.</summary>
     public string CalibrationDir => Path.Combine(LocalDir, "calibration");
 
-    public string ModelsDir(AppSettings settings) => settings.Whisper.ModelsDir ?? DefaultModelsDir;
+    /// <summary>
+    /// The models that come with Dictum (Decision 16, 17/10/2026: base.en ships in every package), beside Dictum.exe and, when
+    /// installed from the Store, inside the package. Read-only: Dictum never downloads into, writes or deletes anything here.
+    /// </summary>
+    public string BundledModelsDir => Path.Combine(ExeDir, "models");
+
+    /// <summary>
+    /// Where downloads go and Dictum's own models folder: the folder chosen in Settings > Models (<see cref="ChosenModelsDir"/>),
+    /// else the per-user default. Where a model is looked for: <see cref="ModelFolders.LookupOrder"/>.
+    /// </summary>
+    public string ModelsDir(AppSettings settings) => ChosenModelsDir(settings) ?? DefaultModelsDir;
+
+    /// <summary>
+    /// models.folder, else its earlier name whisper.models_dir; null when neither is set. A folder that is the bundled one or
+    /// inside it is never used (null): that folder is never written, so no download can land there.
+    /// </summary>
+    public string? ChosenModelsDir(AppSettings settings) =>
+        (settings.Models.Folder ?? settings.Whisper.ModelsDir) is { } chosen && !IsBundled(chosen) ? chosen : null;
+
+    /// <summary>True for <see cref="BundledModelsDir"/> and any folder inside it.</summary>
+    public bool IsBundled(string folder) =>
+        Storage.PathRegistry.SamePath(folder, BundledModelsDir) || Storage.PathRegistry.IsInside(folder, BundledModelsDir);
 
     /// <summary>
     /// The app's folders under the platform's two app-data roots (Windows: %APPDATA% and %LOCALAPPDATA%), or the
