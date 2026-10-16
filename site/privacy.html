@@ -39,7 +39,7 @@
     <ul>
       <li><strong>We collect nothing.</strong> Dictum has no account, no analytics, no telemetry and no crash reporting. We never receive your audio or your text.</li>
       <li><strong>Your speech is turned into text on your PC</strong>, and the text is tidied on your PC.</li>
-      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or, if you switch it on, to send text to a cloud clean-up service or a server you choose, or to check for updates.</li>
+      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or, if you switch it on, to send text to a cloud clean-up service or a server you choose.</li>
     </ul>
   </section>
 
@@ -105,14 +105,14 @@
     <h3>OpenAI-compatible service (off by default)</h3>
     <p>Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it. This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.</p>
 
-    <h3>Update check: <code>dictum.kynni.au</code> (direct download only, off by default)</h3>
-    <p>Only if you turn on the update check in the direct-download version. Dictum then reads one small file, <code>version.json</code>, from this website and sends nothing about you. The Microsoft Store version never checks; the Store updates it.</p>
+    <h3>This website: <code>dictum.kynni.au</code></h3>
+    <p>Only when you open the privacy policy from Settings, which opens this page in your browser. Dictum has no update check: the Microsoft Store version is updated by the Store, and the direct download by installing the new version from GitHub when one is released.</p>
 
     <h3>Offline only</h3>
     <p>With the <code>offline_only</code> setting turned on, Dictum never connects to anything outside your PC: downloads, cloud clean-up and servers that aren’t on your PC are all refused. A clean-up server running on your own PC still works. You can copy model files in instead of downloading them.</p>
 
     <h3>What any connection reveals</h3>
-    <p>Like any internet connection, each of these reveals your IP address to the host you connect to. Hugging Face, Anthropic, OpenAI, Google Gemini and any server you name handle that under their own policies. Model downloads, requests to Anthropic, OpenAI and Google Gemini, and the update check all use HTTPS. A server you name yourself uses the address you give it, so use an <code>https://</code> address for anything that isn’t on your own PC.</p>
+    <p>Like any internet connection, each of these reveals your IP address to the host you connect to. Hugging Face, Anthropic, OpenAI, Google Gemini and any server you name handle that under their own policies. Model downloads and requests to Anthropic, OpenAI and Google Gemini use HTTPS. A server you name yourself uses the address you give it, so use an <code>https://</code> address for anything that isn’t on your own PC.</p>
   </section>
 
   <section aria-labelledby="store">

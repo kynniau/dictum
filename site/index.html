@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dictum by Kynni · Desktop dictation for Windows PCs, Mac coming soon</title>
-<meta name="description" content="Hold a key, talk, let go. A free, open-source desktop dictation app for Windows PCs, with a Mac version coming soon. Everything runs on your own computer; nothing leaves it by default.">
+<title>Dictum by Kynni · Free dictation for Windows that keeps your words on your PC</title>
+<meta name="description" content="Hold a key, talk, let go. Dictum types what you said into any app on your Windows PC. Free for life, open source, and nothing you say leaves your computer. Mac version in progress.">
 <meta name="color-scheme" content="light dark">
 <link rel="canonical" href="https://dictum.kynni.au/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Dictum by Kynni">
-<meta property="og:title" content="Dictum: desktop dictation for Windows PCs, Mac coming soon">
-<meta property="og:description" content="Say it, it’s written. Free and open source; speech is turned into text on your own computer. Windows now, Mac coming soon.">
+<meta property="og:title" content="Dictum: say it, it’s written">
+<meta property="og:description" content="Free dictation for Windows PCs. Speech becomes text on your own computer, in any app. No account, no subscription, nothing leaves your PC.">
 <meta property="og:url" content="https://dictum.kynni.au/">
 </head>
 <body>
@@ -26,8 +26,10 @@
     </a>
     <nav class="site-nav" aria-label="Sections">
       <ul>
+        <li><a href="#why">Why Dictum</a></li>
         <li><a href="#how">How it works</a></li>
-        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#compare">Compare</a></li>
+        <li><a href="#next">What’s next</a></li>
         <li><a href="#faq">FAQ</a></li>
         <li><a href="https://github.com/kynniau/dictum">GitHub</a></li>
       </ul>
@@ -40,28 +42,31 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <div class="hero-title">
-          <svg class="mark" width="96" height="96" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g class="mark-halo"><rect x="4" y="4" width="56" height="52" rx="14"/><path d="M14 50 L14 63 L27 50 Z"/></g><rect x="4" y="4" width="56" height="52" rx="14" fill="#0B1220"/><path d="M14 50 L14 63 L27 50 Z" fill="#0B1220"/><rect x="18" y="24" width="6" height="16" rx="3" fill="#FFFFFF"/><rect x="29" y="15" width="6" height="34" rx="3" fill="#FFFFFF"/><rect x="40" y="21" width="6" height="22" rx="3" fill="#FFFFFF"/></svg>
-          <h1 id="hero-title">Dictum</h1>
-        </div>
-        <p class="lede">Desktop dictation for your PC. Say it, it’s written.</p>
-        <p class="sub">Hold a key, talk, let go: your words appear at the cursor in whatever app you’re using. A desktop app for Windows PCs, with a Mac version coming soon. Free and open source. Nothing leaves your computer by default.</p>
+        <p class="eyebrow">Free dictation for Windows PCs · Mac version in progress</p>
+        <h1 id="hero-title">Say it. It’s written.</h1>
+        <p class="lede">Hold a key, talk, let go. Dictum types what you said into whatever you’re working in, and nothing you say leaves your PC.</p>
 
         <div class="cta" id="get">
+          <a class="btn btn-primary" href="https://github.com/kynniau/dictum/releases/latest" aria-describedby="direct-note">Download for Windows</a>
           <div class="cta-item">
             <!--
-              Store button: pending until the listing https://apps.microsoft.com/detail/9N0DG1DHTR57 is live
-              (it returned HTTP 410 "ProductNotFound" on 15/10/2026). To go live, replace this <a> and the
-              "Coming soon" note with:
-                <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>
-              and change the Direct download button below to class="btn btn-secondary". See docs/STORE.md, "Go-live".
+              Store button: pending until the listing https://apps.microsoft.com/detail/9N0DG1DHTR57 is live.
+              To go live, replace this <a> and the "Coming soon" note with:
+                <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>
+              See docs/STORE.md, "Go-live".
             -->
-            <a class="btn" role="link" aria-disabled="true" aria-describedby="store-soon" data-store-pending data-store-href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>
+            <a class="btn" role="link" aria-disabled="true" aria-describedby="store-soon" data-store-pending data-store-href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Microsoft Store</a>
             <span class="soon" id="store-soon">Coming soon</span>
           </div>
-          <a class="btn btn-primary" href="https://github.com/kynniau/dictum/releases/latest" aria-describedby="direct-note">Direct download</a>
         </div>
-        <p class="note" id="direct-note">The free installer for Windows 10 and 11 (x64), from GitHub. It isn’t code-signed yet, so Windows may warn you before it runs: <a href="#faq-smartscreen">here’s what to click</a>.</p>
+        <p class="note" id="direct-note">Free installer for Windows 10 and 11 (x64). It isn’t code-signed yet, so Windows may warn you before it runs: <a href="#faq-smartscreen">here’s what to click</a>.</p>
+
+        <ul class="trust" aria-label="At a glance">
+          <li>Free for life</li>
+          <li>No account</li>
+          <li>Open source</li>
+          <li>Runs on your PC</li>
+        </ul>
       </div>
 
       <div class="demo" aria-hidden="true">
@@ -86,13 +91,42 @@
     </div>
   </section>
 
+  <section class="section" id="why" aria-labelledby="why-title">
+    <div class="wrap">
+      <h2 id="why-title">Why people switch to Dictum</h2>
+      <p class="section-intro">Most dictation tools send your voice to someone else’s servers and charge you monthly for the privilege. Dictum does the work on your own computer, for free.</p>
+      <ul class="benefits">
+        <li class="card">
+          <svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2457E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 20h10M12 18v2M7 9h6M7 13h10"/></svg>
+          <h3>Works where you work</h3>
+          <p>Email, documents, chat, browser forms, your CRM. Anywhere a cursor blinks, Dictum types there. No special editor, no copy and paste.</p>
+        </li>
+        <li class="card">
+          <svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2457E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <h3>Nothing leaves your PC</h3>
+          <p>Speech recognition and tidy-up both run on your computer. No account, no cloud, no telemetry. Once your models are downloaded it works with the internet off.</p>
+        </li>
+        <li class="card">
+          <svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2457E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5H10.5a1.75 1.75 0 0 0 0 3.5h4"/></svg>
+          <h3>Free for life</h3>
+          <p>No subscription, no word limits, no upsell. Dictum is open source under the MIT licence, made by Kynni, a small Australian business that uses it every day.</p>
+        </li>
+        <li class="card">
+          <svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2457E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v18M7 8v8M17 8v8M3 11v2M21 11v2"/></svg>
+          <h3>Sounds like you</h3>
+          <p>The ums go, punctuation goes in, and your clients’ names are spelled your way. Calibration finds the model that hears your accent best.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
   <section class="section" id="how" aria-labelledby="how-title">
     <div class="wrap">
       <h2 id="how-title">How it works</h2>
       <ol class="steps">
         <li class="card">
           <h3>Hold <kbd>Right Ctrl</kbd></h3>
-          <p>Click where you want the words, in any app, then hold the right Ctrl key. A small pill at the bottom of the screen shows Dictum is listening.</p>
+          <p>Click where you want the words, in any app, then hold the key. A small pill at the bottom of the screen shows Dictum is listening.</p>
         </li>
         <li class="card">
           <h3>Say it</h3>
@@ -100,80 +134,156 @@
         </li>
         <li class="card">
           <h3>Let go</h3>
-          <p>Your speech becomes text on your PC, gets tidied (the ums go, capitals and punctuation go in) and is pasted at your cursor. Changed your mind? <kbd>Esc</kbd> cancels.</p>
+          <p>Your words are typed at the cursor a moment later, tidied up. Changed your mind? <kbd>Esc</kbd> cancels and nothing is pasted.</p>
         </li>
       </ol>
-      <p class="aside">Right Ctrl is the default. You can pick another key, such as Caps Lock or an F-key.</p>
+      <p class="aside">Right Ctrl is the default. Pick any key you like, such as Caps Lock or an F-key, in Settings.</p>
+    </div>
+  </section>
+
+  <section class="section" id="see" aria-labelledby="see-title">
+    <div class="wrap">
+      <h2 id="see-title">A quick look</h2>
+      <p class="section-intro">Dictum lives in the system tray and stays out of your way. Everything you might want to change is in one small panel and a Settings window.</p>
+      <div class="gallery">
+        <figure class="shot shot-tall">
+          <img src="/img/flyout.png" width="440" height="700" loading="lazy" alt="The Dictum tray panel: a Light or Full mode switch, speech model and clean-up pickers, the microphone, the big recording indicator choice, profanity filter, grammar assist and sound toggles, and buttons for calibration, dictionary, fix last dictation and settings.">
+          <figcaption>The tray panel. Pick Light or Full mode, your model and your microphone, and go.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/img/settings-general.png" width="900" height="712" loading="lazy" alt="Dictum settings, General page: the hotkey, a fix-last-dictation hotkey, the on-screen pill and big recording indicator, start and stop sounds, and how text is pasted.">
+          <figcaption>Your hotkey, what shows on screen while you talk, and how the text is pasted.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/img/settings-models.png" width="900" height="712" loading="lazy" alt="Dictum settings, Models page: the speech models and clean-up models you can download, with sizes, and the one in use.">
+          <figcaption>Models download once and stay on your PC. Smaller ones for laptops, bigger ones if you have a graphics card.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/img/settings-privacy.png" width="900" height="712" loading="lazy" alt="Dictum settings, Privacy page: offline-only mode, what stays on this PC, and the button to delete everything.">
+          <figcaption>Privacy in plain words, an offline-only switch, and one button that removes everything.</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/img/fix-last.png" width="600" height="400" loading="lazy" alt="The Fix last dictation window: the text that was just pasted, ready to edit, with buttons to copy, paste the fix, or save the changed words as corrections.">
+          <figcaption>Fix last dictation: correct a word once and it’s fixed every time after.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="compare" aria-labelledby="compare-title">
+    <div class="wrap">
+      <h2 id="compare-title">How it compares</h2>
+      <p class="section-intro">The big difference isn’t a feature. It’s where your voice goes.</p>
+      <div class="table-scroll">
+        <table class="compare">
+          <thead>
+            <tr>
+              <th scope="col"><span class="visually-hidden">What</span></th>
+              <th scope="col" class="is-dictum">Dictum</th>
+              <th scope="col">Wispr Flow</th>
+              <th scope="col">Aqua Voice</th>
+              <th scope="col">Superwhisper</th>
+              <th scope="col">Windows voice typing</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Price</th>
+              <td class="is-dictum">Free for life</td>
+              <td>Free plan with 2,000 words a week on desktop. Pro from US$12 per user a month on a yearly plan, US$15 monthly.</td>
+              <td>Free plan with 1,000 words. Pro from US$8 a month on a yearly plan, US$10 monthly.</td>
+              <td>Free tier. Pro US$8.49 a month, US$84.99 a year, or US$249.99 once.</td>
+              <td>Included with Windows</td>
+            </tr>
+            <tr>
+              <th scope="row">Where your speech is processed</th>
+              <td class="is-dictum">On your PC</td>
+              <td>In the cloud. Their privacy page says transcription always happens in the cloud.</td>
+              <td>Their site doesn’t say. Their privacy policy says transcripts can be stored on their servers unless you turn on Privacy Mode.</td>
+              <td>On your device with local models, best on Apple Silicon Macs. Cloud models are optional.</td>
+              <td>Microsoft’s online speech service</td>
+            </tr>
+            <tr>
+              <th scope="row">Works with the internet off</th>
+              <td class="is-dictum">Yes, once your models are downloaded</td>
+              <td>No, transcription is done in the cloud</td>
+              <td>Not stated on their site</td>
+              <td>Yes, with the local models</td>
+              <td>No. Dictation needs online speech recognition switched on.</td>
+            </tr>
+            <tr>
+              <th scope="row">Runs on</th>
+              <td class="is-dictum">Windows 10 and 11. Mac in progress.</td>
+              <td>Mac, Windows, iPhone, Android</td>
+              <td>Mac, Windows, iPhone, Android</td>
+              <td>Mac, Windows, iPhone, Android</td>
+              <td>Windows</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="caption compare-note">Checked on 16/10/2026 on each product’s own website or App Store listing and on Microsoft’s documentation; prices are in US dollars as listed there and may have changed since. Dictum’s optional cloud clean-up is off by default and comes with a warning.</p>
+    </div>
+  </section>
+
+  <section class="section" id="next" aria-labelledby="next-title">
+    <div class="wrap">
+      <h2 id="next-title">What’s next</h2>
+      <p class="section-intro">Dictum 1.0 shipped in October 2026. These are being built now, in the open, on GitHub. No dates, because we would rather ship them right.</p>
+      <ul class="roadmap">
+        <li><span class="status status-progress">In progress</span><div><h3>Mouse-button hotkeys and snippets</h3><p>Hold a side button on your mouse instead of a key. Say a phrase, paste a link or your sign-off.</p></div></li>
+        <li><span class="status status-progress">In progress</span><div><h3>Names spelled right, every time</h3><p>Smarter checks so the tidy-up never inserts a name from your dictionary that you didn’t say.</p></div></li>
+        <li><span class="status status-progress">In progress</span><div><h3>Cloud tidy-up for advanced users</h3><p>Optional presets for OpenAI, Google Gemini and a local Ollama, behind a clear warning that your text would leave your PC.</p></div></li>
+        <li><span class="status status-testing">In testing</span><div><h3>Dictate in your own language</h3><p>Hindi, Tagalog and the other languages Whisper knows, with optional translation to English as you go.</p></div></li>
+        <li><span class="status status-next">Next</span><div><h3>Long sessions, typed as you speak</h3><p>Hands-free dictation that types each sentence after you pause, so a 30-minute session reads back in real time.</p></div></li>
+        <li><span class="status status-next">Next</span><div><h3>Mac version</h3><p>The same app, built for macOS.</p></div></li>
+      </ul>
     </div>
   </section>
 
   <section class="section" id="privacy" aria-labelledby="privacy-title">
     <div class="wrap">
-      <h2 id="privacy-title">Nothing leaves your PC</h2>
-      <p class="section-intro">Speech recognition and clean-up both run on your computer. There’s no account, no analytics, no telemetry and no crash reporting. Dictum goes online only in these cases:</p>
+      <h2 id="privacy-title">Nothing leaves your PC, by default</h2>
+      <p class="section-intro">Speech recognition and tidy-up run on your computer. There’s no account, no analytics, no telemetry and no crash reporting. Dictum goes online only when you ask it to:</p>
       <ul class="hosts">
         <li class="card">
           <h3 class="host host-generic">Model downloads</h3>
-          <p>When you choose a model to download, Dictum fetches that one file from the model makers’ official download page and sends nothing about you or what you say. Every file is checked against a fingerprint built into Dictum before it is used. The exact address is listed in the privacy policy.</p>
+          <p>When you choose a model, Dictum fetches that one file from the model makers’ official download page and sends nothing about you. Every file is checked against a fingerprint built into Dictum before it is used.</p>
         </li>
         <li class="card">
           <h3 class="host">api.anthropic.com, api.openai.com, generativelanguage.googleapis.com <span class="tag">Off by default</span></h3>
-          <p>Only if you switch on cloud clean-up, which can use Anthropic, OpenAI, Google Gemini or any OpenAI-compatible server with your own key, behind a consent step and a warning. The text of each dictation is then sent there to be tidied.</p>
+          <p>Only if you switch on cloud tidy-up, which can use Anthropic, OpenAI, Google Gemini or any OpenAI-compatible server with your own key, behind a consent step. The text of each dictation is then sent there to be tidied. A server on your own PC, such as Ollama, keeps your text on it unless that server forwards to a cloud service of its own.</p>
+        </li>
+        <li class="card">
+          <h3 class="host">dictum.kynni.au</h3>
+          <p>Only when you open the privacy policy from Settings, which opens this site in your browser. Dictum has no update check today: the Store version is updated by the Microsoft Store, and the direct download by installing the new version from GitHub when one is released.</p>
         </li>
         <li class="card">
           <h3 class="host host-generic">A server you name <span class="tag">Off by default</span></h3>
           <p>Only if you point clean-up at a server of your own, such as Ollama. If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.</p>
         </li>
-        <li class="card">
-          <h3 class="host">dictum.kynni.au <span class="tag">Off by default</span></h3>
-          <p>Only if you turn on the update check in the direct-download version. It reads one small file and sends nothing about you. The Store version is updated by the Microsoft Store.</p>
-        </li>
       </ul>
-      <p class="section-outro">Set <code>offline_only</code> to <code>true</code> and Dictum never connects to anything outside your PC. <a href="/privacy">Read the privacy policy</a>.</p>
+      <p class="section-outro"><a href="/privacy">Read the privacy policy</a>. It’s short, and it names every address.</p>
     </div>
   </section>
 
-  <div class="section">
+  <section class="section" id="teams" aria-labelledby="teams-title">
     <div class="wrap pair">
-      <section class="card" id="offline" aria-labelledby="offline-title">
-        <h2 id="offline-title">Works offline</h2>
-        <p>Once your models are downloaded, Dictum needs no internet. Speech recognition (whisper.cpp) and clean-up (a small language model run by llama.cpp) both run on your PC: on the graphics card if you have one, otherwise on the processor.</p>
-        <p>If the clean-up model is missing, or would be too slow for a long dictation, a rule-based tidy is used instead. You still get your text.</p>
-        <p>For machines that must never go online, turn on <code>offline_only</code> and copy the model files in.</p>
+      <section class="card" aria-labelledby="teams-title">
+        <h2 id="teams-title">For teams</h2>
+        <p>Dictum installs per user with no admin rights. It runs on laptops without a graphics card and on Windows virtual machines used over Remote Desktop, with the session’s microphone. Connecting from a Mac? Use the right Option key as your hotkey.</p>
+        <p>On a locked-down machine, switch on offline-only and copy the model files in. Nothing is sent anywhere, and your IT team can read the privacy policy and the source code.</p>
       </section>
-      <section class="card" id="accent" aria-labelledby="accent-title">
-        <h2 id="accent-title">Your accent</h2>
+      <section class="card" aria-labelledby="req-title">
+        <h2 id="req-title">What you need</h2>
         <ul class="feature-list">
-          <li><strong>Calibration.</strong> Read ten short sentences and Dictum measures which of your installed models hears you best, with its error rate and speed on your PC. It does not train or change the model.</li>
-          <li><strong>Dictionary.</strong> Add names and terms, like your clients or your suburb, and Dictum spells them your way.</li>
-          <li><strong>Corrections.</strong> Fix a word once and have it fixed every time.</li>
-          <li><strong>Grammar assist.</strong> Optional help with articles, tenses and word order if English isn’t your first language.</li>
+          <li><strong>Windows 10 or 11</strong>, 64-bit.</li>
+          <li><strong>A microphone.</strong> Any one Windows can use.</li>
+          <li><strong>4 GB of RAM</strong> for the small models. A graphics card is optional and makes the bigger, more accurate models fast.</li>
+          <li><strong>Some disk space</strong> for the models you pick: from 78 MB, up to 1.6 GB for the most accurate speech model, plus an optional 1.1 GB tidy-up model.</li>
+          <li><strong>English</strong> dictation today. Other languages are in testing.</li>
         </ul>
-        <p class="caption">Calibration recordings stay on your PC until you delete them.</p>
       </section>
-    </div>
-  </div>
-
-  <section class="section" id="requirements" aria-labelledby="req-title">
-    <div class="wrap">
-      <h2 id="req-title">System requirements</h2>
-      <dl class="reqs">
-        <div><dt>Windows</dt><dd>Windows 10 or Windows 11, 64-bit (x64).</dd></div>
-        <div><dt>Memory</dt><dd>4 GB RAM for the small models.</dd></div>
-        <div><dt>Graphics card</dt><dd>Optional. A GPU makes the larger, more accurate models fast. Without one, Dictum runs on the processor and suggests a smaller model.</dd></div>
-        <div><dt>Microphone</dt><dd>Any microphone Windows can use, including one redirected over Remote Desktop.</dd></div>
-        <div><dt>Disk space</dt><dd>Room for the models you pick: 78 MB to 1.6 GB for speech, plus 1.1 GB for the recommended clean-up model, which is optional.</dd></div>
-        <div><dt>Language</dt><dd>English dictation. The clean-up model uses Australian spelling.</dd></div>
-        <div><dt>Mac</dt><dd>A Mac version is coming soon.</dd></div>
-      </dl>
-      <p class="aside">For a sense of speed: on our development PC (6-core Intel Xeon W-1250P, NVIDIA Quadro RTX 4000), turning a 10.5-second recording into text took 1.9 s with base.en on the processor and 0.7 s with medium.en on the graphics card. Measured 15/10/2026; your PC will differ.</p>
-    </div>
-  </section>
-
-  <section class="section" id="staff" aria-labelledby="staff-title">
-    <div class="wrap">
-      <h2 id="staff-title">Staff PCs and virtual machines</h2>
-      <p class="section-intro">Dictum installs per user with no admin rights, and runs on CPU-only laptops and on Azure Windows VMs used over Remote Desktop, where base.en is the recommended model. To dictate over Remote Desktop, let the session use your microphone: in Remote Desktop Connection choose Show Options, Local Resources, Remote audio, Settings, then Record from this computer, and Dictum hears it as “Remote Audio”. Mac keyboards have no right Ctrl key, so when you connect from a Mac pick the right Option key (RightAlt) or the right Command key (RightWin) as your hotkey. On a locked-down machine, turn on <code>offline_only</code> and copy the model files in from a share, and Dictum never connects to anything outside the PC. On Windows Server, the Windows Audio service must be running before any microphone appears.</p>
     </div>
   </section>
 
@@ -183,7 +293,7 @@
       <div class="faq">
 
         <details id="faq-smartscreen" open>
-          <summary>Windows warned me about the direct download. What do I click?</summary>
+          <summary>Windows warned me about the download. What do I click?</summary>
           <div class="answer">
             <p>That warning is expected for now. The direct download isn’t code-signed yet, so Microsoft Defender SmartScreen doesn’t recognise it. The Microsoft Store version won’t show it, because Microsoft signs Store apps. Only carry on if the file came from <a href="https://github.com/kynniau/dictum/releases/latest">github.com/kynniau/dictum</a>.</p>
             <ol>
@@ -191,14 +301,6 @@
               <li>When you open the installer and see “Windows protected your PC”: select <b>More info</b>, then <b>Run anyway</b>.</li>
             </ol>
             <p>On a work PC your IT team may have turned these options off. Ask them, or use the Store version once it’s available.</p>
-          </div>
-        </details>
-
-        <details id="faq-remove">
-          <summary>How do I remove everything?</summary>
-          <div class="answer">
-            <p>In Dictum, open <b>Settings</b>, then <b>Storage</b>, then <b>Remove Dictum completely</b>. It lists every file and folder it will delete, with sizes, and asks you to type DELETE. It removes the models, calibration recordings, logs, settings, your dictionary and corrections, your API key file (<code>.env</code>), the Start menu shortcut and the start-at-login entry, then quits. The Store version deletes its data the same way, then opens Windows Settings so you can uninstall the app itself.</p>
-            <p>By hand: search Start for “Add or remove programs”, find Dictum and choose <b>Uninstall</b>. For the direct download, then delete the folders <code>%APPDATA%\Dictum</code> and <code>%LOCALAPPDATA%\Dictum</code> if they’re still there. For the Store version, Windows deletes Dictum’s data when you uninstall it.</p>
           </div>
         </details>
 
@@ -213,8 +315,16 @@
         <details id="faq-models">
           <summary>Is the model safe?</summary>
           <div class="answer">
-            <p>Model files are data, not programs: they hold the numbers that whisper.cpp and llama.cpp read, and no code that runs. Dictum downloads speech models only from the whisper.cpp project’s official download page and clean-up models only from their makers’ official pages, and checks each file against a SHA-256 fingerprint built into Dictum before using it. A download that doesn’t match is deleted, and a copied-in file that doesn’t match is refused.</p>
-            <p>The remaining risk is a bug in the model loader that a deliberately crafted file could exploit, which is what that check guards against. Two optional Gemma models need a login with the model host and can only be size-checked. If you load a model file of your own, use one you trust. The clean-up model only ever sees the words, never your audio.</p>
+            <p>Model files are data, not programs: they hold the numbers that whisper.cpp and llama.cpp read, and no code that runs. Dictum downloads speech models only from the whisper.cpp project’s official download page and tidy-up models only from their makers’ official pages, and checks each file against a SHA-256 fingerprint built into Dictum before using it. A download that doesn’t match is deleted, and a copied-in file that doesn’t match is refused.</p>
+            <p>The remaining risk is a bug in the model loader that a deliberately crafted file could exploit, which is what that check guards against. Two optional Gemma models need a login with the model host and can only be size-checked. If you load a model file of your own, use one you trust. The tidy-up model only ever sees the words, never your audio.</p>
+          </div>
+        </details>
+
+        <details id="faq-remove">
+          <summary>How do I remove everything?</summary>
+          <div class="answer">
+            <p>In Dictum, open <b>Settings</b>, then <b>Storage</b>, then <b>Remove Dictum completely</b>. It lists every file and folder it will delete, with sizes, and asks you to type DELETE. It removes the models, calibration recordings, logs, settings, your dictionary and corrections, your API key file (<code>.env</code>), the Start menu shortcut and the start-at-login entry, then quits. The Store version deletes its data the same way, then opens Windows Settings so you can uninstall the app itself.</p>
+            <p>By hand: search Start for “Add or remove programs”, find Dictum and choose <b>Uninstall</b>. For the direct download, then delete the folders <code>%APPDATA%\Dictum</code> and <code>%LOCALAPPDATA%\Dictum</code> if they’re still there. For the Store version, Windows deletes Dictum’s data when you uninstall it.</p>
           </div>
         </details>
 
@@ -222,10 +332,21 @@
           <summary>What’s the licence?</summary>
           <div class="answer">
             <p>Dictum is free and open source under the MIT licence, copyright 2026 Kynni Pty Ltd. The source is on <a href="https://github.com/kynniau/dictum">GitHub</a>.</p>
-            <p>The speech and clean-up models are made by other organisations and carry their own licences, which Dictum shows when you pick one. The recommended clean-up model, Qwen2.5 1.5B Instruct, is licensed Apache-2.0. Qwen2.5 3B is for non-commercial use only, and Dictum never recommends it.</p>
+            <p>The speech and tidy-up models are made by other organisations and carry their own licences, which Dictum shows when you pick one. The recommended tidy-up model, Qwen2.5 1.5B Instruct, is licensed Apache-2.0. Qwen2.5 3B is for non-commercial use only, and Dictum never recommends it.</p>
           </div>
         </details>
 
+      </div>
+    </div>
+  </section>
+
+  <section class="section cta-band" aria-labelledby="cta-title">
+    <div class="wrap">
+      <h2 id="cta-title">Try it on your next email</h2>
+      <p class="section-intro">Two minutes to install, one key to hold. If it isn’t for you, one button removes everything.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/kynniau/dictum/releases/latest">Download for Windows</a>
+        <a class="btn btn-secondary" href="https://github.com/kynniau/dictum">See the source</a>
       </div>
     </div>
   </section>
@@ -245,7 +366,7 @@
     </ul>
   </div>
   <div class="wrap">
-    <p class="legal">© 2026 Kynni Pty Ltd. Dictum is free software under the MIT licence.</p>
+    <p class="legal">© 2026 Kynni Pty Ltd. Dictum is free software under the MIT licence. Wispr Flow, Aqua Voice, Superwhisper and Windows are trademarks of their owners, none of whom is affiliated with Kynni.</p>
   </div>
 </footer>
 </body>
