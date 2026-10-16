@@ -199,12 +199,15 @@ internal sealed class PrivacyPage : SettingsPage
 }
 
 /// <summary>
-/// Settings → About: version and runtime, Check for updates (decision 11: the direct download only; the Store build says
+/// Settings → About: version and runtime, any model problem (with Try on the CPU; Open log folder is under Files), Check for
+/// updates (decision 11: the direct download only; the Store build says
 /// the Store updates it and has no button), Report a problem (SPEC §22), reload, and the files and folders.
 /// </summary>
 internal sealed class AboutPage : SettingsPage
 {
     private readonly TextBlock _runtime = Ui.Text("");
+    private readonly TextBlock _problem = Ui.Text("");
+    private readonly Button _tryCpu;
     private readonly TextBlock _offline = new() { Text = "Offline only: Dictum connects to no other machine.", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _update = Ui.Text("");
     private readonly TextBlock _notes = Ui.Text("", "caption");
@@ -217,6 +220,9 @@ internal sealed class AboutPage : SettingsPage
         var title = new TextBlock { Text = "Dictum", FontSize = 22, FontWeight = FontWeight.SemiBold };
         _downloadPage = Ui.Button(UpdateCheck.DownloadPageLabel, "primary", () => Run(() => Shell.Platform.Open(UpdateCheck.DownloadPageUrl)));
         _downloadPage.HorizontalAlignment = HorizontalAlignment.Left;
+        _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "secondary", () => Run(() => Shell.TryOnCpu()));
+        _tryCpu.HorizontalAlignment = HorizontalAlignment.Left;
+        Avalonia.Automation.AutomationProperties.SetLiveSetting(_problem, Avalonia.Automation.AutomationLiveSetting.Polite);
         Avalonia.Automation.AutomationProperties.SetLiveSetting(_update, Avalonia.Automation.AutomationLiveSetting.Polite);
         ShowUpdate(null);
         Control updates;
@@ -238,7 +244,7 @@ internal sealed class AboutPage : SettingsPage
         Compose(
             Ui.Card(Ui.Stack(10,
                 Ui.Row(14, new MarkIcon(48), Ui.Stack(2, title, Ui.Text($"Version {version} · Kynni Pty Ltd · MIT licence", "caption"))),
-                _offline, _runtime, updates), "Dictum"),
+                _offline, _runtime, _problem, _tryCpu, updates), "Dictum"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("Report a problem opens an email to " + AppShell.SupportEmail + " in your own mail app, with the version and models filled in. " +
                         "Dictum sends nothing itself and never attaches what you dictated."),
@@ -262,9 +268,20 @@ internal sealed class AboutPage : SettingsPage
     protected override void Redraw()
     {
         var packaged = Shell.Platform.Package.IsPackaged ? "installed from a package" : "installed from the download";
-        _runtime.Text = $"On {Shell.Platform.Name}, {packaged}.\nModels: {Shell.Status.Models}.\nClean-up: {Shell.CleanupStatus}.";
+        var status = Shell.Status;
+        // The clean-up in use says "on this PC" while its model failed to load; the tidy is what runs then.
+        var cleanup = Shell.Settings.Llm.Provider == LlmSettings.Local && Shell.CleanupError is not null && !Shell.CleanupLoading
+            ? CleanupFailedLine(Shell.Models.CurrentCleanupName)
+            : $"Clean-up: {Shell.CleanupStatus}.";
+        _runtime.Text = $"On {Shell.Platform.Name}, {packaged}.\nModels: {status.Models}.\n{cleanup}";
+        _problem.Text = status.Problem ?? "";
+        _problem.IsVisible = status.Problem is not null;
+        _tryCpu.IsVisible = status.TryCpu;
         _offline.IsVisible = Shell.Settings.OfflineOnly; // SPEC §5: the About box says "Offline only"
     }
+
+    /// <summary>The clean-up line while the local model failed to load. PROPOSED copy (17/10/2026), awaiting the product owner's review: do not reword.</summary>
+    internal static string CleanupFailedLine(string model) => $"Clean-up: {model} could not be loaded, so the rule-based tidy is used.";
 
     /// <summary>
     /// One check per press; a press while one is running is ignored, so it is still one request. The press clears the last
