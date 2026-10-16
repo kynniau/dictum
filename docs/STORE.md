@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 17/10/2026 for 1.1.0 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.0.0, so the package is 1.0.0.0 | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.1.0, so the package is 1.1.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026 and to 1.1.0 on 17/10/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The first submission failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -241,7 +241,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.0.0 (set 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.1.0 (set 17/10/2026; 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -301,7 +301,7 @@ after the app change that reads the bundled model from `<program folder>\models`
 model-folder change (PR #11): without it the package carries the file but the first run still asks for a download.
 
 ```text
-Notes written 17/10/2026 for Dictum 1.0.0.
+Notes written 17/10/2026 for Dictum 1.1.0.
 
 CHANGED SINCE THE LAST SUBMISSION: the speech engine could not load on a PC without the Microsoft Visual C++ runtime, which showed as "model error". The package now declares Microsoft's framework package for that runtime, Microsoft.VCLibs.140.00.UWPDesktop, which the Store installs with Dictum. No download is needed to test: the base.en speech model ships inside the package.
 
@@ -388,6 +388,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
    (docs/TESTING-MSIX.md). The licensed source of that framework `.appx` is, per KB 3176696 (**recalled, not verified**,
    from the 17/10/2026 review; not re-read in this lane): Visual Studio with the UWP workload, under
    `%ProgramFiles(x86)%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs.Desktop\14.0`.
+   Not run for 1.1.0 (17/10/2026): Microsoft's signed VCLibs framework .appx is not available on this PC without a Visual Studio or Windows SDK install; the evidence accepted instead is the 17/10/2026 review that ran the CPU engines unpackaged on the framework's own 14.40.33728 runtime DLLs (`--selftest` PASS, `--transcribe` correct).
 5. Submit (sections 3 to 7), with the certification notes of section 7 as they now read.
 6. When the listing is live (https://apps.microsoft.com/detail/9N0DG1DHTR57 returns 200): in
    `site/index.html`, replace the pending Store link and its "Coming soon" note with
