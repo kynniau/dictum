@@ -55,8 +55,8 @@ public class CloudWarningAndPresetsTests
     // deliberate. Settings > Clean-up and Settings > Privacy say it while cloud clean-up is on and offline only refuses it.
     private const string ApprovedOfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
 
-    // Proposed to the product owner on 16/10/2026 and awaiting confirmation: pinned word for word, independently of the app's copy, so the owner's replacement is a deliberate change here. Settings > Clean-up says it while cloud clean-up was agreed to but the clean-up in use sends nothing for a reason no other line names (an address refused as insecure).
-    private const string ProposedNothingSentLine = "On, but nothing is sent: the clean-up in use runs on this PC.";
+    // Approved by the product owner on 16/10/2026 as written: pinned word for word, independently of the app's copy, so any change is deliberate. Settings > Clean-up says it while cloud clean-up was agreed to but the clean-up in use sends nothing for a reason no other line names (an address refused as insecure).
+    private const string ApprovedNothingSentLine = "On, but nothing is sent: the clean-up in use runs on this PC.";
 
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
 
@@ -534,7 +534,7 @@ public class CloudWarningAndPresetsTests
 
             var window = new SettingsWindow(shell);
             window.Show();
-            Assert.Equal(ProposedNothingSentLine, CleanUpStateLine(window));
+            Assert.Equal(ApprovedNothingSentLine, CleanUpStateLine(window));
             var privacy = PrivacyPageLines(window);
             Assert.Contains(privacy, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal));
             Assert.DoesNotContain(privacy, l => l.StartsWith("The text of each dictation goes to ", StringComparison.Ordinal) || l.Contains(ApprovedStateLine, StringComparison.Ordinal));
