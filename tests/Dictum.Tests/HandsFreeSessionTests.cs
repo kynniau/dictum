@@ -284,7 +284,8 @@ public class HandsFreeSessionTests
     [Fact]
     public async Task The_auto_stop_ends_the_session_and_types_what_is_left()
     {
-        using var rig = Make(new PartTranscriber("the first part", "the rest at the stop"), options: new StateMachineOptions(300, 400, HandsFreeMaxSeconds: 1));
+        // Two seconds, so a slow runner still cuts the first part before the auto-stop.
+        using var rig = Make(new PartTranscriber("the first part", "the rest at the stop"), options: new StateMachineOptions(300, 400, HandsFreeMaxSeconds: 2));
         rig.Capture.Rest = Part(1);
         await StartHandsFree(rig);
         rig.Capture.Cut(Part(0));
