@@ -285,6 +285,8 @@ public class SegmentJoinTests
     [InlineData("Il a dit «stop.»")]
     [InlineData("Thanks.\r\n")]
     [InlineData("Thanks,\n\"")] // a line break, then an opening quote (aligned 16/10/2026: it carried on before)
+    [InlineData("वह आ गया।")]   // the Devanagari danda (16/10/2026)
+    [InlineData("वह आ गया॥")]
     public void After_any_sentence_end_a_part_starts_with_its_capital(string before)
     {
         Assert.Equal("Then we left.", SegmentJoin.Join(before, "then we left", "then we left.", trailingSpace: false, NoNames).Text);

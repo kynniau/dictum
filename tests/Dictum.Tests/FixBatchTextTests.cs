@@ -49,6 +49,8 @@ public class FixBatchTextTests
     [InlineData("Paid (in full.) Bill is due.", "Paid (in full.) Bill is due.")] // so is a closing bracket (aligned)
     [InlineData("Pay the “Bill” today.", "Pay the “bill” today.")]           // mid-sentence, inside quotes
     [InlineData("Pay the (Bill) today.", "Pay the (bill) today.")]
+    [InlineData("भुगतान हुआ। Bill is due.", "भुगतान हुआ। Bill is due.")]   // a danda ends a sentence (16/10/2026)
+    [InlineData("भुगतान हुआ॥ Bill is due.", "भुगतान हुआ॥ Bill is due.")]
     public void A_correction_keeps_a_capital_wherever_a_sentence_starts(string text, string expected) =>
         Assert.Equal(expected, Rules("Bill => bill").Apply(text));
 

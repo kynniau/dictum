@@ -183,6 +183,28 @@ public class ProfanityFilterTests
         Assert.Equal(expected, Shipped.Apply(input, ProfanitySettings.Remove));
     }
 
+    /// <summary>
+    /// The Devanagari danda and double danda end a sentence like a full stop (orchestrator, 16/10/2026: the languages lens
+    /// found "वह कमीना।" filtered to "वह ।"). A one-word list, as an override profanity.txt would give.
+    /// </summary>
+    [Theory]
+    [InlineData("वह कमीना।", "वह।")]                         // the mark attaches to the word before, as in "It's shit." → "It's."
+    [InlineData("वह कमीना॥", "वह॥")]
+    [InlineData("कमीना। मैं भूल गया।", "मैं भूल गया।")]       // a sentence of its own goes with its mark
+    [InlineData("पहला। कमीना, दूसरा।", "पहला। दूसरा।")]      // a sentence start after a danda takes the comma with the word
+    public void Remove_ends_a_sentence_at_a_danda_too(string input, string expected)
+    {
+        Assert.Equal(expected, new ProfanityFilter(["कमीना"], "test").Apply(input, ProfanitySettings.Remove));
+    }
+
+    [Theory]
+    [InlineData("It's shit… really.", "It's… really.")] // aligned with the danda, 16/10/2026: was "It's … really."
+    [InlineData("Shit… I forgot.", "I forgot.")]          // was "… I forgot."
+    public void Remove_treats_an_ellipsis_after_the_word_like_a_full_stop(string input, string expected)
+    {
+        Assert.Equal(expected, Shipped.Apply(input, ProfanitySettings.Remove));
+    }
+
     [Theory]
     [InlineData(ProfanitySettings.Mask)]
     [InlineData(ProfanitySettings.Remove)]

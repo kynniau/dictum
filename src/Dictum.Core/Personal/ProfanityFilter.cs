@@ -84,14 +84,14 @@ public sealed class ProfanityFilter
                 next++; // "Damn, that…" → "That…"; "Well, shit, that…" → "Well, that…"
                 while (next < text.Length && text[next] is ' ' or '\t') next++;
             }
-            else if (start && next < text.Length && text[next] is '.' or '!' or '?')
+            else if (start && next < text.Length && SentenceStart.IsEndMark(text[next]))
             {
                 next++; // a sentence of its own: "Shit! I forgot…" → "I forgot…", not "! I forgot…"
                 while (next < text.Length && text[next] is ' ' or '\t') next++;
             }
-            else if (next >= text.Length || text[next] is '.' or '!' or '?' or ',' or ';' or ':' or '\n' or '\r')
+            else if (next >= text.Length || SentenceStart.IsEndMark(text[next]) || text[next] is ',' or ';' or ':' or '\n' or '\r')
             {
-                TrimEndSpaces(sb); // "It's shit." → "It's."
+                TrimEndSpaces(sb); // "It's shit." → "It's."; "वह कमीना।" → "वह।"
             }
             if (start)
             {
