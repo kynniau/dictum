@@ -13,6 +13,7 @@ namespace Dictum.App;
 /// offline_only on, and no dialog opens on a settings reload (it could take focus mid-dictation).
 /// </summary>
 /// <param name="gpuMachine">Tests decide; production probes the whisper runtime (<see cref="WhisperEngine.GpuMachine"/>).</param>
+/// <param name="freeBytes">Free bytes on the drive holding a folder: tests decide; production reads the drive (<see cref="Storage.DiskSpace.FreeBytes"/>).</param>
 public sealed class ModelCoordinator(
     AppPaths paths,
     ModelManager models,
@@ -28,7 +29,8 @@ public sealed class ModelCoordinator(
     Action refreshTooltip,
     Action<string, bool> balloon,
     ModelIntegrity? integrity = null,
-    Func<bool>? gpuMachine = null)
+    Func<bool>? gpuMachine = null,
+    Func<string, long?>? freeBytes = null)
 {
     /// <summary>Added to the download question when the download ends in a model switch.</summary>
     public const string SwitchNote = "Dictum switches to it when the download finishes";
@@ -36,7 +38,15 @@ public sealed class ModelCoordinator(
     /// <summary>What the balloon, and a page whose choice it was, say when settings.json cannot be written (<see cref="Write"/>).</summary>
     public const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
 
+    /// <summary>
+    /// PROPOSED copy (17/10/2026), for the product owner to approve: Settings > Models > Model folder > Browse… when the folder
+    /// picked is the one holding the models that come with Dictum (or inside it), which is never written (Decision 16).
+    /// </summary>
+    public const string BundledFolderRefused = "That folder holds the models that come with Dictum, which Dictum never changes. Choose another folder.";
+
     private readonly HashSet<string> _warnedMissing = [];
+    private readonly Dictionary<string, (long Length, DateTime Written, bool Passes)> _bundledChecks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<string, long?> _freeBytes = freeBytes ?? Storage.DiskSpace.FreeBytes;
     private readonly ModelDownloads _downloads = new(http, log, settings, integrity, refreshTooltip, balloon);
     private string? _launchOverride = launchOverride;
     private string? _firstRunSpeechDownload;
@@ -54,11 +64,25 @@ public sealed class ModelCoordinator(
 
     /// <summary>The download question's note, with the low-space warning when the download would leave under 2 GB (SPEC §17).</summary>
     private string WithSpaceWarning(string note, long? bytes) =>
-        bytes is long b && Storage.DiskSpace.DownloadWarning(paths.ModelsDir(settings()), b) is { } warning ? $"{note}. {warning}" : note;
+        bytes is long b && Storage.DiskSpace.DownloadWarning(paths.ModelsDir(settings()), b, _freeBytes) is { } warning ? $"{note}. {warning}" : note;
 
-    public string ModelPath => SettingsFile.EffectiveModelPath(settings(), paths, environment, _launchOverride);
+    /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
+    public string ModelPath
+    {
+        get
+        {
+            Interlocked.Increment(ref _lookups); // a name is looked up in up to three folders; a path or the environment names the file at no cost, counted all the same
+            return SettingsFile.EffectiveModelPath(settings(), paths, environment, _launchOverride, BundledCheck);
+        }
+    }
 
-    public string CurrentName => ModelCatalog.DisplayName(models.ModelPath ?? ModelPath);
+    /// <summary>
+    /// The speech model file in use: the one loaded or loading, else <see cref="ModelPath"/>. What a page that redraws on every
+    /// progress tick asks (re-lens, 17/10/2026): with a model loaded it looks in no folder.
+    /// </summary>
+    public string CurrentPath => models.ModelPath ?? ModelPath;
+
+    public string CurrentName => ModelCatalog.DisplayName(CurrentPath);
 
     /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, or the cloud provider.</summary>
     public string CurrentCleanupName => settings().Llm.Provider switch
@@ -68,19 +92,87 @@ public sealed class ModelCoordinator(
         var cloud => cloud,
     };
 
-    public bool IsDownloaded(ModelInfo info) => File.Exists(ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())));
+    /// <summary>The model is on this PC: downloaded, copied in, or come with Dictum, in any of the model folders (<see cref="ModelFolders"/>).</summary>
+    public bool IsDownloaded(ModelInfo info) => Source(info) is not null;
 
-    public bool IsCleanupDownloaded(CleanupModelInfo info) => File.Exists(CleanupCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())));
+    public bool IsCleanupDownloaded(CleanupModelInfo info) => Locate(info.FileName, info.Bytes) is not null;
+
+    /// <summary>The folder the model is used from (the first in the lookup order that has it), or null when it is not on this PC.</summary>
+    public ModelFolderKind? Source(ModelInfo info) => Locate(info.FileName, info.Bytes)?.Kind;
+
+    /// <summary>The file the model is used from (the first in the lookup order that passes), or null when it is not on this PC.</summary>
+    public string? Find(ModelInfo info) => Locate(info.FileName, info.Bytes)?.Path;
+
+    /// <summary>
+    /// The copy that would be used if <paramref name="gone"/> were deleted: the next file named <paramref name="fileName"/> in the
+    /// lookup order that passes (the bundled one held to its SHA-256, as for every lookup), with the folder it is in; null when none.
+    /// </summary>
+    public (string Path, ModelFolderKind Kind)? FindBesides(string fileName, long? bytes, string gone) => Locate(fileName, bytes, except: gone);
+
+    private int _lookups;
+
+    /// <summary>How many folder lookups this coordinator has made (each reads up to three folders, a name resolved by <see cref="ModelPath"/> included): tests count them.</summary>
+    internal int Lookups => Volatile.Read(ref _lookups);
+
+    /// <summary>How many downloads have ended (arrived, failed or cancelled): Settings > Models looks the catalogue up again after one.</summary>
+    public int DownloadsEnded => _downloads.Ended;
+
+    private (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppSettings? lookIn = null, string? except = null)
+    {
+        Interlocked.Increment(ref _lookups);
+        return ModelFolders.Locate(fileName, bytes, paths, lookIn ?? settings(), BundledCheck, except);
+    }
+
+    /// <summary>The full catalogue check for a file in the bundled folder, when there is an integrity record to check with.</summary>
+    private Func<string, bool>? BundledCheck => integrity is null ? null : BundledFilePasses;
+
+    /// <summary>
+    /// Decision 16: a model file in the bundled folder is used only when it passes the catalogue check of every load (size,
+    /// then SHA-256; <see cref="ModelIntegrity.Verify"/>, which remembers a pass in verified-models.json, so base.en is hashed
+    /// once per version of the file). One that fails is passed over as if it were absent, said once in the log, and never
+    /// deleted or replaced: the folder is read-only. The result is kept per file version for the session, so a failing file is
+    /// not hashed again on every lookup.
+    /// </summary>
+    private bool BundledFilePasses(string path)
+    {
+        var file = new FileInfo(path);
+        lock (_bundledChecks)
+        {
+            if (_bundledChecks.TryGetValue(path, out var seen) && seen.Length == file.Length && seen.Written == file.LastWriteTimeUtc) return seen.Passes;
+            // simplification: the first lookup of a bundled file after an install or an update hashes it on the calling
+            // thread, which during a start is the UI thread (base.en: 0.5 s, measured 17/10/2026 on the development machine
+            // with the built app's --selftest). Ceiling: a bigger bundled model holds that start up for longer. Trigger to
+            // retire: shipping a bigger model in the package; then check it in the background.
+            var passes = true;
+            try
+            {
+                integrity!.Verify(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) // ModelIntegrityException is an IOException
+            {
+                passes = false;
+                log.Warn($"{path} came with Dictum but fails the catalogue check, so it is not used (and, being read-only, never deleted or replaced): {ex.Message}");
+            }
+            _bundledChecks[path] = (file.Length, file.LastWriteTimeUtc, passes);
+            return passes;
+        }
+    }
 
     private bool EnvOverride => SettingsFile.ModelPathOverride(environment) is not null;
 
     /// <summary>
     /// First run: the speech picker, then the cleanup picker, each with the recommendation pre-selected; only the questions
     /// settings.json leaves open are asked (<see cref="AppRules.FirstRunQuestions"/>), and only those answers are written.
-    /// With a model override (scripted/test launch) the pickers are skipped and the recommendations written. Returns false
-    /// if the user chose Quit.
+    /// With a model override (scripted/test launch) the pickers are skipped and the recommendations written. When base.en is on
+    /// this PC (Decision 16: it comes with Dictum, so in every package that ships it) nothing is asked: the open choices are
+    /// answered with base.en and the rule-based tidy, as "No AI cleanup (rule-based tidy)" answers the cleanup picker, and
+    /// Settings > Models offers the AI clean-up download; a seeded settings.json that names llm.provider (local, with no
+    /// llm.model) keeps it and gets the recommended clean-up model, which is not downloaded: nothing downloads, and
+    /// <see cref="EnsureCleanup"/> says the rule-based tidy is used until it is. Returns false if the user chose Quit.
     /// </summary>
-    public bool FirstRun(bool askSpeech = true, bool askCleanup = true)
+    /// <param name="seeded">The settings.json being completed (a seeded models.folder is looked in too); null: the settings in use.</param>
+    /// <param name="keepProvider">settings.json names llm.provider (<see cref="SettingsLoadResult.NamesCleanupProvider"/>).</param>
+    public bool FirstRun(bool askSpeech = true, bool askCleanup = true, AppSettings? seeded = null, bool keepProvider = false)
     {
         var gpu = gpuMachine is not null ? gpuMachine() : ProbeGpuMachine();
         var (speech, speechWhy) = ModelCatalog.Recommend(gpu);
@@ -91,6 +183,14 @@ public sealed class ModelCoordinator(
         if (_launchOverride is not null || EnvOverride)
         {
             log.Info("First run with a model override: pickers skipped.");
+        }
+        else if (Locate(ModelCatalog.FileName(ModelCatalog.Bundled), ModelCatalog.KnownSize(ModelCatalog.Bundled), seeded) is { } bundled)
+        {
+            chosenSpeech = ModelCatalog.Bundled;
+            if (!keepProvider) provider = LlmSettings.NoProvider; // the lens, 17/10/2026: a seeded "local" was turned to none without a question
+            log.Info(provider == LlmSettings.NoProvider
+                ? $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up)."
+                : $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled}, and settings.json's llm.provider (local) is kept with the recommended {chosenCleanup}, which is not downloaded (Settings > Models).");
         }
         else
         {
@@ -202,7 +302,7 @@ public sealed class ModelCoordinator(
             if (llm.ModelPath is not null) llm.Unload();
             return;
         }
-        var path = SettingsFile.CleanupModelPath(s, paths);
+        var path = SettingsFile.CleanupModelPath(s, paths, BundledCheck);
         if (File.Exists(path))
         {
             llm.BeginLoad(path, s.Llm.Gpu);
@@ -251,9 +351,11 @@ public sealed class ModelCoordinator(
         }
         _launchOverride = null; // a tray choice replaces a --model launch override
         if (EnvOverride) balloon("The DICTUM_MODEL_PATH environment variable is set and still overrides the model choice.", true);
+        var destination = ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings()));
         if (IsDownloaded(info)) SetValues(("whisper.model", info.Name));
-        else if (!RefuseOffline(info.FileName) && prompts.ConfirmDownload(info.FileName, info.SizeText, WithSpaceWarning($"{info.TradeOff}. {SwitchNote}", info.Bytes)))
-            StartDownload(info.Download, ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), () => SetValues(("whisper.model", info.Name)));
+        else if (!RefuseOffline(info.FileName) && !RefuseLowSpace(destination, info.FileName, info.Bytes)
+                 && prompts.ConfirmDownload(info.FileName, info.SizeText, WithSpaceWarning($"{info.TradeOff}. {SwitchNote}", info.Bytes)))
+            StartDownload(info.Download, destination, () => SetValues(("whisper.model", info.Name)));
     }
 
     /// <summary>A cleanup catalogue entry was chosen (tray panel or Settings).</summary>
@@ -266,11 +368,12 @@ public sealed class ModelCoordinator(
             return;
         }
         (string, string)[] values = [("llm.provider", LlmSettings.Local), ("llm.model", info.Name)];
+        var destination = CleanupCatalog.ResolvePath(info.Name, paths.ModelsDir(settings()));
         if (IsCleanupDownloaded(info)) SetValues(values);
         else if (info.RequiresLogin) balloon($"{info.Name} {ModelDownloader.LoginRequired}.", true);
-        else if (!RefuseOffline(info.FileName) && prompts.ConfirmDownload(info.FileName, info.SizeText,
+        else if (!RefuseOffline(info.FileName) && !RefuseLowSpace(destination, info.FileName, info.Bytes) && prompts.ConfirmDownload(info.FileName, info.SizeText,
                      WithSpaceWarning(info.TradeOff + (info.CommercialUse ? "" : ". Licence: " + info.Licence) + ". " + SwitchNote, info.Bytes)))
-            StartDownload(info.Download, CleanupCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), () => SetValues(values));
+            StartDownload(info.Download, destination, () => SetValues(values));
     }
 
     /// <summary>Tray: "No AI cleanup (rule-based tidy)".</summary>
@@ -315,6 +418,43 @@ public sealed class ModelCoordinator(
         if (!settings().OfflineOnly) return false;
         balloon($"offline_only is on: {fileName} cannot be downloaded. Copy it into {paths.ModelsDir(settings())} instead.", true);
         return true;
+    }
+
+    /// <summary>
+    /// Decision 15: a download that would not fit on its drive with 200 MB to spare is refused, with a balloon saying so
+    /// (<see cref="Storage.DiskSpace.DownloadRefusal"/>), before it is asked and again before it starts. A kept partial download
+    /// needs only the rest. Unknown sizes and unknown free space (a network share) go ahead.
+    /// </summary>
+    private bool RefuseLowSpace(string destination, string fileNames, long? bytes) => RefuseLowSpace([(destination, bytes)], fileNames);
+
+    private bool RefuseLowSpace(IReadOnlyList<(string Destination, long? Bytes)> files, string fileNames)
+    {
+        long needed = 0;
+        foreach (var (destination, bytes) in files)
+        {
+            if (bytes is not long total) continue;
+            var part = new FileInfo(destination + ".part");
+            needed += part.Exists && part.Length < total ? total - part.Length : total; // the downloader resumes a kept .part from its end
+        }
+        if (needed == 0 || Storage.DiskSpace.DownloadRefusal(Path.GetDirectoryName(Path.GetFullPath(files[0].Destination))!, fileNames, needed, _freeBytes) is not { } refusal)
+            return false;
+        balloon(refusal, true);
+        return true;
+    }
+
+    /// <summary>
+    /// Settings > Models > Model folder (Decision 15): writes models.folder (null: the per-user default) and reloads, so the next
+    /// lookup and download use it. No file is moved. A folder that holds the bundled models, or is inside it, is refused
+    /// (<see cref="BundledFolderRefused"/>, returned for the page to show). The earlier name whisper.models_dir is cleared when
+    /// set, so the folder chosen here is the one in force. A file that cannot be written is ballooned (<see cref="Write"/>).
+    /// </summary>
+    public string? SetModelsFolder(string? folder)
+    {
+        if (folder is not null && paths.IsBundled(folder)) return BundledFolderRefused;
+        var values = new List<(string, JsonNode?)> { ("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))) };
+        if (settings().Whisper.ModelsDir is not null) values.Add(("whisper.models_dir", null));
+        Write([.. values]);
+        return null;
     }
 
     private void SetValues(params (string Key, string Value)[] values) => Write([.. values.Select(v => (v.Key, (JsonNode?)JsonValue.Create(v.Value)))]);
@@ -385,6 +525,11 @@ public sealed class ModelCoordinator(
             finished?.Invoke(false);
             return;
         }
+        if (RefuseLowSpace([.. missing.Select(m => (m.Destination, m.Spec.Bytes))], names))
+        {
+            finished?.Invoke(false);
+            return;
+        }
         var total = missing.Sum(m => m.Spec.Bytes ?? 0);
         if (!prompts.ConfirmDownload(names, ModelCatalog.FormatSize(total), WithSpaceWarning(note, total)))
         {
@@ -410,6 +555,11 @@ public sealed class ModelCoordinator(
         if (spec.RequiresLogin)
         {
             balloon($"{spec.FileName} {ModelDownloader.LoginRequired}.", true);
+            onFailure?.Invoke();
+            return;
+        }
+        if (RefuseLowSpace(destination, spec.FileName, spec.Bytes))
+        {
             onFailure?.Invoke();
             return;
         }

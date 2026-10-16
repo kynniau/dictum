@@ -23,7 +23,6 @@ public static class DownloadCommand
             return 1;
         }
         var settings = config.Settings;
-        var modelsDir = paths.ModelsDir(settings);
         DownloadSpec spec;
         if (options.Mode == CliMode.DownloadCleanupModel)
         {
@@ -35,11 +34,18 @@ public static class DownloadCommand
             if (info is null) Console.Error.WriteLine($"warning: \"{options.DownloadName}\" is not in Dictum's model catalogue, so its size and SHA-256 cannot be verified.");
             spec = info?.Download ?? new DownloadSpec(ModelCatalog.DownloadUri(options.DownloadName!), ModelCatalog.FileName(options.DownloadName!), null, null);
         }
-        var destination = Path.Combine(modelsDir, spec.FileName);
-        return await DownloadAsync(spec, destination, settings.OfflineOnly, log, new ModelIntegrity(paths.VerifiedModelsFile, log, () => modelsDir), http);
+        var destination = Path.Combine(paths.ModelsDir(settings), spec.FileName);
+        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings));
+        // The app's lookup (ModelFolders, the lens 17/10/2026): a copy in any model folder counts, the one that comes with Dictum
+        // included, so "--download-model base.en" fetches no second copy of the bundled file.
+        var present = spec.Bytes is null ? null : ModelFolders.Find(spec.FileName, spec.Bytes, paths, settings, integrity.Passes);
+        return await DownloadAsync(spec, destination, settings.OfflineOnly, log, integrity, http, present);
     }
 
-    internal static async Task<int> DownloadAsync(DownloadSpec spec, string destination, bool offlineOnly, ILog log, ModelIntegrity? integrity = null, HttpClient? http = null)
+    /// <param name="integrity">Checks a copy already on this PC (size and SHA-256, or the record of an earlier check); null: none is looked for.</param>
+    /// <param name="present">The copy the app's lookup found (<see cref="ModelFolders.Find"/>), checked instead of <paramref name="destination"/>.</param>
+    internal static async Task<int> DownloadAsync(DownloadSpec spec, string destination, bool offlineOnly, ILog log, ModelIntegrity? integrity = null, HttpClient? http = null,
+        string? present = null)
     {
         if (offlineOnly)
         {
@@ -47,18 +53,27 @@ public static class DownloadCommand
             log.Warn($"Download of {spec.FileName} refused: offline_only is on.");
             return 1;
         }
-        if (File.Exists(destination) && spec.Bytes is long bytes && new FileInfo(destination).Length == bytes)
+        var existing = present ?? destination;
+        if (integrity is not null && File.Exists(existing) && spec.Bytes is long bytes && new FileInfo(existing).Length == bytes)
         {
-            var existing = await ModelDownloader.HashFileAsync(destination, CancellationToken.None);
-            if (ModelDownloader.Verify(spec, bytes, existing) is null)
+            string? status = null;
+            try
             {
+                status = integrity.Verify(existing);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) // ModelIntegrityException is an IOException
+            {
+            }
+            if (status is not null)
+            {
+                // PROPOSED copy (17/10/2026), for the product owner to approve: the two lines below name the copy the app's lookup found, in
+                // any model folder, and how it was checked ("SHA-256 verified", or "verified earlier"); they named the download folder's file and the hash.
                 Console.Out.WriteLine(spec.Sha256 is null
-                    ? $"{destination} is already present with the catalogue size ({bytes:N0} bytes; no published SHA-256 to check). Nothing to do."
-                    : $"{destination} is already present and matches the catalogue ({bytes:N0} bytes, SHA-256 {existing}). Nothing to do.");
-                integrity?.Remember(destination);
+                    ? $"{existing} is already present with the catalogue size ({bytes:N0} bytes; no published SHA-256 to check). Nothing to do."
+                    : $"{existing} is already present and matches the catalogue ({bytes:N0} bytes, {status}). Nothing to do.");
                 return 0;
             }
-            Console.Error.WriteLine($"warning: {destination} has the right size but the wrong SHA-256; downloading it again.");
+            Console.Error.WriteLine($"warning: {existing} has the right size but the wrong SHA-256; downloading it again.");
         }
 
         Console.Out.WriteLine($"Downloading {spec.Uri}");

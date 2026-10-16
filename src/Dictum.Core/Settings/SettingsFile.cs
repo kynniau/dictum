@@ -20,22 +20,28 @@ public static class SettingsFile
 
     /// <summary>
     /// The model file to load. Precedence: the --model launch override (name or path), then DICTUM_MODEL_PATH (or its
-    /// earlier name DICTATE_MODEL_PATH), then whisper.model resolved against models_dir.
+    /// earlier name DICTATE_MODEL_PATH), then whisper.model. A name is looked up in the model folders (<see cref="ModelFolders"/>).
     /// </summary>
-    public static string EffectiveModelPath(AppSettings settings, AppPaths paths, Func<string, string?> environment, string? launchOverride = null)
+    /// <param name="bundledCheck">The full check for a file in the bundled folder (<see cref="ModelFolders.Find"/>); null: its size.</param>
+    public static string EffectiveModelPath(AppSettings settings, AppPaths paths, Func<string, string?> environment, string? launchOverride = null,
+        Func<string, bool>? bundledCheck = null)
     {
-        if (!string.IsNullOrWhiteSpace(launchOverride)) return ModelCatalog.ResolvePath(launchOverride.Trim(), paths.ModelsDir(settings));
+        if (!string.IsNullOrWhiteSpace(launchOverride)) return SpeechModelPath(launchOverride.Trim(), settings, paths, bundledCheck);
         var overridePath = ModelPathOverride(environment);
         if (!string.IsNullOrWhiteSpace(overridePath)) return Path.GetFullPath(overridePath.Trim().Trim('"'));
-        return ModelCatalog.ResolvePath(settings.Whisper.Model, paths.ModelsDir(settings));
+        return SpeechModelPath(settings.Whisper.Model, settings, paths, bundledCheck);
     }
 
-    /// <param name="model">whisper.model to write.</param>
-    /// <param name="cleanupProvider">llm.provider to write (local, or none for rules only).</param>
-    /// <param name="cleanupModel">llm.model to write for the local provider.</param>
-    /// <summary>The local cleanup model file: llm.model resolved against models_dir (catalogue name or absolute path).</summary>
-    public static string CleanupModelPath(AppSettings settings, AppPaths paths) =>
-        CleanupCatalog.ResolvePath(settings.Llm.Model, paths.ModelsDir(settings));
+    /// <summary>A speech model name or path to a file: an absolute path as it is; a name looked up in the model folders.</summary>
+    private static string SpeechModelPath(string model, AppSettings settings, AppPaths paths, Func<string, bool>? bundledCheck) =>
+        Path.IsPathFullyQualified(model) ? model : ModelFolders.Resolve(ModelCatalog.FileName(model), ModelCatalog.KnownSize(model), paths, settings, bundledCheck);
+
+    /// <summary>The local cleanup model file: llm.model as an absolute .gguf path, or a name looked up in the model folders.</summary>
+    /// <param name="bundledCheck">As for <see cref="EffectiveModelPath"/>.</param>
+    public static string CleanupModelPath(AppSettings settings, AppPaths paths, Func<string, bool>? bundledCheck = null) =>
+        Path.IsPathFullyQualified(settings.Llm.Model)
+            ? settings.Llm.Model
+            : ModelFolders.Resolve(CleanupCatalog.FileNameFor(settings.Llm.Model), CleanupCatalog.Find(settings.Llm.Model)?.Bytes, paths, settings, bundledCheck);
 
     /// <summary>--cleanup-model: for this launch only, the local provider with that model.</summary>
     public static AppSettings WithCleanupOverride(AppSettings settings, string? cleanupModel) => cleanupModel is null
@@ -59,8 +65,9 @@ public static class SettingsFile
                 ["hands_free_max_seconds"] = "Hands-free stops by itself after this many seconds (30-3600; Settings > General). Hands-free types each part as you pause, and what is left is typed at the stop. A held key always stops after 300 seconds, whatever this says.",
                 ["silence_threshold"] = "Recordings whose loudest 20 ms block (RMS, 0-1) stays below this are discarded as silence.",
                 ["audio.device"] = "null = the system's default microphone, or a device ID / part of its name (see Settings > Microphone or Dictum.exe --selftest).",
-                ["whisper"] = "model: short name (small.en, medium.en, medium.en-q5_0, large-v3-turbo, or the multilingual small, medium, large-v3...) resolved to ggml-<name>.bin in models_dir, or an absolute path. language: a whisper code (en, hi, tl, bn, ta...) or auto to detect it; anything but en needs a multilingual model (no .en). translate: true writes English whatever language is spoken (multilingual model; large-v3-turbo cannot translate). gpu: auto | vulkan | cpu (change needs a restart). threads: 0 = auto. beam_size: 0 = greedy decoding (fastest), 1-8 = beam search (Calibrate my voice can set it).",
-                ["llm"] = $"provider: local (default: a small model on this PC, nothing leaves it) | anthropic | openai-compatible | none (rule-based tidy only). model: for local a cleanup model name ({string.Join(", ", CleanupCatalog.Entries.Select(e => e.Name))}) or an absolute .gguf path; for cloud providers the model id. gpu (local): auto | vulkan | cpu, needs a restart. base_url is required for openai-compatible (e.g. http://localhost:11434/v1 for Ollama; plain http:// only for a server on this PC); for anthropic it is optional and replaces https://api.anthropic.com (the ANTHROPIC_BASE_URL environment variable is ignored). A cloud provider runs only after Settings > Clean-up's consent step, which records it in consent.json; settings.json cannot switch it on. prompt_file: absolute path to a custom system prompt. grammar_assist: true also fixes articles, tenses, prepositions and word order (for speakers whose first language is not English).",
+                ["whisper"] = "model: short name (small.en, medium.en, medium.en-q5_0, large-v3-turbo, or the multilingual small, medium, large-v3...) looked up as ggml-<name>.bin in the model folders (see models), or an absolute path. language: a whisper code (en, hi, tl, bn, ta...) or auto to detect it; anything but en needs a multilingual model (no .en). translate: true writes English whatever language is spoken (multilingual model; large-v3-turbo cannot translate). gpu: auto | vulkan | cpu (change needs a restart). threads: 0 = auto. beam_size: 0 = greedy decoding (fastest), 1-8 = beam search (Calibrate my voice can set it).",
+                ["models"] = "folder: null = Dictum's own folder, %LOCALAPPDATA%\\Dictum\\models; or an absolute folder on another drive or a network share (models load slowly from a share), where Dictum looks first and downloads go. It then looks in its own folder, then in the models that come with it (base.en, beside Dictum.exe, never changed). Changing it moves no files. Settings > Models > Model folder writes it.",
+                ["llm"] = $"provider: local (a small model on this PC, nothing leaves it; used when this key is absent) | anthropic | openai-compatible | none (rule-based tidy only; the first run writes it when base.en comes with Dictum, and Settings > Models > Add AI clean-up switches to local). model: for local a cleanup model name ({string.Join(", ", CleanupCatalog.Entries.Select(e => e.Name))}) or an absolute .gguf path; for cloud providers the model id. gpu (local): auto | vulkan | cpu, needs a restart. base_url is required for openai-compatible (e.g. http://localhost:11434/v1 for Ollama; plain http:// only for a server on this PC); for anthropic it is optional and replaces https://api.anthropic.com (the ANTHROPIC_BASE_URL environment variable is ignored). A cloud provider runs only after Settings > Clean-up's consent step, which records it in consent.json; settings.json cannot switch it on. prompt_file: absolute path to a custom system prompt. grammar_assist: true also fixes articles, tenses, prepositions and word order (for speakers whose first language is not English).",
                 ["insert"] = "method: paste (clipboard + Ctrl+V) or type (simulated typing for apps that block paste). restore_clipboard restores text formats only. clipboard_history false keeps transcripts out of Win+V history and cloud clipboard.",
                 ["indicator"] = "mode: off | orb | edge | both. The orb is a large badge in a corner (orb_corner: bottom-right | bottom-left | top-right | top-left); edge is a red glow round every screen while recording. Both are click-through and never take focus.",
                 ["sounds"] = "enabled: true plays a short sound when recording starts and stops.",
@@ -81,13 +88,13 @@ public static class SettingsFile
             ["whisper"] = new JsonObject
             {
                 ["model"] = model,
-                ["models_dir"] = null,
                 ["language"] = d.Whisper.Language,
                 ["translate"] = d.Whisper.Translate,
                 ["threads"] = d.Whisper.Threads,
                 ["gpu"] = d.Whisper.Gpu,
                 ["beam_size"] = d.Whisper.BeamSize,
             },
+            ["models"] = new JsonObject { ["folder"] = null },
             ["llm"] = new JsonObject
             {
                 ["provider"] = cleanupProvider ?? d.Llm.Provider,

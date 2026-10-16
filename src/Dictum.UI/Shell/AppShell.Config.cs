@@ -33,6 +33,7 @@ public sealed partial class AppShell
             Notify("Dictum settings", $"{config.File.Warnings.Count} setting(s) were invalid and use defaults. Details are in the log.", warning: true);
         }
         _settings = SessionChoices(config.Settings, config.Secrets);
+        _modelFileChanges++; // another models folder, or a file chosen, may be in force now (ModelFilesVersion)
         if (_fileLog is not null) _fileLog.MinLevel = LogExtensions.ParseLevel(_settings.LogLevel);
         var personal = Personal.Load(); // dictionary, corrections, profanity list (SPEC §16)
         var outgoing = _cleaner;

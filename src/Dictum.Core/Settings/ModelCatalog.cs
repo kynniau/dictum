@@ -72,6 +72,12 @@ public static partial class ModelCatalog
 
     public static string FileName(string shortName) => $"ggml-{shortName}.bin";
 
+    /// <summary>
+    /// The speech model inside every package (Decision 16, 17/10/2026): models\ggml-base.en.bin beside Dictum.exe. When it is
+    /// found the first run asks no model question (ModelCoordinator.FirstRun).
+    /// </summary>
+    public const string Bundled = "base.en";
+
     /// <summary>The catalogue entry whose file this is (any folder), for the first-use hash check.</summary>
     public static ModelInfo? FindByFile(string path) =>
         Entries.FirstOrDefault(e => string.Equals(FileName(e.Name), Path.GetFileName(path), StringComparison.OrdinalIgnoreCase));

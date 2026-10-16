@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Dictum.Settings;
@@ -7,14 +8,36 @@ using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views.Settings;
 
-/// <summary>Settings → Models: the speech and clean-up catalogues with their state, a file chooser for each, decoding, and the language.</summary>
+/// <summary>
+/// Settings → Models: the speech and clean-up catalogues with their state, a file chooser for each, decoding, the language,
+/// "Add AI clean-up" while the rule-based tidy is in use, and the model folder (Decision 15).
+/// </summary>
 internal sealed class ModelsPage : SettingsPage
 {
+    // PROPOSED copy (17/10/2026), for the product owner to approve before release (Decisions 15 and 16).
+    internal const string FolderLabel = "Model folder";
+    internal const string BrowseLabel = "Browse…";
+    internal const string UseDefaultLabel = "Use default";
+    internal const string FolderNote = "Dictum looks here first and downloads go here. Changing it does not move any files.";
+    internal const string NetworkWarning = "Models load slowly from a network folder; a folder on this PC is faster.";
+    internal const string IncludedState = "Included";
+    internal const string AddCleanupLabel = "Add AI clean-up";
+
+    /// <summary>PROPOSED: "Add AI clean-up (1.1 GB download)", the size read from the catalogue; without the download part once the model is on this PC.</summary>
+    internal static string AddCleanupText(CleanupModelInfo model, bool onThisPc) => onThisPc ? AddCleanupLabel : $"{AddCleanupLabel} ({model.SizeText} download)";
+
+    /// <summary>The line under the folder when models would load from the network (a UNC path or a mapped network drive), else null.</summary>
+    internal static string? FolderWarning(string folder) => DiskSpace.IsNetwork(folder) ? NetworkWarning : null;
+
     private static readonly IReadOnlyList<(string Code, string Label)> Languages = WhisperLanguages.PickerItems();
 
     private readonly SettingsWindow _window;
     private readonly StackPanel _speech = new() { Spacing = 8 };
     private readonly StackPanel _cleanup = new() { Spacing = 8 };
+    private readonly TextBox _folder = new() { IsReadOnly = true };
+    private readonly Button _useDefault;
+    private readonly TextBlock _folderWarning = Ui.Text("", "caption");
+    private readonly Button _addCleanup;
     private readonly ComboBox _decoding = new() { ItemsSource = new[] { "Greedy (fastest)", "Beam search, 5 beams (more accurate, slower)" }, Width = 320 };
     private readonly ComboBox _language = new() { ItemsSource = Languages.Select(l => l.Label).ToList(), Width = 320 };
     private readonly ToggleSwitch _translate;
@@ -23,6 +46,9 @@ internal sealed class ModelsPage : SettingsPage
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, Height = 4 };
     private readonly StackPanel _download;
     private string _drawn = "";
+    private (int, int)? _lookedUpAt; // the shell's ModelFilesVersion when the lookups below were made; null: look up at the next redraw
+    private List<ModelFolderKind?> _sources = []; // the folder each speech catalogue entry is used from, in catalogue order
+    private List<string> _cleanupOnPc = []; // the clean-up catalogue entries on this PC
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -67,6 +93,15 @@ internal sealed class ModelsPage : SettingsPage
             Say(on ? "Dictum writes English whatever language you speak." : "Dictum writes what you say in the language you spoke.");
         });
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload()));
+        // The recommended clean-up model, through the catalogue's own path (asked first, then downloaded and switched to).
+        _addCleanup = Ui.Button("", "primary", () => Run(() => Shell.Models.SelectCleanup(CleanupCatalog.Recommend(Shell.GpuMachine).Model)));
+        AutomationProperties.SetName(_folder, FolderLabel);
+        _useDefault = Ui.Button(UseDefaultLabel, "secondary", () => Run(() => Say(Shell.Models.SetModelsFolder(null) ?? "")), name: "Use the default model folder");
+        var browse = Ui.Button(BrowseLabel, "secondary", () => Run(BrowseFolder), name: "Browse for a model folder");
+        var folderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 8 };
+        Grid.SetColumn(browse, 1);
+        Grid.SetColumn(_useDefault, 2);
+        folderRow.Children.AddRange([_folder, browse, _useDefault]);
         Compose(
             _download,
             Ui.Card(Ui.Stack(10, Ui.Text("Turns your voice into words, on this PC. Bigger is more accurate and slower."), _speech,
@@ -78,12 +113,20 @@ internal sealed class ModelsPage : SettingsPage
                 Ui.Line("Spoken language", _language, "Detect automatically works it out from the first seconds of each dictation."),
                 Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
                 _languageNote), "Language"),
-            Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _cleanup,
+            Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _addCleanup, _cleanup,
                 Ui.Row(8,
                     Ui.Button("Rule-based tidy only", "secondary", () => Run(Shell.Models.SelectRulesOnly)),
                     Ui.Button("Choose .gguf file…", "secondary", () => Run(Shell.Models.ChooseCleanupFile))),
                 Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption")), "Clean-up model"),
+            Ui.Card(Ui.Stack(8, folderRow, Ui.Text(FolderNote, "caption"), _folderWarning), FolderLabel),
             Ui.Button("Storage: model sizes, free space and Delete", "link", () => _window.ShowPage("Storage")));
+    }
+
+    /// <summary>Model folder → Browse…: the system's folder chooser, then models.folder is written and the settings reload.</summary>
+    private void BrowseFolder()
+    {
+        if (Shell.Dialogs.ChooseFolder(Shell.ModelsDir) is not { } folder) return;
+        Say(Shell.Models.SetModelsFolder(folder) ?? "");
     }
 
     protected override void Redraw()
@@ -99,38 +142,66 @@ internal sealed class ModelsPage : SettingsPage
         for (var i = 0; i < Languages.Count && languageIndex < 0; i++) if (Languages[i].Code == s.Whisper.Language) languageIndex = i;
         _language.SelectedIndex = languageIndex;
         Ui.SetQuietly(_translate, s.Whisper.Translate);
-        _languageNote.Text = WhisperLanguages.Problem(Shell.Models.ModelPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
+        // Judged against the model in use, which a redraw reads from memory (a progress tick looks in no folder; re-lens, 17/10/2026).
+        _languageNote.Text = WhisperLanguages.Problem(Shell.Models.CurrentPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
         _languageNote.IsVisible = _languageNote.Text.Length > 0;
+        var folder = Shell.ModelsDir;
+        _folder.Text = Shell.RealPath(folder);
+        _useDefault.IsEnabled = Shell.Paths.ChosenModelsDir(s) is not null;
+        _folderWarning.Text = FolderWarning(folder) ?? "";
+        _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
 
+        // Every catalogue model is looked up again only after a settings load, a download that ended or a deletion, or when the
+        // page is shown again (Leave), never on a download's progress ticks: each lookup reads up to three folders, on the UI
+        // thread, and a folder on the network could stall every redraw (lens, 17/10/2026).
+        var version = Shell.ModelFilesVersion;
+        if (_lookedUpAt != version)
+        {
+            _lookedUpAt = version;
+            _sources = [.. ModelCatalog.Entries.Select(Shell.Models.Source)];
+            _cleanupOnPc = [.. CleanupCatalog.Entries.Where(Shell.Models.IsCleanupDownloaded).Select(e => e.Name)];
+        }
         // The lists are rebuilt only when what they show changes, not on every download-progress tick.
-        var downloaded = string.Join(",", ModelCatalog.Entries.Where(Shell.Models.IsDownloaded).Select(e => e.Name)) + "|" +
-                         string.Join(",", CleanupCatalog.Entries.Where(Shell.Models.IsCleanupDownloaded).Select(e => e.Name));
+        var downloaded = string.Join(",", _sources) + "|" + string.Join(",", _cleanupOnPc);
         var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}";
         if (key == _drawn) return;
         _drawn = key;
 
+        var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(Shell.GpuMachine).Model)!;
+        _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
+        _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider;
+
         _speech.Children.Clear();
-        foreach (var e in ModelCatalog.Entries)
+        for (var i = 0; i < ModelCatalog.Entries.Count; i++)
         {
+            var e = ModelCatalog.Entries[i];
             var inUse = e.Name == Shell.Models.CurrentName;
-            var have = Shell.Models.IsDownloaded(e);
-            _speech.Children.Add(ModelRow($"{e.Name} · {e.SizeText}", $"{(inUse ? "In use" : have ? "Downloaded" : "Not downloaded")} · {e.TradeOff}",
+            var have = _sources[i] is not null;
+            var state = inUse ? "In use" : !have ? "Not downloaded" : _sources[i] == ModelFolderKind.Bundled ? IncludedState : "Downloaded";
+            _speech.Children.Add(ModelRow($"{e.Name} · {e.SizeText}", $"{state} · {e.TradeOff}",
                 inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.Select(e.Name))));
         }
         if (ModelCatalog.Find(Shell.Models.CurrentName) is null)
-            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.ModelPath}", null, () => { }));
+            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.CurrentPath}", null, () => { }));
 
         _cleanup.Children.Clear();
         var current = s.Llm.Provider == LlmSettings.Local ? CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model : null;
         foreach (var e in CleanupCatalog.Entries)
         {
             var inUse = e.Name == current;
-            var have = Shell.Models.IsCleanupDownloaded(e);
+            var have = _cleanupOnPc.Contains(e.Name);
             _cleanup.Children.Add(ModelRow($"{e.Name} · {e.SizeText}{e.Marker}", $"{(inUse ? "In use" : have ? "Downloaded" : "Not downloaded")} · {e.TradeOff}",
                 inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.SelectCleanup(e.Name))));
         }
         if (current is null)
             _cleanup.Children.Add(Ui.Text($"In use: {Shell.Models.CurrentCleanupName}{(s.Llm.Provider == LlmSettings.NoProvider ? " (rule-based tidy)" : "")}", "caption"));
+    }
+
+    /// <summary>Shown again later, the page looks every model up afresh (a file copied in meanwhile is seen).</summary>
+    public override void Leave()
+    {
+        _lookedUpAt = null;
+        base.Leave();
     }
 
     private static Grid ModelRow(string title, string detail, string? action, Action click)
@@ -147,13 +218,28 @@ internal sealed class ModelsPage : SettingsPage
 }
 
 /// <summary>
-/// Settings → Storage (SPEC §17, §18.2): where everything is (the real path when packaged), free space, every model file
-/// with its size and Delete, the data deletions with the size each frees, and "Remove Dictum completely".
+/// Settings → Storage (SPEC §17, §18.2): where everything is (the real path when packaged), the model folders in lookup order,
+/// free space, every model file with its size, its folder and Delete (none for the read-only models that came with Dictum),
+/// the data deletions with the size each frees, and "Remove Dictum completely".
 /// </summary>
 internal sealed class StoragePage : SettingsPage
 {
+    // PROPOSED copy (17/10/2026), for the product owner to approve before release (Decisions 15 and 16).
+    internal const string LookupIntro = "Dictum looks for a model in these folders, in this order:";
+    internal const string NoModels = "No model files yet.";
+
+    internal static string DownloadsGoTo(string folder) => $"Downloads go to: {folder}";
+
+    internal static string FolderName(ModelFolderKind kind) => kind switch
+    {
+        ModelFolderKind.Chosen => "Chosen folder",
+        ModelFolderKind.Default => "Default folder",
+        _ => "Included with Dictum (read-only)",
+    };
+
     private readonly TextBlock _folder = Ui.Text("", "caption");
     private readonly TextBlock _free = Ui.Text("", "caption");
+    private readonly StackPanel _folders = new() { Spacing = 2 };
     private readonly StackPanel _models = new() { Spacing = 8 };
     private readonly TextBlock _total = Ui.Text("", "caption");
     private readonly TextBlock _recordings = Ui.Text("", "hint");
@@ -167,7 +253,7 @@ internal sealed class StoragePage : SettingsPage
     {
         _including.IsCheckedChanged += (_, _) => Draw();
         Compose(
-            Ui.Card(Ui.Stack(8, _folder, _free, _models, _total), "Models"),
+            Ui.Card(Ui.Stack(8, _folder, _free, _folders, _models, _total), "Models"),
             Ui.Card(Ui.Stack(10,
                 DataRow("Calibration recordings", _recordings, RemovalScope.CalibrationRecordings),
                 DataRow("Logs", _logs, RemovalScope.Logs),
@@ -192,23 +278,32 @@ internal sealed class StoragePage : SettingsPage
         _drawnAt = Environment.TickCount64;
         var s = Shell.Settings;
         var dir = Shell.ModelsDir;
-        _folder.Text = $"Models folder: {Shell.RealPath(dir)}";
+        _folder.Text = DownloadsGoTo(Shell.RealPath(dir));
         _free.Text = DiskSpace.FreeBytes(dir) is long free ? $"{ModelCatalog.FormatSize(free)} free on this drive." : "Free space on this drive could not be read.";
-        var files = ModelFiles.List(Shell.Paths, s);
+        _folders.Children.Clear();
+        _folders.Children.Add(Ui.Text(LookupIntro, "caption"));
+        var order = ModelFolders.LookupOrder(Shell.Paths, s);
+        for (var i = 0; i < order.Count; i++) _folders.Children.Add(Ui.Text($"{i + 1}. {FolderName(order[i].Kind)}: {Shell.RealPath(order[i].Path)}", "hint"));
+        var files = ModelFiles.List(Shell.Paths, s, withBundled: true);
         _models.Children.Clear();
         foreach (var model in files)
         {
             var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 12 };
-            grid.Children.Add(Ui.Stack(2, Ui.Text(model.Name + (model.Partial ? " (unfinished download)" : ""), "body"), Ui.Text(Shell.RealPath(model.Path), "hint")));
+            grid.Children.Add(Ui.Stack(2, Ui.Text(model.Name + (model.Partial ? " (unfinished download)" : ""), "body"),
+                Ui.Text($"{FolderName(model.Folder)} · {Shell.RealPath(model.Path)}", "hint")));
             var size = Ui.Text(ModelCatalog.FormatSize(model.Bytes), "caption");
             size.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(size, 1);
-            var delete = Ui.Button("Delete…", "secondary", () => _ = DeleteAsync(model), name: $"Delete {model.Name}");
-            Grid.SetColumn(delete, 2);
-            grid.Children.AddRange([size, delete]);
+            grid.Children.Add(size);
+            if (!model.ReadOnly) // the models that came with Dictum are never deleted (ModelFiles.Delete refuses them too)
+            {
+                var delete = Ui.Button("Delete…", "secondary", () => _ = DeleteAsync(model), name: $"Delete {model.Name}");
+                Grid.SetColumn(delete, 2);
+                grid.Children.Add(delete);
+            }
             _models.Children.Add(grid);
         }
-        if (files.Count == 0) _models.Children.Add(Ui.Text("No model files in this folder.", "caption"));
+        if (files.Count == 0) _models.Children.Add(Ui.Text(NoModels, "caption"));
         _total.Text = $"Total: {ModelCatalog.FormatSize(files.Sum(f => f.Bytes))}.";
         _recordings.Text = Size(RemovalScope.CalibrationRecordings);
         _logs.Text = Size(RemovalScope.Logs);

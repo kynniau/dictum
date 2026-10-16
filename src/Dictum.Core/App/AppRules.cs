@@ -8,9 +8,11 @@ namespace Dictum.App;
 public static class AppRules
 {
     /// <summary>
-    /// Which first-run pickers to show: both without a settings.json, and with one only the choices it leaves open (an admin
-    /// seed with offline_only alone still gets both pickers; one naming whisper.model gets the cleanup picker). A file that
-    /// cannot be read gets none: its choices are unknown and it is never written over.
+    /// Which first-run choices are open: both without a settings.json, and with one only the choices it leaves open (an admin
+    /// seed with offline_only alone leaves both; one naming whisper.model leaves the cleanup choice). A file that cannot be read
+    /// leaves none: its choices are unknown and it is never written over. The open choices are asked in the pickers, unless
+    /// base.en is on this PC (it comes with Dictum, Decision 16): then they are answered without a question, base.en and the
+    /// rule-based tidy (<see cref="ModelCoordinator.FirstRun"/>).
     /// </summary>
     public static (bool AskSpeech, bool AskCleanup) FirstRunQuestions(SettingsLoadResult file) =>
         file.Usable ? (!file.NamesSpeechModel, !file.NamesCleanupModel) : (false, false);

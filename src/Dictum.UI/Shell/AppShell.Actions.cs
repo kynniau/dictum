@@ -21,12 +21,25 @@ public sealed partial class AppShell
     /// <summary>
     /// Settings → Storage → Delete for one model (SPEC §17): names the file and its size and asks once. The model in use
     /// cannot be deleted; the dialog offers to switch to the recommended downloaded model first, then deletes it once the
-    /// switch has loaded. Returns what happened, for the page.
+    /// switch has loaded. When the same model is also further along the lookup (a base.en downloaded by 1.0.x, beside the one
+    /// that comes with Dictum) the copy in use can be deleted: it asks (<see cref="DeleteThisCopy"/>), releases the model,
+    /// deletes the file and reloads, as "Delete all app data" does, so Dictum goes on with the other copy (re-lens, 17/10/2026).
+    /// Returns what happened, for the page.
     /// </summary>
     public async Task<string> DeleteModelAsync(StoredModel model)
     {
         var inUse = ModelsInUse().Any(p => p is not null && PathRegistry.SamePath(p, model.Partial ? model.Path[..^5] : model.Path));
-        if (inUse)
+        string? released = null; // the copy in use that is deleted after its model is released: the reload then finds the next copy
+        if (inUse && NextCopy(model) is { } next)
+        {
+            var otherFolder = next.Kind == ModelFolderKind.Bundled ? null : RealPath(Path.GetDirectoryName(next.Path)!);
+            if (Dialogs.Ask("Delete a model", DeleteThisCopy(model.Name, model.Bytes, otherFolder),
+                    new DialogChoice("Delete", IsDefault: true, IsDanger: true), new DialogChoice("Cancel")) != 0) return "Nothing was deleted.";
+            if (model.IsCleanup) _llm.Unload();
+            else _models.Unload();
+            released = model.Path;
+        }
+        else if (inUse)
         {
             if (Replacement(model) is not { } other) return $"{model.Name} is in use and no other model is downloaded. Download or choose another model first.";
             if (Dialogs.Ask("Delete a model in use", $"{model.Name} is in use. Switch to {other.Name} first, then delete {model.Name} ({ModelCatalog.FormatSize(model.Bytes)})?",
@@ -40,19 +53,80 @@ public sealed partial class AppShell
         {
             return "Nothing was deleted.";
         }
-        var result = ModelFiles.Delete(model.Path, Paths, _settings, ModelsInUse(), Integrity);
+        ModelDeletion result;
+        try
+        {
+            // After the release the lookup still finds this file first, so ModelsInUse names it: it is left out of the check.
+            result = ModelFiles.Delete(model.Path, Paths, _settings, ModelsInUse().Where(p => released is null || p is null || !PathRegistry.SamePath(p, released)), Integrity);
+        }
+        finally
+        {
+            if (released is not null) Reload(userRequested: false); // loads the next copy, or this one again when it could not be deleted
+        }
+        _modelFileChanges++;
         _log.Info(result.Message);
         StatusChanged();
         return result.Message;
     }
 
-    /// <summary>The recommended downloaded model of the same kind, else any other downloaded one.</summary>
+    /// <summary>
+    /// PROPOSED copy (17/10/2026), for the product owner to approve: the question Settings > Storage > Delete asks, titled "Delete a
+    /// model", on the copy of a model in use when the same model is also further along the lookup (a base.en downloaded by 1.0.x,
+    /// beside the one that comes with Dictum; <paramref name="otherFolder"/> is null for that one). The second sentence says what
+    /// Dictum uses afterwards; for a copy in another of Dictum's folders it names that folder.
+    /// </summary>
+    internal static string DeleteThisCopy(string name, long bytes, string? otherFolder) =>
+        $"Delete this copy of {name} ({ModelCatalog.FormatSize(bytes)})? Dictum then uses {(otherFolder is null ? "the copy that came with it" : $"the other copy, in {otherFolder}")}.";
+
+    /// <summary>
+    /// What Dictum would go on with if this copy of the model in use were deleted: the same file further along the lookup order
+    /// that passes the tray app's own check (the size, and for the one that came with Dictum its SHA-256); null when there is
+    /// none, or the file is a partial download (re-lens, 17/10/2026).
+    /// </summary>
+    private (string Path, ModelFolderKind Kind)? NextCopy(StoredModel model)
+    {
+        if (model.Partial || Path.IsPathFullyQualified(model.IsCleanup ? _settings.Llm.Model : _settings.Whisper.Model)) return null; // a setting that names the file by its path has no other copy to fall back to
+        var (fileName, bytes) = model.IsCleanup
+            ? (CleanupCatalog.FileNameFor(model.Name), CleanupCatalog.Find(model.Name)?.Bytes)
+            : (ModelCatalog.FileName(model.Name), ModelCatalog.KnownSize(model.Name));
+        return Models.FindBesides(fileName, bytes, model.Path);
+    }
+
+    /// <summary>
+    /// The recommended model of the same kind on this PC, else any other one: downloaded, or come with Dictum (the bundled base.en
+    /// is switched to, never deleted; lens, 17/10/2026). By name, so a second copy of the model in use is never its replacement,
+    /// and only a model the tray app's lookup would load (<see cref="WouldLoad"/>; re-lens, 17/10/2026).
+    /// </summary>
     private StoredModel? Replacement(StoredModel model)
     {
-        var others = ModelFiles.List(Paths, _settings).Where(m => !m.Partial && m.IsCleanup == model.IsCleanup && m.Path != model.Path).ToList();
+        var others = ModelFiles.List(Paths, _settings, withBundled: true)
+            .Where(m => !m.Partial && m.IsCleanup == model.IsCleanup && m.Name != model.Name && WouldLoad(m)).ToList();
         var recommended = model.IsCleanup ? CleanupCatalog.Recommend(GpuMachine).Model : ModelCatalog.Recommend(GpuMachine).Model;
         return others.FirstOrDefault(m => m.Name == recommended) ?? others.FirstOrDefault();
     }
+
+    /// <summary>
+    /// The tray app's lookup loads this very file when its name is chosen (re-lens, 17/10/2026): a bundled base.en that fails
+    /// its SHA-256 is passed over there, so switching to its name would leave the setting naming a file that is not loaded.
+    /// </summary>
+    private bool WouldLoad(StoredModel model) => model.IsCleanup
+        ? CleanupCatalog.Find(model.Name) is { } cleanup && Models.IsCleanupDownloaded(cleanup)
+        : ModelCatalog.Find(model.Name) is { } speech && Models.Find(speech) is { } found && PathRegistry.SamePath(found, model.Path);
+
+    /// <summary>
+    /// PROPOSED copy (17/10/2026), for the product owner to approve: what "Delete all app data" asks about a chosen models folder
+    /// outside the user's profile, which it leaves alone (lens, 17/10/2026: other users may load the models in it).
+    /// </summary>
+    internal static string LeftAlone(string folder) => $"Left alone: {folder} (outside your user folder, so other users may share its models; Delete beside a model removes one).";
+
+    private int _modelFileChanges; // settings loads and deletions (ModelFilesVersion)
+
+    /// <summary>
+    /// Changes whenever the model files on this PC, or the folders they are looked for in, may have changed: a settings load,
+    /// a download that ended, a deletion. Settings > Models looks the catalogue up again only then (lens, 17/10/2026: it looked
+    /// every model up on each redraw, a download's progress ticks included, on the UI thread).
+    /// </summary>
+    internal (int Changes, int DownloadsEnded) ModelFilesVersion => (_modelFileChanges, Models.DownloadsEnded);
 
     private async Task<bool> WaitForSwitchAsync(StoredModel model)
     {
@@ -66,7 +140,8 @@ public sealed partial class AppShell
 
     /// <summary>
     /// Settings → Storage: delete recordings, logs, or all app data (SPEC §17). Shows the size it frees, asks once, then
-    /// deletes. "All app data" releases the loaded models first and never touches .env or the program folder.
+    /// deletes. "All app data" releases the loaded models first and never touches .env or the program folder, and its question
+    /// names a chosen models folder outside the user's profile that it leaves alone (<see cref="DataCategory.SharedModels"/>).
     /// </summary>
     public string DeleteData(RemovalScope scope)
     {
@@ -80,7 +155,10 @@ public sealed partial class AppShell
             RemovalScope.AllDataIncludingSettings => "all of Dictum's data, including settings, your dictionary, corrections and snippets (never your .env keys or the program)",
             _ => "all of Dictum's data: models, recordings, logs (settings, your dictionary, corrections, snippets and .env keys are kept)",
         };
-        if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.",
+        var leftAlone = scope is RemovalScope.AllData or RemovalScope.AllDataIncludingSettings
+            ? string.Concat(PathRegistry.Locations(Paths, _settings).Where(l => l.Category == DataCategory.SharedModels).Select(l => " " + LeftAlone(RealPath(l.Path))))
+            : "";
+        if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.{leftAlone}",
                 new DialogChoice("Delete", IsDefault: true, IsDanger: true), new DialogChoice("Cancel")) != 0)
         {
             return "Nothing was deleted.";
@@ -92,7 +170,9 @@ public sealed partial class AppShell
         }
         if (scope is RemovalScope.Logs or RemovalScope.AllData or RemovalScope.AllDataIncludingSettings) _fileLog?.Release();
         var result = plan.Execute();
-        var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use); see the log." : "");
+        _modelFileChanges++;
+        // PROPOSED copy (17/10/2026), for the product owner to approve: "(in use or not permitted)" was "(in use)"; a file Windows refuses to delete counts too.
+        var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use or not permitted); see the log." : "");
         foreach (var failure in result.Failures) _log.Warn($"Not deleted: {failure}");
         _log.Info($"Storage: {scope} {message}");
         if (scope is RemovalScope.AllDataIncludingSettings && !File.Exists(Paths.SettingsFile)) _offlineOnlyThisSession = false; // deleted on request: no new settings.json (SaveSessionChoices)

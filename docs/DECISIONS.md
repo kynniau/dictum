@@ -1814,3 +1814,373 @@ suite (`FullyQualifiedName!~Install_copies_models`): 1,297 total, 1,276 passed, 
 1,298 tests (those 1,297 plus `Install_copies_models`, which CI runs), 1,277 passed, 21 skipped, 0 failed; the two
 "GitHub Release" jobs were skipped (tag builds only), so the release job's new checkout and `--notes-file` have not run.
 Not run: the installer, the Store package build, Windows Sandbox, a release build, and the packaged self-test.
+
+## Model folder and the bundled base.en (17/10/2026, branch feature/model-folder-bundled)
+
+Decisions 15 and 16 (product owner, 16-17/10/2026). Offshore staff use shared Azure virtual desktops with no GPU and little
+space on C:, and the Store resubmission should need no download to test.
+
+- **Decision 15: a user can nominate another drive or folder for the models.** `models.folder` in settings.json, written by
+  Settings > Models > Model folder (Browse…, Use default). An absolute folder or empty; a relative or invalid value falls
+  back to the default with a warning line, as every other key does. `whisper.models_dir`, which already moved the models
+  folder for both kinds of model, is kept as its earlier name: read when `models.folder` is not set, ignored with a warning
+  when both are set and differ, and cleared by Browse… and Use default so the folder chosen there is the one in force. The
+  key left `whisper` because it was never only whisper's. New settings files write `models.folder` only. `install.ps1`
+  (not this lane's) asks the app (`--print-models-dir`), which now reads either.
+- **Decision 16: base.en ships inside every package** (a parallel lane puts `models\ggml-base.en.bin` beside `Dictum.exe`
+  in the MSIX, the zip and the installer, per the orchestrator's brief; not checked from this lane), **no clean-up model by
+  default** (the rule-based tidy), and the entry level must run on small machines.
+- **The lookup, for both kinds (`ModelFolders`):** the chosen folder, then `%LOCALAPPDATA%\Dictum\models`, then the bundled
+  `models` folder beside `Dictum.exe`. A name resolves to the first folder holding its file with the catalogue's exact size;
+  nothing found resolves to where a download puts it. Chosen first, so an administrator's or the user's choice wins; the
+  per-user folder next, so models downloaded before this change keep working; the bundled folder last, so a copy the user
+  downloads or copies in takes over without the bundled one being touched. The tray panel, Settings, Mode presets,
+  calibration, `--transcribe` and `--selftest` all resolve through it (`SettingsFile.EffectiveModelPath` and
+  `CleanupModelPath`, `ModelCoordinator.IsDownloaded`, `CalibrationHost`).
+- **The check:** the size in every folder (one file-system read: Settings > Models looks every catalogue model up on each
+  redraw, on the UI thread); in the bundled folder the tray app also runs the full catalogue check
+  (`ModelIntegrity.Verify`: size, then SHA-256, a pass remembered in verified-models.json, the result kept per file version
+  for the session). A bundled file that fails is passed over as if absent, said once in the log, and never deleted or
+  replaced. Every catalogue file is still size- and SHA-256-checked before it loads, wherever it was found, as before. Two
+  `// simplification:` notes: in the user's folders a same-size file with the wrong bytes is found and then refused at load
+  rather than passed over (`ModelFolders.Locate`); the first lookup of a bundled file after an install or update hashes it
+  on the calling thread, the UI thread during a start (`ModelCoordinator.BundledFilePasses`; base.en took 0.5 s, below).
+- **The bundled folder is read-only.** It is never a download destination (`AppPaths.ChosenModelsDir` ignores a chosen
+  folder that is it or inside it, and Browse… refuses it with a sentence); it is not in the path registry, so "Delete all
+  app data" and Storage's Delete never reach it (`ModelFiles.Delete` refuses it too); Settings > Storage shows its models
+  with no Delete. Removing the program's own files stays the packaging lane's.
+- **First run:** when base.en is found in the lookup order no model question is asked: the choices settings.json leaves open
+  are answered with `whisper.model` = `base.en` and `llm.provider` = `none`, exactly what the pickers write for base.en and
+  "No AI cleanup (rule-based tidy)" (a test compares the two files byte for byte, new and seeded). The hotkey check stays.
+  Without it (a package without the file, a deleted one, one failing its check) the pickers run as before. Settings >
+  Models offers "Add AI clean-up (1.1 GB download)" while the rule-based tidy is in use: the catalogue's own path for the
+  recommended model (asked first, size and host named, then downloaded, checked and switched to). The in-memory default
+  (`llm.provider` = `local` when the key is absent) is unchanged: every first run writes the key, and changing the default
+  would change what a hand-edited file without it means.
+- **No-move rule:** changing the folder moves no files, and the note under the field says so. Copying gigabytes behind the
+  user's back from a Settings click, possibly across a network, is not done.
+- **Network folders:** a `\\server\share` path (read from the text alone, so deciding touches no share) or a mapped network
+  drive (Windows' drive type) gets a one-line warning under the field. A warning, not a refusal: an administrator may still
+  choose a share. Not measured: how slowly models load from an Azure file share; the product owner's concern is the reason
+  for the warning and for the layout below.
+- **Recommended layout for shared virtual desktops** (amended after the lens, below): one local folder per VM shared by its
+  users (for example `E:\Dictum models` on a persistent data disk), readable by every user and writable only by
+  administrators, seeded as `models.folder` for every user with `install.ps1 -Settings` and filled once by an administrator
+  with `-ModelsFrom`; a user who wants another model uses Use default. Dictum then looks only in their own folder and the
+  models that come with it, no longer in the shared folder, so the models they use from it are downloaded again. Not a
+  cool-tier Azure file share.
+- **Free space:** a download is refused, before it is asked and again where it starts, when its drive would keep less than
+  200 MB (decimal, as every size Dictum shows); a kept `.part` needs only the rest. When the free space cannot be read the
+  download goes ahead, as the existing 2 GB warning does. Recalled, not checked here: .NET's `DriveInfo` refuses a UNC root,
+  so a download into a share is never refused for space.
+
+Strings, all PROPOSED in code comments for the product owner (17/10/2026):
+- Settings > Models card and field label "Model folder"; buttons "Browse…" (screen-reader name "Browse for a model
+  folder") and "Use default" ("Use the default model folder"); note "Dictum looks here first and downloads go here.
+  Changing it does not move any files."; network line "Models load slowly from a network folder; a folder on this PC is
+  faster."; chooser title "Choose a folder for Dictum's models"; refusal "That folder holds the models that come with
+  Dictum, which Dictum never changes. Choose another folder."
+- "Add AI clean-up (1.1 GB download)" (the size from the catalogue), "Add AI clean-up" once the model is on the PC; a
+  speech model used from the bundled folder reads "Included".
+- Settings > Storage: "Downloads go to: <folder>" (was "Models folder: <folder>"), "Dictum looks for a model in these
+  folders, in this order:", "1. Chosen folder: …", "2. Default folder: …", "3. Included with Dictum (read-only): …", each
+  model row "<folder name> · <path>", "No model files yet." (was "No model files in this folder.").
+- Download refusal: "Not enough space for <file> (<size>): <free> is free on that drive, and Dictum keeps 200 MB spare.
+  Free some space, or choose another model folder in Settings > Models."
+- The first run adds no sentence: with base.en on the PC its model pickers are simply not shown.
+
+Files outside the lane's list that the deliverables needed (none is on its do-not-edit list): `Storage/DiskSpace.cs` (the
+refusal, the network test), `Storage/ModelFiles.cs` (each model's folder; the bundled ones for Storage only),
+`Storage/PathRegistry.cs` (comment), `App/PersonalService.cs` and `Calibration/CalibrationHost.cs` (the lookup),
+`Shell/IShellDialogs.cs` and `Shell/ShellDialogs.cs` (the folder chooser; `ChooseFile` shares its owner-window code now).
+
+Not done, for the orchestrator (the first two, and the STORE.md lines, were done in the lens fixes below):
+- `Cli/CliOptions.cs` and `Cli/CliCommands.cs` (not this lane's) still describe `--print-models-dir` as "whisper.models_dir,
+  else the default"; the command prints what the app now resolves (`models.folder` first), and the README says so.
+- In the CLI (`--selftest`, `--transcribe`) a bundled file is held to the size check only at lookup; a same-size damaged one
+  is then refused by the CLI's own check with ModelIntegrity's remedy ("rename it"), which does not fit a read-only folder.
+  `ModelIntegrity`'s remedy also treats only the download folder as Dictum's, so a damaged file in the per-user folder
+  while another folder is chosen is told "rename it" (as with `whisper.models_dir` before). Both are outside this lane.
+- The network line's wiring on the page is pinned through `ModelsPage.FolderWarning` only: a headless page test with a UNC
+  folder would look every model up on that share.
+- docs/STORE.md lines the store-description text did not list still describe a first-run download: the minimum
+  requirements ("An internet connection to download a model on first use, or model files copied in"), section 9 rows 3, 6,
+  11 and 17, the offline-test note (copy "ggml-base.en.bin" into the models folder) and its date line. Left as they are, as
+  instructed ("everything not listed stays exactly as it is").
+
+**Verification** (17/10/2026, this machine). Release `--no-incremental` builds, 0 warnings, 0 errors. Filtered suite
+(`FullyQualifiedName!~Install_copies_models`): main at c0aa989 1,130 total, 1,111 passed, 19 skipped, 0 failed; this lane's
+first commit on it 1,162 / 1,143 / 19 / 0 (32 new cases; the 33rd, the preset and calibration pin, was then run with its
+class, 33 of 33). Rebased onto main at 23acf35 (no conflicts): main 1,267 / 1,248 / 19 / 0; this lane 1,300 / 1,281 / 19 / 0
+(33 new cases in `ModelFolderTests`). One full run on the rebased docs commit had one failure in an
+untouched test, `FixBatchPrivacyTests.A_request_to_this_machine_never_goes_through_a_configured_proxy(host: "localhost")`
+(2.0 s; it sets the process-wide `HttpClient.DefaultProxy`); its class then passed three times alone and the full suite
+passed again (failure text not kept).
+
+The built app (`Dictum.exe --selftest`, a copy of this build's output with this machine's own
+`%LOCALAPPDATA%\Dictum\models\ggml-base.en.bin`, read only, copied into its `models` folder; scratch APPDATA and
+LOCALAPPDATA; settings naming base.en): the speech model resolved to the bundled file,
+"SHA-256 verified", whisper loaded on Vulkan, PASS, and the log line "Verified ggml-base.en.bin against the catalogue on
+first use (SHA-256) in 0.5 s". With `models.folder` naming a scratch folder holding a 1,000-byte `ggml-base.en.bin`, that
+copy was passed over for the bundled one ("SHA-256 verified earlier", PASS); with a good copy there, the chosen copy was
+used ("SHA-256 verified", PASS). The bundled folder held only the copied file afterwards, unchanged. Not run: the tray app
+(the product owner's own copy is running), the first-run windows on a real desktop, a real network share, a mapped drive, a package
+built by the packaging lane.
+
+**Mutation checks**, each on a Release `--no-incremental` build, the pin class run, the source restored with
+`git checkout` and the tree checked clean (scratchpad `mutate.ps1`, exact single-occurrence replacements). All 29 on
+1ce0523 (before the rebase); each observed failing on the reverted behaviour:
+the lookup with the per-user folder before the chosen one, 2 failures (the precedence pin and the Storage listing); with
+the bundled folder first, 2 (the same); with no size check, so a wrong-size copy is used, 1 (precedence); the bundled
+folder accepted as the chosen folder, 1 (the download pin: the download landed there); Browse… accepting it, 2 (that pin's
+refusal and the Browse pin); a bundled file used unchecked, 2 (both cases of the failing-file pin); its check not
+remembered, so it is checked and logged at every lookup, 2 (the same, logged more than once); the first run's bundled
+branch removed, 5 (the first start end to end, both first-run cases, the seeded file, the seeded folder); the bundled first
+run writing the local clean-up model instead of the tidy, 4; the first run never asking, base.en or not, 4 (both "as
+before" halves and both failing-file cases); a seeded `models.folder` ignored at first run, 1; no free-space refusal
+anywhere, 1; none where a download starts, 1 (the first run's download); the 200 MB spare dropped, 2 (the rule and the
+sites); a kept `.part` not counted, 1; a UNC path not seen as a network folder, 2 (the two UNC strings; `\\?\UNC\` has its
+own branch); Browse… writing without a reload, 2 (both Browse pins); Browse… ignoring the folder picked, 1; Browse…
+leaving `whisper.models_dir` set, 1; Storage offering Delete for a bundled model, 1; "Add AI clean-up" shown whatever the
+provider, 1; a bundled model reading "Downloaded", 1; `models.folder` accepting any text, 2 (the relative and the invalid
+value); no warning when the two keys differ, 1; calibration looking only in the download folder, 1; Mode presets the
+same, 1; a new settings.json still writing `whisper.models_dir`, 1; the speech model resolved in the download folder only,
+5; the clean-up model the same, 1.
+After the rebase, ten of them again on f91b672 (the lines they change are the same), each failing as often as before: the
+per-user folder before the chosen one 2, the bundled folder accepted as the chosen folder 1, a bundled file used unchecked
+2, the first run's bundled branch removed 5, the local clean-up model written instead of the tidy 4, the first run never
+asking 4, no free-space refusal 1, a UNC path not seen as a network folder 2, Browse… writing without a reload 2, a new
+settings.json still writing `whisper.models_dir` 1. The tree was clean at f91b672 after each.
+
+### Lens fixes (17/10/2026: the opus lens on 4fb1a6f returned Block)
+
+The lens's probes P1 to P4, P6 and P7 (each asserted a defect and passed at 4fb1a6f) are pins of the fixed behaviour now,
+in `tests/Dictum.Tests/ModelFolderSafetyTests.cs`, with its P5 pin added as it wrote it and a pin of its own for the
+deletion backstop (18 cases in all).
+
+1. **A chosen folder that other users may share (the blocker).** The layout above had the shared folder "writable too, if
+   they may download into it", and two things trusted whatever was in it: ModelIntegrity's verified-models.json (size and
+   last-write time, so a same-size file swapped in with its time put back loaded without a hash: P7) and "Delete all app
+   data" (it deleted the folder's catalogue files, asking with a count and a size only). Now:
+   - The docs say the folder is readable by every user and writable only by administrators, who fill it once with
+     `install.ps1 -ModelsFrom`; a user who wants another model uses Use default. Dictum then looks only in their own
+     folder and the models that come with it, no longer in the shared folder, so the models they use from it are
+     downloaded again. The example is `E:\Dictum models` on a persistent data disk: D: was dropped because on Azure VMs it
+     is often the temporary disk (the orchestrator's note; recalled, not checked here).
+   - ModelIntegrity takes the lookup order (`ModelFolders.LookupOrder`) and trusts the record only for a file in the
+     per-user folder or the bundled folder. Any other file (the chosen folder, a file chosen by path) is hashed at its first
+     load in each session; a pass is remembered for that session, and a file Dictum has just downloaded counts as checked
+     for the session. The `// simplification:` note now names the in-session ceiling as well.
+   - A chosen folder outside the user's profile (`AppPaths.ProfileDir`, from `Environment.SpecialFolder.UserProfile`;
+     `InProfile` follows links) has its own category in the path registry, `SharedModels`, which "Delete all app data"
+     (with or without settings) leaves alone; its question then ends "Left alone: <folder> (…)". Storage's Delete still
+     removes one of its models, permissions allowing, and "Remove Dictum completely" still lists and deletes each one, as
+     before (it shows every path; whether it should leave them too is for the orchestrator). An item a deletion cannot
+     remove is now reported as "in use or not permitted".
+2. **The replacement for a model in use** (P2): `Replacement` looks in the bundled folder too and compares names, so the
+   bundled base.en is offered, switched to and never deleted, and a second copy of the model in use is never its own
+   replacement.
+3. **A seeded clean-up provider** (P6): `SettingsLoadResult.NamesCleanupProvider`; a seed naming `llm.provider` (local, no
+   `llm.model`) keeps it at a first run with base.en and gets the recommended model written. Nothing downloads, and the
+   existing "Cleanup model … is not downloaded; using the rule-based tidy" notice shows.
+4. **The bundled folder by another name** (P1 deleted the bundled base.en through a junction): `AppPaths.IsBundled` also
+   compares final paths (`PathRegistry.FinalPath`: each junction or symbolic link along the path followed, 8.3 names and
+   a `\\?\C:\` path normalised; not a subst drive or a mounted volume). Checked on this machine with a scratch
+   program (17/10/2026, the .NET 10 runtime of the SDK here): `Path.GetFullPath` expands 8.3 names (`C:\PROGRA~1` became
+   `C:\Program Files`) but keeps `\\?\` and `\\.\`;
+   `DirectoryInfo.ResolveLinkTarget(true)` returns a junction's target and null for a path through one, hence the walk
+   part by part (about 60 µs a part here). A `// simplification:` note: links are not followed on a network folder, and a
+   subst drive or a volume mounted in a folder is not followed at all (that needs a native call, which Dictum.Core may
+   not declare: ArchitectureTests).
+   The backstop: `ModelFiles.Delete` and `RemovalPlan` refuse any model file whose final path is inside the bundled
+   folder, and the settings load logs a `models.folder` (or `whisper.models_dir`) it ignores.
+5. **The advice for a damaged file** (P3) follows its folder: the chosen and per-user folders "Delete it and download it
+   again.", the bundled one "It came with Dictum: reinstall Dictum, or download <name> in Settings > Models.", a file
+   anywhere else "rename it" as before.
+6. **One lookup** (P4): `CalibrationHost` takes the tray app's lookup (`ModelCoordinator.Find`), so a bundled base.en
+   failing its SHA-256 is passed over there too and offered as a download. `--download-model` and `--bench-cleanup` look
+   in every model folder (`ModelFolders.Find`, the bundled one held to `ModelIntegrity.Passes`), so `--download-model
+   base.en` with the bundled copy downloads nothing; the existing-copy check now goes through ModelIntegrity. install.ps1
+   and the README use `-Model small.en` as the example.
+7. **Help and docs:** `--print-models-dir` (help and summary), install.ps1's folder lines and its `-Model` text, STORE.md
+   (screenshot 5 is now the Settings > Models page, the requirements line, the Esc sentence in the notes, section 9 rows
+   3, 4, 6, 11 and 17; line 287 left for PR #10) and SPEC §18.4.
+8. **Settings > Models' lookups:** the catalogue (every speech and clean-up model: 22 lookups, each up to three folders)
+   is looked up again only after a settings load, a download that ended or a deletion (`AppShell.ModelFilesVersion`), or
+   when the page is shown again, never on a download's progress tick. `ModelCoordinator.Lookups` counts lookups for the pin.
+
+Strings, PROPOSED in code comments for the product owner (17/10/2026):
+- Delete all app data's question, when a chosen folder is outside the user's profile: "Left alone: <folder> (outside
+  your user folder, so other users may share its models; Delete beside a model removes one)."
+- The advice for a damaged model that came with Dictum: "It came with Dictum: reinstall Dictum, or download <name> in
+  Settings > Models."
+- Storage's Delete on a file in the bundled folder by another name: "<file> came with Dictum, so Dictum does not delete it."
+- Changed: "… item(s) could not be deleted (in use or not permitted); see the log." (was "(in use)").
+- Log line and `--selftest` note: `Setting "models.folder" (<folder>) is the folder of the models that come with Dictum,
+  or inside it, which Dictum never changes, so it is ignored: models download to <per-user folder>.` (or
+  `whisper.models_dir`).
+- Command line: "<path> is already present and matches the catalogue (<bytes> bytes, SHA-256 verified). Nothing to do."
+  or "(…, SHA-256 verified earlier)" (was "(…, SHA-256 <hash>)"), the path now the copy the lookup found; and
+  `--print-models-dir`'s help line.
+- STORE.md: screenshot 5 "Settings, Models page (…)" with "Choose a bigger speech model or add AI clean-up; base.en comes
+  with Dictum."; requirement "No download needed to start: base.en is included; bigger speech models and AI clean-up are
+  optional downloads"; the notes' "Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops
+  and keeps what is already typed."
+
+**Verification** (17/10/2026, this machine). Release `--no-incremental` builds, 0 warnings, 0 errors. Filtered suite
+(`FullyQualifiedName!~Install_copies_models`): 4fb1a6f 1,300 total, 1,281 passed, 19 skipped, 0 failed; c1929ed (the
+fixes) 1,317 / 1,298 / 19 / 0; d88e09a (the backstop pin on its own) 1,318 / 1,299 / 19 / 0, 18 new cases, the junction
+ones run, not skipped. The built app (`Dictum.exe`, a copy of this build's output; scratch APPDATA and LOCALAPPDATA;
+`offline_only` on; this machine's own `ggml-base.en.bin` copied, read only, into its `models` folder and into a scratch
+chosen folder): the bundled copy "SHA-256 verified", then "SHA-256 verified earlier" at the next start; the chosen
+folder's copy "SHA-256 verified" at both starts (hashed again in the next session); with `models.folder` a junction to
+the bundled folder, `--print-models-dir` printed the per-user folder and `--selftest` showed the ignored-folder note and
+used the bundled file ("SHA-256 verified earlier", PASS); a same-size zero-filled bundled `ggml-base.en.bin` in a second
+copy of the app was refused with "… It came with Dictum: reinstall Dictum, or download base.en in Settings > Models."
+[FAIL]. The bundled folder was unchanged and the junction removed. Not run: the tray app, a real network share, a subst
+drive, a package built by the packaging lane, `--download-model` against the network (its pin uses a counting server).
+
+**Mutation checks**, each on a Release `--no-incremental` build and the whole filtered suite, the files restored with
+`git checkout`, each checked byte-identical to HEAD (`git hash-object` against HEAD's blob) and the tree clean
+(scratchpad `fixlane/mutate.pl`, exact single-occurrence replacements). Run 1, all 18 on c1929ed, each observed failing on
+the reverted behaviour: the record trusted in every folder, 1 (the P7 pin); a chosen folder outside the profile counted
+with the user's own models, 1 (the delete-all pin, outside case); a failed deletion reading "(in use)" again, 1; the
+replacement looked for without the bundled folder, 1 (P2); the replacement compared by path, not name, 1 (two copies);
+a seeded provider turned to none, 1 (P6); `IsBundled` by path text only, 1 (P1); no backstop in `ModelFiles.Delete`, 1
+(P1, on the refusal's message); no backstop in `RemovalPlan`, 1 (P1); no log line for an ignored folder, 1 (P1); the
+per-user folder told "rename it" while another is chosen, 2 (P3 and FixBatchLifecycleTests' picked-file pin); the bundled
+folder told "rename it", 1 (P3); calibration on the plain lookup, 1 (P4); `--download-model` in the download folder only,
+1; Settings > Models looking every model up on each redraw, 1 (110 lookups for five progress ticks, 22 each); a download
+that ended not seen by the page, 1 (only Select's own lookup followed it); the page not looking again when shown again, 1;
+the bundled folder accepted as the chosen folder, 2 (P1 and ModelFolderTests' download pin; the lens's P5 pin held, since
+the `RemovalPlan` backstop still skipped the bundled files). Run 2 on d88e09a, after the backstop case got its own pin:
+`IsBundled` by path text only 2 (P1, and the backstop pin, whose bundled file was then deleted through the junction); no
+backstop in `ModelFiles.Delete` 2 (P1, and the backstop pin on the deletion itself: `Deleted` was true); no backstop in
+`RemovalPlan` 1 (the backstop pin: "Delete all app data" listed the bundled file); no log line 1 (P1); the bundled folder
+as the chosen folder 2 (as in run 1); that and no `RemovalPlan` backstop together 6 (P1, the download pin, the backstop
+pin and three cases of the lens's P5 pin). Every restore was byte-identical and the tree clean (18 and 6).
+
+Not done, for the orchestrator:
+- "Remove Dictum completely" still deletes the catalogue files of a chosen folder outside the user's profile (it lists
+  each path first); the brief named "Delete all app data" only.
+- A subst drive, a mounted volume, or a share that points back at this PC, is not seen as the bundled folder (the
+  simplification note).
+- `--selftest` and `--transcribe` still find a bundled file by size alone; a damaged one is then refused with the new
+  advice (shown above), not passed over.
+- The help's `--download-model` example (`e.g. base.en`, in `CliOptions` and the README's command list) was left as it was;
+  with base.en in the package it says the file is already present. (Changed to `e.g. small.en` in the re-lens fixes below.)
+- Settings > Models resolves the speech model in use through the folders on a redraw only while no model is loaded
+  (`CurrentName`); the 22 catalogue lookups were the finding. (The re-lens found the language note doing it on every
+  redraw, a progress tick included, even with a model loaded; it now reads the loaded model: see the re-lens fixes below.)
+- `--bench-cleanup`'s lookup had no pin of its own (running it needs a clean-up model). (Pinned in the re-lens fixes
+  below, through a clean-up model whose SHA-256 fails, which needs no engine.)
+
+**Rebased onto main 6daff77** (17/10/2026, at the orchestrator's request: PR #10, the VC++ runtime framework and base.en in
+every package, had merged). Conflicts only in docs: DECISIONS.md (both appended after the hands-free section; PR #10's
+section kept first, then this one) and STORE.md (the certification notes' model paragraph: this PR's text kept, as the
+orchestrator asked; PR #10's offline-test note and its other lines merged as they were); README merged cleanly. The patch
+this PR makes to `src`, `tests` and `scripts` on 6daff77 is byte-identical to the one it made on 23acf35 (the two
+`git diff` outputs compared). The rebase renamed the commits: c1929ed is 0967f4d, d88e09a is b954028, 8c319cf is 74eeb47.
+Release `--no-incremental` build, 0 warnings, 0 errors; filtered suite on 74eeb47: 1,348 total, 1,327 passed, 21 skipped,
+0 failed (main's 1,297 with 21 skipped, per PR #10's record, plus this PR's 51 cases). Run 3 of the mutation checks, all 19
+on 74eeb47 the same way, each again observed failing on the reverted behaviour: M1 the verified record trusted in every folder: 1; M2 a chosen folder outside the profile emptied by Delete all app data: 1; M3 a failed deletion said "(in use)" again: 1; M4 the replacement looked for without the bundled folder: 1; M5 the replacement chosen by path, not name: 1; M6 a seeded llm.provider turned to none at first run: 1; M7 IsBundled comparing path text only: 2; M8 no backstop in ModelFiles.Delete: 2; M9 no backstop in RemovalPlan: 1; M10 no log line for an ignored bundled models.folder: 1; M11 the per-user folder told "rename it" while another is chosen: 2; M12 the bundled folder told "rename it": 1; M13 calibration on the plain lookup again: 1; M14 --download-model looking only at the download folder: 1; M15 Settings > Models looking every model up on each redraw: 1; M16 a download that ended not seen by Settings > Models: 1; M17 Settings > Models not looking again when shown again: 1; M18 the bundled folder accepted as the chosen folder: 2; M19 M18 and M9 together: the bundled folder chosen and no backstop in RemovalPlan: 6. Every restore was
+byte-identical to HEAD and the tree clean (19 of 19). Left for the orchestrator: PR #10's sentence before the certification
+notes in STORE.md ("The 'no download is needed' lines … hold only for a package built after the app change that reads the
+bundled model … has merged") describes this PR as still to come, and can go once it merges (reworded in the re-lens fixes
+below: it now says "merged together with the model-folder change (PR #11)"); and the notes now say twice
+that no download is needed (PR #10's "CHANGED SINCE THE LAST SUBMISSION" paragraph and this PR's), kept as instructed.
+
+### Re-lens fixes (17/10/2026: the opus re-lens on fa73e02 returned Needs changes)
+
+No blocker; six minors and four nits. The re-lens's probes R9, R12 and R13 (each asserted a defect and passed at fa73e02) are pins
+of the fixed behaviour now, in `tests/Dictum.Tests/ModelFolderSafetyTests.cs`, beside a pin for each other finding: 21 new cases,
+20 net (the second-copy pin became the first of two cases of the delete-a-copy pin), 38 in the file.
+
+1. **F1, the bundled folder by its volume name.** `models.folder` = `\\?\Volume{GUID}\...` (the bundled folder, its volume
+   name from `mountvol C:\ /L`) was accepted. `PathRegistry.Plain` unwraps only a drive or UNC path behind `\\?\` or `\\.\`, so
+   no comparison took the volume name for the bundled folder; the re-lens saw `--print-models-dir` print it and `ModelFiles.Delete`
+   delete its base.en (its probe R9b). `SettingsLoader.FolderProblem` now refuses every device path other than `\\?\X:\` and
+   `\\?\UNC\` (`PathRegistry.IsUnsupportedDevicePath`, beside `Plain`): a volume or GLOBALROOT name, `\\.\` and `\??\` in any form,
+   either slash, a bare `\\?\C:`. The usual warning ("expected an absolute folder path") and the default folder follow, for
+   `whisper.models_dir` too. The `// simplification:` note in `PathRegistry.FinalPath` names mounted volumes, and the claims in
+   README, SPEC §24, item 4 above and four code comments (`AppPaths`, `ConfigLoader`, `ModelFiles`) now say "a `\\?\C:\` path; not a
+   subst drive or a mounted volume" or "a name `IsBundled` sees through".
+2. **F2, a replacement the tray app would not load.** `AppShell.Replacement` offered a bundled base.en that fails its SHA-256
+   (Storage showed base.en as not on this PC, yet Delete on tiny.en offered "Switch to base.en first", and accepting left
+   `whisper.model` = `base.en` naming a file the tray app passes over). It offers a candidate only when the tray app's lookup loads
+   that very file (`WouldLoad`): for a speech model `Models.Find` returns its path, for a clean-up model
+   `Models.IsCleanupDownloaded`.
+3. **F3, a downloaded copy of the model in use.** A base.en downloaded by 1.0.x (CPU PCs were recommended it), beside the one that
+   comes with Dictum, could not be deleted: "base.en is in use and no other model is downloaded", which was untrue. When the same
+   model is also further along the lookup and passes the tray app's check (`ModelFolders.Locate(except)`,
+   `ModelCoordinator.FindBesides`; the bundled copy is held to its SHA-256), Delete asks "Delete this copy of base.en (147 MB)?
+   Dictum then uses the copy that came with it." (titled "Delete a model"; for a next copy in another of Dictum's folders, "…
+   Dictum then uses the other copy, in <folder>."), releases the model (`Unload`), deletes the file with that path left out of the
+   in-use check, and reloads, as "Delete all app data" does. If the deletion throws, the reload still runs and loads the same
+   file again. The pins' stand-in engine holds its file open without sharing deletion, as a memory-mapped model does on Windows,
+   so a deletion that does not release the model first fails.
+4. **F4, a lookup on every progress tick.** `ModelsPage.Redraw` read `Shell.Models.ModelPath` for the language note, which resolves
+   the model through the folders (file reads, on the UI thread) on every redraw, a progress tick included, even with a model
+   loaded; the counting pin counted only `ModelCoordinator.Locate`. The note and the "In use" row now read
+   `ModelCoordinator.CurrentPath` (the model loaded or loading, else `ModelPath`, as `CurrentName` did), and `ModelPath` counts as
+   a lookup, so the pin sees every route. Checked against `ModelFolders.Locate` itself with a temporary static counter (not
+   committed): five ticks with the page open and a model loaded made 5 `Locate` calls before and 0 now, the coordinator's count
+   agreeing (5 and 0). With no model loaded, `CurrentName` still resolves the model once per redraw, as before.
+5. **F5, Use default.** "Dictum then looks only in their own folder and the models that come with it, no longer in the shared
+   folder, so the models they use from it are downloaded again." follows the Use default advice in README, SPEC §24 and above
+   (twice).
+6. **F6, pins.** R12: `InProfile` through a junction inside the profile that points out of it counts as outside, and the reverse as
+   inside, with the registry category asserted for each (`SharedModels`, `Models`). `--bench-cleanup`: with another folder chosen,
+   a clean-up model in the per-user folder is found through the app's lookup (the qwen2.5-0.5b file, at the catalogue's size, fails
+   its SHA-256, which is logged, so no engine is needed).
+7. **Nits.** The `--download-model` examples (help, the error for a bad name, README) are `small.en`: base.en is already on the PC.
+   PROPOSED markers on the deletion result's "(in use or not permitted)", on the ignored-folder log line
+   (`ConfigLoader.BundledFolderIgnored`) and on the command line's "already present" lines. STORE.md section 9 row 3 says the
+   refusal applies with `offline_only` on and that with the network off a download fails after its retries (8 attempts, README
+   "Model downloads and checks"); the certification caveat reads "has merged together with the model-folder change (PR #11)".
+
+Strings, PROPOSED in code comments for the product owner (17/10/2026):
+- Settings > Storage > Delete on the copy of a model in use when the same model is next in the lookup, titled "Delete a model":
+  "Delete this copy of <name> (<size>)? Dictum then uses the copy that came with it." and, when the next copy is in another of
+  Dictum's folders (an addition to the wording asked for), "Delete this copy of <name> (<size>)? Dictum then uses the other copy,
+  in <folder>."
+- Marked PROPOSED now, wording unchanged: "… item(s) could not be deleted (in use or not permitted); see the log.", the
+  ignored-folder log line and `--selftest` note, and the command line's "<path> is already present … Nothing to do." lines.
+- Changed: the help line "download a model (e.g. small.en) to the models folder with" and the error "--download-model needs a
+  model name such as small.en (see --help)." (both were "base.en").
+- Not new: a refused device path gets the existing warning, `Setting "models.folder" has invalid value "<value>": expected an
+  absolute folder path. Using default null.`
+- docs/STORE.md section 9 row 3 and the certification caveat, as in item 7.
+
+**Verification** (17/10/2026, this machine). Release `--no-incremental` builds, 0 warnings, 0 errors. Filtered suite
+(`FullyQualifiedName!~Install_copies_models`): fa73e02, run first, 1,348 total, 1,327 passed, 21 skipped, 0 failed (the
+numbers recorded above); the code and pins (26a727d) 1,368 / 1,347 / 21 / 0 (the 21 skips are the gated integration
+tests and the desktop ones, none of the junction or volume-name pins); the head (the docs, the `--download-model` error
+text and one doc comment on top, after the mutation checks) 1,368 total, 1,347 passed, 21 skipped, 0 failed. The two counters (the
+`ModelFolders.Locate` one of item 4 and the `PathRegistry.FinalPath` one below) were temporary instrumentation, never
+committed. Not run: the built app (`Dictum.exe`), a real network share, a subst drive, a volume mounted in a folder, a
+package, `--download-model` against the network.
+
+**Mutation checks**, each an exact single-occurrence replacement on the committed tree (ab0b8d8), a Release
+`--no-incremental` build and the whole filtered suite, the file restored with `git checkout`, checked byte-identical to
+HEAD's blob (`git hash-object`), and `src`, `tests` and `scripts` clean (scratchpad `mf3/mutate.js`). All 16 observed
+failing on the reverted behaviour, with this many failures each: F1 the refusal of device paths removed 9; the `\\?\X:\`
+form not accepted 2; the `\\?\UNC\` form not accepted 2; `//?/` forms not seen as device paths 2; F2 any speech model
+offered as the replacement 1; any clean-up model offered as the replacement 1; F3 no next copy ever found 3; no reload
+after the deletion 3; the next copy not held to the tray app's check 1; the question always saying the copy that came
+with Dictum 1; the copy being deleted still counted as in use 3; the model not released before its file is deleted 2; F4
+the language note looking the model up on every redraw 1; CurrentPath always looking the model up 2; F6 InProfile
+comparing text only 1; --bench-cleanup looking in the download folder only 1. Every restore was byte-identical and the
+tree clean (16 of 16).
+
+Not done, for the orchestrator:
+- A refused `\\?\Volume{...}` value gets the existing "expected an absolute folder path" (blunt: it is absolute). A clearer sentence
+  would be a new PROPOSED string; left for you.
+- The new question's title is "Delete a model" (the plain Delete's), and its second form (a next copy in another of Dictum's
+  folders) is an addition to the wording asked for. Strike either if unwanted.
+- Settings > Models' redraw also evaluates `AppPaths.IsBundled` (read from the code: through `Shell.ModelsDir` and
+  `ChosenModelsDir`) on every tick while a folder is chosen: five ticks with the page open, a model loaded and a folder
+  chosen made 20 `PathRegistry.FinalPath` calls, four a tick, each a walk along a path with a file-system call per part
+  on a local drive (a temporary counter, not committed; not timed). It is not in the re-lens's list and is unchanged.
+- The brief's `ConfigLoader.cs:353-354` does not exist (the file has 66 lines): the PROPOSED marker went on
+  `ConfigLoader.BundledFolderIgnored`, the only string that file gained in this PR.

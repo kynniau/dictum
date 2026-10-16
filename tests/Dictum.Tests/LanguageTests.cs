@@ -248,7 +248,7 @@ public class LanguageTests
         FakeSpeechEngine? engine = null;
         var host = new CalibrationHost(scratch.Paths, () => hindiTranslated, () => PersonalText.Empty,
             new ModelIntegrity(Path.Combine(scratch.Root.FullName, "verified-models.json"), NullLog.Instance), NullLog.Instance,
-            Write: _ => { }, DownloadSpeechModel: (_, _, _) => { }, AddDictionaryTerms: _ => { }, AddCorrections: _ => { },
+            FindSpeechModel: _ => null, Write: _ => { }, DownloadSpeechModel: (_, _, _) => { }, AddDictionaryTerms: _ => { }, AddCorrections: _ => { },
             LoadSpeech: (path, _, decode) =>
             {
                 loads.Add(decode);

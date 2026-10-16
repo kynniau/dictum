@@ -1,11 +1,12 @@
 # Dictum
 
 System-wide voice dictation for Windows 10/11 (x64), in the style of Wispr Flow. Hold a key, talk, let go:
-your speech is transcribed **on this PC** with whisper.cpp, tidied by a small language model that also runs **on this
-PC** (llama.cpp), and pasted at the cursor of whatever app has focus.
+your speech is transcribed **on this PC** with whisper.cpp, tidied (by a rule-based tidy, or by a small language model
+that also runs **on this PC** with llama.cpp, once you add it), and pasted at the cursor of whatever app has focus.
 
 - **Nothing leaves the machine by default.** No accounts, telemetry, analytics, crash reporting or automatic update
-  checks: the direct download checks only when you click Check for updates.
+  checks: the direct download checks only when you click Check for updates. Nothing is downloaded to get started: a
+  small English speech model (base.en) comes with Dictum, and bigger models and AI clean-up are downloads you choose.
 - Works fully offline; with `offline_only: true` Dictum itself connects to no other machine. A cleanup server on
   this PC is still allowed; what such a server does with the text is up to it (see "Privacy").
 - If the cleanup model is missing, slow or gives a bad answer, a rule-based tidy is pasted instead: never a failure.
@@ -115,8 +116,8 @@ an edit made in the file is picked up within a second and shows in the window.
 |---|---|
 | General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), **Hands-free stops after** (30 seconds to 60 minutes), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
 | Mode | Light or Full, with what each means on this PC. |
-| Models | Every speech and cleanup catalogue model with size, state and Use / Download, a file chooser for each, greedy or beam-search decoding. |
-| Storage | Where everything is, free space, every model file with its size and Delete, delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
+| Models | Every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
+| Storage | Where everything is, the model folders in the order Dictum looks in them, free space, every model file with its folder, size and Delete (none for the models that come with Dictum), delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
@@ -311,20 +312,31 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 
 ### First run
 
-1. With no `settings.json` yet, Dictum shows **two pickers**: the speech model, then the cleanup model (or "No AI
-   cleanup (rule-based tidy)"). Each lists every catalogue entry with its size and whether it is downloaded, the
-   recommendation for this PC pre-selected, and one sentence on the trade-off. Your choices are written to
-   `%APPDATA%\Dictum\settings.json`; a model that is not on disk yet is then downloaded from huggingface.co
-   (progress in the tray panel and the icon's tooltip; the two one after the other) and checked against the catalogue's size and SHA-256.
-   Nothing is downloaded without that choice. A `settings.json` seeded by an administrator gets only the pickers for
-   what it leaves open: one without `whisper.model` gets the speech picker, one without `llm.model` or `llm.provider`
-   the cleanup picker, and only the answers are added to it. A `settings.json` that cannot be read gets no picker.
-   Recommendations: speech `medium.en` when a discrete GPU is found, `base.en` otherwise, integrated graphics
-   included (`small.en` offered as more accurate, a few seconds slower); cleanup `qwen2.5-1.5b` on every machine (see
-   "Cleanup models" for why). `--selftest` prints both, with the Vulkan devices it found.
-   After the pickers comes the **hotkey check** (SPEC §20): the "Press your hotkey" box with `RightCtrl` chosen, the
-   note for Mac keyboards over Remote Desktop, and **Use this hotkey** or **Skip** (see "Keyboards and Remote
-   Desktop"). With `DICTUM_MODEL_PATH` or `--model` set it is not shown.
+1. **base.en comes with Dictum** (`models\ggml-base.en.bin` beside `Dictum.exe`; inside the package for the Store
+   build), so with no `settings.json` yet the first run asks **no model question**. It writes `whisper.model` =
+   `base.en` and `llm.provider` = `none` (the rule-based tidy: exactly what the pickers below write for base.en and
+   "No AI cleanup (rule-based tidy)") to `%APPDATA%\Dictum\settings.json`, and Dictum starts ready to dictate with
+   nothing downloaded. Bigger speech models and AI clean-up are downloads you choose in Settings > Models; **Add AI
+   clean-up (1.1 GB download)** fetches the recommended cleanup model, `qwen2.5-1.5b`, after asking (see "Cleanup
+   models"). A base.en in your own models folder, or in the one you chose, counts the same (see "Model folder").
+   **Without base.en** (a build without its `models` folder, or the file removed or failing its check) Dictum shows
+   **two pickers**, as before: the speech model, then the cleanup model (or "No AI cleanup (rule-based tidy)"). Each
+   lists every catalogue entry with its size and whether it is on this PC, the recommendation for this PC pre-selected,
+   and one sentence on the trade-off. Your choices are written to settings.json; a model that is not on disk yet is
+   then downloaded from huggingface.co (progress in the tray panel and the icon's tooltip; the two one after the other)
+   and checked against the catalogue's size and SHA-256. Nothing is downloaded without that choice.
+   A `settings.json` seeded by an administrator gets only the choices it leaves open, answered without a question when
+   base.en is on the PC and asked in the pickers when it is not: one without `whisper.model` the speech choice, one
+   without `llm.model` or `llm.provider` the cleanup choice, and only those answers are added to it. One that names
+   `llm.provider` = `local` but no `llm.model` keeps `local` when base.en is on the PC: it gets the recommended cleanup
+   model written, which is not downloaded, so nothing downloads and a notice says the rule-based tidy is used until you
+   download it in Settings > Models. A `settings.json` that cannot be read gets neither. Recommendations: speech `medium.en` when a discrete GPU is found, `base.en`
+   otherwise, integrated graphics included (`small.en` offered as more accurate, a few seconds slower); cleanup
+   `qwen2.5-1.5b` on every machine (see "Cleanup models" for why). `--selftest` prints both, with the Vulkan devices it
+   found.
+   Then comes the **hotkey check** (SPEC §20), with or without the pickers: the "Press your hotkey" box with
+   `RightCtrl` chosen, the note for Mac keyboards over Remote Desktop, and **Use this hotkey** or **Skip** (see
+   "Keyboards and Remote Desktop"). With `DICTUM_MODEL_PATH` or `--model` set it is not shown.
 2. If the configured speech model file is missing when Dictum starts, it asks: **Download**, **Choose file…** or
    **Quit**. (While running, a missing model only produces a notification; the loaded model stays in use.) A missing
    cleanup model produces one notification and the rule-based tidy until you download it (tray panel > Clean-up, or
@@ -334,7 +346,8 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 
 ### Speech models
 
-Stored in `%LOCALAPPDATA%\Dictum\models` (or `whisper.models_dir`) as `ggml-<name>.bin`, downloaded from
+`base.en` comes with Dictum (see "First run"). The others are stored in the model folder
+(`%LOCALAPPDATA%\Dictum\models` unless you choose another: see "Model folder") as `ggml-<name>.bin`, downloaded from
 `https://huggingface.co/ggerganov/whisper.cpp/resolve/<commit>/ggml-<name>.bin`, pinned to commit
 `5359861c739e955e79d9a303bcbc70fb988958b1` so the URL keeps serving the bytes the hashes describe even if the
 repository changes. Sizes verified by HTTP HEAD (`X-Linked-Size`) on 15/10/2026, and again at that commit. Get one
@@ -399,9 +412,10 @@ Untested here: large-v3-turbo, quantised models, and other CPUs; Azure VM figure
 
 The two models do different jobs: whisper turns your audio into words; the cleanup model only tidies those words
 (fillers, punctuation, spoken commands) and never hears the audio. A speech model is required; a cleanup model is
-optional, and without one the rule-based tidy runs.
+optional, and without one the rule-based tidy runs. None is set up by default (decided 17/10/2026): the first run uses
+the rule-based tidy, and Settings > Models > **Add AI clean-up (1.1 GB download)** fetches the recommended one.
 
-Stored in `%LOCALAPPDATA%\Dictum\models` (or `whisper.models_dir`), downloaded from the vendor's own organisation on
+Stored in the model folder (see "Model folder"), downloaded from the vendor's own organisation on
 huggingface.co (`https://huggingface.co/<repo>/resolve/<commit>/<file>`, each pinned to the repository commit listed
 below) and verified by size and SHA-256 like the speech models. Get one with the tray panel's Clean-up picker or Settings > Models,
 `Dictum.exe --download-cleanup-model <name>`, or `scripts\download-model.ps1 -Cleanup <name>`. Every value below was
@@ -534,14 +548,51 @@ CPUs, Azure VMs.
 - **Files Dictum did not download are checked on first use.** A catalogue model that arrived another way (copied
   with `install.ps1 -ModelsFrom`, fetched with curl, left by an older build) is hashed the first time it is loaded
   and refused if it does not match: a notification, an error in the tooltip, `[FAIL]` in
-  `--selftest`, and the file is not loaded. A match is remembered in `%LOCALAPPDATA%\Dictum\verified-models.json` (path, size, time)
-  so it is not hashed again. Hashing took 4.0 s for the 1.5 GB medium.en here. Gated models without a published
-  hash are size-checked only.
+  `--selftest`, and the file is not loaded. A match is remembered in `%LOCALAPPDATA%\Dictum\verified-models.json` (path, size, time),
+  so a file in your own folders (`%LOCALAPPDATA%\Dictum\models` and the models that come with Dictum) is not hashed
+  again. A file anywhere else (in a model folder you chose, which other users may be able to change, or one you picked by
+  path) is hashed again the first time it is loaded in each session. Hashing took 4.0 s for the 1.5 GB medium.en here.
+  Gated models without a published hash are size-checked only.
 - **Why downloads drop here.** On this development machine Windows' TLS layer (Schannel) dropped large downloads
   from huggingface.co's CDN with "The decryption operation failed", at a different point each time. Measured
   15/10/2026 on the 1.62 GB large-v3-turbo, six downloads each: 20 dropped connections with Windows' default
   (TLS 1.3), 4 with TLS 1.2. Dictum therefore uses TLS 1.2 for model downloads and always resumes; every test
   download completed. Details in `docs/DECISIONS.md`.
+
+### Model folder
+
+Dictum looks for a model, speech (`.bin`) or clean-up (`.gguf`), in three folders, in this order, and uses the first
+copy whose size matches the catalogue:
+
+1. **The folder you choose** (`models.folder`): Settings > Models > **Model folder** > **Browse…**, for example a
+   folder on another drive when C: is short of space. Downloads go here.
+2. **Your own folder**, `%LOCALAPPDATA%\Dictum\models`. Downloads go here while no folder is chosen (**Use default**).
+3. **The models that come with Dictum**: the `models` folder beside `Dictum.exe` (inside the package for the Store
+   build), which holds `base.en`. Dictum never downloads into it, changes it or deletes anything in it, and it cannot be
+   chosen as the model folder, under another name for it either (a junction or symbolic link, an 8.3 short name, a
+   `\\?\C:\` path; not a subst drive or a mounted volume): such a setting is ignored and the log says so. Of the
+   device paths, only the `\\?\C:\` and `\\?\UNC\` forms are accepted as the model folder; any other (a `\\?\Volume{...}` name,
+   say) is refused with a warning in the log, and the default folder is used.
+
+Every model is still checked against the catalogue's size and SHA-256 before it is loaded, wherever it was found. A
+copy of the wrong size is passed over for the next folder; a model that came with Dictum and fails its check is passed
+over too (the log says so once) and never deleted.
+
+- **Changing the folder moves no files.** Copy the models across yourself, or download them again; the old copies stay
+  until you delete them in Settings > Storage, which lists the three folders and the folder each model is in.
+- **A folder on a network share** (a `\\server\share` path or a mapped network drive) works, but models load slowly
+  from it, and Settings > Models says so under the folder. A folder on the PC is faster.
+- **A folder other users can reach.** A model in the folder you chose is hashed again the first time it is loaded in
+  each session (see "Model downloads and checks"). **Delete all app data** leaves a chosen folder outside your user
+  folder alone, and its question names it; **Delete** beside one of its models in Settings > Storage still removes that
+  model.
+- **Free space:** a download is refused, with a message saying how much is free, when it would leave its drive with
+  less than 200 MB (a download that resumes a kept partial file needs only the rest); one that would leave under 2 GB
+  warns first. When the free space cannot be read, the download goes ahead.
+- `whisper.models_dir`, this setting's earlier name, is still read when `models.folder` is not set; when both are set
+  and differ, `models.folder` wins and the log says so. Choosing a folder in Settings clears the earlier name.
+
+For shared virtual desktops, see "Deploying to staff machines and Azure VMs".
 
 ## Permissions on Windows
 
@@ -588,14 +639,15 @@ warning and the default is used; Dictum never fails to start because of settings
 | `hands_free_max_seconds` | `300` | Auto-stop and type the rest after this long (30–3600; Settings > General > "Hands-free stops after"). A value from 5 to 29 left from an earlier version runs as 30, with a line in the log. Hands-free only: a held key stops after 5 minutes. |
 | `silence_threshold` | `0.01` | Discard if the loudest 20 ms block's RMS (0–1) stays below this. |
 | `audio.device` | `null` | `null` = Windows default microphone; else an endpoint ID or part of the device name (`--selftest` lists them). |
-| `whisper.model` | your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin` in `models_dir`, or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
-| `whisper.models_dir` | `null` | `null` = `%LOCALAPPDATA%\Dictum\models`; else an absolute folder. |
+| `whisper.model` | `base.en` when it comes with Dictum, else your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin`, looked up in the model folders (see "Model folder"), or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
+| `whisper.models_dir` | `null` | The earlier name of `models.folder`, still read when that is not set (ignored, with a warning, when both are set and differ). Choosing a folder in Settings clears it. |
+| `models.folder` | `null` | `null` = `%LOCALAPPDATA%\Dictum\models`; else an absolute folder (another drive, or a `\\server\share`, from which models load slowly) that Dictum looks in first and downloads to. A relative or invalid value is ignored with a warning. Settings > Models > Model folder writes it; changing it moves no files. See "Model folder". |
 | `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`hi`, `tl`, `bn`, `ta`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change rebuilds the decoder and does not load the model again. |
 | `whisper.translate` | `false` | `true`: write English whatever language is spoken. Needs a multilingual model; `large-v3-turbo` cannot translate (OpenAI's README: the turbo model "is not trained for translation tasks"). |
 | `whisper.threads` | `0` | CPU threads; 0 = Whisper.net's default. |
 | `whisper.gpu` | `"auto"` | `auto` / `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `cpu`: CPU, then CPU-without-AVX. Needs a restart. |
 | `whisper.beam_size` | `0` | `0` = greedy decoding (fastest); `1`–`8` = beam search with that many beams (more accurate, slower). Calibration's **Use this** writes it. |
-| `llm.provider` | `"local"` | `local` (the cleanup model on this PC), `none` (rule-based tidy only), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
+| `llm.provider` | `"local"` when the key is absent; the first run writes `"none"` when base.en comes with Dictum (a seeded value is kept) | `local` (the cleanup model on this PC; Settings > Models > Add AI clean-up writes it), `none` (rule-based tidy only), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
 | `llm.model` | your first-run pick (`qwen2.5-1.5b` if the file has no value) | For `local`: a cleanup catalogue name or an absolute path to a `.gguf`; the Clean-up picker and Settings > Models write this. Anything else (for example `claude-haiku-5-5` left by the first build) is treated as unset and the recommendation is used (logged). For `openai-compatible`: the server's model id. With `anthropic` a local name means `claude-haiku-5-5`. |
 | `llm.gpu` | `"auto"` | Cleanup model backend. `auto` / `vulkan`: try Vulkan, then CPU. `cpu`: CPU only. Needs a restart. |
 | `llm.base_url` | `null` | Required for `openai-compatible`, e.g. `http://localhost:11434/v1`. For `anthropic` it is optional and replaces `https://api.anthropic.com` (e.g. a company gateway). The `ANTHROPIC_BASE_URL` environment variable is ignored. Because both providers share this key, a URL left over from `openai-compatible` would receive the Anthropic key and transcripts: Dictum logs a warning and shows a balloon "Anthropic requests will go to <host>" whenever `anthropic` is used with a `base_url`. |
@@ -884,7 +936,7 @@ network connection only in these cases, and only to these hosts:
 
 | When | Host |
 |---|---|
-| Only when you ask for a model download (first-run picker, the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
+| Only when you ask for a model download (first-run picker, shown only when base.en is not on the PC; the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
 | Only when you click **Check for updates** in Settings > About (the direct download; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
 | After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms and, in hands-free, up to 10 words of what you said in the last part: taken before corrections, the profanity filter and snippets, so never their text), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
 | After each dictation, only if you set up an `openai-compatible` server (one off this PC also needs the consent step and `https://`) | the host in `llm.base_url` (the same text). With `localhost`, Dictum's request stays on this PC; what that server does with it is up to the server. |
@@ -938,17 +990,23 @@ send it on, and `offline_only` cannot see that.
 
 ### Storage and removing Dictum
 
-Settings > Storage (SPEC §17) shows where everything is, the free space on the models drive, every model file with its
-size, and the total. Every deletion says how much it frees and asks once; sizes are read from the disk, not from a
-stored count.
+Settings > Storage (SPEC §17) shows where everything is, the model folders in the order Dictum looks in them (see
+"Model folder"), the free space on the drive downloads go to, every model file with its folder and size, and the total.
+Every deletion says how much it frees and asks once; sizes are read from the disk, not from a stored count.
 
 - **Delete** beside a model removes the `.bin` or `.gguf`, its unfinished `.part` and its verified record. The model
-  in use cannot be deleted: the dialog offers to switch to the recommended downloaded model first. A model you chose
-  by path from elsewhere is never deleted, only forgotten. A download that would leave under 2 GB free warns first.
+  in use cannot be deleted: the dialog offers to switch to the recommended other model on this PC first (base.en, which
+  comes with Dictum, counts while it passes its check: it is switched to, never deleted). When Dictum has another copy of
+  the same model to go on with (a base.en downloaded by version 1.0.x, beside the one that comes with Dictum), the copy in
+  use can be deleted: it asks "Delete this copy of base.en (<size>)? Dictum then uses the copy that came with it.", then
+  loads the other copy. A model you chose by path from elsewhere is never deleted, only forgotten, and the models that
+  come with Dictum have no Delete: they are part of the program. A download that would leave under 2 GB free warns
+  first; one that would leave under 200 MB is refused.
 - **Delete calibration recordings**, **Delete logs**, **Delete all app data** (models, recordings, logs and the
   verified record; settings, dictionary and corrections are kept unless "Including settings, dictionary and
-  corrections" is ticked). None of them touches `.env` or the program folder. Dictum keeps no dictation history, so
-  there is nothing else to clear.
+  corrections" is ticked). None of them touches `.env` or the program folder. A model folder you chose outside your
+  user folder, which other users may share, is left alone by **Delete all app data**, and its question says so. Dictum
+  keeps no dictation history, so there is nothing else to clear.
 - **Remove Dictum completely** deletes every model, recording, log, settings.json, `consent.json`, dictionary,
   corrections, the `.env` files, whatever the migration left in Dictate's old folders (see "Moving from Dictate"; a
   Store copy never touches those), the Start menu shortcut, the launch-at-login entry and the program's own files,
@@ -1029,20 +1087,21 @@ Dictum.exe --transcribe <file.wav> [--no-llm] print "raw: ..." (and, unless --no
 Dictum.exe --selftest                        speech and cleanup models with their runtimes, recommendations, the
                                               active Mode preset, decoding, personal file counts, offline_only,
                                               microphones, hotkey, key presence (never values); exit 0/1
-Dictum.exe --download-model <name>           download a speech model (e.g. base.en), verify size and SHA-256; exit 0/1
+Dictum.exe --download-model <name>           download a speech model (e.g. small.en), verify size and SHA-256; exit 0/1
 Dictum.exe --download-cleanup-model <name>   the same for a cleanup model (e.g. qwen2.5-1.5b)
 Dictum.exe --bench-cleanup <file.wav|file.txt> every downloaded cleanup model (and --cleanup-model's file) over the
                                               same input: output, time, validator verdict, side by side (a .wav is
                                               transcribed first); an unreadable file exits 1
-Dictum.exe --print-models-dir                the folder the app keeps models in (whisper.models_dir, else the
-                                              default); install.ps1 uses it
+Dictum.exe --print-models-dir                the folder the app downloads models to (models.folder, else its
+                                              earlier name whisper.models_dir, else the default); install.ps1 uses it
 Dictum.exe ... --model <name|path>           use this speech model for this launch only
 Dictum.exe ... --cleanup-model <name|path>   use this local cleanup model for this launch only
 Dictum.exe ... --config <dir>                use another settings folder
 Dictum.exe --exit-after <seconds>            tray mode, then quit exactly as Quit in the tray panel does (scripted checks)
 ```
 
-A download of a file that is already present and matches its hash does nothing and exits 0. With `offline_only`
+A download of a file that is already present in any of the model folders (so `--download-model base.en` when base.en
+comes with Dictum) and matches its hash does nothing and exits 0. With `offline_only`
 on, or with a settings.json that cannot be read, both download commands refuse and exit 1; for a gated model they
 print the login message and exit 1. `--download-model` also accepts a whisper.cpp name outside the catalogue: it
 warns, and that file has no size or hash to be checked against. A value is never another flag or empty (PowerShell
@@ -1086,9 +1145,11 @@ warns, and that file has no size or hash to be checked against. A value is never
   `scripts\download-model.ps1` (curl with resume; 30 s without data ends an attempt, and if all 8 fail the partial
   file is kept, so running the same command again carries on from where it stopped) or copy it in with
   `install.ps1 -ModelsFrom`.
-- **"does not match the catalogue … it was not loaded".** For a file in the models folder: it is damaged or not the
-  catalogue file; delete it and download it again. For a file you picked from another folder: it has the same name as
-  a catalogue file, so it is checked as that file; rename it, then choose it again. `--selftest` shows the same check.
+- **"does not match the catalogue … it was not loaded".** For a file in one of Dictum's model folders (the one you
+  chose, or `%LOCALAPPDATA%\Dictum\models`): it is damaged or not the catalogue file; delete it and download it again.
+  For a model that came with Dictum: reinstall Dictum, or download that model in Settings > Models (the download is
+  used instead). For a file you picked from another folder: it has the same name as a catalogue file, so it is checked
+  as that file; rename it, then choose it again. `--selftest` shows the same check.
 - **"settings.json could not be read; running offline with defaults".** The file has a JSON error. Dictum runs with
   the defaults and `offline_only` on until you fix it; the log names the problem. A file that breaks while Dictum
   runs keeps the previous settings until it is fixed.
@@ -1119,14 +1180,14 @@ the switches). Fresh Azure and Windows Server images may not have it; `--selftes
 **Install per user (no admin)**, locally, over remote PowerShell, or from Intune:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1 -Source .\Dictum-1.0.0-win-x64.zip -Model base.en -LaunchAtLogin
+powershell -ExecutionPolicy Bypass -File install.ps1 -Source .\Dictum-1.0.0-win-x64.zip -Model small.en -LaunchAtLogin
 ```
 
 | Switch | Effect |
 |---|---|
 | `-Source <folder or zip>` | The published build (default: `..\dist\Dictum` or the newest zip there). |
-| `-Model <name>` | Pre-downloads that model with `Dictum.exe --download-model`; if there is no settings.json (and no `-Settings`), writes it as `whisper.model` so the first launch skips the speech picker. The cleanup picker still asks; to skip it too, seed `llm.model` or `llm.provider` with `-Settings`, and supply that model with `-ModelsFrom` or `download-model.ps1 -Cleanup`. |
-| `-ModelsFrom <folder>` | Copies every `.bin` and `.gguf` in that folder (for example a network share) into the models folder the installed app resolves (`whisper.models_dir` from the seeded settings.json, else `%LOCALAPPDATA%\Dictum\models`) instead of downloading: for air-gapped or `offline_only` machines. A file already present with the same size is skipped. Copied catalogue files are hashed the first time Dictum loads them and refused if they do not match; `--selftest` runs the same check. |
+| `-Model <name>` | Pre-downloads that model with `Dictum.exe --download-model`; if there is no settings.json (and no `-Settings`), writes it as `whisper.model` so the first launch skips the speech picker. With base.en beside `Dictum.exe` the first launch then writes the rule-based tidy without asking; without it the cleanup picker still asks. To choose the clean-up yourself, seed `llm.model` or `llm.provider` with `-Settings`, and supply that model with `-ModelsFrom` or `download-model.ps1 -Cleanup`. |
+| `-ModelsFrom <folder>` | Copies every `.bin` and `.gguf` in that folder (for example a network share) into the models folder the installed app resolves (`models.folder` from the seeded settings.json, or its earlier name `whisper.models_dir`, else `%LOCALAPPDATA%\Dictum\models`) instead of downloading: for air-gapped or `offline_only` machines. A file already present with the same size is skipped. Copied catalogue files are hashed the first time Dictum loads them (in a chosen folder, the first time in each session) and refused if they do not match; `--selftest` runs the same check. |
 | `-Settings <path>` | Seeds `%APPDATA%\Dictum\settings.json` if none exists (a read-only seed is copied writable, so the tray can still save choices). |
 | `-EnvFile <path>` | Copies a prepared `.env` to `%APPDATA%\Dictum\.env` if none exists. |
 | `-LaunchAtLogin` | Adds `HKCU\...\Run\Dictum` (same value as the tray item). |
@@ -1155,21 +1216,38 @@ to be slower than the 6-core Xeon figures):
 
 | Machine | Model | Measured transcribe time for 10.5 s of speech |
 |---|---|---|
-| Any CPU-only or integrated-graphics VM, laptop or desktop | `base.en` (the recommendation there; settings.json's own default is `medium.en`, so seed `whisper.model`); `tiny.en` if that is still too slow | base.en 1.9 s, tiny.en 0.9 s on the 6-core CPU |
+| Any CPU-only or integrated-graphics VM, laptop or desktop | `base.en` (the recommendation there, and what the first run uses when base.en comes with Dictum; without it settings.json's own default is `medium.en`, so seed `whisper.model`); `tiny.en` if that is still too slow | base.en 1.9 s, tiny.en 0.9 s on the 6-core CPU |
 | CPU-only, accuracy matters more than speed | `small.en`: more accurate, a few seconds slower | small.en 6.4 s on the 6-core CPU |
 | Discrete GPU (Vulkan) or a fast desktop | `medium.en` | 0.73 s with Vulkan; 20.1 s on the 6-core CPU |
 | GPU only | `large-v3-turbo` | not measured |
 
-**Which cleanup model:** `qwen2.5-1.5b` everywhere (adds about 1.8 s per 10 s dictation on the 6-core CPU,
-about 0.2 s with a GPU). On slow VMs choose "No AI cleanup (rule-based tidy)"; `qwen2.5-0.5b` is not recommended
-(see "Cleanup models"). To pre-set the tidy instead, seed a settings.json with `-Settings`
-(`{ "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }`); to supply the model offline, put the
-`.gguf` in the `-ModelsFrom` folder, or run `scripts\download-model.ps1 -Cleanup qwen2.5-1.5b`.
+**Which cleanup model:** none by default: the first run uses the rule-based tidy. For AI clean-up, `qwen2.5-1.5b`
+everywhere (adds about 1.8 s per 10 s dictation on the 6-core CPU, about 0.2 s with a GPU), from Settings > Models >
+Add AI clean-up. On slow VMs keep the rule-based tidy; `qwen2.5-0.5b` is not recommended (see "Cleanup models"). To
+pre-set AI clean-up, seed a settings.json with `-Settings`
+(`{ "whisper": { "model": "base.en" }, "llm": { "provider": "local", "model": "qwen2.5-1.5b" } }`); to supply the
+model offline, put the `.gguf` in the `-ModelsFrom` folder, or run `scripts\download-model.ps1 -Cleanup qwen2.5-1.5b`.
 
 **Air-gapped or locked-down machines:** seed a settings.json with `-Settings` such as
 `{ "offline_only": true, "whisper": { "model": "base.en" }, "llm": { "provider": "local", "model": "qwen2.5-1.5b" } }`
-and supply both model files with `-ModelsFrom`. Name the models: a seed that leaves them out gets the first-run
-pickers, and settings.json's own default speech model is `medium.en`. Dictum itself then connects to no other machine.
+and supply the clean-up model file, and any speech model other than base.en (which comes with Dictum), with
+`-ModelsFrom`. Name
+the models: with base.en beside `Dictum.exe` a seed that leaves them out gets base.en and the rule-based tidy; without
+it, the first-run pickers, and settings.json's own default speech model is `medium.en`. Dictum itself then connects to
+no other machine.
+
+**Shared virtual desktops (Azure Virtual Desktop and similar: no GPU, little space on C:):** give each VM one local
+folder that all its users share, for example `E:\Dictum models` on a persistent data disk, readable by every user and
+writable only by administrators, so no user can change or delete a model another user loads. Seed it as the model
+folder for each user (`-Settings` with `{ "models": { "folder": "E:\\Dictum models" } }`); an administrator fills it once
+with `install.ps1 -ModelsFrom` (a file already there with the same size is skipped, so a user's install with the same
+`-ModelsFrom` copies nothing). Users then keep no large file on C:, and base.en needs nothing at all: it comes with
+Dictum. A user who wants a model the folder does not hold chooses **Use default** in Settings > Models > Model folder,
+so downloads go to their own folder. Dictum then looks only in their own folder and the models that come with it, no
+longer in the shared folder, so the models they use from it are downloaded again. Dictum hashes a model in a chosen
+folder again the first time it loads it in each session, and **Delete all app data** leaves a chosen folder outside the
+user's own folder alone. An Azure file share, cool tier especially, is not recommended: models would load across the
+network at every start (Settings > Models warns about any network folder; not measured here). See "Model folder".
 
 **SmartScreen and Smart App Control:** the files are unsigned, so the first launch may show "Windows protected your
 PC" (More info > Run anyway), enterprise policy can prevent continuing, and Smart App Control blocks unsigned files

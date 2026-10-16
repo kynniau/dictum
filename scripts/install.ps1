@@ -15,21 +15,24 @@
 .PARAMETER LaunchAtLogin
   Adds HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Dictum (the same value the tray item writes).
 .PARAMETER Model
-  Pre-downloads this model (e.g. base.en) with Dictum.exe --download-model. If no settings.json exists and
-  -Settings is not given, also writes it as whisper.model so the first launch skips the speech model picker (the
-  cleanup picker still asks, unless settings.json names llm.model or llm.provider).
+  Pre-downloads this model (e.g. small.en; base.en comes with Dictum, so it needs no download) with
+  Dictum.exe --download-model. If no settings.json exists and -Settings is not given, also writes it as whisper.model
+  so the first launch skips the speech model picker (with base.en beside Dictum.exe the first launch then writes the
+  rule-based tidy without asking; without it the cleanup picker still asks, unless settings.json names llm.model or
+  llm.provider).
 .PARAMETER ModelsFrom
   A folder (for example a network share) whose .bin and .gguf model files are copied into the models folder instead
-  of downloading them: for air-gapped or offline_only installs. The folder is the one the installed app resolves
-  (whisper.models_dir from the seeded settings.json, else %LOCALAPPDATA%\Dictum\models). Files already present with
-  the same size are skipped.
+  of downloading them: for air-gapped or offline_only installs. The folder is the one the installed app downloads to and
+  looks in first, as Dictum.exe --print-models-dir prints it (models.folder, or its earlier name whisper.models_dir,
+  from the seeded settings.json, else %LOCALAPPDATA%\Dictum\models). Files already present with the same size are
+  skipped.
 .PARAMETER Settings
   A prepared settings.json to seed %APPDATA%\Dictum\settings.json.
 .PARAMETER EnvFile
   A prepared .env to copy to %APPDATA%\Dictum\.env (or set ANTHROPIC_API_KEY machine-wide instead).
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File install.ps1 -Source .\Dictum-1.0.0-win-x64.zip -Model base.en -LaunchAtLogin
+  powershell -ExecutionPolicy Bypass -File install.ps1 -Source .\Dictum-1.0.0-win-x64.zip -Model small.en -LaunchAtLogin
 #>
 [CmdletBinding()]
 param(
@@ -134,7 +137,8 @@ if ($EnvFile) {
 }
 
 # 5b. Models copied from a folder (no network): .bin speech models and .gguf cleanup models, into the folder the installed
-#     app itself resolves (whisper.models_dir in the settings just seeded, else %LOCALAPPDATA%\Dictum\models).
+#     app itself downloads to and looks in first (models.folder, or its earlier name whisper.models_dir, in the settings
+#     just seeded, else %LOCALAPPDATA%\Dictum\models).
 if ($ModelsFrom) {
     $modelsDir = (& $exe --print-models-dir | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $modelsDir) { throw "Dictum.exe --print-models-dir failed (exit $LASTEXITCODE): fix settings.json, then run the install again. No models were copied." }

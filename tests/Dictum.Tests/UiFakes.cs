@@ -204,12 +204,49 @@ internal sealed class ScriptedDialogs : IShellDialogs
         return ConfirmWord;
     }
 
-    public string HotkeyCheck(AppShell shell, string current) => current;
-    public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir) => new(recommended, null, false);
-    public CleanupPick CleanupPicker(string recommended, string reason, Func<CleanupModelInfo, bool> isDownloaded, string modelsDir) => new(null, null, true, false);
+    /// <summary>How many times each first-run step was shown: the speech picker, the cleanup picker, the hotkey check.</summary>
+    public (int Speech, int Cleanup, int Hotkey) FirstRunSteps { get; private set; }
+
+    /// <summary>What Settings > Models > Model folder > Browse… picks (null: the chooser was cancelled), and the folder it opened in.</summary>
+    public string? Folder { get; set; }
+    public List<string> FolderChooserOpenedIn { get; } = [];
+
+    public string HotkeyCheck(AppShell shell, string current)
+    {
+        FirstRunSteps = FirstRunSteps with { Hotkey = FirstRunSteps.Hotkey + 1 };
+        return current;
+    }
+
+    public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir)
+    {
+        FirstRunSteps = FirstRunSteps with { Speech = FirstRunSteps.Speech + 1 };
+        return new(recommended, null, false);
+    }
+
+    public CleanupPick CleanupPicker(string recommended, string reason, Func<CleanupModelInfo, bool> isDownloaded, string modelsDir)
+    {
+        FirstRunSteps = FirstRunSteps with { Cleanup = FirstRunSteps.Cleanup + 1 };
+        return new(null, null, true, false);
+    }
+
     public MissingModelChoice MissingModel(string shortName, bool canDownload) => MissingModelChoice.Quit;
-    public bool ConfirmDownload(string fileName, string sizeText, string note) => ConfirmDownloads;
+
+    /// <summary>The file names every download question named, in order.</summary>
+    public List<string> DownloadQuestions { get; } = [];
+
+    public bool ConfirmDownload(string fileName, string sizeText, string note)
+    {
+        DownloadQuestions.Add(fileName);
+        return ConfirmDownloads;
+    }
+
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;
+
+    public string? ChooseFolder(string initialDir)
+    {
+        FolderChooserOpenedIn.Add(initialDir);
+        return Folder;
+    }
 }
 
 /// <summary>A scratch profile: a settings folder, a local folder and an exe folder under one temporary directory.</summary>
@@ -225,7 +262,9 @@ internal sealed class Scratch : IDisposable
     }
 
     public DirectoryInfo Root { get; }
-    public AppPaths Paths { get; }
+
+    /// <summary>The scratch profile's folders; a test may change them (another ProfileDir, say) before it makes a shell.</summary>
+    public AppPaths Paths { get; set; }
 
     /// <summary>A shell over a fake platform with scripted dialogs, not started (no tray, no hook, no models).</summary>
     /// <param name="speechModels">A speech model manager with a fake loader, for tests that make a model ready; else the real one.</param>

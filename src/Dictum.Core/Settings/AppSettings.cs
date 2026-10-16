@@ -27,6 +27,7 @@ public sealed record AppSettings
     public double SilenceThreshold { get; init; } = 0.01;
     public AudioSettings Audio { get; init; } = new();
     public WhisperSettings Whisper { get; init; } = new();
+    public ModelsSettings Models { get; init; } = new();
     public LlmSettings Llm { get; init; } = new();
     public InsertSettings Insert { get; init; } = new();
     public PillSettings Pill { get; init; } = new();
@@ -56,6 +57,8 @@ public sealed record AudioSettings
 public sealed record WhisperSettings
 {
     public string Model { get; init; } = "medium.en";
+
+    /// <summary>models.folder's earlier name (whisper.models_dir), still read when models.folder is not set (<see cref="AppPaths.ChosenModelsDir"/>).</summary>
     public string? ModelsDir { get; init; }
 
     /// <summary>A Whisper language code ("en", "hi", "tl"…) or "auto" to detect it from the first seconds (needs a multilingual model).</summary>
@@ -70,6 +73,16 @@ public sealed record WhisperSettings
 
     /// <summary>0 = greedy decoding (the default); 1 or more = beam search with this many beams (SPEC §16.5).</summary>
     public int BeamSize { get; init; }
+}
+
+/// <summary>models.folder (Decision 15, 17/10/2026): where both kinds of model are looked for first and downloaded to.</summary>
+public sealed record ModelsSettings
+{
+    /// <summary>
+    /// An absolute folder on another drive or a network share, chosen in Settings > Models > Model folder; null = the per-user
+    /// default (%LOCALAPPDATA%\Dictum\models). The lookup order and the folder that is never written: <see cref="ModelFolders"/>.
+    /// </summary>
+    public string? Folder { get; init; }
 }
 
 public sealed record LlmSettings

@@ -369,7 +369,8 @@ present; AppData wins). Models and logs in `%LOCALAPPDATA%\Dictate\models` and
   "hands_free_max_seconds": 300,
   "silence_threshold": 0.01,
   "audio": { "device": null },
-  "whisper": { "model": "medium.en", "models_dir": null, "language": "en", "threads": 0, "gpu": "auto" },
+  "whisper": { "model": "medium.en", "language": "en", "threads": 0, "gpu": "auto" },
+  "models": { "folder": null },
   "llm": { "provider": "local", "model": "qwen2.5-1.5b", "base_url": null, "timeout_ms": 15000, "prompt_file": null, "gpu": "auto" },
   "offline_only": false,
   "insert": { "method": "paste", "restore_clipboard": false, "trailing_space": true, "paste_delay_ms": 150 },
@@ -380,8 +381,12 @@ present; AppData wins). Models and logs in `%LOCALAPPDATA%\Dictate\models` and
 ```
 
 `whisper.model` accepts a short name (`small.en`, `medium.en`, `medium.en-q5_0`,
-`large-v3-turbo`…) resolved to `ggml-<name>.bin` in `models_dir`, or an absolute path.
+`large-v3-turbo`…) looked up as `ggml-<name>.bin` in the model folders (§24), or an absolute path.
 Unknown keys and malformed values: log a warning, use the default, never crash.
+
+`models.folder` (amendment, 17/10/2026, §24): `null` (the per-user folder) or an absolute
+folder that is looked in first and downloaded to; a relative or invalid value falls back to
+`null` with a warning. `whisper.models_dir` is its earlier name, still read when it is not set.
 
 `hands_free_max_seconds` (amendment, 16/10/2026): 30–3600, set from Settings > General (§20). A
 value from 5 to 29 left by an earlier version is raised to 30 at load with a log line, and the file
@@ -409,7 +414,10 @@ silently once a user has chosen): GPU runtime loaded → `medium.en`; CPU only �
 which is too slow for a flow feel on CPU). The picker lists every catalogue
 entry with size and download state, pre-selects the recommendation, and explains the
 trade-off in one sentence. The choice is written to settings.json so it is visible and
-editable; the tray submenu changes it later in one click.
+editable; the tray submenu changes it later in one click. Amended 17/10/2026 (§24, Decision
+16): base.en ships inside every package; when it is found the first run asks no model
+question and writes base.en and the rule-based tidy (`llm.provider` = `none`), and the
+pickers run only without it.
 Already downloaded on this machine to `%LOCALAPPDATA%\Dictate\models`:
 `ggml-small.en.bin` (487,614,201 bytes) and `ggml-medium.en.bin` (1,533,774,781 bytes),
 source `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<file>` (sizes verified
@@ -658,7 +666,14 @@ Users must be able to remove what the app has put on disk, from inside the app.
   shows the size it will free and asks once. Rationale and sizes come from the file system,
   not from a stored count.
 - Free space shown next to the models dir; a warning before any download that would leave
-  under 2 GB free.
+  under 2 GB free. Amended 17/10/2026 (§24): a download that would leave under 200 MB is
+  refused; Storage lists the three model folders in lookup order and the folder each model
+  is in, and the models that come with Dictum (read-only) have no Delete. After the lens
+  (17/10/2026, §24): the switch offered for a model in use can be to the bundled base.en,
+  "Delete all app data" leaves a chosen folder outside the user's profile alone, and a
+  deletion that fails says "in use or not permitted". After the re-lens (§24): that switch
+  is offered only to a model the tray app's lookup loads, and a downloaded copy of the
+  model in use can be deleted when the same model is next in the lookup.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
   the integrity record, and reports freed bytes; "Delete all app data" never touches
   `.env` or the program folder.
@@ -746,8 +761,9 @@ Everything the Partner Center submission needs, written once: app name "Dictum" 
 reserve; category Productivity; short and long description; the privacy policy text
 (also published at dictum.kynni.au/privacy); the restricted-capability justification
 for runFullTrust (global hotkey and paste into other apps); notes for certification
-testers (first run downloads a model from huggingface.co; `offline_only` for an offline
-test; no account; how to dictate); age rating answers; screenshots list (from the design
+testers (no download is needed to test: base.en is in the package, and other models are
+optional downloads from huggingface.co; `offline_only` for an offline test; no account;
+how to dictate; amended 17/10/2026, §24); age rating answers; screenshots list (from the design
 canvas, re-taken from the real app); support contact hello@kynni.com.au; what to expect
 from certification (a few business days) and the common rejection reasons for
 full-trust apps.
@@ -778,7 +794,8 @@ user. Required:
   sets the fix-last hotkey, with "Use for Fix last dictation" and "Turn off"; one box
   listens at a time. Tab, and a bare Enter or Space, name no hotkey in a box: they are how
   a keyboard user reaches and presses its buttons. Tab is refused as a hotkey, as Esc is.)
-- First run: the same capture box after the model picker, defaulting to `RightCtrl`, with
+- First run: the same capture box after the model picker (amended 17/10/2026, §24: or, when
+  base.en comes with Dictum, with no model question before it), defaulting to `RightCtrl`, with
   the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
   Command (RightWin)".
 - `--selftest` prints a 5-second "press your hotkey now" check and reports whether the
@@ -957,3 +974,75 @@ common Filipino and Indian languages".
   the tree, the Models and Mode pages on the headless platform (refused changes spring back
   before any reload; accepted ones reach settings and the clean-up status), and the
   coordinator's balloon on a model that cannot do what the settings ask.
+
+## 24. Model folder and the bundled base.en (amendment, 17/10/2026: Decisions 15 and 16)
+
+Asked for: offshore staff on shared Azure virtual desktops (no GPU, little space on C:) need the models on another drive
+or folder (Decision 15); base.en ships inside every package, no clean-up model is set up by default, and the entry level
+must run on small machines (Decision 16). These amend §9, §10, §17 and §20; where they conflict, this section wins.
+
+- **Setting:** `models.folder` (§9): `null` (the per-user folder) or an absolute folder, on another drive or a network
+  share. A relative or invalid value falls back to `null` with a warning. `whisper.models_dir` is its earlier name: read
+  when `models.folder` is not set, ignored with a warning when both are set and differ, cleared when a folder is chosen in
+  Settings. New settings files write `models.folder` only.
+- **Lookup, for speech and clean-up models alike:** the chosen folder, then `%LOCALAPPDATA%\Dictum\models`, then the
+  bundled `models` folder beside `Dictum.exe` (inside the package when installed from the Store). A model name resolves to
+  the first file with the catalogue's exact size; in the bundled folder the tray app also requires the SHA-256 check
+  (remembered in verified-models.json), and a file that fails is passed over, logged once and never deleted. Nothing
+  found: the name resolves to where a download puts it. Every catalogue file is still size- and SHA-256-checked before it
+  loads, wherever it was found (§10, §22).
+- **Downloads** go to the chosen folder, else the per-user folder; never to the bundled folder, which is never written,
+  deleted or chosen (a chosen folder that is it, or inside it, is ignored, and Settings refuses it with a sentence). A
+  download is refused, before it is asked and again where it starts, when its drive would keep under 200 MB (decimal); a
+  kept `.part` needs only the rest; when the free space cannot be read the download goes ahead, as the 2 GB warning does.
+- **Changing the folder moves no files.**
+- **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices
+  settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
+  base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
+  `llm.model` gets the recommended clean-up model written, which is not downloaded (nothing downloads; the "not
+  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows. Without base.en the pickers run
+  as before. `llm.provider`'s own default when the key is absent stays `local`.
+- **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
+  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
+  one-line warning when the folder is on a network share: a UNC path, read from the text alone, or a mapped network
+  drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
+  ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled
+  folder. Storage (§17) lists the three folders in lookup order and the folder each model is in; bundled models have no
+  Delete. All new sentences are PROPOSED for the product owner.
+- **Recommended layout for shared virtual desktops:** one local folder per VM shared by its users, on a persistent data
+  disk, readable by every user and writable only by administrators, seeded as `models.folder` for every user and filled by
+  an administrator with `install.ps1 -ModelsFrom`; a user who wants another model uses **Use default**. Dictum then looks
+  only in their own folder and the models that come with it, no longer in the shared folder, so the models they use from it
+  are downloaded again. Not an Azure file share (slow loading; not measured).
+- **A folder other users may reach (lens, 17/10/2026):** verified-models.json is trusted, so a model is not hashed again,
+  only in the user's own folders (the per-user one and the bundled one); any other file (the chosen folder, a file chosen
+  by path) is hashed at its first load in each session. "Delete all app data" leaves a chosen folder outside the user's
+  profile alone (its own category in the path registry, §17) and its question names it; Storage's Delete still removes one
+  of its models, and "Remove Dictum completely" still lists each one. A deletion that fails reports "in use or not
+  permitted".
+- **The bundled folder by another name:** a chosen folder is compared with the bundled one by final path (links followed,
+  8.3 names and a `\\?\C:\` path normalised; not a subst drive or a mounted volume, and not on a network folder), is
+  ignored with a log line when it is the bundled one, and model deletion and the removal plan refuse any file whose final
+  path is inside the bundled folder. A device path other than `\\?\C:\` and `\\?\UNC\` (`\\?\Volume{...}`, `\\?\GLOBALROOT`, `\\.\`,
+  `\??\`, either slash) is refused as models.folder with the usual warning (re-lens, 17/10/2026). Deleting the model in
+  use offers the bundled base.en as its replacement (by name, so a second copy of the model in use never is), switched to
+  and never deleted.
+- **One lookup:** calibration uses the tray app's lookup (a bundled file held to its SHA-256), and `--download-model` and
+  `--bench-cleanup` look in every model folder, so `--download-model base.en` with base.en in the package downloads
+  nothing. A mismatch's advice follows the folder: Dictum's folders "Delete it and download it again", the bundled one
+  "It came with Dictum: reinstall Dictum, or download <name> in Settings > Models", anywhere else "rename it". Settings >
+  Models looks every catalogue model up again only after a settings load, a download that ended or a deletion.
+- **Re-lens (17/10/2026, on fa73e02):** the replacement offered for a model in use must be one the tray app's lookup
+  loads (a bundled base.en failing its SHA-256 is not offered). A downloaded copy of the model in use can be deleted when
+  the same model is next in the lookup and passes the tray app's check: it asks "Delete this copy of base.en (<size>)?
+  Dictum then uses the copy that came with it." (for a next copy in another of Dictum's folders, "Dictum then uses the
+  other copy, in <folder>."), releases the model, deletes the file and reloads; if the deletion fails the model is loaded
+  again. With a model loaded, a progress tick makes no folder lookup at all (the language note judges the model in use).
+  All new sentences are PROPOSED for the product owner.
+- Tests (`ModelFolderTests`): the setting's validation and documentation, the earlier name, the lookup order for both kinds
+  with a wrong-size copy passed over, the bundled folder never a download destination, a failing bundled file passed over
+  and logged once, the first run with and without base.en (the written file compared byte for byte with the pickers'),
+  a seeded folder at first run, the free-space rule at each site, a kept `.part`, the network test on UNC strings, the
+  Models and Storage pages on the headless platform, the Light preset and calibration using the bundled base.en, and a
+  first start end to end. `ModelFolderSafetyTests` pins the lens fixes above, a junction to the bundled folder included,
+  and the re-lens fixes.

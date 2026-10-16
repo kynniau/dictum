@@ -19,15 +19,17 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
           Dictum.exe --selftest                       load the models, report their runtimes, list
                                                        microphones, the data folders and the .env keys (never their
                                                        values), give you 5 s to press the hotkey; exit 0/1
-          Dictum.exe --download-model <name>          download a model (e.g. base.en) to the models folder with
+          Dictum.exe --download-model <name>          download a model (e.g. small.en) to the models folder with
                                                        a progress line; exit 0/1
           Dictum.exe --download-cleanup-model <name>  download a cleanup model (e.g. qwen2.5-1.5b) the same way
           Dictum.exe --bench-cleanup <file.txt|file.wav>
                                                        run every downloaded cleanup model over the same input
                                                        (a .wav is transcribed first) and print each one's output,
                                                        time and validator verdict side by side
-          Dictum.exe --print-models-dir               print the folder the app keeps models in (whisper.models_dir,
-                                                       else %LOCALAPPDATA%\Dictum\models); install.ps1 uses it
+          Dictum.exe --print-models-dir               print the folder the app downloads models to and looks in
+                                                       first (models.folder, else its earlier name
+                                                       whisper.models_dir, else %LOCALAPPDATA%\Dictum\models);
+                                                       install.ps1 uses it
           --model <name|path>                          use this model for this launch only (any mode)
           --cleanup-model <name|path>                  use this local cleanup model for this launch only (any mode)
           --config <dir>                               use <dir> instead of %APPDATA%\Dictum for settings.json/.env
@@ -77,7 +79,7 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
                     break;
                 case "--download-model":
                     download = Next();
-                    if (download is null || !ModelCatalog.IsShortName(download)) return (null, "--download-model needs a model name such as base.en (see --help).");
+                    if (download is null || !ModelCatalog.IsShortName(download)) return (null, "--download-model needs a model name such as small.en (see --help).");
                     if (Use(CliMode.DownloadModel, "--download-model") is { } clashD) return (null, clashD);
                     break;
                 case "--download-cleanup-model":

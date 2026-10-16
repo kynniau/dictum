@@ -80,7 +80,10 @@ public static class CleanupCatalog
     public static bool IsValidSetting(string value) => Find(value) is not null || (Path.IsPathFullyQualified(value) && value.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase));
 
     public static string ResolvePath(string model, string modelsDir) =>
-        Path.IsPathFullyQualified(model) ? model : Path.Combine(modelsDir, Find(model)?.FileName ?? $"{model}.gguf");
+        Path.IsPathFullyQualified(model) ? model : Path.Combine(modelsDir, FileNameFor(model));
+
+    /// <summary>The file a cleanup model name is kept as: the catalogue's file name, or "&lt;name&gt;.gguf" for a name outside it.</summary>
+    public static string FileNameFor(string name) => Find(name)?.FileName ?? $"{name}.gguf";
 
     /// <summary>The catalogue name for a catalogue name or a path to a catalogue file (any folder, as the hash check matches); otherwise the file name.</summary>
     public static string DisplayName(string model) =>

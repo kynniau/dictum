@@ -7,8 +7,9 @@ namespace Dictum.Settings;
 /// <param name="Usable">False when settings.json exists but could not be read or parsed: its values are unknown.</param>
 /// <param name="NamesSpeechModel">The file sets whisper.model (otherwise the first-run speech picker still has a choice to make).</param>
 /// <param name="NamesCleanupModel">The file chooses cleanup: llm.model, or a provider other than local.</param>
+/// <param name="NamesCleanupProvider">The file sets llm.provider (a first run with base.en on this PC keeps it: ModelCoordinator.FirstRun).</param>
 public sealed record SettingsLoadResult(AppSettings Settings, IReadOnlyList<string> Warnings, bool FileExisted, bool Usable = true,
-    bool NamesSpeechModel = true, bool NamesCleanupModel = true);
+    bool NamesSpeechModel = true, bool NamesCleanupModel = true, bool NamesCleanupProvider = false);
 
 /// <summary>
 /// Tolerant settings.json reader: every key is validated on its own. An unknown key or a malformed value
@@ -70,9 +71,10 @@ public static class SettingsLoader
             }
             var settings = Bind(new ObjectReader(root, "", warnings));
             var namesSpeech = HasString(root, "whisper", "model");
+            var namesProvider = HasString(root, "llm", "provider");
             var namesCleanup = HasString(root, "llm", "model")
-                || (HasString(root, "llm", "provider") && !string.Equals(settings.Llm.Provider, LlmSettings.Local, StringComparison.Ordinal));
-            return new SettingsLoadResult(settings, warnings, true, Usable: true, namesSpeech, namesCleanup);
+                || (namesProvider && !string.Equals(settings.Llm.Provider, LlmSettings.Local, StringComparison.Ordinal));
+            return new SettingsLoadResult(settings, warnings, true, Usable: true, namesSpeech, namesCleanup, namesProvider);
         }
     }
 
@@ -95,6 +97,7 @@ public static class SettingsLoader
             SilenceThreshold = r.Double("silence_threshold", d.SilenceThreshold, 0, 1),
             Audio = BindAudio(r.Child("audio")),
             Whisper = BindWhisper(r.Child("whisper")),
+            Models = BindModels(r.Child("models")),
             Llm = BindLlm(r.Child("llm")),
             Insert = BindInsert(r.Child("insert")),
             Pill = BindPill(r.Child("pill")),
@@ -113,7 +116,28 @@ public static class SettingsLoader
             r.Warn($"Setting \"fix_hotkey\" ({fixSpec.Display}) shares keys with \"hotkey\" ({main.Display}): one press could start a dictation and open Fix last dictation together, so fix_hotkey is ignored. Choose keys the hotkey does not use (for example LeftCtrl instead of Ctrl).");
             settings = settings with { FixHotkey = null };
         }
+        if (settings.Models.Folder is { } folder && settings.Whisper.ModelsDir is { } earlier && !string.Equals(folder, earlier, StringComparison.OrdinalIgnoreCase))
+            r.Warn("Setting \"whisper.models_dir\" is ignored: \"models.folder\" chooses the models folder.");
         return settings;
+    }
+
+    /// <summary>
+    /// models.folder and its earlier name whisper.models_dir: an absolute folder (a drive or a network share), or empty for the
+    /// default. A device path is refused unless it is \\?\X:\ or \\?\UNC\ (re-lens, 17/10/2026: \\?\Volume{GUID}\ names the
+    /// bundled folder by a name that no comparison takes for it, and the bundled base.en was deleted through it): the usual
+    /// warning and the default follow.
+    /// </summary>
+    private static string? FolderProblem(string value) =>
+        Path.IsPathFullyQualified(value) && value.IndexOfAny(Path.GetInvalidPathChars()) < 0 && !Storage.PathRegistry.IsUnsupportedDevicePath(value)
+            ? null
+            : "expected an absolute folder path";
+
+    private static ModelsSettings BindModels(ObjectReader? r)
+    {
+        if (r is null) return new ModelsSettings();
+        var s = new ModelsSettings { Folder = r.NullableString("folder", FolderProblem) };
+        r.WarnUnknown();
+        return s;
     }
 
     private static ProfanitySettings BindProfanity(ObjectReader? r)
@@ -184,7 +208,7 @@ public static class SettingsLoader
         var s = new WhisperSettings
         {
             Model = r.String("model", d.Model, v => ModelCatalog.IsValidModelSetting(v) ? null : "expected a model name like \"small.en\" or an absolute path to a .bin file"),
-            ModelsDir = r.NullableString("models_dir", v => Path.IsPathFullyQualified(v) ? null : "expected an absolute folder path"),
+            ModelsDir = r.NullableString("models_dir", FolderProblem),
             Language = r.String("language", d.Language, v => Transcribe.WhisperLanguages.IsValid(v.ToLowerInvariant()) ? null : "expected a whisper language code such as \"en\", \"hi\" or \"tl\" (openai/whisper's list), or \"auto\"").ToLowerInvariant(),
             Translate = r.Bool("translate", d.Translate),
             Threads = r.Int("threads", d.Threads, 0, 64),
