@@ -93,6 +93,10 @@ internal sealed class CleanupPage : SettingsPage
     /// off would change that. Not for text that is not English (SPEC §23): the plain cleaner never asks a provider, so nothing would
     /// be sent either way, and the pages say that the clean-up in use runs on this PC. Settings > Privacy decides the same way.
     /// </summary>
+    // simplification: the English test is recomputed from the settings, the same expression AppShell.LoadConfiguration gives
+    // TranscriptCleaner.Create, because AppShell does not expose whether the cleaner in use is plain. Ceiling: the page and the cleaner
+    // agree only while that one call decides. Retire it when AppShell exposes TranscriptCleaner.IsPlain (or the cleaner gains another
+    // reason to be plain): read it from the shell here and on the Privacy page.
     internal static bool OfflineOnlyIsWhyNothingIsSent(AppSettings s) =>
         TranscriptCleaner.OfflineRefusal(s.Llm, s.OfflineOnly) is not null && WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate);
 
