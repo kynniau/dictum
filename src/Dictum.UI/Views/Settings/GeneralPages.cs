@@ -20,7 +20,7 @@ internal sealed class GeneralPage : SettingsPage
                                     "While Dictum is on and a speech model is ready, that button no longer reaches other apps at all (no right-click menu, no middle-click, " +
                                     "no Back); a side button you do not use is the best choice.";
     /// <summary>The fix-last listener has no speech model to wait for, so its button is swallowed whenever Dictum is on.</summary>
-    private const string FixMouseNote ="While Dictum is on, a mouse button chosen here no longer reaches other apps at all.";
+    private const string FixMouseNote = "While Dictum is on, a mouse button chosen here no longer reaches other apps at all.";
     private const string FixCaption = "Press the key for Fix last dictation";
     private const string FixPrompt = "Listening: press the key or mouse button that should open Fix last dictation.";
 
