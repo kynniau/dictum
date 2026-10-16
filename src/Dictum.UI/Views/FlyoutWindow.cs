@@ -16,7 +16,8 @@ namespace Dictum.UI.Views;
 
 /// <summary>
 /// The tray panel (docs/design/Flyout.dc.html), opened by a click on the tray icon and closed by another click, Esc, or
-/// focus moving elsewhere: status and the on/off switch, Light/Full, the two model pickers, the microphone with its meter,
+/// focus moving elsewhere: status and the on/off switch, any model problem (with Try on the CPU and Open log folder),
+/// Light/Full, the two model pickers, the microphone with its meter,
 /// the indicator and the three toggles, four actions, the privacy line and Quit. Opened on purpose, so it takes focus.
 /// </summary>
 internal sealed class FlyoutWindow : Window
@@ -27,6 +28,9 @@ internal sealed class FlyoutWindow : Window
 
     private readonly AppShell _shell;
     private readonly TextBlock _models = Ui.Text("", "caption");
+    private readonly TextBlock _problem = Ui.Text("", "caption");
+    private readonly Button _tryCpu;
+    private readonly StackPanel _problemBox;
     private readonly Ellipse _dot = new() { Width = 8, Height = 8 };
     private readonly TextBlock _state = Ui.Text("", "caption");
     private readonly ToggleSwitch _enabled;
@@ -76,6 +80,19 @@ internal sealed class FlyoutWindow : Window
         AutomationProperties.SetName(_cleanup, "Clean-up");
         AutomationProperties.SetName(_mic, "Microphone");
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => shell.Models.CancelDownload()));
+        // Why a model could not load or runs on the CPU, under the header, with what to do about it (Store investigation, 16/10/2026).
+        _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "link", () =>
+        {
+            // The reload hides this button and its box while the model loads: keyboard focus goes first to the panel's first control.
+            if (_tryCpu!.IsFocused) _enabled.Focus(NavigationMethod.Tab); // set by then: the button exists before it can be pressed
+            Act(() => shell.TryOnCpu());
+        });
+        var openLogs = Ui.Button("Open log folder", "link", () => Act(() =>
+        {
+            if (shell.OpenPath(shell.RealPath(shell.Paths.LogsDir), folder: true) is { } why) shell.Notify("Dictum", why, warning: true);
+        }));
+        AutomationProperties.SetLiveSetting(_problem, AutomationLiveSetting.Polite);
+        _problemBox = Ui.Stack(4, _problem, Ui.Row(12, _tryCpu, openLogs));
 
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"), ColumnSpacing = 10 };
         header.Children.Add(new MarkIcon(28));
@@ -113,6 +130,7 @@ internal sealed class FlyoutWindow : Window
 
         var body = Ui.Stack(14,
             header,
+            _problemBox,
             _download,
             Ui.Stack(6, Ui.Text("Mode", "caption"), _mode, _modeHint),
             Ui.Columns(2, 10, Labelled("Speech model", _speech), Labelled("Clean-up", _cleanup)),
@@ -189,6 +207,9 @@ internal sealed class FlyoutWindow : Window
             var s = _shell.Settings;
             var status = _shell.Status;
             _models.Text = status.Models;
+            _problem.Text = status.Problem ?? "";
+            _problemBox.IsVisible = status.Problem is not null;
+            _tryCpu.IsVisible = status.TryCpu;
             _state.Text = status.State;
             _dot[!Shape.FillProperty] = new DynamicResourceExtension(status.Tone switch
             {

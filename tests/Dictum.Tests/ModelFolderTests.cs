@@ -54,7 +54,7 @@ public sealed class ModelFolderTests : IDisposable
 
     private ModelCoordinator Make(ModelIntegrity? integrity = null, Func<string, long?>? free = null, HttpMessageHandler? server = null, ILog? log = null,
         ModelManager? models = null, ScriptedPrompts? prompts = null, AppPaths? paths = null, Func<AppSettings>? settings = null) =>
-        new(paths ?? _paths, models ?? new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false),
+        new(paths ?? _paths, models ?? new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false),
             new LocalLlmManager(NullLog.Instance, loader: (p, _) => new FakeLocalEngine(p)), new HttpClient(server ?? new CountingHandler()), log ?? NullLog.Instance,
             settings ?? (() => _settings), null, prompts ?? _prompts, _ => null, reload: () => _settings = SettingsLoader.LoadFile(_paths.SettingsFile).Settings,
             shutdown: () => { }, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Add(text), integrity: integrity, gpuMachine: () => false,
@@ -215,7 +215,7 @@ public sealed class ModelFolderTests : IDisposable
         var bundled = Create(_paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
         var integrity = new ModelIntegrity(_paths.VerifiedModelsFile, NullLog.Instance, () => ModelFolders.LookupOrder(_paths, _settings));
         integrity.Remember(bundled); // as if hashed once already: zeros would fail the SHA-256
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var coordinator = Make(integrity: integrity, models: models);
 
         Assert.Equal((true, true), AppRules.FirstRunQuestions(SettingsLoader.LoadFile(_paths.SettingsFile)));
@@ -355,7 +355,7 @@ public sealed class ModelFolderTests : IDisposable
         using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "models_dir": null } }""");
         var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
         var inChosen = Create(chosen, "ggml-tiny.en.bin", TinyEnBytes);
-        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false));
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false));
         shell.Reload(userRequested: false);
         var window = new SettingsWindow(shell);
         window.Show();
@@ -498,7 +498,7 @@ public sealed class ModelFolderTests : IDisposable
         var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
         new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled);
         var server = new CountingHandler();
-        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false),
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false),
             downloadHandler: server);
         shell.Reload(userRequested: false);
 
@@ -525,7 +525,7 @@ public sealed class ModelFolderTests : IDisposable
         var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
         new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled); // as if hashed once already
         var server = new CountingHandler();
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: server);
         try
         {

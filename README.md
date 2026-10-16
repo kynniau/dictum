@@ -87,6 +87,13 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 
 - **Status**: the models in use with their runtimes and the hotkey, a coloured state (Ready, Recording, Working,
   Loading, Downloading, No model, Error, Off) and the **Dictation on** switch (saved as `enabled`).
+- **A model problem**, under the status when there is one: why a model could not load (in plain words for a missing
+  Visual C++ runtime, else the engine's own message), or that it runs on the CPU because the graphics driver could not
+  run it, now or the last time it started (see Troubleshooting). A model that fails on the GPU is tried once more on the
+  CPU at once; if that fails too, the line shows the CPU's own error. Beside the line, **Open log folder** and, when a
+  model failed inside the GPU runtime before any try on the CPU, **Try on the CPU**, which saves `whisper.gpu` or
+  `llm.gpu` = `cpu` and loads the model again off the GPU; if it fails again, the line asks you to restart Dictum, which
+  then loads the CPU-only runtime. Settings > About shows the same line.
 - **Download progress** with **Cancel download** while a model downloads or waits its turn. Downloads run one at a
   time; cancelling deletes the partial file and drops any download waiting behind it. A dropped connection is resumed
   automatically (see "Model downloads and checks").
@@ -645,11 +652,11 @@ warning and the default is used; Dictum never fails to start because of settings
 | `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`hi`, `tl`, `bn`, `ta`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change rebuilds the decoder and does not load the model again. |
 | `whisper.translate` | `false` | `true`: write English whatever language is spoken. Needs a multilingual model; `large-v3-turbo` cannot translate (OpenAI's README: the turbo model "is not trained for translation tasks"). |
 | `whisper.threads` | `0` | CPU threads; 0 = Whisper.net's default. |
-| `whisper.gpu` | `"auto"` | `auto` / `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `cpu`: CPU, then CPU-without-AVX. Needs a restart. |
+| `whisper.gpu` | `"auto"` | `auto` / `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `cpu`: CPU, then CPU-without-AVX. The runtime is chosen once per start, so a change needs a restart; a model loaded after a change to `cpu` already stays off the GPU. A model whose load or warm-up fails on the GPU is loaded once more on the CPU, and a start after the GPU ended Dictum while it loaded the model uses the CPU-only runtime for that run (Troubleshooting, "Dictum quits by itself"). |
 | `whisper.beam_size` | `0` | `0` = greedy decoding (fastest); `1`–`8` = beam search with that many beams (more accurate, slower). Calibration's **Use this** writes it. |
 | `llm.provider` | `"local"` when the key is absent; the first run writes `"none"` when base.en comes with Dictum (a seeded value is kept) | `local` (the cleanup model on this PC; Settings > Models > Add AI clean-up writes it), `none` (rule-based tidy only), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
 | `llm.model` | your first-run pick (`qwen2.5-1.5b` if the file has no value) | For `local`: a cleanup catalogue name or an absolute path to a `.gguf`; the Clean-up picker and Settings > Models write this. Anything else (for example `claude-haiku-5-5` left by the first build) is treated as unset and the recommendation is used (logged). For `openai-compatible`: the server's model id. With `anthropic` a local name means `claude-haiku-5-5`. |
-| `llm.gpu` | `"auto"` | Cleanup model backend. `auto` / `vulkan`: try Vulkan, then CPU. `cpu`: CPU only. Needs a restart. |
+| `llm.gpu` | `"auto"` | Cleanup model backend. `vulkan`: try Vulkan, then CPU. `auto`: the same, except that when every GPU Vulkan finds is integrated graphics the CPU build is used (faster there: on the development PC's Intel UHD P630 and 6-core Xeon, 2.1-2.2 s per clean-up against 4.2-4.3 s on Vulkan, qwen2.5-1.5b, 17/10/2026). Dictum learns the GPUs from the speech model's runtime, so `auto` keeps Vulkan on such a PC when that runtime is the CPU-only one (`whisper.gpu = cpu`, which **Try on the CPU** writes, or a start after the GPU ended Dictum on the speech model) or when no speech model load has been asked for (a missing speech model, say), and `--bench-cleanup` always times Vulkan there; set `llm.gpu` to `cpu` for the CPU build in those cases. `cpu`: CPU only. The backend is chosen once per start, so a change needs a restart; a model loaded after a change to `cpu` already stays off the GPU. A model whose load or warm-up fails on the GPU is loaded once more on the CPU, and a start after the GPU ended Dictum while it loaded the model uses the CPU build for that run. |
 | `llm.base_url` | `null` | Required for `openai-compatible`, e.g. `http://localhost:11434/v1`. For `anthropic` it is optional and replaces `https://api.anthropic.com` (e.g. a company gateway). The `ANTHROPIC_BASE_URL` environment variable is ignored. Because both providers share this key, a URL left over from `openai-compatible` would receive the Anthropic key and transcripts: Dictum logs a warning and shows a balloon "Anthropic requests will go to <host>" whenever `anthropic` is used with a `base_url`. |
 | `llm.timeout_ms` | `15000` | The shortest cleanup deadline (1000–120000). The deadline is 10 s + 0.1 s per dictated word, at least this and at most 60 s (or this, if longer); past it the rule-based tidy is pasted. |
 | `llm.prompt_file` | `null` | Absolute path to a custom system prompt; the built-in prompt otherwise. The grammar-assist sentence and the dictionary line are added to it too. |
@@ -716,8 +723,11 @@ Cleanup removes filler words and false starts, fixes punctuation and casing, app
 **Deadline:** 10 s plus 0.1 s per dictated word, at least `llm.timeout_ms` (15 s by default) and at most 60 s. It is
 a hard limit: Dictum stops waiting then, and tells the model to stop, even if it has not stopped. Before calling the
 local model, Dictum estimates the time from the speed measured at warm-up (a short cleanup run right after the model
-loads) and on the latest dictations, including ones stopped at their deadline; if the estimate is over the deadline
-it skips the model, uses the rule-based tidy and the pill says "Polishing… skipped (long dictation)".
+loads, run twice the first time with only the second run counted, since the first pays one-off costs) and on the
+latest dictations, including ones stopped at their deadline; if the estimate is over the deadline it skips the model,
+uses the rule-based tidy and the pill says "Polishing… skipped (long dictation)". A skipped dictation measures nothing,
+so after three in a row the next one runs the model anyway and measures its speed again; while the model stays too
+slow that allowance doubles (6, 12, at most 24), and a dictation the estimate lets through puts it back to three.
 
 A reply is rejected if it is empty; has more than 1.6× or fewer than 0.4× the dictation's words (dictations of 8+
 words; spoken commands such as "new line" and "comma" and hesitations are not counted, and the lower bound is
@@ -982,6 +992,13 @@ send it on, and `offline_only` cannot see that.
   logged: any occurrence of a configured key is replaced with `[redacted]`.
 - **API keys** come only from environment variables or `.env`; never from or into settings.json, the windows, or error
   messages. With the default `local` provider no key is needed for cleanup.
+- **GPU-load markers** (`%LOCALAPPDATA%\Dictum\gpu-load-speech.txt`, `gpu-load-cleanup.txt`) hold the path of a model
+  while it loads on the GPU, and nothing else. GPU loads run one after the other, so this run writes at most one file at
+  a time; a file left by an earlier start can sit beside it. One stays whenever Dictum ends during that load without quitting normally: the GPU ending it, but also Task Manager ending
+  it, a power loss, or Windows signing out or shutting down before Dictum quits. Dictum cannot tell these apart, so the
+  next start puts that model on the CPU when its gpu setting is `auto` (see Troubleshooting). To let the model try the
+  GPU again, quit Dictum and delete the file, or set its gpu setting to `vulkan`. Settings > Storage > Delete all app
+  data and Remove Dictum completely delete them.
 - **Model files** are data, not programs (see "Cleanup models"), and downloads are checked against the pinned SHA-256
   where the catalogue has one; Gemma files are size-checked only.
 - **Report a problem** (Settings > About) opens an email to hello@kynni.com.au in your own mail app, with Dictum's
@@ -1132,6 +1149,25 @@ warns, and that file has no size or hash to be checked against. A value is never
   "Install".
 - **Model missing.** Use Settings > Models, `Dictum.exe --download-model small.en`,
   `scripts\download-model.ps1 -Model small.en`, or point `whisper.model` at a file you already have.
+- **"The Microsoft Visual C++ runtime is missing" (tray panel, Settings > About).** The speech and clean-up engines need
+  the Microsoft Visual C++ Redistributable (x64), version 14.51 or later, and neither could load without it (an older
+  `msvcp140.dll` counts as missing). Install it as the "model error" entry above says, then restart Dictum. Until then
+  nothing can be dictated; Open log folder shows the engines' own messages. The balloon says this once for both models.
+- **"The graphics driver could not run the model; Dictum will use the CPU".** The model failed on the GPU (log:
+  `failed while the GPU was in use (…); loading it again on the CPU`) and runs on the CPU now. Update the graphics
+  driver, or set `whisper.gpu` / `llm.gpu` to `cpu` to start on the CPU every time. If the CPU fails too, the line shows
+  the CPU's own error instead, with Open log folder; Try on the CPU is not offered then, since the CPU has been tried.
+- **Dictum quits by itself while it loads a model on the GPU.** whisper.cpp (and llama.cpp) can end the program, rather
+  than report an error, when the GPU refuses the model's memory (seen with an artificial 16 MiB buffer limit, 17/10/2026).
+  While a model loads on the GPU, Dictum keeps its path in `gpu-load-speech.txt` or `gpu-load-cleanup.txt` in
+  `%LOCALAPPDATA%\Dictum` and deletes the file when the load ends. GPU loads run one after the other, so this run writes
+  at most one file at a time; a file left by an earlier start can sit beside it. If Dictum was ended instead (by the GPU, or by anything else during that load), the next
+  start that loads that model first, with its gpu setting `auto`, loads it on the CPU for that run (the CPU-only
+  runtime) and says "The graphics driver could not run this model, so Dictum uses the CPU for it." The file stays, so
+  later starts do the same; loading another model on the GPU replaces it, deleting the file (with Dictum quit) lets that
+  model try the GPU again, and `"gpu": "vulkan"` always tries the GPU. To keep a model off the GPU for good,
+  set `"whisper": { "gpu": "cpu" }` (or `llm.gpu`) in settings.json. Not covered: the GPU ending Dictum during a
+  dictation, after the model had loaded.
 - **Slow cleanup.** Check the cleanup backend in the tray panel or `--selftest`. On `CPU`, choose
   "No AI cleanup (rule-based tidy)" (tray panel > Clean-up > Rule-based tidy) if 1.5b is too slow (see the measured table). If the
   log shows `applying the rule-based tidy instead: timed out` or `skipped: estimated …`, the dictation was too long

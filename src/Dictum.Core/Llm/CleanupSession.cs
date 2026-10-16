@@ -31,6 +31,9 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
     /// <summary>Tokens and time of the last prefix evaluation (at load and whenever the prompt changes).</summary>
     public (int Tokens, TimeSpan Time) LastPrefix { get; private set; }
 
+    /// <summary>How many times a prefix has been evaluated, so a caller can tell whether its own call evaluated one.</summary>
+    public int PrefixEvaluations { get; private set; }
+
     /// <summary>The counts of the latest call that was cancelled (no text), for the speed estimate.</summary>
     public GenerationResult? Cancelled { get; private set; }
 
@@ -87,6 +90,7 @@ internal sealed class CleanupSession(LLamaWeights weights, IContextParams contex
         _prefixTokens = _conversation.TokenCount;
         _prefixText = prefix;
         LastPrefix = (_prefixTokens, sw.Elapsed);
+        PrefixEvaluations++;
     }
 
     public async Task<GenerationResult> GenerateAsync(string systemPrompt, IReadOnlyList<(string Raw, string Clean)> examples, string raw, string? carried, int maxTokens,

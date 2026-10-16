@@ -27,6 +27,10 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
     public string LogsDir => Path.Combine(LocalDir, "logs");
     public string VerifiedModelsFile => Path.Combine(LocalDir, "verified-models.json");
 
+    /// <summary>The model whose GPU load is under way, or ended Dictum (<see cref="Transcribe.GpuLoadMarker"/>): one file per engine, beside the verified record.</summary>
+    public string SpeechGpuMarkerFile => Path.Combine(LocalDir, Transcribe.GpuLoadMarker.SpeechFile);
+    public string CleanupGpuMarkerFile => Path.Combine(LocalDir, Transcribe.GpuLoadMarker.CleanupFile);
+
     // Batch 2 (SPEC §16): plain text files the user can read, edit and delete; watched like settings.json.
     public string DictionaryFile => Path.Combine(ConfigDir, "dictionary.txt");
     public string CorrectionsFile => Path.Combine(ConfigDir, "corrections.txt");

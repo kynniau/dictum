@@ -57,7 +57,7 @@ public partial class CloudOffTakesEffectTests
     {
         var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
         File.WriteAllText(model, "");
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var (shell, _, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model), log: log);
         Assert.True(shell.Start(lifetime: null));
         return shell;

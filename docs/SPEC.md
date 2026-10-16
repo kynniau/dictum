@@ -1046,3 +1046,46 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   Models and Storage pages on the headless platform, the Light preset and calibration using the bundled base.en, and a
   first start end to end. `ModelFolderSafetyTests` pins the lens fixes above, a junction to the bundled folder included,
   and the re-lens fixes.
+
+## 25. Runtime resilience (amendment, 17/10/2026)
+
+From the Store certification investigation (16/10/2026); decisions and measurements in DECISIONS.md, "Runtime
+resilience".
+
+- **A model that cannot load is named.** When an engine's native library cannot load and the Visual C++ runtime
+  (vcruntime140, vcruntime140_1, msvcp140, vcomp140) is not on the PC, the reason reads "The Microsoft Visual C++
+  runtime is missing; install it from Microsoft, then restart Dictum"; an msvcp140 older than 14.51 (the build scripts'
+  floor) counts as missing, and off Windows the runtime is never reported missing. Other failures keep the engine's own
+  words. The tray panel shows the reason under its status line ("Speech model: …", "Clean-up model: …", or both models
+  on one line when they share it), with Open log folder and, when the model failed inside a GPU runtime before any try
+  on the CPU for that failure, Try on the CPU, which writes `whisper.gpu` / `llm.gpu` = `cpu` and reloads; if the model
+  then fails on the CPU inside the GPU runtime the line adds "Restart Dictum to use the CPU." After the retry on the CPU
+  (below) has failed too, the line shows the CPU's own error and Try on the CPU is not offered. Pressing it moves
+  keyboard focus to a control that stays visible (the tray panel's Dictation on switch; in About, the next control, where
+  Tab would go). Settings >
+  About shows the same line, and its clean-up line says the local model could not be loaded instead of "on this PC"
+  while it failed, except for text that is not English, whose plain clean-up keeps its own line. The load balloon for a
+  missing runtime is that reason alone, once for both models. All of this copy is proposed, awaiting the product owner's
+  review.
+- **One more try on the CPU.** A speech or clean-up load or warm-up that fails while the GPU is in use is loaded once
+  more on the CPU inside the same runtime (whisper: no GPU; llama.cpp: no GPU layers and no op offload); the line then
+  reads "The graphics driver could not run the model; Dictum will use the CPU" and the models line says CPU. An engine
+  whose warm-up fails is released. `cpu` keeps a model off the GPU even inside a GPU runtime loaded earlier, so a
+  changed setting takes effect at the model's next load; the runtime order still changes only at a start.
+- **A GPU that ends Dictum.** whisper.cpp (and llama.cpp) can end the program when the GPU refuses a model's memory, which
+  no retry survives. While a model loads on the GPU its path is in `gpu-load-speech.txt` / `gpu-load-cleanup.txt` in the
+  per-user local data folder, deleted when the load ends and at quit. The two managers' GPU loads (warm-up included) run
+  one after the other through one gate per folder, so this run writes at most one file at a time; a file left by an
+  earlier start can sit beside it, and a file this run writes names the load under way. A
+  file also stays when anything else ends Dictum during that load (Task Manager, power loss, sign-out). A start whose
+  first load is the model such a file names, with that model's gpu setting `auto`, loads it on the CPU for that run, with
+  no click (whisper: the CPU-only runtime; llama.cpp: the CPU build), and the line reads "The graphics driver could not
+  run this model, so Dictum uses the CPU for it." A hand-set `vulkan` tries the GPU regardless. The file stays, so
+  starts do not alternate; a GPU load of another model replaces it. Settings > Storage's deletions list the files.
+- **Integrated graphics.** With `llm.gpu = auto`, the clean-up model uses llama.cpp's CPU build when every Vulkan device
+  whisper's runtime found is integrated graphics (`uma: 1`); a discrete GPU keeps Vulkan, and `vulkan` / `cpu` force.
+  Exceptions: when whisper's runtime is the CPU-only one (`whisper.gpu = cpu`, or a start after the GPU ended Dictum on
+  the speech model) or no speech load has been asked for, the devices are not known and `auto` keeps Vulkan.
+- **Speed estimate.** A model's first warm-up runs twice and only the second run's speed is kept. After three
+  dictations in a row that the estimate skipped, the next one runs the model and measures again; the allowance doubles
+  (to 24 at most) while the model stays too slow, and a dictation the estimate lets through resets it.

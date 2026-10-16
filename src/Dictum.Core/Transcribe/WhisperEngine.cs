@@ -73,6 +73,7 @@ public sealed partial class WhisperEngine : ISpeechEngine
     private static int _vulkanDevices = -1;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> Devices = new(); // index → integrated
     private static bool _runtimeConfigured;
+    private static string? _configuredGpu; // the whisper.gpu value the runtime order was set from; null until then
     private static IDisposable? _nativeLogSubscription;
 
     private readonly SemaphoreSlim _busy = new(1, 1);
@@ -152,6 +153,7 @@ public sealed partial class WhisperEngine : ISpeechEngine
         {
             if (_runtimeConfigured) return;
             _runtimeConfigured = true;
+            Volatile.Write(ref _configuredGpu, gpuSetting);
             // Only the runtimes this app ships (SPEC §2). No Cuda: those packages need an installed CUDA Toolkit.
             RuntimeOptions.RuntimeLibraryOrder = gpuSetting == "cpu"
                 ? [RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx]
@@ -205,6 +207,12 @@ public sealed partial class WhisperEngine : ISpeechEngine
     /// Whether the recommendations and the Mode presets treat this PC as a GPU machine: Vulkan is in use and
     /// <see cref="IsGpuMachine"/> holds for the devices it described.
     /// </summary>
+    // simplification: a fact about the runtime, not about where the speech model runs. Ceiling: after the retry on the CPU
+    // (ModelManager.RunsOnCpu, Notice GpuFailed) Vulkan is still in use, so Full still offers large-v3-turbo and the
+    // recommendations stay GPU-sized on a PC whose GPU just failed; a start after the GPU ended Dictum sets the CPU-only order
+    // (when nothing set an order before it), which this already reads as a CPU machine. Trigger to retire: the shell's
+    // GPU-machine question taking the speech model's RunsOnCpu into account (AppShell.cs:77, outside the resilience lane), or a
+    // report of Full choosing a model the GPU cannot run.
     public static bool GpuMachine => VulkanActive && IsGpuMachine(VulkanDevices, Devices.Count(d => !d.Value), Devices.Count(d => d.Value));
 
     /// <summary>
@@ -216,6 +224,41 @@ public sealed partial class WhisperEngine : ISpeechEngine
 
     /// <summary>Devices reported by ggml_vulkan, or -1 if it has not reported.</summary>
     public static int VulkanDevices => Volatile.Read(ref _vulkanDevices);
+
+    /// <summary>
+    /// The GPUs the clean-up model's backend choice weighs (<see cref="Llm.LocalLlmEngine.ConfigureBackend"/>): the Vulkan
+    /// devices whisper's runtime found (all, discrete, integrated), loading that runtime first when its order is already set.
+    /// Null when the order is not set yet (no speech load has been asked for), when it is the CPU order (whisper.gpu = cpu:
+    /// whisper's Vulkan build is never loaded just to look), or when Vulkan did not load.
+    /// </summary>
+    public static (int Found, int Discrete, int Integrated)? VulkanDevicesForCleanup(ILog log)
+    {
+        // simplification: no order set, or the CPU order, answers null, and the clean-up's auto then keeps Vulkan. Ceiling: on a PC
+        // whose only GPU is integrated graphics, whisper.gpu = cpu (which Try on the CPU writes, and which a start after the GPU
+        // ended Dictum on the speech model also sets) or a clean-up load asked before any speech load puts the clean-up on
+        // Vulkan, the slower choice there (LocalLlmEngine.UseVulkan). Trigger to retire: as LocalLlmEngine.ConfigureBackend's note.
+        if (!ProbeAllowed(Volatile.Read(ref _configuredGpu))) return null;
+        NativeLoadGate.Run(() =>
+        {
+            try
+            {
+                WhisperFactory.GetRuntimeInfo(); // loads the runtime if no speech model has yet; ggml_vulkan describes its devices as it does
+            }
+            catch (Exception ex)
+            {
+                log.Warn($"Whisper runtime probe for the clean-up backend failed: {ex.GetType().Name}: {ex.Message}");
+            }
+            return 0;
+        });
+        return RuntimeOptions.LoadedLibrary == RuntimeLibrary.Vulkan ? (VulkanDevices, Devices.Count(d => !d.Value), Devices.Count(d => d.Value)) : null;
+    }
+
+    /// <summary>
+    /// Whether the clean-up's backend choice may load whisper's runtime to read its devices: only once a speech load has set the
+    /// runtime order (<paramref name="configuredGpu"/>, the whisper.gpu value it was set from), and never against whisper.gpu =
+    /// cpu, whose order leaves whisper's Vulkan runtime out (it is never loaded just to look).
+    /// </summary>
+    internal static bool ProbeAllowed(string? configuredGpu) => configuredGpu is not (null or "cpu");
 
     /// <summary>"2 (1 discrete, 1 integrated)" for the log and --selftest.</summary>
     public static string DeviceSummary =>
@@ -245,22 +288,35 @@ public sealed partial class WhisperEngine : ISpeechEngine
         return m.Success ? (int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), m.Groups[2].Value == "1") : null;
     }
 
+    /// <param name="gpuSetting">whisper.gpu: sets the runtime order the first time (<see cref="ConfigureRuntime"/>); "cpu" also keeps
+    /// this model off the GPU inside a GPU runtime already loaded (a changed setting, or <see cref="ModelManager"/>'s retry after the
+    /// GPU failed), through Whisper.net's UseGpu (observed 16/10/2026 on the Intel UHD P630: base.en 3.0-3.6 s per 10.7 s clip).</param>
     /// <param name="decode">The decoder options, language and translate included (<see cref="DecodeOptions.Default"/>: English, greedy, no prompt).</param>
     public static WhisperEngine Load(string modelPath, int threads, string gpuSetting, ILog log, DecodeOptions? decode = null)
     {
         if (!File.Exists(modelPath)) throw new FileNotFoundException("Whisper model file not found.", modelPath);
         var options = decode ?? DecodeOptions.Default;
         if (WhisperLanguages.Problem(modelPath, options.Language, options.Translate) is { } problem) log.Warn($"Whisper settings: {problem}");
+        var useGpu = gpuSetting != "cpu";
         var sw = Stopwatch.StartNew();
         var engine = NativeLoadGate.Run(() =>
         {
             ConfigureRuntime(gpuSetting, log);
-            var factory = WhisperFactory.FromPath(modelPath);
-            return new WhisperEngine(factory, threads, options, modelPath, TimeSpan.Zero, log);
+            var factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = useGpu });
+            try
+            {
+                return new WhisperEngine(factory, threads, options, modelPath, TimeSpan.Zero, log);
+            }
+            catch
+            {
+                factory.Dispose(); // a processor that cannot be built never leaves its model loaded
+                throw;
+            }
         });
         sw.Stop();
         engine.LoadTime = sw.Elapsed;
-        log.Info($"Whisper model {Path.GetFileName(modelPath)} loaded in {sw.Elapsed.TotalSeconds:0.0} s on runtime {LoadedRuntime} " +
+        var where = useGpu || RuntimeOptions.LoadedLibrary != RuntimeLibrary.Vulkan ? "" : ", on the CPU";
+        log.Info($"Whisper model {Path.GetFileName(modelPath)} loaded in {sw.Elapsed.TotalSeconds:0.0} s on runtime {LoadedRuntime}{where} " +
                  $"({options.DescribeLanguage()}, {options.Describe()}{(options.Prompt is null ? "" : ", dictionary prompt")}).");
         return engine;
     }

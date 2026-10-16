@@ -63,9 +63,10 @@ public sealed partial class AppShell : IDisposable
     /// production uses the socket handler.
     /// </param>
     /// <param name="updateHandler">The same for the Check for updates client; production uses its socket handler, which follows no redirect.</param>
+    /// <param name="cleanupModels">Tests pass one that loads a fake engine; production builds the llama.cpp one.</param>
     public AppShell(IPlatform platform, AppPaths paths, ILog log, SecretRedactor redactor, ShellOptions options, IShellDialogs? dialogs = null,
         IInstanceLock? instance = null, Func<bool>? gpuMachine = null, ModelManager? speechModels = null, HttpMessageHandler? downloadHandler = null,
-        HttpMessageHandler? updateHandler = null)
+        HttpMessageHandler? updateHandler = null, LocalLlmManager? cleanupModels = null)
     {
         Platform = platform;
         Paths = paths;
@@ -78,7 +79,7 @@ public sealed partial class AppShell : IDisposable
         Dialogs = dialogs ?? new ShellDialogs();
         (_http, _downloadHttp, _updateHttp) = AppRules.CreateClients(() => _settings.OfflineOnly, downloadHandler, updateHandler);
         Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, _settings));
-        _llm = new LocalLlmManager(log, Integrity);
+        _llm = cleanupModels ?? new LocalLlmManager(log, Integrity);
         _models = speechModels ?? new ModelManager(log, Integrity);
         Models = new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
             reload: () => Reload(userRequested: false), shutdown: Quit, refreshTooltip: StatusChanged,
@@ -199,7 +200,7 @@ public sealed partial class AppShell : IDisposable
         StatusChanged();
         if (error is null || error == shown) return;
         shown = error;
-        Notify("Dictum", $"{error} ({what}: Settings > Models)", warning: true);
+        if (LoadBalloon(error, what, bothShown: _speechErrorShown == _cleanupErrorShown) is { } text) Notify("Dictum", text, warning: true);
     }
 
     /// <summary>

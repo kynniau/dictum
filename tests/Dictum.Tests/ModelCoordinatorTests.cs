@@ -67,7 +67,7 @@ public sealed class ModelCoordinatorTests : IDisposable
         var file = Path.Combine(paths.ModelsDir(settings), "ggml-base.en.bin");
         Directory.CreateDirectory(paths.ModelsDir(settings));
         File.WriteAllBytes(file, new byte[16]); // present; the fake loader never reads it
-        using var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        using var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var coordinator = new ModelCoordinator(paths, models, _llm, _http, NullLog.Instance, () => settings, null, _prompts, _ => null,
             reload: () => { }, shutdown: () => _shutdowns++, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Add(text));
 
@@ -102,7 +102,7 @@ public sealed class ModelCoordinatorTests : IDisposable
         {
             Interlocked.Increment(ref loads);
             return new FakeSpeechEngine(p, d);
-        }, warmUp: () => false);
+        }, gpuInUse: () => false);
         var coordinator = new ModelCoordinator(paths, models, _llm, _http, NullLog.Instance, () => settings, null, _prompts, _ => null,
             reload: () => { }, shutdown: () => _shutdowns++, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Add(text));
         coordinator.Ensure(previousPath: null, startup: true);

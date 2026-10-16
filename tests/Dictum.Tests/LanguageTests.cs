@@ -162,7 +162,7 @@ public class LanguageTests
     public async Task A_language_or_translate_change_rebuilds_the_decoder_without_loading_the_model_again()
     {
         var loads = 0;
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => { Interlocked.Increment(ref loads); return new FakeSpeechEngine(p, d); }, warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => { Interlocked.Increment(ref loads); return new FakeSpeechEngine(p, d); }, gpuInUse: () => false);
         models.BeginLoad(@"C:\models\ggml-medium.bin", new WhisperSettings());
         var engine = Assert.IsType<FakeSpeechEngine>(await models.GetAsync(Ct));
         Assert.Equal("en", engine.Decode.Language);
@@ -191,7 +191,7 @@ public class LanguageTests
         Directory.CreateDirectory(modelsDir);
         File.WriteAllBytes(Path.Combine(modelsDir, "ggml-medium.bin"), new byte[16]); // present; the fake loader never reads it
         File.WriteAllText(scratch.Paths.DictionaryFile, "Kynni\nParramatta\n");
-        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var shell = await UiSession.Run(() =>
         {
             var (s, _, _) = scratch.Shell(models);
@@ -223,7 +223,7 @@ public class LanguageTests
         Directory.CreateDirectory(modelsDir);
         File.WriteAllBytes(Path.Combine(modelsDir, "ggml-small.en.bin"), new byte[16]); // present; the fake loader never reads it
         var log = new RecordingLog();
-        var models = new ModelManager(log, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+        var models = new ModelManager(log, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var shell = new AppShell(new FakePlatform(scratch.Paths), scratch.Paths, log, new SecretRedactor(), new ShellOptions(), new ScriptedDialogs(),
             gpuMachine: () => false, speechModels: models);
         shell.Reload(userRequested: true);
