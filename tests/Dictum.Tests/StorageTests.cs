@@ -27,9 +27,10 @@ public class StorageTests
         File.WriteAllBytes(Path.Combine(models, "ggml-base.en.bin.part"), new byte[300]);
         File.WriteAllBytes(Path.Combine(models, "qwen2.5-1.5b-instruct-q4_k_m.gguf"), new byte[500]);
         new ModelIntegrity(paths.VerifiedModelsFile, NullLog.Instance).Remember(Path.Combine(models, "ggml-small.en.bin"));
-        // GPU loads that ended Dictum leave their markers (GpuLoadMarker.Begin with no End after it).
-        new GpuLoadMarker(paths.SpeechGpuMarkerFile, NullLog.Instance).Begin(Path.Combine(models, "ggml-small.en.bin"));
-        new GpuLoadMarker(paths.CleanupGpuMarkerFile, NullLog.Instance).Begin(Path.Combine(models, "qwen2.5-1.5b-instruct-q4_k_m.gguf"));
+        // Markers left by earlier runs the GPU ended. Written directly: in one process, a second GpuLoadMarker.Begin in this folder
+        // waits for the first one's End (the shared GPU-load gate); RuntimeResilienceTests pins the files' names against these paths.
+        File.WriteAllText(paths.SpeechGpuMarkerFile, Path.Combine(models, "ggml-small.en.bin"));
+        File.WriteAllText(paths.CleanupGpuMarkerFile, Path.Combine(models, "qwen2.5-1.5b-instruct-q4_k_m.gguf"));
         CloudConsentFile.Write(paths.ConsentFile, new CloudConsentRecord("anthropic", "api.anthropic.com", DateTimeOffset.UtcNow, "test"));
         File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), paths.CalibrationScriptFile, overwrite: true);
         var recordings = CalibrationRecordings.For(paths);
