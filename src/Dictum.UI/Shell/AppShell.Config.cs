@@ -14,6 +14,7 @@ public sealed partial class AppShell
     private string? _offlineWarned;
     private string? _redirectWarned;
     private bool _cloudWithdrawn; // Switch cloud clean-up off, until both files keep it or cloud clean-up is switched on again (DisableCloud, SaveCloudOff, EnableCloud)
+    private bool _consentWithdrawn; // its consent withdrawal, until consent.json is gone or "Allow" records a new consent; a server on this PC switched on does not end it
     private (string? Consent, string? Settings) _cloudOffNotSaved; // why the last try could not delete consent.json or save settings.json (SaveCloudOff)
     private bool _offlineOnlyThisSession; // offline only switched on, until settings.json keeps it (SetOfflineOnly, SaveOfflineOnly)
     private string? _offlineOnlyNotSaved; // why the last try could not save it (SaveOfflineOnly)
@@ -58,8 +59,10 @@ public sealed partial class AppShell
     /// <summary>
     /// What this session's choices keep in force over the files, applied after every load until the files keep them
     /// (<see cref="SaveSessionChoices"/>): once cloud clean-up is switched off (<see cref="DisableCloud"/>) no server is used,
-    /// on this PC or not, and no consent applies, whatever settings.json and consent.json still say; offline only switched on
-    /// stays on (<see cref="SetOfflineOnly"/>). Each time a choice overrides the settings loaded, the log says so in one line.
+    /// on this PC or not, whatever settings.json still says, and no consent applies, whatever consent.json still says, until it
+    /// is gone or "Allow" records a new one, also after a server on this PC is switched on (<see cref="EnableCloud"/>); offline
+    /// only switched on stays on (<see cref="SetOfflineOnly"/>). Each time a choice overrides the settings loaded, the log says
+    /// so in one line.
     /// </summary>
     private AppSettings SessionChoices(AppSettings settings, SecretStore secrets)
     {
@@ -68,31 +71,45 @@ public sealed partial class AppShell
             _log.Info("Offline only is on for this session: the settings loaded have it off, because settings.json does not keep it yet.");
             settings = settings with { OfflineOnly = true };
         }
-        if (!_cloudWithdrawn || settings.Llm.Provider is not (LlmSettings.Anthropic or LlmSettings.OpenAiCompatible)) return settings;
-        var host = CloudPolicy.CloudHost(settings.Llm) ?? CloudPolicy.LocalServerHost(settings.Llm);
-        _log.Info($"Cloud clean-up is off for this session: the settings loaded name {settings.Llm.Provider}{(host is null ? "" : $" at {host}")}, which is not used, because the switch-off is not saved yet.");
-        var local = settings with { Llm = settings.Llm with { Provider = LlmSettings.Local, CloudConsent = null } };
-        return EffectiveSettings.Cleanup(local, secrets.Get(SecretStore.AnthropicKey) is not null, () => ProbeGpu(local), _log.Warn);
+        var anthropicKey = secrets.Get(SecretStore.AnthropicKey) is not null;
+        if (_cloudWithdrawn && settings.Llm.Provider is (LlmSettings.Anthropic or LlmSettings.OpenAiCompatible))
+        {
+            var host = CloudPolicy.CloudHost(settings.Llm) ?? CloudPolicy.LocalServerHost(settings.Llm);
+            _log.Info($"Cloud clean-up is off for this session: the settings loaded name {settings.Llm.Provider}{(host is null ? "" : $" at {host}")}, which is not used, because the switch-off is not saved yet.");
+            var local = settings with { Llm = settings.Llm with { Provider = LlmSettings.Local, CloudConsent = null } };
+            return EffectiveSettings.Cleanup(local, anthropicKey, () => ProbeGpu(local), _log.Warn);
+        }
+        // Only a consent on file lets a host off this PC through the load (EffectiveSettings): while the withdrawal is not
+        // saved, that consent is dropped and the repair runs again, so the local model is used.
+        if (_consentWithdrawn && CloudPolicy.CloudHost(settings.Llm) is { } cloudHost)
+        {
+            _log.Info($"Cloud clean-up consent is withdrawn for this session: the consent to {cloudHost} in consent.json is not used, because consent.json is not deleted yet.");
+            var unconsented = settings with { Llm = settings.Llm with { CloudConsent = null } };
+            return EffectiveSettings.Cleanup(unconsented, anthropicKey, () => ProbeGpu(unconsented), _log.Warn);
+        }
+        return settings;
     }
 
     /// <summary>
     /// Saves what this session holds over the files (<see cref="SessionChoices"/>) to the files the next start reads: after
-    /// every reload, once the load has put the choices in effect (so clearing read-only or fixing a file by hand is enough: the
-    /// folder watcher reloads on both), and once at quit (<see cref="Dispose"/>). A hold ends when its files keep it. A file
-    /// that already keeps a choice is not written again, so the reload the watcher makes after a write finds nothing to do.
-    /// No balloon: the page that made the choice said what could not be saved.
+    /// every reload, once the load has put the choices in effect (so clearing read-only on settings.json or fixing it by hand
+    /// is enough: the folder watcher reloads on both; a program letting go of a file it held open is not seen, so that file is
+    /// tried again at the next reload of any kind), and once at quit (<see cref="Dispose"/>). A hold ends when its files keep
+    /// it. A file that already keeps a choice is not written again, so the reload the watcher makes after a write finds
+    /// nothing to do. No balloon: the page that made the choice said what could not be saved.
     /// </summary>
     private void SaveSessionChoices()
     {
-        if (_cloudWithdrawn) SaveCloudOff();
+        if (_cloudWithdrawn || _consentWithdrawn) SaveCloudOff();
         if (_offlineOnlyThisSession) SaveOfflineOnly();
     }
 
     /// <summary>
-    /// Cloud clean-up off (<see cref="DisableCloud"/>): deletes consent.json if it is there, and writes the local model to
-    /// settings.json (llm.provider, and the recommended llm.model) while that file names anthropic or openai-compatible, or
-    /// cannot be read. A missing settings.json loads as the defaults, which name the local model, so it is never created: the
-    /// next start then asks the first-run questions and uses no server. One log line per try.
+    /// Cloud clean-up off (<see cref="DisableCloud"/>): deletes consent.json if it is there, which ends the consent withdrawal,
+    /// and, while the switch-off holds, writes the local model to settings.json (llm.provider, and the recommended llm.model)
+    /// while that file names anthropic or openai-compatible, or cannot be read. A missing settings.json loads as the defaults,
+    /// which name the local model, so it is never created: the next start then asks the first-run questions and uses no
+    /// server. One log line per try.
     /// </summary>
     private void SaveCloudOff()
     {
@@ -104,6 +121,14 @@ public sealed partial class AppShell
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             consent = SettingsFile.ShortReason(ex, Paths.ConsentFile);
+        }
+        _consentWithdrawn = consent is not null;
+        if (!_cloudWithdrawn)
+        {
+            // A server on this PC was switched on since (EnableCloud): only the consent is left to withdraw.
+            if (consent is null) _log.Info("Cloud clean-up consent withdrawal is saved: there is no consent.json.");
+            else _log.Warn($"Cloud clean-up consent withdrawal is not saved yet (consent.json could not be deleted: {consent}); the consent on file is not used this session, and deleting it is tried again at the next reload and at quit.");
+            return;
         }
         var file = SettingsLoader.LoadFile(Paths.SettingsFile);
         if (!file.Usable || file.Settings.Llm.Provider is LlmSettings.Anthropic or LlmSettings.OpenAiCompatible)
@@ -215,12 +240,14 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, second draft), not yet approved: the product owner reviews it before release. Pinned word for
+    /// PROPOSED copy (16/10/2026, third draft), not yet approved: the product owner reviews it before release. Pinned word for
     /// word in CloudOffTakesEffectTests; do not reword it until that review. Shown while offline only is on for this session
-    /// and settings.json does not have it on. No "Nothing is sent": offline only still allows a server on this PC.
+    /// and settings.json does not have it on. No "Nothing is sent": offline only still allows a server on this PC. Open for that
+    /// review (checked 16/10/2026): the final clause is untrue when settings.json still cannot be read at the next start (not
+    /// valid JSON, say), since Dictum then starts offline with the defaults (ConfigLoader.BrokenAtStartup).
     /// </summary>
     internal static string OfflineOnlyNotSaved(string reason) =>
-        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits.";
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only.";
 
     private void ApplyEnabled(bool enabled, bool persist)
     {

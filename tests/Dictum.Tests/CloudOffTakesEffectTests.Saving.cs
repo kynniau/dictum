@@ -64,30 +64,33 @@ public partial class CloudOffTakesEffectTests
     }
 
     [Theory]
-    [InlineData("both read-only", false)] // then Settings > About > Reload settings
-    [InlineData("both read-only", true)] // then Quit
-    [InlineData("consent.json read-only", false)]
-    [InlineData("consent.json read-only", true)]
+    [InlineData("consent.json held open, settings.json read-only", false)] // then Settings > About > Reload settings
+    [InlineData("consent.json held open, settings.json read-only", true)] // then Quit
+    [InlineData("consent.json held open", false)]
+    [InlineData("consent.json held open", true)]
     public Task Saving_the_switch_off_is_tried_again_at_a_reload_and_at_quit_until_both_files_keep_it(string mode, bool atQuit) => UiSession.Run(() =>
     {
         // Lens on f69457d (finding 1): the switch-off was kept in memory only, and nothing tried the files again. Both read-only,
         // read-only cleared, About > Reload: consent.json was still there and settings.json still named the host, so the next start
         // sent again. consent.json alone read-only: settings.json was saved, but the consent stayed on file, so a later hand edit
-        // back to the host was honoured at the next start with no consent dialog.
+        // back to the host was honoured at the next start with no consent dialog. Since the lens on eaa3a04 a read-only consent.json
+        // is deleted at once (CloudConsentFile.Delete), so another program holding it open is what keeps it here.
         using var scratch = new Scratch(CloudSettings);
         Consent(scratch);
         var (shell, _, _) = scratch.Shell();
+        FileStream? held = null;
         try
         {
             shell.Reload(userRequested: false);
-            File.SetAttributes(scratch.Paths.ConsentFile, FileAttributes.ReadOnly);
-            if (mode == "both read-only") File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            held = HoldOpen(scratch.Paths.ConsentFile);
+            if (mode != "consent.json held open") File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
             Assert.NotNull(shell.DisableCloud());
-            shell.Reload(userRequested: true); // tried again with nothing cleared yet: not saved, still held
+            shell.Reload(userRequested: true); // tried again with nothing changed yet: not saved, still held
             Assert.True(File.Exists(scratch.Paths.ConsentFile));
             AssertLocal(shell);
 
-            Normal(scratch.Paths.ConsentFile);
+            held.Dispose(); // let go
+            held = null;
             Normal(scratch.Paths.SettingsFile);
             if (atQuit) shell.Quit();
             else shell.Reload(userRequested: true);
@@ -110,6 +113,7 @@ public partial class CloudOffTakesEffectTests
         }
         finally
         {
+            held?.Dispose();
             Normal(scratch.Paths.ConsentFile);
             Normal(scratch.Paths.SettingsFile);
             shell.Dispose();
@@ -117,38 +121,51 @@ public partial class CloudOffTakesEffectTests
     });
 
     [Fact]
-    public Task Clearing_read_only_on_consent_json_is_enough_and_the_reloads_then_stop() => UiSession.RunAsync(async () =>
+    public Task Clearing_read_only_on_settings_json_is_enough_and_the_reloads_then_stop_while_consent_json_is_held_open() => UiSession.RunAsync(async () =>
     {
         // The folder watcher reloads on consent.json and on a change of attributes (AppRules.ReloadsOn, NotifyFilters.Attributes),
-        // so clearing read-only alone lets a reload delete the consent. A save fires one more reload, which finds the files saved
-        // and writes nothing: the reloads stop, also while consent.json stays read-only and settings.json is already saved.
-        // Asynchronous, so the UI thread's own loop runs the watcher's posts and the reload debounce timer while it waits.
+        // so clearing read-only on settings.json alone lets a reload save the switch-off there. A save fires one more reload, which
+        // finds the files saved and writes nothing: the reloads stop, also while another program holds consent.json open (since the
+        // lens on eaa3a04, read-only no longer stops its delete: CloudConsentFile.Delete clears it). Letting go of consent.json is no
+        // change the watcher sees: the next reload of any kind deletes it. Asynchronous, so the UI thread's own loop runs the
+        // watcher's posts and the reload debounce timer while it waits.
         var log = new RecordingLog();
         using var scratch = new Scratch(StartingCloudSettings);
         Consent(scratch);
         var shell = StartedShell(scratch, log);
         int Reloads() => log.Lines.Count(l => l.Message.StartsWith("Settings reloaded", StringComparison.Ordinal));
+        FileStream? held = null;
         try
         {
             Assert.StartsWith("openai-compatible/m at llm.example.com", shell.CleanupStatus);
-            File.SetAttributes(scratch.Paths.ConsentFile, FileAttributes.ReadOnly); // a change of attributes: the watcher reloads
-            Assert.True(await QuietAsync(Reloads), "the reloads did not stop after consent.json was made read-only");
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly); // a change of attributes: the watcher reloads
+            Assert.True(await QuietAsync(Reloads), "the reloads did not stop after settings.json was made read-only");
+            held = HoldOpen(scratch.Paths.ConsentFile);
+            Reasons([shell.DisableCloud()!], NeitherChanged);
+            Assert.True(await QuietAsync(Reloads), "the reloads did not stop while neither file could be changed");
+            AssertLocal(shell);
+
             var before = Reloads();
-            Assert.NotNull(shell.DisableCloud()); // settings.json saved; consent.json still there
-            Assert.True(await QuietAsync(Reloads), "the reloads did not stop while consent.json stayed read-only");
-            Assert.True(Reloads() - before >= 2, "the watcher did not reload after settings.json was saved"); // the switch's own, then the watcher's
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal); // nothing else: no save, no Reload settings
+            Assert.True(await EventuallyAsync(() => SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Llm.Provider == LlmSettings.Local),
+                "clearing read-only did not let a reload save settings.json");
+            Assert.True(await QuietAsync(Reloads), "the reloads did not stop while consent.json stayed held open");
+            Assert.True(Reloads() - before >= 2, "the watcher did not reload after settings.json was saved"); // the attributes', then the save's
             Assert.True(File.Exists(scratch.Paths.ConsentFile));
             AssertLocal(shell);
 
-            File.SetAttributes(scratch.Paths.ConsentFile, FileAttributes.Normal); // nothing else: no save, no Reload settings
-            Assert.True(await EventuallyAsync(() => !File.Exists(scratch.Paths.ConsentFile)), "clearing read-only did not let a reload delete consent.json");
+            held.Dispose(); // let go
+            held = null;
+            shell.Reload(userRequested: true); // Settings > About > Reload settings
+            Assert.False(File.Exists(scratch.Paths.ConsentFile));
             Assert.True(await QuietAsync(Reloads), "the reloads did not stop once the switch-off was saved");
             AssertLocal(shell);
             return true;
         }
         finally
         {
-            Normal(scratch.Paths.ConsentFile);
+            held?.Dispose();
+            Normal(scratch.Paths.SettingsFile);
             shell.Dispose();
         }
     });

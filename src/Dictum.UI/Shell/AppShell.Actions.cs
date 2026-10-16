@@ -95,6 +95,7 @@ public sealed partial class AppShell
         var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use); see the log." : "");
         foreach (var failure in result.Failures) _log.Warn($"Not deleted: {failure}");
         _log.Info($"Storage: {scope} {message}");
+        if (scope is RemovalScope.AllDataIncludingSettings && !File.Exists(Paths.SettingsFile)) _offlineOnlyThisSession = false; // deleted on request: no new settings.json (SaveSessionChoices)
         if (scope is RemovalScope.AllData or RemovalScope.AllDataIncludingSettings) Reload(userRequested: false);
         StatusChanged();
         return message;
@@ -164,7 +165,8 @@ public sealed partial class AppShell
     /// records the consent in consent.json (provider, host, time, app version), then writes the provider to settings.json.
     /// A plain http:// server off this PC is refused outright. When settings.json cannot be written, the consent just recorded
     /// is withdrawn again, since the settings do not name that host, and the write failure is returned. A successful write
-    /// ends the off switch's hold (<see cref="DisableCloud"/>); a failed one leaves it in force.
+    /// ends the off switch's hold (<see cref="DisableCloud"/>); a failed one leaves it in force. Only "Allow" ends the
+    /// switch's consent withdrawal: a server on this PC switched on leaves a consent.json that could not be deleted unused.
     /// </summary>
     public string? EnableCloud(LlmSettings proposed)
     {
@@ -185,6 +187,7 @@ public sealed partial class AppShell
                 return "Cloud clean-up was not switched on; nothing is sent.";
             }
             CloudConsentFile.Write(Paths.ConsentFile, new CloudConsentRecord(proposed.Provider, host, DateTimeOffset.UtcNow, AppVersion));
+            _consentWithdrawn = false; // a new consent is on record
             _log.Info($"Cloud clean-up agreed to in the consent dialog: {proposed.Provider} at {host}.");
         }
         var withdrawn = _cloudWithdrawn;
@@ -200,34 +203,38 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// Switches cloud clean-up off, in memory first, before either file is changed: from this call until both files keep it,
-    /// or cloud clean-up is switched on again (<see cref="EnableCloud"/>), no server tidies a dictation, on this PC or not,
-    /// and no consent applies, whatever settings.json and consent.json say (<see cref="SessionChoices"/>). The reload replaces
-    /// the clean-up in use with the local model, so a request it has under way is cancelled and nothing more is sent; then it
-    /// deletes consent.json and writes the local model to settings.json (<see cref="SaveCloudOff"/>). Returns null when both
-    /// files keep the switch, else <see cref="OffNotSaved"/>: the switch then holds, and saving it is tried again at every
-    /// reload and once at quit.
+    /// Switches cloud clean-up off, in memory first, before either file is changed (<see cref="SessionChoices"/>): from this
+    /// call until both files keep it, or cloud clean-up is switched on again (<see cref="EnableCloud"/>), no server tidies a
+    /// dictation, on this PC or not, whatever settings.json says; and until consent.json is gone, or "Allow" records a new
+    /// consent, no consent applies, whatever consent.json says, also after a server on this PC is switched on. The reload
+    /// replaces the clean-up in use with the local model, so a request it has under way is cancelled and nothing more is
+    /// sent; then it deletes consent.json and writes the local model to settings.json (<see cref="SaveCloudOff"/>). Returns
+    /// null when both files keep the switch, else <see cref="OffNotSaved"/>: the switch then holds, and saving it is tried
+    /// again at every reload and once at quit.
     /// </summary>
     public string? DisableCloud()
     {
         _cloudWithdrawn = true;
+        _consentWithdrawn = true;
         _log.Info("Cloud clean-up switched off; consent withdrawn.");
         Reload(userRequested: false);
         return _cloudOffNotSaved is (null, null) ? null : OffNotSaved(_cloudOffNotSaved.Consent, _cloudOffNotSaved.Settings);
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, second draft), not yet approved: the product owner reviews it before release. Pinned word for
+    /// PROPOSED copy (16/10/2026, third draft), not yet approved: the product owner reviews it before release. Pinned word for
     /// word in CloudOffTakesEffectTests; do not reword it until that review. What Switch cloud clean-up off says when a file
-    /// could not be changed, each line true of the files as they are when it is shown: consent.json still there
-    /// (<paramref name="consent"/>, why it could not be deleted), settings.json not saved (<paramref name="settings"/>), or both.
-    /// Only the first says plain "off": settings.json was saved, or names no cloud service.
+    /// could not be changed: consent.json still there (<paramref name="consent"/>, why it could not be deleted), settings.json
+    /// not saved (<paramref name="settings"/>), or both. Only the first says plain "off": settings.json was saved, or names no
+    /// cloud service. The first and the last say what the files mean if the last try, at quit, fails too. Open for that review
+    /// (checked 16/10/2026): the last one's final clause is untrue when settings.json still cannot be read at the next start
+    /// (not valid JSON, say), since Dictum then starts offline with the defaults (ConfigLoader.BrokenAtStartup).
     /// </summary>
     internal static string OffNotSaved(string? consent, string? settings) => (consent, settings) switch
     {
-        ({ } c, null) => $"Cloud clean-up is off, but consent.json could not be deleted ({c}). Nothing is sent. Dictum tries again at the next reload and when it quits.",
+        ({ } c, null) => $"Cloud clean-up is off, but consent.json could not be deleted ({c}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is deleted, your consent stays on file.",
         (null, { } s) => $"Cloud clean-up is off for this session, but settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits.",
-        ({ } c, { } s) => $"Cloud clean-up is off for this session, but consent.json could not be deleted ({c}) and settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits.",
+        ({ } c, { } s) => $"Cloud clean-up is off for this session, but consent.json could not be deleted ({c}) and settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again.",
         _ => throw new ArgumentException("Both files keep the switch: there is nothing to say."),
     };
 

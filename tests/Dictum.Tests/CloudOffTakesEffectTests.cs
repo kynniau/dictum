@@ -37,23 +37,24 @@ public partial class CloudOffTakesEffectTests
     // The write path's own failure text (ModelCoordinator.WriteFailed), pinned word for word, independently of the app's copy.
     private const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
 
-    // PROPOSED copy (16/10/2026, second draft), awaiting the product owner's review: pinned word for word as proposed,
+    // PROPOSED copy (16/10/2026, third draft), awaiting the product owner's review: pinned word for word as proposed,
     // independently of the app's copy (AppShell.OffNotSaved). Shown when consent.json could not be deleted but settings.json
     // keeps cloud clean-up off.
     private static string ConsentNotDeleted(string reason) =>
-        $"Cloud clean-up is off, but consent.json could not be deleted ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
+        $"Cloud clean-up is off, but consent.json could not be deleted ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is deleted, your consent stays on file.";
 
-    // PROPOSED copy (16/10/2026, second draft), as above: settings.json could not be saved; consent.json is gone or never was.
+    // PROPOSED copy (16/10/2026, second draft, kept in the third), as above: settings.json could not be saved; consent.json is
+    // gone or never was.
     private static string SettingsNotSaved(string reason) =>
         $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
 
-    // PROPOSED copy (16/10/2026, second draft), as above: neither file could be changed.
+    // PROPOSED copy (16/10/2026, third draft), as above: neither file could be changed.
     private static string NeitherChanged(string consent, string settings) =>
-        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
+        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again.";
 
-    // PROPOSED copy (16/10/2026, second draft), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
+    // PROPOSED copy (16/10/2026, third draft), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
     private static string OfflineOnlyNotSaved(string reason) =>
-        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits.";
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only.";
 
     private const string CloudSettings = """{ "hotkey": "F24", "llm": { "provider": "openai-compatible", "base_url": "https://llm.example.com/v1", "model": "m" } }""";
 
@@ -269,26 +270,27 @@ public partial class CloudOffTakesEffectTests
     });
 
     [Theory]
-    [InlineData("consent.json read-only")]
-    [InlineData("consent.json locked")]
-    [InlineData("both read-only")]
+    [InlineData("consent.json held open")] // readable, not deletable
+    [InlineData("consent.json locked")] // not even readable
+    [InlineData("consent.json held open, settings.json read-only")]
     public Task Switching_cloud_clean_up_off_stops_sending_when_consent_json_cannot_be_deleted(string mode) => UiSession.Run(() =>
     {
         // Lens P1 on 31d01f3: the delete ran first and threw, so nothing else did. The clean-up in use stayed openai-compatible/m at
         // llm.example.com, the page said "On: the text of each dictation is sent to…" over "That did not work: …", and a later
-        // reload re-applied the consent still on file.
+        // reload re-applied the consent still on file. Since the lens on eaa3a04, read-only no longer stops the delete
+        // (CloudConsentFile.Delete clears it): another program holding consent.json open does.
         using var scratch = new Scratch(CloudSettings);
         Consent(scratch);
         var (shell, _, _) = scratch.Shell();
         FileStream? held = null;
+        var both = mode.EndsWith("settings.json read-only", StringComparison.Ordinal);
         try
         {
             shell.Reload(userRequested: false);
             Assert.StartsWith("openai-compatible/m at llm.example.com", shell.CleanupStatus);
             Assert.False(shell.NothingLeaves);
-            if (mode == "consent.json locked") held = new FileStream(scratch.Paths.ConsentFile, FileMode.Open, FileAccess.Read, FileShare.None);
-            else File.SetAttributes(scratch.Paths.ConsentFile, FileAttributes.ReadOnly);
-            if (mode == "both read-only") File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            held = new FileStream(scratch.Paths.ConsentFile, FileMode.Open, FileAccess.Read, mode == "consent.json locked" ? FileShare.None : FileShare.Read);
+            if (both) File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
             var before = File.ReadAllText(scratch.Paths.SettingsFile);
             var window = new SettingsWindow(shell);
             window.Show();
@@ -296,7 +298,7 @@ public partial class CloudOffTakesEffectTests
             Click(window, "Switch cloud clean-up off");
 
             var said = VisibleLines(window);
-            if (mode == "both read-only") Reasons(said, NeitherChanged);
+            if (both) Reasons(said, NeitherChanged);
             else Reason(said, ConsentNotDeleted);
             Assert.DoesNotContain(said, l => l.StartsWith("That did not work", StringComparison.Ordinal));
             Assert.True(File.Exists(scratch.Paths.ConsentFile)); // the delete really failed
@@ -305,16 +307,25 @@ public partial class CloudOffTakesEffectTests
             Assert.DoesNotContain(cleanUp, l => l.StartsWith("On: ", StringComparison.Ordinal) || l.StartsWith("On, ", StringComparison.Ordinal));
             Assert.True(Shown(window, "Use cloud clean-up…"));
             Assert.Contains("Nothing leaves this PC: speech recognition and clean-up both run here.", PageLines(window, "Privacy"));
-            if (mode == "both read-only") Assert.Equal(before, File.ReadAllText(scratch.Paths.SettingsFile)); // still names the host
+            if (both) Assert.Equal(before, File.ReadAllText(scratch.Paths.SettingsFile)); // still names the host
             else Assert.Equal(LlmSettings.Local, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Llm.Provider); // saved
 
-            // A later reload, with the consent to llm.example.com on file and readable: the switch holds.
-            held?.Dispose();
-            held = null;
+            // A later reload, with the consent to llm.example.com on file and readable: the switch holds. Still held open, consent.json
+            // is tried again later; let go, the next reload deletes it.
+            if (mode == "consent.json locked")
+            {
+                held.Dispose();
+                held = null;
+            }
             Assert.Equal("llm.example.com", CloudConsentFile.Read(scratch.Paths.ConsentFile)?.Host);
             shell.Reload(userRequested: false);
             AssertLocal(shell);
-            Assert.Equal(mode != "consent.json locked", File.Exists(scratch.Paths.ConsentFile)); // unlocked, that reload deleted it; read-only, it is tried again later
+            Assert.Equal(held is not null, File.Exists(scratch.Paths.ConsentFile));
+            held?.Dispose();
+            held = null;
+            shell.Reload(userRequested: false);
+            AssertLocal(shell);
+            Assert.False(File.Exists(scratch.Paths.ConsentFile));
             window.Close();
         }
         finally
