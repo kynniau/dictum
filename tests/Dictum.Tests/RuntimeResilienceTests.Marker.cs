@@ -337,6 +337,25 @@ public sealed partial class RuntimeResilienceTests
     }
 
     [Fact]
+    public async Task A_newer_clean_up_load_during_a_GPU_warm_up_gives_up_the_gate_at_once()
+    {
+        // Same hang as Unload, reached by BeginLoad: the earlier load's warm-up waits 5 s for its token, and only BeginLoad's
+        // stale.Cancel() stops it. Without that call the speech model's GPU load waits behind the old warm-up.
+        using var local = new LocalFolder();
+        FakeLocalEngine? first = null;
+        using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, _) => first ??= new FakeLocalEngine(p, waitForCancel: true),
+            gpuInUse: () => true);
+        llm.BeginLoad(local.Model("cleanup-a.gguf"), "auto");
+        Assert.True(await Eventually(() => first is not null && File.Exists(local.CleanupMarker)), "the clean-up GPU load never began");
+        llm.BeginLoad(local.Model("cleanup-b.gguf"), "cpu"); // a newer choice, on the CPU so it takes no GPU gate itself
+        using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => true);
+        models.BeginLoad(local.Model("speech-a.bin"), new WhisperSettings());
+        Assert.True(await Eventually(() => models.IsReady, 2000), "the speech GPU load still waited behind the stale clean-up warm-up");
+        Assert.False(File.Exists(local.CleanupMarker));
+        Assert.True(first!.Disposed);
+    }
+
+    [Fact]
     public void Off_Windows_the_runtime_check_is_true_even_when_the_probes_find_nothing()
     {
         string[] none = [];

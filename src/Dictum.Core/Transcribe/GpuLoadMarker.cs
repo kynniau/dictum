@@ -73,7 +73,8 @@ internal sealed class GpuLoadMarker(string? file, ILog log)
         // simplification: the gate covers the whole GPU load and warm-up, so the two models' warm-ups no longer overlap at start-up
         // and a GPU load that hangs holds the other model's GPU load behind it (the native loads already queued on NativeLoadGate).
         // Ceiling: start-up's time to both models ready is the sum of the two GPU loads; speech may wait for the clean-up's warm-up,
-    // and a hung clean-up warm-up blocks speech for the session. Trigger to retire: a measured start-up
+        // and a hung clean-up warm-up blocks speech until it is superseded, unloaded or Dictum quits (a hang inside native code is not
+        // cancellable). Trigger to retire: a measured start-up
         // that is too slow, or a hung load reported; then record the marker per load step instead of per load.
         _gate?.Wait(); // outside _lock, so Close at quit never waits for the other manager's load
         lock (_lock)
