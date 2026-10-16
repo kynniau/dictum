@@ -87,11 +87,12 @@ public sealed class DictationPipeline
         _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : "the rule-based tidy")} in {sw.ElapsedMilliseconds} ms.");
         if (settings.LogTranscripts) _log.Info($"Cleaned transcript: {text}");
         // The boundary rule decides the first letter before corrections, the profanity filter and snippets run, so a snippet
-        // is still pasted exactly as written; the separator goes in front of the finished text.
+        // is still pasted exactly as written; the separator goes in front of the finished text. Text that is not English (the
+        // plain clean-up) keeps its case: SPEC §23 leaves it as whisper wrote it.
         var separator = "";
         if (part?.Before is { } before && text.Length > 0)
         {
-            (separator, text) = SegmentJoin.Join(before, raw, text, settings.Insert.TrailingSpace, _names());
+            (separator, text) = SegmentJoin.Join(before, raw, text, settings.Insert.TrailingSpace, _names(), keepCase: cleaner.IsPlain);
         }
         var spoken = text; // what was said: the next part's carried words come from this, never from the finished text below
         var finished = _finish(text);

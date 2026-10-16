@@ -37,7 +37,8 @@ public sealed class HandsFreePart(int number, HandsFreePart? last)
 /// <summary>
 /// How a hands-free part is typed after the one before it (SPEC §3 amendment, 16/10/2026). The boundary rule: when the last
 /// part did not end with terminal punctuation, this one goes on in lower case after a space; when it did, a space and this
-/// part's capital. A spoken "new line" or "new paragraph" at either side of the boundary still works. Pure functions.
+/// part's capital. A spoken "new line" or "new paragraph" at either side of the boundary still works. Text that is not
+/// English keeps its case (SPEC §23 leaves it as whisper wrote it): only the separator applies. Pure functions.
 /// </summary>
 public static class SegmentJoin
 {
@@ -79,10 +80,16 @@ public static class SegmentJoin
     /// <param name="cleaned">This part's text after the clean-up.</param>
     /// <param name="trailingSpace">insert.trailing_space: the last paste already ended with a space.</param>
     /// <param name="names">The personal dictionary's terms: one spelt with a capital keeps it mid-sentence.</param>
-    public static (string Separator, string Text) Join(string before, string raw, string cleaned, bool trailingSpace, IEnumerable<string> names)
+    /// <param name="keepCase">
+    /// The clean-up is plain (<see cref="TranscriptCleaner.IsPlain"/>): the text is not English, and SPEC §23 leaves it exactly
+    /// as whisper wrote it, so no letter changes case here; the separator is chosen as for any part.
+    /// </param>
+    public static (string Separator, string Text) Join(string before, string raw, string cleaned, bool trailingSpace, IEnumerable<string> names,
+        bool keepCase = false)
     {
-        if (LeadingBreak(raw, cleaned) is { } spokenBreak) return (spokenBreak, Capitalised(cleaned));
+        if (LeadingBreak(raw, cleaned) is { } spokenBreak) return (spokenBreak, keepCase ? cleaned : Capitalised(cleaned));
         var separator = before.Length == 0 || char.IsWhiteSpace(before[^1]) || trailingSpace ? "" : " ";
+        if (keepCase) return (separator, cleaned);
         return (separator, SentenceStart.At(before, before.Length) ? Capitalised(cleaned) : Continued(cleaned, names));
     }
 

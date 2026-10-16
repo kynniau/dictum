@@ -302,6 +302,25 @@ public class HandsFreeSessionTests
     }
 
     [Fact]
+    public async Task Text_that_is_not_English_is_typed_part_by_part_as_whisper_wrote_it()
+    {
+        // SPEC §23 (rebase onto main, 16/10/2026): the plain clean-up leaves text that is not English exactly as written, so the
+        // boundary rule changes no case: a capital after a part with no sentence end stays, and so does a small letter after
+        // one. The separator is the usual one; a Devanagari part has no case to change.
+        using var rig = Make(new PartTranscriber("Pumunta kami sa", "Maynila kahapon.", "salamat po", "वह आ गया"), TranscriptCleaner.Plain("test"));
+        await StartHandsFree(rig);
+        rig.Capture.Cut(Part(0));
+        rig.Capture.Cut(Part(1));
+        rig.Capture.Cut(Part(2));
+        rig.Capture.Rest = Part(3);
+        await WaitUntil(() => rig.Pasted.Count == 3, "three parts");
+        StopTap(rig);
+        await WaitUntil(() => rig.Pasted.Count == 4, "the rest");
+
+        Assert.Equal(["Pumunta kami sa", " Maynila kahapon.", " salamat po", " वह आ गया"], rig.Pasted);
+    }
+
+    [Fact]
     public async Task With_the_trailing_space_on_no_second_space_is_typed()
     {
         using var rig = Make(new PartTranscriber("we met on tuesday", "and agreed the plan"), trailingSpace: true);

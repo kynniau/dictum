@@ -1,6 +1,7 @@
 using Dictum.Audio;
 using Dictum.Core;
 using Dictum.Llm;
+using Dictum.Transcribe;
 
 namespace Dictum.Tests;
 
@@ -262,6 +263,17 @@ public class SegmentJoinTests
     }
 
     [Fact]
+    public void A_parts_whisper_prompt_adds_the_carried_words_and_keeps_the_language_and_translate()
+    {
+        // Rebase onto main (16/10/2026): the language and translate travel in DecodeOptions now, and the processor built for a
+        // part's carried words is built from WithCarried's options, so a Hindi part being translated stays one.
+        const string carried = "we should move the meeting to";
+        Assert.Equal(new DecodeOptions("Kynni, Parramatta. " + carried, 5, "hi", Translate: true),
+            new DecodeOptions("Kynni, Parramatta", 5, "hi", Translate: true).WithCarried(carried));
+        Assert.Equal(new DecodeOptions(carried, 0, "tl"), new DecodeOptions(null, 0, "tl").WithCarried(carried));
+    }
+
+    [Fact]
     public void The_boundary_rule_reads_what_was_typed_and_the_context_what_was_said()
     {
         // Merge lens P1, 16/10/2026: the carried words reach a cloud clean-up's prompt, so a snippet's text must never be among them.
@@ -361,6 +373,18 @@ public class SegmentJoinTests
         Assert.Equal((" ", "3 more things."), SegmentJoin.Join("There are", "3 more things", "3 more things.", false, NoNames));
         Assert.Equal((" ", "\"Hello,\" she said."), SegmentJoin.Join("And then", "hello she said", "\"Hello,\" she said.", false, NoNames));
         Assert.Equal((" ", "iPhone is fine."), SegmentJoin.Join("All good.", "iphone is fine", "iPhone is fine.", false, NoNames));
+    }
+
+    [Fact]
+    public void Text_that_is_not_English_keeps_its_case_and_still_gets_its_separator()
+    {
+        // SPEC §23 (rebase onto main, 16/10/2026): with the plain clean-up, text is left exactly as whisper wrote it, so the
+        // boundary rule changes no case on either side of a sentence end; the separator follows the usual rules.
+        Assert.Equal((" ", "Maynila kahapon."), SegmentJoin.Join("Pumunta kami sa", "Maynila kahapon.", "Maynila kahapon.", false, NoNames, keepCase: true));
+        Assert.Equal((" ", "salamat po"), SegmentJoin.Join("Pumunta kami sa Maynila kahapon.", "salamat po", "salamat po", false, NoNames, keepCase: true));
+        Assert.Equal((" ", "वह आ गया"), SegmentJoin.Join("हम कल", "वह आ गया", "वह आ गया", false, NoNames, keepCase: true));
+        Assert.Equal(("", "Maynila kahapon."), SegmentJoin.Join("Pumunta kami sa", "Maynila kahapon.", "Maynila kahapon.", true, NoNames, keepCase: true));
+        Assert.Equal(("", "salamat po"), SegmentJoin.Join("Pumunta kami.\n", "salamat po", "salamat po", false, NoNames, keepCase: true));
     }
 }
 

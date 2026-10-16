@@ -37,9 +37,10 @@ in the last part as context (taken before corrections, the profanity filter and 
 those words are never typed again. A part that carries on a sentence (the last one did not end with . ! ? …, a
 Devanagari danda or a line break) starts with a small letter unless its first word is "I", has another capital in it,
 or is a dictionary term spelt with a capital; with the rule-based tidy, which ends a part with a full stop whenever it
-ends with a letter or a digit, nearly every part is typed as its own sentence. Stay in the window you are dictating
-into until the session stops: each part is typed into whichever window is in front when it is ready, so switching
-windows mid-session types the next parts there.
+ends with a letter or a digit, nearly every part is typed as its own sentence. Text in a language other than English is
+not cleaned up (see "Other languages and translation"), so no letter changes case where its parts join: each part is
+typed as whisper wrote it. Stay in the window you are dictating into until the session stops: each part is typed into
+whichever window is in front when it is ready, so switching windows mid-session types the next parts there.
 
 ### The pill
 

@@ -134,11 +134,12 @@ Hold-to-talk stays one recording, and calibration takes are never cut.
   last part ended a sentence (. ! ? … । ॥ or a line break, read back past quotes and brackets: the
   rule the corrections and the profanity filter use too), this part starts with its capital after
   a space; otherwise it carries on in lower case, unless its first word is "I", has another capital
-  in it, or is a dictionary term spelt with a capital. No second space after
-  `insert.trailing_space`; a spoken "new line" or "new paragraph" on either side of a cut still
-  breaks the line. The rule-based tidy ends a part with a full stop whenever it ends with a letter
-  or a digit, so with it nearly every part is typed as its own sentence (an open question:
-  DECISIONS.md, "Hands-free segments").
+  in it, or is a dictionary term spelt with a capital. Text that is not English (the plain
+  clean-up, §23) keeps every letter's case as whisper wrote it: only the separator applies. No
+  second space after `insert.trailing_space`; a spoken "new line" or "new paragraph" on either
+  side of a cut still breaks the line. The rule-based tidy ends a part with a full stop whenever
+  it ends with a letter or a digit, so with it nearly every part is typed as its own sentence (an
+  open question: DECISIONS.md, "Hands-free segments").
 - The stop (the hotkey, the auto-stop, a lost microphone) types what followed the last cut last.
   Esc stops the session: what is typed stays, the rest is dropped.
 - Each part is typed into whatever window is in front when it is ready (§6); a window change
@@ -916,7 +917,9 @@ common Filipino and Indian languages".
   translate off and a language other than `en`, `auto` included), the cleaner is
   `TranscriptCleaner.Plain`: no model and no English rules, whitespace tidied only, status
   "skipped: …" in About and `--selftest`. Corrections, the profanity filter and snippets
-  (§16.6) still run.
+  (§16.6) still run. In hands-free the boundary rule (§3, "Hands-free segments") changes no
+  case in such text; only the separator between parts applies (hands-free amendment,
+  16/10/2026).
 - **Catalogue:** the multilingual `small`, `small-q5_1`, `medium`, `medium-q5_0`,
   `large-v3` and `large-v3-q5_0`, sizes and SHA-256 from the HF API tree at the pinned
   commit (four existing entries, small.en, medium.en, large-v3-turbo and its q5_0, served
