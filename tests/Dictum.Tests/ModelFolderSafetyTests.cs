@@ -37,6 +37,23 @@ public sealed class ModelFolderSafetyTests
 
     private static ModelManager FakeModels() => new(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
 
+    /// <summary>
+    /// A loaded model stand-in that keeps its file open, without sharing deletion, until it is disposed, as a memory-mapped model
+    /// does on Windows: the file cannot be deleted while the model is loaded, so a deletion has to release the model first.
+    /// </summary>
+    private sealed class HoldingEngine(string path, DecodeOptions decode) : ISpeechEngine
+    {
+        private readonly FileStream _held = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        public string ModelPath { get; } = path;
+        public DecodeOptions Decode { get; private set; } = decode;
+        public void Reconfigure(DecodeOptions options) => Decode = options;
+        public Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken) => Task.FromResult(Path.GetFileName(ModelPath));
+        public void Dispose() => _held.Dispose();
+    }
+
+    private static ModelManager HoldingModels() => new(NullLog.Instance, loader: (p, _, d) => new HoldingEngine(p, d), warmUp: () => false);
+
     /// <summary>Another user's swap: the same size, other bytes, the last-write time put back.</summary>
     private static void Swap(string path)
     {
@@ -265,10 +282,11 @@ public sealed class ModelFolderSafetyTests
             var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
             var own = Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes); // found first
             if (bundledPasses) new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled); // as if hashed once already
-            var models = FakeModels();
+            var models = HoldingModels();
             var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
             shell.Reload(userRequested: false);
             Assert.Equal(own, models.ModelPath);
+            Assert.True(await Eventually(() => models.IsReady)); // loaded, and holding its file: the deletion has to release it first
             dialogs.Answers.Enqueue(0); // Delete
             var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en"));
             var result = (said, dialogs.Asked.ToList(), shell.Settings.Whisper.Model, models.ModelPath, File.Exists(own), File.Exists(bundled), own, bundled);
@@ -307,10 +325,11 @@ public sealed class ModelFolderSafetyTests
             File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = "base.en" }, llm = new { provider = "none" }, models = new { folder = chosenFolder } }));
             var chosen = Create(chosenFolder, "ggml-base.en.bin", BaseEnBytes); // found first
             var own = Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", BaseEnBytes);
-            var models = FakeModels();
+            var models = HoldingModels();
             var (shell, _, dialogs) = scratch.Shell(models, downloadHandler: new CountingHandler());
             shell.Reload(userRequested: false);
             Assert.Equal(chosen, models.ModelPath);
+            Assert.True(await Eventually(() => models.IsReady)); // loaded, and holding its file
             dialogs.Answers.Enqueue(0); // Delete
             var said = await shell.DeleteModelAsync(ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "base.en" && m.Folder == ModelFolderKind.Chosen));
             var result = (said, dialogs.Asked.ToList(), models.ModelPath, File.Exists(chosen), File.Exists(own), own, scratch.Paths.DefaultModelsDir);
