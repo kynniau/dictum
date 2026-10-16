@@ -71,7 +71,7 @@ as the trigger of a chord (`Ctrl+Mouse4`), for the dictation hotkey and the fix 
 alike, with the same hold / double-tap rules as a key. A mouse-button trigger is always
 swallowed, whatever `suppress_hotkey` says (its click would otherwise reach the app under
 the pointer on release), and the dictation listener lets its button through until a
-speech model is ready. The left button is refused (holding it to dictate would swallow
+speech model is ready, except during a dictation already under way, when the button stays swallowed so the stop tap and Esc keep working. The left button is refused (holding it to dictate would swallow
 every click). The listener adds a WH_MOUSE_LL hook on the keyboard hook's own thread only
 when a hotkey names a mouse button (a hotkey change replaces the listener) and decodes
 button messages only (never moves, wheel turns or the left button). The capture box and
