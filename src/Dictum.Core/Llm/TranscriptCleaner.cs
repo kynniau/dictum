@@ -58,7 +58,7 @@ public sealed class TranscriptCleaner
     public bool UsesModel => _client is not null;
 
     /// <summary>
-    /// The key variable (OPENAI_API_KEY, GEMINI_API_KEY) whose absence stopped the configured service when this cleaner was
+    /// The key variable (OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY) whose absence stopped the configured service when this cleaner was
     /// built, or null. Settings > Clean-up and Privacy read it from the cleaner in use, never from the .env files, so they
     /// say "waiting" exactly while that is why nothing is sent, until a reload builds the next cleaner.
     /// </summary>
@@ -230,7 +230,7 @@ public sealed class TranscriptCleaner
             default:
                 if (AnthropicRedirectWarning(settings) is { } redirect) log.Warn(redirect);
                 var apiKey = secrets.Get(SecretStore.AnthropicKey);
-                if (apiKey is null) return RulesOnly("rule-based tidy only: ANTHROPIC_API_KEY is not set (environment or .env)");
+                if (apiKey is null) return RulesOnly("rule-based tidy only: ANTHROPIC_API_KEY is not set (environment or .env)", missingKey: SecretStore.AnthropicKey);
                 // llm.model defaults to a local cleanup model; that is not an Anthropic model id.
                 var model = CleanupCatalog.IsValidSetting(settings.Model) ? LlmSettings.AnthropicDefaultModel : settings.Model;
                 var anthropic = new AnthropicLlmClient(apiKey, model, timeout, settings.BaseUrl, http); // the shared, offline-guarded client

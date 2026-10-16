@@ -111,7 +111,7 @@ public sealed partial class AppShell : IDisposable
     public string CleanupStatus => _cleaner.Status;
 
     /// <summary>
-    /// The key the clean-up in use is waiting for (OPENAI_API_KEY, GEMINI_API_KEY), or null: the cleaner built at the last
+    /// The key the clean-up in use is waiting for (OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY), or null: the cleaner built at the last
     /// load found none, so nothing is sent until a reload finds it (<see cref="TranscriptCleaner.MissingKey"/>).
     /// </summary>
     public string? CleanupWaitingForKey => _cleaner.MissingKey;

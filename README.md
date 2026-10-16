@@ -250,7 +250,7 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
    cleanup model produces one notification and the rule-based tidy until you download it (tray panel > Clean-up, or
    Settings > Models).
 3. Check everything with `.\Dictum.exe --selftest | Out-Host`.
-4. Optional, off by default: cloud polish with Anthropic or your own server (see "Optional cloud polish").
+4. Optional, off by default: cloud polish with Anthropic, OpenAI, Google Gemini or your own server (see "Optional cloud polish").
 
 ### Speech models
 

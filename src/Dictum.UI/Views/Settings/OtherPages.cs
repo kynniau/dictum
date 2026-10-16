@@ -72,11 +72,13 @@ internal sealed class CleanupPage : SettingsPage
         _cloudOn.IsVisible = on;
         _cloudOff.IsVisible = !on;
         // The settings and the clean-up in use (both from the last load) decide the line, never the .env files as they are now.
-        // Offline only refuses a host off this PC before the key is looked at, so at most one of the two "On, but" lines applies.
+        // Offline only refuses a host off this PC before the key is looked at, so at most one of the waiting and offline-only lines applies.
+        // The last "On, but" line is for whatever else leaves nothing sent although cloud was agreed to, such as an address refused as insecure.
         _cloudState.Text = !on ? ""
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
             : Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
             : TranscriptCleaner.OfflineRefusal(s.Llm, s.OfflineOnly) is not null ? CloudPolicy.OfflineOnlyLine
+            : Shell.NothingLeaves ? CloudPolicy.NothingSentLine
             : $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}";
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";

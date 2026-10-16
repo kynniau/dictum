@@ -53,7 +53,10 @@ public class CloudWarningAndPresetsTests
 
     // Approved by the product owner on 16/10/2026 as written: pinned word for word, so any change is
     // deliberate. Settings > Clean-up and Settings > Privacy say it while cloud clean-up is on and offline only refuses it.
-    private const string ProposedOfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
+    private const string ApprovedOfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
+
+    // Proposed to the product owner on 16/10/2026 and awaiting confirmation: pinned word for word, independently of the app's copy, so the owner's replacement is a deliberate change here. Settings > Clean-up says it while cloud clean-up was agreed to but the clean-up in use sends nothing for a reason no other line names (an address refused as insecure).
+    private const string ProposedNothingSentLine = "On, but nothing is sent: the clean-up in use runs on this PC.";
 
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
 
@@ -301,6 +304,22 @@ public class CloudWarningAndPresetsTests
     }
 
     [Fact]
+    public async Task Anthropic_without_its_key_sends_nothing_and_records_the_key_it_waits_for()
+    {
+        // Lens finding F1a on d18de66 (16/10/2026): the Anthropic branch of TranscriptCleaner.Create did not record the key it stopped on, so the
+        // pages could not say they are waiting for it, as they do for the OpenAI and Google Gemini presets.
+        var anthropic = Agreed(new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel });
+        var handler = new Recorder();
+        var cleaner = TranscriptCleaner.Create(anthropic, offlineOnly: false, SecretStore.Empty, new HttpClient(handler), NullLog.Instance);
+        Assert.False(cleaner.UsesModel);
+        Assert.Equal("rule-based tidy only: ANTHROPIC_API_KEY is not set (environment or .env)", cleaner.Status);
+        Assert.Equal("ANTHROPIC_API_KEY", cleaner.MissingKey);
+        var result = await cleaner.CleanAsync("um the client's account is overdrawn", TestContext.Current.CancellationToken);
+        Assert.False(result.Cleaned);
+        Assert.Equal(0, handler.Count); // no request at all
+    }
+
+    [Fact]
     public Task Switching_on_the_OpenAI_preset_without_its_key_sends_nothing_and_says_which_key_is_missing()
     {
         Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SecretStore.OpenAiKey)), "OPENAI_API_KEY is set in this machine's environment, which wins over .env.");
@@ -362,10 +381,49 @@ public class CloudWarningAndPresetsTests
             File.Delete(scratch.Paths.EnvFile);
             shell.Write(("offline_only", System.Text.Json.Nodes.JsonValue.Create(true)));
             Assert.Contains("offline_only", shell.CleanupStatus);
-            Assert.Equal(ProposedOfflineOnlyLine, CleanUpStateLine(window));
+            Assert.Equal(ApprovedOfflineOnlyLine, CleanUpStateLine(window));
             var offline = PrivacyPageLines(window);
-            Assert.Contains(ProposedOfflineOnlyLine, offline);
+            Assert.Contains(ApprovedOfflineOnlyLine, offline);
             Assert.DoesNotContain(offline, l => l.Contains("waiting", StringComparison.Ordinal));
+            window.Close();
+            shell.Dispose();
+        });
+    }
+
+    [Fact]
+    public Task Anthropic_agreed_to_and_without_its_key_says_on_both_pages_that_it_is_waiting_for_it()
+    {
+        // Lens finding F1a on d18de66 (16/10/2026): with Anthropic agreed to, its key gone from .env and a syntax error in settings.json, the
+        // load keeps the settings in use and so skips the repair that would switch Anthropic to the local model. The cleaner then has no key and
+        // sends nothing, as its status says, yet both pages said the text of each dictation is sent to api.anthropic.com.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SecretStore.AnthropicKey)), "ANTHROPIC_API_KEY is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+            File.WriteAllText(scratch.Paths.EnvFile, "ANTHROPIC_API_KEY=k-test\n");
+            var (shell, _, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            dialogs.Answers.Enqueue(0); // Allow
+            Assert.Null(shell.EnableCloud(new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel }));
+            Assert.EndsWith("(ANTHROPIC_API_KEY present)", shell.CleanupStatus);
+            Assert.Null(shell.CleanupWaitingForKey);
+
+            // The key leaves .env and settings.json loses its closing brace: the next load keeps Anthropic, agreed to, and finds no key.
+            File.Delete(scratch.Paths.EnvFile);
+            File.WriteAllText(scratch.Paths.SettingsFile, """{ "hotkey": "F24", "llm": { "provider": "anthropic" }""");
+            shell.Reload(userRequested: false);
+            Assert.Equal(LlmSettings.Anthropic, shell.Settings.Llm.Provider);
+            Assert.True(CloudPolicy.HasConsent(shell.Settings.Llm));
+            Assert.Equal("rule-based tidy only: ANTHROPIC_API_KEY is not set (environment or .env)", shell.CleanupStatus);
+            Assert.Equal("ANTHROPIC_API_KEY", shell.CleanupWaitingForKey);
+            Assert.True(shell.NothingLeaves);
+
+            var window = new SettingsWindow(shell);
+            window.Show();
+            Assert.Equal(ApprovedWaitingLine("ANTHROPIC_API_KEY"), CleanUpStateLine(window));
+            var privacy = PrivacyPageLines(window);
+            Assert.Contains(ApprovedWaitingLine("ANTHROPIC_API_KEY"), privacy);
+            Assert.DoesNotContain(privacy, l => l.StartsWith("The text of each dictation goes to ", StringComparison.Ordinal) || l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal));
             window.Close();
             shell.Dispose();
         });
@@ -445,10 +503,41 @@ public class CloudWarningAndPresetsTests
             Assert.True(shell.NothingLeaves);
             var window = new SettingsWindow(shell);
             window.Show();
-            Assert.Equal(ProposedOfflineOnlyLine, CleanUpStateLine(window));
+            Assert.Equal(ApprovedOfflineOnlyLine, CleanUpStateLine(window));
             var privacy = PrivacyPageLines(window);
-            Assert.Contains(ProposedOfflineOnlyLine, privacy);
+            Assert.Contains(ApprovedOfflineOnlyLine, privacy);
             Assert.DoesNotContain(privacy, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal) || l.Contains(ApprovedStateLine, StringComparison.Ordinal));
+            window.Close();
+            shell.Dispose();
+        });
+    }
+
+    [Fact]
+    public Task Anthropic_agreed_to_but_refused_for_its_http_address_says_on_the_card_that_nothing_is_sent()
+    {
+        // Lens finding F1b on d18de66 (16/10/2026): Anthropic agreed to at http://localhost:8080 with its key set is refused as insecure, so the
+        // clean-up in use sends nothing and Settings > Privacy said so, while the Clean-up card still said the text of each dictation is sent to localhost.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SecretStore.AnthropicKey)), "ANTHROPIC_API_KEY is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24", "llm": { "provider": "anthropic", "base_url": "http://localhost:8080", "model": "m" } }""");
+            CloudConsentFile.Write(scratch.Paths.ConsentFile, new CloudConsentRecord(LlmSettings.Anthropic, "localhost", DateTimeOffset.UtcNow, "test"));
+            File.WriteAllText(scratch.Paths.EnvFile, "ANTHROPIC_API_KEY=k-test\n"); // the key is set, so it is the address that stops the request
+            var (shell, _, _) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            Assert.Equal(LlmSettings.Anthropic, shell.Settings.Llm.Provider); // agreed to, so the load leaves it as it is
+            Assert.True(CloudPolicy.HasConsent(shell.Settings.Llm));
+            Assert.Contains("needs an https:// address", shell.CleanupStatus);
+            Assert.EndsWith("; rule-based tidy only", shell.CleanupStatus);
+            Assert.Null(shell.CleanupWaitingForKey);
+            Assert.True(shell.NothingLeaves);
+
+            var window = new SettingsWindow(shell);
+            window.Show();
+            Assert.Equal(ProposedNothingSentLine, CleanUpStateLine(window));
+            var privacy = PrivacyPageLines(window);
+            Assert.Contains(privacy, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal));
+            Assert.DoesNotContain(privacy, l => l.StartsWith("The text of each dictation goes to ", StringComparison.Ordinal) || l.Contains(ApprovedStateLine, StringComparison.Ordinal));
             window.Close();
             shell.Dispose();
         });
@@ -524,6 +613,19 @@ public class CloudWarningAndPresetsTests
                 ("LLM_API_KEY", "absent", null),
             },
             lines);
+    }
+
+    [Fact]
+    public void The_self_test_lists_the_keys_through_KeyLines_and_not_a_list_of_its_own()
+    {
+        // Lens finding F2 on d18de66 (16/10/2026): the test above reads KeyLines, so a Run that printed two keys by hand would still pass it.
+        // Run is not called here: with no speech model it still loads the native whisper runtime (WhisperEngine.ProbeRuntime), once for the
+        // whole process, and every test that does that is gated on a model and runs in the "Process-wide state" collection. The call site is
+        // pinned in the source instead, as other tests in this project pin source.
+        var source = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src", "Dictum.Core", "Cli", "SelfTestCommand.cs"));
+        Assert.Single(Regex.Matches(source, @"\bKeyLines\(secrets, Line\);")); // Run hands KeyLines its own line writer
+        Assert.DoesNotContain("secrets.Describe(", source, StringComparison.Ordinal); // a key described here would bypass KeyLines
+        Assert.DoesNotContain("SecretStore.", source, StringComparison.Ordinal); // so would a list of keys of its own
     }
 
     [Fact]

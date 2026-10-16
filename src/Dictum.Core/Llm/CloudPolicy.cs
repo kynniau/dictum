@@ -101,4 +101,11 @@ public static class CloudPolicy
     /// as written: never reword it; only the product owner's replacement may change it.
     /// </summary>
     public const string OfflineOnlyLine = "On, but offline only is on: nothing is sent until you switch offline only off.";
+
+    /// <summary>
+    /// The Settings > Clean-up state line while cloud clean-up was agreed to but the clean-up in use sends nothing for a reason no other
+    /// line names, such as an address refused as insecure (<see cref="InsecureEndpoint"/>): the rule-based tidy runs on this PC
+    /// (<see cref="NothingLeaves"/>). Proposed to the product owner on 16/10/2026 and awaiting confirmation: use it as written, never reword it; only the product owner's replacement may change it.
+    /// </summary>
+    public const string NothingSentLine = "On, but nothing is sent: the clean-up in use runs on this PC.";
 }
