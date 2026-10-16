@@ -18,8 +18,9 @@ patched.
 These are the guarantees the README states ("Privacy"); anything that breaks one is a security bug:
 
 - Nothing leaves the PC by default. Dictum connects only to `huggingface.co` (and its download CDN) when you ask for a
-  model, and to a clean-up service off this PC only after you switch it on and agree to that host in the consent
-  step. No telemetry, analytics, crash reports or update checks.
+  model, to `dictum.kynni.au` for one small file (`/version.json`, sending nothing about you) when you click Check for
+  updates in the direct download, and to a clean-up service off this PC only after you switch it on and agree to that
+  host in the consent step. No telemetry, analytics, crash reports or automatic update checks.
 - With `offline_only: true`, Dictum itself connects to no other machine.
 - Dictation audio stays in memory and is never written to disk; transcripts are not written to disk, and reach the
   log only if you turn on `log_transcripts`.

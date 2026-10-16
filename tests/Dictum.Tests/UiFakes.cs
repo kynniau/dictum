@@ -229,12 +229,14 @@ internal sealed class Scratch : IDisposable
     /// <summary>A shell over a fake platform with scripted dialogs, not started (no tray, no hook, no models).</summary>
     /// <param name="speechModels">A speech model manager with a fake loader, for tests that make a model ready; else the real one.</param>
     /// <param name="options">Launch options (a --model override, say); none by default.</param>
-    public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null)
+    /// <param name="downloadHandler">A fake server under the download client's real offline_only guard; the network otherwise.</param>
+    public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null,
+        HttpMessageHandler? downloadHandler = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
         var shell = new AppShell(platform, Paths, NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs, gpuMachine: () => false,
-            speechModels: speechModels);
+            speechModels: speechModels, downloadHandler: downloadHandler);
         return (shell, platform, dialogs);
     }
 

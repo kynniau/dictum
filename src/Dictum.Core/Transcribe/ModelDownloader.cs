@@ -53,11 +53,16 @@ public static partial class ModelDownloader
     /// </summary>
     public const SslProtocols DownloadTls = SslProtocols.Tls12;
 
-    /// <summary>The HttpClient for model downloads, behind the offline_only guard. <paramref name="protocols"/> None lets Windows choose the TLS version.</summary>
-    public static HttpClient CreateHttpClient(Func<bool> offlineOnly, SslProtocols protocols = DownloadTls) => new(new OfflineGuardHandler(offlineOnly, CreateDownloadHandler(protocols)))
-    {
-        Timeout = Timeout.InfiniteTimeSpan, // bounded per read by DownloadPolicy.StallTimeout instead
-    };
+    /// <summary>
+    /// The HttpClient for model downloads and Check for updates (<see cref="UpdateCheck"/>), behind the offline_only guard.
+    /// <paramref name="protocols"/> None lets Windows choose the TLS version. <paramref name="inner"/> replaces the socket
+    /// handler under the guard: tests pass a fake server, so the guard they exercise is the real one.
+    /// </summary>
+    public static HttpClient CreateHttpClient(Func<bool> offlineOnly, SslProtocols protocols = DownloadTls, HttpMessageHandler? inner = null) =>
+        new(new OfflineGuardHandler(offlineOnly, inner ?? CreateDownloadHandler(protocols)))
+        {
+            Timeout = Timeout.InfiniteTimeSpan, // downloads are bounded per read by DownloadPolicy.StallTimeout, the update check by UpdateCheck.CheckTimeout
+        };
 
     /// <summary>The socket handler under the download client (separate so a test can pin its TLS choice).</summary>
     internal static SocketsHttpHandler CreateDownloadHandler(SslProtocols protocols = DownloadTls) => new()

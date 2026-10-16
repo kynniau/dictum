@@ -3,6 +3,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Dictum.Llm;
 using Dictum.Settings;
+using Dictum.Transcribe;
 using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views.Settings;
@@ -185,20 +186,47 @@ internal sealed class PrivacyPage : SettingsPage
     }
 }
 
-/// <summary>Settings → About: version and runtime, Report a problem (SPEC §22), reload, and the files and folders.</summary>
+/// <summary>
+/// Settings → About: version and runtime, Check for updates (decision 11: the direct download only; the Store build says
+/// the Store updates it and has no button), Report a problem (SPEC §22), reload, and the files and folders.
+/// </summary>
 internal sealed class AboutPage : SettingsPage
 {
     private readonly TextBlock _runtime = Ui.Text("");
     private readonly TextBlock _offline = new() { Text = "Offline only: Dictum connects to no other machine.", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _update = Ui.Text("");
+    private readonly TextBlock _notes = Ui.Text("", "caption");
+    private readonly Button _downloadPage;
+    private bool _checking;
 
     public AboutPage(AppShell shell) : base(shell, "About")
     {
         var version = typeof(AboutPage).Assembly.GetName().Version?.ToString(3) ?? "?";
         var title = new TextBlock { Text = "Dictum", FontSize = 22, FontWeight = FontWeight.SemiBold };
+        _downloadPage = Ui.Button(UpdateCheck.DownloadPageLabel, "primary", () => Run(() => Shell.Platform.Open(UpdateCheck.DownloadPageUrl)));
+        _downloadPage.HorizontalAlignment = HorizontalAlignment.Left;
+        Avalonia.Automation.AutomationProperties.SetLiveSetting(_update, Avalonia.Automation.AutomationLiveSetting.Polite);
+        ShowUpdate(null);
+        Control updates;
+        if (Shell.Platform.Package.IsPackaged)
+        {
+            updates = Ui.Text(UpdateCheck.StoreLine); // the sentence alone: no button, so the Store build can never check
+        }
+        else
+        {
+            var check = Ui.Button(UpdateCheck.ButtonLabel, "secondary", () => _ = CheckForUpdatesAsync());
+            var explainer = Ui.Text(UpdateCheck.PrivacyLine, "caption");
+            explainer.VerticalAlignment = VerticalAlignment.Center;
+            Avalonia.Automation.AutomationProperties.SetHelpText(check, UpdateCheck.PrivacyLine); // a screen reader says it with the button
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12 }; // the explainer wraps beside the button
+            Grid.SetColumn(explainer, 1);
+            row.Children.AddRange([check, explainer]);
+            updates = Ui.Stack(8, row, _update, _downloadPage, _notes);
+        }
         Compose(
             Ui.Card(Ui.Stack(10,
                 Ui.Row(14, new MarkIcon(48), Ui.Stack(2, title, Ui.Text($"Version {version} · Kynni Pty Ltd · MIT licence", "caption"))),
-                _offline, _runtime), "Dictum"),
+                _offline, _runtime, updates), "Dictum"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("Report a problem opens an email to " + AppShell.SupportEmail + " in your own mail app, with the version and models filled in. " +
                         "Dictum sends nothing itself and never attaches what you dictated."),
@@ -224,5 +252,36 @@ internal sealed class AboutPage : SettingsPage
         var packaged = Shell.Platform.Package.IsPackaged ? "installed from a package" : "installed from the download";
         _runtime.Text = $"On {Shell.Platform.Name}, {packaged}.\nModels: {Shell.Status.Models}.\nClean-up: {Shell.CleanupStatus}.";
         _offline.IsVisible = Shell.Settings.OfflineOnly; // SPEC §5: the About box says "Offline only"
+    }
+
+    /// <summary>One check per press; a press while one is running is ignored, so it is still one request.</summary>
+    private async Task CheckForUpdatesAsync()
+    {
+        if (_checking) return;
+        _checking = true;
+        try
+        {
+            ShowUpdate(await Shell.CheckForUpdatesAsync());
+        }
+        catch (Exception ex)
+        {
+            Shell.Log.Error($"Check for updates: {ex.GetType().Name}: {ex.Message}");
+            ShowUpdate(new UpdateCheckResult(UpdateStatus.Failed));
+        }
+        finally
+        {
+            _checking = false;
+        }
+    }
+
+    /// <summary>The result line; for a newer version also the download-page button and, under it, the release notes.</summary>
+    private void ShowUpdate(UpdateCheckResult? result)
+    {
+        _update.Text = result?.Line ?? "";
+        _update.IsVisible = result is not null;
+        var notes = result is { Status: UpdateStatus.NewerAvailable } ? result.Notes : null;
+        _downloadPage.IsVisible = result is { Status: UpdateStatus.NewerAvailable };
+        _notes.Text = notes ?? "";
+        _notes.IsVisible = notes is not null;
     }
 }

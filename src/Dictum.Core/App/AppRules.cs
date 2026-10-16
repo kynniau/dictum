@@ -17,9 +17,13 @@ public static class AppRules
 
     public static StateMachineOptions Options(AppSettings s) => new(s.TapMs, s.DoubleTapMs, s.HandsFreeMaxSeconds);
 
-    /// <summary>The cleanup-provider and model-download clients: each refuses any off-machine request while offline_only is on (read per request).</summary>
-    public static (HttpClient Providers, HttpClient Downloads) CreateClients(Func<bool> offlineOnly) =>
-        (OfflineGuardHandler.CreateClient(offlineOnly), ModelDownloader.CreateHttpClient(offlineOnly));
+    /// <summary>
+    /// The cleanup-provider and model-download clients (the second also serves Check for updates): each refuses any
+    /// off-machine request while offline_only is on (read per request). <paramref name="downloadHandler"/> replaces the
+    /// download client's socket handler under its guard (tests).
+    /// </summary>
+    public static (HttpClient Providers, HttpClient Downloads) CreateClients(Func<bool> offlineOnly, HttpMessageHandler? downloadHandler = null) =>
+        (OfflineGuardHandler.CreateClient(offlineOnly), ModelDownloader.CreateHttpClient(offlineOnly, inner: downloadHandler));
 
     /// <summary>Only these two settings shape the hotkey listener; anything else leaves the running one (and its key state) alone.</summary>
     public static bool HotkeyChanged(AppSettings before, AppSettings after) =>

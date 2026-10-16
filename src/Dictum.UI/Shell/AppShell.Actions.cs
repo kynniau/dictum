@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.Storage;
+using Dictum.Transcribe;
 
 namespace Dictum.UI.Shell;
 
@@ -193,8 +194,16 @@ public sealed partial class AppShell
         Write(("llm.provider", JsonValue.Create(LlmSettings.Local)), ("llm.model", JsonValue.Create(CleanupCatalog.Recommend(GpuMachine).Model)));
     }
 
-    /// <summary>"1.0.0": what the consent record and Report a problem name.</summary>
+    /// <summary>"1.0.0": what the consent record, Report a problem and Check for updates name.</summary>
     internal static string AppVersion => typeof(AppShell).Assembly.GetName().Version?.ToString(3) ?? "?";
+
+    /// <summary>
+    /// Settings → About → Check for updates (decision 11, 16/10/2026): runs only when the user presses the button. One
+    /// request for version.json through the model-download client, so the offline_only guard, TLS 1.2 and the proxy rules
+    /// of every download apply; offline_only refuses before anything is sent, and the Store build never checks.
+    /// </summary>
+    public Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken cancellationToken = default) =>
+        UpdateCheck.CheckAsync(_downloadHttp, AppVersion, Platform.Package.IsPackaged, () => _settings.OfflineOnly, _log, cancellationToken);
 
     /// <summary>
     /// SPEC §22 "Report a problem": a prefilled email to the support address (the user's own mail app sends it, or not).
