@@ -75,7 +75,9 @@ public sealed class DictationController : IDisposable
 
     /// <summary>
     /// No dictation is recording or processing. Read from other threads as a gate (a window that takes focus must not
-    /// open mid-dictation, or the paste would land in it); a stale read only delays or allows one opening.
+    /// open mid-dictation, or the paste would land in it); a stale read only delays or allows one opening. The mouse-hotkey
+    /// listener reads it too (AppShell.ApplyHookEnabled), again on each tray state, and the end of processing is reported
+    /// only after the machine is idle (Finished).
     /// </summary>
     public bool IsIdle => _machine.State == DictationState.Idle;
 
@@ -135,7 +137,12 @@ public sealed class DictationController : IDisposable
     private IReadOnlyList<Effect> Finished(DoneInput done)
     {
         _lastWords = done.Words;
-        return _machine.ProcessingFinished(done.SessionId, done.Outcome);
+        var effects = _machine.ProcessingFinished(done.SessionId, done.Outcome);
+        // The UI hears the end only after the machine's own transition (for every finished pipeline, as before). Told from
+        // the pipeline task, before this message was even queued, a UI that reads IsIdle on that news (the mouse-hotkey gate,
+        // AppShell.ApplyHookEnabled) could still see the dictation under way and keep a mouse button swallowed after it.
+        _ui.SetTrayState(done.Outcome == ProcessingOutcome.Failed ? TrayState.Error : TrayState.Idle);
+        return effects;
     }
 
     private IReadOnlyList<Effect> CaptureLost(long sessionId)
@@ -231,8 +238,7 @@ public sealed class DictationController : IDisposable
             {
                 _log.Error($"Processing failed: {ex.GetType().Name}: {ex.Message}");
             }
-            _ui.SetTrayState(outcome == ProcessingOutcome.Failed ? TrayState.Error : TrayState.Idle);
-            _inbox.Writer.TryWrite(new DoneInput(begin.SessionId, outcome, words));
+            _inbox.Writer.TryWrite(new DoneInput(begin.SessionId, outcome, words)); // Finished sets the tray state
         });
     }
 

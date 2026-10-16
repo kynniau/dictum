@@ -126,14 +126,17 @@ public sealed partial class AppShell
 
     /// <summary>
     /// The one rule for the dictation listener: on while dictation is enabled and no capture box pauses it, and, for a
-    /// mouse-button hotkey, only while a speech model is ready. A mouse button is always swallowed (HotkeyMatcher), so with
-    /// no model to dictate with (the first-run download, a failed load, a model swap) it would vanish from every app for
-    /// nothing; it keeps its normal job until the model is ready. A keyboard hotkey stays on (the controller ignores a press
-    /// while no model is ready). Called on every change it depends on: the listener, enabled, a pause, each model state change.
+    /// mouse-button hotkey, only while a speech model is ready or a dictation is under way. A mouse button is always
+    /// swallowed (HotkeyMatcher), so with no model to dictate with (the first-run download, a failed load, a model swap) it
+    /// would vanish from every app for nothing; it keeps its normal job until the model is ready. A dictation already under
+    /// way keeps the listener on: a model load that starts mid-dictation (a download finishing, a model swap) must not cut
+    /// off its release, its stop tap or Esc. A keyboard hotkey stays on (the controller ignores a press while no model is
+    /// ready). Called on every change it depends on: the listener, enabled, a pause, each model state change, and each
+    /// dictation state the controller reports (SetTrayState), so the listener goes off again when that dictation ends.
     /// </summary>
     private void ApplyHookEnabled()
     {
-        if (_hook is not null) _hook.Enabled = _settings.Enabled && _hotkeyPauses == 0 && (!_hookUsesMouse || _models.IsReady);
+        if (_hook is not null) _hook.Enabled = _settings.Enabled && _hotkeyPauses == 0 && (!_hookUsesMouse || _models.IsReady || _controller is { IsIdle: false });
     }
 
     /// <summary>From the hook thread: to the window that asked for the hotkey (calibration's "or hold Right Ctrl"), else to dictation.</summary>

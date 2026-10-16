@@ -87,10 +87,11 @@ public sealed class Corrections
 
     /// <summary>
     /// One snippets.txt line: the phrase, the arrow, and the text with each backslash written as "\\" and then each line
-    /// break as "\n", so a typed "\\server\new-clients" reads back as typed rather than with a line break in it.
+    /// break as "\n", so a typed "\\server\new-clients" reads back as typed rather than with a line break in it. Only
+    /// spaces and tabs are trimmed from the text: a line break at either end is written as "\n" and kept.
     /// </summary>
     public static string SnippetLine(string phrase, string text) =>
-        $"{phrase.Trim()} {Arrow} {text.Trim().Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}";
+        $"{phrase.Trim()} {Arrow} {text.Trim(' ', '\t').Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}";
 
     public string Apply(string text)
     {

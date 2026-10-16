@@ -253,7 +253,7 @@ internal sealed class AddSnippetWindow : DialogWindow
         var add = Ui.Button("Add", "primary", () =>
         {
             var said = phrase.Text?.Trim() ?? "";
-            var pasted = text.Text?.Trim() ?? "";
+            var pasted = text.Text?.Trim(' ', '\t') ?? ""; // a line break at either end is the user's: kept (SPEC §16.6)
             if (shell.Personal.CheckNewSnippet(said, pasted) is { } problem)
             {
                 status.Text = problem;

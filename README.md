@@ -129,14 +129,17 @@ written `XButton1`/`XButton2`) work exactly like a key: hold to record, double-t
 part of a chord (`Ctrl+Mouse4`). Choose one in the **Press your hotkey** box by pressing it, or write it in
 `settings.json`. The button is always hidden from the app under the pointer, whatever `suppress_hotkey` says, so
 holding the right button opens no menu and a side button does not go Back in a browser (that click would otherwise
-arrive when you let go, in the middle of the dictation). Until a speech model is ready (none downloaded yet, one still
+arrive when you let go, in the middle of the dictation). So while Dictum is on and a speech model is ready, that button
+no longer reaches other apps at all, not even a quick click (no right-click menu, no middle-click, no Back); a side
+button you do not use is the best choice. Until a speech model is ready (none downloaded yet, one still
 loading, or one that failed to load) a mouse-button dictation hotkey leaves its button alone, so it keeps its normal
 job while there is nothing to dictate with. Each name means whichever physical button Windows reports as that button
 (Dictum reads the button messages Windows sends, not the hardware). **The left button cannot be used**: holding it to
 dictate would swallow every click.
 Dictum watches the mouse (a WH_MOUSE_LL hook on the same thread as the keyboard hook) only while a hotkey names a mouse
 button, a **Press your hotkey** box is listening, or `--selftest` runs; the hook decodes button presses only and passes
-moves and wheel turns on untouched. The fix-last hotkey can be a mouse button too.
+moves and wheel turns on untouched. The fix-last hotkey can be a mouse button too; while Dictum is on, that button no
+longer reaches other apps at all either.
 
 ### Keyboards and Remote Desktop
 

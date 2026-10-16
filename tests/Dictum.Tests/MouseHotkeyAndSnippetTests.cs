@@ -94,6 +94,15 @@ public class MouseHotkeyTests
     }
 
     [Fact]
+    public void The_parser_does_not_state_the_unverified_button_swap_as_fact()
+    {
+        // DECISIONS (16/10/2026) lists "Windows swaps the buttons before WH_MOUSE_LL" as recalled, not verified; so must the source.
+        var source = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src", "Dictum.Core", "Hotkey", "HotkeyParser.cs"));
+        Assert.DoesNotContain("follows the swap", source, StringComparison.Ordinal);
+        Assert.Contains("whether Windows swaps before WH_MOUSE_LL is recalled, not verified", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Two_hotkeys_on_different_mouse_buttons_do_not_conflict_but_the_same_button_does()
     {
         Assert.False(HotkeyParser.Parse("RightMouse").CanFireTogether(HotkeyParser.Parse("Mouse5")));
@@ -259,6 +268,63 @@ public class MouseHotkeyTests
         var (decoded, _, _, data) = Decode(Native.WM_XBUTTONDOWN, 3u << 16);
         Assert.False(decoded);
         Assert.Equal(1234u, data.time); // read (to learn which button), then refused
+    }
+
+    /// <summary>
+    /// Calls a hook callback the way Windows does: HC_ACTION (0), the message as wParam, the struct in unmanaged memory. The
+    /// hook is never started, so nothing is installed; a passed event goes to CallNextHookEx, which is not 1.
+    /// </summary>
+    private static nint Call<T>(Func<int, nint, nint, nint> proc, int message, T data) where T : struct
+    {
+        var p = Marshal.AllocHGlobal(Marshal.SizeOf<T>());
+        try
+        {
+            Marshal.StructureToPtr(data, p, fDeleteOld: false);
+            return proc(0, message, p);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(p);
+        }
+    }
+
+    private static Native.MSLLHOOKSTRUCT ButtonData(uint xButton = 0) => new() { mouseData = xButton << 16, time = 1000 };
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)] // a mouse button is swallowed whatever suppress_hotkey says
+    public void The_mouse_hook_callback_swallows_the_hotkey_button_and_passes_the_others(bool suppress)
+    {
+        var events = new List<HookEvent>();
+        using var hook = new InputHook(new HotkeyMatcher(HotkeyParser.Parse("Mouse5"), suppress), events.Add, NullLog.Instance);
+        Assert.Equal((nint)1, Call(hook.MouseProc, Native.WM_XBUTTONDOWN, ButtonData(Native.XBUTTON2)));
+        Assert.Equal((nint)1, Call(hook.MouseProc, Native.WM_XBUTTONUP, ButtonData(Native.XBUTTON2)));
+        Assert.NotEqual((nint)1, Call(hook.MouseProc, Native.WM_RBUTTONDOWN, ButtonData()));
+        Assert.NotEqual((nint)1, Call(hook.MouseProc, Native.WM_RBUTTONUP, ButtonData()));
+        Assert.NotEqual((nint)1, Call(hook.MouseProc, Native.WM_XBUTTONDOWN, ButtonData(Native.XBUTTON1))); // the other side button
+        Assert.Equal([HotkeySignal.Down, HotkeySignal.Up], events.Select(e => e.Signal));
+    }
+
+    [Fact]
+    public void The_keyboard_hook_callback_swallows_the_hotkey_when_told_and_passes_other_keys()
+    {
+        const int f24 = Vk.F1 + 23, a = 'A';
+        static Native.KBDLLHOOKSTRUCT Key(int vk) => new() { vkCode = (uint)vk, time = 1000 };
+
+        var events = new List<HookEvent>();
+        using var hook = new InputHook(new HotkeyMatcher(HotkeyParser.Parse("F24"), suppress: true), events.Add, NullLog.Instance);
+        Assert.Equal((nint)1, Call(hook.KeyboardProc, Native.WM_KEYDOWN, Key(f24)));
+        Assert.Equal((nint)1, Call(hook.KeyboardProc, Native.WM_KEYUP, Key(f24)));
+        Assert.NotEqual((nint)1, Call(hook.KeyboardProc, Native.WM_KEYDOWN, Key(a)));
+        Assert.NotEqual((nint)1, Call(hook.KeyboardProc, Native.WM_KEYUP, Key(a)));
+        Assert.Equal([HotkeySignal.Down, HotkeySignal.Up], events.Select(e => e.Signal));
+
+        // suppress_hotkey off: the key reaches the app and the hotkey still fires.
+        var passed = new List<HookEvent>();
+        using var open = new InputHook(new HotkeyMatcher(HotkeyParser.Parse("F24"), suppress: false), passed.Add, NullLog.Instance);
+        Assert.NotEqual((nint)1, Call(open.KeyboardProc, Native.WM_KEYDOWN, Key(f24)));
+        Assert.NotEqual((nint)1, Call(open.KeyboardProc, Native.WM_KEYUP, Key(f24)));
+        Assert.Equal([HotkeySignal.Down, HotkeySignal.Up], passed.Select(e => e.Signal));
     }
 
     [Fact]
@@ -450,6 +516,24 @@ public class SnippetTests
     }
 
     [Fact]
+    public void A_phrase_a_correction_would_change_is_refused_but_a_change_of_case_passes()
+    {
+        // Corrections also run before the snippets: "my e mail" is "my email" by then, so its snippet could never fire.
+        using var scratch = new Scratch();
+        File.WriteAllText(scratch.Paths.CorrectionsFile, "e mail => email\nkynni => Kynni\n");
+        var personal = Service(scratch);
+        Assert.Equal("A correction in corrections.txt changes these words before the snippet runs; use the corrected form as the phrase.",
+            personal.CheckNewSnippet("my e mail", "kyle@example.com"));
+        Assert.Equal("Send it to my email.", personal.Finish("Send it to my e mail.")); // why: the snippet would see this
+        Assert.Null(personal.CheckNewSnippet("my email", "kyle@example.com")); // the corrected form
+
+        Assert.Null(personal.CheckNewSnippet("my kynni link", "https://kynni.au")); // a correction that only changes case
+        personal.AddSnippet("my kynni link", "https://kynni.au");
+        personal.Load(); // this service's reload callback does nothing
+        Assert.Equal("Book at https://kynni.au.", personal.Finish("Book at my kynni link.")); // snippets match any case: it fires
+    }
+
+    [Fact]
     public void A_backslash_is_written_as_two_and_read_back_as_typed()
     {
         var line = Corrections.SnippetLine("my share", @"\\server\new-clients");
@@ -552,6 +636,70 @@ public class MouseHotkeyAndSnippetUiTests
         using (shell.PauseHotkey()) Assert.False(mouse.Enabled); // a listening capture box still pauses it
         Assert.True(mouse.Enabled);
         shell.Dispose();
+    });
+
+    /// <summary>
+    /// The same rule with a dictation under way (lens 2, 16/10/2026), so on a started shell: the real controller, with the
+    /// hotkey routed through the shell and each tray state reported back to it. The test above cannot have a dictation: its
+    /// shell is never started, so it has no controller.
+    /// </summary>
+    [Fact]
+    public Task A_mouse_hotkey_stays_on_through_a_dictation_while_a_model_loads_and_goes_off_when_it_ends() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "Mouse4", "whisper": { "model": "base.en" }, "llm": { "provider": "none" }, "pill": { "enabled": false } }""");
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
+        File.WriteAllText(model, "");
+        using var loads = new ManualResetEventSlim(initialState: true); // a load finishes at once unless the test holds it
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) =>
+        {
+            loads.Wait();
+            return new FakeSpeechEngine(p, d);
+        }, warmUp: () => false);
+        var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model));
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            var mouse = platform.LastListener!;
+            Assert.True(mouse.Matcher.Spec.UsesMouse);
+            Assert.True(Eventually(() => mouse.Enabled), "the mouse listener did not come on when the speech model became ready");
+
+            // Event times a minute ahead of the controller's own clock, so its tick can expire nothing while the test runs.
+            var t0 = Environment.TickCount64 + 60_000;
+
+            // Hands-free on Mouse4 (tap, tap); then a model load starts (a download finishing, a model swap).
+            foreach (var (signal, at) in new[] { (HotkeySignal.Down, 0), (HotkeySignal.Up, 50), (HotkeySignal.Down, 150), (HotkeySignal.Up, 200) })
+                mouse.Post(new HookEvent(signal, t0 + at));
+            Assert.True(Eventually(() => !shell.DictationIdle), "the dictation did not start");
+            loads.Reset();
+            models.BeginLoad(model, new WhisperSettings());
+            Dispatcher.UIThread.RunJobs(); // the shell hears the load start
+            Assert.False(shell.SpeechReady);
+            Assert.True(mouse.Enabled, "a model load mid-dictation turned the listener off: the stop tap would reach the app and Esc would post nothing");
+
+            // Esc ends it with no model ready: the button goes back to its normal job until the model is ready again.
+            mouse.Post(new HookEvent(HotkeySignal.Escape, t0 + 300));
+            Assert.True(Eventually(() => !mouse.Enabled), "the listener stayed on after the dictation ended with no speech model ready");
+            Assert.True(shell.DictationIdle);
+            loads.Set();
+            Assert.True(Eventually(() => mouse.Enabled), "the listener did not come back when the load finished");
+
+            // A dictation that ends in processing: the model is removed mid-hold (Settings > Storage), the release stops the
+            // recording, the transcription fails for want of a model, and the listener goes off as the dictation ends.
+            mouse.Post(new HookEvent(HotkeySignal.Down, t0 + 1_000));
+            Assert.True(Eventually(() => !shell.DictationIdle), "the second dictation did not start");
+            models.Unload();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(shell.SpeechReady);
+            Assert.True(mouse.Enabled, "removing the model mid-hold turned the listener off: the release would be lost");
+            mouse.Post(new HookEvent(HotkeySignal.Up, t0 + 2_000));
+            Assert.True(Eventually(() => !mouse.Enabled), "the listener stayed on after a dictation that failed with no speech model");
+            Assert.True(shell.DictationIdle);
+        }
+        finally
+        {
+            loads.Set(); // never leave a load blocked on a worker thread
+            shell.Dispose();
+        }
     });
 
     [Fact]
@@ -767,6 +915,52 @@ public class MouseHotkeyAndSnippetUiTests
         Assert.Contains("Updated.", Texts(window)); // a later line for the same phrase wins
         Assert.Equal("kyle@kynni.au\nKynni Pty Ltd", shell.Personal.Finish("my email"));
 
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task A_line_break_typed_at_either_end_of_a_snippet_is_kept() => UiSession.Run(() =>
+    {
+        // The window says "pasted exactly as you type it here, line breaks included" (SPEC §16.6: never trimmed).
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: true);
+        var window = new AddSnippetWindow(shell);
+        window.Show();
+        var fields = All<TextBox>(window).ToList();
+
+        fields[0].Text = "my sign off";
+        fields[1].Text = "\r\nKyle Manson\r\nKynni Pty Ltd\r\n";
+        Click(window, "Add");
+        Assert.Contains("Added.", Texts(window));
+        Assert.Contains(@"my sign off => \nKyle Manson\nKynni Pty Ltd\n", File.ReadAllLines(scratch.Paths.SnippetsFile));
+        Assert.Equal("Regards,\nKyle Manson\nKynni Pty Ltd\n", shell.Personal.Finish("Regards,my sign off"));
+
+        // Spaces and tabs at either end are still dropped: a "phrase => text" line cannot hold them.
+        fields[0].Text = "my email";
+        fields[1].Text = " \tkyle@example.com\t ";
+        Click(window, "Add");
+        Assert.Contains("my email => kyle@example.com", File.ReadAllLines(scratch.Paths.SnippetsFile));
+
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task Settings_says_a_mouse_button_hotkey_no_longer_reaches_other_apps() => UiSession.Run(() =>
+    {
+        // A quick click is swallowed too, not only a hold: the user must hear that before giving up right-click or Back.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: true);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("General");
+        var texts = Texts(window);
+        Assert.Contains("While Dictum is on and a speech model is ready, that button no longer reaches other apps at all (no right-click menu, " +
+                        "no middle-click, no Back); a side button you do not use is the best choice.", texts);
+        Assert.Contains("While Dictum is on, a mouse button chosen here no longer reaches other apps at all.", texts); // the fix-last box
         window.Close();
         shell.Dispose();
     });

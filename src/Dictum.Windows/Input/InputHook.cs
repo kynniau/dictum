@@ -114,7 +114,8 @@ internal abstract class LowLevelHook : IDisposable
         else _log.Warn($"Mouse hook ({_name}) installation failed (Win32 error {Marshal.GetLastWin32Error()}); keys are still reported, mouse buttons are not.");
     }
 
-    private nint KeyboardProc(int nCode, nint wParam, nint lParam)
+    /// <summary>The WH_KEYBOARD_LL callback: 1 swallows the key. Internal so the tests can call it with a marshalled struct, as Windows does.</summary>
+    internal nint KeyboardProc(int nCode, nint wParam, nint lParam)
     {
         if (nCode >= 0)
         {
@@ -129,7 +130,8 @@ internal abstract class LowLevelHook : IDisposable
         return Native.CallNextHookEx(0, nCode, wParam, lParam);
     }
 
-    private nint MouseProc(int nCode, nint wParam, nint lParam)
+    /// <summary>The WH_MOUSE_LL callback: 1 swallows the button event. Internal so the tests can call it with a marshalled struct, as Windows does.</summary>
+    internal nint MouseProc(int nCode, nint wParam, nint lParam)
     {
         if (nCode >= 0 && Button((int)wParam, lParam, out var vk, out var isDown, out var data) && data.dwExtraInfo != Native.InjectedMarker)
         {

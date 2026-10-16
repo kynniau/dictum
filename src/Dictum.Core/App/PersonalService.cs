@@ -79,7 +79,8 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
 
     /// <summary>
     /// Why a snippet cannot be added to snippets.txt, or null (SPEC §16.6). The phrase must fit on one line of the file, and
-    /// the profanity filter (which runs before the snippets) must leave it alone, or the snippet could never match.
+    /// corrections and the profanity filter (which run before the snippets) must leave its words alone, or the snippet could
+    /// never match. A correction that only changes case passes: snippets match any case.
     /// </summary>
     public string? CheckNewSnippet(string phrase, string text)
     {
@@ -88,6 +89,8 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
         if (phrase.StartsWith('#')) return "A snippet cannot start with #: in snippets.txt that marks a comment line.";
         if (phrase.Contains(Corrections.Arrow, StringComparison.Ordinal)) return $"The words you say cannot contain {Corrections.Arrow}.";
         if (!phrase.Any(char.IsLetterOrDigit)) return "The words you say need a letter or a digit in them.";
+        if (WholeWords.Key(_text.Corrections.Apply(phrase)) != WholeWords.Key(phrase))
+            return "A correction in corrections.txt changes these words before the snippet runs; use the corrected form as the phrase.";
         if (_text.Profanity.Apply(phrase, settings().Profanity.Mode) != phrase)
             return "The profanity filter would change these words before the snippet runs; choose another phrase.";
         if (text.Length == 0) return "Type what Dictum should paste.";

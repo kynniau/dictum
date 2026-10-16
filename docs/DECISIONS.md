@@ -858,16 +858,18 @@ link" snippets.
   a browser on Mouse4) and wrecked the dictation. `HotkeyMatcher` suppresses when `suppress_hotkey` is on or the key is
   a mouse button; `suppress_hotkey` still governs keys. Settings has no note for that case any more.
 - The dictation listener is on only while `enabled` is true, no capture box pauses it, and, for a mouse-button hotkey,
-  the speech model is ready (`ModelManager.IsReady`; review fix A). Reason: the button is always swallowed, so during
-  the first-run download (the hook starts before `Models.Ensure`), a failed load or a model swap it vanished from every
-  app with nothing to dictate with. One helper, `AppShell.ApplyHookEnabled`, applies the rule from `StartHook`,
-  `ApplyEnabled`, `PauseHotkey` and its undo, and every model state change; the shell now subscribes to both model
-  managers' `Changed` in its constructor instead of in `Start` (nothing loads before `Start`, so production behaviour
-  is the same, and the rule holds from the first load). A keyboard hotkey keeps its old rule (the controller ignores a
-  press while no model is ready), and so does the fix hotkey. Accepted edge: a model load that starts while a mouse
-  hotkey is held turns the listener off mid-hold; the release is swallowed with no Up signal, so that recording runs
-  on until the button is pressed and released again (the stale held state makes the next press count as a repeat) or
-  until the `hands_free_max_seconds` auto-stop.
+  the speech model is ready (`ModelManager.IsReady`; review fix A) or a dictation is under way (the controller is not
+  idle; lens 2, below). Reason: the button is always swallowed, so during the first-run download (the hook starts
+  before `Models.Ensure`), a failed load or a model swap it vanished from every app with nothing to dictate with; but a
+  dictation already under way keeps it, so a model load that starts mid-dictation cannot cut off its release, its
+  stop tap or Esc. One helper, `AppShell.ApplyHookEnabled`, applies the rule from `StartHook`, `ApplyEnabled`,
+  `PauseHotkey` and its undo, every model state change, and every tray state the controller reports (so the listener
+  goes off again when that dictation ends); the shell now subscribes to both model managers' `Changed` in its
+  constructor instead of in `Start` (nothing loads before `Start`, so production behaviour is the same, and the rule
+  holds from the first load). A keyboard hotkey keeps its old rule (the controller ignores a press while no model is
+  ready), and so does the fix hotkey. The edge accepted here before lens 2 (a load starting mid-hold swallowed the
+  release with no Up signal, so the recording ran on to the next press or the `hands_free_max_seconds` auto-stop) is
+  gone with it.
 - The key monitor (capture box, `--selftest`) always installs the mouse hook: it is short-lived, and the box must be
   able to name a button when one is pressed. So the mouse is also watched while a capture box listens or `--selftest`
   runs, whatever the hotkey (the README said "only while a hotkey names a mouse button" until the review fixes). For
@@ -959,3 +961,51 @@ Each test below was observed failing on the reverted behaviour, then passing wit
   button Windows reports as that button.
 - That an Avalonia `TextBox` with `AcceptsReturn` keeps Enter from firing the dialog's default button (the Add-a-snippet
   window relies on it for the multi-line field).
+
+**Lens 2, 16/10/2026**
+
+The second lens returned Needs changes: one Major, five Minor, no blockers. All six are fixed:
+
+1. Major: the hook callbacks' swallow had no test (the lens made `MouseProc` and `KeyboardProc` never return 1 and the
+   suite stayed green). Both are now `internal` (Dictum.Windows already grants the tests its internals) and tests call
+   them on a never-started `InputHook` with a struct marshalled as Windows hands it over:
+   `The_mouse_hook_callback_swallows_the_hotkey_button_and_passes_the_others` (Mouse5, `suppress_hotkey` on and off:
+   XBUTTON2 down and up return 1 and post Down and Up; the right button and XBUTTON1 pass) and
+   `The_keyboard_hook_callback_swallows_the_hotkey_when_told_and_passes_other_keys` (F24).
+2. Minor: a model load that started mid-dictation turned a mouse listener off, so a hands-free stop tap reached the app
+   and Esc posted nothing until the load ended or the auto-stop. The gate now also holds while the controller is not
+   idle, and `SetTrayState` re-applies it (the bullet above). For it to go off again reliably when the dictation ends,
+   `DictationController` now reports the end of processing to the UI from `Finished`, after the machine is idle: it had
+   reported it from the pipeline task before even queuing `DoneInput`, so the gate, re-applied on that news, could still
+   read the dictation as under way and keep the button swallowed after it ended with no model ready (after a model
+   removed mid-dictation, until something else re-applied the gate, such as the next model change). Pins:
+   `The_UI_hears_that_a_dictation_ended_only_once_the_controller_is_idle` (ControllerTests) and
+   `A_mouse_hotkey_stays_on_through_a_dictation_while_a_model_loads_and_goes_off_when_it_ends`, on a started shell
+   (added beside the readiness test above, whose shell is never started and so has no controller).
+3. Minor: Settings never said that the chosen button stops reaching other apps altogether (a quick click is swallowed
+   too). `GeneralPage.MouseNote` now says so, the fix-last card (whose listener has no model to wait for) says "While
+   Dictum is on, a mouse button chosen here no longer reaches other apps at all.", and the README says both. Pin:
+   `Settings_says_a_mouse_button_hotkey_no_longer_reaches_other_apps`.
+4. Minor: the Add-a-snippet window and `Corrections.SnippetLine` trimmed all whitespace, losing a typed line break at
+   either end. Both now trim only spaces and tabs; those are still dropped at either end, as a `phrase => text` line
+   cannot hold them (the reader trims around the arrow). Pin, through the window:
+   `A_line_break_typed_at_either_end_of_a_snippet_is_kept`.
+5. Minor: `CheckNewSnippet` now also refuses a phrase a correction would change (corrections run first, so its snippet
+   could never fire), compared by `WholeWords.Key`, so a correction that only changes case passes (snippets match any
+   case). Pin: `A_phrase_a_correction_would_change_is_refused_but_a_change_of_case_passes`.
+6. Minor: the parser's comment stated the button swap as fact; it now says it is recalled, not verified. Pin:
+   `The_parser_does_not_state_the_unverified_button_swap_as_fact` (reads the source).
+
+Each pin was observed failing on the reverted behaviour, then passing with the fix restored: (1) each callback with its
+`return 1` removed ("Expected: 1, Actual: 0"); (2) the gate without the controller term, `SetTrayState` without
+`ApplyHookEnabled`, and the controller's old order (the UI was told Idle, and Error, while `IsIdle` was false; the
+started-shell test passed on the old order in the run made, most likely because its 10 ms polling lets the queued
+`DoneInput` land first, which is why the controller test exists); (3) each sentence removed; (4) `Trim()` restored in the window, and separately in
+`SnippetLine` (each wrote `my sign off => Kyle Manson\nKynni Pty Ltd`); (5) the check removed, and separately made
+case-sensitive; (6) the old comment restored. Full suite after these fixes: 791 tests, 772 passed, 19 skipped, 0 failed
+(before: 781, 762, 19, 0).
+
+Not verified by the lens, and still not verified: whether Windows applies a button swap before WH_MOUSE_LL; whether an
+Alt or Win + mouse-button chord can still open the menu bar or Start once its click is swallowed (the matcher sends no
+menu mask for a swallowed trigger); cursor latency and hook timeouts with the mouse hook installed; the 19 gated desktop
+and tray tests, skipped under Remote Desktop, were not re-run.

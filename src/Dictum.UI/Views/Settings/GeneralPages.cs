@@ -16,7 +16,11 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ToggleSwitch _login;
     private readonly TextBlock _loginHint = Ui.Text("", "hint");
     public const string MouseNote = "A mouse button works too: hold the right or middle button or a side button (Mouse4, Mouse5), and double-tap it for " +
-                                    "hands-free. The left button cannot be used. Hands-free stops by itself after hands_free_max_seconds in settings.json (5 minutes unless changed).";
+                                    "hands-free. The left button cannot be used. Hands-free stops by itself after hands_free_max_seconds in settings.json (5 minutes unless changed). " +
+                                    "While Dictum is on and a speech model is ready, that button no longer reaches other apps at all (no right-click menu, no middle-click, " +
+                                    "no Back); a side button you do not use is the best choice.";
+    /// <summary>The fix-last listener has no speech model to wait for, so its button is swallowed whenever Dictum is on.</summary>
+    private const string FixMouseNote ="While Dictum is on, a mouse button chosen here no longer reaches other apps at all.";
     private const string FixCaption = "Press the key for Fix last dictation";
     private const string FixPrompt = "Listening: press the key or mouse button that should open Fix last dictation.";
 
@@ -75,7 +79,7 @@ internal sealed class GeneralPage : SettingsPage
                 Ui.Text(MouseNote, "caption"),
                 Ui.Text(HotkeyCheckWindow.MacNote, "caption")), "Hotkey"),
             Ui.Card(Ui.Stack(12,
-                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse5 work well."),
+                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse5 work well. " + FixMouseNote),
                 _fixCapture,
                 Ui.Row(8, _saveFix, _clearFix)), "Fix last dictation hotkey"),
             Ui.Card(Ui.Stack(4,

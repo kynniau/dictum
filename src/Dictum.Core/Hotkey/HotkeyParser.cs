@@ -192,7 +192,7 @@ public static class HotkeyParser
         Add(new("Apps", [Vk.Apps], false), "apps", "contextmenu", "menu", "application");
         Add(new("`", [0xC0], false), "`", "backtick", "grave", "tilde");
 
-        // Mouse buttons: whichever physical button Windows reports as that button (so a swapped mouse follows the swap).
+        // Mouse buttons: whichever button the hook's messages name; whether Windows swaps before WH_MOUSE_LL is recalled, not verified (DECISIONS 16/10/2026).
         // The left button is refused in TryKey; the matcher never sees it (the mouse hook does not decode it).
         Add(new("RightMouse", [Vk.RButton], false), "rightmouse", "rightclick", "rightbutton", "rbutton", "mouseright", "mouse2");
         Add(new("MiddleMouse", [Vk.MButton], false), "middlemouse", "middleclick", "middlebutton", "mbutton", "mousemiddle", "wheelclick", "mouse3");

@@ -73,7 +73,11 @@ public sealed partial class AppShell
         Changed?.Invoke();
     }
 
-    /// <summary>From the controller (any thread): the tray icon, the start/stop sounds and the panel's state word.</summary>
+    /// <summary>
+    /// From the controller (any thread): the tray icon, the start/stop sounds, the panel's state word, and the dictation
+    /// listener's rule (<see cref="ApplyHookEnabled"/>: a mouse hotkey stays on through a dictation and goes off when it ends
+    /// with no speech model ready).
+    /// </summary>
     internal void SetTrayState(TrayState state)
     {
         if (!Dispatcher.UIThread.CheckAccess())
@@ -90,6 +94,7 @@ public sealed partial class AppShell
             else if (state == TrayState.Processing && previous == TrayState.Recording) Platform.PlayCue(SoundCue.Stop);
         }
         StatusChanged();
+        ApplyHookEnabled();
     }
 
     /// <summary>What the controller needs from the UI; never blocks the caller.</summary>
