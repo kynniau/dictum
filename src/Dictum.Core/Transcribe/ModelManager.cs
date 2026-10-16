@@ -208,9 +208,9 @@ public sealed class ModelManager : IDisposable
             // after a model had loaded on the GPU.
             try
             {
-                _marker.Begin(modelPath);
                 try
                 {
+                    _marker.Begin(modelPath); // inside the try: End releases the gate whatever Begin or the load throws
                     engine = LoadAndWarm(modelPath, settings, decode, onCpu);
                 }
                 finally

@@ -1075,7 +1075,8 @@ resilience".
 - **A GPU that ends Dictum.** whisper.cpp (and llama.cpp) can end the program when the GPU refuses a model's memory, which
   no retry survives. While a model loads on the GPU its path is in `gpu-load-speech.txt` / `gpu-load-cleanup.txt` in the
   per-user local data folder, deleted when the load ends and at quit. The two managers' GPU loads (warm-up included) run
-  one after the other through one gate per folder, so at most one file exists and a file left names the load under way. A
+  one after the other through one gate per folder, so this run writes at most one file at a time; a file left by an
+  earlier start can sit beside it, and a file this run writes names the load under way. A
   file also stays when anything else ends Dictum during that load (Task Manager, power loss, sign-out). A start whose
   first load is the model such a file names, with that model's gpu setting `auto`, loads it on the CPU for that run, with
   no click (whisper: the CPU-only runtime; llama.cpp: the CPU build), and the line reads "The graphics driver could not

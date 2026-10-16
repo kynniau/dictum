@@ -14,8 +14,10 @@ namespace Dictum.Transcribe;
 /// between the GPU and the CPU. A GPU load of another model replaces it, so a model it does not name tries the GPU again.
 /// Only with the gpu setting <c>auto</c>: a hand-set <c>vulkan</c> always tries the GPU, and <c>cpu</c> never does.
 /// <para>
-/// The speech and clean-up markers share one gate per folder, held from <see cref="Begin"/> to <see cref="End"/>, so at most one
-/// of the two files exists at a time and a file left behind names the load that was under way. Start-up begins both loads at
+/// The speech and clean-up markers share one gate per folder, held from <see cref="Begin"/> to <see cref="End"/>: GPU loads run
+/// one after the other, so this run writes at most one file at a time; a file left by an earlier start can sit beside it (a
+/// speech file read at start puts speech on the CPU, so no Begin replaces it, while the clean-up's GPU load writes its own), and
+/// a file this run writes names the load under way. Start-up begins both loads at
 /// once; without the gate the clean-up's file was written while its load still queued behind whisper's on
 /// <see cref="NativeLoadGate"/>, so a crash in whisper's load left both files and put the clean-up model on the CPU too (lens on
 /// PR #12, 17/10/2026). GPU loads therefore run one after the other, warm-up included. NativeLoadGate itself cannot hold the
@@ -70,7 +72,8 @@ internal sealed class GpuLoadMarker(string? file, ILog log)
     {
         // simplification: the gate covers the whole GPU load and warm-up, so the two models' warm-ups no longer overlap at start-up
         // and a GPU load that hangs holds the other model's GPU load behind it (the native loads already queued on NativeLoadGate).
-        // Ceiling: start-up's time to both models ready is the sum of the two GPU loads. Trigger to retire: a measured start-up
+        // Ceiling: start-up's time to both models ready is the sum of the two GPU loads; speech may wait for the clean-up's warm-up,
+    // and a hung clean-up warm-up blocks speech for the session. Trigger to retire: a measured start-up
         // that is too slow, or a hung load reported; then record the marker per load step instead of per load.
         _gate?.Wait(); // outside _lock, so Close at quit never waits for the other manager's load
         lock (_lock)

@@ -24,6 +24,7 @@ public sealed class LocalLlmManager : IDisposable
     private Task<ILocalLlmEngine>? _loading; // the latest choice's load; null after Unload
     private Task _tail = Task.CompletedTask; // the last load started: the next one waits for it
     private long _generation; // bumped by every BeginLoad, Unload and Dispose
+    private CancellationTokenSource _superseded = new(); // the latest load's: cancelled when a newer BeginLoad or Unload bumps the generation
     private ILocalLlmEngine? _engine;
     private bool _engineOnCpu; // the engine in use was loaded with llm.gpu "cpu": by the setting, after its GPU load failed, or by the marker
     private ModelFailure.Assessment? _failure; // why the latest load failed; null while it loads or once it loaded
@@ -130,10 +131,14 @@ public sealed class LocalLlmManager : IDisposable
     {
         // The first BeginLoad of a run is never for the path already loading, so the marker is read before any early return.
         var cpuForThisRun = _marker.CpuForThisRun(path, gpuSetting);
+        CancellationTokenSource stale;
         lock (_gate)
         {
             if (ModelPath == path && _loading is { IsFaulted: false }) return;
             var generation = ++_generation;
+            stale = _superseded;
+            _superseded = new CancellationTokenSource();
+            var superseded = _superseded.Token;
             ModelPath = path;
             _failure = null;
             var before = _tail;
@@ -141,28 +146,29 @@ public sealed class LocalLlmManager : IDisposable
             {
                 await before.ContinueWith(static _ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)
                     .ConfigureAwait(false); // two models never load at once
-                return await LoadAsync(path, gpuSetting, generation, cpuForThisRun).ConfigureAwait(false);
+                return await LoadAsync(path, gpuSetting, generation, cpuForThisRun, superseded).ConfigureAwait(false);
             });
             _loading = load;
             _tail = load;
             load.ContinueWith(t => Finished(t, path, gpuSetting, generation), TaskScheduler.Default);
         }
+        stale.Cancel(); // the earlier load's warm-up stops; outside the lock, so its continuations never run under _gate
         Changed?.Invoke();
     }
 
-    private async Task<ILocalLlmEngine> LoadAsync(string path, string gpuSetting, long generation, bool cpuForThisRun)
+    private async Task<ILocalLlmEngine> LoadAsync(string path, string gpuSetting, long generation, bool cpuForThisRun, CancellationToken superseded)
     {
         if (IsStale(generation)) return Overtaken(path, loaded: false); // chosen and replaced before its turn
         _integrity?.Verify(path); // a catalogue file that fails its size or SHA-256 check is never loaded
         // The GPU ended Dictum on this model last time: llm.gpu = cpu for this run, so llama.cpp's CPU build is the one configured.
         if (cpuForThisRun || gpuSetting == "cpu")
-            return await LoadOnAsync(path, "cpu", generation, cpuForThisRun ? ModelFailure.GpuFailedLastTime : null).ConfigureAwait(false);
+            return await LoadOnAsync(path, "cpu", generation, superseded, cpuForThisRun ? ModelFailure.GpuFailedLastTime : null).ConfigureAwait(false);
         try
         {
-            _marker.Begin(path);
             try
             {
-                return await LoadOnAsync(path, gpuSetting, generation, notice: null).ConfigureAwait(false);
+                _marker.Begin(path); // inside the try: End releases the gate whatever Begin or the load throws
+                return await LoadOnAsync(path, gpuSetting, generation, superseded, notice: null).ConfigureAwait(false);
             }
             finally
             {
@@ -175,7 +181,7 @@ public sealed class LocalLlmManager : IDisposable
             _log.Warn($"Cleanup model {Path.GetFileName(path)} failed while the GPU was in use ({ex.GetType().Name}: {ex.Message}); loading it again on the CPU.");
             try
             {
-                return await LoadOnAsync(path, "cpu", generation, ModelFailure.GpuFailed).ConfigureAwait(false);
+                return await LoadOnAsync(path, "cpu", generation, superseded, ModelFailure.GpuFailed).ConfigureAwait(false);
             }
             catch (Exception cpu)
             {
@@ -185,9 +191,14 @@ public sealed class LocalLlmManager : IDisposable
         }
     }
 
-    /// <summary>Loads the engine with this llm.gpu value, warms it up and installs it; an engine whose warm-up fails is released.</summary>
-    private async Task<ILocalLlmEngine> LoadOnAsync(string path, string gpuSetting, long generation, string? notice)
+    /// <summary>
+    /// Loads the engine with this llm.gpu value, warms it up and installs it; an engine whose warm-up fails is released. The warm-up
+    /// stops at quit and when <paramref name="superseded"/> fires (a newer BeginLoad or Unload), so a stale GPU warm-up gives up the
+    /// <see cref="GpuLoadMarker"/> gate at once instead of holding the speech model's GPU load behind it.
+    /// </summary>
+    private async Task<ILocalLlmEngine> LoadOnAsync(string path, string gpuSetting, long generation, CancellationToken superseded, string? notice)
     {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token, superseded);
         var engine = _loader(path, gpuSetting);
         // Evaluates the prompt prefix into the cache, measures the speed estimate and, on a GPU, compiles shaders; again if
         // the prompt changed meanwhile, so the engine is installed warm for the prompt dictations will use.
@@ -216,7 +227,7 @@ public sealed class LocalLlmManager : IDisposable
             }
             try
             {
-                var time = await engine.WarmUpAsync(prompt, _shutdown.Token).ConfigureAwait(false);
+                var time = await engine.WarmUpAsync(prompt, stop.Token).ConfigureAwait(false);
                 var (promptRate, generationRate) = engine.Rates;
                 var backend = gpuSetting == "cpu" ? "CPU" : LocalLlmEngine.Backend;
                 _log.Info($"Cleanup model warm-up on {backend} took {time.TotalMilliseconds:0} ms (prompt {promptRate:0} tokens/s, generation {generationRate:0.0} tokens/s).");
@@ -266,9 +277,12 @@ public sealed class LocalLlmManager : IDisposable
     public void Unload()
     {
         ILocalLlmEngine? engine;
+        CancellationTokenSource stale;
         lock (_gate)
         {
             _generation++;
+            stale = _superseded;
+            _superseded = new CancellationTokenSource();
             engine = _engine;
             _engine = null;
             _engineOnCpu = false;
@@ -276,6 +290,7 @@ public sealed class LocalLlmManager : IDisposable
             _loading = null;
             ModelPath = null;
         }
+        stale.Cancel(); // a warm-up still under way stops and gives up the GPU gate (outside the lock, as in BeginLoad)
         engine?.Dispose();
         Changed?.Invoke();
     }

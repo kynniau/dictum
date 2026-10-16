@@ -269,6 +269,73 @@ public sealed partial class RuntimeResilienceTests
         Assert.Null(llm.Notice);
     }
 
+    // ---- Third lens on 3f86820 (17/10/2026): each half of the auto-only rule pinned on its own, and a stale warm-up ----
+
+    [Fact]
+    public async Task A_marker_read_under_auto_stops_applying_once_the_setting_is_vulkan()
+    {
+        // Pins CpuForThisRun's return (gpuSetting == "auto" && _cpuModel …): without it the model read under auto stays on the CPU.
+        using var local = new LocalFolder();
+        var speech = local.Model("speech-a.bin");
+        File.WriteAllText(local.SpeechMarker, speech);
+        var asked = new ConcurrentQueue<string>();
+        using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, s, d) =>
+        {
+            asked.Enqueue(s.Gpu);
+            return new FakeSpeechEngine(p, d);
+        }, gpuInUse: () => true);
+        models.BeginLoad(speech, new WhisperSettings()); // auto: the marker names it, so the CPU
+        Assert.True(await Eventually(() => models.IsReady || models.LoadFailed));
+        Assert.Equal(ModelFailure.GpuFailedLastTime, models.Notice);
+        models.BeginLoad(speech, new WhisperSettings { Gpu = "vulkan" });
+        Assert.True(await Eventually(() => asked.Count == 2 && (models.IsReady || models.LoadFailed)));
+        Assert.Equal(new[] { "cpu", "vulkan" }, asked.ToArray());
+        Assert.False(models.RunsOnCpu);
+        Assert.Null(models.Notice);
+    }
+
+    [Fact]
+    public async Task A_marker_seen_first_under_vulkan_never_puts_a_later_auto_load_on_the_CPU()
+    {
+        // Pins the first read's condition (gpuSetting == "auto" && Read() …): without it a vulkan start records the model for the CPU.
+        using var local = new LocalFolder();
+        var speech = local.Model("speech-a.bin");
+        File.WriteAllText(local.SpeechMarker, speech);
+        var asked = new ConcurrentQueue<string>();
+        using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, s, d) =>
+        {
+            asked.Enqueue(s.Gpu);
+            return new FakeSpeechEngine(p, d);
+        }, gpuInUse: () => true);
+        models.BeginLoad(speech, new WhisperSettings { Gpu = "vulkan" });
+        Assert.True(await Eventually(() => models.IsReady || models.LoadFailed));
+        models.BeginLoad(speech, new WhisperSettings()); // auto
+        Assert.True(await Eventually(() => asked.Count == 2 && (models.IsReady || models.LoadFailed)));
+        Assert.Equal(new[] { "vulkan", "auto" }, asked.ToArray());
+        Assert.False(models.RunsOnCpu);
+        Assert.Null(models.Notice);
+    }
+
+    [Fact]
+    public async Task Unload_during_a_clean_up_GPU_warm_up_gives_up_the_gate_at_once()
+    {
+        // The fake warm-up waits 5 s for its token. Before the fix only quit cancelled it, so a warm-up Unload had made stale kept
+        // the shared GPU gate, and the speech model's GPU load waited behind it.
+        using var local = new LocalFolder();
+        FakeLocalEngine? warming = null;
+        using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, _) => warming = new FakeLocalEngine(p, waitForCancel: true),
+            gpuInUse: () => true);
+        llm.BeginLoad(local.Model("cleanup-a.gguf"), "auto");
+        Assert.True(await Eventually(() => warming is not null && File.Exists(local.CleanupMarker)), "the clean-up GPU load never began");
+        llm.Unload();
+        using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => true);
+        models.BeginLoad(local.Model("speech-a.bin"), new WhisperSettings());
+        Assert.True(await Eventually(() => models.IsReady, 2000), "the speech GPU load still waited behind the stale clean-up warm-up");
+        Assert.False(File.Exists(local.CleanupMarker));
+        Assert.True(warming!.Disposed);
+        Assert.Null(llm.Ready);
+    }
+
     [Fact]
     public void Off_Windows_the_runtime_check_is_true_even_when_the_probes_find_nothing()
     {
