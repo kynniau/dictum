@@ -464,7 +464,7 @@ public sealed class PrivateMaterialHooksTests : IDisposable
             Assert.Contains(folder, lib);
         });
 
-        var ci = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
+        var ci = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml")).Replace("\r\n", "\n"); // a Windows checkout may use CRLF
         Assert.Contains("\n  private-material:\n", ci);
         Assert.Contains(". .githooks/private-guard.sh", ci);
         Assert.Contains("pg_audit_tracked_files", ci);
