@@ -45,7 +45,10 @@ public sealed class TranscriptCleaner
 
     /// <param name="timeout">llm.timeout_ms: the shortest deadline; longer dictations get longer (<see cref="Deadline"/>).</param>
     /// <param name="deadline">Tests replace the deadline rule; production uses <see cref="Deadline"/>.</param>
-    /// <param name="validation">The checks for each reply (<see cref="PersonalCleanup.Checks"/>); without them, the prompt only.</param>
+    /// <param name="validation">
+    /// The checks for each reply (<see cref="PersonalCleanup.Checks"/>); without them, the prompt only. Their prompt is always
+    /// <paramref name="systemPrompt"/>, so the echo check runs against the prompt actually sent.
+    /// </param>
     public TranscriptCleaner(ILlmClient? client, string systemPrompt, TimeSpan timeout, ILog log, string status, Func<int, TimeSpan>? deadline = null,
         ValidationContext? validation = null)
     {
@@ -54,7 +57,7 @@ public sealed class TranscriptCleaner
         _deadline = deadline ?? (words => Deadline(words, timeout));
         _log = log;
         Status = status;
-        _validation = validation ?? new ValidationContext(systemPrompt);
+        _validation = (validation ?? new ValidationContext(systemPrompt)) with { SystemPrompt = systemPrompt };
     }
 
     /// <summary>

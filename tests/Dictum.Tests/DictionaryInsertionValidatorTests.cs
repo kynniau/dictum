@@ -120,9 +120,67 @@ public class DictionaryInsertionValidatorTests
     public void An_everyday_word_that_spells_a_term_is_not_the_term(string terms, string raw, string reply) =>
         Assert.Null(Reject(raw, reply, terms.Split('|')));
 
-    [Fact]
-    public void A_term_that_is_also_an_everyday_word_is_caught_when_written_as_the_term() =>
-        Assert.Equal(Added, Reject("ask him to call me", "Ask Will to call me.", ["Will"]));
+    // Lens on fc177ba (16/10/2026): with the dictation counted in any case, each lower-case use of the everyday word in the
+    // dictation let one capitalised term through. A term with a capital is counted as written on both sides.
+    [Theory]
+    [InlineData("Will", "ask him to call me", "Ask Will to call me.")]
+    [InlineData("Will", "ask him if he will call me", "Ask Will if he will call me.")]
+    [InlineData("Will", "Ask him if he will call me.", "Ask Will if he will call me.")] // with whisper's capitals
+    [InlineData("Bill", "pay the bill and send it to accounts", "Bill, pay the bill and send it to accounts.")]
+    [InlineData("IT", "it is broken so call support about it", "It is broken so call IT support about it.")]
+    [InlineData("May", "ask her if it may rain", "Ask May if it may rain.")]
+    public void A_term_that_is_also_an_everyday_word_is_caught_when_written_as_the_term(string term, string raw, string reply) =>
+        Assert.Equal(Added, Reject(raw, reply, [term]));
+
+    // The documented cost of counting the dictation as written: whisper's lower-case "will", capitalised at the start of a
+    // sentence, no longer covers that "Will" once a grammar fix adds the word again. With whisper's own sentence capitals the
+    // same reply is accepted. A false rejection costs polish only: the tidy is typed instead.
+    [Theory]
+    [InlineData("Will", "will you come tomorrow i see you then", "Will you come tomorrow? I will see you then.", Added)]
+    [InlineData("Will", "Will you come tomorrow? I see you then.", "Will you come tomorrow? I will see you then.", null)]
+    [InlineData("May", "may be late i come tomorrow", "May be late. I may come tomorrow.", Added)]
+    [InlineData("May", "May be late. I come tomorrow.", "May be late. I may come tomorrow.", null)]
+    public void An_everyday_word_a_grammar_fix_repeats_needs_whisper_capitals_at_a_sentence_start(string term, string raw, string reply, string? rejection) =>
+        Assert.Equal(rejection, Reject(raw, reply, [term]));
+
+    // Lens on fc177ba (16/10/2026): the dictation's allowance counted plurals and joined runs while the reply was counted by
+    // sound alone, so a plural or split word the reply kept paid for an added term. Both sides are counted alike.
+    [Theory]
+    [InlineData("Dictum|Kynni", "add a name to the dictionary when it comes to new words", "Add Kynni to the dictionary when it comes to new words.")]
+    [InlineData("Dictum|Kynni", "It learns my words too. Add a name to the dictionary once. It's spelled right every time it comes up. Dictum, by Kynni.",
+        "It learns my words too. Add Kynni to the dictionary once. It's spelled right every time it comes up. Dictum, by Kynni.")]
+    [InlineData("Bill", "pay the bills today please", "Bill, pay the bills today please.")]
+    [InlineData("Will", "check the wills today", "Will, check the wills today.")]
+    [InlineData("Xero", "send the series of invoices today", "Send the Xero series of invoices today.")]
+    [InlineData("Priya", "list the pros and cons for me", "Priya, list the pros and cons for me.")]
+    [InlineData("Mark", "check the marks before friday", "Mark, check the marks before Friday.")]
+    [InlineData("Zoom", "the camera zooms in too far", "The Zoom camera zooms in too far.")]
+    [InlineData("Dictum|Kynni", "tell them the games start at noon", "Tell Kynni the games start at noon.")]
+    [InlineData("GitHub", "push it to git hub and tell the team", "Push it to git hub and tell the GitHub team.")]
+    public void A_plural_or_split_word_the_reply_keeps_does_not_pay_for_an_added_term(string terms, string raw, string reply) =>
+        Assert.Equal(Added, Reject(raw, reply, terms.Split('|')));
+
+    // Lens on fc177ba (16/10/2026), in the rule since ad38c63: a spoken command that shares a term's sound key ("comma" and
+    // Kynni, "mark" and Mark, "quote" and Kate, "line" and Lena), or a hesitation ("um" and Owen), paid for an added term.
+    [Theory]
+    [InlineData("Dictum|Kynni", "add a name to the dictionary comma it is spelled right every time", "Add Kynni to the dictionary, it is spelled right every time.")]
+    [InlineData("Mark", "can you send the report today question mark", "Mark, can you send the report today?")]
+    [InlineData("Kate", "she said open quote send it today close quote", "Kate said \"send it today\".")]
+    [InlineData("Lena", "thanks for the update new line regards", "Thanks for the update, Lena.\nRegards")]
+    [InlineData("Owen", "um send the report today", "Send Owen the report today.")]
+    public void A_spoken_command_does_not_pay_for_an_added_term(string terms, string raw, string reply) =>
+        Assert.Equal(Added, Reject(raw, reply, terms.Split('|')));
+
+    // Commands and hesitations are left out on both sides: one the reply keeps as a word is not counted against it either.
+    [Theory]
+    [InlineData("Dictum|Kynni", "dictum comma by kynni", "Dictum, by Kynni.")] // the spoken comma, no insertion
+    [InlineData("Mark", "ask mark if it is done question mark", "Ask Mark if it is done?")]
+    [InlineData("Dictum|Kynni", "put a comma after kynni", "Put a comma after Kynni.")]
+    [InlineData("Mark", "put a question mark after mark", "Put a question mark after Mark.")]
+    [InlineData("Lena", "add a new line after lena", "Add a new line after Lena.")]
+    [InlineData("Owen", "um tell owen the news", "Um, tell Owen the news.")]
+    public void A_spoken_command_is_counted_on_neither_side(string terms, string raw, string reply) =>
+        Assert.Null(Reject(raw, reply, terms.Split('|')));
 
     // Respellings that join or split words (lens, 16/10/2026: rejected on ad38c63, accepted before the rule existed).
     [Theory]
@@ -136,6 +194,9 @@ public class DictionaryInsertionValidatorTests
     [InlineData("kyle@kynni.com.au", "email kyle at kynni dot com dot au", "Email kyle@kynni.com.au.")]
     [InlineData("Salestrekker", "update sales trekker today", "Update Salestrekker today.")]
     [InlineData("O'Brien", "call o brien today", "Call O'Brien today.")]
+    [InlineData("e-mail", "send me an e dash mail", "Send me an e-mail.")] // a spoken separator left out
+    [InlineData("e-mail", "send me an e hyphen mail", "Send me an e-mail.")]
+    [InlineData("DoorDash", "order lunch on door dash today", "Order lunch on DoorDash today.")] // a separator word that is part of the term
     public void A_respelling_that_joins_or_splits_words_is_accepted(string terms, string raw, string reply) =>
         Assert.Null(Reject(raw, reply, terms.Split('|')));
 
@@ -145,6 +206,7 @@ public class DictionaryInsertionValidatorTests
     [InlineData("GitHub", "push it to git hub", "Push it to GitHub. GitHub.")] // one run covers one
     [InlineData("Kynni Pty Ltd", "send it to kynni pty ltd today", "Send it to Kynni Pty Ltd and Kynni today.")] // the larger allowance, not both
     [InlineData("Ed", "its done now", "Ed, its done now.")] // a three-letter word ending in s is not a plural
+    [InlineData("DoorDash", "order lunch on door dash today", "Order lunch on door dash today from DoorDash.")] // the reply's run counts too
     public void An_allowance_does_not_admit_an_addition(string terms, string raw, string reply) =>
         Assert.Equal(Added, Reject(raw, reply, terms.Split('|')));
 
@@ -191,7 +253,7 @@ public class DictionaryInsertionValidatorTests
         Assert.Equal(121, dictionary.Terms.Count);
         Assert.DoesNotContain("Will", dictionary.CleanupTerms);
         Assert.Equal(PersonalDictionary.CleanupLinePrefix + string.Join(", ", dictionary.CleanupTerms) + ".", dictionary.CleanupLine);
-        Assert.Null(Reject(PersonalOf(terms), "i send the report tomorrow", "I will send the report tomorrow."));
+        Assert.Null(Reject(PersonalOf(terms), "ask him to send the report", "Ask Will to send the report.")); // an addition, but "Will" is not in the line
 
         var paragraph = string.Concat(Enumerable.Repeat("Please note that every invoice has been checked twice before it goes out to the client. ", 12)).Trim();
         var withParagraph = PersonalOf([paragraph, "Kynni"]);
@@ -237,6 +299,19 @@ public class DictionaryInsertionValidatorTests
         Assert.Equal(Dictum.Cli.BenchCleanupCommand.Checks(settings, personal, _ => { }), (cleaner.SystemPrompt, cleaner.Validation));
         var result = await cleaner.CleanAsync("add a name to the dictionary once", TestContext.Current.CancellationToken);
         Assert.Equal(Added, result.FallbackReason);
+    }
+
+    // The constructor takes the prompt and the checks separately; the checks always use the prompt it sends, so a context
+    // built with another prompt (or none) cannot turn off the check for a reply that repeats it (lens on fc177ba).
+    [Fact]
+    public void A_cleaner_checks_replies_against_the_prompt_it_sends()
+    {
+        static ValidationContext Checks(ValidationContext? given) =>
+            new TranscriptCleaner(null, "the prompt sent", TimeSpan.FromSeconds(1), NullLog.Instance, "test", validation: given).Validation;
+        var other = new ValidationContext("another prompt", ["damn"], TwoTerms);
+        Assert.Equal(other with { SystemPrompt = "the prompt sent" }, Checks(other));
+        Assert.Equal(new ValidationContext("the prompt sent"), Checks(new ValidationContext(null)));
+        Assert.Equal(new ValidationContext("the prompt sent"), Checks(null));
     }
 
     [Fact]

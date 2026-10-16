@@ -182,6 +182,13 @@ internal static partial class ValidatorText
     // word ("kin knee") is not a near miss; a word with a digit or a letter outside a-z (after accents are removed) only
     // matches itself. Trigger to retire: a typed reply that swapped a sound-alike word for a term, or a wanted dictionary
     // fix rejected as an addition.
+    // The dictionary-term rule built on it (CleanupValidator.AddsTerm) counts a term's forms on each side instead of pairing
+    // each reply word with the dictated word it came from, which adds two ceilings. Real words whose letters spell a term
+    // pass as its respelling: {PowerPoint} "the power point in the kitchen is broken" (a wall socket) → "The PowerPoint in
+    // the kitchen is broken." is accepted; trigger to retire: a typed reply that turned dictated words into a term with
+    // another meaning. A sound-alike the reply rewrites pays for an insertion elsewhere: "i'm gonna add a name to the
+    // dictionary" → "I'm going to add Kynni to the dictionary." and {Xero} "put zero on the invoice" → "Put 0 on the Xero
+    // invoice." are accepted; trigger to retire: a typed reply that added a term while rewriting a sound-alike of it.
     private static string? SoundKey(string word)
     {
         var key = new StringBuilder(word.Length + 1);
