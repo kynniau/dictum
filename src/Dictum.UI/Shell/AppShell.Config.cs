@@ -240,14 +240,14 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, third draft), not yet approved: the product owner reviews it before release. Pinned word for
+    /// PROPOSED copy (16/10/2026, fourth draft), not yet approved: the product owner reviews it before release. Pinned word for
     /// word in CloudOffTakesEffectTests; do not reword it until that review. Shown while offline only is on for this session
-    /// and settings.json does not have it on. No "Nothing is sent": offline only still allows a server on this PC. Open for that
-    /// review (checked 16/10/2026): the final clause is untrue when settings.json still cannot be read at the next start (not
-    /// valid JSON, say), since Dictum then starts offline with the defaults (ConfigLoader.BrokenAtStartup).
+    /// and settings.json does not have it on. No "Nothing is sent": offline only still allows a server on this PC. The last
+    /// clause names the start with a settings.json that still cannot be read (not valid JSON, say), which runs offline with
+    /// the defaults (ConfigLoader.BrokenAtStartup).
     /// </summary>
     internal static string OfflineOnlyNotSaved(string reason) =>
-        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only.";
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only, unless settings.json cannot be read, in which case Dictum starts offline.";
 
     private void ApplyEnabled(bool enabled, bool persist)
     {

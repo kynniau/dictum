@@ -222,19 +222,19 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, third draft), not yet approved: the product owner reviews it before release. Pinned word for
-    /// word in CloudOffTakesEffectTests; do not reword it until that review. What Switch cloud clean-up off says when a file
-    /// could not be changed: consent.json still there (<paramref name="consent"/>, why it could not be deleted), settings.json
-    /// not saved (<paramref name="settings"/>), or both. Only the first says plain "off": settings.json was saved, or names no
-    /// cloud service. The first and the last say what the files mean if the last try, at quit, fails too. Open for that review
-    /// (checked 16/10/2026): the last one's final clause is untrue when settings.json still cannot be read at the next start
-    /// (not valid JSON, say), since Dictum then starts offline with the defaults (ConfigLoader.BrokenAtStartup).
+    /// PROPOSED copy (16/10/2026; the last line is the fourth draft), not yet approved: the product owner reviews it before
+    /// release. Pinned word for word in CloudOffTakesEffectTests; do not reword it until that review. What Switch cloud
+    /// clean-up off says when a file could not be changed: consent.json still there (<paramref name="consent"/>, why it could
+    /// not be deleted), settings.json not saved (<paramref name="settings"/>), or both. Only the first says plain "off":
+    /// settings.json was saved, or names no cloud service. The first and the last say what the files mean if the last try, at
+    /// quit, fails too; the last also names the start with a settings.json that still cannot be read (not valid JSON, say),
+    /// which runs offline with the defaults (ConfigLoader.BrokenAtStartup).
     /// </summary>
     internal static string OffNotSaved(string? consent, string? settings) => (consent, settings) switch
     {
         ({ } c, null) => $"Cloud clean-up is off, but consent.json could not be deleted ({c}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is deleted, your consent stays on file.",
         (null, { } s) => $"Cloud clean-up is off for this session, but settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits.",
-        ({ } c, { } s) => $"Cloud clean-up is off for this session, but consent.json could not be deleted ({c}) and settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again.",
+        ({ } c, { } s) => $"Cloud clean-up is off for this session, but consent.json could not be deleted ({c}) and settings.json could not be saved ({s}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again, unless settings.json cannot be read, in which case Dictum starts offline.",
         _ => throw new ArgumentException("Both files keep the switch: there is nothing to say."),
     };
 

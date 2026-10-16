@@ -33,6 +33,32 @@ public partial class CloudOffTakesEffectTests
         }
     }
 
+    /// <summary>
+    /// The next start as Dictum starts (<see cref="AppShell.Start"/>): a reload would keep the settings in use when settings.json
+    /// cannot be read, a start runs offline with the defaults. Then <paramref name="check"/>, with that start's log.
+    /// </summary>
+    private static void NextRealStart(Scratch scratch, Action<AppShell, RecordingLog> check)
+    {
+        var log = new RecordingLog();
+        var next = StartedShell(scratch, log);
+        try
+        {
+            check(next, log);
+        }
+        finally
+        {
+            next.Dispose();
+        }
+    }
+
+    /// <summary>A start that runs offline with the local model, saying why: settings.json could not be read.</summary>
+    private static void AssertStartedOffline(AppShell next, RecordingLog log)
+    {
+        Assert.True(next.Settings.OfflineOnly);
+        AssertLocal(next);
+        Assert.Contains(log.Lines, l => l.Message.Contains(ConfigLoader.BrokenAtStartup, StringComparison.Ordinal));
+    }
+
     [Fact]
     public Task A_read_only_consent_json_is_deleted_by_the_switch_off_so_a_later_hand_edit_back_to_the_host_sends_nothing() => UiSession.Run(() =>
     {
@@ -175,6 +201,34 @@ public partial class CloudOffTakesEffectTests
         }
     });
 
+    [Fact]
+    public Task With_both_files_unchanged_and_settings_json_unreadable_the_next_start_is_offline_as_the_page_says() => UiSession.Run(() =>
+    {
+        // The page's sentence for both files ends "unless settings.json cannot be read, in which case Dictum starts offline" (lens on
+        // eaa3a04, finding 2). consent.json held open until after the quit, settings.json not valid JSON through it.
+        using var scratch = new Scratch(StartingCloudSettings);
+        Consent(scratch);
+        var (shell, _, _) = scratch.Shell();
+        FileStream? held = null;
+        try
+        {
+            shell.Reload(userRequested: false);
+            MakeUnwritable(scratch, shell, readOnly: false); // not valid JSON
+            held = HoldOpen(scratch.Paths.ConsentFile);
+            Reasons([shell.DisableCloud()!], NeitherChanged);
+            shell.Quit(); // the last try: neither file can be changed
+            held.Dispose();
+            held = null;
+            Assert.True(File.Exists(scratch.Paths.ConsentFile)); // the consent is still on file
+            NextRealStart(scratch, AssertStartedOffline);
+        }
+        finally
+        {
+            held?.Dispose();
+            shell.Dispose();
+        }
+    });
+
     [Theory]
     [InlineData(false)] // consent.json read-only
     [InlineData(true)] // consent.json held open by another program until after the quit
@@ -240,6 +294,28 @@ public partial class CloudOffTakesEffectTests
         finally
         {
             Normal(scratch.Paths.SettingsFile);
+            shell.Dispose();
+        }
+    });
+
+    [Fact]
+    public Task Offline_only_the_quit_could_not_save_with_settings_json_unreadable_the_next_start_is_offline_as_the_page_says() => UiSession.Run(() =>
+    {
+        // The offline-only sentence ends "unless settings.json cannot be read, in which case Dictum starts offline" (lens on eaa3a04,
+        // finding 2). settings.json not valid JSON through the quit.
+        using var scratch = new Scratch(StartingCloudSettings);
+        Consent(scratch);
+        var (shell, _, _) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            MakeUnwritable(scratch, shell, readOnly: false); // not valid JSON
+            Reason([shell.SetOfflineOnly(true)!], OfflineOnlyNotSaved);
+            shell.Quit(); // the last try: still not valid JSON
+            NextRealStart(scratch, AssertStartedOffline);
+        }
+        finally
+        {
             shell.Dispose();
         }
     });

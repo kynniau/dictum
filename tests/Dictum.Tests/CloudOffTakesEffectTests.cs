@@ -48,13 +48,13 @@ public partial class CloudOffTakesEffectTests
     private static string SettingsNotSaved(string reason) =>
         $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
 
-    // PROPOSED copy (16/10/2026, third draft), as above: neither file could be changed.
+    // PROPOSED copy (16/10/2026, fourth draft), as above: neither file could be changed.
     private static string NeitherChanged(string consent, string settings) =>
-        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again.";
+        $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start sends dictations again, unless settings.json cannot be read, in which case Dictum starts offline.";
 
-    // PROPOSED copy (16/10/2026, third draft), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
+    // PROPOSED copy (16/10/2026, fourth draft), awaiting the product owner's review: pinned word for word as proposed, independently of the app's copy.
     private static string OfflineOnlyNotSaved(string reason) =>
-        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only.";
+        $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only, unless settings.json cannot be read, in which case Dictum starts offline.";
 
     private const string CloudSettings = """{ "hotkey": "F24", "llm": { "provider": "openai-compatible", "base_url": "https://llm.example.com/v1", "model": "m" } }""";
 
