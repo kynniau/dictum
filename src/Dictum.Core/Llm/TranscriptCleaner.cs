@@ -141,9 +141,10 @@ public sealed class TranscriptCleaner
     }
 
     /// <param name="carried">
-    /// A hands-free part's context (SPEC §3 amendment, 16/10/2026): the closing words of the part typed before it. The provider
-    /// gets them beside the part, never as its dictation, and the reply is checked against the part's own words with them as
-    /// prompt text (a reply that repeats them is rejected). Null for a whole recording.
+    /// A hands-free part's context (SPEC §3 amendment, 16/10/2026): the closing words of what the part before it said, before
+    /// corrections, the profanity filter and snippets. The provider gets them beside the part, never as its dictation, and the
+    /// reply is checked against the part's own words with them as prompt text (a reply that repeats them is rejected). Null for
+    /// a whole recording.
     /// </param>
     public async Task<CleanupResult> CleanAsync(string raw, CancellationToken cancellationToken, string? carried = null)
     {

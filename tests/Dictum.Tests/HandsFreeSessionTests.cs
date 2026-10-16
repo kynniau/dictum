@@ -9,6 +9,7 @@ using Dictum.Audio;
 using Dictum.Core;
 using Dictum.Hotkey;
 using Dictum.Llm;
+using Dictum.Personal;
 using Dictum.Settings;
 using Dictum.Transcribe;
 using Dictum.UI.Overlays;
@@ -98,7 +99,9 @@ public class HandsFreeSessionTests
     }
 
     /// <summary>The trailing space is off by default here, so the separator each part is typed with shows in the pastes.</summary>
-    private static Rig Make(PartTranscriber whisper, TranscriptCleaner? cleaner = null, StateMachineOptions? options = null, bool trailingSpace = false)
+    /// <param name="finish">The step before the paste (corrections, the profanity filter, snippets); none by default.</param>
+    private static Rig Make(PartTranscriber whisper, TranscriptCleaner? cleaner = null, StateMachineOptions? options = null, bool trailingSpace = false,
+        Func<string, string>? finish = null)
     {
         var settings = new AppSettings { Insert = new InsertSettings { TrailingSpace = trailingSpace } };
         var capture = new CuttingCapture();
@@ -112,7 +115,7 @@ public class HandsFreeSessionTests
                 pasted.Enqueue(text);
                 return Task.CompletedTask;
             },
-            () => settings, NullLog.Instance, inserted: remembered.Enqueue, names: () => ["Kynni"]);
+            () => settings, NullLog.Instance, finish, inserted: remembered.Enqueue, names: () => ["Kynni"]);
         var ui = new FakeUi();
         return new Rig(new DictationController(machine, capture, pipeline, ui, () => settings, NullLog.Instance), capture, whisper, ui, pasted, remembered, machine);
     }
@@ -232,6 +235,38 @@ public class HandsFreeSessionTests
         Assert.Equal("thursday and then we will see", second.User); // the dictation is the part's own words
         Assert.Equal(CleanupPrompt.WithCarried(CleanupPrompt.Default, "We should move the meeting to"), second.System);
         Assert.Equal(" thursday and then we will see.", rig.Pasted.Last()); // nothing of the first part typed again
+    }
+
+    [Fact]
+    public async Task The_carried_words_are_what_was_said_never_a_snippet_a_correction_or_the_filters_mask()
+    {
+        // Merge lens P1, 16/10/2026: a cloud clean-up gets the carried words in its system prompt, so they come from what the
+        // part said, before corrections, the profanity filter and snippets put the user's own text in its place.
+        var personal = new PersonalText(PersonalDictionary.Empty, new Corrections(Corrections.Parse(["kinney => Kynni Pty Ltd"])),
+            new ProfanityFilter(["shit"], "test"), new Corrections(Corrections.Parse(["my email => kyle@example.com"], lineBreaks: true), verbatim: true));
+        var mask = new ProfanitySettings { Mode = ProfanitySettings.Mask };
+        var llm = new TableLlmClient(new()
+        {
+            ["send the draft to my email"] = "Send the draft to my email.",
+            ["the shit report came from kinney"] = "The shit report came from kinney.",
+            ["thanks everyone"] = "Thanks everyone.",
+        });
+        var whisper = new PartTranscriber("send the draft to my email", "the shit report came from kinney", "thanks everyone");
+        using var rig = Make(whisper, ModelCleaner(llm), finish: text => personal.Finish(text, mask));
+        await StartHandsFree(rig);
+        rig.Capture.Cut(Part(0));
+        rig.Capture.Cut(Part(1));
+        rig.Capture.Cut(Part(2));
+        await WaitUntil(() => rig.Pasted.Count == 3, "three parts");
+
+        Assert.Equal(["Send the draft to kyle@example.com.", " The s*** report came from Kynni Pty Ltd.", " Thanks everyone."], rig.Pasted);
+        var sent = llm.Sent.ToList();
+        Assert.Equal(CleanupPrompt.WithCarried(CleanupPrompt.Default, "Send the draft to my email."), sent[1].System); // the snippet's phrase, not its text
+        Assert.Equal(CleanupPrompt.WithCarried(CleanupPrompt.Default, "The shit report came from kinney."), sent[2].System); // no correction, no mask
+        Assert.All(sent, s => Assert.DoesNotContain("kyle@example.com", s.System + s.User, StringComparison.Ordinal));
+        Assert.All(sent, s => Assert.DoesNotContain("Kynni", s.System + s.User, StringComparison.Ordinal));
+        Assert.All(sent, s => Assert.DoesNotContain("s***", s.System + s.User, StringComparison.Ordinal));
+        Assert.Equal([null, "Send the draft to my email.", "The shit report came from kinney."], whisper.Heard.Select(h => h.Carried)); // whisper's prompt too
     }
 
     [Fact]

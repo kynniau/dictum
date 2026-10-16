@@ -17,8 +17,9 @@ public interface ILlmClient
     Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, CancellationToken cancellationToken);
 
     /// <summary>
-    /// A hands-free part (SPEC §3 amendment, 16/10/2026): <paramref name="carried"/>, the closing words of the part typed before
-    /// it, go with the request as context, never as the dictation. This default sends them as a line after the system prompt
+    /// A hands-free part (SPEC §3 amendment, 16/10/2026): <paramref name="carried"/>, the closing words of what the part before
+    /// it said (before corrections, the profanity filter and snippets, so none of the user's own text from those files), go
+    /// with the request as context, never as the dictation. This default sends them as a line after the system prompt
     /// (<see cref="CleanupPrompt.WithCarried"/>); the local model puts them after its cached prompt prefix instead.
     /// </summary>
     Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, string carried, CancellationToken cancellationToken) =>

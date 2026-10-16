@@ -247,7 +247,18 @@ public class SegmentJoinTests
         Assert.Equal("Hello there.", SegmentJoin.Tail("Hello there."));
         Assert.Null(SegmentJoin.Tail(" \n "));
         Assert.Null(new HandsFreePart(1, null).Carried);
-        Assert.Equal("then I said that we should move the meeting to", new HandsFreePart(2, "Yes. And then I said that we should move the meeting to").Carried);
+        const string said = "Yes. And then I said that we should move the meeting to";
+        Assert.Equal("then I said that we should move the meeting to", new HandsFreePart(2, new HandsFreePart(1, null) { Typed = said, Spoken = said }).Carried);
+    }
+
+    [Fact]
+    public void The_boundary_rule_reads_what_was_typed_and_the_context_what_was_said()
+    {
+        // Merge lens P1, 16/10/2026: the carried words reach a cloud clean-up's prompt, so a snippet's text must never be among them.
+        var last = new HandsFreePart(1, null) { Typed = "Send the draft to kyle@example.com.", Spoken = "Send the draft to my email." };
+        var next = new HandsFreePart(2, last);
+        Assert.Equal("Send the draft to kyle@example.com.", next.Before);
+        Assert.Equal("Send the draft to my email.", next.Carried);
     }
 
     [Fact]

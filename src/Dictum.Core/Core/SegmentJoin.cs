@@ -3,22 +3,34 @@ using Dictum.Llm;
 namespace Dictum.Core;
 
 /// <summary>
-/// One hands-free part on its way through the pipeline (SPEC §3 amendment, 16/10/2026), with what the part typed before it
-/// left behind: the text, for the boundary rule, and its closing words, carried to whisper's prompt and the clean-up.
+/// One hands-free part on its way through the pipeline (SPEC §3 amendment, 16/10/2026), with what the last part that typed
+/// something left behind: its text as typed, for the boundary rule, and the closing words of what it said, carried to
+/// whisper's prompt and the clean-up.
 /// </summary>
-/// <param name="Number">1 for the session's first part, and so on (for the log).</param>
-/// <param name="Before">The text the last part typed, as typed (null before anything is typed in this session).</param>
-public sealed class HandsFreePart(int number, string? before)
+/// <param name="number">1 for the session's first part, and so on (for the log).</param>
+/// <param name="last">The last part of this session that typed something, or null before anything is typed.</param>
+public sealed class HandsFreePart(int number, HandsFreePart? last)
 {
     public int Number { get; } = number;
 
-    public string? Before { get; } = before;
+    /// <summary>The text the last part typed, as typed (null before anything is typed in this session): the boundary rule reads it.</summary>
+    public string? Before { get; } = last?.Typed;
 
-    /// <summary>The closing words of <see cref="Before"/>, given to whisper and the clean-up as context; never typed again.</summary>
-    public string? Carried { get; } = before is null ? null : SegmentJoin.Tail(before);
+    /// <summary>
+    /// The closing words of what the last part said (its <see cref="Spoken"/> text), given to whisper and the clean-up as
+    /// context; never typed again. Never taken from the typed text: corrections, the profanity filter and snippets put the
+    /// user's own text there (a snippet's address, a correction's name), and a cloud clean-up gets these words in its prompt.
+    /// </summary>
+    public string? Carried { get; } = last?.Spoken is { } spoken ? SegmentJoin.Tail(spoken) : null;
 
     /// <summary>What this part typed (without the separator), once it is pasted; null until then, or when nothing was typed.</summary>
     public string? Typed { get; internal set; }
+
+    /// <summary>
+    /// What this part said: its text after the clean-up and the boundary rule, before corrections, the profanity filter and
+    /// snippets. Set with <see cref="Typed"/>.
+    /// </summary>
+    public string? Spoken { get; internal set; }
 }
 
 /// <summary>

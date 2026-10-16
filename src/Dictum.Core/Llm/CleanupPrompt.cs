@@ -35,8 +35,9 @@ public static class CleanupPrompt
     public const string CarriedLinePrefix = "The dictation continues text that is already typed; use it only as context and do not repeat it: ";
 
     /// <summary>
-    /// A hands-free part's context (SPEC §3 amendment, 16/10/2026): the closing words of the part typed before it, sent with the
-    /// part but never as its dictation, so the reply is checked against the part's own words (CleanupValidator).
+    /// A hands-free part's context (SPEC §3 amendment, 16/10/2026): the closing words of what the part before it said (never
+    /// its typed text, which corrections, the profanity filter and snippets may have rewritten), sent with the part but never
+    /// as its dictation, so the reply is checked against the part's own words (CleanupValidator).
     /// </summary>
     public static string CarriedLine(string carried) => CarriedLinePrefix + "\"" + carried + "\"";
 

@@ -258,13 +258,14 @@ public sealed class DictationController : IDisposable
 
     /// <summary>
     /// Types one hands-free session's parts one at a time, in the order they were cut; a slow part delays the next and never
-    /// reorders it. Each part carries the last typed part's text (the boundary rule and the context). After Esc (the token)
-    /// the parts still queued are dropped and nothing more is reported: the machine is already idle. Logs counts and timings only.
+    /// reorders it. Each part gets the last part that typed something: its typed text for the boundary rule, the closing words
+    /// of what it said for the context. After Esc (the token) the parts still queued are dropped and nothing more is reported:
+    /// the machine is already idle. Logs counts and timings only.
     /// </summary>
     private async Task TypePartsAsync(HandsFreeSession session)
     {
         var (number, typed, dropped, failed, words) = (0, 0, 0, 0, 0);
-        string? before = null;
+        HandsFreePart? last = null;
         await foreach (var (audio, reason) in session.Parts.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             number++;
@@ -274,7 +275,7 @@ public sealed class DictationController : IDisposable
                 continue;
             }
             _log.Info($"Segment {number}: {audio.Duration.TotalSeconds:0.0} s, {Describe(reason)}.");
-            var part = new HandsFreePart(number, before);
+            var part = new HandsFreePart(number, last);
             try
             {
                 var outcome = await _pipeline.RunAsync(audio, session.Token, view =>
@@ -282,7 +283,7 @@ public sealed class DictationController : IDisposable
                     if (view is PillView.Polishing or PillView.PolishingSkipped) ReportPolishing(session.SessionId, view);
                 }, inserted => words += inserted, part).ConfigureAwait(false);
                 if (outcome == ProcessingOutcome.Inserted) typed++;
-                if (part.Typed is { } text) before = text;
+                if (part.Typed is not null) last = part;
             }
             catch (OperationCanceledException) when (session.Token.IsCancellationRequested)
             {

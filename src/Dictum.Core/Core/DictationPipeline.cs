@@ -8,8 +8,9 @@ namespace Dictum.Core;
 
 /// <summary>
 /// One recording's journey (SPEC §4): gate → transcribe → optional cleanup → insert. In hands-free each part of the
-/// recording takes the same journey (<see cref="HandsFreePart"/>): whisper and the clean-up also hear the last part's closing
-/// words as context, and the part is typed after the last one by the boundary rule (<see cref="SegmentJoin"/>).
+/// recording takes the same journey (<see cref="HandsFreePart"/>): whisper and the clean-up also hear the closing words of
+/// what the last part said as context (never its finished text: corrections, the profanity filter and snippets run after),
+/// and the part is typed after the last one by the boundary rule (<see cref="SegmentJoin"/>).
 /// Everything honours the session's CancellationToken; a cancelled session inserts nothing.
 /// </summary>
 public sealed class DictationPipeline
@@ -92,6 +93,7 @@ public sealed class DictationPipeline
         {
             (separator, text) = SegmentJoin.Join(before, raw, text, settings.Insert.TrailingSpace, _names());
         }
+        var spoken = text; // what was said: the next part's carried words come from this, never from the finished text below
         var finished = _finish(text);
         if (finished != text)
         {
@@ -105,7 +107,7 @@ public sealed class DictationPipeline
         await _insert(separator + text, token).ConfigureAwait(false);
         _log.Info($"Inserted {separator.Length + text.Length} chars via {settings.Insert.Method}.");
         _inserted(text);
-        if (part is not null) part.Typed = text;
+        if (part is not null) (part.Typed, part.Spoken) = (text, spoken);
         insertedWords?.Invoke(text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
         return ProcessingOutcome.Inserted;
     }
