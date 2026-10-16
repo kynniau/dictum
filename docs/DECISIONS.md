@@ -2184,3 +2184,184 @@ Not done, for the orchestrator:
   on a local drive (a temporary counter, not committed; not timed). It is not in the re-lens's list and is unchanged.
 - The brief's `ConfigLoader.cs:353-354` does not exist (the file has 66 lines): the PROPOSED marker went on
   `ConfigLoader.BundledFolderIgnored`, the only string that file gained in this PR.
+
+## Runtime resilience (17/10/2026, branch fix/runtime-resilience)
+
+Four findings of the Store certification investigation (16/10/2026; its logs `logs\p630-*` and `logs\cpu-*` and its
+`harness\Program.cs` are in that session's scratchpad). "Measured here" means this lane's own runs on 17/10/2026, through a
+scratch harness (`scratchpad\resil-harness`, not in the repo) that drives Dictum.Core's `ModelManager`, `LocalLlmManager`
+and `TranscriptCleaner` the way the tray app does, with `LOCALAPPDATA` and `APPDATA` pointed at a scratch folder and the
+models read from `%LOCALAPPDATA%\Dictum\models`. "The P630" is the Intel UHD Graphics P630 alone, selected with
+`GGML_VK_VISIBLE_DEVICES=1`, so the Quadro RTX 4000 that the running copy of Dictum uses was not touched. The clip is the
+investigation's 10.74 s WAV; the clean-up input is its 23-word sentence.
+
+### F2: a model that cannot load is named
+
+- `ModelFailure` (in `ModelManager.cs`) turns the two messages the investigation saw in Windows Sandbox into "The Microsoft
+  Visual C++ runtime is missing; install it from Microsoft, then restart Dictum" when the runtime is not on the PC:
+  Whisper.net's "Failed to load native whisper library…" and LLamaSharp's failed `LLama.Native.NativeApi` type initialiser
+  (both texts read in the two libraries' binaries in the NuGet cache, 17/10/2026), and a `DllNotFoundException`. The runtime
+  counts as present when each of `vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll` and `vcomp140.dll` loads by name
+  (`NativeLibrary.TryLoad`: System32, the program's folder, a packaged app's framework dependency) or sits in one of the
+  program's `runtimes` folders, where `publish.ps1 -VcRuntimeDir` (fix/vc-runtime) puts copies beside the engines. The brief
+  named `vcruntime140.dll`; the four come from the import tables of this build's 54 engine DLLs, read 17/10/2026 with the
+  investigation's `pe-imports.ps1`: all 54 import MSVCP140 and VCRUNTIME140, 38 also VCRUNTIME140_1 and 14 (ggml's CPU and
+  base builds) VCOMP140; the other 9 DLLs there are Avalonia's and import none. A native failure with the runtime present
+  keeps the engine's own words, since its cause is not known.
+- `LastError` carries the plain words, so the existing load balloon (`AppShell.cs`, outside this lane) shows them too. It
+  still ends "(Speech model: Settings > Models)", which does not fit the runtime case: left for the owner of `AppShell.cs`.
+- The tray panel shows a line under its header, and About under its models line: "Speech model: …", "Clean-up model: …",
+  or one "Speech and clean-up models: …" when both share the reason (a missing runtime stops both). Beside it in the panel,
+  "Open log folder" (About has its own under Files) and, when it can help, "Try on the CPU". The line also explains a model
+  that runs on the CPU after a GPU failure (F3); the models line then says `CPU`.
+- About's clean-up line said "Clean-up: local/… on this PC (nothing leaves it)" while the local model had failed; it now
+  says "Clean-up: {model} could not be loaded, so the rule-based tidy is used." until a load succeeds or starts.
+- "Try on the CPU" appears when a model failed inside a GPU runtime (whisper's Vulkan runtime, llama.cpp's Vulkan build) in
+  a way the CPU-only runtime might get past (not a missing engine library, model file or catalogue match) and its gpu
+  setting is not `cpu`. With F3 in place that means the retry on the CPU inside that runtime has failed too. It writes
+  `whisper.gpu` and/or `llm.gpu` = `cpu` through the settings writer (`AppShell.Write`); the reload loads the model again off
+  the GPU at once (`WhisperEngine.Load` now passes Whisper.net's `UseGpu = false` for `cpu`, and `LocalLlmEngine.Load` gives
+  no layers to the GPU and turns op offload off), and if that fails as well the line adds "Restart Dictum to use the CPU.",
+  since the CPU-only runtime loads only at a start. Where no GPU runtime was in use the button is not offered: the model
+  already ran on the CPU. Measured here: `whisper.gpu = cpu` after whisper's Vulkan runtime had loaded (the P630), base.en
+  "loaded in 0.4 s on runtime Vulkan, on the CPU", 2.42 s and 2.38 s for the clip.
+- Proposed strings (17/10/2026, awaiting the product owner's review; each pinned word for word in `RuntimeResilienceTests`):
+  - "The Microsoft Visual C++ runtime is missing; install it from Microsoft, then restart Dictum" (the brief's wording)
+  - "The graphics driver could not run the model; Dictum will use the CPU" (the brief's wording)
+  - "Try on the CPU" (button; the brief's name)
+  - "Restart Dictum to use the CPU." (after a model's reason, see above)
+  - "Speech model: …", "Clean-up model: …", "Speech and clean-up models: …" (the line's prefixes; a full stop is added when
+    the reason has none)
+  - "Clean-up: {model} could not be loaded, so the rule-based tidy is used." (About)
+  - "Open log folder" is About's existing label, reused in the panel.
+- Not done, outside this lane's files: every hotkey press still flashes "Busy" while no speech model is ready
+  (`DictationController.cs`, `PillText.cs`); the problem report's "Models:" line (`AppShell.Actions.cs`) does not carry the
+  reason; the balloon suffix above.
+
+### F3: one more try on the CPU after a GPU failure
+
+- `ModelManager.Load` and `LocalLlmManager.LoadAsync`: a load or warm-up that throws while the GPU is in use (whisper:
+  `WhisperEngine.VulkanActive`; llama.cpp: its Vulkan build loaded) is tried once more with gpu `cpu`, unless
+  `ModelFailure.WorthCpuRetry` says the CPU cannot help (a missing engine library, model file or catalogue match, a load
+  stopped by quit). One warning line names the GPU failure; `Notice` then holds the GPU-failed sentence and `RunsOnCpu` is
+  true. If the CPU fails too, `LastError` is the CPU's own failure.
+- Leak fix: an engine whose warm-up throws is disposed before the failure goes on (before, `ModelManager.Load` lines
+  144-146 left it loaded); `WhisperEngine.Load` also frees its factory when the processor cannot be built.
+- Measured here, a GPU failure provoked with `GGML_VK_FORCE_MAX_BUFFER_SIZE=16777216`, which makes ggml-vulkan refuse any
+  buffer over 16 MiB (the variable is a string in both shipped ggml-vulkan DLLs).
+  `GGML_VK_FORCE_MAX_ALLOCATION_SIZE=16777216` was tried first and provoked nothing (base.en loaded and transcribed):
+  - Clean-up, qwen2.5-0.5b, `llm.gpu = vulkan`, the P630: "llama_model_load: error loading model: unable to allocate
+    Vulkan0 buffer", `LoadWeightsFailedException`, the warning line, then "loaded in 0.6 s on Vulkan, on the CPU", warm-up
+    8.2 s, and two clean-ups by the model in 2.51 s and 1.83 s.
+  - The same run with llama.cpp's default op offload: the retry, with no layers on the GPU, still asked Vulkan for its prompt
+    buffers ("failed to initialize the context: failed to allocate compute pp buffers") and the process crashed (Git Bash
+    reported exit status 139). So `cpu` turns op offload off (`OpOffload = false`; LLamaSharp's default is null, which keeps
+    llama.cpp's own). The brief allowed it only if measured better: the retry succeeds with it off and crashes with it on.
+    Speed is the same either way: qwen2.5-1.5b on the CPU inside the Vulkan build, the P630, 5.84 s and 5.21 s per clean-up
+    with it off (here), 5.96 s and 5.02 s with it on (investigation). `NoKqvOffload` was not changed: with no layers on the
+    GPU it has nothing to keep off.
+  - Speech, base.en on the P630, the same variable: whisper.cpp stopped at `GGML_ASSERT(buffer) failed`
+    (ggml-backend.cpp:194) and the process ended with 0xC0000409; no .NET exception reached Dictum. No in-process retry can
+    catch that case; it needs a crash marker (an unclean exit during a GPU load, so the next start goes to the CPU), not
+    built here. The speech retry is pinned with stand-ins only. README, Troubleshooting, says what to do.
+- Not covered: a warm-up that fails after a decoding change (`ModelManager.Reconfigure`) is logged, as before, not retried.
+
+### F4: the clean-up model stays off integrated graphics
+
+- `LocalLlmEngine.ConfigureBackend`, for `llm.gpu = auto`, asks whisper's runtime which Vulkan devices it found
+  (`WhisperEngine.VulkanDevicesForCleanup`, which loads that runtime if no speech model has yet) and uses llama.cpp's CPU
+  build when every device is integrated graphics (`uma: 1`): `LocalLlmEngine.UseVulkan`. `vulkan` and `cpu` still force.
+  `ModelManager.BeginLoad` now sets whisper's runtime order when a speech load is asked for, so the order is known when the
+  clean-up load asked just after it decides. The probe never loads whisper's Vulkan runtime against `whisper.gpu = cpu`.
+- Ceiling: when whisper's order is not set yet (no speech load asked for, for example a missing speech model) or is the CPU
+  order, the earlier rule stands (Vulkan, then CPU), so a PC with integrated graphics, `whisper.gpu = cpu` and
+  `llm.gpu = auto` still puts the clean-up model on Vulkan.
+- Measured here, the P630 with base.en and qwen2.5-1.5b both on `auto`, the speech load asked first as at tray start:
+  "Cleanup model backend order: CPU (llm.gpu = auto; the only GPUs Vulkan found are integrated graphics, where the CPU is
+  faster)", loaded from the avx2 llama.dll in 1.9 s, warm-up 5.06 s (both passes, F5), and two clean-ups by the model in
+  2.18 s and 2.14 s. On Vulkan on the same GPU: 4.22 s and 4.21 s (F5's run below) and 4.3 s (investigation), with a
+  12-21 s warm-up. This PC with both GPUs visible reports a discrete device and keeps Vulkan: unchanged.
+
+### F5: an honest speed estimate
+
+- A model's first warm-up runs twice and the estimate keeps only the second pass's figures (`SpeedEstimate.WarmUpAsync`,
+  in `LocalLlmEngine.cs`); a prefix's rate stands in for the prompt rate only when that call evaluated the prefix
+  (`CleanupSession.PrefixEvaluations`). Later warm-ups (a changed prompt) run once.
+- Measured here, qwen2.5-1.5b forced onto Vulkan on the P630 (`llm.gpu = vulkan`): both passes took 20.2 s; the first
+  dictation after start-up was cleaned by the model in 4.22 s, and the second in 4.21 s. Before (investigation): every
+  dictation was skipped as "estimated 23.9-28.9 s". The second pass measured 4.1 tokens/s writing and 5,675 tokens/s
+  reading; the reading figure is not real: on Vulkan the prompt's decode returns before the GPU has finished and the time
+  lands on the first generated token (the investigation's direct call logged "34 tokens in 4 ms"), so the writing rate
+  carries it. Inferred, not logged: from those rates and `SpeedEstimate.Predict`'s formula, with about 26 tokens for the
+  sentence, the estimate was roughly 8-9 s, over the real 4.2 s but inside its 15 s deadline, so the dictation ran.
+- `LocalLlmClient`: after three estimated dictations in a row that did not run the model, the next gets no estimate, runs
+  the model (its deadline still holds) and measures it again, a run stopped at its deadline included. If the model is still
+  too slow the allowance doubles (3, 6, 12, then 24 at most), so a PC that really is too slow waits for a deadline less and
+  less often; a dictation the estimate lets through puts it back to three. The brief asked for a decay or re-measure after N
+  dictations; the doubling is this lane's addition, so that a re-measure costs a slow PC one deadline wait less and less
+  often. The pill and the clean-up ask about the same dictation, the same string, which counts once; the client holds that
+  string weakly. `TranscriptCleaner` is unchanged, so its skip still returns `Skipped: true`, and a hands-free part counts as
+  a dictation of its own.
+
+### Pins and mutation checks
+
+`tests/Dictum.Tests/RuntimeResilienceTests.cs`, 22 tests: the proposed strings word for word; the two engine messages, a
+nested and an aggregate form and a missing DLL named as the missing runtime, and their own words kept when the runtime is
+present; the runtime counted present by loading or by copies beside the engines (one DLL missing is enough to fail); the
+problem line's prefixes and its merge; on the headless platform, the tray panel naming the runtime with Open log folder and
+no Try on the CPU, Try on the CPU writing `whisper.gpu = cpu` and the line then asking for a restart, no button where no GPU
+runtime was in use, the CPU fallback's line and `CPU` in the models line, and About's clean-up line and problem line after
+a clean-up model fails its size check (nothing native loads in any of these); the speech and clean-up retries on the CPU,
+each engine whose warm-up failed released, the CPU's own failure when it fails too, no retry for a missing engine library
+or with no GPU runtime in use; the integrated-graphics rule from real device lines; the warm-up's two passes, its reset
+between them, the re-measure after three skips, the doubling, and the pill and the clean-up counting one dictation once.
+
+Each mutant reverted one behaviour in the rebased head; Release `--no-incremental` build, then the whole filtered suite
+(1,289 tests); the six source files restored after each, SHA-256 compared with copies taken before the first. Every
+mutant was observed failing on the reverted behaviour:
+
+| Mutant | Failed (RuntimeResilienceTests) |
+|---|---|
+| M1 speech CPU retry off | 5 |
+| M2 an engine whose warm-up failed not disposed | 2 |
+| M3 clean-up CPU retry off | 2 |
+| M4 native-library failures not recognised | 3 |
+| M5 copies beside the engines ignored | 1 |
+| M6 `auto` keeps Vulkan on integrated graphics | 1 |
+| M7 the first warm-up runs once | 2 |
+| M8 the first pass's figures kept | 1 |
+| M9 a skipping estimate never re-measured | 2 |
+| M10 the allowance never doubles | 1 |
+| M11 the pill and the clean-up counted separately | 1 |
+| M12 Try on the CPU writes nothing | 1 |
+| M13 About keeps "on this PC" for a failed clean-up model | 1 |
+| M14 the tray panel hides the problem line | 3 |
+| M15 a shared reason not merged | 1 |
+| M16 About hides the problem line | 1 |
+| M17 the models line keeps the GPU runtime's name | 1 |
+| M18 the speech restart hint never set | 2 |
+| M19 Try on the CPU offered with no GPU runtime in use | 2 |
+| M20 the clean-up restart hint never set | 1 |
+| M21 the problem line drops the restart hint | 1 |
+
+Not caused by these changes: in 12 of the 21 mutated runs, and in 1 of 2 unmutated full runs of the rebased head,
+`FixBatchPrivacyTests.A_request_to_this_machine_never_goes_through_a_configured_proxy(host: "localhost")` failed too
+(expected 0 connections to its stand-in proxy, saw 1), the failure the hands-free lane traced to the test host's own
+telemetry reaching the process-wide proxy that test sets. Not investigated further here. Not mutation-checked, because
+only a real model exercises them: `WhisperEngine.Load`'s `UseGpu`, `LocalLlmEngine.Load`'s `OpOffload`, and
+`WhisperEngine.VulkanDevicesForCleanup` with `ModelManager.BeginLoad` setting whisper's order early (the measured runs above
+exercise them).
+
+**Real runs** (17/10/2026, this PC, harness as above; one model per run unless named): F2 one (whisper.gpu `cpu` inside
+the Vulkan runtime); F3 five (the allocation-size variable that provoked nothing, the clean-up retry with op offload off,
+the same with it on, the speech crash, and that crash again under PowerShell for its exit code and stderr; three more than the
+brief's one or two, to find a variable that provokes a failure and to measure op offload as the brief asked); op offload's
+speed one (qwen2.5-1.5b on the CPU inside the Vulkan build); F4 one (base.en with qwen2.5-1.5b); F5 one. Each ran once;
+none was looped.
+
+**Verification** (17/10/2026, this PC, rebased on main 23acf35): Release `--no-incremental` build, 0 warnings, 0 errors.
+Filtered suite (`FullyQualifiedName!~Install_copies_models`): 1,289 total, 1,270 passed, 19 skipped, 0 failed (the 22 new
+tests included); the run before it failed only the proxy test above. Before the rebase, on c0aa989: 1,130 total, 1,111
+passed, 19 skipped, 0 failed without these changes; 1,150, 1,131, 19, 0 with the first 20 of the new tests. Not run: the
+desktop-, tray- and model-gated tests (the 19 skipped), Dictum.exe itself (the running copy was left alone), and any run
+on a PC without the Visual C++ runtime (the investigation's Windows Sandbox evidence stands in for it).
