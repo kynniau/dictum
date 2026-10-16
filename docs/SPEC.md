@@ -65,6 +65,18 @@ Fn key is not reachable: on nearly all keyboards it is handled by firmware and n
 reaches Windows as a virtual key. Say so in the README and offer `RightCtrl`, `CapsLock`,
 `F-keys` and `Ctrl+Win` as alternatives.
 
+Mouse buttons (amendment, 16/10/2026): `RightMouse`, `MiddleMouse`, `Mouse4` and `Mouse5`
+(VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2) are accepted as a single-key hotkey or
+as the trigger of a chord (`Ctrl+Mouse4`), for the dictation hotkey and the fix hotkey
+alike, with the same hold / double-tap rules as a key. A mouse-button trigger is always
+swallowed, whatever `suppress_hotkey` says (its click would otherwise reach the app under
+the pointer on release), and the dictation listener lets its button through until a
+speech model is ready, except during a dictation already under way, when the button stays swallowed so the stop tap and Esc keep working. The left button is refused (holding it to dictate would swallow
+every click). The listener adds a WH_MOUSE_LL hook on the keyboard hook's own thread only
+when a hotkey names a mouse button (a hotkey change replaces the listener) and decodes
+button messages only (never moves, wheel turns or the left button). The capture box and
+`--selftest` report mouse buttons like keys ("Mouse5 down").
+
 State machine (pure C#, time injected, fully unit-tested):
 
 | State | Event | Next state and action |
@@ -507,6 +519,26 @@ profanities with plural/-ing/-ed variants listed explicitly) and overridable by
 word, case-insensitive, applied after clean-up and after corrections (corrections run first). Tests for both modes,
 word boundaries ("class", "assess", "Scunthorpe" untouched), and the override file.
 
+### 16.6 Snippets (amendment, 16/10/2026)
+
+`%APPDATA%\Dictum\snippets.txt`: lines `what you say => what is pasted`, the same line
+format, whole-word, case-insensitive matching and "later line wins" rule as corrections,
+but the written text is used **verbatim** (never re-cased; only spaces and tabs at either end are dropped, and line breaks at the ends are kept: a URL at a sentence
+start stays lower-case) and in the file `\n` stands for a line break and `\\` for a
+backslash (the dialog writes both). Applied LAST, after the
+corrections and the profanity filter: the text is something the user typed, not dictated,
+so it is pasted exactly, no correction or filter can rewrite a word inside a pasted link
+or address, and a correction can repair a misheard trigger phrase before the snippet
+matches. Tray panel → "Snippets" and "Add a snippet…" in the dictionary window open a
+two-field dialog (When you say / Dictum pastes, the second multi-line) that appends one
+line; "Open snippets file" creates the file with its header. The file is a personal file
+everywhere the others are: watched for reloads, listed by the path registry for Storage
+and removal, counted in the log and `--selftest`; the log prints the pasted text only
+when `log_transcripts` is on. Tests: verbatim casing
+against the correction behaviour on the same line, `\n` round trip, the order relative to
+corrections and the filter, the bad-line warning naming the file, the dialog writing the
+file and the next `Finish` using it.
+
 ### 16.5 Calibration (tray → "Calibrate my voice…")
 
 Honest framing in the window: "Calibration measures which installed model hears you
@@ -685,7 +717,11 @@ user. Required:
 
 - Settings window: a "Press your hotkey" capture box that shows exactly what Windows
   received (key name and side), with a live "Hold to test" indicator that lights up while
-  the chosen key is held, so a key that never arrives is obvious in seconds.
+  the chosen key is held, so a key that never arrives is obvious in seconds. (16/10/2026:
+  mouse buttons are reported and chosen the same way, and a second box of the same kind
+  sets the fix-last hotkey, with "Use for Fix last dictation" and "Turn off"; one box
+  listens at a time. Tab, and a bare Enter or Space, name no hotkey in a box: they are how
+  a keyboard user reaches and presses its buttons. Tab is refused as a hotkey, as Esc is.)
 - First run: the same capture box after the model picker, defaulting to `RightCtrl`, with
   the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
   Command (RightWin)".

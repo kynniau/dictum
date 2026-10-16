@@ -42,6 +42,7 @@ public sealed partial class AppShell : IDisposable
     private ITrayHost? _tray;
     private OverlayPresenter? _overlays;
     private IHotkeyListener? _hook;
+    private bool _hookUsesMouse; // the dictation listener's hotkey names a mouse button (ApplyHookEnabled)
     private IHotkeyListener? _fixHook;
     private string? _fixHotkey;
     private bool _fixSuppress;
@@ -55,8 +56,9 @@ public sealed partial class AppShell : IDisposable
 
     /// <param name="instance">The single-instance lock the entry point took; this shell listens on it for later launches.</param>
     /// <param name="gpuMachine">Tests decide; production asks the whisper runtime (<see cref="WhisperEngine.GpuMachine"/>).</param>
+    /// <param name="speechModels">Tests pass one that loads a fake engine; production builds the whisper one.</param>
     public AppShell(IPlatform platform, AppPaths paths, ILog log, SecretRedactor redactor, ShellOptions options, IShellDialogs? dialogs = null,
-        IInstanceLock? instance = null, Func<bool>? gpuMachine = null)
+        IInstanceLock? instance = null, Func<bool>? gpuMachine = null, ModelManager? speechModels = null)
     {
         Platform = platform;
         Paths = paths;
@@ -70,7 +72,7 @@ public sealed partial class AppShell : IDisposable
         (_http, _downloadHttp) = AppRules.CreateClients(() => _settings.OfflineOnly);
         Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(_settings));
         _llm = new LocalLlmManager(log, Integrity);
-        _models = new ModelManager(log, Integrity);
+        _models = speechModels ?? new ModelManager(log, Integrity);
         Models = new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
             reload: () => Reload(userRequested: false), shutdown: Quit, refreshTooltip: StatusChanged,
             balloon: (text, warning) => Notify("Dictum", text, warning), integrity: Integrity, gpuMachine: gpuMachine);
@@ -78,6 +80,9 @@ public sealed partial class AppShell : IDisposable
         _capture = platform.CreateCapture(log);
         _inserter = new TextInserter(platform.Clipboard, platform.CreateInputSender(log), log);
         _reloadDebounce = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => DebouncedReload()) { IsEnabled = false };
+        // From construction, not from Start: nothing loads before Start, and the hotkey listener must follow every change.
+        _models.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_models.LastError, ref _speechErrorShown, "Speech model"));
+        _llm.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_llm.LastError, ref _cleanupErrorShown, "Clean-up model"));
     }
 
     public IPlatform Platform { get; }
@@ -143,8 +148,6 @@ public sealed partial class AppShell : IDisposable
 
         _overlays = new OverlayPresenter(this);
         _tray = Platform.CreateTray(point => Dispatcher.UIThread.Post(() => ToggleFlyout(point)), _log);
-        _models.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_models.LastError, ref _speechErrorShown, "Speech model"));
-        _llm.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_llm.LastError, ref _cleanupErrorShown, "Clean-up model"));
 
         var machine = new DictationStateMachine(AppRules.Options(_settings), _settings.Enabled);
         var pipeline = new DictationPipeline(_models.GetAsync, () => _cleaner, InsertAsync, () => _settings, _log, Personal.Finish, RememberPasted);
@@ -167,9 +170,13 @@ public sealed partial class AppShell : IDisposable
     private string? _speechErrorShown;
     private string? _cleanupErrorShown;
 
-    /// <summary>Refreshes the status and shows a load failure (for example a SHA-256 mismatch) once per distinct error.</summary>
+    /// <summary>
+    /// Brings a mouse-button hotkey's listener in line with the speech model (<see cref="ApplyHookEnabled"/>), refreshes the
+    /// status and shows a load failure (for example a SHA-256 mismatch) once per distinct error.
+    /// </summary>
     private void ModelStateChanged(string? error, ref string? shown, string what)
     {
+        ApplyHookEnabled();
         StatusChanged();
         if (error is null || error == shown) return;
         shown = error;

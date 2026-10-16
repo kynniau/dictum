@@ -5,10 +5,18 @@ namespace Dictum.Windows.Interop;
 /// <summary>Win32 declarations for the keyboard hook, input injection, windows and the console. Constants are winuser.h values.</summary>
 internal static class Native
 {
-    public const int WH_KEYBOARD_LL = 13;
+    public const int WH_KEYBOARD_LL = 13, WH_MOUSE_LL = 14;
     public const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105;
+    public const int WM_RBUTTONDOWN = 0x0204, WM_RBUTTONUP = 0x0205, WM_MBUTTONDOWN = 0x0207, WM_MBUTTONUP = 0x0208,
+        WM_XBUTTONDOWN = 0x020B, WM_XBUTTONUP = 0x020C;
     public const int WM_QUIT = 0x0012, WM_APP = 0x8000;
-    public const uint LLKHF_INJECTED = 0x10;
+    public const uint LLKHF_INJECTED = 0x10, LLMHF_INJECTED = 0x01;
+
+    /// <summary>The high word of MSLLHOOKSTRUCT.mouseData for WM_XBUTTONDOWN/UP: which side button.</summary>
+    public const int XBUTTON1 = 0x0001, XBUTTON2 = 0x0002;
+
+    public const uint INPUT_MOUSE = 0;
+    public const uint MOUSEEVENTF_XDOWN = 0x0080, MOUSEEVENTF_XUP = 0x0100;
 
     public const uint INPUT_KEYBOARD = 1;
     public const uint KEYEVENTF_EXTENDEDKEY = 0x0001, KEYEVENTF_KEYUP = 0x0002, KEYEVENTF_UNICODE = 0x0004;
@@ -23,13 +31,26 @@ internal static class Native
     /// <summary>Marks input injected by Dictum so its own hook ignores it ("DICT").</summary>
     public static readonly nuint InjectedMarker = 0x44494354;
 
-    public delegate nint LowLevelKeyboardProc(int nCode, nint wParam, nint lParam);
+    /// <summary>HOOKPROC: the same signature serves LowLevelKeyboardProc and LowLevelMouseProc.</summary>
+    public delegate nint HookProc(int nCode, nint wParam, nint lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     public struct KBDLLHOOKSTRUCT
     {
         public uint vkCode;
         public uint scanCode;
+        public uint flags;
+        public uint time;
+        public nuint dwExtraInfo;
+    }
+
+    /// <summary>What a WH_MOUSE_LL callback's lParam points at: POINT pt, then mouseData, flags, time, dwExtraInfo.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSLLHOOKSTRUCT
+    {
+        public int ptX;
+        public int ptY;
+        public uint mouseData;
         public uint flags;
         public uint time;
         public nuint dwExtraInfo;
@@ -89,7 +110,7 @@ internal static class Native
     }
 
     [DllImport("user32.dll", SetLastError = true)]
-    public static extern nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, nint hMod, uint dwThreadId);
+    public static extern nint SetWindowsHookEx(int idHook, HookProc lpfn, nint hMod, uint dwThreadId);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

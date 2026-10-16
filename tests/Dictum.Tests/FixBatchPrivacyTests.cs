@@ -142,6 +142,8 @@ public class FixBatchPrivacyTests
     [InlineData(WatcherChangeTypes.Renamed, "settings.json", "settings.json.tmp", true)]
     [InlineData(WatcherChangeTypes.Deleted, "dictionary.txt", null, true)]
     [InlineData(WatcherChangeTypes.Changed, "corrections.txt", null, true)]
+    [InlineData(WatcherChangeTypes.Changed, "snippets.txt", null, true)]
+    [InlineData(WatcherChangeTypes.Deleted, "snippets.txt", null, true)] // deleting it switches snippets off at once
     [InlineData(WatcherChangeTypes.Deleted, "settings.json", null, false)] // documented: the settings in use stay
     [InlineData(WatcherChangeTypes.Changed, "notes.txt", null, false)]
     public void The_config_folder_watcher_reloads_on_the_right_changes(WatcherChangeTypes change, string name, string? oldName, bool reloads) =>

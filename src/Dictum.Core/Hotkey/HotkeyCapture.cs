@@ -16,7 +16,11 @@ public sealed class HotkeyCapture
     public string? LastReceived { get; private set; }
 
     /// <summary>Feeds one key event; returns the hotkey text once every key of a gesture is released, else null.</summary>
-    /// <remarks>Esc on its own names no hotkey (the parser refuses it: it cancels a dictation), so it returns null.</remarks>
+    /// <remarks>
+    /// Esc on its own names no hotkey (the parser refuses it: it cancels a dictation), so it returns null. So do Tab in any
+    /// gesture (the parser refuses it too) and a bare Enter or Space: those are how a keyboard user moves to the box's
+    /// buttons and presses them, which must not change the choice. A chord such as Ctrl+Shift+Space still names a hotkey.
+    /// </remarks>
     public string? Feed(RawKeyEvent e)
     {
         var side = HotkeyParser.SideOf(e.Vk) is { } s ? $" ({s} side)" : "";
@@ -33,7 +37,9 @@ public sealed class HotkeyCapture
         _peak = [];
         var trigger = keys.LastOrDefault(k => !HotkeyParser.IsModifierVk(k));
         if (trigger == 0) trigger = keys[^1];
-        var text = string.Join("+", keys.Where(k => k != trigger && HotkeyParser.IsModifierVk(k)).Select(HotkeyParser.NameOf).Append(HotkeyParser.NameOf(trigger)));
+        var modifiers = keys.Where(k => k != trigger && HotkeyParser.IsModifierVk(k)).ToList();
+        if (modifiers.Count == 0 && trigger is Vk.Return or Vk.Space) return null; // a button press, not a choice (remarks)
+        var text = string.Join("+", modifiers.Select(HotkeyParser.NameOf).Append(HotkeyParser.NameOf(trigger)));
         return HotkeyParser.TryParse(text, out _, out _) ? text : null;
     }
 

@@ -103,7 +103,7 @@ public sealed partial class AppShell
             _log.Warn("Could not write \"enabled\" to settings.json (file unreadable or not valid JSON); the change lasts until restart.");
         }
         if (persist) _settings = _settings with { Enabled = enabled };
-        if (_hook is not null) _hook.Enabled = enabled && _hotkeyPauses == 0;
+        ApplyHookEnabled();
         if (_fixHook is not null) _fixHook.Enabled = enabled && _hotkeyPauses == 0;
         _controller?.SetEnabled(enabled);
         _log.Info(enabled ? "Dictation enabled." : "Dictation disabled.");
@@ -115,12 +115,28 @@ public sealed partial class AppShell
         var spec = HotkeyParser.Parse(_settings.Hotkey); // already validated by the loader
         var matcher = new HotkeyMatcher(spec, _settings.SuppressHotkey, Platform.IsKeyDown);
         _hook = Platform.CreateHotkeyListener(matcher, OnHotkey, _log);
-        _hook.Enabled = _settings.Enabled && _hotkeyPauses == 0;
+        _hookUsesMouse = spec.UsesMouse;
+        ApplyHookEnabled();
         if (!_hook.Start())
         {
             _tray?.SetState(TrayState.Error);
             Notify("Dictum", "The global hotkey could not be registered. See the log for details.", warning: true);
         }
+    }
+
+    /// <summary>
+    /// The one rule for the dictation listener: on while dictation is enabled and no capture box pauses it, and, for a
+    /// mouse-button hotkey, only while a speech model is ready or a dictation is under way. A mouse button is always
+    /// swallowed (HotkeyMatcher), so with no model to dictate with (the first-run download, a failed load, a model swap) it
+    /// would vanish from every app for nothing; it keeps its normal job until the model is ready. A dictation already under
+    /// way keeps the listener on: a model load that starts mid-dictation (a download finishing, a model swap) must not cut
+    /// off its release, its stop tap or Esc. A keyboard hotkey stays on (the controller ignores a press while no model is
+    /// ready). Called on every change it depends on: the listener, enabled, a pause, each model state change, and each
+    /// dictation state the controller reports (SetTrayState), so the listener goes off again when that dictation ends.
+    /// </summary>
+    private void ApplyHookEnabled()
+    {
+        if (_hook is not null) _hook.Enabled = _settings.Enabled && _hotkeyPauses == 0 && (!_hookUsesMouse || _models.IsReady || _controller is { IsIdle: false });
     }
 
     /// <summary>From the hook thread: to the window that asked for the hotkey (calibration's "or hold Right Ctrl"), else to dictation.</summary>
@@ -141,12 +157,12 @@ public sealed partial class AppShell
     public IDisposable PauseHotkey()
     {
         _hotkeyPauses++;
-        if (_hook is not null) _hook.Enabled = false;
+        ApplyHookEnabled();
         if (_fixHook is not null) _fixHook.Enabled = false;
         return new Undo(() =>
         {
             _hotkeyPauses = Math.Max(0, _hotkeyPauses - 1);
-            if (_hook is not null) _hook.Enabled = _settings.Enabled && _hotkeyPauses == 0;
+            ApplyHookEnabled();
             if (_fixHook is not null) _fixHook.Enabled = _settings.Enabled && _hotkeyPauses == 0;
         });
     }
@@ -176,7 +192,11 @@ public sealed partial class AppShell
                     if (e.Signal == HotkeySignal.Down) Dispatcher.UIThread.Post(() => OpenFixLast(fromHotkey: true));
                 }, _log);
                 if (hook.Start()) _fixHook = hook;
-                else Notify("Dictum", "The fix_hotkey could not be registered. See the log for details.", warning: true);
+                else
+                {
+                    hook.Dispose(); // its thread and a keyboard hook that did install must not live on unreferenced
+                    Notify("Dictum", "The fix_hotkey could not be registered. See the log for details.", warning: true);
+                }
             }
         }
         if (_fixHook is not null) _fixHook.Enabled = s.Enabled && _hotkeyPauses == 0;

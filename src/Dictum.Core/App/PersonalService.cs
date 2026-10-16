@@ -27,7 +27,7 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
 
     public LastDictation? Last => _last;
 
-    /// <summary>Re-reads the three text files (load, reload, file watcher). Logs counts only.</summary>
+    /// <summary>Re-reads the four text files (load, reload, file watcher). Logs counts only.</summary>
     public PersonalText Load()
     {
         var text = PersonalText.Load(paths, log.Warn);
@@ -36,7 +36,7 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
         return text;
     }
 
-    /// <summary>The last step before a paste: corrections, then the profanity filter (SPEC §16.3, §16.4; order per the fix batch).</summary>
+    /// <summary>The last step before a paste: corrections, the profanity filter, then the snippets (SPEC §16.3, §16.4, §16.6; order per the fix batch).</summary>
     public string Finish(string text) => _text.Finish(text, settings().Profanity);
 
     /// <summary>The pipeline pasted <paramref name="text"/> into <paramref name="target"/>: kept in memory for Fix last dictation.</summary>
@@ -75,6 +75,43 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
     {
         if (!File.Exists(paths.DictionaryFile)) TextList.Append(paths.DictionaryFile, [], PersonalDictionary.FileHeader);
         return paths.DictionaryFile;
+    }
+
+    /// <summary>
+    /// Why a snippet cannot be added to snippets.txt, or null (SPEC §16.6). The phrase must fit on one line of the file, and
+    /// corrections and the profanity filter (which run before the snippets) must leave its words alone, or the snippet could
+    /// never match. A correction that only changes case passes: snippets match any case.
+    /// </summary>
+    public string? CheckNewSnippet(string phrase, string text)
+    {
+        if (phrase.Length == 0) return "Type the words you will say first.";
+        if (phrase.Contains('\r') || phrase.Contains('\n')) return "The words you say must fit on one line.";
+        if (phrase.StartsWith('#')) return "A snippet cannot start with #: in snippets.txt that marks a comment line.";
+        if (phrase.Contains(Corrections.Arrow, StringComparison.Ordinal)) return $"The words you say cannot contain {Corrections.Arrow}.";
+        if (!phrase.Any(char.IsLetterOrDigit)) return "The words you say need a letter or a digit in them.";
+        if (WholeWords.Key(_text.Corrections.Apply(phrase)) != WholeWords.Key(phrase))
+            return "A correction in corrections.txt changes these words before the snippet runs; use the corrected form as the phrase.";
+        if (_text.Profanity.Apply(phrase, settings().Profanity.Mode) != phrase)
+            return "The profanity filter would change these words before the snippet runs; choose another phrase.";
+        if (text.Length == 0) return "Type what Dictum should paste.";
+        return null;
+    }
+
+    /// <summary>Appends one snippet; true when an earlier line already had this phrase (the later line wins, so it is replaced).</summary>
+    public bool AddSnippet(string phrase, string text)
+    {
+        var replaces = _text.Snippets.Rules.Any(r => r.Heard == WholeWords.Key(phrase));
+        TextList.Append(paths.SnippetsFile, [Corrections.SnippetLine(phrase, text)], Corrections.SnippetsHeader);
+        log.Info(replaces ? "Replaced a snippet." : "Added a snippet.");
+        reload();
+        return replaces;
+    }
+
+    /// <summary>Creates snippets.txt (with its header) if needed, for "Open snippets file".</summary>
+    public string EnsureSnippetsFile()
+    {
+        if (!File.Exists(paths.SnippetsFile)) TextList.Append(paths.SnippetsFile, [], Corrections.SnippetsHeader);
+        return paths.SnippetsFile;
     }
 
     /// <summary>The preset these settings match on this hardware (tray panel and Settings → Mode).</summary>

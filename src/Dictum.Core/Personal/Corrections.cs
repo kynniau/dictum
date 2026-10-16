@@ -17,6 +17,9 @@ public sealed record CorrectionRule(string Heard, string Written)
 /// capitals takes a capital first letter only at a sentence start where the heard word had one (an all-capitals acronym
 /// such as "ER" does not count), so "Bill => bill" lower-cases "the Bill" mid-sentence; a written form with capitals
 /// ("Kynni", "iPhone") is used exactly as written.
+/// The same class <see cref="Verbatim"/> is snippets.txt (SPEC §16.6): "what you say => what is pasted", the written text
+/// used exactly as written (a URL at a sentence start stays lower-case, a leading or trailing line break is kept), with
+/// "\n" in the file standing for a line break and "\\" for a backslash.
 /// </summary>
 public sealed class Corrections
 {
@@ -24,18 +27,29 @@ public sealed class Corrections
     public const string FileHeader =
         "Dictum corrections: one per line, \"heard => written\". Whole words, any case. Applied before every paste.\n" +
         "Example: kinney => Kynni";
+    public const string SnippetsHeader =
+        "Dictum snippets: one per line, \"what you say => what is pasted\". Whole words, any case. The text is pasted exactly\n" +
+        "as written, after the clean-up, corrections and profanity filter. Write \\n for a line break and \\\\ for a backslash.\n" +
+        "Examples: my email => kyle@example.com\n" +
+        "          my calendly => https://calendly.com/example/30min";
+
+    /// <summary>A snippet's escapes in snippets.txt: "\\" is a backslash and "\n" a line break, read in one left-to-right pass.</summary>
+    private static readonly Regex SnippetEscape = new(@"\\(\\|n)", RegexOptions.CultureInvariant);
 
     public static readonly Corrections Empty = new([]);
 
     private readonly Dictionary<string, string> _written = new(StringComparer.Ordinal);
     private readonly Regex? _pattern;
 
-    public Corrections(IEnumerable<CorrectionRule> rules)
+    /// <param name="verbatim">Snippets: the written text is pasted exactly, never re-cased or trimmed.</param>
+    public Corrections(IEnumerable<CorrectionRule> rules, bool verbatim = false)
     {
+        Verbatim = verbatim;
         foreach (var rule in rules)
         {
             var key = WholeWords.Key(rule.Heard);
-            if (key.Length > 0) _written[key] = rule.Written.Trim(); // a later line for the same phrase wins
+            // A later line for the same phrase wins. A snippet keeps a line break at either end (or one that is all of it).
+            if (key.Length > 0) _written[key] = Verbatim ? rule.Written : rule.Written.Trim();
         }
         Rules = _written.Select(kv => new CorrectionRule(kv.Key, kv.Value)).ToList();
         _pattern = WholeWords.Pattern(_written.Keys);
@@ -43,9 +57,18 @@ public sealed class Corrections
 
     public IReadOnlyList<CorrectionRule> Rules { get; }
 
+    /// <summary>True for snippets: the written text is used exactly as written.</summary>
+    public bool Verbatim { get; }
+
     public static Corrections Load(string path, Action<string>? warn = null) => new(Parse(TextList.Read(path, warn), warn));
 
-    public static IEnumerable<CorrectionRule> Parse(IEnumerable<string> lines, Action<string>? warn = null)
+    /// <summary>snippets.txt: the same line format, the written text verbatim with "\n" for a line break and "\\" for a backslash.</summary>
+    public static Corrections LoadSnippets(string path, Action<string>? warn = null) =>
+        new(Parse(TextList.Read(path, warn), warn, Path.GetFileName(path), lineBreaks: true), verbatim: true);
+
+    /// <param name="fileName">Named in the warning for a bad line (never the line's text).</param>
+    /// <param name="lineBreaks">Snippets: "\n" in the written text becomes a line break and "\\" a backslash.</param>
+    public static IEnumerable<CorrectionRule> Parse(IEnumerable<string> lines, Action<string>? warn = null, string fileName = "corrections.txt", bool lineBreaks = false)
     {
         foreach (var line in lines)
         {
@@ -54,17 +77,30 @@ public sealed class Corrections
             var written = arrow < 0 ? "" : line[(arrow + Arrow.Length)..].Trim();
             if (heard.Length == 0 || written.Length == 0)
             {
-                warn?.Invoke($"corrections.txt: a line without \"heard {Arrow} written\" on both sides was ignored ({line.Length} characters)."); // never the text
+                warn?.Invoke($"{fileName}: a line without \"heard {Arrow} written\" on both sides was ignored ({line.Length} characters)."); // never the text
                 continue;
             }
+            if (lineBreaks) written = SnippetEscape.Replace(written, m => m.Groups[1].Value == "n" ? "\n" : "\\");
             yield return new CorrectionRule(heard, written);
         }
     }
 
+    /// <summary>
+    /// One snippets.txt line: the phrase, the arrow, and the text with each backslash written as "\\" and then each line
+    /// break as "\n", so a typed "\\server\new-clients" reads back as typed rather than with a line break in it. Only
+    /// spaces and tabs are trimmed from the text: a line break at either end is written as "\n" and kept.
+    /// </summary>
+    public static string SnippetLine(string phrase, string text) =>
+        $"{phrase.Trim()} {Arrow} {text.Trim(' ', '\t').Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}";
+
     public string Apply(string text)
     {
         if (_pattern is null || string.IsNullOrEmpty(text)) return text;
-        return _pattern.Replace(text, m => Cased(m.Value, _written[WholeWords.Key(m.Value)], AtSentenceStart(text, m.Index)));
+        return _pattern.Replace(text, m =>
+        {
+            var written = _written[WholeWords.Key(m.Value)];
+            return Verbatim ? written : Cased(m.Value, written, AtSentenceStart(text, m.Index));
+        });
     }
 
     /// <summary>The text start, or after ". ", "! ", "? " or a line break: where a capital is the sentence's, not the word's.</summary>

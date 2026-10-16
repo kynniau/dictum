@@ -30,6 +30,7 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
     // Batch 2 (SPEC §16): plain text files the user can read, edit and delete; watched like settings.json.
     public string DictionaryFile => Path.Combine(ConfigDir, "dictionary.txt");
     public string CorrectionsFile => Path.Combine(ConfigDir, "corrections.txt");
+    public string SnippetsFile => Path.Combine(ConfigDir, "snippets.txt");
     public string ProfanityOverrideFile => Path.Combine(ConfigDir, "profanity.txt");
 
     /// <summary>The word list shipped beside the executable.</summary>

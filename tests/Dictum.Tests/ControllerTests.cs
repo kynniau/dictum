@@ -106,4 +106,34 @@ public class ControllerTests
         Assert.DoesNotContain(PillView.Polishing, pills);
         Assert.Empty(rig.Inserted);
     }
+
+    /// <summary>Records, at each tray state the controller reports, whether the controller then says it is idle.</summary>
+    private sealed class IdleAtTrayStateUi : IDictationUi
+    {
+        public DictationController? Controller { get; set; }
+        public ConcurrentQueue<(TrayState State, bool Idle)> States { get; } = new();
+        public void ShowPill(PillState state) { }
+        public void SetTrayState(TrayState state) => States.Enqueue((state, Controller!.IsIdle));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task The_UI_hears_that_a_dictation_ended_only_once_the_controller_is_idle(bool fails)
+    {
+        // The mouse-hotkey gate (AppShell.ApplyHookEnabled) reads IsIdle when it hears a tray state (lens 2, 16/10/2026).
+        // Told "Idle" while the machine still said Processing, it kept a mouse button swallowed after a dictation that ended
+        // with no speech model ready.
+        var ui = new IdleAtTrayStateUi();
+        var settings = new AppSettings();
+        var pipeline = new DictationPipeline(
+            _ => fails ? Task.FromException<ITranscriber>(new InvalidOperationException("No speech model is loaded.")) : Task.FromResult<ITranscriber>(new FakeTranscriber("hello there")),
+            () => TranscriptCleaner.RulesOnly("test"), (_, _) => Task.CompletedTask, () => settings, NullLog.Instance);
+        using var controller = new DictationController(new DictationStateMachine(StateMachineOptions.Default), new FakeCapture(), pipeline, ui, () => settings, NullLog.Instance);
+        ui.Controller = controller;
+        Hold(controller); // transcribe and paste, or fail for want of a model
+        var end = fails ? TrayState.Error : TrayState.Idle;
+        await WaitUntil(() => ui.States.Any(s => s.State == end), $"the {end} tray state");
+        Assert.Equal([(TrayState.Recording, false), (TrayState.Processing, false), (end, true)], ui.States.ToArray());
+    }
 }

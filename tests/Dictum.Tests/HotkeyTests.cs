@@ -154,6 +154,19 @@ public class HotkeyMatcherTests
     }
 
     [Fact]
+    public void A_swallowed_key_still_held_when_disabled_keeps_its_repeats_and_release_swallowed()
+    {
+        // Switching the listener off stops new presses only. Passing on the auto-repeat of a key whose press was swallowed,
+        // while swallowing its release, would show the app a key going down that never comes up.
+        var m = Matcher("RightCtrl");
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Down, false), m.OnKey(RCtrl, true, true));
+        Assert.Equal(new KeyDecision(true, HotkeySignal.None, false), m.OnKey(RCtrl, true, false)); // auto-repeat, listener off
+        Assert.Equal(new KeyDecision(true, HotkeySignal.Up, false), m.OnKey(RCtrl, false, false));
+        Assert.Equal(KeyDecision.Pass, m.OnKey(RCtrl, true, false)); // the next press, still off, passes untouched
+        Assert.Equal(KeyDecision.Pass, m.OnKey(RCtrl, false, false));
+    }
+
+    [Fact]
     public void Stale_modifier_is_dropped_when_the_probe_says_it_is_up()
     {
         var physicallyDown = new HashSet<int>();

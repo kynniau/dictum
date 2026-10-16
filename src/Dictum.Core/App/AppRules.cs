@@ -25,7 +25,7 @@ public static class AppRules
     public static bool HotkeyChanged(AppSettings before, AppSettings after) =>
         !string.Equals(before.Hotkey, after.Hotkey, StringComparison.Ordinal) || before.SuppressHotkey != after.SuppressHotkey;
 
-    private static readonly string[] PersonalFiles = ["dictionary.txt", "corrections.txt", "profanity.txt"];
+    private static readonly string[] PersonalFiles = ["dictionary.txt", "corrections.txt", "snippets.txt", "profanity.txt"];
 
     /// <summary>
     /// Which config-folder changes reload: settings.json, .env and the personal text files. Deleting a text file switches

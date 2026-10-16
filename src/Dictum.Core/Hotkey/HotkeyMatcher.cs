@@ -23,13 +23,20 @@ public readonly record struct KeyDecision(bool Suppress, HotkeySignal Signal, bo
 /// safe to call from inside the hook callback.
 /// Suppression rules (SPEC §3): Esc is never suppressed; a single-key hotkey is suppressed when
 /// <c>suppress_hotkey</c> is on; in a chord only the final non-modifier key is suppressed, never a bare
-/// modifier, and only while the chord is complete. Auto-repeat never produces a signal.
+/// modifier, and only while the chord is complete. A mouse-button trigger is suppressed whatever
+/// <c>suppress_hotkey</c> says: its click reaching the app under the pointer on release (a context menu, a browser
+/// Back) would wreck the dictation. Auto-repeat never produces a signal.
+/// A listener switched off (<c>enabled</c> false) starts no new press, but a press already under way finishes as it
+/// began: its auto-repeat and release stay swallowed if its press was, and its release reports Up once. The listener
+/// can go off mid-press (a mouse hotkey's readiness gate closes as a dictation ends, which can be while its stop tap
+/// is still down), and until the state machine hears Up it believes the key is held and takes the next press for
+/// auto-repeat.
 /// </summary>
 public sealed class HotkeyMatcher
 {
     private readonly HashSet<int> _down = [];
     private readonly Func<int, bool>? _isPhysicallyDown;
-    private bool _active;
+    private bool _active; // Down reported, Up not yet: owed whether or not the listener is still on (a lost key-up drops it)
     private int _activeTriggerVk;
     private bool _triggerSuppressed;
 
@@ -67,26 +74,20 @@ public sealed class HotkeyMatcher
             return new KeyDecision(false, isDown && !repeat && enabled ? HotkeySignal.Escape : HotkeySignal.None, false);
         }
 
-        if (!enabled)
-        {
-            _active = false;
-            var swallowUp = !isDown && _triggerSuppressed && vk == _activeTriggerVk;
-            if (swallowUp) _triggerSuppressed = false;
-            return swallowUp ? new KeyDecision(true, HotkeySignal.None, false) : KeyDecision.Pass;
-        }
-
         var isTrigger = Spec.Trigger.Contains(vk);
         var isChordModifier = Spec.Modifiers.Any(m => m.Contains(vk));
 
         if (isDown)
         {
             if (repeat) return new KeyDecision(_triggerSuppressed && vk == _activeTriggerVk, HotkeySignal.None, false);
-            if (_active || !Completes(vk, isTrigger, isChordModifier)) return KeyDecision.Pass;
+            // Switched off: no new press. A press under way is finished below whether the listener is on or off.
+            if (!enabled || _active || !Completes(vk, isTrigger, isChordModifier)) return KeyDecision.Pass;
 
             _active = true;
             _activeTriggerVk = vk;
             // Single key: suppressible even if it is a modifier (default RightCtrl). Chord: only a non-modifier trigger.
-            var suppress = SuppressEnabled && isTrigger && (!Spec.IsChord || !Spec.Trigger.IsModifier);
+            // A mouse button is always swallowed (class summary).
+            var suppress = (SuppressEnabled || Vk.IsMouseButton(vk)) && isTrigger && (!Spec.IsChord || !Spec.Trigger.IsModifier);
             _triggerSuppressed = suppress;
             var mask = !suppress && ChordHoldsWinOrAlt();
             return new KeyDecision(suppress, HotkeySignal.Down, mask);

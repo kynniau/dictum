@@ -23,7 +23,7 @@ public sealed class DictationPipeline
     /// <param name="transcriber">Returns the loaded engine, waiting for a model load still in progress.</param>
     /// <param name="cleaner">Current cleanup configuration (rebuilt on settings reload).</param>
     /// <param name="insert">Inserts text at the cursor; checks the token before the first keystroke.</param>
-    /// <param name="finish">The last step before the paste (SPEC §22 order: corrections, then the profanity filter); identity if null.</param>
+    /// <param name="finish">The last step before the paste (SPEC §22 order: corrections, the profanity filter, then snippets); identity if null.</param>
     /// <param name="inserted">Told the text that was pasted (kept in memory for "Fix last dictation").</param>
     public DictationPipeline(
         Func<CancellationToken, Task<ITranscriber>> transcriber,
@@ -77,7 +77,7 @@ public sealed class DictationPipeline
         var finished = _finish(text);
         if (finished != text)
         {
-            _log.Info("Corrections and the profanity filter changed the text."); // never the text itself
+            _log.Info("Corrections, the profanity filter or snippets changed the text."); // never the text itself
             if (settings.LogTranscripts) _log.Info($"Final text: {finished}");
             text = finished;
         }

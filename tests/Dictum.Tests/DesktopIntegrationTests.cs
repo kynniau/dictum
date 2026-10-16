@@ -44,7 +44,7 @@ public class DesktopIntegrationTests(ITestOutputHelper output)
         Assert.Equal(40, Marshal.SizeOf<KeyInput>());
 
         var events = new BlockingCollection<HookEvent>();
-        using var hook = new KeyboardHook(new HotkeyMatcher(HotkeyParser.Parse("F24"), suppress: true), events.Add, NullLog.Instance);
+        using var hook = new InputHook(new HotkeyMatcher(HotkeyParser.Parse("F24"), suppress: true), events.Add, NullLog.Instance);
         Assert.True(hook.Start(), "SetWindowsHookEx failed");
 
         const ushort f24 = 0x87;

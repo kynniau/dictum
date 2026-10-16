@@ -15,7 +15,8 @@ PC** (llama.cpp), and pasted at the cursor of whatever app has focus.
 
 ## Using it
 
-Default hotkey: **Right Ctrl**.
+Default hotkey: **Right Ctrl**. Any other key, a chord, or a mouse button (right, middle or a side button) can take its
+place: see "Choosing a hotkey". Every gesture below works the same with a mouse button.
 
 | Gesture | What happens |
 |---|---|
@@ -82,8 +83,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   dictate.
 - **Big recording indicator** (Off | Orb | Edge | Both), **Profanity filter** (on = Mask; Remove is in Settings >
   Clean-up), **Grammar assist**, **Start and stop sounds** (`sounds.enabled`, off by default).
-- **Calibrate my voice**, **Dictionary** (add a word, open the dictionary or corrections file), **Fix last
-  dictation**, **Settings**.
+- **Calibrate my voice**, **Dictionary** (add a word, open the dictionary or corrections file), **Snippets** (a phrase
+  you say and the text pasted in its place, see "Snippets"), **Fix last dictation**, **Settings**.
 - The privacy line ("Nothing leaves this PC", or the host cloud clean-up sends to) and **Quit**.
 
 The icon's tooltip reads `Dictum · <speech model> · <runtime> · <cleanup model> · <runtime> · <hotkey>`. Notices
@@ -118,10 +119,28 @@ or a raw virtual-key code like `0x7B`) or modifiers plus one key (`Ctrl+Win`, `C
 Right Ctrl + C no longer copies); in a chord only the final non-modifier key is swallowed, never Ctrl/Shift/Alt/Win.
 A single-key hotkey fires even while Ctrl, Shift, Alt or Win is held, so with a letter or an F-key that key's own app
 shortcuts (Ctrl+F, Alt+F9) start Dictum instead; use a chord if that matters. A chord naming one key twice under two
-names (`Ctrl+RightCtrl`) is refused.
+names (`Ctrl+RightCtrl`) is refused, and so are Esc (it cancels a dictation) and Tab (it moves keyboard focus).
 
 **The Fn key cannot be used.** It is handled at firmware level on nearly all keyboards and no Microsoft source lists
 an Fn virtual key, so Windows never sees it. Use `RightCtrl`, `CapsLock`, an F-key or `Ctrl+Win` instead.
+
+**A mouse button can be the hotkey.** `RightMouse`, `MiddleMouse`, `Mouse4` and `Mouse5` (the two side buttons, also
+written `XButton1`/`XButton2`) work exactly like a key: hold to record, double-tap for hands-free, alone or as the last
+part of a chord (`Ctrl+Mouse4`). Choose one in the **Press your hotkey** box by pressing it, or write it in
+`settings.json`. The button is always hidden from the app under the pointer, whatever `suppress_hotkey` says, so
+holding the right button opens no menu and a side button does not go Back in a browser (that click would otherwise
+arrive when you let go, in the middle of the dictation). So while Dictum is on and a speech model is ready, that button
+no longer reaches other apps at all, not even a quick click (no right-click menu, no middle-click, no Back); a side
+button you do not use is the best choice. Until a speech model is ready (none downloaded yet, one still
+loading, or one that failed to load) a mouse-button dictation hotkey leaves its button alone, so it keeps its normal
+job while there is nothing to dictate with; a dictation already under way keeps it swallowed until that dictation
+ends, so the stop tap and Esc still work. Each name means whichever physical button Windows reports as that button
+(Dictum reads the button messages Windows sends, not the hardware). **The left button cannot be used**: holding it to
+dictate would swallow every click.
+Dictum watches the mouse (a WH_MOUSE_LL hook on the same thread as the keyboard hook) only while a hotkey names a mouse
+button, a **Press your hotkey** box is listening, or `--selftest` runs; the hook decodes button presses only and passes
+moves and wheel turns on untouched. The fix-last hotkey can be a mouse button too; while Dictum is on, that button no
+longer reaches other apps at all either.
 
 ### Keyboards and Remote Desktop
 
@@ -131,10 +150,14 @@ key, so the default `RightCtrl` never fires there. **On a Mac over Remote Deskto
 `CapsLock` and the F-keys. Fn never reaches Windows (above).
 
 To see what Windows actually receives, use the **Press your hotkey** box (Settings > General, and at first run): press
-**Change…**, then the key. The box names exactly what arrived, with its side ("RightAlt (right side) down"), and its
-**Hold to test** light is on for as long as the chosen key is held; a key that never arrives is obvious in seconds.
-While the box listens, the dictation hotkey is paused, so testing does not start a dictation. `Dictum.exe --selftest`
-runs the same check from the command line: "Press your hotkey (…) now", watching for 5 s.
+**Change…**, then the key or mouse button. The box names exactly what arrived, with its side ("RightAlt (right side)
+down", "Mouse5 down"), and its **Hold to test** light is on for as long as the chosen key is held; a key that never
+arrives is obvious in seconds. While the box listens, both hotkeys are paused, so testing does not start a dictation.
+Settings > General has a second box of the same kind for the **Fix last dictation** hotkey: press **Change…**, press the
+key or button, then **Use for Fix last dictation**; **Turn off** removes it. Only one box listens at a time. Tab, and
+Enter or Space pressed on their own, choose nothing in a box: with the keyboard they move to its buttons and press
+them (a chord such as `Ctrl+Shift+Space` still counts).
+`Dictum.exe --selftest` runs the same check from the command line: "Press your hotkey (…) now", watching for 5 s.
 
 ## Install
 
@@ -463,8 +486,8 @@ warning and the default is used; Dictum never fails to start because of settings
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | Hotkey on/off (tray "Enabled"). |
-| `hotkey` | `"RightCtrl"` | See "Choosing a hotkey". |
-| `suppress_hotkey` | `true` | Hide the hotkey from the focused app (chords: final non-modifier key only). |
+| `hotkey` | `"RightCtrl"` | See "Choosing a hotkey". A key, a chord, or a mouse button (`RightMouse`, `MiddleMouse`, `Mouse4`, `Mouse5`, alone or ending a chord); never the left button. |
+| `suppress_hotkey` | `true` | Hide the hotkey from the focused app (chords: final non-modifier key only). A mouse button is always hidden. |
 | `tap_ms` | `300` | A press shorter than this is a tap, not a hold (50–2000). |
 | `double_tap_ms` | `400` | Window for the second tap that starts hands-free (100–2000). |
 | `min_recording_ms` | `300` | Shorter recordings are discarded (0–10000). |
@@ -627,10 +650,10 @@ active preset.
 
 ## Making it hear you better
 
-Three plain text files in `%APPDATA%\Dictum` (or your `--config` folder) personalise Dictum. Each is one entry per
-line, `#` starts a comment, and saving the file takes effect at once. Deleting `dictionary.txt` or `corrections.txt`
-switches that feature off; deleting a `profanity.txt` override returns to the shipped list (set `profanity.mode` to
-`off` to stop filtering).
+Four plain text files in `%APPDATA%\Dictum` (or your `--config` folder) personalise Dictum. Each is one entry per
+line, `#` starts a comment, and saving the file takes effect at once. Deleting `dictionary.txt`, `corrections.txt` or
+`snippets.txt` switches that feature off; deleting a `profanity.txt` override returns to the shipped list (set
+`profanity.mode` to `off` to stop filtering).
 
 **Personal dictionary (`dictionary.txt`).** Names, products and jargon you want spelt your way, one per line (tray panel >
 Dictionary: add a word, or Open dictionary file). They are used twice: as whisper's initial prompt (a comma-separated
@@ -650,6 +673,22 @@ capitals ("Kynni", "iPhone") is used exactly as written, and a lowercase one rep
 case unless it starts a sentence. A rule matches whole words, including the stem of a contraction ("don't", "it's").
 They run on the text just before it is pasted, after the cleanup and before the profanity filter (so a correction
 cannot bring back a word the filter hides), with every provider including the rule-based tidy.
+
+**Snippets (`snippets.txt`).** A short phrase you say and the text Dictum pastes in its place: `my email =>
+kyle@example.com`, `my calendly => https://calendly.com/example/30min`, `my signature => Kyle Manson\nKynni Pty Ltd`.
+Tray panel > **Snippets** (or **Add a snippet…** in the Dictionary window) writes a line for you; the file is plain
+text like the others. The same whole-word, any-case matching as corrections ("my emails" is left alone; "my email
+address" is expanded), the longest phrase wins where two overlap, and a later line for the same phrase replaces the
+earlier one. The difference from a correction is that the text is pasted *exactly as written*: a URL at the start of a
+sentence stays lower-case, and in the file `\n` stands for a line break and `\\` for a backslash (the Add window writes
+both for you, so `\\server\new-clients` typed there is pasted as typed). In Type mode (`insert.method = "type"`) each
+line break is typed as Enter, which sends the message in some chat apps. The Add window refuses a phrase with a line
+break in it, or one the profanity filter would change (the filter runs first, so that snippet could never match).
+Snippets run last, after the corrections and the profanity filter, so nothing rewrites a word inside a pasted
+address, and a correction can repair a misheard phrase first (`calendar lee => calendly` makes "my calendar lee"
+reach the `my calendly` snippet). The clean-up model never sees the pasted text, only the phrase you said; if it tends to
+rewrite your phrase (for example "my e-mail"), add that form as a second line. Say the phrase as whole words with
+nothing attached, and keep it something you would not say by accident.
 
 **Fix last dictation** (tray, or an optional `fix_hotkey`). Opens a small always-on-top editor with the last text
 Dictum pasted (kept in memory only, never written to disk). **Copy**; **Paste fix** (switches back to the window the
@@ -763,9 +802,10 @@ send it on, and `offline_only` cannot see that.
   to disk. The only audio Dictum stores is what you record on purpose in the calibration window: ten WAV files in
   `%LOCALAPPDATA%\Dictum\calibration`, kept until you press **Delete recordings** (calibration window, or Settings > Storage; or uninstall with `-RemoveData`),
   never uploaded, and used only by that window.
-- **Your own text files** in `%APPDATA%\Dictum`: `dictionary.txt`, `corrections.txt` and an optional `profanity.txt`
-  override. Plain text you can read, edit and delete; nothing else reads them. Corrections and the profanity list
-  never leave the PC. The dictionary goes into the cleanup prompt, so with `anthropic` or an `openai-compatible`
+- **Your own text files** in `%APPDATA%\Dictum`: `dictionary.txt`, `corrections.txt`, `snippets.txt` and an optional
+  `profanity.txt` override. Plain text you can read, edit and delete; nothing else reads them. Corrections, snippets
+  and the profanity list never leave the PC (a snippet's text, such as an address or a link, is added after the
+  clean-up, so even a cloud clean-up never receives it). The dictionary goes into the cleanup prompt, so with `anthropic` or an `openai-compatible`
   server its terms are sent with every dictation (to this PC's own server, or to the cloud).
 - **The last dictation** is kept in memory for "Fix last dictation" and is gone when Dictum quits. It is never written
   to disk or the log.
@@ -776,8 +816,9 @@ send it on, and `offline_only` cannot see that.
   `insert.clipboard_history: true` to allow both. Clipboard managers that ignore those formats can still see it.
 - **Logs** (`%LOCALAPPDATA%\Dictum\logs`, one file per day, newest 14 kept) contain timings, character counts,
   device names, the runtimes and models, which cleanup tier ran and why a reply was rejected, settings warnings and
-  errors, how many dictionary terms, corrections and profanity words were loaded (never the words), and calibration's
-  WER and timing figures. Transcript and calibration text only if `log_transcripts` is `true`. API keys are never
+  errors, how many dictionary terms, corrections, snippets and profanity words were loaded (never the words), and
+  calibration's WER and timing figures. Transcript text (including what a snippet pasted) and calibration text only if
+  `log_transcripts` is `true`. API keys are never
   logged: any occurrence of a configured key is replaced with `[redacted]`.
 - **API keys** come only from environment variables or `.env`; never from or into settings.json, the windows, or error
   messages. With the default `local` provider no key is needed for cleanup.

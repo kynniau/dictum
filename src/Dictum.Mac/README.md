@@ -18,8 +18,8 @@ Permissions the app will need: Microphone, Accessibility (to post Cmd-V) and Inp
 | `ResolvePaths(configOverride)` | `%APPDATA%\Dictum`, `%LOCALAPPDATA%\Dictum` | `~/Library/Application Support/Dictum` for both, or a separate caches folder for models *(recalled)* |
 | `LegacyFolders()` | `%APPDATA%\Dictate`, `%LOCALAPPDATA%\Dictate` | none: there was no macOS Dictate (return folders that do not exist) |
 | `Package` (`IPackageInfo`) | `GetCurrentPackageFullName`; MSIX redirection | App Store sandbox container detection *(recalled: the sandbox redirects to `~/Library/Containers/<bundle id>`)*; `OtherInstall()` checks for the other build |
-| `CreateHotkeyListener(matcher, post, log)` | WH_KEYBOARD_LL hook on its own thread | CGEventTap on its own run loop thread; key codes mapped to the virtual-key codes `HotkeyParser` uses |
-| `CreateKeyMonitor(onKey, log)` | the same hook, passing every key | a listen-only CGEventTap |
+| `CreateHotkeyListener(matcher, post, log)` | WH_KEYBOARD_LL hook on its own thread, plus a WH_MOUSE_LL hook on the same thread while `matcher.Spec.UsesMouse` (mouse buttons arrive as VK_RBUTTON…VK_XBUTTON2) | CGEventTap on its own run loop thread; key codes mapped to the virtual-key codes `HotkeyParser` uses; mouse button events (`otherMouseDown` etc.) mapped to the same mouse virtual keys when the spec uses the mouse |
+| `CreateKeyMonitor(onKey, log)` | the same hooks, passing every key and mouse button (never the left one) | a listen-only CGEventTap for keys and non-left buttons |
 | `IsKeyDown(vk)` | `GetAsyncKeyState` | `CGEventSourceKeyState` *(recalled)* |
 | `CreateInputSender(log)` (`IInputSender`) | SendInput (Ctrl+V, Unicode typing) | CGEvent keyboard events posting Cmd-V *(recalled: `CGEventCreateKeyboardEvent`, `CGEventPost`)* |
 | `Clipboard` (`IClipboard`) | raw Win32 clipboard with the history opt-out formats | NSPasteboard; the history opt-out has a macOS convention *(recalled: `org.nspasteboard.TransientType` / `ConcealedType`)* |

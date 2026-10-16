@@ -65,7 +65,7 @@ public sealed class WindowsPlatform : IPlatform, IDisposable
         return !string.IsNullOrWhiteSpace(value) && Path.IsPathFullyQualified(value) ? value : Environment.GetFolderPath(fallback);
     }
 
-    public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log) => new KeyboardHook(matcher, post, log);
+    public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log) => new InputHook(matcher, post, log);
 
     public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => new KeyMonitor(onKey, log);
 

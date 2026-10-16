@@ -13,6 +13,16 @@ public static class HotkeyParser
         "The Fn key is handled by keyboard firmware on nearly all keyboards and never reaches Windows as a key. " +
         "Use RightCtrl, CapsLock, an F-key (F9...F24) or Ctrl+Win instead.";
 
+    public const string LeftMouseMessage =
+        "The left mouse button cannot be the hotkey: it is the button that clicks everything, so holding it to dictate would " +
+        "swallow every click. Use RightMouse, MiddleMouse, or a side button (Mouse4, Mouse5).";
+
+    /// <summary>The mouse buttons a hotkey may name, for messages and the Settings page.</summary>
+    public const string MouseButtonNames = "RightMouse, MiddleMouse, Mouse4, Mouse5";
+
+    /// <summary>Tab is refused like Esc: a keyboard user tabbing to the capture box's buttons would otherwise choose it.</summary>
+    public const string TabMessage = "Tab moves keyboard focus everywhere and cannot be the hotkey.";
+
     private static readonly Dictionary<string, KeyGroup> Keys = BuildTable();
 
     public static HotkeySpec Parse(string text)
@@ -84,6 +94,18 @@ public static class HotkeyParser
             error = "Esc is reserved for cancelling a recording and cannot be the hotkey.";
             return false;
         }
+        if (key == "tab")
+        {
+            group = null;
+            error = TabMessage;
+            return false;
+        }
+        if (key is "leftmouse" or "leftclick" or "leftbutton" or "lbutton" or "mouseleft" or "mouse1")
+        {
+            group = null;
+            error = LeftMouseMessage;
+            return false;
+        }
         if (Keys.TryGetValue(key, out group))
         {
             error = null;
@@ -93,11 +115,17 @@ public static class HotkeyParser
         var hex = key.StartsWith("0x", StringComparison.Ordinal) ? key[2..] : key.StartsWith("vk", StringComparison.Ordinal) ? key[2..] : null;
         if (hex is not null && int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var vk) && vk is > 0 and < 0xFF && vk != Vk.Escape)
         {
-            group = new KeyGroup($"0x{vk:X2}", [vk], IsModifierVk(vk));
+            if (vk is Vk.LButton or Vk.Tab)
+            {
+                error = vk == Vk.Tab ? TabMessage : LeftMouseMessage;
+                return false;
+            }
+            group = new KeyGroup(NameOf(vk), [vk], IsModifierVk(vk));
             error = null;
             return true;
         }
-        error = $"unknown key \"{token}\". Use a key name such as RightCtrl, LeftAlt, Win, CapsLock, Pause, Space, F1-F24, A-Z, 0-9, or a virtual-key code like 0x7B.";
+        error = $"unknown key \"{token}\". Use a key name such as RightCtrl, LeftAlt, Win, CapsLock, Pause, Space, F1-F24, A-Z, 0-9, " +
+                $"a mouse button ({MouseButtonNames}), or a virtual-key code like 0x7B.";
         return false;
     }
 
@@ -114,7 +142,7 @@ public static class HotkeyParser
     /// The name the parser accepts for one virtual key, sided where the key has sides ("RightAlt", "LeftCtrl", "F24"),
     /// or a raw code ("0xE8") for a key without a name: what the "Press your hotkey" box shows and writes.
     /// </summary>
-    public static string NameOf(int vk) => Names.Value.TryGetValue(vk, out var name) ? name : $"0x{vk:X2}";
+    public static string NameOf(int vk) => vk == Vk.LButton ? "LeftMouse" : Names.Value.TryGetValue(vk, out var name) ? name : $"0x{vk:X2}";
 
     /// <summary>Which side of the keyboard a sided key is on ("right"), or null.</summary>
     public static string? SideOf(int vk) => vk switch
@@ -147,7 +175,7 @@ public static class HotkeyParser
         Add(new("ScrollLock", [0x91], false), "scrolllock", "scroll");
         Add(new("NumLock", [0x90], false), "numlock");
         Add(new("Space", [Vk.Space], false), "space", "spacebar");
-        Add(new("Tab", [Vk.Tab], false), "tab");
+        Add(new("Tab", [Vk.Tab], false), "tab"); // named for the capture box ("Tab down"); refused as a hotkey in TryKey
         Add(new("Enter", [Vk.Return], false), "enter", "return");
         Add(new("Backspace", [Vk.Back], false), "backspace", "back");
         Add(new("Insert", [0x2D], false), "insert", "ins");
@@ -163,6 +191,13 @@ public static class HotkeyParser
         Add(new("PrintScreen", [0x2C], false), "printscreen", "prtsc", "prtscr", "print");
         Add(new("Apps", [Vk.Apps], false), "apps", "contextmenu", "menu", "application");
         Add(new("`", [0xC0], false), "`", "backtick", "grave", "tilde");
+
+        // Mouse buttons: whichever button the hook's messages name; whether Windows swaps before WH_MOUSE_LL is recalled, not verified (DECISIONS 16/10/2026).
+        // The left button is refused in TryKey; the matcher never sees it (the mouse hook does not decode it).
+        Add(new("RightMouse", [Vk.RButton], false), "rightmouse", "rightclick", "rightbutton", "rbutton", "mouseright", "mouse2");
+        Add(new("MiddleMouse", [Vk.MButton], false), "middlemouse", "middleclick", "middlebutton", "mbutton", "mousemiddle", "wheelclick", "mouse3");
+        Add(new("Mouse4", [Vk.XButton1], false), "mouse4", "xbutton1", "sidebutton1", "mouseside1");
+        Add(new("Mouse5", [Vk.XButton2], false), "mouse5", "xbutton2", "sidebutton2", "mouseside2");
 
         for (var i = 1; i <= 24; i++) Add(new($"F{i}", [Vk.F1 + i - 1], false), $"f{i}");
         for (var c = 'A'; c <= 'Z'; c++) Add(new(c.ToString(), [c], false), char.ToLowerInvariant(c).ToString());
