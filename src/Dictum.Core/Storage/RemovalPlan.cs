@@ -9,7 +9,10 @@ public enum RemovalScope
     CalibrationRecordings,
     Logs,
 
-    /// <summary>"Delete all app data": models, recordings, logs, the verified record; settings and personal files kept; never .env.</summary>
+    /// <summary>
+    /// "Delete all app data": models, recordings, logs, the verified record; settings and personal files kept; never .env. A
+    /// chosen models folder outside the user's profile is left alone (<see cref="DataCategory.SharedModels"/>).
+    /// </summary>
     AllData,
 
     /// <summary>"Delete all app data" with "including settings" ticked: also settings.json and the personal files; still never .env.</summary>
@@ -76,6 +79,8 @@ public sealed class RemovalPlan
             if (!Directory.Exists(location.Path)) continue;
             foreach (var file in new DirectoryInfo(location.Path).EnumerateFiles().Where(f => Matches(location.Pattern, f.Name)))
             {
+                // The backstop (lens, 17/10/2026): a model file that is in the bundled folder under another name is never listed.
+                if (location.Category is DataCategory.Models or DataCategory.SharedModels && paths.IsBundled(file.FullName)) continue;
                 Add(new RemovalItem(file.FullName, file.Length, location.Category, false));
             }
         }

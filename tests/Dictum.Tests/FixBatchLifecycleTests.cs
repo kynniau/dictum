@@ -164,7 +164,7 @@ public sealed class FixBatchLifecycleTests : IDisposable
     public void A_picked_file_outside_the_models_folder_is_never_to_be_deleted()
     {
         var (models, downloads) = (_dir.CreateSubdirectory("models").FullName, _dir.CreateSubdirectory("downloads").FullName);
-        var integrity = new ModelIntegrity(Path.Combine(_dir.FullName, "v.json"), NullLog.Instance, () => models);
+        var integrity = new ModelIntegrity(Path.Combine(_dir.FullName, "v.json"), NullLog.Instance, () => [new ModelFolder(models, ModelFolderKind.Default)]);
         var picked = Path.Combine(downloads, "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"); // a community file sharing the catalogue name
         File.WriteAllBytes(picked, new byte[4096]);
 
@@ -181,7 +181,7 @@ public sealed class FixBatchLifecycleTests : IDisposable
     public void A_same_size_file_with_another_hash_outside_the_models_folder_is_never_to_be_deleted()
     {
         var (models, downloads) = (_dir.CreateSubdirectory("models").FullName, _dir.CreateSubdirectory("downloads").FullName);
-        var integrity = new ModelIntegrity(Path.Combine(_dir.FullName, "v.json"), NullLog.Instance, () => models);
+        var integrity = new ModelIntegrity(Path.Combine(_dir.FullName, "v.json"), NullLog.Instance, () => [new ModelFolder(models, ModelFolderKind.Default)]);
         var picked = Path.Combine(downloads, "ggml-tiny.en.bin"); // the smallest catalogue file; all zeros, so its SHA-256 differs
         using (var file = File.Create(picked)) file.SetLength(ModelCatalog.Find("tiny.en")!.Bytes);
 

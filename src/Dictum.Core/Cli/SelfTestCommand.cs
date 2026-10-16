@@ -54,7 +54,7 @@ public static partial class SelfTestCommand
         foreach (var w in load.Warnings) Line("  warning", w);
         foreach (var note in messages.Except(load.Warnings)) Line("  note", note); // the cleanup repairs
         var (settings, secrets) = (config.Settings, config.Secrets);
-        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(settings));
+        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings));
         Line("offline_only", settings.OfflineOnly ? "on: no network calls, downloads and cloud providers refused" : "off");
 
         var whisper = settings.Whisper;

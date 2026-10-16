@@ -179,7 +179,7 @@ build: never upload the design-canvas mockups. Use made-up sample text, never re
 | 2 | The tray flyout, opened from the notification area | Everything in one place: on or off, Light or Full mode, models, microphone and tools. |
 | 3 | The calibration window with results | Calibration finds the installed model that hears you best. It does not train the model. |
 | 4 | Settings, Storage page (or the hotkey capture box) | See and delete everything Dictum stores, or remove it completely. |
-| 5 (optional) | The first-run model picker | Pick a speech model; Dictum recommends one for your PC. |
+| 5 (optional) | Settings, Models page (replaces the first-run model picker, which a package with base.en no longer shows; noted 17/10/2026) | Choose a bigger speech model or add AI clean-up; base.en comes with Dictum. |
 | 6 (optional) | Fix last dictation | Fix a misheard word once and save it as a correction. |
 
 ### Minimum system requirements (Additional system requirements, up to 11 items of 200 characters)
@@ -191,7 +191,7 @@ Windows 10 or Windows 11, 64-bit (x64)
 A microphone
 4 GB RAM for the small speech models
 78 MB to 1.6 GB of disk space for a speech model, plus 1.1 GB for the optional clean-up model
-An internet connection to download a model on first use, or model files copied in
+No download needed to start: base.en is included; bigger speech models and AI clean-up are optional downloads
 ```
 
 Recommended hardware:
@@ -311,7 +311,7 @@ NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside
 
 TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json. base.en is already inside the package; to test AI clean-up offline too, copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder (Settings > Storage shows it). Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
-TO DICTATE: click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels at any time and nothing is pasted. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
+TO DICTATE: click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
 Cloud clean-up (Anthropic) is optional, off by default, and needs the user's own API key. It is not needed for testing.
 
@@ -343,21 +343,21 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 |---|---|---|---|---|
 | 1 | Incomplete app, placeholder text, links to unfinished pages | CF #1 | Ship only finished features. Every in-app link must resolve: the site and /privacy were 404 and the repo empty on 15/10/2026 (section 1). | Blocker until deployed |
 | 2 | Fails the Windows App Certification Kit | CF #2, certification process | Microsoft now calls the kit (WACK) "deprecated and no longer maintained" and certifies on submission ("Package a desktop or UWP app in Visual Studio", retrieved 16/10/2026), so a local run is optional. Not run here: no part of the kit is in the Microsoft.Windows.SDK.BuildTools package the scripts use (searched 16/10/2026). | Optional |
-| 3 | Crashes or hangs without a network connection | CF #4, Store Policies 10.4.2 | Offline is a degraded mode, never a failure (SPEC §1). Test first run with the network off: the picker must explain and offer "Choose file…" or Quit. | Test |
-| 4 | Testers cannot test it | CF #5, Store Policies 10.3 | No account. Section 7 notes give the dictation steps, the model download and the offline path. | Done |
+| 3 | Crashes or hangs without a network connection | CF #4, Store Policies 10.4.2 | Offline is a degraded mode, never a failure (SPEC §1). base.en is in the package, so a first run with the network off asks no model question and starts ready; test that, and that a download asked for offline is refused with a message (amended 17/10/2026). | Test |
+| 4 | Testers cannot test it | CF #5, Store Policies 10.3 | No account. Section 7 notes give the dictation steps, that no download is needed (base.en is in the package) and the offline path. | Done |
 | 5 | Missing or inadequate privacy policy | CF #6, Store Policies 10.5.1 | /privacy lists what is accessed (microphone audio, text, clipboard, hotkey), where it is stored, every host and when, who receives what, user controls and deletion. Microsoft's FAQ also says to "include a privacy policy URL and display it in the app": add a Privacy link in About or Settings. | Page written; in-app link to do |
-| 6 | Description does not match the app | CF #7, Store Policies 10.1, 10.1.1 | The description states English only, microphone required, first-run model download, the administrator-window limit and the Fn key. Screenshots come from the real app. | Done; re-check against release |
+| 6 | Description does not match the app | CF #7, Store Policies 10.1, 10.1.1 | The description states English only, microphone required, base.en included with the bigger models optional downloads, the administrator-window limit and the Fn key. Screenshots come from the real app. | Done; re-check against release |
 | 7 | Inaccurate age-rating answers | CF #8, Store Policies 11.11 | Section 5. | Done |
 | 8 | Accessibility declared without testing | CF #9, Product declarations | Leave the box unticked unless tested end to end. | Done |
 | 9 | Restricted capability not approved | Submission options page, Store Policies 10.6 | Justification in section 7; only runFullTrust, microphone and the startup task are declared. | Done |
 | 10 | Dynamic inclusion of code | Store Policies 10.2.2 | Models are data, checked by SHA-256; Dictum downloads no code. The Store build has no self-updater (SPEC §18.2). | Done |
-| 11 | Undisclosed dependency | Store Policies 10.2.4 | The first-run model download is disclosed in the description's second paragraph. | Done |
+| 11 | Undisclosed dependency | Store Policies 10.2.4 | No longer a first-run download (amended 17/10/2026): base.en is in the package, and the description's second paragraph says so and that the larger models are optional downloads from Hugging Face. | Done |
 | 12 | Live generative AI not disclosed, or no way to report content | Store Policies 11.16, Product declarations | Tick the generative AI declaration and keep the description's AI paragraph. 11.16 also requires "a means for users to report inappropriate content to the developer": add "Report a problem" (a mail link to hello@kynni.com.au) in the app; the description's email line is a stopgap. | In-app action to do |
 | 13 | Personal information sent to a third party without opt-in consent | Store Policies 10.5.2 | Cloud clean-up is off by default, but today it is switched on by editing settings.json. 10.5.2 wants "express permission in the product user interface" after saying what is shared and with whom, plus a way to opt out later: add a consent prompt when the user picks Anthropic or a non-local server, and an off switch. | Risk: app change needed |
 | 14 | Personal information transmitted insecurely | Store Policies 10.5.4 | Hugging Face, Anthropic and the update check use HTTPS. A user-entered `http://` server that is not on the PC would carry transcripts unencrypted: refuse or warn for non-loopback `http://` addresses. | Risk: app change needed |
 | 15 | Cannot be cleanly uninstalled | Store Policies 10.2.7 | Uninstalling an MSIX removes the package and the AppData files Windows redirected for it (Microsoft Learn, "Understanding how packaged desktop apps run on Windows"). Settings → Storage → "Remove Dictum completely" deletes the data first. Files that already existed in the real AppData folder (for example from an earlier direct-download install) are modified in place and survive uninstall, which is one more reason the app warns when both builds are installed (SPEC §18.2). | Done in SPEC; verify in build |
 | 16 | Changes Windows settings without consent | Store Policies 10.2.8 | Launch at login only when the user ticks it; no default-app changes. | Verify manifest |
-| 17 | Value not clear on first run | Store Policies 10.1.1 | The first-run picker explains the trade-off in one sentence; after setup, show how to dictate ("Hold Right Ctrl and talk"). | Verify in build |
+| 17 | Value not clear on first run | Store Policies 10.1.1 | With base.en in the package the first run shows no model picker, only the hotkey check, and starts ready (amended 17/10/2026); after setup, show how to dictate ("Hold Right Ctrl and talk"). | Verify in build |
 | 18 | No message on an unsupported device | Store Policies 10.4.1 | No microphone: the pill shows "Mic error" and the README explains it; make sure first run says so plainly too. The package is x64 only; whether Windows on Arm runs it under emulation is **recalled, not verified** and untested. | Decide and test |
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |

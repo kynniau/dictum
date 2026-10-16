@@ -327,8 +327,10 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
    and checked against the catalogue's size and SHA-256. Nothing is downloaded without that choice.
    A `settings.json` seeded by an administrator gets only the choices it leaves open, answered without a question when
    base.en is on the PC and asked in the pickers when it is not: one without `whisper.model` the speech choice, one
-   without `llm.model` or `llm.provider` the cleanup choice, and only those answers are added to it. A `settings.json`
-   that cannot be read gets neither. Recommendations: speech `medium.en` when a discrete GPU is found, `base.en`
+   without `llm.model` or `llm.provider` the cleanup choice, and only those answers are added to it. One that names
+   `llm.provider` = `local` but no `llm.model` keeps `local` when base.en is on the PC: it gets the recommended cleanup
+   model written, which is not downloaded, so nothing downloads and a notice says the rule-based tidy is used until you
+   download it in Settings > Models. A `settings.json` that cannot be read gets neither. Recommendations: speech `medium.en` when a discrete GPU is found, `base.en`
    otherwise, integrated graphics included (`small.en` offered as more accurate, a few seconds slower); cleanup
    `qwen2.5-1.5b` on every machine (see "Cleanup models" for why). `--selftest` prints both, with the Vulkan devices it
    found.
@@ -546,9 +548,11 @@ CPUs, Azure VMs.
 - **Files Dictum did not download are checked on first use.** A catalogue model that arrived another way (copied
   with `install.ps1 -ModelsFrom`, fetched with curl, left by an older build) is hashed the first time it is loaded
   and refused if it does not match: a notification, an error in the tooltip, `[FAIL]` in
-  `--selftest`, and the file is not loaded. A match is remembered in `%LOCALAPPDATA%\Dictum\verified-models.json` (path, size, time)
-  so it is not hashed again. Hashing took 4.0 s for the 1.5 GB medium.en here. Gated models without a published
-  hash are size-checked only.
+  `--selftest`, and the file is not loaded. A match is remembered in `%LOCALAPPDATA%\Dictum\verified-models.json` (path, size, time),
+  so a file in your own folders (`%LOCALAPPDATA%\Dictum\models` and the models that come with Dictum) is not hashed
+  again. A file anywhere else (in a model folder you chose, which other users may be able to change, or one you picked by
+  path) is hashed again the first time it is loaded in each session. Hashing took 4.0 s for the 1.5 GB medium.en here.
+  Gated models without a published hash are size-checked only.
 - **Why downloads drop here.** On this development machine Windows' TLS layer (Schannel) dropped large downloads
   from huggingface.co's CDN with "The decryption operation failed", at a different point each time. Measured
   15/10/2026 on the 1.62 GB large-v3-turbo, six downloads each: 20 dropped connections with Windows' default
@@ -565,7 +569,8 @@ copy whose size matches the catalogue:
 2. **Your own folder**, `%LOCALAPPDATA%\Dictum\models`. Downloads go here while no folder is chosen (**Use default**).
 3. **The models that come with Dictum**: the `models` folder beside `Dictum.exe` (inside the package for the Store
    build), which holds `base.en`. Dictum never downloads into it, changes it or deletes anything in it, and it cannot be
-   chosen as the model folder.
+   chosen as the model folder, under any other name for it either (a junction or symbolic link, an 8.3 short name, a
+   `\\?\` path): such a setting is ignored and the log says so.
 
 Every model is still checked against the catalogue's size and SHA-256 before it is loaded, wherever it was found. A
 copy of the wrong size is passed over for the next folder; a model that came with Dictum and fails its check is passed
@@ -575,6 +580,10 @@ over too (the log says so once) and never deleted.
   until you delete them in Settings > Storage, which lists the three folders and the folder each model is in.
 - **A folder on a network share** (a `\\server\share` path or a mapped network drive) works, but models load slowly
   from it, and Settings > Models says so under the folder. A folder on the PC is faster.
+- **A folder other users can reach.** A model in the folder you chose is hashed again the first time it is loaded in
+  each session (see "Model downloads and checks"). **Delete all app data** leaves a chosen folder outside your user
+  folder alone, and its question names it; **Delete** beside one of its models in Settings > Storage still removes that
+  model.
 - **Free space:** a download is refused, with a message saying how much is free, when it would leave its drive with
   less than 200 MB (a download that resumes a kept partial file needs only the rest); one that would leave under 2 GB
   warns first. When the free space cannot be read, the download goes ahead.
@@ -984,14 +993,16 @@ Settings > Storage (SPEC §17) shows where everything is, the model folders in t
 Every deletion says how much it frees and asks once; sizes are read from the disk, not from a stored count.
 
 - **Delete** beside a model removes the `.bin` or `.gguf`, its unfinished `.part` and its verified record. The model
-  in use cannot be deleted: the dialog offers to switch to the recommended downloaded model first. A model you chose
+  in use cannot be deleted: the dialog offers to switch to the recommended other model on this PC first (base.en, which
+  comes with Dictum, counts: it is switched to, never deleted). A model you chose
   by path from elsewhere is never deleted, only forgotten, and the models that come with Dictum have no Delete: they
   are part of the program. A download that would leave under 2 GB free warns first; one that would leave under 200 MB
   is refused.
 - **Delete calibration recordings**, **Delete logs**, **Delete all app data** (models, recordings, logs and the
   verified record; settings, dictionary and corrections are kept unless "Including settings, dictionary and
-  corrections" is ticked). None of them touches `.env` or the program folder. Dictum keeps no dictation history, so
-  there is nothing else to clear.
+  corrections" is ticked). None of them touches `.env` or the program folder. A model folder you chose outside your
+  user folder, which other users may share, is left alone by **Delete all app data**, and its question says so. Dictum
+  keeps no dictation history, so there is nothing else to clear.
 - **Remove Dictum completely** deletes every model, recording, log, settings.json, `consent.json`, dictionary,
   corrections, the `.env` files, whatever the migration left in Dictate's old folders (see "Moving from Dictate"; a
   Store copy never touches those), the Start menu shortcut, the launch-at-login entry and the program's own files,
@@ -1085,7 +1096,8 @@ Dictum.exe ... --config <dir>                use another settings folder
 Dictum.exe --exit-after <seconds>            tray mode, then quit exactly as Quit in the tray panel does (scripted checks)
 ```
 
-A download of a file that is already present and matches its hash does nothing and exits 0. With `offline_only`
+A download of a file that is already present in any of the model folders (so `--download-model base.en` when base.en
+comes with Dictum) and matches its hash does nothing and exits 0. With `offline_only`
 on, or with a settings.json that cannot be read, both download commands refuse and exit 1; for a gated model they
 print the login message and exit 1. `--download-model` also accepts a whisper.cpp name outside the catalogue: it
 warns, and that file has no size or hash to be checked against. A value is never another flag or empty (PowerShell
@@ -1129,9 +1141,11 @@ warns, and that file has no size or hash to be checked against. A value is never
   `scripts\download-model.ps1` (curl with resume; 30 s without data ends an attempt, and if all 8 fail the partial
   file is kept, so running the same command again carries on from where it stopped) or copy it in with
   `install.ps1 -ModelsFrom`.
-- **"does not match the catalogue … it was not loaded".** For a file in the models folder: it is damaged or not the
-  catalogue file; delete it and download it again. For a file you picked from another folder: it has the same name as
-  a catalogue file, so it is checked as that file; rename it, then choose it again. `--selftest` shows the same check.
+- **"does not match the catalogue … it was not loaded".** For a file in one of Dictum's model folders (the one you
+  chose, or `%LOCALAPPDATA%\Dictum\models`): it is damaged or not the catalogue file; delete it and download it again.
+  For a model that came with Dictum: reinstall Dictum, or download that model in Settings > Models (the download is
+  used instead). For a file you picked from another folder: it has the same name as a catalogue file, so it is checked
+  as that file; rename it, then choose it again. `--selftest` shows the same check.
 - **"settings.json could not be read; running offline with defaults".** The file has a JSON error. Dictum runs with
   the defaults and `offline_only` on until you fix it; the log names the problem. A file that breaks while Dictum
   runs keeps the previous settings until it is fixed.
@@ -1162,7 +1176,7 @@ the switches). Fresh Azure and Windows Server images may not have it; `--selftes
 **Install per user (no admin)**, locally, over remote PowerShell, or from Intune:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1 -Source .\Dictum-1.0.0-win-x64.zip -Model base.en -LaunchAtLogin
+powershell -ExecutionPolicy Bypass -File install.ps1 -Source .\Dictum-1.0.0-win-x64.zip -Model small.en -LaunchAtLogin
 ```
 
 | Switch | Effect |
@@ -1219,13 +1233,16 @@ it, the first-run pickers, and settings.json's own default speech model is `medi
 no other machine.
 
 **Shared virtual desktops (Azure Virtual Desktop and similar: no GPU, little space on C:):** give each VM one local
-folder that all its users share, for example `D:\Dictum models` on the VM's own data disk, readable by every user
-(writable too, if they may download into it). Seed it as the model folder for each user (`-Settings` with
-`{ "models": { "folder": "D:\\Dictum models" } }`) and copy the models into it with `-ModelsFrom` (a file already there
-with the same size is skipped, so the second user's install copies nothing). Users then keep no large file on C:, and
-base.en needs nothing at all: it comes with Dictum. An Azure file share, cool tier especially, is not recommended:
-models would load across the network at every start (Settings > Models warns about any network folder; not measured
-here). See "Model folder".
+folder that all its users share, for example `E:\Dictum models` on a persistent data disk, readable by every user and
+writable only by administrators, so no user can change or delete a model another user loads. Seed it as the model
+folder for each user (`-Settings` with `{ "models": { "folder": "E:\\Dictum models" } }`); an administrator fills it once
+with `install.ps1 -ModelsFrom` (a file already there with the same size is skipped, so a user's install with the same
+`-ModelsFrom` copies nothing). Users then keep no large file on C:, and base.en needs nothing at all: it comes with
+Dictum. A user who wants a model the folder does not hold chooses **Use default** in Settings > Models > Model folder,
+so downloads go to their own folder. Dictum hashes a model in a chosen folder again the first time it loads it in each
+session, and **Delete all app data** leaves a chosen folder outside the user's own folder alone. An Azure file share,
+cool tier especially, is not recommended: models would load across the network at every start (Settings > Models warns
+about any network folder; not measured here). See "Model folder".
 
 **SmartScreen and Smart App Control:** the files are unsigned, so the first launch may show "Windows protected your
 PC" (More info > Run anyway), enterprise policy can prevent continuing, and Smart App Control blocks unsigned files

@@ -1863,9 +1863,10 @@ space on C:, and the Store resubmission should need no download to test.
   drive (Windows' drive type) gets a one-line warning under the field. A warning, not a refusal: an administrator may still
   choose a share. Not measured: how slowly models load from an Azure file share; the product owner's concern is the reason
   for the warning and for the layout below.
-- **Recommended layout for shared virtual desktops:** one local folder per VM shared by its users (for example
-  `D:\Dictum models` on the VM's data disk), seeded as `models.folder` for every user with `install.ps1 -Settings` and filled
-  once with `-ModelsFrom`. Not a cool-tier Azure file share.
+- **Recommended layout for shared virtual desktops** (amended after the lens, below): one local folder per VM shared by its
+  users (for example `E:\Dictum models` on a persistent data disk), readable by every user and writable only by
+  administrators, seeded as `models.folder` for every user with `install.ps1 -Settings` and filled once by an administrator
+  with `-ModelsFrom`; a user who wants another model uses Use default. Not a cool-tier Azure file share.
 - **Free space:** a download is refused, before it is asked and again where it starts, when its drive would keep less than
   200 MB (decimal, as every size Dictum shows); a kept `.part` needs only the rest. When the free space cannot be read the
   download goes ahead, as the existing 2 GB warning does. Recalled, not checked here: .NET's `DriveInfo` refuses a UNC root,
@@ -1891,7 +1892,7 @@ refusal, the network test), `Storage/ModelFiles.cs` (each model's folder; the bu
 `Storage/PathRegistry.cs` (comment), `App/PersonalService.cs` and `Calibration/CalibrationHost.cs` (the lookup),
 `Shell/IShellDialogs.cs` and `Shell/ShellDialogs.cs` (the folder chooser; `ChooseFile` shares its owner-window code now).
 
-Not done, for the orchestrator:
+Not done, for the orchestrator (the first two, and the STORE.md lines, were done in the lens fixes below):
 - `Cli/CliOptions.cs` and `Cli/CliCommands.cs` (not this lane's) still describe `--print-models-dir` as "whisper.models_dir,
   else the default"; the command prints what the app now resolves (`models.folder` first), and the README says so.
 - In the CLI (`--selftest`, `--transcribe`) a bundled file is held to the size check only at lookup; a same-size damaged one

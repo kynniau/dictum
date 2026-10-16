@@ -26,8 +26,10 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
                                                        run every downloaded cleanup model over the same input
                                                        (a .wav is transcribed first) and print each one's output,
                                                        time and validator verdict side by side
-          Dictum.exe --print-models-dir               print the folder the app keeps models in (whisper.models_dir,
-                                                       else %LOCALAPPDATA%\Dictum\models); install.ps1 uses it
+          Dictum.exe --print-models-dir               print the folder the app downloads models to and looks in
+                                                       first (models.folder, else its earlier name
+                                                       whisper.models_dir, else %LOCALAPPDATA%\Dictum\models);
+                                                       install.ps1 uses it
           --model <name|path>                          use this model for this launch only (any mode)
           --cleanup-model <name|path>                  use this local cleanup model for this launch only (any mode)
           --config <dir>                               use <dir> instead of %APPDATA%\Dictum for settings.json/.env

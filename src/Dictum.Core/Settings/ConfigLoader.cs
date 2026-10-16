@@ -44,10 +44,19 @@ public static class ConfigLoader
         var loaded = CloudConsentFile.Apply(file.Usable ? file.Settings : new AppSettings { OfflineOnly = true }, CloudConsentFile.Read(paths.ConsentFile));
         var repaired = EffectiveSettings.HandsFree(EffectiveSettings.Cleanup(loaded, secrets.Get(SecretStore.AnthropicKey) is not null, () => gpuRuntime(loaded), warn), warn);
         var settings = SettingsFile.WithCleanupOverride(repaired, cleanupOverride);
+        if ((settings.Models.Folder ?? settings.Whisper.ModelsDir) is { } chosen && paths.IsBundled(chosen))
+            warn(BundledFolderIgnored(settings.Models.Folder is null ? "whisper.models_dir" : "models.folder", chosen, paths.DefaultModelsDir));
         return file.Usable
             ? new ConfigLoadResult(settings, secrets, file, null)
             : new ConfigLoadResult(settings, secrets, file, BrokenAtStartup) { ForcedOffline = true };
     }
+
+    /// <summary>
+    /// The log line when models.folder (or whisper.models_dir) names the folder of the models that come with Dictum, or one
+    /// inside it, by any name: <see cref="AppPaths.ChosenModelsDir"/> ignores it (lens, 17/10/2026).
+    /// </summary>
+    internal static string BundledFolderIgnored(string key, string folder, string defaultFolder) =>
+        $"Setting \"{key}\" ({folder}) is the folder of the models that come with Dictum, or inside it, which Dictum never changes, so it is ignored: models download to {defaultFolder}.";
 
     public const string BrokenAtStartup = "settings.json could not be read; running offline with defaults until it is fixed";
 

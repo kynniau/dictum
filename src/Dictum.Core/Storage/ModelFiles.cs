@@ -26,6 +26,9 @@ public static class ModelFiles
     /// <summary>The registry pattern for "catalogue model files and their partial downloads".</summary>
     public const string Pattern = "<catalogue model files>";
 
+    /// <summary>PROPOSED copy (17/10/2026), for the product owner to approve: why a model that came with Dictum is not deleted.</summary>
+    internal static string BundledNotDeleted(string fileName) => $"{fileName} came with Dictum, so Dictum does not delete it.";
+
     /// <summary>A catalogue model file name, or one of their partial downloads.</summary>
     public static bool IsModelFile(string fileName)
     {
@@ -56,13 +59,17 @@ public static class ModelFiles
     }
 
     /// <summary>
-    /// Deletes one catalogue model: the file, its .part and its verified record. Refuses a path outside the models folders,
-    /// a file the catalogue does not know, and the model in use (<paramref name="inUse"/>).
+    /// Deletes one catalogue model: the file, its .part and its verified record. Refuses a file that came with Dictum (in the
+    /// bundled folder by any name: <see cref="AppPaths.IsBundled"/>), a path outside the models folders, a file the catalogue
+    /// does not know, and the model in use (<paramref name="inUse"/>).
     /// </summary>
     public static ModelDeletion Delete(string path, AppPaths paths, AppSettings settings, IEnumerable<string?> inUse, ModelIntegrity integrity)
     {
         var full = Path.GetFullPath(path);
         var name = Path.GetFileName(full);
+        // The backstop (lens, 17/10/2026): whichever folder it was listed in, a file that is in the bundled folder under another
+        // name (through a junction, say) is never deleted.
+        if (paths.IsBundled(full)) return new ModelDeletion(false, 0, BundledNotDeleted(name));
         if (!PathRegistry.ModelFolders(paths, settings).Any(dir => PathRegistry.IsInside(full, dir) && PathRegistry.SamePath(Path.GetDirectoryName(full)!, dir)))
             return new ModelDeletion(false, 0, $"{name} is not in Dictum's models folder, so Dictum does not delete it (a model chosen by path is only forgotten).");
         if (!IsModelFile(name))

@@ -183,7 +183,7 @@ public sealed class ModelFolderTests : IDisposable
     {
         var log = new RecordingLog();
         var bundled = Create(_paths.BundledModelsDir, "ggml-base.en.bin", bytes);
-        var coordinator = Make(integrity: new ModelIntegrity(_paths.VerifiedModelsFile, log, () => _paths.ModelsDir(_settings)), log: log);
+        var coordinator = Make(integrity: new ModelIntegrity(_paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(_paths, _settings)), log: log);
         var baseEn = ModelCatalog.Find("base.en")!;
 
         Assert.False(coordinator.IsDownloaded(baseEn));
@@ -213,7 +213,7 @@ public sealed class ModelFolderTests : IDisposable
     {
         if (seed is not null) File.WriteAllText(_paths.SettingsFile, seed);
         var bundled = Create(_paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
-        var integrity = new ModelIntegrity(_paths.VerifiedModelsFile, NullLog.Instance, () => _paths.ModelsDir(_settings));
+        var integrity = new ModelIntegrity(_paths.VerifiedModelsFile, NullLog.Instance, () => ModelFolders.LookupOrder(_paths, _settings));
         integrity.Remember(bundled); // as if hashed once already: zeros would fail the SHA-256
         var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
         var coordinator = Make(integrity: integrity, models: models);

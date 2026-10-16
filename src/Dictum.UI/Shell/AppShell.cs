@@ -77,7 +77,7 @@ public sealed partial class AppShell : IDisposable
         _gpuMachine = gpuMachine ?? (() => WhisperEngine.GpuMachine);
         Dialogs = dialogs ?? new ShellDialogs();
         (_http, _downloadHttp, _updateHttp) = AppRules.CreateClients(() => _settings.OfflineOnly, downloadHandler, updateHandler);
-        Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(_settings));
+        Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, _settings));
         _llm = new LocalLlmManager(log, Integrity);
         _models = speechModels ?? new ModelManager(log, Integrity);
         Models = new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
@@ -154,7 +154,7 @@ public sealed partial class AppShell : IDisposable
         if (askSpeech || askCleanup)
         {
             // With base.en on this PC (it comes with Dictum) no model question is asked; the hotkey check below stays.
-            if (!Models.FirstRun(askSpeech, askCleanup, file.Settings))
+            if (!Models.FirstRun(askSpeech, askCleanup, file.Settings, keepProvider: file.NamesCleanupProvider))
             {
                 _log.Info("First-run picker: user chose Quit.");
                 Quit();

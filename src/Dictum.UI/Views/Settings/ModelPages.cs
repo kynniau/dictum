@@ -46,6 +46,9 @@ internal sealed class ModelsPage : SettingsPage
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, Height = 4 };
     private readonly StackPanel _download;
     private string _drawn = "";
+    private (int, int)? _lookedUpAt; // the shell's ModelFilesVersion when the lookups below were made; null: look up at the next redraw
+    private List<ModelFolderKind?> _sources = []; // the folder each speech catalogue entry is used from, in catalogue order
+    private List<string> _cleanupOnPc = []; // the clean-up catalogue entries on this PC
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -147,16 +150,24 @@ internal sealed class ModelsPage : SettingsPage
         _folderWarning.Text = FolderWarning(folder) ?? "";
         _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
 
+        // Every catalogue model is looked up again only after a settings load, a download that ended or a deletion, or when the
+        // page is shown again (Leave), never on a download's progress ticks: each lookup reads up to three folders, on the UI
+        // thread, and a folder on the network could stall every redraw (lens, 17/10/2026).
+        var version = Shell.ModelFilesVersion;
+        if (_lookedUpAt != version)
+        {
+            _lookedUpAt = version;
+            _sources = [.. ModelCatalog.Entries.Select(Shell.Models.Source)];
+            _cleanupOnPc = [.. CleanupCatalog.Entries.Where(Shell.Models.IsCleanupDownloaded).Select(e => e.Name)];
+        }
         // The lists are rebuilt only when what they show changes, not on every download-progress tick.
-        var sources = ModelCatalog.Entries.Select(Shell.Models.Source).ToList();
-        var downloaded = string.Join(",", sources) + "|" +
-                         string.Join(",", CleanupCatalog.Entries.Where(Shell.Models.IsCleanupDownloaded).Select(e => e.Name));
+        var downloaded = string.Join(",", _sources) + "|" + string.Join(",", _cleanupOnPc);
         var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}";
         if (key == _drawn) return;
         _drawn = key;
 
         var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(Shell.GpuMachine).Model)!;
-        _addCleanup.Content = AddCleanupText(recommended, Shell.Models.IsCleanupDownloaded(recommended));
+        _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
         _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider;
 
         _speech.Children.Clear();
@@ -164,8 +175,8 @@ internal sealed class ModelsPage : SettingsPage
         {
             var e = ModelCatalog.Entries[i];
             var inUse = e.Name == Shell.Models.CurrentName;
-            var have = sources[i] is not null;
-            var state = inUse ? "In use" : !have ? "Not downloaded" : sources[i] == ModelFolderKind.Bundled ? IncludedState : "Downloaded";
+            var have = _sources[i] is not null;
+            var state = inUse ? "In use" : !have ? "Not downloaded" : _sources[i] == ModelFolderKind.Bundled ? IncludedState : "Downloaded";
             _speech.Children.Add(ModelRow($"{e.Name} · {e.SizeText}", $"{state} · {e.TradeOff}",
                 inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.Select(e.Name))));
         }
@@ -177,12 +188,19 @@ internal sealed class ModelsPage : SettingsPage
         foreach (var e in CleanupCatalog.Entries)
         {
             var inUse = e.Name == current;
-            var have = Shell.Models.IsCleanupDownloaded(e);
+            var have = _cleanupOnPc.Contains(e.Name);
             _cleanup.Children.Add(ModelRow($"{e.Name} · {e.SizeText}{e.Marker}", $"{(inUse ? "In use" : have ? "Downloaded" : "Not downloaded")} · {e.TradeOff}",
                 inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.SelectCleanup(e.Name))));
         }
         if (current is null)
             _cleanup.Children.Add(Ui.Text($"In use: {Shell.Models.CurrentCleanupName}{(s.Llm.Provider == LlmSettings.NoProvider ? " (rule-based tidy)" : "")}", "caption"));
+    }
+
+    /// <summary>Shown again later, the page looks every model up afresh (a file copied in meanwhile is seen).</summary>
+    public override void Leave()
+    {
+        _lookedUpAt = null;
+        base.Leave();
     }
 
     private static Grid ModelRow(string title, string detail, string? action, Action click)

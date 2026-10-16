@@ -56,14 +56,31 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
 
     /// <summary>
     /// models.folder, else its earlier name whisper.models_dir; null when neither is set. A folder that is the bundled one or
-    /// inside it is never used (null): that folder is never written, so no download can land there.
+    /// inside it, by any name (<see cref="IsBundled"/>), is never used (null): that folder is never written, so no download can
+    /// land there, and the settings load logs that it is ignored (ConfigLoader).
     /// </summary>
     public string? ChosenModelsDir(AppSettings settings) =>
         (settings.Models.Folder ?? settings.Whisper.ModelsDir) is { } chosen && !IsBundled(chosen) ? chosen : null;
 
-    /// <summary>True for <see cref="BundledModelsDir"/> and any folder inside it.</summary>
-    public bool IsBundled(string folder) =>
-        Storage.PathRegistry.SamePath(folder, BundledModelsDir) || Storage.PathRegistry.IsInside(folder, BundledModelsDir);
+    /// <summary>
+    /// True for <see cref="BundledModelsDir"/> and any folder or file inside it, also by another name for it: a junction or
+    /// symbolic link, an 8.3 short name, a \\?\ prefix (<see cref="Storage.PathRegistry.FinalPath"/>; lens, 17/10/2026).
+    /// </summary>
+    public bool IsBundled(string path) =>
+        Within(path, BundledModelsDir) || Within(Storage.PathRegistry.FinalPath(path), Storage.PathRegistry.FinalPath(BundledModelsDir));
+
+    /// <summary>
+    /// The user's profile folder (Windows: %USERPROFILE%), which other users cannot open by default. A chosen models folder
+    /// outside it may be shared with them, so "Delete all app data" leaves it alone (<see cref="Storage.DataCategory.SharedModels"/>).
+    /// Tests set their own.
+    /// </summary>
+    public string ProfileDir { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+    /// <summary>True when <paramref name="folder"/> is <see cref="ProfileDir"/> or inside it, links followed; false when the profile is unknown.</summary>
+    public bool InProfile(string folder) =>
+        !string.IsNullOrWhiteSpace(ProfileDir) && Within(Storage.PathRegistry.FinalPath(folder), Storage.PathRegistry.FinalPath(ProfileDir));
+
+    private static bool Within(string path, string folder) => Storage.PathRegistry.SamePath(path, folder) || Storage.PathRegistry.IsInside(path, folder);
 
     /// <summary>
     /// The app's folders under the platform's two app-data roots (Windows: %APPDATA% and %LOCALAPPDATA%), or the

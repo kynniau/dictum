@@ -7,8 +7,9 @@ namespace Dictum.Settings;
 /// <param name="Usable">False when settings.json exists but could not be read or parsed: its values are unknown.</param>
 /// <param name="NamesSpeechModel">The file sets whisper.model (otherwise the first-run speech picker still has a choice to make).</param>
 /// <param name="NamesCleanupModel">The file chooses cleanup: llm.model, or a provider other than local.</param>
+/// <param name="NamesCleanupProvider">The file sets llm.provider (a first run with base.en on this PC keeps it: ModelCoordinator.FirstRun).</param>
 public sealed record SettingsLoadResult(AppSettings Settings, IReadOnlyList<string> Warnings, bool FileExisted, bool Usable = true,
-    bool NamesSpeechModel = true, bool NamesCleanupModel = true);
+    bool NamesSpeechModel = true, bool NamesCleanupModel = true, bool NamesCleanupProvider = false);
 
 /// <summary>
 /// Tolerant settings.json reader: every key is validated on its own. An unknown key or a malformed value
@@ -70,9 +71,10 @@ public static class SettingsLoader
             }
             var settings = Bind(new ObjectReader(root, "", warnings));
             var namesSpeech = HasString(root, "whisper", "model");
+            var namesProvider = HasString(root, "llm", "provider");
             var namesCleanup = HasString(root, "llm", "model")
-                || (HasString(root, "llm", "provider") && !string.Equals(settings.Llm.Provider, LlmSettings.Local, StringComparison.Ordinal));
-            return new SettingsLoadResult(settings, warnings, true, Usable: true, namesSpeech, namesCleanup);
+                || (namesProvider && !string.Equals(settings.Llm.Provider, LlmSettings.Local, StringComparison.Ordinal));
+            return new SettingsLoadResult(settings, warnings, true, Usable: true, namesSpeech, namesCleanup, namesProvider);
         }
     }
 

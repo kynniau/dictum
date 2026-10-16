@@ -262,7 +262,9 @@ internal sealed class Scratch : IDisposable
     }
 
     public DirectoryInfo Root { get; }
-    public AppPaths Paths { get; }
+
+    /// <summary>The scratch profile's folders; a test may change them (another ProfileDir, say) before it makes a shell.</summary>
+    public AppPaths Paths { get; set; }
 
     /// <summary>A shell over a fake platform with scripted dialogs, not started (no tray, no hook, no models).</summary>
     /// <param name="speechModels">A speech model manager with a fake loader, for tests that make a model ready; else the real one.</param>

@@ -86,8 +86,22 @@ public sealed class ModelCoordinator(
     /// <summary>The folder the model is used from (the first in the lookup order that has it), or null when it is not on this PC.</summary>
     public ModelFolderKind? Source(ModelInfo info) => Locate(info.FileName, info.Bytes)?.Kind;
 
-    private (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppSettings? lookIn = null) =>
-        ModelFolders.Locate(fileName, bytes, paths, lookIn ?? settings(), BundledCheck);
+    /// <summary>The file the model is used from (the first in the lookup order that passes), or null when it is not on this PC.</summary>
+    public string? Find(ModelInfo info) => Locate(info.FileName, info.Bytes)?.Path;
+
+    private int _lookups;
+
+    /// <summary>How many catalogue lookups this coordinator has made (each reads up to three folders): tests count them.</summary>
+    internal int Lookups => Volatile.Read(ref _lookups);
+
+    /// <summary>How many downloads have ended (arrived, failed or cancelled): Settings > Models looks the catalogue up again after one.</summary>
+    public int DownloadsEnded => _downloads.Ended;
+
+    private (string Path, ModelFolderKind Kind)? Locate(string fileName, long? bytes, AppSettings? lookIn = null)
+    {
+        Interlocked.Increment(ref _lookups);
+        return ModelFolders.Locate(fileName, bytes, paths, lookIn ?? settings(), BundledCheck);
+    }
 
     /// <summary>The full catalogue check for a file in the bundled folder, when there is an integrity record to check with.</summary>
     private Func<string, bool>? BundledCheck => integrity is null ? null : BundledFilePasses;
@@ -132,10 +146,13 @@ public sealed class ModelCoordinator(
     /// With a model override (scripted/test launch) the pickers are skipped and the recommendations written. When base.en is on
     /// this PC (Decision 16: it comes with Dictum, so in every package that ships it) nothing is asked: the open choices are
     /// answered with base.en and the rule-based tidy, as "No AI cleanup (rule-based tidy)" answers the cleanup picker, and
-    /// Settings > Models offers the AI clean-up download. Returns false if the user chose Quit.
+    /// Settings > Models offers the AI clean-up download; a seeded settings.json that names llm.provider (local, with no
+    /// llm.model) keeps it and gets the recommended clean-up model, which is not downloaded: nothing downloads, and
+    /// <see cref="EnsureCleanup"/> says the rule-based tidy is used until it is. Returns false if the user chose Quit.
     /// </summary>
     /// <param name="seeded">The settings.json being completed (a seeded models.folder is looked in too); null: the settings in use.</param>
-    public bool FirstRun(bool askSpeech = true, bool askCleanup = true, AppSettings? seeded = null)
+    /// <param name="keepProvider">settings.json names llm.provider (<see cref="SettingsLoadResult.NamesCleanupProvider"/>).</param>
+    public bool FirstRun(bool askSpeech = true, bool askCleanup = true, AppSettings? seeded = null, bool keepProvider = false)
     {
         var gpu = gpuMachine is not null ? gpuMachine() : ProbeGpuMachine();
         var (speech, speechWhy) = ModelCatalog.Recommend(gpu);
@@ -149,8 +166,11 @@ public sealed class ModelCoordinator(
         }
         else if (Locate(ModelCatalog.FileName(ModelCatalog.Bundled), ModelCatalog.KnownSize(ModelCatalog.Bundled), seeded) is { } bundled)
         {
-            (chosenSpeech, provider) = (ModelCatalog.Bundled, LlmSettings.NoProvider);
-            log.Info($"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up).");
+            chosenSpeech = ModelCatalog.Bundled;
+            if (!keepProvider) provider = LlmSettings.NoProvider; // the lens, 17/10/2026: a seeded "local" was turned to none without a question
+            log.Info(provider == LlmSettings.NoProvider
+                ? $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up)."
+                : $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled}, and settings.json's llm.provider (local) is kept with the recommended {chosenCleanup}, which is not downloaded (Settings > Models).");
         }
         else
         {

@@ -31,6 +31,9 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
     /// <summary>How far the running download has got (0-1), or null when none runs or its size is unknown.</summary>
     public double? Fraction { get; private set; }
 
+    /// <summary>How many downloads have ended, arrived or not (counted before the status refresh that follows).</summary>
+    public int Ended { get; private set; }
+
     /// <summary>A download to this file is running or waiting its turn.</summary>
     public bool IsFetching(string destination) =>
         _current is { } running && Same(running.Destination, destination) || _queue.Any(job => Same(job.Destination, destination));
@@ -138,6 +141,7 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
             _cts = null;
             _current = null;
             cts.Dispose();
+            Ended++;
             refreshTooltip();
         }
         return false;

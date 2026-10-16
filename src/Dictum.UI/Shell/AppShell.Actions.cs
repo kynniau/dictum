@@ -41,18 +41,37 @@ public sealed partial class AppShell
             return "Nothing was deleted.";
         }
         var result = ModelFiles.Delete(model.Path, Paths, _settings, ModelsInUse(), Integrity);
+        _modelFileChanges++;
         _log.Info(result.Message);
         StatusChanged();
         return result.Message;
     }
 
-    /// <summary>The recommended downloaded model of the same kind, else any other downloaded one.</summary>
+    /// <summary>
+    /// The recommended model of the same kind on this PC, else any other one: downloaded, or come with Dictum (the bundled base.en
+    /// is switched to, never deleted; lens, 17/10/2026). By name, so a second copy of the model in use is never its replacement.
+    /// </summary>
     private StoredModel? Replacement(StoredModel model)
     {
-        var others = ModelFiles.List(Paths, _settings).Where(m => !m.Partial && m.IsCleanup == model.IsCleanup && m.Path != model.Path).ToList();
+        var others = ModelFiles.List(Paths, _settings, withBundled: true).Where(m => !m.Partial && m.IsCleanup == model.IsCleanup && m.Name != model.Name).ToList();
         var recommended = model.IsCleanup ? CleanupCatalog.Recommend(GpuMachine).Model : ModelCatalog.Recommend(GpuMachine).Model;
         return others.FirstOrDefault(m => m.Name == recommended) ?? others.FirstOrDefault();
     }
+
+    /// <summary>
+    /// PROPOSED copy (17/10/2026), for the product owner to approve: what "Delete all app data" asks about a chosen models folder
+    /// outside the user's profile, which it leaves alone (lens, 17/10/2026: other users may load the models in it).
+    /// </summary>
+    internal static string LeftAlone(string folder) => $"Left alone: {folder} (outside your user folder, so other users may share its models; Delete beside a model removes one).";
+
+    private int _modelFileChanges; // settings loads and deletions (ModelFilesVersion)
+
+    /// <summary>
+    /// Changes whenever the model files on this PC, or the folders they are looked for in, may have changed: a settings load,
+    /// a download that ended, a deletion. Settings > Models looks the catalogue up again only then (lens, 17/10/2026: it looked
+    /// every model up on each redraw, a download's progress ticks included, on the UI thread).
+    /// </summary>
+    internal (int Changes, int DownloadsEnded) ModelFilesVersion => (_modelFileChanges, Models.DownloadsEnded);
 
     private async Task<bool> WaitForSwitchAsync(StoredModel model)
     {
@@ -66,7 +85,8 @@ public sealed partial class AppShell
 
     /// <summary>
     /// Settings → Storage: delete recordings, logs, or all app data (SPEC §17). Shows the size it frees, asks once, then
-    /// deletes. "All app data" releases the loaded models first and never touches .env or the program folder.
+    /// deletes. "All app data" releases the loaded models first and never touches .env or the program folder, and its question
+    /// names a chosen models folder outside the user's profile that it leaves alone (<see cref="DataCategory.SharedModels"/>).
     /// </summary>
     public string DeleteData(RemovalScope scope)
     {
@@ -80,7 +100,10 @@ public sealed partial class AppShell
             RemovalScope.AllDataIncludingSettings => "all of Dictum's data, including settings, your dictionary, corrections and snippets (never your .env keys or the program)",
             _ => "all of Dictum's data: models, recordings, logs (settings, your dictionary, corrections, snippets and .env keys are kept)",
         };
-        if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.",
+        var leftAlone = scope is RemovalScope.AllData or RemovalScope.AllDataIncludingSettings
+            ? string.Concat(PathRegistry.Locations(Paths, _settings).Where(l => l.Category == DataCategory.SharedModels).Select(l => " " + LeftAlone(RealPath(l.Path))))
+            : "";
+        if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.{leftAlone}",
                 new DialogChoice("Delete", IsDefault: true, IsDanger: true), new DialogChoice("Cancel")) != 0)
         {
             return "Nothing was deleted.";
@@ -92,7 +115,8 @@ public sealed partial class AppShell
         }
         if (scope is RemovalScope.Logs or RemovalScope.AllData or RemovalScope.AllDataIncludingSettings) _fileLog?.Release();
         var result = plan.Execute();
-        var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use); see the log." : "");
+        _modelFileChanges++;
+        var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use or not permitted); see the log." : "");
         foreach (var failure in result.Failures) _log.Warn($"Not deleted: {failure}");
         _log.Info($"Storage: {scope} {message}");
         if (scope is RemovalScope.AllDataIncludingSettings && !File.Exists(Paths.SettingsFile)) _offlineOnlyThisSession = false; // deleted on request: no new settings.json (SaveSessionChoices)

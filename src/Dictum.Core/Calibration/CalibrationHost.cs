@@ -7,6 +7,10 @@ using Dictum.Transcribe;
 namespace Dictum.Calibration;
 
 /// <summary>What the calibration window needs from the running app; every write goes through the app's own paths.</summary>
+/// <param name="FindSpeechModel">
+/// The tray app's own lookup (<see cref="App.ModelCoordinator.Find"/>): the file a catalogue speech model is used from, in the
+/// model folders, with a file that came with Dictum held to its full check (size and SHA-256); null when it is not on this PC.
+/// </param>
 /// <param name="Write">Writes settings.json keys through the tray's writer (which reloads and hot-swaps the model).</param>
 /// <param name="DownloadSpeechModel">Asks, downloads through the app's downloader (refused under offline_only), then calls back; the
 /// last callback says whether it arrived (false when declined, refused, failed or cancelled).</param>
@@ -17,27 +21,22 @@ internal sealed record CalibrationHost(
     Func<PersonalText> Personal,
     ModelIntegrity Integrity,
     ILog Log,
+    Func<ModelInfo, string?> FindSpeechModel,
     Action<(string Key, JsonNode? Value)[]> Write,
     Action<string, Action, Action<bool>> DownloadSpeechModel,
     Action<IReadOnlyList<string>> AddDictionaryTerms,
     Action<IReadOnlyList<CorrectionRule>> AddCorrections,
     Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null)
 {
-    /// <summary>Catalogue models on this PC: the file each name resolves to in the model folders (ModelFolders; the one that came with Dictum included).</summary>
-    public IReadOnlyList<SpeechCandidate> InstalledModels()
-    {
-        var settings = Settings();
-        return [.. ModelCatalog.Entries
-            .Select(e => (e.Name, Path: ModelFolders.Find(e.FileName, e.Bytes, Paths, settings)))
+    /// <summary>Catalogue models on this PC: the file each name resolves to through the tray app's lookup (<see cref="FindSpeechModel"/>).</summary>
+    public IReadOnlyList<SpeechCandidate> InstalledModels() =>
+        [.. ModelCatalog.Entries
+            .Select(e => (e.Name, Path: FindSpeechModel(e)))
             .Where(c => c.Path is not null)
             .Select(c => new SpeechCandidate(c.Name, c.Path!))];
-    }
 
-    public IReadOnlyList<ModelInfo> MissingModels()
-    {
-        var settings = Settings();
-        return ModelCatalog.Entries.Where(e => ModelFolders.Find(e.FileName, e.Bytes, Paths, settings) is null).ToList();
-    }
+    /// <summary>Catalogue models the same lookup does not find: calibration offers them as "Download and include".</summary>
+    public IReadOnlyList<ModelInfo> MissingModels() => ModelCatalog.Entries.Where(e => FindSpeechModel(e) is null).ToList();
 
     /// <summary>
     /// The engine over real whisper models: each file is size/SHA-256 checked before it is loaded, as everywhere else. It decodes

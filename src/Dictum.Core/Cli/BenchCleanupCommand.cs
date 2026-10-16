@@ -31,7 +31,7 @@ public static class BenchCleanupCommand
         if (CliCommands.Unreadable(config, paths)) return 1;
         var settings = config.Settings;
         var personal = CliCommands.LoadPersonal(paths, log);
-        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(settings));
+        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings));
         string raw;
         try
         {
@@ -52,11 +52,10 @@ public static class BenchCleanupCommand
         var sw = Stopwatch.StartNew();
         var tidy = DeterministicCleaner.Clean(raw);
         var rows = new List<Row> { new("rule-based tidy", "-", $"{sw.Elapsed.TotalMilliseconds:0.0} ms", "-", tidy) };
-        var modelsDir = paths.ModelsDir(settings);
         foreach (var info in CleanupCatalog.Entries)
         {
-            var path = CleanupCatalog.ResolvePath(info.Name, modelsDir);
-            if (!File.Exists(path))
+            // The app's lookup (ModelFolders): a copy in the chosen, the per-user or the bundled folder, as the tray app finds it.
+            if (ModelFolders.Find(info.FileName, info.Bytes, paths, settings, integrity.Passes) is not { } path)
             {
                 Console.Error.WriteLine($"{info.Name}: not downloaded, skipped");
                 continue;

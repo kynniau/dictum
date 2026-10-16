@@ -17,6 +17,13 @@ public enum DataCategory
     /// <summary>Speech and clean-up model files the catalogue knows, and their partial downloads.</summary>
     Models,
 
+    /// <summary>
+    /// The same files in a chosen models folder outside the user's profile, which other users may share (the README's layout
+    /// for shared virtual desktops; lens, 17/10/2026): Storage's Delete removes them one at a time and "Remove Dictum
+    /// completely" lists each one, but "Delete all app data", whose question shows only a count and a size, leaves them alone.
+    /// </summary>
+    SharedModels,
+
     /// <summary>verified-models.json: which model files already passed their SHA-256 check.</summary>
     ModelVerification,
 
@@ -77,7 +84,8 @@ public static class PathRegistry
         };
         foreach (var dir in ModelFolders(paths, settings))
         {
-            list.Add(new(dir, DataCategory.Models, "models", ModelFiles.Pattern));
+            var shared = !SamePath(dir, paths.DefaultModelsDir) && !paths.InProfile(dir);
+            list.Add(new(dir, shared ? DataCategory.SharedModels : DataCategory.Models, "models", ModelFiles.Pattern));
         }
         list.Add(new(paths.DefaultModelsDir, DataCategory.AppFolder, "models folder"));
         list.Add(new(paths.CalibrationDir, DataCategory.AppFolder, "calibration folder"));
@@ -89,7 +97,8 @@ public static class PathRegistry
 
     /// <summary>
     /// The default models folder, plus the chosen one (models.folder, or its earlier name whisper.models_dir) when it is elsewhere:
-    /// only catalogue files are touched there. Never the bundled folder beside Dictum.exe, whose models came with Dictum.
+    /// only catalogue files are touched there, and when it is outside the user's profile "Delete all app data" leaves it alone
+    /// (<see cref="DataCategory.SharedModels"/>). Never the bundled folder beside Dictum.exe, whose models came with Dictum.
     /// </summary>
     public static IEnumerable<string> ModelFolders(AppPaths paths, AppSettings settings)
     {
@@ -107,5 +116,54 @@ public static class PathRegistry
         var full = Path.GetFullPath(path);
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
         return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The place <paramref name="path"/> names, for telling whether two paths are the same folder by different names (lens,
+    /// 17/10/2026: a junction to the bundled folder was taken for another folder, and the base.en in it was deleted): full,
+    /// with 8.3 short names expanded (Path.GetFullPath does that), without a \\?\ or \\.\ prefix (\\?\UNC\server\share is
+    /// \\server\share), without a trailing separator, and with each junction or symbolic link along it replaced by its target.
+    /// The parts that do not exist are kept as written.
+    /// </summary>
+    // simplification: links are followed only on this PC's own drives (on a network folder each step would be a round trip to
+    // the server), and a drive letter made with subst is not followed (that needs a native call, which this assembly does not
+    // make: ArchitectureTests). Ceiling: a subst drive, or a share that points back at a folder on this PC, is not seen as the
+    // folder it names. Trigger to retire: a report of either; then ask the platform for the final path (GetFinalPathNameByHandle).
+    public static string FinalPath(string path) => FinalPath(path, 0);
+
+    private static string FinalPath(string path, int depth)
+    {
+        var full = Plain(path);
+        var root = Path.GetPathRoot(full);
+        if (depth > 31 || string.IsNullOrEmpty(root) || DiskSpace.IsNetwork(full)) return full; // 31: a cycle of links ends
+        var parts = full[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        var current = root;
+        for (var i = 0; i < parts.Length; i++)
+        {
+            current = Path.Combine(current, parts[i]);
+            FileSystemInfo? target;
+            try
+            {
+                target = new DirectoryInfo(current).ResolveLinkTarget(returnFinalTarget: true); // null: not a link
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return Path.Combine([current, .. parts[(i + 1)..]]); // missing or unreadable: nothing further along is a link to follow
+            }
+            if (target is not null) return FinalPath(Path.Combine([target.FullName, .. parts[(i + 1)..]]), depth + 1);
+        }
+        return current;
+    }
+
+    /// <summary>Full (8.3 short names expanded), without a \\?\ or \\.\ prefix before a drive or UNC path and without a trailing separator.</summary>
+    private static string Plain(string path)
+    {
+        if (path.StartsWith(@"\\?\", StringComparison.Ordinal) || path.StartsWith(@"\\.\", StringComparison.Ordinal))
+        {
+            var rest = path[4..];
+            if (rest.StartsWith(@"UNC\", StringComparison.OrdinalIgnoreCase)) path = @"\\" + rest[4..];
+            else if (rest.Length >= 2 && rest[1] == ':') path = rest;
+        }
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
     }
 }

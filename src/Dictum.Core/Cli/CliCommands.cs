@@ -12,9 +12,10 @@ namespace Dictum.Cli;
 public static class CliCommands
 {
     /// <summary>
-    /// --print-models-dir: the models folder the app uses (whisper.models_dir, else the default), so install.ps1 copies
-    /// -ModelsFrom files where the app looks. A settings.json that cannot be read prints nothing and exits 1: the folder
-    /// it names is unknown, and guessing would copy models where the app does not look.
+    /// --print-models-dir: the folder the app downloads models to and looks in first (models.folder, else its earlier name
+    /// whisper.models_dir, else %LOCALAPPDATA%\Dictum\models; never the folder of the models that come with Dictum), so
+    /// install.ps1 copies -ModelsFrom files where the app looks. A settings.json that cannot be read prints nothing and exits 1:
+    /// the folder it names is unknown, and guessing would copy models where the app does not look.
     /// </summary>
     public static int PrintModelsDir(AppPaths paths, TextWriter output, TextWriter error)
     {
@@ -45,7 +46,7 @@ public static class CliCommands
             Console.Error.WriteLine($"error: model file not found: {modelPath} (set whisper.model, or {SettingsFile.ModelPathVariable}; Dictum.exe --download-model can fetch one)");
             return 1;
         }
-        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(settings));
+        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings));
         try
         {
             integrity.Verify(modelPath);
