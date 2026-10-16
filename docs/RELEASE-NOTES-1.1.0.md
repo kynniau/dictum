@@ -24,8 +24,6 @@ Released 17/10/2026. This is the first update to the 1.0.0 release.
 
 **The base.en speech model is included, and nothing is downloaded on first run.** Every package now carries the base.en English speech model, so a new install asks no model questions and is ready to dictate. The AI clean-up model is no longer chosen on first run: the rule-based tidy is the default, and "Add AI clean-up (1.1 GB download)" in Settings > Models adds the model when you want it. Larger speech models stay optional downloads.
 
-**Clearer messages when a model cannot load (if included in this release).** When the speech or clean-up engine cannot start, Dictum now says why, such as the Visual C++ runtime being missing, and offers "Open log folder" and, where it helps, "Try on the CPU". A model that fails on the graphics card is retried on the CPU, and a graphics driver that ended Dictum once no longer does so at every start. With only integrated graphics, the clean-up model uses the CPU, which is faster there.
-
 **The Visual C++ runtime.** The speech and AI engines need Microsoft's Visual C++ runtime. The Store version declares it as a dependency, so the Store installs it. The direct-download installer checks for it before installing and offers Microsoft's download (https://aka.ms/vc14/vc_redist.x64.exe, which needs administrator rights). The portable zip needs the runtime installed first.
 
 **Third-party notices.** `THIRD-PARTY-NOTICES.txt` now lists every third-party component Dictum ships, with its licence, and is included in each package.
