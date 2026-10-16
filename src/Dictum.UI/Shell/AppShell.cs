@@ -29,7 +29,8 @@ public sealed partial class AppShell : IDisposable
     private readonly SecretRedactor _redactor;
     private readonly ShellOptions _options;
     private readonly HttpClient _http; // cleanup providers; callers bound each request
-    private readonly HttpClient _downloadHttp; // model downloads and Check for updates
+    private readonly HttpClient _downloadHttp; // model downloads only
+    private readonly HttpClient _updateHttp; // Check for updates only: follows no redirect
     private readonly ModelManager _models;
     private readonly LocalLlmManager _llm;
     private readonly IAudioCapture _capture;
@@ -58,11 +59,13 @@ public sealed partial class AppShell : IDisposable
     /// <param name="gpuMachine">Tests decide; production asks the whisper runtime (<see cref="WhisperEngine.GpuMachine"/>).</param>
     /// <param name="speechModels">Tests pass one that loads a fake engine; production builds the whisper one.</param>
     /// <param name="downloadHandler">
-    /// Tests pass a fake server to stand in for the network under the download client's offline_only guard (model
-    /// downloads and Check for updates); production uses the socket handler.
+    /// Tests pass a fake server to stand in for the network under the model-download client's offline_only guard;
+    /// production uses the socket handler.
     /// </param>
+    /// <param name="updateHandler">The same for the Check for updates client; production uses its socket handler, which follows no redirect.</param>
     public AppShell(IPlatform platform, AppPaths paths, ILog log, SecretRedactor redactor, ShellOptions options, IShellDialogs? dialogs = null,
-        IInstanceLock? instance = null, Func<bool>? gpuMachine = null, ModelManager? speechModels = null, HttpMessageHandler? downloadHandler = null)
+        IInstanceLock? instance = null, Func<bool>? gpuMachine = null, ModelManager? speechModels = null, HttpMessageHandler? downloadHandler = null,
+        HttpMessageHandler? updateHandler = null)
     {
         Platform = platform;
         Paths = paths;
@@ -73,7 +76,7 @@ public sealed partial class AppShell : IDisposable
         _instance = instance;
         _gpuMachine = gpuMachine ?? (() => WhisperEngine.GpuMachine);
         Dialogs = dialogs ?? new ShellDialogs();
-        (_http, _downloadHttp) = AppRules.CreateClients(() => _settings.OfflineOnly, downloadHandler);
+        (_http, _downloadHttp, _updateHttp) = AppRules.CreateClients(() => _settings.OfflineOnly, downloadHandler, updateHandler);
         Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => paths.ModelsDir(_settings));
         _llm = new LocalLlmManager(log, Integrity);
         _models = speechModels ?? new ModelManager(log, Integrity);
@@ -277,5 +280,6 @@ public sealed partial class AppShell : IDisposable
         _llm.Dispose();
         _http.Dispose();
         _downloadHttp.Dispose();
+        _updateHttp.Dispose();
     }
 }

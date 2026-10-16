@@ -254,11 +254,15 @@ internal sealed class AboutPage : SettingsPage
         _offline.IsVisible = Shell.Settings.OfflineOnly; // SPEC §5: the About box says "Offline only"
     }
 
-    /// <summary>One check per press; a press while one is running is ignored, so it is still one request.</summary>
+    /// <summary>
+    /// One check per press; a press while one is running is ignored, so it is still one request. The press clears the last
+    /// result first, so it visibly did something and the line that follows is this check's.
+    /// </summary>
     private async Task CheckForUpdatesAsync()
     {
         if (_checking) return;
         _checking = true;
+        ShowUpdate(null);
         try
         {
             ShowUpdate(await Shell.CheckForUpdatesAsync());

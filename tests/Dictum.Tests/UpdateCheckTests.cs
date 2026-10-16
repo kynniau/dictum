@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Transcribe;
 using Dictum.UI.Shell;
 using Dictum.UI.Views;
@@ -76,8 +77,11 @@ public class UpdateCheckTests
         }
     }
 
-    /// <summary>Answers only once <see cref="Release"/> is called, so a check stays in flight.</summary>
-    private sealed class GateSite(string body) : HttpMessageHandler
+    /// <summary>
+    /// Answers only once <see cref="Release"/> is called, so a check stays in flight. With <paramref name="failFirst"/>, the
+    /// first request is answered at once with HTTP 500.
+    /// </summary>
+    private sealed class GateSite(string body, bool failFirst = false) : HttpMessageHandler
     {
         private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _requests;
@@ -88,7 +92,7 @@ public class UpdateCheckTests
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Interlocked.Increment(ref _requests);
+            if (Interlocked.Increment(ref _requests) == 1 && failFirst) return new HttpResponseMessage(HttpStatusCode.InternalServerError) { RequestMessage = request };
             await _gate.Task.WaitAsync(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json"), RequestMessage = request };
         }
@@ -100,8 +104,30 @@ public class UpdateCheckTests
         public override bool CanSeek => false;
     }
 
-    /// <summary>The production client for model downloads and the check, offline_only guard included, with the network replaced by <paramref name="site"/>.</summary>
+    /// <summary>
+    /// A client built as the check's own is (<see cref="ModelDownloader.CreateHttpClient"/>, offline_only guard included), with
+    /// the network replaced by <paramref name="site"/>.
+    /// </summary>
     private static HttpClient Client(HttpMessageHandler site, Func<bool>? offlineOnly = null) => ModelDownloader.CreateHttpClient(offlineOnly ?? (() => false), inner: site);
+
+    /// <summary>The check's own client exactly as production builds it (<see cref="AppRules.CreateClients"/>), real socket handler included.</summary>
+    private static HttpClient UpdateClient()
+    {
+        var (providers, downloads, updates) = AppRules.CreateClients(() => false);
+        providers.Dispose();
+        downloads.Dispose();
+        return updates;
+    }
+
+    /// <summary>Between the guard and the real socket handler: sends the request for dictum.kynni.au to a listener on this PC instead.</summary>
+    private sealed class ToListener(int port, HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.RequestUri = new Uri($"http://127.0.0.1:{port}{request.RequestUri!.AbsolutePath}");
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
 
     private static Task<UpdateCheckResult> Check(HttpClient http, string running = "1.0.0", bool packaged = false, bool offlineOnly = false, TimeSpan? timeout = null) =>
         UpdateCheck.CheckAsync(http, running, packaged, () => offlineOnly, NullLog.Instance, Ct, timeout);
@@ -122,7 +148,7 @@ public class UpdateCheckTests
     }
 
     [Fact]
-    public async Task On_the_wire_the_download_client_adds_no_header_but_Host()
+    public async Task On_the_wire_the_check_s_own_client_adds_no_header_but_Host()
     {
         // The fake-server tests see the request as Dictum builds it; this reads what the real socket handler writes, from a
         // listener on this PC (a loopback address: nothing leaves it).
@@ -146,7 +172,7 @@ public class UpdateCheckTests
                 await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {LiveFile.Length}\r\nConnection: close\r\n\r\n{LiveFile}"), Ct);
                 return received.ToString();
             }, Ct);
-            using var http = ModelDownloader.CreateHttpClient(() => false);
+            using var http = UpdateClient();
             using var request = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{port}/version.json"); // as CheckAsync builds its request
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, Ct);
             var lines = (await server).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
@@ -156,6 +182,31 @@ public class UpdateCheckTests
         {
             listener.Stop();
         }
+    }
+
+    [Fact]
+    public async Task A_redirect_is_not_followed_so_no_other_server_can_answer_for_dictum_kynni_au()
+    {
+        // Lens probe (16/10/2026): through the model-download client, a 301 from "dictum.kynni.au" to another host was followed
+        // inside the socket handler, after the offline_only guard, and that host's "99.0.0 is available." was shown. This is the
+        // check's own client as production builds it, with the address changed between its guard and its real socket handler.
+        // Both servers are listeners on this PC, so even a followed redirect stays on it.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        const string elsewhere = """{"version":"99.0.0","notes":"Served by another host."}""";
+        var other = OfflineGuardTests.Serve($"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {elsewhere.Length}\r\nConnection: close\r\n\r\n{elsewhere}", cts.Token);
+        var site = OfflineGuardTests.Serve($"HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:{other.Port}/version.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", cts.Token);
+        using (var http = UpdateClient())
+        {
+            // HttpClient does not expose its handler: read through the invoker's private field, as the TLS pin does.
+            var guard = Assert.IsType<OfflineGuardHandler>(typeof(HttpMessageInvoker).GetField("_handler", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(http));
+            guard.InnerHandler = new ToListener(site.Port, guard.InnerHandler!);
+            var result = await Check(http);
+            Assert.Equal(UpdateStatus.Failed, result.Status);
+            Assert.Equal(ProposedFailedLine, result.Line);
+        }
+        Assert.Equal(1, site.Connections());
+        Assert.Equal(0, other.Connections()); // the redirect was not followed
+        cts.Cancel();
     }
 
     [Theory]
@@ -216,14 +267,23 @@ public class UpdateCheckTests
         Assert.Equal(UpdateStatus.NewerAvailable, (await Check(http)).Status);
     }
 
-    [Fact]
-    public async Task An_answer_bigger_than_a_version_file_is_not_read()
+    /// <summary>The most of an answer the check reads: 16 KiB, pinned here as a number so a change to it is deliberate.</summary>
+    private const int SizeLimit = 16 * 1024;
+
+    [Theory]
+    [InlineData(SizeLimit, true, UpdateStatus.NewerAvailable)]
+    [InlineData(SizeLimit, false, UpdateStatus.NewerAvailable)]
+    [InlineData(SizeLimit + 1, true, UpdateStatus.Failed)]
+    [InlineData(SizeLimit + 1, false, UpdateStatus.Failed)]
+    public async Task At_most_16_KiB_of_an_answer_is_read(int bytes, bool contentLength, UpdateStatus status)
     {
-        var huge = Encoding.UTF8.GetBytes($$"""{"version":"99.0.0","notes":"{{new string('x', 64 * 1024)}}"}""");
-        var announced = new FakeSite(HttpStatusCode.OK, () => new ByteArrayContent(huge)); // Content-Length says so up front
-        using (var http = Client(announced)) Assert.Equal(UpdateStatus.Failed, (await Check(http)).Status);
-        var unannounced = new FakeSite(HttpStatusCode.OK, () => new StreamContent(new NoLengthStream(huge))); // the read stops at the limit
-        using (var http = Client(unannounced)) Assert.Equal(UpdateStatus.Failed, (await Check(http)).Status);
+        const string head = "{\"version\":\"99.0.0\",\"notes\":\"", tail = "\"}";
+        var body = Encoding.UTF8.GetBytes(head + new string('x', bytes - head.Length - tail.Length) + tail);
+        Assert.Equal(bytes, body.Length);
+        // With Content-Length the size is known up front; without it (as a chunked answer arrives) the read stops at the limit.
+        var site = new FakeSite(HttpStatusCode.OK, () => contentLength ? new ByteArrayContent(body) : new StreamContent(new NoLengthStream(body)));
+        using var http = Client(site);
+        Assert.Equal(status, (await Check(http)).Status);
     }
 
     [Fact]
@@ -329,13 +389,15 @@ public class UpdateCheckTests
         var (status, body, expected) = answer switch
         {
             Answer.Latest => (HttpStatusCode.OK, $$"""{"version":"{{RunningVersion}}","notes":"Nothing new."}""", ProposedLatestLine(RunningVersion)),
-            Answer.Newer => (HttpStatusCode.OK, """{"version":"99.1.0","notes":"Faster start-up."}""", ProposedNewerLine("99.1.0")),
+            // The file names an address of its own: the button must still open the fixed one.
+            Answer.Newer => (HttpStatusCode.OK, """{"version":"99.1.0","notes":"Faster start-up.","url":"https://example.invalid/not-the-download-page"}""", ProposedNewerLine("99.1.0")),
             Answer.Failure => (HttpStatusCode.InternalServerError, """{"version":"99.1.0"}""", ProposedFailedLine),
             _ => (HttpStatusCode.OK, """{"version":"99.1.0"}""", ProposedOfflineOnlyLine),
         };
         var site = new FakeSite(status, body);
+        var downloads = new CountingHandler(); // the model-download client's network: the check has its own client, so nothing lands here
         using var scratch = new Scratch(answer == Answer.OfflineOnly ? """{ "hotkey": "F24", "offline_only": true }""" : """{ "hotkey": "F24" }""");
-        var (shell, platform, _) = scratch.Shell(downloadHandler: site);
+        var (shell, platform, _) = scratch.Shell(downloadHandler: downloads, updateHandler: site);
         shell.Reload(userRequested: false);
         var window = new SettingsWindow(shell);
         window.Show();
@@ -347,6 +409,7 @@ public class UpdateCheckTests
         Click(window, ProposedButton);
         Assert.True(Eventually(() => VisibleLines(window).Contains(expected)), $"the About page never showed \"{expected}\"");
         Assert.Equal(answer == Answer.OfflineOnly ? 0 : 1, site.Requests.Count);
+        Assert.Equal(0, downloads.Requests);
         if (answer == Answer.Newer)
         {
             // The line, then the button, then the release notes under it.
@@ -372,8 +435,9 @@ public class UpdateCheckTests
     public Task Pressing_the_button_again_while_a_check_runs_sends_no_second_request() => UiSession.Run(() =>
     {
         var site = new GateSite($$"""{"version":"{{RunningVersion}}"}""");
+        var downloads = new CountingHandler();
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
-        var (shell, _, _) = scratch.Shell(downloadHandler: site);
+        var (shell, _, _) = scratch.Shell(downloadHandler: downloads, updateHandler: site);
         shell.Reload(userRequested: false);
         var window = new SettingsWindow(shell);
         window.Show();
@@ -386,6 +450,39 @@ public class UpdateCheckTests
             site.Release();
             Assert.True(Eventually(() => VisibleLines(window).Contains(ProposedLatestLine(RunningVersion))), "the check never finished");
             Assert.Equal(1, site.Requests);
+            Assert.Equal(0, downloads.Requests);
+        }
+        finally
+        {
+            site.Release(); // never leave a request waiting
+            window.Close();
+            shell.Dispose();
+        }
+    });
+
+    [Fact]
+    public Task A_new_press_clears_the_last_result_until_its_answer_arrives() => UiSession.Run(() =>
+    {
+        // Lens (16/10/2026): pressing again after "Could not check right now." left that line up while the new check ran, so
+        // the press looked like it did nothing.
+        var site = new GateSite($$"""{"version":"{{RunningVersion}}"}""", failFirst: true);
+        var downloads = new CountingHandler();
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell(downloadHandler: downloads, updateHandler: site);
+        shell.Reload(userRequested: false);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("About");
+        try
+        {
+            Click(window, ProposedButton);
+            Assert.True(Eventually(() => VisibleLines(window).Contains(ProposedFailedLine)), "the first check never failed");
+            Click(window, ProposedButton);
+            Assert.True(Eventually(() => site.Requests == 2), "the second press sent nothing");
+            Assert.DoesNotContain(ProposedFailedLine, VisibleLines(window)); // the answer is still held back: the old line is gone
+            site.Release();
+            Assert.True(Eventually(() => VisibleLines(window).Contains(ProposedLatestLine(RunningVersion))), "the second check never finished");
+            Assert.Equal(0, downloads.Requests);
         }
         finally
         {
@@ -399,8 +496,9 @@ public class UpdateCheckTests
     public async Task The_Store_build_has_no_check_button_and_says_the_Store_updates_it() => await UiSession.RunAsync(async () =>
     {
         var site = new FakeSite(HttpStatusCode.OK, """{"version":"99.1.0"}""");
+        var downloads = new CountingHandler();
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
-        var (shell, platform, _) = scratch.Shell(downloadHandler: site);
+        var (shell, platform, _) = scratch.Shell(downloadHandler: downloads, updateHandler: site);
         platform.FakePackage.IsPackaged = true;
         shell.Reload(userRequested: false);
         var window = new SettingsWindow(shell);
@@ -416,6 +514,7 @@ public class UpdateCheckTests
         var result = await shell.CheckForUpdatesAsync(Ct);
         Assert.Equal(UpdateStatus.StoreBuild, result.Status);
         Assert.Empty(site.Requests);
+        Assert.Equal(0, downloads.Requests);
         shell.Dispose();
         return true;
     });

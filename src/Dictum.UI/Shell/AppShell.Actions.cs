@@ -199,11 +199,12 @@ public sealed partial class AppShell
 
     /// <summary>
     /// Settings → About → Check for updates (decision 11, 16/10/2026): runs only when the user presses the button. One
-    /// request for version.json through the model-download client, so the offline_only guard, TLS 1.2 and the proxy rules
-    /// of every download apply; offline_only refuses before anything is sent, and the Store build never checks.
+    /// request for version.json through the check's own client (AppRules.CreateClients): the offline_only guard, TLS 1.2
+    /// and the proxy rules of every download apply, and it follows no redirect; offline_only refuses before anything is
+    /// sent, and the Store build never checks.
     /// </summary>
     public Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken cancellationToken = default) =>
-        UpdateCheck.CheckAsync(_downloadHttp, AppVersion, Platform.Package.IsPackaged, () => _settings.OfflineOnly, _log, cancellationToken);
+        UpdateCheck.CheckAsync(_updateHttp, AppVersion, Platform.Package.IsPackaged, () => _settings.OfflineOnly, _log, cancellationToken);
 
     /// <summary>
     /// SPEC §22 "Report a problem": a prefilled email to the support address (the user's own mail app sends it, or not).

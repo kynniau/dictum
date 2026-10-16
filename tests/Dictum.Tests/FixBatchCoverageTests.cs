@@ -121,15 +121,19 @@ public sealed class FixBatchCoverageTests : IDisposable
     }
 
     [Fact]
-    public async Task Both_network_clients_refuse_other_machines_under_offline_only()
+    public async Task Every_network_client_refuses_other_machines_under_offline_only()
     {
-        var (providers, downloads) = AppRules.CreateClients(() => true);
+        var updateSite = new CountingHandler(); // under the update client's guard: without the guard, the request lands here
+        var (providers, downloads, updates) = AppRules.CreateClients(() => true, updateHandler: updateSite);
         using (providers)
         using (downloads)
+        using (updates)
         {
             await Assert.ThrowsAsync<OfflineOnlyException>(() => providers.GetAsync("https://dictate-test.invalid/v1", Ct));
             await Assert.ThrowsAsync<OfflineOnlyException>(() => downloads.GetAsync("https://dictate-test.invalid/model.bin", Ct));
+            await Assert.ThrowsAsync<OfflineOnlyException>(() => updates.GetAsync(UpdateCheck.VersionUrl, Ct));
         }
+        Assert.Equal(0, updateSite.Requests);
     }
 
     [Fact]

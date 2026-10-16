@@ -18,7 +18,7 @@ public enum UpdateStatus
     /// <summary>offline_only is on, so nothing was requested.</summary>
     OfflineOnly,
 
-    /// <summary>No answer in time, an HTTP error, or an answer that is not a version.json Dictum can read.</summary>
+    /// <summary>No answer in time, an HTTP error or redirect, or an answer that is not a version.json Dictum can read.</summary>
     Failed,
 
     /// <summary>The Microsoft Store build: it never checks, because the Store updates it.</summary>
@@ -45,8 +45,9 @@ public sealed record UpdateCheckResult(UpdateStatus Status, string? Version = nu
 /// <summary>
 /// Check for updates (decision 11, 16/10/2026): the direct download's Settings → About asks whether a newer version is
 /// out, only when the user presses the button; nothing is automatic. One GET of <see cref="VersionUrl"/> over HTTPS
-/// through the model-download client (<see cref="ModelDownloader.CreateHttpClient"/>: the offline_only guard, TLS 1.2,
-/// no proxy for this machine), with no query string and no header of Dictum's own, so nothing about the user is sent.
+/// through the check's own client (<see cref="Dictum.App.AppRules.CreateClients"/>: built like the model-download client,
+/// so the offline_only guard, TLS 1.2 and no proxy for this machine, but it follows no redirect, so no other host can
+/// answer for dictum.kynni.au), with no query string and no header of Dictum's own, so nothing about the user is sent.
 /// No retry; <see cref="CheckTimeout"/> bounds the whole request. The Store build never checks (the Store updates it),
 /// and offline_only refuses before anything is sent.
 /// </summary>
@@ -95,7 +96,10 @@ public static partial class UpdateCheck
     /// One check. A network or file problem never throws: the result says what happened and the reason is logged. Only the
     /// caller's own cancellation throws.
     /// </summary>
-    /// <param name="http">The model-download client: its guard refuses the request too if offline_only comes on as it leaves.</param>
+    /// <param name="http">
+    /// The check's own client (<see cref="Dictum.App.AppRules.CreateClients"/>): its guard refuses the request too if
+    /// offline_only comes on as it leaves, and a redirect comes back as a failure instead of being followed.
+    /// </param>
     /// <param name="runningVersion">This copy's version ("1.0.0"; a "+sha" suffix is ignored).</param>
     /// <param name="packaged">The Store build: nothing is ever requested.</param>
     /// <param name="offlineOnly">Read before anything is sent.</param>

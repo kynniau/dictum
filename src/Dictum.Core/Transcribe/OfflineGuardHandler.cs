@@ -3,14 +3,15 @@ using System.Net;
 namespace Dictum.Transcribe;
 
 /// <summary>
-/// The single network choke point for offline_only: every HttpClient Dictum creates (model downloads, the
-/// OpenAI-compatible and Anthropic providers) sends through this handler, which refuses any request to a host that
+/// The single network choke point for offline_only: every HttpClient Dictum creates (model downloads, Check for updates,
+/// the OpenAI-compatible and Anthropic providers) sends through this handler, which refuses any request to a host that
 /// is not on this machine while the setting is on. The per-feature checks stay for their clearer messages; this is
 /// the backstop that holds even if one of them is missed. Read on every request, so it follows settings reloads.
 /// </summary>
 /// <remarks>
 /// Redirects are followed inside the inner <see cref="SocketsHttpHandler"/> and are not seen here, so the provider client
-/// (<see cref="CreateClient"/>) does not follow them at all.
+/// (<see cref="CreateClient"/>) and the Check for updates client (<see cref="Dictum.App.AppRules.CreateClients"/>) do not
+/// follow them at all.
 /// </remarks>
 public sealed class OfflineGuardHandler(Func<bool> offlineOnly, HttpMessageHandler inner) : DelegatingHandler(inner)
 {
