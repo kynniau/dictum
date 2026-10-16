@@ -523,7 +523,7 @@ word boundaries ("class", "assess", "Scunthorpe" untouched), and the override fi
 
 `%APPDATA%\Dictum\snippets.txt`: lines `what you say => what is pasted`, the same line
 format, whole-word, case-insensitive matching and "later line wins" rule as corrections,
-but the written text is used **verbatim** (never re-cased or trimmed: a URL at a sentence
+but the written text is used **verbatim** (never re-cased; only spaces and tabs at either end are dropped, and line breaks at the ends are kept: a URL at a sentence
 start stays lower-case) and in the file `\n` stands for a line break and `\\` for a
 backslash (the dialog writes both). Applied LAST, after the
 corrections and the profanity filter: the text is something the user typed, not dictated,
