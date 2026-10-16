@@ -1164,3 +1164,152 @@ without the matcher, so the first pin drives the matcher and the state machine d
   Models-page tests failed with it removed from `AppShell.Config`; the new test and the plain-text test failed with the
   constructor's `_plain = plain` removed. Full suite on the rebased head (this lane's run): build 0 warnings, 0 errors;
   1,015 tests, 996 passed, 19 skipped, 0 failed.
+
+## Hands-free segments (16/10/2026, PR #8, branch feature/hands-free-segments)
+
+Product owner decisions 3 and 5 (16/10/2026): hands-free types each part as the speaker pauses, and the auto-stop moves
+into Settings > General, from 30 s to 60 minutes. SPEC §3 "Hands-free segments" is the amendment; §7, §9, §20 and §22
+carry the rest. This section is the build lane's record as folded by the orchestrator, corrected to the code after the
+merge lens's fixes (below).
+
+**Constants** (blocks are the 20 ms level-meter blocks `CaptureBuffer` already measured; the segmenter's timings, its
+floor and the carried-word count each sit under a `// simplification:` note with a trigger to retire it):
+
+| Constant | Value | What it does |
+|---|---|---|
+| `PauseBlocks` | 35 (0.7 s) | Quiet that ends a part |
+| `MinSpeechBlocks` | 100 (2 s) | Speech a part needs before a pause may end it |
+| `LimitBlocks` | 1,500 (30 s) | Part length at which the hard cut happens |
+| `LookBackBlocks` | 150 (3 s) | How far back the hard cut looks for its quietest block |
+| `RelativeFloor` | 0.1 | Quiet threshold as a fraction of the recent speech level |
+| `LevelDecay` | 0.986 per block | The speech level halves in about a second (0.986^50 ≈ 0.49) |
+| `SegmentJoin.CarriedWords` | 10 | Closing words carried to the next part |
+| `HandsFreeLimit.SettleMs` | 400 ms | The slider and number box write once they are still this long |
+| `StateMachineOptions.DefaultHoldMaxSeconds` | 300 | A held key's auto-stop (not a setting) |
+
+- **Cut rule.** A pause cut lands in the middle of the quiet run, so both parts keep some quiet; the hard cut takes the
+  quietest block of the last 3 s, preferring one that was below the floor when it arrived. A block is quiet below the
+  larger of `silence_threshold` and 0.1 × the recent speech level (the loudest recent block, decaying). Why: with
+  `silence_threshold` alone (0.01) a room noisier than that never shows a pause and every part runs to 30 s.
+- **The noise ceiling is about 24 dB, not 20** (merge lens finding 10, recomputed in this lane): the floor decays with
+  the level through the pause, so the 35th quiet block is measured against 0.1 × 0.986^34 = 0.0619 of the loudest recent
+  block, 20·log10(0.0619) = −24.2 dB. Room noise within about 24 dB of that block defeats a 0.7 s pause and only the
+  30 s cut splits. Pinned on the real segmenter: noise at 0.0615 of the speech (−24.2 dB) is cut at the pause, at 0.0625
+  (−24.1 dB) it is not (`A_pause_is_found_only_in_noise_more_than_about_24_dB_under_the_speech`).
+- **Whisper gets a processor per part.** Whisper.net 1.9.1 takes the prompt when a processor is built (`WithPrompt`,
+  read at tag 1.9.1 in Batch 2); the build lane found no way to change it on a built processor (not re-checked in the
+  fix lane), so a processor with the dictionary terms and then the carried words is built and freed per part, the
+  decoder in use is left alone, and a build that fails transcribes the part without the words. Ceiling, marked in
+  `WhisperEngine`: on Vulkan a prompt of a length not seen before can compile shaders on its first run (24–26 s once
+  for a longer dictionary prompt, Batch 2 above), so the first parts of a session could stall.
+- **Context placement.** Cloud providers get the carried words as a line after the system prompt (`CleanupPrompt
+  .WithCarried`); the local model gets them as a system turn after its cached prefix, so the prefix stays evaluated
+  (`CleanupSession.Turns`, pinned since the lens). The line the model reads: "The dictation continues text that is
+  already typed; use it only as context and do not repeat it: " and the carried words in quotes.
+- **Carried words are what was said** (merge lens finding 1, Blocker): the part's text after the clean-up and the
+  boundary rule, before corrections, the profanity filter and snippets. Taken from the typed text, a snippet's address
+  reached a cloud provider's prompt. A cloud clean-up therefore repeats at most 10 words of the previous part per request:
+  same host, same consent, that part's own cleaned dictation (the reply the host returned, or the tidy of the transcript
+  sent to it), never text from the user's files.
+- **Validator.** Carried words are prompt text, never dictation: every rule, the dictionary-term rule included,
+  measures the reply against the part's own words. A reply that repeats two adjacent carried words (one a content word)
+  that the part did not say is rejected: "...we should move the meeting to" then "thursday" → "Move the meeting to
+  Thursday." Since the lens (finding 2) a pair counts as said when the dictation has two adjacent words that sound like
+  it word by word (`ValidatorText.SoundsLike`), read without spoken commands and hesitations and both with and without
+  the prompt's fillers (`DeterministicCleaner.FillerPhrases`, the one list). Ceilings: a fix that changes a word's sound
+  or inserts a word into a carried pair is still rejected ("buys" → "buy", "go to shop" → "Go to the shop.": the tidy is
+  typed, polish lost); a repeat is accepted when the part said two words that sound like it.
+- **Esc and the token.** One cancellation token per session, from the second tap through the stop: Esc while recording
+  or after the stop drops the parts in flight or queued and keeps what is typed ("Stopped. Text already typed stays.").
+  A lost microphone types the rest last, under the same token (pinned since the lens); one failed part does not end the
+  session (pinned since the lens). `CaptureFailed`'s hands-free branch could never run and is gone (finding 11).
+- **The field.** Settings > General > Hands-free: a number with its unit, a 30 s–60 min slider and quick picks. The
+  number box and the slider write once they settle, the box also on Enter or when it loses focus (finding 6: typing
+  "120" wrote 30 first, and each write reached the state machine on reload). A value from 5 to 29 left in a file is
+  raised to 30 at load with a log line and the file is not rewritten; the field writes the new value when next changed.
+  `GeneralPage.MouseNote` lost its sentence pointing at `hands_free_max_seconds` in settings.json. The wording is
+  PROPOSED, awaiting the product owner.
+- **A held key keeps 5 minutes** (orchestrator decision 7a; finding 3): the field limits hands-free only. With it shared,
+  a 30 s field cut a 45 s hold short and a 60-minute field let a stuck key record for an hour.
+- `AppShell.cs`: one line passes the dictionary terms to the pipeline (`names: () => Personal.Text.Dictionary.Terms`),
+  for the boundary rule's capital exception.
+- **One sentence-start rule** (finding 9): `SentenceStart` (TextList.cs) serves the corrections, the profanity filter
+  and the boundary rule: the start of the text, or after a line break or a mark that ends a sentence, read back past
+  spaces, quotes and brackets. Aligned on purpose, each pinned: the corrections and the filter now take an ellipsis as a
+  sentence end and pass over curly quotes and closing brackets; the boundary rule passes over opening ones. Not folded
+  in: the tidy's own token-by-token capitalisation (`DeterministicCleaner.Capitalise`), a different shape and a pinned
+  table of its own; and `CorrectionSuggestions.Edge`, the characters trimmed from a suggested correction's ends, which
+  is not a sentence rule and is left for its own follow-up (it lacks …, the dandas, « » and [ ]).
+- **The danda ends a sentence** (orchestrator, 16/10/2026, for Hindi dictation from the languages PR): the marks are
+  `SentenceStart.IsEndMark`: . ! ? … and the Devanagari danda । (U+0964) and double danda ॥ (U+0965). The profanity
+  filter's remove mode reads the same marks after a removed word, so "वह कमीना।" becomes "वह।" (the languages lens saw
+  "वह ।", a space left before the danda, while "It's shit." gave "It's.") and a word that was a sentence of its own takes
+  its danda with it. English pins unchanged; aligned with it, an ellipsis after a removed word now behaves like a full
+  stop ("It's shit… really." → "It's… really.", was "It's … really."; "Shit… I forgot." → "I forgot.", was "… I forgot.").
+- **Fix last dictation holds the last part typed** (finding 8, kept by decision): each part is remembered as it is
+  pasted, with the window it went to. The editor shows that part, not the session.
+
+**Ceilings, documented in the code with triggers to retire them**
+
+- A 0.7 s thinking pause mid-sentence ends a part; a speaker who never pauses for 0.7 s gets 30 s parts.
+- A name the dictionary does not list is lower-cased when a part carries on a sentence ("…meeting with" then "sarah
+  tomorrow.").
+- Ten carried words after a long dictionary prompt can pass whisper's prompt budget; whisper.cpp then drops the oldest
+  prompt tokens itself (recalled, as under Batch 2 above).
+- **Parts are typed into whatever window is in front** (finding 5): a window change mid-session sends the next parts
+  to the other app, where with `insert.method = type` a spoken "new line" is the Enter key. The README tells the user to
+  stay in the window until the session stops. Holding parts while another window is in front is **Kyle's decision,
+  due 17/10/2026**; nothing is held in this change.
+
+**Open question for Kyle (finding 7b): the boundary rule rarely carries a sentence on.** The rule-based tidy ends every
+line that ends with a letter or a digit with a full stop (`DeterministicCleaner.TidyLine`), so with it nearly every part
+is typed as its own sentence and the next starts with a capital (`Parts_are_typed_in_order_while_recording_goes_on`:
+"We met on tuesday.", " And agreed the plan."); the continuation (a small letter after a space) fires only after a part
+with no closing mark, which a clean-up model's reply can be. Accepted for now. The options: (1) accept it; (2) hold back
+a part's closing full stop until the next part shows whether the sentence went on; (3) lengthen the pause that ends a
+part, so parts end at sentence ends more often, at the cost of later feedback.
+
+**Merge lens on 193ca49 (Block), and the fixes**
+
+| # | Severity | Finding | Fix | Pins (each observed failing on the reverted behaviour) |
+|---|---|---|---|---|
+| 1 | Blocker | Carried words from the finished text: a snippet's text reached a cloud prompt | `HandsFreePart.Spoken`; `Carried` is its tail | P1 through the controller and a cloud-style client; a unit pin |
+| 2 | Major | The pair rule rejected filler drops, homophone fixes and dictionary respellings | Sound-alike pairs, read with and without fillers | P2 a–c, plus d ("like" as a word) and the ceiling |
+| 3 | Major | `hands_free_max_seconds` also limited a held key | `HoldMaxSeconds` (300); AppRules passes 300 | P3, P3b |
+| 4 | Major | Three claims no test held | `CleanupSession.Turns`; pins | carried turn, P5, P6 |
+| 5 | Major | Parts follow the window in front | Documented (decision due 17/10/2026) | README sentence pinned |
+| 6 | Minor | The number box wrote on every keystroke | Settle timer; Enter, focus and page flush | P7 (three ways to finish) |
+| 7 | Minor | SPEC was cited but not amended | SPEC §3, §7, §9, §20, §22; this section | — |
+| 7b | Minor | The rule-based tidy closes nearly every part | README corrected; options above | existing pin (`Parts_are_typed_in_order…`) |
+| 8 | Minor | Fix last holds the last part | Kept and documented | existing pin (`Remembered.Last()`) |
+| 9 | Minor | Three sentence-boundary checks | `SentenceStart`, with the dandas (orchestrator addition) | rows per caller, Hindi rows |
+| 10 | Minor | "Within 20 dB" | About 24 dB, recomputed | the 24 dB pin |
+| 11 | Minor | A dead `CaptureFailed` branch | Deleted | P5 |
+
+**Mutation checks of the fix lane**, each a `--no-incremental` build and the whole filtered suite on the finished code
+(1,091 tests before the danda addition; the sentence-start, danda and carried-word rows re-run on 1,101 after it), each
+source restored byte-identical (SHA-256 compared). Failed per mutant:
+
+| Mutant | Failed |
+|---|---|
+| Carried words from the typed text (finding 1 reverted) | 2: P1 and the unit pin |
+| The old exact-pair rule (finding 2 reverted) | 3: P2 a, b, c |
+| No sound matching / no filler reading / fillers always dropped | 2 (b, c) / 1 (a) / 1 (d) |
+| No pair rule at all | 2: the original rejection pin and the ceiling pin |
+| A hold uses `hands_free_max_seconds` (finding 3 reverted) / AppRules passes the field | 3 / 3 |
+| Carried words folded into the user turn | 1 |
+| A lost microphone in hands-free sent down the drop path (the lens's M10) | 2: P5 (state machine and controller) |
+| `break` after a failed part (the lens's M11) | 1: P6 |
+| The number box reports each change at once (finding 6 reverted) / no Enter flush / no lost-focus flush | 3 / 2 / 1 |
+| The three old sentence checks back (finding 9 reverted) | 17: the 7 aligned rows, the 8 danda rows and the 2 ellipsis rows |
+| `SentenceStart` without … / without curly quotes / without brackets | 5 / 3 / 5 |
+| Without the dandas / Remove's lists back to the English literals / both files before the dandas | 8 / 5 / 10 |
+| The level does not decay (`LevelDecay` 1.0) | 2: the 24 dB pin's −24.1 dB row and `A_cut_lands_on_a_quiet_block_when_the_look_back_has_one` |
+| The README's stay-in-the-window sentence removed | 1 |
+| `CarriedWords` 9 | 1 |
+
+**Verification** (16/10/2026, this machine): Release `--no-incremental` build, 0 warnings, 0 errors. Filtered suite
+(`FullyQualifiedName!~Install_copies_models`; that test runs a copied Dictum.exe and is CI's): 1,101 total, 1,082
+passed, 19 skipped (the same 19 env-gated tests as before), 0 failed; at 193ca49 it was 1,043, 1,024, 19, 0. Not run in
+this lane: any real model or GPU (the merge lens ran its hands-free probes once against real models; their results are
+in its report, not repeated here), the desktop- and tray-gated tests, and Dictum.exe itself.

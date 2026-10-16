@@ -551,6 +551,17 @@ public class HandsFreeSettingsTests
     }
 
     [Fact]
+    public void The_README_says_to_stay_in_the_window_and_that_a_held_key_keeps_its_own_limit()
+    {
+        // Merge lens findings 3 and 5, 16/10/2026: a part is typed into whatever window is in front (Kyle's decision on holding
+        // parts is due 17/10/2026), so this sentence is the user's only guard; and the field no longer limits a held key.
+        var readme = System.Text.RegularExpressions.Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md")), @"\s+", " ");
+        Assert.Contains("Stay in the window you are dictating into until the session stops: each part is typed into whichever window is in " +
+                        "front when it is ready, so switching windows mid-session types the next parts there.", readme, StringComparison.Ordinal);
+        Assert.Contains("a held key, a stuck one included, stops the same way after 5 minutes, whatever that setting says.", readme, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public Task The_pill_says_what_Esc_kept() => UiSession.Run(() =>
     {
         var pill = new PillWindow(null);

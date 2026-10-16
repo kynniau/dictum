@@ -130,6 +130,16 @@ public class SpeechSegmenterTests
         Assert.Equal(138, Assert.Single(cuts).Cut.Block);
     }
 
+    [Theory]
+    [InlineData(0.0615f, true)]  // −24.2 dB under the speech: the 35th quiet block is still under the decayed floor
+    [InlineData(0.0625f, false)] // −24.1 dB: by the 35th block the floor (0.1 × 0.986^34 ≈ 0.0619 of the speech) is under it
+    public void A_pause_is_found_only_in_noise_more_than_about_24_dB_under_the_speech(float fraction, bool found)
+    {
+        // The ceiling the relative floor's simplification note states (merge lens finding 10: the note said 20 dB).
+        var cuts = Feed(new SpeechSegmenter(0.01), (Loud, 120), (Loud * fraction, 200));
+        Assert.Equal(found, cuts.Any(c => c.Cut.Reason == CutReason.Pause));
+    }
+
     [Fact]
     public void Silence_threshold_stays_the_floor_for_a_quiet_speaker()
     {

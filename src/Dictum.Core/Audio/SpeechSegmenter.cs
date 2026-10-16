@@ -58,9 +58,11 @@ public sealed class SpeechSegmenter
     /// office), which would leave only 30 s cuts; the relative floor finds those pauses, and silence_threshold stays the
     /// lower bound, so a quiet speaker in a silent room is measured exactly as the existing setting says.
     /// </summary>
-    // simplification: one fixed fraction of a decaying peak, not a noise-floor estimate. Ceiling: in a room whose noise is
-    // within 20 dB of the speech no block reads as quiet, so only the 30 s cut splits (at the quietest block, which may then
-    // be inside a sound). Trigger to retire: parts cut at the limit in a room where the speaker did pause.
+    // simplification: one fixed fraction of a decaying peak, not a noise-floor estimate. Ceiling: the floor decays with the
+    // level through the pause, so the 35th quiet block is measured against 0.1 × 0.986^34 ≈ 0.062 of the loudest recent block
+    // (about −24 dB); room noise within about 24 dB of the loudest recent block defeats a 0.7 s pause, and only the 30 s cut
+    // splits (at the quietest block, which may then be inside a sound). Trigger to retire: parts cut at the limit in a room
+    // where the speaker did pause.
     public const float RelativeFloor = 0.1f;
 
     /// <summary>The recent speech level is the loudest block, decaying to half in about a second (0.986^50 ≈ 0.49).</summary>

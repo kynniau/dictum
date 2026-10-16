@@ -29,12 +29,17 @@ place: see "Choosing a hotkey". Every gesture below works the same with a mouse 
 | Hotkey while transcribing | Ignored (the pill shows "Busy"). |
 
 Recordings shorter than `min_recording_ms` (0.3 s) or quieter than `silence_threshold` are discarded, because
-whisper invents text on silence. A recording auto-stops and is **transcribed** (never discarded) after
+whisper invents text on silence. A hands-free recording auto-stops and is **transcribed** (never discarded) after
 `hands_free_max_seconds` (5 minutes unless changed in Settings > General > "Hands-free stops after", from 30 seconds
-to 60 minutes), including a stuck hold key. In hands-free each part goes through the same steps; whisper and the
-clean-up also get the last part's closing words as context, which are never typed again, and a part that carries on a
-sentence (the last one did not end with . ! or ?) starts with a small letter unless its first word is "I", has another
-capital in it, or is a dictionary term spelt with a capital.
+to 60 minutes); a held key, a stuck one included, stops the same way after 5 minutes, whatever that setting says. In
+hands-free each part goes through the same steps; whisper and the clean-up also get the closing words of what you said
+in the last part as context (taken before corrections, the profanity filter and snippets, so never their text), and
+those words are never typed again. A part that carries on a sentence (the last one did not end with . ! ? …, a
+Devanagari danda or a line break) starts with a small letter unless its first word is "I", has another capital in it,
+or is a dictionary term spelt with a capital; with the rule-based tidy, which ends a part with a full stop whenever it
+ends with a letter or a digit, nearly every part is typed as its own sentence. Stay in the window you are dictating
+into until the session stops: each part is typed into whichever window is in front when it is ready, so switching
+windows mid-session types the next parts there.
 
 ### The pill
 
@@ -106,7 +111,7 @@ an edit made in the file is picked up within a second and shows in the window.
 
 | Page | What is there |
 |---|---|
-| General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
+| General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), **Hands-free stops after** (30 seconds to 60 minutes), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
 | Mode | Light or Full, with what each means on this PC. |
 | Models | Every speech and cleanup catalogue model with size, state and Use / Download, a file chooser for each, greedy or beam-search decoding. |
 | Storage | Where everything is, free space, every model file with its size and Delete, delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
@@ -549,7 +554,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `tap_ms` | `300` | A press shorter than this is a tap, not a hold (50–2000). |
 | `double_tap_ms` | `400` | Window for the second tap that starts hands-free (100–2000). |
 | `min_recording_ms` | `300` | Shorter recordings are discarded (0–10000). |
-| `hands_free_max_seconds` | `300` | Auto-stop and type the rest after this long (30–3600; Settings > General > "Hands-free stops after"). A value from 5 to 29 left from an earlier version runs as 30, with a line in the log. |
+| `hands_free_max_seconds` | `300` | Auto-stop and type the rest after this long (30–3600; Settings > General > "Hands-free stops after"). A value from 5 to 29 left from an earlier version runs as 30, with a line in the log. Hands-free only: a held key stops after 5 minutes. |
 | `silence_threshold` | `0.01` | Discard if the loudest 20 ms block's RMS (0–1) stays below this. |
 | `audio.device` | `null` | `null` = Windows default microphone; else an endpoint ID or part of the device name (`--selftest` lists them). |
 | `whisper.model` | your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin` in `models_dir`, or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
@@ -648,7 +653,10 @@ checks exist because qwen2.5-0.5b and qwen2.5-1.5b both returned replies with wh
 other check accepted; they are measured against the dictation with each retracted clause removed, so a correct
 "scratch that" is not counted as a loss but the rest of the dictation is still protected. Dictated quotation marks
 and a final dictated line break are kept. British/Australian and US spellings of the same word (colour/color,
-analyse/analyze, centre/center, catalogue/catalog, licence/license) count as one.
+analyse/analyze, centre/center, catalogue/catalog, licence/license) count as one. In hands-free, the words carried from
+the last part are context, never dictation, and a reply is also rejected when it repeats two neighbouring carried words
+(one of them a content word) that this part did not say; two neighbouring words of this part that sound like them count
+as said, with or without fillers such as "like" or "you know" between them.
 
 **Esc** during "Polishing…" cancels the cleanup and pastes nothing; Dictum is ready again at once. Measured with
 the long test dictation (184 tokens) and qwen2.5-1.5b, cancel 200 ms in: on Vulkan the model stopped 2 ms after
@@ -757,7 +765,8 @@ rewrite your phrase (for example "my e-mail"), add that form as a second line. S
 nothing attached, and keep it something you would not say by accident.
 
 **Fix last dictation** (tray, or an optional `fix_hotkey`). Opens a small always-on-top editor with the last text
-Dictum pasted (kept in memory only, never written to disk). **Copy**; **Paste fix** (switches back to the window the
+Dictum pasted (kept in memory only, never written to disk); in hands-free, Fix last dictation holds the last part typed.
+**Copy**; **Paste fix** (switches back to the window the
 dictation went to and pastes through the normal insert path: select the wrong text there first to replace it);
 **Save corrections** (compares your edit with the original word by word and lists each replaced phrase as "Add
 correction: X => Y", unticked; only the ones you tick are added). Added or deleted words and punctuation or

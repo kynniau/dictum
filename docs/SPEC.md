@@ -84,13 +84,15 @@ State machine (pure C#, time injected, fully unit-tested):
 | Idle | hotkey down | RecordingHold: start capture immediately, show pill "Recording · hold" |
 | RecordingHold | hotkey up, held ≥ `tap_ms` | Processing: stop capture, transcribe |
 | RecordingHold | hotkey up, held < `tap_ms` | PendingTap: keep capturing, start `double_tap_ms` timer |
-| PendingTap | hotkey down within window | RecordingHandsFree: keep capturing (no audio lost), pill "Recording · hands-free 0:00"; this down event is consumed, its matching up is ignored |
+| PendingTap | hotkey down within window | RecordingHandsFree: keep capturing (no audio lost), pill "Recording · hands-free 0:00"; this down event is consumed, its matching up is ignored; from now on the recording is cut at pauses and each part is typed while recording goes on (amendment 16/10/2026: "Hands-free segments" below) |
 | PendingTap | window expires | Idle: discard audio, hide pill |
-| RecordingHandsFree | hotkey down (a new press) | Processing: stop capture, transcribe |
-| RecordingHandsFree | elapsed ≥ `hands_free_max_seconds` (default 300) | Processing: stop and transcribe what was captured (auto-stop, never discard) |
-| RecordingHold | elapsed ≥ `hands_free_max_seconds` | same auto-stop (a stuck key must not record all afternoon) |
-| Any recording state | Esc | Idle: discard audio, pill flashes "Cancelled" then hides |
-| Processing | Esc | Idle: cancel whisper and LLM via CancellationToken, nothing is pasted |
+| RecordingHandsFree | hotkey down (a new press) | Processing: stop capture; what followed the last cut is typed last, after the parts already queued |
+| RecordingHandsFree | elapsed ≥ `hands_free_max_seconds` (default 300; 30–3600, Settings > General) | Processing: stop and type what followed the last cut (auto-stop, never discard) |
+| RecordingHold | elapsed ≥ 300 s (a fixed limit, not `hands_free_max_seconds`: amendment 16/10/2026) | same auto-stop (a stuck key must not record all afternoon) |
+| RecordingHold, RecordingHandsFree | microphone lost (unplugged, battery) | Processing: transcribe what was captured, pill flashes "Mic error"; in hands-free the parts already typed stay and what followed the last cut is typed last (fix batch, 15/10/2026; hands-free 16/10/2026) |
+| RecordingHold, PendingTap | Esc | Idle: discard audio, pill flashes "Cancelled" then hides |
+| RecordingHandsFree | Esc | Idle: stop capture; the text already typed stays; parts in flight or queued and what followed the last cut are dropped; pill flashes "Stopped. Text already typed stays." (amendment 16/10/2026) |
+| Processing | Esc | Idle: cancel whisper and LLM via CancellationToken, nothing more is pasted; after a hands-free stop the parts already typed stay and the pill flashes "Stopped. Text already typed stays." instead of "Cancelled" |
 | Processing | hotkey down | ignored (pill briefly shows "Busy") |
 | Any | disabled via tray | Idle; hotkey ignored until re-enabled; Esc watcher inert |
 
@@ -104,6 +106,46 @@ Rules:
 - For chords, suppress only the final non-modifier key, never bare modifiers, and only
   while the chord is complete.
 - The hook must survive the UI being busy: that is why it has its own thread.
+
+**Hands-free segments (amendment, 16/10/2026; product owner decisions 3 and 5).** In hands-free the
+capture cuts the recording at pauses and each part goes through the §4 pipeline while recording goes
+on: one part at a time, in the order cut, all under the session's one cancellation token.
+Hold-to-talk stays one recording, and calibration takes are never cut.
+
+- Cut rule (`SpeechSegmenter`, on the 20 ms block levels the capture already measures; fixed
+  constants, each with a `// simplification:` note): a part ends at 0.7 s of quiet (35 blocks)
+  once it holds 2 s of speech (100 blocks), cut in the middle of the pause; with no such pause it
+  is cut at 30 s (1,500 blocks) on the quietest block of the last 3 s (150 blocks), preferring one
+  that was quiet when it arrived. A block is quiet below the larger of `silence_threshold` and 0.1
+  of the recent speech level (the loudest recent block, decaying by 0.986 a block, so it halves in
+  about a second), because `silence_threshold` alone (0.01) finds no pause in a room noisier than
+  that. Ceiling: the floor decays through the pause, so at the 35th quiet block it is
+  0.1 × 0.986^34 ≈ 0.062 of the loudest recent block (about −24 dB), and room noise within about
+  24 dB of that block defeats a 0.7 s pause; only the 30 s cut splits then.
+- Context: each part after the first carries the last 10 words of what the last part that typed
+  something said (its text after the clean-up and the boundary rule, before corrections, the
+  profanity filter and snippets, so none of the user's own text from those files). They follow the
+  dictionary terms in whisper's prompt (Whisper.net 1.9.1 takes the prompt when a processor is
+  built, `WithPrompt`, so one is built and freed per part; if that build fails the part is
+  transcribed without them) and go to the clean-up beside the part, never as its dictation: cloud
+  providers get a line after the system prompt, the local model a system turn after its cached
+  prefix. They are never typed again.
+- Boundary rule (`SegmentJoin`, before corrections, the profanity filter and snippets): when the
+  last part ended a sentence (. ! ? … । ॥ or a line break, read back past quotes and brackets: the
+  rule the corrections and the profanity filter use too), this part starts with its capital after
+  a space; otherwise it carries on in lower case, unless its first word is "I", has another capital
+  in it, or is a dictionary term spelt with a capital. No second space after
+  `insert.trailing_space`; a spoken "new line" or "new paragraph" on either side of a cut still
+  breaks the line. The rule-based tidy ends a part with a full stop whenever it ends with a letter
+  or a digit, so with it nearly every part is typed as its own sentence (an open question:
+  DECISIONS.md, "Hands-free segments").
+- The stop (the hotkey, the auto-stop, a lost microphone) types what followed the last cut last.
+  Esc stops the session: what is typed stays, the rest is dropped.
+- Each part is typed into whatever window is in front when it is ready (§6); a window change
+  mid-session sends the next parts there (a known ceiling; holding parts is Kyle's decision, due
+  17/10/2026).
+- Fix last dictation holds the last part typed. The log carries counts and timings only. A held key
+  keeps its own fixed limit (300 s); `hands_free_max_seconds` is hands-free's alone.
 
 ## 4. Pipeline
 
@@ -277,6 +319,10 @@ Ctrl+V.
   Verify with a test that showing the pill does not change `GetForegroundWindow()`.
 - Texts: "Recording · hold", "Recording · hands-free m:ss", "Transcribing…", "Polishing…",
   "Done", "Cancelled", "Busy", "Mic error". Hide after a short fade.
+- Hands-free (amendment, 16/10/2026; wording PROPOSED, awaiting the product owner): after the
+  "Hands-free" label and the timer the hint reads "typing as you pause · tap to stop · Esc stops and
+  keeps what's typed"; Esc in hands-free flashes "Stopped. Text already typed stays." for 1.8 s with
+  a grey stop-square badge.
 - Respect reduced motion (`SystemParameters.ClientAreaAnimation` false → no pulse/fade).
 
 ## 8. Tray
@@ -333,6 +379,11 @@ present; AppData wins). Models and logs in `%LOCALAPPDATA%\Dictate\models` and
 `whisper.model` accepts a short name (`small.en`, `medium.en`, `medium.en-q5_0`,
 `large-v3-turbo`…) resolved to `ggml-<name>.bin` in `models_dir`, or an absolute path.
 Unknown keys and malformed values: log a warning, use the default, never crash.
+
+`hands_free_max_seconds` (amendment, 16/10/2026): 30–3600, set from Settings > General (§20). A
+value from 5 to 29 left by an earlier version is raised to 30 at load with a log line, and the file
+is not rewritten (`EffectiveSettings.HandsFree`); 0–4 and over 3600 still fall back to the default
+with a warning. It limits hands-free only: a held key stops after a fixed 300 s (§3).
 
 ## 10. Models
 
@@ -729,6 +780,14 @@ user. Required:
   Command (RightWin)".
 - `--selftest` prints a 5-second "press your hotkey now" check and reports whether the
   configured key was seen.
+- Settings window, Hands-free (amendment, 16/10/2026): a "Hands-free" card on General with
+  "Hands-free stops after" as a number box with a minutes/seconds dropdown, a 30 s–60 min slider and
+  quick picks of 1, 2, 5, 10, 30 and 60 min, all named for screen readers and keyboard-reachable. The
+  slider and the number box write settings.json once their value settles (400 ms without a change),
+  the box also on Enter or when it loses focus, and leaving the page writes a value still settling;
+  a pick writes at once; every value is clamped to 30 s–60 min. Label and help text PROPOSED,
+  awaiting the product owner: "Hands-free stops after"; "Hands-free dictation types each sentence as
+  you pause, so a long session reads back as you go. It stops by itself after this long."
 - README: a short "Keyboards and Remote Desktop" subsection covering Mac key mapping,
   Fn being unreachable, and the single keys known to work over RDP (RightAlt, RightWin,
   CapsLock, F-keys).
@@ -818,6 +877,19 @@ These amend earlier sections; where they conflict, this section wins.
 - **§22 cloud consent (amended):** consent is recorded in a file written only by the
   in-app dialog (`%APPDATA%\Dictum\consent.json`: provider, timestamp, app version);
   `llm.cloud_consent` in settings.json is ignored and documented as such.
+- **§5 validator, hands-free parts (amendment, 16/10/2026):** a part's carried words (§3,
+  "Hands-free segments") are prompt text, never dictation: every rule, the dictionary-term rule
+  included, measures the reply against the part's own words. A reply is also rejected when it repeats
+  two adjacent carried words, one of them a content word, that the part did not say; the part said a
+  pair when its dictation has two adjacent words that sound like it word by word
+  (`ValidatorText.SoundsLike`), read without spoken commands and hesitations, and both with and
+  without the fillers the prompt lists.
+- **§16.3/§16.4 and §3 sentence start (amendment, 16/10/2026):** the corrections, the profanity
+  filter and the hands-free boundary rule share one sentence-start rule (`SentenceStart`): the start
+  of the text, or after a line break or a mark that ends a sentence, read back past spaces, quotes
+  and brackets. The marks are . ! ? … and the Devanagari danda । and double danda ॥ (Hindi
+  dictation); the profanity filter's remove mode uses the same marks for the one after a removed
+  word ("वह कमीना।" → "वह।", as "It's shit." → "It's.").
 
 ## 23. Languages and translation (amendment, 16/10/2026)
 
