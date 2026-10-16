@@ -233,6 +233,23 @@ Dictate: see "Moving from Dictate".
    or install it per user with `scripts\install.ps1` (see "Deploying to staff machines and Azure VMs"). The build is
    self-contained: no .NET install is needed.
 
+**The direct download needs the Microsoft Visual C++ Redistributable (x64), version 14.51 or later**, unless its
+`runtimes` folders carry the Visual C++ runtime DLLs (a build made with `publish.ps1 -VcRuntimeDir`; see "Build from
+source"). The speech engine (whisper.cpp) and the clean-up engine (llama.cpp) are built with Microsoft's C++ compiler
+and load its runtime; many PCs already have it, but a clean Windows does not, and then the tray shows "model error"
+and the `whisper runtime` line of `--selftest` says `model load failed`. Install it from Microsoft,
+https://aka.ms/vc14/vc_redist.x64.exe ("Microsoft Visual C++ Redistributable latest supported downloads", read
+17/10/2026); that needs administrator rights. The installer checks for it before it installs anything and asks:
+**Yes** opens that download and carries on installing Dictum, **No** carries on without it, **Cancel** stops Setup (an
+install run with `/SUPPRESSMSGBOXES` carries on and logs it). Its "Launch Dictum" box appears at the end only when the
+runtime is there by then. The Store build declares Microsoft's runtime framework package for the Store to install with
+it (no packaged run has confirmed that yet: docs/STORE.md, section 10).
+
+**Every build carries the base.en speech model** (Decision 16, 17/10/2026): `models\ggml-base.en.bin` beside
+`Dictum.exe`, the catalogue's file byte for byte. `THIRD-PARTY-NOTICES.txt` beside it carries the model's MIT notices
+and the licence notice of every other third-party component in the folder (a test fails when a shipped package is
+missing from it).
+
 Testing the self-signed MSIX package before the Store listing is live: see [docs/TESTING-MSIX.md](docs/TESTING-MSIX.md).
 
 ### Build from source
@@ -265,8 +282,16 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 
    Run a gated job with `-failSkips` (or check the skip count) if a missing variable must fail it rather than skip.
 3. Publish: `powershell -ExecutionPolicy Bypass -File scripts\publish.ps1` → `dist\Dictum\Dictum.exe` and
-   `dist\Dictum-<version>-win-x64.zip` (self-contained: 276 files with `manifest.txt` and `Dictum.ico`, 278.8 MiB unpacked / 98.4 MiB zipped, measured 16/10/2026 for 1.0.0, including the two data files `profanity.txt` and `calibration-sentences.txt`, Avalonia's Skia, HarfBuzz and ANGLE libraries,
+   `dist\Dictum-<version>-win-x64.zip` (self-contained: 278 files with `manifest.txt`, 420.3 MiB unpacked / 226.1 MiB zipped, measured 17/10/2026 for 1.0.0 with the bundled model and the full third-party notices; 276 files, 278.8 MiB / 98.4 MiB without it on 16/10/2026; including the two data files `profanity.txt` and `calibration-sentences.txt`, the base.en speech model in `models\` with `THIRD-PARTY-NOTICES.txt`, Avalonia's Skia, HarfBuzz and ANGLE libraries,
    the Vulkan, CPU and no-AVX whisper runtimes and the Vulkan and CPU llama.cpp runtimes; English resources only; `-FrameworkDependent` gives a small build that needs the .NET 10 Runtime: no Desktop Runtime, as there is no WPF or WinForms).
+   `-VcRuntimeDir <folder>` copies the Visual C++ runtime (`msvcp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`,
+   `vcomp140.dll`) beside each of the 8 native runtime folders, so the zip and the installer run on a PC without the
+   redistributable. The folder is `VC\Redist\MSVC\<version>\x64` of a Visual Studio or Build Tools install, version
+   14.51 or later; Microsoft allows only licensed Visual Studio users to redistribute these files
+   (docs\DECISIONS.md, "Visual C++ runtime"). Without it, publish warns that the build needs the redistributable.
+   The bundled base.en model comes from `dist\model-cache`, else from a matching copy in `%LOCALAPPDATA%\Dictum\models`
+   (read only), else from huggingface.co at the catalogue's pinned commit; `download-model.ps1` checks its size and
+   SHA-256 every time and stops the publish on a mismatch.
 4. Installer: install [Inno Setup](https://jrsoftware.org/isdl.php) 7 for your user (the version used is in
    `docs\DECISIONS.md`), then `powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1` →
    `dist\Dictum-Setup-<version>.exe` (the version comes from `<Version>` in `Directory.Build.props`).
@@ -274,11 +299,14 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
    `dist\Dictum-<version>-test.msix`, signed with that self-signed certificate (see
    [docs/TESTING-MSIX.md](docs/TESTING-MSIX.md)); or `-Store` → `dist\Dictum-<version>-store.msix` with the Partner
    Center identity, unsigned because the Store signs what it publishes. The Store refuses a version whose first part
-   is 0, so `-Store` needs `<Version>` 1.0 or later. The first run restores the Windows SDK build tools (MakeAppx,
+   is 0, so `-Store` needs `<Version>` 1.0 or later. Both declare Microsoft's Visual C++ runtime framework package,
+   `Microsoft.VCLibs.140.00.UWPDesktop`, which the Store installs and a sideload needs first (docs/TESTING-MSIX.md);
+   any Visual C++ runtime DLLs in `dist\Dictum` are left out of the package. `scripts\sandbox-check.ps1` runs the
+   self-test of a build or a package layout in Windows Sandbox, a clean Windows (docs/TESTING-MSIX.md). The first run restores the Windows SDK build tools (MakeAppx,
    MakePri, SignTool) and Svg.Skia, which renders the logos from `site\dictum.svg`, from nuget.org into
    `packaging\out`; no Windows SDK install is needed.
 6. CI: `.github/workflows/ci.yml` builds, runs the ungated tests and publishes the zip on every push and pull
-   request; a tag `v<version>` matching `<Version>` also builds steps 4 and 5 and publishes a GitHub release with
+   request (the publish downloads the base.en model, hash-checked, and fails the job on a mismatch); a tag `v<version>` matching `<Version>` also builds steps 4 and 5 and publishes a GitHub release with
    the zip, the installer, the test MSIX, its certificate and `SHA256SUMS.txt`.
 
 ### First run
@@ -414,8 +442,9 @@ example from a share used by `-ModelsFrom`). Do not deploy any model in a busine
 
 **Gated models (Gemma):** Google requires you to accept its licence on huggingface.co while logged in, so an
 anonymous download gets HTTP 401. Dictum does not handle Hugging Face tokens; tray, picker and
-`--download-cleanup-model` say "requires a Hugging Face login to download; use install.ps1 -ModelsFrom or
-download-model.ps1 with a token" instead of trying. Accept the licence on the repository page, then run
+`--download-cleanup-model` say "requires a Hugging Face login to download; download it in your browser, then choose it
+in Settings > Models" instead of trying. Accept the licence on the repository page, then either download the file there
+and pick it with Settings > Models > Choose .gguf file…, or (direct download, which ships the scripts) run
 `scripts\download-model.ps1 -Cleanup gemma-3-1b` and enter the token when asked (typing is hidden), or set
 `HF_TOKEN` for that session. The token goes only to huggingface.co and only for a gated model, in a temporary header
 file, and is never written to settings or logs. `-Token <token>` still works but warns: a token on the command line
@@ -1036,6 +1065,12 @@ warns, and that file has no size or hash to be checked against. A value is never
   `Whisper model ... loaded ... on runtime ...`). On `CPU`, pick `small.en` or `base.en` in the tray panel or Settings > Models
   (see the measured table above). The Vulkan runtime needs a GPU driver with Vulkan support; without one Dictum
   uses the CPU runtime, which is expected, not an error.
+- **"model error" with a model that is there**, and the `whisper runtime` line of `--selftest` says `model load
+  failed: Exception: Failed to load native whisper library` (the `cleanup backend` line: `load failed:
+  TypeInitializationException: The type initializer for 'LLama.Native.NativeApi' threw an exception`). The PC lacks
+  the Microsoft Visual C++ runtime that both engines load. Install the Microsoft Visual C++
+  Redistributable (x64) from https://aka.ms/vc14/vc_redist.x64.exe (administrator rights), then restart Dictum. See
+  "Install".
 - **Model missing.** Use Settings > Models, `Dictum.exe --download-model small.en`,
   `scripts\download-model.ps1 -Model small.en`, or point `whisper.model` at a file you already have.
 - **Slow cleanup.** Check the cleanup backend in the tray panel or `--selftest`. On `CPU`, choose
@@ -1073,7 +1108,13 @@ CPU for its recommendations and Mode presets; untested on an integrated GPU) and
 Desktop (CPU only, often Windows Server).
 
 **Build once:** `scripts\publish.ps1` → `dist\Dictum-<version>-win-x64.zip` (self-contained; the Vulkan, CPU and
-no-AVX whisper runtimes and the Vulkan and CPU llama.cpp runtimes are inside).
+no-AVX whisper runtimes, the Vulkan and CPU llama.cpp runtimes and the base.en speech model are inside).
+
+**Visual C++ runtime:** both engines need it (see "Install"). A build made with `publish.ps1 -VcRuntimeDir` carries it
+and needs nothing more, which suits per-user installs without administrator rights. Otherwise every machine needs the
+Microsoft Visual C++ Redistributable (x64) 14.51 or later, installed once by an administrator, for example
+`vc_redist.x64.exe /install /quiet /norestart` ("Redistribute Visual C++ files", Microsoft Learn, read 17/10/2026, has
+the switches). Fresh Azure and Windows Server images may not have it; `--selftest` shows it (`whisper runtime`).
 
 **Install per user (no admin)**, locally, over remote PowerShell, or from Intune:
 

@@ -129,7 +129,8 @@ foreach ($tool in @($makeappx, $makepri, $signtool)) {
 }
 Write-Host "  Microsoft.Windows.SDK.BuildTools $sdkVersion (tools $($sdkBin.Name)): makeappx, makepri, signtool"
 
-# 5. The package layout: the published build, minus any .env (secrets placed beside Dictum.exe never ship).
+# 5. The package layout: the published build, minus any .env (secrets placed beside Dictum.exe never ship) and any
+#    app-local Visual C++ runtime (below).
 if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force }
 $layout = Join-Path $work "layout"
 $priRoot = Join-Path $work "pri"
@@ -138,6 +139,14 @@ $secrets = @(Get-ChildItem -LiteralPath $published -Recurse -Force -File -Filter
 if ($secrets) { Write-Warning "Left out of the package: $($secrets.FullName -join ', ')" }
 Get-ChildItem -LiteralPath $published -Force | Where-Object { $_.Name -notlike "*.env" } | Copy-Item -Destination $layout -Recurse -Force
 Get-ChildItem -LiteralPath $layout -Recurse -Force -File -Filter "*.env" | Remove-Item -Force
+# The Visual C++ runtime comes from Microsoft's framework package, which the manifest declares: a packaged desktop app
+# must not carry its own copy ("C++ Runtime framework packages for Desktop Bridge", KB 3176696), so the copies a
+# publish.ps1 -VcRuntimeDir build puts beside the native runtimes stay out of the package.
+$appLocalVc = @(Get-ChildItem -LiteralPath $layout -Recurse -Force -File | Where-Object { $VcRuntimeDlls -contains $_.Name.ToLowerInvariant() })
+if ($appLocalVc) {
+    $appLocalVc | Remove-Item -Force
+    Write-Host "Left out $($appLocalVc.Count) app-local Visual C++ runtime DLLs: the package uses Microsoft.VCLibs.140.00.UWPDesktop."
+}
 
 # 6. Logos, rendered from the SVG mark.
 Invoke-Tool $dotnet @("run", "--project", $toolsProject, "-c", "Release", "--no-build", "--", "logos",
@@ -185,3 +194,4 @@ if ($cert) {
 } else {
     Write-Host "  Unsigned: Partner Center signs Store packages. Upload this file, not the -test one."
 }
+Write-Host "  Depends on Microsoft.VCLibs.140.00.UWPDesktop: the Store installs it; a sideload needs it first (docs\TESTING-MSIX.md)."

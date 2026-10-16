@@ -1,0 +1,21 @@
+<!--
+  Windows Sandbox configuration for scripts\sandbox-check.ps1, which fills the {{...}} tokens and writes the result into
+  its output folder. A clean Windows with networking, the virtual GPU, the microphone, the camera, the clipboard and
+  printers off; every mapped folder is read-only except the output folder (C:\sbx\out).
+  Adapted from the Store certification investigation's vcrt-check.wsb (16/10/2026, docs\DECISIONS.md, "Visual C++ runtime").
+-->
+<Configuration>
+  <VGpu>Disable</VGpu>
+  <Networking>Disable</Networking>
+  <AudioInput>Disable</AudioInput>
+  <VideoInput>Disable</VideoInput>
+  <ClipboardRedirection>Disable</ClipboardRedirection>
+  <PrinterRedirection>Disable</PrinterRedirection>
+  <MemoryInMB>6144</MemoryInMB>
+  <MappedFolders>
+{{MappedFolders}}
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\sbx\scripts\sandbox-check-inside.ps1</Command>
+  </LogonCommand>
+</Configuration>

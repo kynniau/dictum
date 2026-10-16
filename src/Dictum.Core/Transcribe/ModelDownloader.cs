@@ -9,9 +9,12 @@ using Dictum.Settings;
 
 namespace Dictum.Transcribe;
 
-/// <summary>Raised instead of any network call when offline_only is on.</summary>
+/// <summary>
+/// Raised instead of any network call when offline_only is on. The message reaches the Store build's balloon and the
+/// --download-model output, so it names Settings, which every build has, not install.ps1, which the Store package lacks.
+/// </summary>
 public sealed class OfflineOnlyException(string what)
-    : InvalidOperationException($"{what} refused: offline_only is on, so Dictum makes no network calls. Copy the file into the models folder instead (install.ps1 -ModelsFrom).");
+    : InvalidOperationException($"{what} refused: offline_only is on, so Dictum makes no network calls. Copy the file into the models folder instead (Settings > Storage shows the folder).");
 
 /// <summary>The download did not complete; <see cref="Reason"/> is short enough for a balloon ("connection dropped").</summary>
 public sealed class DownloadFailedException(string fileName, int attempts, string reason, Exception? inner = null, bool resumable = false)
@@ -43,7 +46,11 @@ public sealed record DownloadPolicy(int MaxAttempts, Func<int, TimeSpan> Backoff
 /// </summary>
 public static partial class ModelDownloader
 {
-    public const string LoginRequired = "requires a Hugging Face login to download; use install.ps1 -ModelsFrom or download-model.ps1 with a token";
+    /// <summary>
+    /// Ends the balloon and error for a file behind a login (a gated catalogue entry, or HTTP 401/403). It names the Settings
+    /// page every build has: the Store package ships neither install.ps1 nor download-model.ps1.
+    /// </summary>
+    public const string LoginRequired = "requires a Hugging Face login to download; download it in your browser, then choose it in Settings > Models";
 
     /// <summary>
     /// TLS for model downloads. Measured 15/10/2026 on this network, ggml-large-v3-turbo.bin (1.62 GB) six times each:

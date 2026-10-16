@@ -303,6 +303,21 @@ public sealed class OfflineAndDownloadTests : IDisposable
     }
 
     [Fact]
+    public void A_login_wall_points_at_Settings_not_at_scripts_the_Store_package_lacks()
+    {
+        Assert.Contains("Settings > Models", ModelDownloader.LoginRequired);
+        Assert.DoesNotContain(".ps1", ModelDownloader.LoginRequired);
+    }
+
+    [Fact]
+    public void An_offline_refusal_points_at_Settings_not_at_install_ps1_which_the_Store_package_lacks()
+    {
+        var message = new OfflineOnlyException("Download of ggml-base.en.bin").Message;
+        Assert.Contains("Copy the file into the models folder instead (Settings > Storage shows the folder).", message);
+        Assert.DoesNotContain(".ps1", message);
+    }
+
+    [Fact]
     public async Task A_server_error_is_retried()
     {
         var (content, spec) = Sample();

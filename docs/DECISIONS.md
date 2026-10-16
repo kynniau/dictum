@@ -1403,3 +1403,414 @@ measured). The re-run failed only the pin.
 (`FullyQualifiedName!~Install_copies_models`; CI runs that test): 93e7e72 1,202 total, 1,183 passed, 19 skipped, 0 failed;
 with these changes 1,212, 1,193, 19, 0 (ten more test cases). Not run in this lane: any real model or GPU, Dictum.exe, and the
 desktop- and tray-gated tests (the 19 skipped). No on-screen string changed.
+
+## Visual C++ runtime (Store certification fix, 17/10/2026, branch fix/vc-runtime)
+
+**The finding** (investigation lane, 16/10/2026; evidence in that session's scratchpad: `sbx\vcrt-check.wsb`,
+`sbx\in\run.ps1`, `sbx\out\*`, `pe-imports.ps1`, `vcrt-exports-check.ps1`, `logs\vclibs-*`). The first Store submission
+failed certification; the tester's screenshot showed "model error" and "error". Every whisper.cpp and llama.cpp DLL
+imports `MSVCP140.dll`, `VCRUNTIME140.dll` and `VCRUNTIME140_1.dll`, and the ggml CPU builds also `VCOMP140.DLL`; the
+.NET runtime and Avalonia's native libraries import none of them. The Store package carried none and declared only
+`TargetDeviceFamily`. In Windows Sandbox 10.0.26100 (no VC++ DLLs in System32, no redistributable registry key, no
+VCLibs packages) `--selftest` printed `whisper runtime … model load failed: Exception: Failed to load native whisper
+library …` and `cleanup backend … load failed: TypeInitializationException: The type initializer for
+'LLama.Native.NativeApi' threw an exception.` while the UI ran. With the four VC++ 14.40.33728 DLLs beside each native
+runtime folder both engines loaded and `--transcribe` transcribed a 10.74 s clip. Whisper.net also found a runtime DLL
+beside Dictum.exe; LLamaSharp did not.
+
+Measured again on this branch (17/10/2026): the published layout has 38 native DLLs in 8 folders under `runtimes\`; all
+38 import the VC++ runtime and 10 of them `vcomp140.dll`. Their PE headers name MSVC linker 14.44 (Whisper.net.Runtime
+and .Vulkan 1.9.1, LLamaSharp.Backend.Cpu and .Vulkan.Windows 0.27.0) and 14.51 (Whisper.net.Runtime.NoAvx 1.9.1).
+The investigation's export check, re-run against the 14.40.33728 framework DLLs: 1,977 imported VC++ functions across
+the five packages, 0 missing.
+
+**Sources** (Microsoft Learn, read 17/10/2026, unless marked):
+- "C++ Runtime framework packages for Desktop Bridge" (KB 3176696): desktop apps that depend on the C++ runtime "must
+  specify the corresponding version of the C++ Runtime framework package" instead of redistributing the runtime, with the
+  `PackageDependency` for `Microsoft.VCLibs.140.00.UWPDesktop` and Publisher
+  `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`.
+- "MSIX troubleshooting guide", Missing dependencies: through the Store "framework dependencies are automatically
+  downloaded and installed"; a sideload installs https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx first.
+- "Basic troubleshooting for Windows App" lists `Microsoft.VCLibs.140.00.UWPDesktop_14.0.33728.0` as a current framework
+  file. The build PC has 14.0.33728.0 (x64 and x86) from the Store, Publisher as above, its DLLs 14.40.33728.0 signed
+  Microsoft Corporation (`Get-AppxPackage`, `Get-AuthenticodeSignature`, 17/10/2026). MinVersion is that version, the one
+  tested.
+- "Dynamic-link library search order": a packaged process searches its package dependency graph for a DLL's
+  dependencies "even if the first DLL was loaded by specifying a full path".
+- "Redistribute Visual C++ files" and "Distributable Code for Visual Studio 2022": distribution of the redistributable
+  package, merge modules and individual binaries "is limited to licensed Visual Studio users"; the files come from
+  `[VisualStudioFolder]\VC\redist`; app-local copies are not recommended for servicing reasons; the redistributable's
+  registry key and its `/install /quiet /norestart` switches; run unelevated, it asks for UAC.
+- "Microsoft Visual C++ Redistributable latest supported downloads": https://aka.ms/vc14/vc_redist.x64.exe;
+  "Redistribution is permitted only for licensed Visual Studio users"; the installed redistributable "must be the same
+  or later than the version of the MSVC Build Tools used to create your application".
+- Whisper.net 1.9.1's readme (in its NuGet package): "Microsoft Visual C++ Redistributable for at least Visual Studio
+  2022 (x64)" and "Windows 11 or Windows Server 2022 (or newer) is required".
+
+**Fix, Store package.** `packaging/AppxManifest.template.xml` declares
+`<PackageDependency Name="Microsoft.VCLibs.140.00.UWPDesktop" MinVersion="14.0.33728.0" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" />`.
+`package-msix.ps1` leaves any app-local VC++ DLL out of the layout (observed: "Left out 32 app-local Visual C++ runtime
+DLLs" when packaging a `-VcRuntimeDir` publish) and ends by naming the dependency. Rebuilt on 17/10/2026 from this
+branch with `package-msix.ps1 -Store -NoPublish` over a plain publish: `dist\Dictum-1.0.0-store.msix`, 105,953,677
+bytes, unsigned, 350 files; rebuilt again with the bundled model (below), 239,909,521 bytes, 352 files. In both, the
+`AppxManifest.xml` read back out of the .msix carries the element, and the .msix holds no VC++ DLL.
+
+**Fix, direct download: the route taken, and why.**
+- No licensed app-local source is on the build PC: no Visual Studio or Build Tools (no `Microsoft Visual Studio` folder
+  under either Program Files, no vswhere), no Windows SDK, no `Microsoft.VC14*.CRT` folder under `C:\Program Files*`,
+  `C:\ProgramData`, `D:\`, `G:\` or `E:\` (the private data folder excluded), and no VCLibs `.appx` in the NuGet cache or
+  anywhere else searched. The only copies are the installed redistributable in System32 (14.51.36247) and the installed
+  framework package (14.40.33728); neither is a documented source to redistribute from.
+- Microsoft limits redistribution of the runtime in every form, the vc_redist package included, to licensed Visual
+  Studio users, so bundling vc_redist.x64.exe into Setup needs the same licence as app-local DLLs. Setup is also per user
+  (`PrivilegesRequired=lowest`): it never runs elevated, so it could not run vc_redist silently.
+- So this branch redistributes nothing. `publish.ps1 -VcRuntimeDir <Visual Studio or Build Tools VC\Redist\MSVC\<version>\x64>`
+  copies the four DLLs beside each of the 8 native runtime folders and refuses a DLL that is not Microsoft-signed or is
+  older than 14.51 (`$MinVcRuntime` in `scripts/build-common.ps1`: the newest linker above); without it, publish warns.
+  A Setup built from such a layout carries the runtime. Any other Setup reads
+  `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` (Installed, Major, Minor) in `InitializeSetup`, before it
+  installs anything, and asks: Yes opens https://aka.ms/vc14/vc_redist.x64.exe and carries on, No carries on, Cancel stops
+  Setup; its Launch Dictum box waits for the key. (Amended 17/10/2026, "Lens fixes" below: the first version read the key
+  after the files were copied and launched Dictum anyway.) README: Install (both direct-download routes), Build from
+  source, Troubleshooting and staff deployment.
+- **For Kyle to decide:** whether Kynni installs Visual Studio or Build Tools whose redistributable is 14.51 or later on
+  the build PC, under a licence it holds, and builds releases with `-VcRuntimeDir`. Staff without administrator rights
+  need that, since the redistributable needs an administrator. The first such release must carry whatever notice the
+  Visual Studio licence asks for (the licence text was not read here), which is why `THIRD-PARTY-NOTICES.txt` carries no
+  notice for Microsoft's runtime DLLs: none is redistributed yet. CI does not pass `-VcRuntimeDir`; whether Kynni may redistribute DLLs from GitHub's
+  runner image is a licence question this branch does not settle.
+
+**Test.** `tests/Dictum.Tests/VcRuntimeTests.cs`: a C# port of `pe-imports.ps1` (import and delay-import tables,
+machine, linker version) and 7 tests, one a theory of 3. Every whisper and llama engine imports the runtime and nothing
+beyond `$VcRuntimeDlls`; the template declares the tested framework from Microsoft and the layout carries no copy; a
+manifest without the element, with an older MinVersion or with another publisher is refused; a Store layout with its
+own `vcruntime140.dll` is refused; a direct-download layout needs the DLLs beside every DLL that imports them (one
+missing, named); `$MinVcRuntime` is no older than the newest linker; and, gated on `DICTUM_PUBLISHED_DIR`, a real layout
+(the Store check when it holds an `AppxManifest.xml`, else app-local). Observed failing on the reverted behaviour, each
+then restored:
+- the template's PackageDependency line deleted: 4 of the 9 failed (the Store test, "Collection was not empty", and the
+  three theory cases);
+- `$MinVcRuntime` set to 14.44: 1 failed, "accepts a Visual C++ runtime from 14.44, but a native DLL was linked by MSVC
+  14.51";
+- `vcomp140.dll` dropped from `$VcRuntimeDlls`: 2 failed;
+- one shipped DLL removed from a `-VcRuntimeDir` publish (`runtimes\win-x64\native\avx2\vcomp140.dll`): the gated test
+  failed, naming `runtimes\win-x64\native\avx2\ggml-cpu.dll imports vcomp140.dll`;
+- the plain publish fails the gated test too, by design; the Store layout passes it, also when packaged from a
+  `-VcRuntimeDir` publish.
+
+**Clean-PC check** (`scripts/sandbox-check.ps1`, `scripts/sandbox-check.wsb`, `scripts/sandbox-check-inside.ps1`;
+Windows Sandbox 10.0.26100 with no VC++ DLLs in System32, no redistributable key and no VCLibs packages; ggml-base.en and
+qwen2.5-0.5b mapped read-only; 17/10/2026 from 00:32 AEDT; microphone lines fail in every run, as there is no audio, and
+do not count):
+- (these layouts were built before the base.en model was bundled, below; the model file does not change which DLLs
+  load)
+- the rebuilt zip layout (`publish.ps1` without `-VcRuntimeDir`), gpu auto and cpu: `whisper runtime … model load
+  failed: Exception: Failed to load native whisper library … [FAIL]` and `cleanup backend … load failed:
+  TypeInitializationException … [FAIL]`. The README's redistributable step is required for it.
+- a `-VcRuntimeDir` layout built only for this check from the build PC's System32 copies (14.51.36247; never shipped,
+  kept in the session scratchpad): auto `whisper runtime … Vulkan (whisper.gpu = auto; loaded in 4.1 s) [OK]` and
+  `cleanup backend … Vulkan (llm.gpu = auto; loaded in 4.4 s; …native/vulkan/llama.dll) [OK]`; cpu `CPU (whisper.gpu =
+  cpu; loaded in 0.7 s) [OK]` and `CPU (llm.gpu = cpu; loaded in 3.5 s; …native/avx2/llama.dll) [OK]`.
+- the Store layout: Windows refused it without the framework, `0x80073CF3`, "Windows cannot install package
+  Kynni.Dictum_1.0.0.0_x64__43s584kx66f64 because this package depends on a framework that could not be found. Provide the
+  framework "Microsoft.VCLibs.140.00.UWPDesktop" published by "CN=Microsoft Corporation, O=Microsoft Corporation,
+  L=Redmond, S=Washington, C=US", with neutral or x64 processor architecture and minimum version 14.0.33728.0": the
+  declared dependency is read and enforced as written. Registering the framework from a copy of the build PC's installed
+  folder failed both ways (Developer Mode: "DevelopmentMode is not allowed when registering framework or resource
+  packages"; without it: "the manifest is not in the package root"), so the packaged self-test did not run. It needs
+  Microsoft's signed `.appx`, which is not on the build PC; docs/TESTING-MSIX.md has the command.
+
+**Risks, and what is not verified.**
+- The packaged app loading both engines from the framework: inferred, not observed. Premises: the manifest declares the
+  framework (read back from the .msix, and enforced by Windows above); a packaged process searches its dependency graph
+  for the dependencies of a DLL loaded by full path ("Dynamic-link library search order"); the framework's 14.40.33728
+  DLLs export every import and loaded both engines' Vulkan builds (investigation).
+- The framework's runtime (14.40.33728) is older than the build tools of the native DLLs (14.44 and 14.51), and
+  Microsoft's rule is a runtime at least as recent as the build tools. No newer UWPDesktop framework was seen: 14.0.33728.0
+  is what Learn's Windows App page names and what the build PC's Store-updated install has. Every import is exported by
+  14.40; the CPU and no-AVX builds were not exercised on 14.40.
+- Setup's runtime check compiled (Inno Setup 7.1.0), as first written and again after the 17/10/2026 rewrite; its behaviour
+  at install time is not verified here ("Lens fixes", below, says what was and was not run).
+- Windows 10 (F6): Whisper.net's readme says Windows 11 or Server 2022, the manifest allows 10.0.17763, and nothing has
+  run on Windows 10 (docs/STORE.md, section 4). No change made.
+- Partner Center and a package version it has already seen: recalled, not verified, that it refuses one; STORE.md's
+  go-live list gives `-Version 1.0.1` as the fallback.
+
+**Also on this branch, F7.** `ModelDownloader.LoginRequired` ends the balloon for a model behind a Hugging Face login
+(and the 401/403 error). Before: "requires a Hugging Face login to download; use install.ps1 -ModelsFrom or
+download-model.ps1 with a token" (scripts the Store package does not ship). After: "requires a Hugging Face login to
+download; download it in your browser, then choose it in Settings > Models". The Models page's buttons are "Choose model
+file…" and "Choose .gguf file…", so the text names the page, which every build has. A balloon: it joins the morning
+batch. `A_login_wall_points_at_Settings_not_at_scripts_the_Store_package_lacks` pins it (observed failing with the old
+text). Not changed in that first version: `OfflineOnlyException` also named `install.ps1 -ModelsFrom` (changed under "Lens
+fixes", below).
+
+**Also on this branch: the bundled base.en model (Decision 16, Kyle, 17/10/2026, through the orchestrator).** Every
+package layout carries the base.en speech model, so first use and Store testing need no download.
+- `scripts/publish.ps1` puts `models\ggml-base.en.bin` and `THIRD-PARTY-NOTICES.txt` beside Dictum.exe in
+  `dist\Dictum`, and both are in its required-file list. Every layout takes that folder whole: the zip
+  (`Compress-Archive` of the folder), the installer (`[Files]` `{#PublishDir}\*` with `recursesubdirs`), `install.ps1`
+  (copies the whole build) and both MSIX flavours (the layout is a copy of `dist\Dictum`). The model comes from
+  `dist\model-cache`, else from a copy of `%LOCALAPPDATA%\Dictum\models\ggml-base.en.bin` (read only), else from
+  huggingface.co at commit `5359861c739e955e79d9a303bcbc70fb988958b1`. In every case
+  `download-model.ps1 -Model base.en -ModelsDir dist\model-cache` checks the size and SHA-256 against its table (the
+  catalogue's values, kept in sync by an existing unit test) and throws on a mismatch, which stops the publish and, in
+  CI, the job; the tag build packs the installer and the test MSIX from that same `dist\Dictum`.
+- Observed 17/10/2026 on the build PC (reused copy): "…\dist\model-cache\ggml-base.en.bin already exists and matches
+  (147964211 bytes). Nothing to do."; the copy in `dist\Dictum\models` and the entry inside the .msix both 147,964,211
+  bytes, SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002` (`Get-FileHash`; SHA-256 of the zip
+  entry). The download path was not run here; CI runs it on every push.
+- Sizes, 17/10/2026, before and after: `dist\Dictum` 275 files, 292,416,648 bytes, then 277 files, 440,383,016 bytes
+  (each plus manifest.txt); zip 103,208,176 then 236,986,310 bytes; Setup 55,248,402 then 184,530,924 bytes; Store MSIX
+  105,953,677 then 239,909,521 bytes (350 then 352 files; SHA-256 of the new one
+  `cda44d16b58b3ca30c7f845362146a2dc138615ca5ff96c54376c38912a9a526`).
+- Licence, verified 17/10/2026: the Hugging Face API for ggerganov/whisper.cpp gives `license: mit`, at sha
+  `5359861c…` (the pinned commit is the current one); openai/whisper's README says "Whisper's code and model weights are
+  released under the MIT License", and its LICENSE reads "Copyright (c) 2022 OpenAI"; ggml-org/whisper.cpp's LICENSE
+  reads "Copyright (c) 2023-2026 The ggml authors". `THIRD-PARTY-NOTICES.txt` carries both copyright lines and the MIT
+  text, and ships beside Dictum.exe. The brief asked for the entry "as the repo's notices already do for other
+  components", but there were none: no notices file in the repository, and no licence or notice file in `dist\Dictum`
+  for the libraries it bundles (whisper.cpp, llama.cpp, Whisper.net, LLamaSharp, Avalonia and others; their licences are
+  recalled as MIT-style, not verified here). Flagged in that first version; fixed under "Lens fixes", below.
+- Tests: `tests/Dictum.Tests/BundledModelTests.cs` pins publish.ps1's `$bundledModel` to base.en in the catalogue, and
+  the notice to the catalogue's file, commit, size and SHA-256 and to both copyright lines; gated on
+  `DICTUM_PUBLISHED_DIR`, a layout must carry the model byte for byte and the notice. Observed failing: the gated test on
+  the layout built before this change ("…\models\ggml-base.en.bin is missing"), and the notice test with the OpenAI line
+  removed. Both gated layout tests pass on the Store layout; on `dist\Dictum` the model test passes and the VC runtime
+  test fails, by design (no `-VcRuntimeDir`).
+- Not on this branch: the app reading the bundled file. A separate lane makes the app look in `<exe dir>\models` as a
+  read-only fallback; until that merges, every build carries the file and the first run still offers a download. Build
+  the Store package after both have merged.
+
+### Lens fixes (17/10/2026)
+
+An opus lens reviewed ae5543c and found one major and several minor problems. This subsection records the rebase and each
+fix; the passages above say "amended" where a fix changed them.
+
+**Rebase.** origin/main had moved to 23acf35 (PR #8, 24 commits). `git rebase origin/main` conflicted only in
+docs/DECISIONS.md, where both sides had appended at the end: main's hands-free sections are kept and this entry follows
+them. Rebased head f3f9ff9c20dca309aa2cf654d42d218889a2e67f, pushed with
+`--force-with-lease=fix/vc-runtime:ae5543c558bda14ef60a54eec4c67bba45c308b8`. Release `--no-incremental` build: 0 warnings,
+0 errors. Filtered suite (`FullyQualifiedName!~Install_copies_models`): 1,279 total, 1,258 passed, 21 skipped, 0 failed.
+
+**1. The installer asked after it had installed (major).** Before, `CurStepChanged(ssPostInstall)` read the key once the
+files were copied, and the Finished page then offered "Launch Dictum" (ticked) whether or not the runtime was there: on a
+clean PC a user could click Yes to the download prompt, then Finish, and Dictum started without the runtime and showed
+"model error". After, in `packaging/Dictum.iss` under `#ifdef CheckVcRedist` (a layout without the runtime):
+- `InitializeSetup` runs the Store and Dictate warnings, then `if not VcRuntimeReady() then Result := OfferVcRuntime();`.
+  It runs before the wizard exists and before a file is copied (Inno Setup help: "Called during Setup's initialization.
+  Return False to abort Setup, True otherwise.").
+- `VcRuntimeReady` is `VcRuntimeAt(HKLM64) or VcRuntimeAt(HKLM32)`. `VcRuntimeAt` reads
+  `SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64`: `Installed` = 1, and `Major` above the floor, or `Major` equal
+  and `Minor` at or above it (the floor, 14.51, reaches the script from `$MinVcRuntime` as `/DMinVcMajor` and `/DMinVcMinor`).
+  Read on this PC, 17/10/2026: Installed 1, Major 14, Minor 51, Bld 36247 (so it would pass; the check was not run as Setup).
+- `OfferVcRuntime` logs, then asks with Yes, No and Cancel (Yes is the default button): "Dictum's speech recognition and AI
+  clean-up need the Microsoft Visual C++ Redistributable (x64), version 14.51 or later. This PC has none, or one older than
+  14.51. Installing it needs administrator rights." and one line per button. **Yes** opens
+  https://aka.ms/vc14/vc_redist.x64.exe as the original user (a failure to open is logged) and Setup carries on; **No**
+  carries on without it; **Cancel** returns False and Setup ends. With `/SUPPRESSMSGBOXES` (which "only has an effect when
+  combined with /SILENT or /VERYSILENT"; a silent install without it still shows the box) `SuppressibleMsgBox` returns its
+  default, No: Setup carries on and the log line records the missing runtime.
+- The `[Run]` launch line carries `Check: VcRuntimeReady` in the `#ifdef CheckVcRedist` branch, and is the plain line in
+  the `#else` branch. A missing or too-old runtime therefore shows no "Launch Dictum" checkbox. `VcRuntimeReady` only
+  reads the registry, because the help says Setup "might call each check function several times". Not verified: when
+  Inno evaluates a postinstall entry's Check (the help says only that these entries are processed after the Setup
+  Completed page is shown). If it is before the user could finish installing the runtime during Setup, the box stays
+  hidden and Dictum starts from the Start menu, the safe direction.
+- Build evidence, Inno Setup 7.1.0 (the version CI pins): `ISCC.exe /DAppVersion=1.0.0 /DNumericVersion=1.0.0.0
+  /DPublishDir=<scratch folder of two stand-in files> /DOutputDir=<scratch> packaging\Dictum.iss`, with and without
+  `/DCheckVcRedist /DMinVcMajor=14 /DMinVcMinor=51`: "Successful compile", exit 0 both times (2,099,722 and 2,098,972 bytes).
+  Negative control: a copy with the launch line's Check misspelt exits 2 with "Required function or procedure
+  'VcRuntimeReadyTypo' not found", so the compile does check the Check reference. **Not run:** the installer itself, so the
+  dialog, the browser opening, the exit code of a Cancel and the Finished page are not observed.
+- `scripts/build-installer.ps1` (comment and message) and the README's Install paragraph now describe this flow. The lens
+  named "Microsoft Visual C++ 2015-2022 runtime" for the site; 14.51's own entry in Apps & features on this PC is
+  "Microsoft Visual C++ v14 Redistributable (x64) - 14.51.36247" (registry read 17/10/2026), so the site, the README and
+  the installer use "Microsoft Visual C++ Redistributable (x64) 14.51 or later", the name of Microsoft's page.
+
+**2. STORE.md no longer says Fixed (minor).** Section 1's row and section 9, row 22, now read "Fix in package; packaged
+self-test pending". Section 10 gains step 4, a packaged self-test before upload (`Dictum.exe --selftest` from the installed
+package, on a PC or Sandbox with Microsoft.VCLibs.140.00.UWPDesktop 14.0.33728.0 or later and no Visual C++
+Redistributable in System32; `whisper runtime` and `cleanup backend` both `[OK]`; `scripts\sandbox-check.ps1 -Package
+... -Framework ... -CleanupModel ...` does it in Windows Sandbox), and the later steps are renumbered. The framework
+`.appx`'s licensed source (Visual Studio with the UWP workload,
+`%ProgramFiles(x86)%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs.Desktop\14.0`, per KB 3176696) is the
+lens's statement, marked in STORE.md as recalled, not verified: it was not re-read in this lane. The README's sentence
+that the Store build "needs nothing" is qualified the same way.
+
+**3. The direct download's requirement, on the site and in the release notes (minor).** `site/index.html`'s "What you
+need" list gains "Microsoft Visual C++ Redistributable (x64) 14.51 or later, for the direct download", with the installer's
+check and the administrator-rights caveat (the same page says Dictum installs with no admin rights, which stays true of
+Dictum itself). The release job builds its notes with `gh release create ... --generate-notes` and has no checkout, so it
+now checks out the repository (`persist-credentials: false`, the build job's pinned `actions/checkout`) and passes
+`--notes-file packaging/release-notes-preamble.md` ahead of the generated notes. The preamble states the runtime floor,
+the installer's check, the zip's lack of one, the test MSIX's framework prerequisite and the bundled base.en model.
+Provenance for the flags: `gh release create --help` (gh 2.97.0) documents that extra notes "can be prepended to
+automatically generated notes" with `--notes`; the source at tag v2.97.0 (`pkg/cmd/release/create/create.go`, read with the
+GitHub API) shows `--notes-file` filling the same body field and `--generate-notes` setting `generate_release_notes`. The
+GitHub API's own statement that a body is prepended is recalled, not verified. The preamble assumes releases come from CI,
+which does not pass `-VcRuntimeDir`; if releases are ever built with it, rewrite its first paragraph. Its base.en paragraph
+says what each file carries, not that first use needs no download, because that also needs the separate app change (item 5).
+
+**4. `OfflineOnlyException` (minor).** Before: "...so Dictum makes no network calls. Copy the file into the models folder
+instead (install.ps1 -ModelsFrom)." After: "...so Dictum makes no network calls. Copy the file into the models folder instead
+(Settings > Storage shows the folder)." The Storage page draws "Models folder: <path>"
+(`src/Dictum.UI/Views/Settings/ModelPages.cs`, `StoragePage`). The text reaches the Store build's balloon
+(`ModelDownloads.cs`) and the `--download-model` output (`DownloadCommand.cs`); a balloon, so it joins the morning batch.
+`An_offline_refusal_points_at_Settings_not_at_install_ps1_which_the_Store_package_lacks` pins it (observed failing with
+the old text; passes with the new).
+
+**5. The sentences that assume the parallel model-folder change** (docs/STORE.md sections 6 and 7, `publish.ps1`'s model
+comment, `BundledModelTests.cs`'s summary) are left as they are: the app change that reads `<program folder>\models`
+and this PR both merge before any upload.
+
+**6. Pins (18 new tests; each observed failing on its reverted text, rebuilt `--no-incremental` each time, the file
+restored byte-identical and checked by SHA-256).**
+- `InstallerVcCheckTests` (8): the key `...\Runtimes\x64` and its `Installed`, `Major`, `Minor` values; the comparison; both
+  registry views; the one call of `OfferVcRuntime` sits in `InitializeSetup` and `ssPostInstall` is gone; Yes, No and
+  Cancel; the wording "has none, or one older than"; the launch line's `Check: VcRuntimeReady` and its plain twin identical
+  otherwise; `build-installer.ps1` passes `/DCheckVcRedist` and the floor from `$MinVcRuntime`. Mutations, one test failed
+  each: key x64 to x86; `or VcRuntimeAt(HKLM32)` deleted; `Minor >=` flipped to `<=`; the question moved back to
+  `CurStepChanged(ssPostInstall)`; `Check:` removed; the plain line's description changed; `/DMinVcMinor=0`; "does not have
+  it" restored; `if Answer = IDYES` to `IDNO`; Cancel returning True; `MB_YESNOCANCEL` to `MB_YESNO`.
+- `OfflineAndDownloadTests.An_offline_refusal...` (1): described above; 1 of 1 failed on the old text.
+- `ReleaseWorkflowTests` (5): every action in ci.yml is pinned to a 40-character commit; the cache step is whole-line
+  `path: dist/model-cache` and `key: model-ggml-base.en-<the catalogue's SHA-256>` and comes before the publish step; the
+  release job checks out before it downloads and passes `--notes-file packaging/release-notes-preamble.md` with
+  `--generate-notes`; the preamble names the floor read from `$MinVcRuntime`, the aka.ms URL, `models\ggml-base.en.bin`
+  and `THIRD-PARTY-NOTICES.txt`; README, site and preamble state the same floor. Mutations: key one character off; path
+  `dist/model-cachee` (this first passed because the assertion was a substring, so the assertions were made whole-line,
+  then it failed); key with a suffix; the cache action pinned to a tag; `--notes-file` removed; the release checkout
+  removed; the preamble without the model; the site at 14.50 (1 failed); the preamble at 14.50 (2 failed).
+- `ThirdPartyNoticesTests` (4): item 8.
+- The workflow YAML was not parsed here (no YAML parser on the build PC); its first run is the proof.
+
+**7. CI downloads the model once (minor).** `.github/workflows/ci.yml` restores `dist/model-cache` with `actions/cache`
+before the publish step, keyed
+`model-ggml-base.en-a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002` (the pinned SHA-256, kept equal to the
+catalogue's by a test). A restored copy is trusted for nothing: `download-model.ps1` hashes it again and, on a mismatch,
+downloads to a `.part` file, verifies it and replaces the copy (read in the script). actions/cache v6.1.0 is the latest
+release (published 2026-06-26) and its tag points at commit `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (GitHub API,
+17/10/2026), pinned by SHA like the other actions; its `action.yml` at that commit has `path` and `key` inputs and a post
+step that saves only if the job has succeeded. Observed in the two CI runs for ad72ef5: "Cache not found for input keys",
+then the publish step downloaded the file ("Done: ...ggml-base.en.bin (147964211 bytes, size and SHA-256 verified)"), then
+"Cache saved with key: model-ggml-base.en-a03779c8..." in each run (the push run's entry belongs to the branch, the
+pull-request run's to the PR). A restore had not been observed when this was written; the next push to the branch should
+show one.
+
+**8. THIRD-PARTY-NOTICES.txt now covers every third-party component in the published folder (needed before
+resubmission).** The inventory comes from the layout the earlier lane published (`dist\Dictum`, 278 files) and the
+restore result (`src\Dictum.Windows\obj\project.assets.json`, 39 packages in the graph). Audit, run with a script over
+those two sources: all 278 files have an owner. 14 are Dictum's own (Dictum.exe, Dictum.dll, Dictum.Core.dll,
+Dictum.UI.dll, their symbols, deps.json, runtimeconfig.json, the icon, the two data files, manifest.txt and the notices
+file itself), 1 is the model, and 263 belong to 30 packages and 2 runtime packs, each of which has an entry (the .NET
+runtime pack 187 files, 172 managed and 15 native, per `Dictum.deps.json`; the Windows SDK projection 2 files;
+Whisper.net's natives 13 and LLamaSharp's 25 under `runtimes\`, which arrive by build targets and are not in deps.json).
+The audit found one package the csproj files do not name: `LLamaSharp.Backend.Vulkan.Windows`, the transitive package
+that carries the Vulkan llama.cpp natives (`LLamaSharp.Backend.Vulkan` is a meta-package with no files of its own, kept
+as an entry because the csproj names it). Packages in the graph whose natives are for Linux, macOS or the web
+(`Whisper.net.Runtime.Metal`, `LLamaSharp.Backend.Vulkan.Linux`, `SkiaSharp.NativeAssets.Linux/macOS/WebAssembly`,
+`HarfBuzzSharp.NativeAssets.Linux/WebAssembly`) and the build-time `Avalonia.BuildServices` put no file in the folder and
+have no entry. The file was written by a one-off script (not committed) that read the nuspec and licence files below; the
+text is kept by hand from now on. Annexes A to C are the packages' own third-party notice files, reproduced with LF line
+endings (source SHA-256 in each annex header; the copies in the other packages were hash-compared and are identical). The
+file is UTF-8 with a byte-order mark, because the nuspec copyright lines contain the copyright sign and Windows 10 1809's
+Notepad needs the mark to read UTF-8. Size 285,154 bytes (was 2,157). The layout becomes 440,694,290 bytes, 420.3 MiB, and
+the zip 237,035,759 bytes, 226.1 MiB (a copy of `dist\Dictum` with the new file and a regenerated manifest.txt, zipped
+with `Compress-Archive -CompressionLevel Optimal`, as publish.ps1 does; the README's figures are updated to these).
+
+Sources, every file read on 17/10/2026 from the NuGet cache of the build PC (`%USERPROFILE%\.nuget\packages`; each of the
+33 package folders' `.nupkg.metadata` names https://api.nuget.org/v3/index.json as its source; the package signatures were
+not verified here). Licence and copyright are quoted as found. Beside these, the model section is unchanged, and
+`dist\Dictum\Dictum.deps.json` and `src\Dictum.Windows\obj\project.assets.json` were read for the inventory:
+
+| Component | Version | Licence as found | Copyright as found | Files read (under `%USERPROFILE%\.nuget\packages\<id in lower case>\<version>\`) |
+|---|---|---|---|---|
+| Microsoft.NETCore.App.Runtime.win-x64 | 10.0.13 | MIT (nuspec expression) + package LICENSE.TXT | nuspec: "© Microsoft Corporation. All rights reserved."; LICENSE.TXT: "Copyright (c) .NET Foundation and Contributors" | microsoft.netcore.app.runtime.win-x64.nuspec; LICENSE.TXT; THIRD-PARTY-NOTICES.TXT (Annex A source) |
+| Microsoft.Windows.SDK.NET.Ref | 10.0.19041.57 | none: licenseUrl https://aka.ms/WinSDKLicenseURL only (requireLicenseAcceptance true); not reproduced | nuspec: "© Microsoft Corporation. All rights reserved." | microsoft.windows.sdk.net.ref.nuspec |
+| Whisper.net | 1.9.1 | nuspec license type "file" -> LICENSE (text: "MIT License") | nuspec: none stated; LICENSE: "Copyright (c) 2024 sandrohanea" | whisper.net.nuspec; LICENSE |
+| Whisper.net.Runtime | 1.9.1 | MIT (nuspec expression) | nuspec: none stated | whisper.net.runtime.nuspec; content/readme.md (the whisper.cpp note) |
+| Whisper.net.Runtime.NoAvx | 1.9.1 | MIT (nuspec expression) | nuspec: none stated | whisper.net.runtime.noavx.nuspec |
+| Whisper.net.Runtime.Vulkan | 1.9.1 | MIT (nuspec expression) | nuspec: none stated | whisper.net.runtime.vulkan.nuspec |
+| LLamaSharp | 0.27.0 | MIT (nuspec expression) | nuspec: "MIT, SciSharp STACK 2026" | llamasharp.nuspec |
+| LLamaSharp.Backend.Cpu | 0.27.0 | MIT (nuspec expression) | nuspec: "Copyright 2023 The llama.cpp Authors. All rights reserved." | llamasharp.backend.cpu.nuspec |
+| LLamaSharp.Backend.Vulkan | 0.27.0 | MIT (nuspec expression) | nuspec: "Copyright 2023 The llama.cpp Authors. All rights reserved." | llamasharp.backend.vulkan.nuspec |
+| LLamaSharp.Backend.Vulkan.Windows | 0.27.0 | MIT (nuspec expression) | nuspec: "Copyright 2023 The llama.cpp Authors. All rights reserved." | llamasharp.backend.vulkan.windows.nuspec |
+| Anthropic | 12.57.0 | MIT (nuspec expression) + package LICENSE | nuspec: "Copyright 2026 Anthropic"; LICENSE: "Copyright 2023 Anthropic, PBC." | anthropic.nuspec; LICENSE |
+| NAudio.Core | 3.1.0 | MIT (nuspec expression) | nuspec: "© Mark Heath 2026" | naudio.core.nuspec |
+| NAudio.Wasapi | 3.1.0 | MIT (nuspec expression) | nuspec: "© Mark Heath 2026" | naudio.wasapi.nuspec |
+| Avalonia | 11.3.22 | MIT (nuspec expression) | nuspec: "Copyright 2013-2026 © The AvaloniaUI Project" | avalonia.nuspec |
+| Avalonia.Themes.Fluent | 11.3.22 | MIT (nuspec expression) | nuspec: "Copyright 2013-2026 © The AvaloniaUI Project" | avalonia.themes.fluent.nuspec |
+| Avalonia.Win32 | 11.3.22 | MIT (nuspec expression) | nuspec: "Copyright 2013-2026 © The AvaloniaUI Project" | avalonia.win32.nuspec |
+| Avalonia.Skia | 11.3.22 | MIT (nuspec expression) | nuspec: "Copyright 2013-2026 © The AvaloniaUI Project" | avalonia.skia.nuspec |
+| Avalonia.Remote.Protocol | 11.3.22 | MIT (nuspec expression) | nuspec: "Copyright 2013-2026 © The AvaloniaUI Project" | avalonia.remote.protocol.nuspec |
+| Avalonia.Angle.Windows.Natives | 2.1.25547.20250602 | nuspec license type "file" -> LICENSE (no identifier named) | nuspec: "Copyright 2013-2025 © The AvaloniaUI Project"; LICENSE: "Copyright 2018 The ANGLE Project Authors." | avalonia.angle.windows.natives.nuspec; LICENSE |
+| MicroCom.Runtime | 0.11.0 | MIT (nuspec expression) | nuspec: "Copyright 2021 © Nikita Tsukanov" | microcom.runtime.nuspec |
+| SkiaSharp | 2.88.9 | MIT (nuspec expression) + package LICENSE.txt | nuspec: "© Microsoft Corporation. All rights reserved."; LICENSE.txt: "Copyright (c) 2015-2016 Xamarin, Inc." and "Copyright (c) 2017-2018 Microsoft Corporation." | skiasharp.nuspec; LICENSE.txt; THIRD-PARTY-NOTICES.txt (Annex B source) |
+| SkiaSharp.NativeAssets.Win32 | 2.88.9 | MIT (nuspec expression) + package LICENSE.txt | nuspec: "© Microsoft Corporation. All rights reserved."; LICENSE.txt: same two lines | skiasharp.nativeassets.win32.nuspec; LICENSE.txt; THIRD-PARTY-NOTICES.txt (hash-compared with Annex B) |
+| HarfBuzzSharp | 8.3.1.1 | MIT (nuspec expression) + package LICENSE.txt | nuspec: "© Microsoft Corporation. All rights reserved."; LICENSE.txt: same two lines | harfbuzzsharp.nuspec; LICENSE.txt |
+| HarfBuzzSharp.NativeAssets.Win32 | 8.3.1.1 | MIT (nuspec expression) + package LICENSE.txt | nuspec: "© Microsoft Corporation. All rights reserved."; LICENSE.txt: same two lines | harfbuzzsharp.nativeassets.win32.nuspec; LICENSE.txt; THIRD-PARTY-NOTICES.txt (hash-compared with Annex B) |
+| CommunityToolkit.HighPerformance | 8.4.2 | MIT (nuspec expression) + package License.md | nuspec: "(c) .NET Foundation and Contributors. All rights reserved."; License.md: "Copyright © .NET Foundation and Contributors" | communitytoolkit.highperformance.nuspec; License.md; ThirdPartyNotices.txt (Annex C source) |
+| System.Interactive.Async | 7.0.0 | MIT (nuspec expression) | nuspec: "Copyright (c) .NET Foundation and Contributors." | system.interactive.async.nuspec |
+| System.Linq.Async | 7.0.0 | MIT (nuspec expression) | nuspec: "Copyright (c) .NET Foundation and Contributors." | system.linq.async.nuspec |
+| Microsoft.Bcl.AsyncInterfaces | 10.0.5 | MIT (nuspec expression) | nuspec: "© Microsoft Corporation. All rights reserved." | microsoft.bcl.asyncinterfaces.nuspec; THIRD-PARTY-NOTICES.TXT (hash-compared with Annex A) |
+| Microsoft.Bcl.Memory | 10.0.5 | MIT (nuspec expression) | nuspec: "© Microsoft Corporation. All rights reserved." | microsoft.bcl.memory.nuspec; THIRD-PARTY-NOTICES.TXT (hash-compared with Annex A) |
+| Microsoft.Extensions.AI.Abstractions | 10.5.1 | MIT (nuspec expression) | nuspec: "© Microsoft Corporation. All rights reserved." | microsoft.extensions.ai.abstractions.nuspec |
+| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.5 | MIT (nuspec expression) | nuspec: "© Microsoft Corporation. All rights reserved." | microsoft.extensions.dependencyinjection.abstractions.nuspec; THIRD-PARTY-NOTICES.TXT (hash-compared with Annex A) |
+| Microsoft.Extensions.Logging.Abstractions | 10.0.5 | MIT (nuspec expression) | nuspec: "© Microsoft Corporation. All rights reserved." | microsoft.extensions.logging.abstractions.nuspec; THIRD-PARTY-NOTICES.TXT (hash-compared with Annex A) |
+| System.Numerics.Tensors | 10.0.5 | MIT (nuspec expression) | nuspec: "© Microsoft Corporation. All rights reserved." | system.numerics.tensors.nuspec; THIRD-PARTY-NOTICES.TXT (hash-compared with Annex A) |
+
+Annex sources are the same table's files: `THIRD-PARTY-NOTICES.TXT` of the .NET runtime pack (78,041 bytes, SHA-256
+`6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21`, identical in five Microsoft packages), SkiaSharp's
+`THIRD-PARTY-NOTICES.txt` (139,775 bytes, `21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5`, identical in the two
+native-assets packages) and CommunityToolkit.HighPerformance's `ThirdPartyNotices.txt` (8,600 bytes,
+`7774f8b0ab66bfb47ec154ce24a2d6d574febc44a74d940b8a037d1c56756163`).
+
+**What the notices do not settle.**
+- **Microsoft.Windows.SDK.NET.Ref 10.0.19041.57** (`Microsoft.Windows.SDK.NET.dll`, 24.9 MB, and `WinRT.Runtime.dll`)
+  states its licence only as a URL, https://aka.ms/WinSDKLicenseURL, with `requireLicenseAcceptance` true. The package
+  holds no licence text and no identifier (its nuspec and file list, read in the NuGet cache on 17/10/2026). The
+  orchestrator read that URL on 17/10/2026 and passed this lane what follows; this lane could read nothing but git and
+  gh and did not read it again. The URL led to
+  https://download.microsoft.com/download/0/F/F/0FF2B061-47DD-4F55-89B6-FD1D8C44F14D/sdk_license.rtf, titled "MICROSOFT
+  SOFTWARE LICENSE TERMS - MICROSOFT WINDOWS SOFTWARE DEVELOPMENT KIT (SDK) FOR WINDOWS 10". Its "Distributable Code"
+  section sets the conditions on which an application may include SDK files, and those conditions include an
+  end-user-terms requirement. The entry in `THIRD-PARTY-NOTICES.txt` gives the title and the address and says to read
+  the terms there; it does not reproduce them, and this record does not copy the requirement's wording either.
+  **Pending:** the product owner's decision on the end-user-terms requirement (morning batch). `WinRT.Runtime.dll` is
+  covered separately: its version information (file version 2.2.0.48161, product version
+  `2.2.0.48161+8649ee3eeb2445ca2a36d80d878ef60b96a6c65d`, copyright "Copyright (c) Microsoft Corporation. All rights
+  reserved.", read in the NuGet cache on 17/10/2026) names commit 8649ee3 of https://github.com/microsoft/CsWinRT. The
+  `LICENSE` at that commit, read through the GitHub API on 17/10/2026 (git blob
+  `3d8b93bc7987d14c848448c089e2ae15311380d7`, 1,162 bytes), is the MIT License, "Copyright (c) Microsoft Corporation.";
+  the entry reproduces it verbatim, keeping the source's four-space indent and changing only its line endings, from CRLF
+  to LF.
+- The native libraries (whisper.cpp, ggml, llama.cpp and the Vulkan builds) are covered by their packages' nuspec licence
+  (MIT) and copyright line. What those binaries embed beyond that (shaders, Vulkan headers, other code) was not
+  examined; Annex B covers Skia and HarfBuzz because their package says so.
+- Whisper.net.Runtime, .NoAvx and .Vulkan state no copyright line; their entries say so and point to whisper.cpp's lines
+  in the model section (read by the earlier lane, not re-read here).
+- LLamaSharp's copyright element reads "MIT, SciSharp STACK 2026"; it is quoted as found, not tidied.
+- A shipped package's licence can change with a version. The test below makes a bump fail until its entry is re-read:
+  Dependabot's monthly NuGet pull request will fail CI until `THIRD-PARTY-NOTICES.txt` names the new versions. That is
+  deliberate; if it proves too much friction, relax the comparison to package ids only.
+
+**The notices pin** (`tests/Dictum.Tests/ThirdPartyNoticesTests.cs`, 4 tests). Every package in the restore result that
+puts a managed library (a runtime asset) or a Windows x64 native DLL (any `.dll` under a `win-x64` path in its file list)
+in the output has a `Package: <id> <version>` entry at that version; the 3 app projects' `PackageReference` elements
+likewise (this catches the meta-package); the self-contained runtime pack and the Windows SDK projection have entries
+(publish.ps1 is `--self-contained`); every entry has "Ships as", "Licence" and "Copyright (nuspec)" lines. The first test
+also asserts it found `LLamaSharp.Backend.Vulkan.Windows` and `SkiaSharp.NativeAssets.Win32`, so a restore-result change
+that hides them fails the test rather than weakening it. Observed failing: an entry deleted (NAudio.Core: the shipping and
+the PackageReference tests, 2 failed); a version changed (Avalonia 11.3.21: 2 failed); the transitive native package's
+entry deleted (`LLamaSharp.Backend.Vulkan.Windows`: only the shipping test failed, which the csproj-only rule would have
+missed); the runtime pack's entry renamed (1 failed); the meta-package's entry renamed (only the PackageReference test
+failed); one entry's copyright line deleted (1 failed). It needs `src\Dictum.Windows\obj\project.assets.json`, which any
+build writes, and does not read the NuGet cache.
+
+**Verification after the fixes** (this lane, 17/10/2026): Release `--no-incremental` build, 0 warnings, 0 errors. Filtered
+suite (`FullyQualifiedName!~Install_copies_models`): 1,297 total, 1,276 passed, 21 skipped, 0 failed (the rebased head had
+1,279, 1,258, 21, 0; 18 new tests). CI on ad72ef5 (the push run and the pull-request run, 17/10/2026): both succeeded, with
+1,298 tests (those 1,297 plus `Install_copies_models`, which CI runs), 1,277 passed, 21 skipped, 0 failed; the two
+"GitHub Release" jobs were skipped (tag builds only), so the release job's new checkout and `--notes-file` have not run.
+Not run: the installer, the Store package build, Windows Sandbox, a release build, and the packaged self-test.
