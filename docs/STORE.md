@@ -23,7 +23,7 @@ re-check every line against the release build before submitting.
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
 | Package version (added 16/10/2026) | `<Version>` 1.0.0, so the package is 1.0.0.0 | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, so `package-msix.ps1 -Store` builds. |
-| Visual C++ runtime (added 17/10/2026) | The first submission failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fixed: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6). Rebuild with `package-msix.ps1 -Store` and upload that file (section 10). |
+| Visual C++ runtime (added 17/10/2026) | The first submission failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
 
@@ -254,8 +254,8 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   the framework package installed on the build PC (14.0.33728.0, the version tested).
 - **The base.en speech model ships inside (Decision 16, 17/10/2026).** `scripts\publish.ps1` puts
   `models\ggml-base.en.bin` (147,964,211 bytes, SHA-256 checked by `download-model.ps1` against the catalogue's pin) and
-  `THIRD-PARTY-NOTICES.txt` (its MIT notices) beside Dictum.exe, so the zip, the installer and both MSIX flavours carry
-  them. Measured 17/10/2026: the Store package grew from 105,953,677 to 239,909,521 bytes (352 files). The app reads
+  `THIRD-PARTY-NOTICES.txt` (the model's MIT notices and those of every other third-party component in the folder)
+  beside Dictum.exe, so the zip, the installer and both MSIX flavours carry them. Measured 17/10/2026: the Store package grew from 105,953,677 to 239,909,521 bytes (352 files). The app reads
   the file only once the separate app-side change (the exe folder's `models` as a read-only fallback) has merged.
 - Capabilities: `runFullTrust` (restricted) and `microphone` (device). Extensions: `windows.startupTask`
   and an app execution alias, `Dictum.exe`, so the command-line modes (such as `--selftest`) run from
@@ -362,7 +362,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |
 | 21 | Listing language does not match the package | Store Policies 10.7 | Use the language the manifest declares (section 4). | Decide |
-| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the first submission) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fixed 17/10/2026 |
+| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the first submission) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fix in package; packaged self-test pending (section 10, step 4) |
 
 ## 10. Go-live
 
@@ -374,16 +374,26 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
    15/10/2026).
 3. Build the package from a checkout that has the Visual C++ runtime fix and the bundled model (fix/vc-runtime,
    17/10/2026) and the app change that reads that model: `package-msix.ps1 -Store` must print "Bundled speech model:
-   models\ggml-base.en.bin" and end with "Depends on Microsoft.VCLibs.140.00.UWPDesktop". Upload that file; an earlier
-   `Dictum-1.0.0-store.msix` lacks the dependency and is the build that failed certification. If Partner Center
-   refuses a package version it has already seen (recalled, not verified that it does), build with `-Version 1.0.1`,
-   which also stamps Dictum.exe 1.0.1.
-4. Submit (sections 3 to 7), with the certification notes of section 7 as they now read.
-5. When the listing is live (https://apps.microsoft.com/detail/9N0DG1DHTR57 returns 200): in
+   models\ggml-base.en.bin" and end with "Depends on Microsoft.VCLibs.140.00.UWPDesktop". That file is the one to upload
+   once step 4 has passed; an earlier `Dictum-1.0.0-store.msix` lacks the dependency and is the build that failed
+   certification. If Partner Center refuses a package version it has already seen (recalled, not verified that it
+   does), build with `-Version 1.0.1`, which also stamps Dictum.exe 1.0.1.
+4. **Packaged self-test, before upload (added 17/10/2026).** The Visual C++ fix is in the package, but no packaged app
+   has yet loaded an engine with the framework (docs/DECISIONS.md, "Visual C++ runtime"), so it is unproven until this
+   passes. Run `Dictum.exe --selftest` from the installed package on a PC or Windows Sandbox that has
+   Microsoft.VCLibs.140.00.UWPDesktop 14.0.33728.0 or later installed, and require the `whisper runtime` and
+   `cleanup backend` lines both `[OK]`. The PC must not have a Visual C++ Redistributable in System32, or the engines
+   load from there without the framework and the run proves nothing (inferred, not tested). In Windows Sandbox, which has none:
+   `scripts\sandbox-check.ps1 -Package packaging\out\msix-store\layout -Framework <Microsoft's signed Microsoft.VCLibs.x64.14.00.Desktop.appx> -CleanupModel <a catalogue .gguf>`
+   (docs/TESTING-MSIX.md). The licensed source of that framework `.appx` is, per KB 3176696 (**recalled, not verified**,
+   from the 17/10/2026 review; not re-read in this lane): Visual Studio with the UWP workload, under
+   `%ProgramFiles(x86)%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs.Desktop\14.0`.
+5. Submit (sections 3 to 7), with the certification notes of section 7 as they now read.
+6. When the listing is live (https://apps.microsoft.com/detail/9N0DG1DHTR57 returns 200): in
    `site/index.html`, replace the pending Store link and its "Coming soon" note with
    `<a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>`,
    change the Direct download button to `btn-secondary`, then redeploy. The HTML comment beside the
    button says the same.
-6. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`;
+7. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`;
    an ISO date such as `2026-10-15` is easiest for the app to parse) in the same deployment as the
    GitHub release.

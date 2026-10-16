@@ -63,7 +63,8 @@ while ($parts.Count -lt 4) { $parts += "0" }
 $numericVersion = $parts -join '.'
 
 # The Visual C++ runtime (docs\DECISIONS.md, "Visual C++ runtime"): a publish.ps1 -VcRuntimeDir build carries it beside
-# every native runtime folder; any other build gets Setup's check for the Microsoft Visual C++ Redistributable.
+# every native runtime folder; any other build gets Setup's check for the Microsoft Visual C++ Redistributable, made
+# before Setup installs anything and again before it offers to launch Dictum (packaging\Dictum.iss, InitializeSetup).
 $defines = @("/DAppVersion=$appVersion", "/DNumericVersion=$numericVersion", "/DPublishDir=$published", "/DOutputDir=$dist")
 $nativeFolders = @(Get-NativeRuntimeFolders $published)
 $withoutVc = @($nativeFolders | Where-Object { $folder = $_; @($VcRuntimeDlls | Where-Object { -not (Test-Path -LiteralPath (Join-Path $folder $_)) }).Count -gt 0 })
@@ -71,7 +72,7 @@ if ($nativeFolders.Count -gt 0 -and $withoutVc.Count -eq 0) {
     Write-Host "dist\Dictum carries the Visual C++ runtime beside all $($nativeFolders.Count) native runtime folders."
 } else {
     $defines += @("/DCheckVcRedist", "/DMinVcMajor=$($MinVcRuntime.Major)", "/DMinVcMinor=$($MinVcRuntime.Minor)")
-    Write-Host "dist\Dictum carries no Visual C++ runtime: Setup checks for the Microsoft Visual C++ Redistributable (x64) $MinVcRuntime or later and offers Microsoft's download."
+    Write-Host "dist\Dictum carries no Visual C++ runtime: Setup checks for the Microsoft Visual C++ Redistributable (x64) $MinVcRuntime or later before it installs anything, offers Microsoft's download, and offers to launch Dictum only once the runtime is there."
 }
 
 # Compile. Windows PowerShell 5.1 turns a native program's stderr lines (ISCC's warnings) into errors under 2>&1,

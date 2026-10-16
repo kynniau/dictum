@@ -21,7 +21,8 @@
 
   The bundled speech model (Decision 16, 17/10/2026): every layout built from dist\Dictum (the zip, the installer and
   both MSIX flavours) carries models\ggml-base.en.bin beside Dictum.exe, so first use and Store testing need no
-  download, and THIRD-PARTY-NOTICES.txt for its licence. download-model.ps1 checks it against the pinned commit, size
+  download, and THIRD-PARTY-NOTICES.txt (its licence, and the notice of every other third-party component in the
+  folder). download-model.ps1 checks it against the pinned commit, size
   and SHA-256 it shares with the app's catalogue. A matching copy in %LOCALAPPDATA%\Dictum\models is reused (read
   only); otherwise it is downloaded from huggingface.co, and dist\model-cache keeps it for the next publish.
 

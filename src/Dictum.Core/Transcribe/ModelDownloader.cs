@@ -9,9 +9,12 @@ using Dictum.Settings;
 
 namespace Dictum.Transcribe;
 
-/// <summary>Raised instead of any network call when offline_only is on.</summary>
+/// <summary>
+/// Raised instead of any network call when offline_only is on. The message reaches the Store build's balloon and the
+/// --download-model output, so it names Settings, which every build has, not install.ps1, which the Store package lacks.
+/// </summary>
 public sealed class OfflineOnlyException(string what)
-    : InvalidOperationException($"{what} refused: offline_only is on, so Dictum makes no network calls. Copy the file into the models folder instead (install.ps1 -ModelsFrom).");
+    : InvalidOperationException($"{what} refused: offline_only is on, so Dictum makes no network calls. Copy the file into the models folder instead (Settings > Storage shows the folder).");
 
 /// <summary>The download did not complete; <see cref="Reason"/> is short enough for a balloon ("connection dropped").</summary>
 public sealed class DownloadFailedException(string fileName, int attempts, string reason, Exception? inner = null, bool resumable = false)

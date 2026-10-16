@@ -239,11 +239,16 @@ source"). The speech engine (whisper.cpp) and the clean-up engine (llama.cpp) ar
 and load its runtime; many PCs already have it, but a clean Windows does not, and then the tray shows "model error"
 and the `whisper runtime` line of `--selftest` says `model load failed`. Install it from Microsoft,
 https://aka.ms/vc14/vc_redist.x64.exe ("Microsoft Visual C++ Redistributable latest supported downloads", read
-17/10/2026); that needs administrator rights. The installer checks for it at the end and offers that download. The
-Store build needs nothing: the Store installs the runtime with it.
+17/10/2026); that needs administrator rights. The installer checks for it before it installs anything and asks:
+**Yes** opens that download and carries on installing Dictum, **No** carries on without it, **Cancel** stops Setup (an
+install run with `/SUPPRESSMSGBOXES` carries on and logs it). Its "Launch Dictum" box appears at the end only when the
+runtime is there by then. The Store build declares Microsoft's runtime framework package for the Store to install with
+it (no packaged run has confirmed that yet: docs/STORE.md, section 10).
 
 **Every build carries the base.en speech model** (Decision 16, 17/10/2026): `models\ggml-base.en.bin` beside
-`Dictum.exe`, the catalogue's file byte for byte, with its MIT notices in `THIRD-PARTY-NOTICES.txt`.
+`Dictum.exe`, the catalogue's file byte for byte. `THIRD-PARTY-NOTICES.txt` beside it carries the model's MIT notices
+and the licence notice of every other third-party component in the folder (a test fails when a shipped package is
+missing from it).
 
 Testing the self-signed MSIX package before the Store listing is live: see [docs/TESTING-MSIX.md](docs/TESTING-MSIX.md).
 
@@ -277,7 +282,7 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 
    Run a gated job with `-failSkips` (or check the skip count) if a missing variable must fail it rather than skip.
 3. Publish: `powershell -ExecutionPolicy Bypass -File scripts\publish.ps1` → `dist\Dictum\Dictum.exe` and
-   `dist\Dictum-<version>-win-x64.zip` (self-contained: 278 files with `manifest.txt`, 420.0 MiB unpacked / 226.0 MiB zipped, measured 17/10/2026 for 1.0.0 with the bundled model; 276 files, 278.8 MiB / 98.4 MiB without it on 16/10/2026; including the two data files `profanity.txt` and `calibration-sentences.txt`, the base.en speech model in `models\` with `THIRD-PARTY-NOTICES.txt`, Avalonia's Skia, HarfBuzz and ANGLE libraries,
+   `dist\Dictum-<version>-win-x64.zip` (self-contained: 278 files with `manifest.txt`, 420.3 MiB unpacked / 226.1 MiB zipped, measured 17/10/2026 for 1.0.0 with the bundled model and the full third-party notices; 276 files, 278.8 MiB / 98.4 MiB without it on 16/10/2026; including the two data files `profanity.txt` and `calibration-sentences.txt`, the base.en speech model in `models\` with `THIRD-PARTY-NOTICES.txt`, Avalonia's Skia, HarfBuzz and ANGLE libraries,
    the Vulkan, CPU and no-AVX whisper runtimes and the Vulkan and CPU llama.cpp runtimes; English resources only; `-FrameworkDependent` gives a small build that needs the .NET 10 Runtime: no Desktop Runtime, as there is no WPF or WinForms).
    `-VcRuntimeDir <folder>` copies the Visual C++ runtime (`msvcp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`,
    `vcomp140.dll`) beside each of the 8 native runtime folders, so the zip and the installer run on a PC without the

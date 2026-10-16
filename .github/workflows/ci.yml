@@ -49,6 +49,16 @@ jobs:
         # set (README, "Build from source"); none is set here.
         run: dotnet test --solution Dictum.sln -c Release --no-build
 
+      - name: Restore the base.en speech model from the cache
+        # The 148 MB file is fetched from huggingface.co once, not on every push and pull request. The key is the SHA-256
+        # that scripts/download-model.ps1 and the app's catalogue pin (a test keeps the three equal), so a new pin is a
+        # new key. A restored copy is trusted for nothing: download-model.ps1 hashes it again and downloads afresh on a
+        # mismatch. actions/cache v6.1.0, commit resolved 17/10/2026 with the GitHub API.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dist/model-cache
+          key: model-ggml-base.en-a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002
+
       - name: Publish (self-contained win-x64 zip, with the base.en speech model)
         # publish.ps1 fetches ggml-base.en.bin from huggingface.co at the commit scripts/download-model.ps1 pins, and
         # fails this job on a size or SHA-256 mismatch (Decision 16, docs/DECISIONS.md "Visual C++ runtime"). The zip,
@@ -116,12 +126,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Only for packaging/release-notes-preamble.md; the built files come from the artifacts below.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: release
           merge-multiple: true
 
-      - name: Create the release with generated notes
+      - name: Create the release with a fixed preamble and generated notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -130,5 +145,6 @@ jobs:
             # The release already exists (for example created by hand): add or replace the built files.
             gh release upload "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "Dictum ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
+            # The preamble states the Visual C++ runtime requirement and the bundled model; GitHub's generated notes follow it.
+            gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "Dictum ${GITHUB_REF_NAME#v}" --notes-file packaging/release-notes-preamble.md --generate-notes --verify-tag
           fi
