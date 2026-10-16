@@ -53,6 +53,11 @@ public static class ModelFolders
             var path = Path.Combine(folder.Path, fileName);
             var file = new FileInfo(path);
             if (!file.Exists) continue;
+            // simplification: in the chosen and per-user folders only the size is checked here; the SHA-256 comes at load, as
+            // before (ModelIntegrity.Verify), because Settings > Models looks every catalogue model up on each redraw, on the
+            // UI thread, and a copied-in 1.5 GB file takes seconds to hash. Ceiling: a same-size file with the wrong bytes in
+            // one of those folders is found, then refused at load, instead of being passed over for a good copy further on.
+            // Trigger to retire: a report of that; then hash here off the UI thread and remember failures too.
             if (folder.Kind == ModelFolderKind.Bundled && bundledCheck is not null ? bundledCheck(path) : bytes is not long want || file.Length == want)
                 return (path, folder.Kind);
         }

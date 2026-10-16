@@ -105,6 +105,10 @@ public sealed class ModelCoordinator(
         lock (_bundledChecks)
         {
             if (_bundledChecks.TryGetValue(path, out var seen) && seen.Length == file.Length && seen.Written == file.LastWriteTimeUtc) return seen.Passes;
+            // simplification: the first lookup of a bundled file after an install or an update hashes it on the calling
+            // thread, which during a start is the UI thread (base.en: 0.5 s, measured 17/10/2026 on the development machine
+            // with the built app's --selftest). Ceiling: a bigger bundled model holds that start up for longer. Trigger to
+            // retire: shipping a bigger model in the package; then check it in the background.
             var passes = true;
             try
             {

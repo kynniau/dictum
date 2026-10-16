@@ -98,18 +98,18 @@ Local dictation for Windows. Hold a key, talk, let go, and your words appear in 
 ```text
 Dictum turns your speech into text in any Windows app. Hold the right Ctrl key, talk, let go: your words are transcribed on your PC, tidied up, and pasted at the cursor.
 
-Before you start: Dictum needs a speech model, which you choose and download on first run from Hugging Face (from 78 MB; the recommended model for PCs without a graphics card is about 148 MB). You also need a microphone. Dictum dictates in English.
+Dictum is ready to use as soon as it is installed: a small English speech model (base.en, about 148 MB) is included, so nothing is downloaded on first run. Larger, more accurate models are optional downloads from Hugging Face in Settings > Models. You also need a microphone. Dictum dictates in English; an optional multilingual model lets it listen in other languages.
 
 PRIVATE BY DESIGN
-Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service with your own Anthropic API key or to your own server. Turn on offline-only mode and it never connects to anything outside your PC.
+Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or to your own server, an advanced option; that service's own terms apply. Turn on offline-only mode and it never connects to anything outside your PC.
 
 AI THAT RUNS ON YOUR PC
-Dictum uses AI models: whisper.cpp to recognise speech and, by default, a small generative language model (Qwen2.5 1.5B Instruct, run by llama.cpp) to tidy the result. It removes filler words, fixes punctuation and capitals, and follows spoken commands such as "new paragraph". The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. If its answer fails Dictum's checks, a rule-based tidy is used instead, and you can switch AI clean-up off completely. To report a problem with text Dictum produced, email hello@kynni.com.au.
+Dictum uses AI models: whisper.cpp to recognise speech and, if you add it in Settings > Models (a 1.1 GB download), a small generative language model (Qwen2.5 1.5B Instruct, run by llama.cpp) to tidy the result. Out of the box a rule-based tidy fixes punctuation and capitals and follows spoken commands such as "new paragraph"; the language model also removes filler words and smooths grammar. The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. If its answer fails Dictum's checks, a rule-based tidy is used instead, and you can switch AI clean-up off completely. To report a problem with text Dictum produced, email hello@kynni.com.au.
 
 HOW IT WORKS
 - Hold Right Ctrl, or a key you choose, speak, and release.
-- Double-tap for hands-free dictation; press the key again to stop.
-- Esc cancels at any time and nothing is pasted.
+- Double-tap for hands-free dictation: Dictum types each sentence as you pause; press the key again to stop.
+- Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed.
 - A small pill at the bottom of the screen shows when Dictum is listening.
 
 MAKE IT HEAR YOU
@@ -134,7 +134,7 @@ Free and open source under the MIT licence, by Kynni Pty Ltd.
 Hold a key, talk and let go: your words are pasted at the cursor in any app
 Speech recognition runs on your PC with whisper.cpp and works offline
 Optional local clean-up removes filler words and fixes punctuation
-Hands-free mode: double-tap to start, tap to stop; Esc cancels
+Hands-free mode types each sentence as you pause: double-tap to start, tap to stop
 Calibration finds the installed model that hears you best
 Personal dictionary and corrections for names and jargon
 Grammar assist for speakers whose first language is not English
@@ -307,7 +307,7 @@ CHANGED SINCE THE LAST SUBMISSION: the speech engine could not load on a PC with
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the menu.
 
-SPEECH MODELS: NO DOWNLOAD IS NEEDED TO TEST. The base.en speech model (147,964,211 bytes) ships inside the package. Dictum can also download larger speech models from huggingface.co, and offers an optional clean-up model, qwen2.5-1.5b (1,117,320,736 bytes, about 1.1 GB); choose "No AI cleanup (rule-based tidy)" to skip that download. Every file is checked against a pinned SHA-256 before use. Model files are data (ggml and GGUF weights read by whisper.cpp and llama.cpp), not executable code: Dictum never downloads or runs code.
+NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside the package and starts ready to dictate; the clean-up model is off by default (a rule-based tidy is used). Larger speech models and the optional clean-up model (qwen2.5-1.5b, about 1.1 GB) are downloads from huggingface.co that you can start in Settings > Models; every downloaded file is checked against a pinned SHA-256 before use. On a PC without a discrete graphics card Dictum runs the models on the CPU. Model files are data (ggml and GGUF weights read by whisper.cpp and llama.cpp), not executable code: Dictum never downloads or runs code.
 
 TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json. base.en is already inside the package; to test AI clean-up offline too, copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder (Settings > Storage shows it). Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
