@@ -1061,7 +1061,8 @@ resilience".
   on the CPU for that failure, Try on the CPU, which writes `whisper.gpu` / `llm.gpu` = `cpu` and reloads; if the model
   then fails on the CPU inside the GPU runtime the line adds "Restart Dictum to use the CPU." After the retry on the CPU
   (below) has failed too, the line shows the CPU's own error and Try on the CPU is not offered. Pressing it moves
-  keyboard focus to a control that stays visible (the tray panel's Dictation on switch, About's heading). Settings >
+  keyboard focus to a control that stays visible (the tray panel's Dictation on switch; in About, the next control, where
+  Tab would go). Settings >
   About shows the same line, and its clean-up line says the local model could not be loaded instead of "on this PC"
   while it failed, except for text that is not English, whose plain clean-up keeps its own line. The load balloon for a
   missing runtime is that reason alone, once for both models. All of this copy is proposed, awaiting the product owner's

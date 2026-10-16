@@ -40,9 +40,9 @@ public static class ModelFailure
 
     /// <summary>
     /// The oldest Visual C++ runtime the engines may run on: a copy of <c>$MinVcRuntime</c> in scripts/build-common.ps1 (14.51,
-    /// fix/vc-runtime at 5584935, PR #10, read 17/10/2026), where Microsoft's rule is recorded: a runtime at least as recent as the
+    /// on main since PR #10, 6daff77, read 17/10/2026), where Microsoft's rule is recorded: a runtime at least as recent as the
     /// build tools that built the app, and the newest linker among the native DLLs is 14.51 (Whisper.net.Runtime.NoAvx 1.9.1).
-    /// Change both together. An msvcp140.dll older than this counts as missing (<see cref="VisualCppRuntimePresent()"/>).
+    /// A test holds the two equal. An msvcp140.dll older than this counts as missing (<see cref="VisualCppRuntimePresent()"/>).
     /// </summary>
     internal static readonly Version MinRuntime = new(14, 51);
 

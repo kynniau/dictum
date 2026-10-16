@@ -1147,8 +1147,8 @@ warns, and that file has no size or hash to be checked against. A value is never
   `scripts\download-model.ps1 -Model small.en`, or point `whisper.model` at a file you already have.
 - **"The Microsoft Visual C++ runtime is missing" (tray panel, Settings > About).** The speech and clean-up engines need
   the Microsoft Visual C++ Redistributable (x64), version 14.51 or later, and neither could load without it (an older
-  `msvcp140.dll` counts as missing). Install the latest from Microsoft, then restart Dictum. Until then nothing can be
-  dictated; Open log folder shows the engines' own messages. The balloon says this once for both models.
+  `msvcp140.dll` counts as missing). Install it as the "model error" entry above says, then restart Dictum. Until then
+  nothing can be dictated; Open log folder shows the engines' own messages. The balloon says this once for both models.
 - **"The graphics driver could not run the model; Dictum will use the CPU".** The model failed on the GPU (log:
   `failed while the GPU was in use (…); loading it again on the CPU`) and runs on the CPU now. Update the graphics
   driver, or set `whisper.gpu` / `llm.gpu` to `cpu` to start on the CPU every time. If the CPU fails too, the line shows

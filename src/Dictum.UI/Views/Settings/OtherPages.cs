@@ -218,15 +218,14 @@ internal sealed class AboutPage : SettingsPage
     public AboutPage(AppShell shell) : base(shell, "About")
     {
         var version = typeof(AboutPage).Assembly.GetName().Version?.ToString(3) ?? "?";
-        // Focusable but not a tab stop: where keyboard focus goes when Try on the CPU hides itself (below).
-        var title = new TextBlock { Text = "Dictum", FontSize = 22, FontWeight = FontWeight.SemiBold, Focusable = true };
-        KeyboardNavigation.SetIsTabStop(title, false);
+        var title = new TextBlock { Text = "Dictum", FontSize = 22, FontWeight = FontWeight.SemiBold };
         _downloadPage = Ui.Button(UpdateCheck.DownloadPageLabel, "primary", () => Run(() => Shell.Platform.Open(UpdateCheck.DownloadPageUrl)));
         _downloadPage.HorizontalAlignment = HorizontalAlignment.Left;
         _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "secondary", () =>
         {
-            // The reload hides this button and the problem line while the model loads: keyboard focus goes first to the heading.
-            if (_tryCpu!.IsFocused) title.Focus(NavigationMethod.Tab); // set by then: the button exists before it can be pressed
+            // The reload hides this button and the problem line while the model loads: keyboard focus goes first where Tab would
+            // take it (Check for updates, or Report a problem in the Store build), a control that stays and shows its focus ring.
+            if (_tryCpu!.IsFocused && KeyboardNavigationHandler.GetNext(_tryCpu, NavigationDirection.Next) is InputElement next) next.Focus(NavigationMethod.Tab);
             Run(() => Shell.TryOnCpu());
         });
         _tryCpu.HorizontalAlignment = HorizontalAlignment.Left;

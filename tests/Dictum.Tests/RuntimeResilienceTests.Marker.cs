@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -379,14 +378,16 @@ public sealed partial class RuntimeResilienceTests
         var now = focus.GetFocusedElement();
         var where = Describe(now);
         var name = now is Control control ? AutomationProperties.GetName(control) : null;
+        var ring = now is Control shown && shown.Classes.Contains(":focus-visible");
         flyout.Close();
         shell.Dispose();
         Assert.True(now is Visual { IsEffectivelyVisible: true }, $"focus after Try on the CPU: {where}");
         Assert.Equal("Dictation on", name);
+        Assert.True(ring, "the focus ring is not shown");
     });
 
     [Fact]
-    public Task Keyboard_focus_moves_to_Abouts_heading_when_Try_on_the_CPU_hides() => UiSession.Run(() =>
+    public Task Keyboard_focus_moves_to_the_next_control_in_About_when_Try_on_the_CPU_hides() => UiSession.Run(() =>
     {
         var (scratch, model) = SpeechScratch();
         using var _scratch = scratch;
@@ -403,9 +404,12 @@ public sealed partial class RuntimeResilienceTests
         Assert.True(EventuallyOnUi(() => VisibleTexts(window).Contains(AppShell.RestartForCpuHint, StringComparison.Ordinal)), "no restart hint");
         var now = focus.GetFocusedElement();
         var where = Describe(now);
+        var ring = now is Control control && control.Classes.Contains(":focus-visible");
         window.Close();
         shell.Dispose();
-        Assert.True(now is TextBlock { Text: "Dictum", IsEffectivelyVisible: true }, $"focus after Try on the CPU: {where}");
+        // Where Tab goes from it: Check for updates in the download build (the Store build: Report a problem).
+        Assert.True(now is Button { IsEffectivelyVisible: true, Content: UpdateCheck.ButtonLabel }, $"focus after Try on the CPU: {where}");
+        Assert.True(ring, "the focus ring is not shown");
     });
 
     // ---- Finding 8: the Visual C++ runtime's version floor ----
@@ -434,12 +438,11 @@ public sealed partial class RuntimeResilienceTests
     }
 
     [Fact]
-    public void The_runtime_floor_is_the_build_scripts_floor()
+    public void The_runtime_check_uses_the_build_scripts_floor_and_DLLs()
     {
-        var script = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "scripts", "build-common.ps1"));
-        var floor = Regex.Match(script, @"\$MinVcRuntime\s*=\s*\[version\]""([\d.]+)""");
-        Assert.SkipUnless(floor.Success, "scripts/build-common.ps1 has no $MinVcRuntime yet (it comes with fix/vc-runtime, PR #10).");
-        Assert.Equal(Version.Parse(floor.Groups[1].Value), ModelFailure.MinRuntime);
+        // scripts/build-common.ps1's $MinVcRuntime and $VcRuntimeDlls, read as the VC++ runtime tests read them.
+        Assert.Equal(VcRuntimeLayout.MinVcRuntime, ModelFailure.MinRuntime);
+        Assert.True(VcRuntimeLayout.Shipped.SetEquals(ModelFailure.RuntimeDlls), $"build-common.ps1 ships {string.Join(", ", VcRuntimeLayout.Shipped)}");
     }
 
     // ---- Finding 9: the load balloon ----

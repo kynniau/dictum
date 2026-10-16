@@ -2434,18 +2434,24 @@ through the production loader on the P630, `whisper.gpu = auto`) are in that ses
   README's `llm.gpu` row names the exceptions.
 - **Keyboard focus (minor).** Try on the CPU hides itself and its line while the reload loads the model, and focus went
   nowhere (the lens's headless probe P3). Pressing it now moves focus first to a control that stays: the tray panel's
-  Dictation on switch, and About's "Dictum" heading (focusable, not a tab stop), both with `NavigationMethod.Tab`, so the
-  focus ring shows. Only when the button had focus.
+  Dictation on switch, and in About the next control, where Tab would go (`KeyboardNavigationHandler.GetNext`: Check for
+  updates in the download build, Report a problem in the Store build), both with `NavigationMethod.Tab`, and only when
+  the button had focus. The brief offered About's heading; a headless probe (17/10/2026) found that a TextBlock given
+  focus gets `:focus-visible` but no `FocusAdorner`, and Dictum's own styles (`Theme/Controls.axaml`) have no focus visual
+  for it, so nothing would show a sighted keyboard user where focus went; a button has the Fluent theme's keyboard focus
+  visual (recalled, not looked at here). The pins check `:focus-visible` on the control focus lands on; no ring was looked
+  at (headless, no screenshots).
 - **Structure (minor).** `ModelFailure` moved to its own file; one `ModelFailure.Assess(error, gpuInUse, gpuSetting,
   runtimePresent)` gives both managers `LastError`, `CpuMightHelp` and `RestartForCpu` (each manager keeps one
   `Assessment` field behind its three properties); one `ModelFailure.RetryOnCpu` holds the retry rule both managers used;
   `ModelManager`'s `warmUp` parameter is `gpuInUse`, as `LocalLlmManager`'s (13 callers in 6 other test files renamed).
 - **Runtime check (minor).** `VisualCppRuntimePresent()` is true off Windows (Dictum.Core also targets macOS, where no such
   runtime exists), and an `msvcp140.dll` older than 14.51 counts as missing: the floor is a copy of `$MinVcRuntime` in
-  `scripts/build-common.ps1` on fix/vc-runtime (PR #10, 5584935, read 17/10/2026), which records Microsoft's rule and the
+  `scripts/build-common.ps1` (on main since PR #10, 6daff77, read 17/10/2026), which records Microsoft's rule and the
   newest linker among the native DLLs. The version is read from the file the process loads by name, or from a copy beside
-  the engines; a version that cannot be read counts as present, as before. A guard test compares the two floors once PR
-  #10's script is on the branch (skipped until then).
+  the engines; a version that cannot be read counts as present, as before. A test holds the floor and the four DLL names
+  equal to the script's, read through PR #10's own `VcRuntimeLayout`. Only `msvcp140.dll`'s version is weighed, as the
+  brief asked.
 - **One-line gaps (minor).** The load balloon (`AppShell.cs` line 200, one line, with `AppShell.LoadBalloon` in
   `AppShell.Status.cs`) drops "(Speech model: Settings > Models)" for a missing runtime, which no model choice fixes, and
   shows it once when both models carry it. `GpuMachine` is unchanged: it is a fact about the runtime, so after the retry
