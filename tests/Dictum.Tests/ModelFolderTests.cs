@@ -490,6 +490,30 @@ public sealed class ModelFolderTests : IDisposable
         shell.Dispose();
     });
 
+    /// <summary>The Light preset and the calibration test find the bundled base.en like every other lookup: nothing to download.</summary>
+    [Fact]
+    public Task The_Light_preset_and_calibration_use_the_bundled_base_en_without_a_download() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en" } }""");
+        var bundled = Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
+        new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(bundled);
+        var server = new CountingHandler();
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false),
+            downloadHandler: server);
+        shell.Reload(userRequested: false);
+
+        var calibration = shell.CreateCalibrationHost();
+        Assert.Contains(calibration.InstalledModels(), c => c.Name == "base.en" && c.Path == bundled);
+        Assert.DoesNotContain(calibration.MissingModels(), m => m.Name == "base.en"); // not offered as "Download and include"
+
+        shell.Personal.SelectPreset(ModePreset.Light); // base.en and the rule-based tidy
+        Assert.Empty(dialogs.DownloadQuestions);
+        Assert.Equal(("base.en", LlmSettings.NoProvider), (shell.Settings.Whisper.Model, shell.Settings.Llm.Provider));
+        Assert.Equal(bundled, shell.Models.ModelPath);
+        Assert.Equal(0, server.Requests);
+        shell.Dispose();
+    });
+
     /// <summary>
     /// Pin, end to end: a first start with base.en beside Dictum.exe shows no model picker, keeps the hotkey check, writes base.en
     /// and the rule-based tidy, and loads the bundled file with nothing downloaded.
