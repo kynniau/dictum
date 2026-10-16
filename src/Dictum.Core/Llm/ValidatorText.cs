@@ -65,6 +65,16 @@ internal static partial class ValidatorText
     /// <summary>The text without spoken formatting commands and hesitations (in any case), which a correct reply drops.</summary>
     public static string WithoutCommands(string text) => Command().Replace(text, " ");
 
+    [GeneratedRegex(@"\b(?:" + DeterministicCleaner.FillerPhrases + @")\b", RegexOptions.IgnoreCase)]
+    private static partial Regex Filler();
+
+    /// <summary>
+    /// The text without the fillers the clean-up prompt tells the model to remove ("like", "you know", "sort of", "kind of",
+    /// "I mean"; <see cref="DeterministicCleaner.FillerPhrases"/>), wherever they are and in any case. Each is also an
+    /// ordinary word or phrase ("I like it"), so read a text both with and without them.
+    /// </summary>
+    public static string WithoutFillers(string text) => Filler().Replace(text, " ");
+
     /// <summary>"\n" or "\n\n" when the dictation ends with a spoken "new line" / "new paragraph", else null.</summary>
     public static string? FinalBreak(string lower)
     {

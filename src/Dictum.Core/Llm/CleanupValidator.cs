@@ -334,32 +334,39 @@ public static partial class CleanupValidator
     /// <summary>
     /// A hands-free part's reply that repeats words already typed (SPEC §3 amendment, 16/10/2026): two words next to each other
     /// in the reply that are next to each other in the carried words, one of them a content word (three letters or more, not a
-    /// function word), and not next to each other in the part's own dictation (hesitations and spoken commands left out).
+    /// function word), that the part did not say. The part said a pair when its dictation has two adjacent words that sound
+    /// like them, word by word (<see cref="ValidatorText.SoundsLike"/>, so a homophone fixed or a dictionary term respelt is
+    /// still said), read without spoken commands and hesitations, and both with and without the fillers the prompt lists (so
+    /// "the like budget" says "the budget", while "I like budgets" still says "like budgets").
     /// Five or more such words are the system-prompt rule's too; this catches the shorter run a model writes when it "finishes"
     /// a part with the words before it: "…we should move the meeting to" then "thursday" → "Move the meeting to Thursday.".
     /// </summary>
-    // simplification: pairs of words, not an alignment of the reply with the dictation. Ceiling: a grammar fix that happens to
-    // join two words the way the carried words do ("the shop" carried, "go to shop" → "Go to the shop.") is rejected, and the
-    // tidy is typed instead (a false rejection costs polish only). Trigger to retire: such a rejection observed in the log.
+    // simplification: pairs of words, not an alignment of the reply with the dictation. Ceiling: a fix that changes a word's
+    // sound or adds a word between two dictated ones, joining a pair the way the carried words do, is still rejected and the
+    // tidy is typed instead (a false rejection costs polish only): "the shop" carried, "go to shop" → "Go to the shop."; "to
+    // buy" carried, "we need to buys the tickets" → "We need to buy the tickets.". Grammar assist makes such fixes on purpose.
+    // A dropped filler, a fixed homophone ("by" → "buy") and a dictionary respelling ("kinney" → "Kynni") no longer reject.
+    // The other way, a reply that repeats a carried pair is accepted when the part said two words that sound like it.
+    // Trigger to retire: such a rejection observed in the log.
     private static bool RepeatsCarried(string rawLower, string textLower, string carried)
     {
-        var said = Pairs(Comparable(Words(WithoutCommands(rawLower))));
-        var before = Pairs(Comparable(Words(MapQuotes(carried).ToLowerInvariant())));
+        var spoken = WithoutCommands(rawLower);
+        var said = PairsOf(Comparable(Words(spoken))).Concat(PairsOf(Comparable(Words(WithoutFillers(spoken))))).ToList();
+        var before = PairsOf(Comparable(Words(MapQuotes(carried).ToLowerInvariant()))).ToHashSet();
         var reply = Comparable(Words(textLower));
         for (var i = 0; i + 1 < reply.Count; i++)
         {
-            if ((IsCorrectionWord(reply[i]) || IsCorrectionWord(reply[i + 1])) && before.Contains(reply[i] + " " + reply[i + 1])
-                && !said.Contains(reply[i] + " " + reply[i + 1]))
+            var pair = (reply[i], reply[i + 1]);
+            if ((IsCorrectionWord(pair.Item1) || IsCorrectionWord(pair.Item2)) && before.Contains(pair)
+                && !said.Any(s => SoundsLike(pair.Item1, s.Item1) && SoundsLike(pair.Item2, s.Item2)))
                 return true;
         }
         return false;
     }
 
-    private static HashSet<string> Pairs(List<string> words)
+    private static IEnumerable<(string, string)> PairsOf(List<string> words)
     {
-        var pairs = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i + 1 < words.Count; i++) pairs.Add(words[i] + " " + words[i + 1]);
-        return pairs;
+        for (var i = 0; i + 1 < words.Count; i++) yield return (words[i], words[i + 1]);
     }
 
     /// <summary>

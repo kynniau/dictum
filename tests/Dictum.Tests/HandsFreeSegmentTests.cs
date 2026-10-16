@@ -386,6 +386,32 @@ public class CarriedContextCleanupTests
         Assert.True(text is not null, rejection);
     }
 
+    /// <summary>
+    /// Merge lens P2, 16/10/2026: faithful replies that share a pair with the carried words, which the pair rule rejected. (a) A
+    /// filler dropped between said words; (b) a homophone fixed; (c) a dictionary term respelt (PR #4's term rule accepts it);
+    /// (d) a filler's word used as a word, kept.
+    /// </summary>
+    [Theory]
+    [InlineData("and then we need to finalise the budget", "so the like budget report is due on friday", "The budget report is due on Friday.", null)]
+    [InlineData("we still have to buy the tickets", "we need to by the tickets tonight", "We need to buy the tickets tonight.", null)]
+    [InlineData("I had lunch with Kynni", "and then i met with kinney again", "And then I met with Kynni again.", "Kynni")]
+    [InlineData("they really like budgets", "i like budgets too", "I like budgets too.", null)]
+    public void A_faithful_reply_that_shares_a_pair_with_the_carried_words_is_accepted(string carried, string raw, string reply, string? term)
+    {
+        var context = new ValidationContext(CleanupPrompt.WithCarried(CleanupPrompt.Default, carried), DictionaryTerms: term is null ? null : [term], Carried: carried);
+        var (text, rejection) = CleanupValidator.Validate(raw, reply, context);
+        Assert.True(text is not null, rejection);
+    }
+
+    [Fact]
+    public void A_fix_that_changes_a_words_sound_into_a_carried_pair_is_still_rejected()
+    {
+        // The rule's documented ceiling (a false rejection: the tidy is typed): "buys" does not sound like the carried "buy".
+        var context = new ValidationContext(CleanupPrompt.WithCarried(CleanupPrompt.Default, "we still have to buy the tickets"), Carried: "we still have to buy the tickets");
+        Assert.Equal("reply repeats words already typed before this part",
+            CleanupValidator.Validate("we need to buys the tickets tonight", "We need to buy the tickets tonight.", context).Rejection);
+    }
+
     /// <summary>A local model stand-in that records which call it got.</summary>
     private sealed class RecordingLocalEngine : ILocalLlmEngine
     {

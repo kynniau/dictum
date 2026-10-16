@@ -22,9 +22,15 @@ public static partial class DeterministicCleaner
     [GeneratedRegex(@"(?<!\d\s*)(?<![\w.'-])(?:[Uu]mm?|[Uu]hh?|[Ee]rm|[Aa]h|[Hh]mm)(?![\w'-]),?")]
     private static partial Regex Hesitation();
 
+    /// <summary>
+    /// The fillers the clean-up prompt lists beside the hesitations ("like", "you know", "sort of", "I mean"), with "kind of",
+    /// as a regex alternation: the one list, read here and by the validator's carried-words rule (ValidatorText.WithoutFillers).
+    /// </summary>
+    internal const string FillerPhrases = "you know|i mean|sort of|kind of|like";
+
     // A multi-word filler only between a sentence start or a comma and a following comma: "you know, we…",
     // "it was, sort of, long". "I mean it." and "Kind of Blue" are left alone.
-    [GeneratedRegex(@"(?:(?<=^)|(?<=[.!?]\s+)|(?<=,)\s*)(?:you know|i mean|sort of|kind of|like)\s*,\s*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(?:(?<=^)|(?<=[.!?]\s+)|(?<=,)\s*)(?:" + FillerPhrases + @")\s*,\s*", RegexOptions.IgnoreCase)]
     private static partial Regex CommaFiller();
 
     // Immediate repeats ("the the"); "that that", "had had" and "is is" ("what it is is") are left alone because they are
