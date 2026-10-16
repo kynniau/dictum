@@ -1767,11 +1767,24 @@ native-assets packages) and CommunityToolkit.HighPerformance's `ThirdPartyNotice
 `7774f8b0ab66bfb47ec154ce24a2d6d574febc44a74d940b8a037d1c56756163`).
 
 **What the notices do not settle.**
-- **Microsoft.Windows.SDK.NET.Ref 10.0.19041.57** (`Microsoft.Windows.SDK.NET.dll`, 24.9 MB, and `WinRT.Runtime.dll`) states
-  its licence only as a URL, https://aka.ms/WinSDKLicenseURL, with `requireLicenseAcceptance` true. The package holds no
-  licence text and no identifier, and this lane could read nothing but git and gh, so the entry says the terms are not
-  reproduced. Someone needs to read that URL and either paste the terms into the entry or decide the projection need not
-  ship. This is the one entry that is not a real licence notice.
+- **Microsoft.Windows.SDK.NET.Ref 10.0.19041.57** (`Microsoft.Windows.SDK.NET.dll`, 24.9 MB, and `WinRT.Runtime.dll`)
+  states its licence only as a URL, https://aka.ms/WinSDKLicenseURL, with `requireLicenseAcceptance` true. The package
+  holds no licence text and no identifier (its nuspec and file list, read in the NuGet cache on 17/10/2026). The
+  orchestrator read that URL on 17/10/2026 and passed this lane what follows; this lane could read nothing but git and
+  gh and did not read it again. The URL led to
+  https://download.microsoft.com/download/0/F/F/0FF2B061-47DD-4F55-89B6-FD1D8C44F14D/sdk_license.rtf, titled "MICROSOFT
+  SOFTWARE LICENSE TERMS - MICROSOFT WINDOWS SOFTWARE DEVELOPMENT KIT (SDK) FOR WINDOWS 10". Its "Distributable Code"
+  section sets the conditions on which an application may include SDK files, and those conditions include an
+  end-user-terms requirement. The entry in `THIRD-PARTY-NOTICES.txt` gives the title and the address and says to read
+  the terms there; it does not reproduce them, and this record does not copy the requirement's wording either.
+  **Pending:** the product owner's decision on the end-user-terms requirement (morning batch). `WinRT.Runtime.dll` is
+  covered separately: its version information (file version 2.2.0.48161, product version
+  `2.2.0.48161+8649ee3eeb2445ca2a36d80d878ef60b96a6c65d`, copyright "Copyright (c) Microsoft Corporation. All rights
+  reserved.", read in the NuGet cache on 17/10/2026) names commit 8649ee3 of https://github.com/microsoft/CsWinRT. The
+  `LICENSE` at that commit, read through the GitHub API on 17/10/2026 (git blob
+  `3d8b93bc7987d14c848448c089e2ae15311380d7`, 1,162 bytes), is the MIT License, "Copyright (c) Microsoft Corporation.";
+  the entry reproduces it verbatim, keeping the source's four-space indent and changing only its line endings, from CRLF
+  to LF.
 - The native libraries (whisper.cpp, ggml, llama.cpp and the Vulkan builds) are covered by their packages' nuspec licence
   (MIT) and copyright line. What those binaries embed beyond that (shaders, Vulkan headers, other code) was not
   examined; Annex B covers Skia and HarfBuzz because their package says so.

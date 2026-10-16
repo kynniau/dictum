@@ -119,13 +119,48 @@ SOFTWARE.
 
 ------------------------------------------------------------------------------
 Package: Microsoft.Windows.SDK.NET.Ref 10.0.19041.57
-Ships as: Microsoft.Windows.SDK.NET.dll, WinRT.Runtime.dll
-Licence: not reproduced. This package states its licence only as a URL, https://aka.ms/WinSDKLicenseURL, and carries
-    no licence text and no licence identifier (its .nuspec sets requireLicenseAcceptance to true). The licence for
-    these files is the one that URL names; it could not be read when this file was prepared.
+Ships as: Microsoft.Windows.SDK.NET.dll (the Windows SDK projection for .NET, file version 10.0.19041.55) and
+    WinRT.Runtime.dll (the C#/WinRT runtime, file version 2.2.0.48161). Dictum calls one Windows API through them,
+    Windows.ApplicationModel.StartupTask, and only when it runs as an MSIX package (the Microsoft Store build or the
+    sideload test package), for launch at login.
+Licence: Microsoft's licence terms for the Windows SDK, not Dictum's MIT licence. The package's .nuspec gives only a
+    licence URL, https://aka.ms/WinSDKLicenseURL (requireLicenseAcceptance true), and the package carries no licence
+    text. On 17/10/2026 that URL led to
+    https://download.microsoft.com/download/0/F/F/0FF2B061-47DD-4F55-89B6-FD1D8C44F14D/sdk_license.rtf, "MICROSOFT
+    SOFTWARE LICENSE TERMS - MICROSOFT WINDOWS SOFTWARE DEVELOPMENT KIT (SDK) FOR WINDOWS 10". Its "Distributable
+    Code" section sets the conditions on which an application may include SDK files. Those terms are not reproduced
+    here: read them at that address.
 Copyright (nuspec): © Microsoft Corporation. All rights reserved.
+Copyright (version resource of both files): Copyright (c) Microsoft Corporation. All rights reserved.
 Authors (nuspec): Microsoft
 Project (nuspec): https://aka.ms/WinSDKProjectURL
+Note: WinRT.Runtime.dll's version information names commit 8649ee3eeb2445ca2a36d80d878ef60b96a6c65d of
+    https://github.com/microsoft/CsWinRT (C#/WinRT), whose LICENSE at that commit is the MIT License (read
+    17/10/2026). It is reproduced below.
+
+--- LICENSE (github.com/microsoft/CsWinRT at commit 8649ee3, read 17/10/2026) ---
+
+    MIT License
+
+    Copyright (c) Microsoft Corporation.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
 
 
 ==============================================================================
@@ -138,7 +173,8 @@ CPU, CPU without AVX, and Vulkan.
 ------------------------------------------------------------------------------
 Package: Whisper.net 1.9.1
 Ships as: Whisper.net.dll
-Licence: LICENSE (nuspec licence expression); the package's own LICENSE file is reproduced below.
+Licence: the package's own LICENSE file (MIT License text), reproduced below. The .nuspec names it (license type
+    "file") and gives no licence identifier.
 Copyright (nuspec): none stated
 Authors (nuspec): Sandro Hanea
 Project (nuspec): https://github.com/sandrohanea/whisper.net
@@ -3285,6 +3321,7 @@ is in the public domain.
 
                     Copyright 1996-2002, 2006 by
           David Turner, Robert Wilhelm, and Werner Lemberg
+
 
 
 Introduction

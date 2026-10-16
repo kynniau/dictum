@@ -53,6 +53,7 @@ public sealed class InstallerVcCheckTests
     {
         var iss = Iss;
         var setup = Squash(Routine("InitializeSetup"));
+        Assert.Contains("begin Result := True;", setup); // Setup runs unless the offer is cancelled
         Assert.Contains("if not VcRuntimeReady() then Result := OfferVcRuntime();", setup);
         Assert.Single(Regex.Matches(iss, @"(?<!function )\bOfferVcRuntime\(\)"));
         // The earlier placement was CurStepChanged(ssPostInstall), after the files were copied.
@@ -67,6 +68,9 @@ public sealed class InstallerVcCheckTests
         Assert.Contains("if Answer = IDYES then", offer);
         Assert.Contains("ShellExecAsOriginalUser('open', VcRedistUrl,", offer);
         Assert.Contains("else if Answer = IDCANCEL then Result := False;", offer);
+        // Yes and No both carry on, so the routine starts true; Cancel is the only path that sets it false.
+        Assert.Contains("begin Result := True; Log(", offer);
+        Assert.Single(Regex.Matches(offer, @"Result := False;"));
         Assert.Contains("VcRedistUrl = 'https://aka.ms/vc14/vc_redist.x64.exe';", Iss);
     }
 
