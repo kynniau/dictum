@@ -37,3 +37,24 @@ Release files are built by GitHub Actions (`.github/workflows/ci.yml`) from the 
 their SHA-256 hashes in `SHA256SUMS.txt`. The installer and the zip are not code-signed yet. The test MSIX is signed
 with a self-signed certificate made for that build only (its private key is not kept); the Microsoft Store version is
 signed by Microsoft.
+
+## Private material
+
+This repository is public, so anything pushed to it is published. Recordings, transcripts and personal test material
+(names, phrases, scenarios) live outside the repository, never in it.
+
+`.githooks` stops them being committed or pushed:
+
+- `pre-commit` and `pre-push` refuse media files (audio and video, apart from a `.wav` directly in `tests/fixtures`),
+  anything under a `private/`, `recordings/` or `transcripts/` folder, any file over 5 MB, and any file name or added
+  line that contains an entry from a denylist you keep outside the repository. They print file names only, never the
+  text that matched. Binary files are checked by name, type and size, not for text.
+- The denylist is a plain text file with one case-insensitive string per line (blank lines and `#` comments are
+  ignored). Point the `DICTUM_PRIVATE_DENYLIST` environment variable at it; the comment at the top of
+  `.githooks/private-guard.sh` says where the hooks look when it is not set. Without the file they skip that one check
+  and say so.
+- Turn the hooks on once per clone, for every worktree: `git config core.hooksPath .githooks`.
+- `--no-verify` skips them, and a clone without them has no guard. The `private-material` job in
+  `.github/workflows/ci.yml` therefore also fails a push or pull request that tracks a media file, a private folder or
+  a file over 5 MB. It runs after the push, so it only detects: a public repository is public at push time, and the
+  hooks are the real gate.

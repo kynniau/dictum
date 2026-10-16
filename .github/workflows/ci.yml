@@ -129,3 +129,23 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "Dictum ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
           fi
+
+  private-material:
+    # An after-the-fact detector, not a gate: this repository is public from the moment a push lands, so the real gate is
+    # the pair of hooks in .githooks (pre-commit and pre-push; turn them on with `git config core.hooksPath .githooks`).
+    # This job catches what got past them, such as a commit made with --no-verify or a clone without the hooks. It fails
+    # when a tracked file is a recording or other media file, sits under a private/, recordings/ or transcripts/ folder,
+    # or is over 5 MB, using the same rules as the hooks (.githooks/private-guard.sh). Independent of the build job.
+    name: Private material
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fail if a recording, a private folder or a file over 5 MB is tracked
+        shell: sh
+        run: |
+          . .githooks/private-guard.sh
+          pg_audit_tracked_files

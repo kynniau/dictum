@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refuses a commit that would add private material to this public repository (recordings, private folders, large files,
+# text from a local denylist). The rules and the checks are in private-guard.sh. Turn on: git config core.hooksPath .githooks
+. "$(dirname "$0")/private-guard.sh"
+
+# What to inspect: the staged changes.
+changes() { git -c core.quotePath=false diff --cached --no-color --no-ext-diff --no-textconv --no-renames "$@"; }
+
+pg_setup
+pg_load_denylist
+pg_run commit
+exit 0
