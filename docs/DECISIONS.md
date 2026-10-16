@@ -2344,10 +2344,14 @@ mutant was observed failing on the reverted behaviour:
 | M20 the clean-up restart hint never set | 1 |
 | M21 the problem line drops the restart hint | 1 |
 
-Not caused by these changes: in 12 of the 21 mutated runs, and in 1 of 2 unmutated full runs of the rebased head,
+Not caused by these changes: in 12 of the 21 mutated runs, and in 2 of 3 unmutated full runs of the rebased head,
 `FixBatchPrivacyTests.A_request_to_this_machine_never_goes_through_a_configured_proxy(host: "localhost")` failed too
 (expected 0 connections to its stand-in proxy, saw 1), the failure the hands-free lane traced to the test host's own
-telemetry reaching the process-wide proxy that test sets. Not investigated further here. Not mutation-checked, because
+telemetry reaching the process-wide proxy that test sets. Those runs had no telemetry opt-out in their environment; with
+`DOTNET_CLI_TELEMETRY_OPTOUT=1` and `TESTINGPLATFORM_TELEMETRY_OPTOUT=1` (CI sets the first) 2 of 2 full runs passed
+it. Two runs prove little, and the mechanism is the hands-free lane's finding, not re-traced here; both variable names
+are strings in the test output's `Microsoft.Testing.Platform.dll` (read 17/10/2026). The runs without the opt-out may have
+let the test host try to connect out. Not mutation-checked, because
 only a real model exercises them: `WhisperEngine.Load`'s `UseGpu`, `LocalLlmEngine.Load`'s `OpOffload`, and
 `WhisperEngine.VulkanDevicesForCleanup` with `ModelManager.BeginLoad` setting whisper's order early (the measured runs above
 exercise them).
@@ -2360,8 +2364,8 @@ speed one (qwen2.5-1.5b on the CPU inside the Vulkan build); F4 one (base.en wit
 none was looped.
 
 **Verification** (17/10/2026, this PC, rebased on main 23acf35): Release `--no-incremental` build, 0 warnings, 0 errors.
-Filtered suite (`FullyQualifiedName!~Install_copies_models`): 1,289 total, 1,270 passed, 19 skipped, 0 failed (the 22 new
-tests included); the run before it failed only the proxy test above. Before the rebase, on c0aa989: 1,130 total, 1,111
+Filtered suite (`FullyQualifiedName!~Install_copies_models`), telemetry opted out as above: 1,289 total, 1,270 passed, 19
+skipped, 0 failed (the 22 new tests included), twice. Before the rebase, on c0aa989: 1,130 total, 1,111
 passed, 19 skipped, 0 failed without these changes; 1,150, 1,131, 19, 0 with the first 20 of the new tests. Not run: the
 desktop-, tray- and model-gated tests (the 19 skipped), Dictum.exe itself (the running copy was left alone), and any run
 on a PC without the Visual C++ runtime (the investigation's Windows Sandbox evidence stands in for it).
