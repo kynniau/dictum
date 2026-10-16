@@ -35,7 +35,7 @@ public sealed class ModelFolderSafetyTests
         return path;
     }
 
-    private static ModelManager FakeModels() => new(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), warmUp: () => false);
+    private static ModelManager FakeModels() => new(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
 
     /// <summary>
     /// A loaded model stand-in that keeps its file open, without sharing deletion, until it is disposed, as a memory-mapped model
@@ -52,7 +52,7 @@ public sealed class ModelFolderSafetyTests
         public void Dispose() => _held.Dispose();
     }
 
-    private static ModelManager HoldingModels() => new(NullLog.Instance, loader: (p, _, d) => new HoldingEngine(p, d), warmUp: () => false);
+    private static ModelManager HoldingModels() => new(NullLog.Instance, loader: (p, _, d) => new HoldingEngine(p, d), gpuInUse: () => false);
 
     /// <summary>Another user's swap: the same size, other bytes, the last-write time put back.</summary>
     private static void Swap(string path)
