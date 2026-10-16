@@ -2066,3 +2066,17 @@ Not done, for the orchestrator:
 - Settings > Models still resolves the speech model in use once per redraw (`ModelPath`, for the language note and the
   "In use" row) when no model is loaded; the 22 catalogue lookups were the finding.
 - `--bench-cleanup`'s lookup has no pin of its own (running it needs a clean-up model).
+
+**Rebased onto main 6daff77** (17/10/2026, at the orchestrator's request: PR #10, the VC++ runtime framework and base.en in
+every package, had merged). Conflicts only in docs: DECISIONS.md (both appended after the hands-free section; PR #10's
+section kept first, then this one) and STORE.md (the certification notes' model paragraph: this PR's text kept, as the
+orchestrator asked; PR #10's offline-test note and its other lines merged as they were); README merged cleanly. The patch
+this PR makes to `src`, `tests` and `scripts` on 6daff77 is byte-identical to the one it made on 23acf35 (the two
+`git diff` outputs compared). The rebase renamed the commits: c1929ed is 0967f4d, d88e09a is b954028, 8c319cf is 74eeb47.
+Release `--no-incremental` build, 0 warnings, 0 errors; filtered suite on 74eeb47: 1,348 total, 1,327 passed, 21 skipped,
+0 failed (main's 1,297 with 21 skipped, per PR #10's record, plus this PR's 51 cases). Run 3 of the mutation checks, all 19
+on 74eeb47 the same way, each again observed failing on the reverted behaviour: M1 the verified record trusted in every folder: 1; M2 a chosen folder outside the profile emptied by Delete all app data: 1; M3 a failed deletion said "(in use)" again: 1; M4 the replacement looked for without the bundled folder: 1; M5 the replacement chosen by path, not name: 1; M6 a seeded llm.provider turned to none at first run: 1; M7 IsBundled comparing path text only: 2; M8 no backstop in ModelFiles.Delete: 2; M9 no backstop in RemovalPlan: 1; M10 no log line for an ignored bundled models.folder: 1; M11 the per-user folder told "rename it" while another is chosen: 2; M12 the bundled folder told "rename it": 1; M13 calibration on the plain lookup again: 1; M14 --download-model looking only at the download folder: 1; M15 Settings > Models looking every model up on each redraw: 1; M16 a download that ended not seen by Settings > Models: 1; M17 Settings > Models not looking again when shown again: 1; M18 the bundled folder accepted as the chosen folder: 2; M19 M18 and M9 together: the bundled folder chosen and no backstop in RemovalPlan: 6. Every restore was
+byte-identical to HEAD and the tree clean (19 of 19). Left for the orchestrator: PR #10's sentence before the certification
+notes in STORE.md ("The 'no download is needed' lines … hold only for a package built after the app change that reads the
+bundled model … has merged") describes this PR as still to come, and can go once it merges; and the notes now say twice
+that no download is needed (PR #10's "CHANGED SINCE THE LAST SUBMISSION" paragraph and this PR's), kept as instructed.
