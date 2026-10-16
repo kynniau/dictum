@@ -1184,7 +1184,7 @@ floor and the carried-word count each sit under a `// simplification:` note with
 | `RelativeFloor` | 0.1 | Quiet threshold as a fraction of the recent speech level |
 | `LevelDecay` | 0.986 per block | The speech level halves in about a second (0.986^50 ≈ 0.49) |
 | `SegmentJoin.CarriedWords` | 10 | Closing words carried to the next part |
-| `HandsFreeLimit.SettleMs` | 400 ms | The slider and number box write once they are still this long |
+| `HandsFreeLimit.SettleMs` | 400 ms | The slider writes once it is still this long (the number box has no pause: Enter, focus leaving or the page being left) |
 | `StateMachineOptions.DefaultHoldMaxSeconds` | 300 | A held key's auto-stop (not a setting) |
 
 - **Cut rule.** A pause cut lands in the middle of the quiet run, so both parts keep some quiet; the hard cut takes the
@@ -1210,22 +1210,29 @@ floor and the carried-word count each sit under a `// simplification:` note with
   boundary rule, before corrections, the profanity filter and snippets. Taken from the typed text, a snippet's address
   reached a cloud provider's prompt. A cloud clean-up therefore repeats at most 10 words of the previous part per request:
   same host, same consent, that part's own cleaned dictation (the reply the host returned, or the tidy of the transcript
-  sent to it), never text from the user's files.
+  sent to it), never text from the user's files. Since the lens on 93e7e72 a clean-up gets them only if it is the one that
+  cleaned them (`HandsFreePart.CarriedFrom`): every settings reload builds a new one, so cloud clean-up switched on
+  mid-session is sent none of what was said before it was. Whisper, on this PC, still hears them.
 - **Validator.** Carried words are prompt text, never dictation: every rule, the dictionary-term rule included,
   measures the reply against the part's own words. A reply that repeats two adjacent carried words (one a content word)
-  that the part did not say is rejected: "...we should move the meeting to" then "thursday" → "Move the meeting to
-  Thursday." Since the lens (finding 2) a pair counts as said when the dictation has two adjacent words that sound like
-  it word by word (`ValidatorText.SoundsLike`), read without spoken commands and hesitations and both with and without
-  the prompt's fillers (`DeterministicCleaner.FillerPhrases`, the one list). Ceilings: a fix that changes a word's sound
-  or inserts a word into a carried pair is still rejected ("buys" → "buy", "go to shop" → "Go to the shop.": the tidy is
-  typed, polish lost); a repeat is accepted when the part said two words that sound like it.
+  more often than the part said them is rejected: "...we should move the meeting to" then "thursday" → "Move the
+  meeting to Thursday." Since the lens (finding 2) a pair counts as said when the dictation has two adjacent words that
+  sound like it word by word (`ValidatorText.SoundsLike`), read without spoken commands and hesitations and both with and
+  without the prompt's fillers (`DeterministicCleaner.FillerPhrases`, the one list). Since the lens on 93e7e72 the pairs
+  are counted, as the term rule counts a term's forms: the reply may have as many pairs that sound like a carried pair as
+  one reading of the dictation has. Ceilings: a fix that changes a word's sound or inserts a word into a carried pair is
+  still rejected ("buys" → "buy", "go to shop" → "Go to the shop.": the tidy is typed, polish lost); a reply that swaps a
+  pair the part said for the carried pair it sounds like is accepted, since the part's pair pays for it once ("I spoke to
+  the team" carried, "we went to town afterwards" → "We went to the team afterwards."; pinned as a ceiling).
 - **Esc and the token.** One cancellation token per session, from the second tap through the stop: Esc while recording
   or after the stop drops the parts in flight or queued and keeps what is typed ("Stopped. Text already typed stays.").
   A lost microphone types the rest last, under the same token (pinned since the lens); one failed part does not end the
   session (pinned since the lens). `CaptureFailed`'s hands-free branch could never run and is gone (finding 11).
 - **The field.** Settings > General > Hands-free: a number with its unit, a 30 s–60 min slider and quick picks. The
-  number box and the slider write once they settle, the box also on Enter or when it loses focus (finding 6: typing
-  "120" wrote 30 first, and each write reached the state machine on reload). A value from 5 to 29 left in a file is
+  slider writes once it settles (400 ms); the number box writes only on Enter, when it loses focus or when the page is
+  left (finding 6: typing "120" wrote 30 first, and each write reached the state machine on reload; a settle timer on
+  the box, the first fix, still wrote 30 at ordinary typing speed, since the box's value does not change while "1" and
+  "12" both clamp to 30 s: the lens on 93e7e72, row 1 below). A value from 5 to 29 left in a file is
   raised to 30 at load with a log line and the file is not rewritten; the field writes the new value when next changed.
   `GeneralPage.MouseNote` lost its sentence pointing at `hands_free_max_seconds` in settings.json. The wording is
   PROPOSED, awaiting the product owner.
@@ -1278,7 +1285,7 @@ part, so parts end at sentence ends more often, at the cost of later feedback.
 | 3 | Major | `hands_free_max_seconds` also limited a held key | `HoldMaxSeconds` (300); AppRules passes 300 | P3, P3b |
 | 4 | Major | Three claims no test held | `CleanupSession.Turns`; pins | carried turn, P5, P6 |
 | 5 | Major | Parts follow the window in front | Documented (decision due 17/10/2026) | README sentence pinned |
-| 6 | Minor | The number box wrote on every keystroke | Settle timer; Enter, focus and page flush | P7 (three ways to finish) |
+| 6 | Minor | The number box wrote on every keystroke | Enter, focus and page flush (a settle timer was the first fix and is gone from the box: the lens on 93e7e72, row 1) | P7 (three ways to finish) |
 | 7 | Minor | SPEC was cited but not amended | SPEC §3, §7, §9, §20, §22; this section | — |
 | 7b | Minor | The rule-based tidy closes nearly every part | README corrected; options above | existing pin (`Parts_are_typed_in_order…`) |
 | 8 | Minor | Fix last holds the last part | Kept and documented | existing pin (`Remembered.Last()`) |
@@ -1354,3 +1361,45 @@ Two changes after the rebase:
 
 Filtered suite: the rebased head 1,198 total, 1,179 passed, 19 skipped, 0 failed; with the two changes 1,202, 1,183,
 19, 0 (main a88e492 alone, the same filter: 1,077, 1,058, 19, 0).
+
+**Lens on 93e7e72 (Needs changes), and the fixes** (the lens 16/10/2026, the fixes 16 and 17/10/2026). No blocker and no
+privacy regression. Three minors, the nits, and the consent tightening the lens suggested; the code follows the
+replacements the lens had already trialled.
+
+| # | Severity | Finding | Fix | Pins (each observed failing on the reverted behaviour) |
+|---|---|---|---|---|
+| 1 | Minor | The number box's settle timer counted from the first key: `ValueChanged` does not fire while the clamped value stays the same ("1" and "12" both clamp to 30 s), so 1, 2, 0 at 250 ms a key wrote 30 at about 500 ms, then 120 | The box never arms the timer; a `_typed` flag holds its value until Enter, focus leaving the box or the page being left (`Settling` is the timer or the flag; `Flush` and `Choose` clear it); the slider keeps the timer | `Typing_at_ordinary_speed_never_writes_the_digits_on_the_way_under_the_real_timer` (the real `DispatcherTimer`, `Task.Delay(250)` between keys, the file never holds 30 and ends at 120 after Enter) |
+| 2 | Minor | A said pair that only sounds like a carried pair paid for it even when the reply also kept the said pair: "so we had the meeting" carried, "it came to nothing in the end" → "The meeting came to nothing in the end." (also "The meeting. It came to nothing in the end."; "I spoke to the team", "we went to town afterwards" → "The team went to town afterwards.") was accepted | Counted as the term rule's `Allowance` counts: for each carried pair in the reply, one reading of the dictation (with the fillers, or without) must hold at least as many pairs sounding like it as the reply does | `A_reply_that_adds_a_carried_pair_beside_a_said_pair_that_only_sounds_like_it_is_rejected` (three rows); a pair said twice and kept twice is accepted (a row of `A_part_that_says_the_carried_words_again_is_accepted`) |
+| 3a | Minor | The settle timer's own write was pinned by nothing: every slider pin ended by leaving the page, which flushes | Pin only | `The_slider_timer_writes_the_value_by_itself_with_the_page_still_open` |
+| 3b | Minor | Which auto-stop line is logged (the limit that fired) was pinned by nothing | Pin only | `A_hands_free_auto_stop_logs_hands_free_max_seconds_never_the_hold_limit`, `A_held_keys_auto_stop_logs_the_hold_limit_never_hands_free_max_seconds` (`HoldMaxSeconds` 1 against `HandsFreeMaxSeconds` 2) |
+| 4 | Nit | `ValidationContext.Carried` said "typed before it"; a code comment and a test comment named the product owner | "What the part before it said, before corrections, the profanity filter and snippets"; "the product owner's decision" | — |
+| 4b | Minor (the lens's optional tightening) | Cloud clean-up switched on mid-session: its first request carried up to 10 words that were said, and cleaned on this PC, before it was switched on | `HandsFreePart.CarriedFrom` and `CleanedBy`: the pipeline gives the clean-up the carried words only if it is the clean-up that cleaned them; every settings reload builds a new one | `A_clean_up_built_since_the_last_part_gets_none_of_its_words` (through the controller: the new clean-up gets none, whisper still hears them, the part after carries on as usual) |
+
+Cost of 4b: the first part after any settings reload mid-session is cleaned without the words of the part before it (that
+part's context only: the boundary rule reads the typed text, not the carried words). The boundary rule, whisper and the
+typed text are unchanged.
+
+Ceiling added, in the code under `RepeatsCarried`'s `// simplification:` note with its trigger and pinned as a ceiling
+(`A_reply_that_swaps_a_said_pair_for_the_carried_one_it_sounds_like_is_still_accepted`, a pin that passes before and
+after, so not a mutation pin): a reply that swaps a pair the part said for the carried pair it sounds like is accepted,
+since the part's pair pays for it once.
+
+| Mutant (whole filtered suite, `--no-incremental`; each source restored byte-identical, SHA-256 of the seven files compared) | Failed |
+|---|---|
+| The number box arms the settle timer again (finding 1 reverted) | 1: the real-timer pin, which saw `[300, 300, 30, 30, 120]` where `[300, 300, 300, 300, 300]` is expected |
+| The number box holds nothing: no timer, no `_typed` flag | 5: the three rows of `Typing_a_value_writes_it_once_never_the_digits_on_the_way`, the clamp test and the real-timer pin |
+| The old uncounted carried-pair check (finding 2 reverted) | 3: the three new rows |
+| The slider's settle timer callback emptied | 1 |
+| The two auto-stop log lines swapped | 2 |
+| The clean-up gets the carried words whichever clean-up cleaned them | 1 (see below) |
+| The clean-up gets them only if it cleaned the current part, so never | 3: the pin and two existing context pins |
+
+The first run of the "whichever clean-up" mutant also failed `OfflineAndDownloadTests.A_slow_but_live_connection_is_not_a_stall`
+(2 download attempts where 1 was expected; its reads are 40 ms apart against a 150 ms stall limit). The test is timing-bound
+and untouched here; that run took 49 s against about 30 s for the others, so machine load is the likely cause (inferred, not
+measured). The re-run failed only the pin.
+
+**Verification** (16 and 17/10/2026, this machine): Release `--no-incremental` build, 0 warnings, 0 errors. Filtered suite
+(`FullyQualifiedName!~Install_copies_models`; CI runs that test): 93e7e72 1,202 total, 1,183 passed, 19 skipped, 0 failed;
+with these changes 1,212, 1,193, 19, 0 (ten more test cases). Not run in this lane: any real model or GPU, Dictum.exe, and the
+desktop- and tray-gated tests (the 19 skipped). No on-screen string changed.

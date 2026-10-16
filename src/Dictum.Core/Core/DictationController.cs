@@ -266,7 +266,7 @@ public sealed class DictationController : IDisposable
     // recording always was; but a session runs for minutes while the speaker may switch windows. Ceiling: after a window change
     // mid-session the next parts are typed into the other app, and with insert.method = type a spoken "new line" there is the
     // Enter key, which sends the message in some chat apps. The README tells the user to stay in the window until the session
-    // stops. Trigger to retire: Kyle's decision on holding parts while another window is in front, due 17/10/2026.
+    // stops. Trigger to retire: the product owner's decision on holding parts while another window is in front, due 17/10/2026.
     private async Task TypePartsAsync(HandsFreeSession session)
     {
         var (number, typed, dropped, failed, words) = (0, 0, 0, 0, 0);

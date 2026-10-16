@@ -210,10 +210,12 @@ internal sealed class GeneralPage : SettingsPage
 /// Settings → General → Hands-free (product owner decisions 3 and 5, 16/10/2026): "Hands-free stops after" as a number with
 /// its unit, a slider from 30 s to 60 min and quick picks of 1, 2, 5, 10, 30 and 60 min, all showing one value in seconds
 /// (hands_free_max_seconds). Every control is reached and used from the keyboard and has a name for screen readers. A pick
-/// is reported at once. The slider and the number box report once they settle (<see cref="SettleMs"/> without a change), the
-/// box also on Enter or when it loses focus, and leaving the page reports a value still settling; all clamped to 30 s–60
-/// min. So a drag, or typing "120", writes settings.json once: never each step, nor the 30 s that "1" is clamped to on the
-/// way (a reload hands every write to the state machine). Changing the unit shows the same time and reports nothing.
+/// is reported at once. The slider reports once it settles (<see cref="SettleMs"/> without a change). The number box
+/// reports only on Enter, when it loses focus or when the page is left, never on a pause: its value does not change while
+/// the digits typed clamp to the same one ("1" and "12" are both 30 s), so a pause timer would count from the first key
+/// and write 30 s at ordinary typing speed. Leaving the page reports either one still waiting; all clamped to 30 s–60 min.
+/// So a drag, or typing "120", writes settings.json once: never each step, nor the 30 s that "1" is clamped to on the way
+/// (a reload hands every write to the state machine). Changing the unit shows the same time and reports nothing.
 /// </summary>
 internal sealed class HandsFreeLimit
 {
@@ -222,7 +224,10 @@ internal sealed class HandsFreeLimit
     public static readonly int[] PresetMinutes = [1, 2, 5, 10, 30, 60];
     public static readonly string[] Units = ["minutes", "seconds"];
 
-    /// <summary>How long the slider or the number box stays unchanged before its value is reported.</summary>
+    /// <summary>
+    /// How long the slider stays unchanged before its value is reported. The number box has no pause: it reports on Enter,
+    /// when it loses focus or when the page is left.
+    /// </summary>
     public const int SettleMs = 400;
 
     private const int Min = AppSettings.HandsFreeMinimumSeconds;
@@ -231,6 +236,7 @@ internal sealed class HandsFreeLimit
     private readonly Action<int> _chosen;
     private readonly DispatcherTimer _settle;
     private bool _quiet; // the controls are being set from a value, not by the user
+    private bool _typed; // the number box holds a value that waits for Enter, focus leaving the box or the page being left
 
     /// <param name="seconds">The value to show first.</param>
     /// <param name="chosen">Told each value the user settles on (already clamped).</param>
@@ -254,10 +260,12 @@ internal sealed class HandsFreeLimit
         Box.ValueChanged += (_, e) =>
         {
             if (_quiet || e.NewValue is not decimal value) return;
-            // Typed or stepped: the box is left as the user has it, and the value is reported once it settles (Flush).
+            // Typed or stepped: the box is left as the user has it and its value waits for Enter, focus leaving the box or the
+            // page being left (Flush). Not for a pause: ValueChanged does not fire while the clamped value stays the same ("1"
+            // and "12" both clamp to 30 s), so a timer started here would count from the first key and write 30 s mid-number.
             Seconds = (int)Math.Round(value * UnitSeconds, MidpointRounding.AwayFromZero);
-            _settle.Stop();
-            _settle.Start();
+            _settle.Stop(); // a slider value still settling is older than this one
+            _typed = true;
         };
         Box.AddHandler(InputElement.KeyDownEvent, (_, e) =>
         {
@@ -292,8 +300,8 @@ internal sealed class HandsFreeLimit
     /// <summary>The time the controls show, in seconds.</summary>
     public int Seconds { get; private set; }
 
-    /// <summary>A slider or typed value is waiting to be reported.</summary>
-    public bool Settling => _settle.IsEnabled;
+    /// <summary>A slider value is settling or a typed one is waiting to be reported.</summary>
+    public bool Settling => _settle.IsEnabled || _typed;
 
     private int UnitSeconds => Unit.SelectedIndex == 1 ? 1 : 60;
 
@@ -303,17 +311,16 @@ internal sealed class HandsFreeLimit
         if (!Settling) Display(seconds, keepUnit: false);
     }
 
-    /// <summary>Reports a value still settling now (the timer, Enter or focus leaving the box, the page being left).</summary>
+    /// <summary>Reports a value still waiting now (the slider's timer, Enter or focus leaving the box, the page being left).</summary>
     public void Flush()
     {
-        if (!_settle.IsEnabled) return;
-        _settle.Stop();
-        Choose(Seconds);
+        if (Settling) Choose(Seconds);
     }
 
     private void Choose(int seconds)
     {
         _settle.Stop();
+        _typed = false; // a pick, or the flush: nothing older is left waiting
         var clamped = Math.Clamp(seconds, Min, Max);
         Display(clamped, keepUnit: true);
         _chosen(clamped);

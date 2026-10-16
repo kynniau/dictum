@@ -34,7 +34,8 @@ whisper invents text on silence. A hands-free recording auto-stops and is **tran
 to 60 minutes); a held key, a stuck one included, stops the same way after 5 minutes, whatever that setting says. In
 hands-free each part goes through the same steps; whisper and the clean-up also get the closing words of what you said
 in the last part as context (taken before corrections, the profanity filter and snippets, so never their text), and
-those words are never typed again. A part that carries on a sentence (the last one did not end with . ! ? …, a
+those words are never typed again. A clean-up set up since that part was cleaned, such as cloud clean-up switched on
+mid-session, is given none of them. A part that carries on a sentence (the last one did not end with . ! ? …, a
 Devanagari danda or a line break) starts with a small letter unless its first word is "I", has another capital in it,
 or is a dictionary term spelt with a capital; with the rule-based tidy, which ends a part with a full stop whenever it
 ends with a letter or a digit, nearly every part is typed as its own sentence. Text in a language other than English is
@@ -656,8 +657,8 @@ other check accepted; they are measured against the dictation with each retracte
 and a final dictated line break are kept. British/Australian and US spellings of the same word (colour/color,
 analyse/analyze, centre/center, catalogue/catalog, licence/license) count as one. In hands-free, the words carried from
 the last part are context, never dictation, and a reply is also rejected when it repeats two neighbouring carried words
-(one of them a content word) that this part did not say; two neighbouring words of this part that sound like them count
-as said, with or without fillers such as "like" or "you know" between them.
+(one of them a content word) more often than this part said them; each pair of neighbouring words of this part that
+sounds like them counts as said once, with or without fillers such as "like" or "you know" between them.
 
 **Esc** during "Polishing…" cancels the cleanup and pastes nothing; Dictum is ready again at once. Measured with
 the long test dictation (184 tokens) and qwen2.5-1.5b, cancel 200 ms in: on Vulkan the model stopped 2 ms after

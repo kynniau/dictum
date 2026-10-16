@@ -129,7 +129,9 @@ Hold-to-talk stays one recording, and calibration takes are never cut.
   built, `WithPrompt`, so one is built and freed per part; if that build fails the part is
   transcribed without them) and go to the clean-up beside the part, never as its dictation: cloud
   providers get a line after the system prompt, the local model a system turn after its cached
-  prefix. They are never typed again.
+  prefix. They are never typed again. The clean-up gets them only if it is the one that cleaned
+  them: every settings reload builds a new one, so a cloud clean-up switched on mid-session is
+  sent none of what was said before it was (whisper, on this PC, still hears them).
 - Boundary rule (`SegmentJoin`, before corrections, the profanity filter and snippets): when the
   last part ended a sentence (. ! ? … । ॥ or a line break, read back past quotes and brackets: the
   rule the corrections and the profanity filter use too), this part starts with its capital after
@@ -784,11 +786,13 @@ user. Required:
 - Settings window, Hands-free (amendment, 16/10/2026): a "Hands-free" card on General with
   "Hands-free stops after" as a number box with a minutes/seconds dropdown, a 30 s–60 min slider and
   quick picks of 1, 2, 5, 10, 30 and 60 min, all named for screen readers and keyboard-reachable. The
-  slider and the number box write settings.json once their value settles (400 ms without a change),
-  the box also on Enter or when it loses focus, and leaving the page writes a value still settling;
-  a pick writes at once; every value is clamped to 30 s–60 min. Label and help text PROPOSED,
-  awaiting the product owner: "Hands-free stops after"; "Hands-free dictation types each sentence as
-  you pause, so a long session reads back as you go. It stops by itself after this long."
+  slider writes settings.json once its value settles (400 ms without a change); the number box writes
+  only on Enter, when it loses focus or when the page is left, never on a pause (a pause timer would
+  write the 30 s that "1" clamps to at ordinary typing speed, on the way to "120"); leaving the page
+  writes a value still waiting; a pick writes at once; every value is clamped to 30 s–60 min. Label
+  and help text PROPOSED, awaiting the product owner: "Hands-free stops after"; "Hands-free
+  dictation types each sentence as you pause, so a long session reads back as you go. It stops by
+  itself after this long."
 - README: a short "Keyboards and Remote Desktop" subsection covering Mac key mapping,
   Fn being unreachable, and the single keys known to work over RDP (RightAlt, RightWin,
   CapsLock, F-keys).
@@ -881,10 +885,12 @@ These amend earlier sections; where they conflict, this section wins.
 - **§5 validator, hands-free parts (amendment, 16/10/2026):** a part's carried words (§3,
   "Hands-free segments") are prompt text, never dictation: every rule, the dictionary-term rule
   included, measures the reply against the part's own words. A reply is also rejected when it repeats
-  two adjacent carried words, one of them a content word, that the part did not say; the part said a
-  pair when its dictation has two adjacent words that sound like it word by word
-  (`ValidatorText.SoundsLike`), read without spoken commands and hesitations, and both with and
-  without the fillers the prompt lists.
+  two adjacent carried words, one of them a content word, more often than the part said them; the part
+  said a pair once for each two adjacent words in its dictation that sound like it word by word
+  (`ValidatorText.SoundsLike`), read without spoken commands and hesitations, once with and once
+  without the fillers the prompt lists. The reply may have as many pairs that sound like a carried pair
+  as one of those readings has, so a said pair that only sounds like a carried one cannot also pay
+  for the carried pair added beside it.
 - **§16.3/§16.4 and §3 sentence start (amendment, 16/10/2026):** the corrections, the profanity
   filter and the hands-free boundary rule share one sentence-start rule (`SentenceStart`): the start
   of the text, or after a line break or a mark that ends a sentence, read back past spaces, quotes

@@ -443,6 +443,7 @@ public class CarriedContextCleanupTests
     [InlineData("move the meeting to friday instead", "Move the meeting to Friday instead.")]
     [InlineData("move uh the meeting to friday instead", "Move the meeting to Friday instead.")] // a hesitation between said words
     [InlineData("and then we will see", "And then we will see.")]
+    [InlineData("move the meeting to friday and move the meeting to monday", "Move the meeting to Friday and move the meeting to Monday.")] // said twice, kept twice
     public void A_part_that_says_the_carried_words_again_is_accepted(string raw, string reply)
     {
         var context = new ValidationContext(CleanupPrompt.WithCarried(CleanupPrompt.Default, "so we should move the meeting to"), Carried: "so we should move the meeting to");
@@ -474,6 +475,35 @@ public class CarriedContextCleanupTests
         var context = new ValidationContext(CleanupPrompt.WithCarried(CleanupPrompt.Default, "we still have to buy the tickets"), Carried: "we still have to buy the tickets");
         Assert.Equal("reply repeats words already typed before this part",
             CleanupValidator.Validate("we need to buys the tickets tonight", "We need to buy the tickets tonight.", context).Rejection);
+    }
+
+    /// <summary>
+    /// Lens on 93e7e72, 16/10/2026: a pair the part said that only sounds like a carried pair ("to nothing" for "the meeting",
+    /// "to town" for "the team") used to pay for the carried pair even when the reply also kept the said one, so a reply that
+    /// inserted the carried words beside the part's own was accepted. Pairs are counted now: the reply may have as many pairs
+    /// that sound like a carried pair as the dictation has.
+    /// </summary>
+    [Theory]
+    [InlineData("so we had the meeting", "it came to nothing in the end", "The meeting came to nothing in the end.")]
+    [InlineData("so we had the meeting", "it came to nothing in the end", "The meeting. It came to nothing in the end.")]
+    [InlineData("I spoke to the team", "we went to town afterwards", "The team went to town afterwards.")]
+    public void A_reply_that_adds_a_carried_pair_beside_a_said_pair_that_only_sounds_like_it_is_rejected(string carried, string raw, string reply)
+    {
+        var context = new ValidationContext(CleanupPrompt.WithCarried(CleanupPrompt.Default, carried), Carried: carried);
+        Assert.Equal("reply repeats words already typed before this part", CleanupValidator.Validate(raw, reply, context).Rejection);
+        // Without the carried words the same reply passes every other rule: this rule is what stops it.
+        Assert.NotNull(CleanupValidator.Validate(raw, reply, new ValidationContext(CleanupPrompt.Default)).Text);
+    }
+
+    [Fact]
+    public void A_reply_that_swaps_a_said_pair_for_the_carried_one_it_sounds_like_is_still_accepted()
+    {
+        // The documented ceiling, the other way round from the pin above (a false acceptance): the part's own "to town" pays for
+        // the carried "the team" once, so the swap passes. Pinned so the note in RepeatsCarried cannot go stale unseen.
+        const string carried = "I spoke to the team";
+        var context = new ValidationContext(CleanupPrompt.WithCarried(CleanupPrompt.Default, carried), Carried: carried);
+        var (text, rejection) = CleanupValidator.Validate("we went to town afterwards", "We went to the team afterwards.", context);
+        Assert.True(text is not null, rejection);
     }
 
     /// <summary>A local model stand-in that records which call it got.</summary>

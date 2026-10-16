@@ -109,24 +109,26 @@ public class HandsFreeSessionTests
 
     /// <summary>The trailing space is off by default here, so the separator each part is typed with shows in the pastes.</summary>
     /// <param name="finish">The step before the paste (corrections, the profanity filter, snippets); none by default.</param>
+    /// <param name="log">Where the controller and the pipeline log; nowhere by default.</param>
+    /// <param name="cleaners">The clean-up each part is given, when it changes between parts (every settings reload builds a new one); else <paramref name="cleaner"/>.</param>
     private static Rig Make(PartTranscriber whisper, TranscriptCleaner? cleaner = null, StateMachineOptions? options = null, bool trailingSpace = false,
-        Func<string, string>? finish = null)
+        Func<string, string>? finish = null, ILog? log = null, Func<TranscriptCleaner>? cleaners = null)
     {
         var settings = new AppSettings { Insert = new InsertSettings { TrailingSpace = trailingSpace } };
         var capture = new CuttingCapture();
         var pasted = new ConcurrentQueue<string>();
         var remembered = new ConcurrentQueue<string>();
         var machine = new DictationStateMachine(options ?? StateMachineOptions.Default);
-        var pipeline = new DictationPipeline(_ => Task.FromResult<ITranscriber>(whisper), () => cleaner ?? TranscriptCleaner.RulesOnly("test"),
+        var pipeline = new DictationPipeline(_ => Task.FromResult<ITranscriber>(whisper), cleaners ?? (() => cleaner ?? TranscriptCleaner.RulesOnly("test")),
             (text, token) =>
             {
                 token.ThrowIfCancellationRequested();
                 pasted.Enqueue(text);
                 return Task.CompletedTask;
             },
-            () => settings, NullLog.Instance, finish, inserted: remembered.Enqueue, names: () => ["Kynni"]);
+            () => settings, log ?? NullLog.Instance, finish, inserted: remembered.Enqueue, names: () => ["Kynni"]);
         var ui = new FakeUi();
-        return new Rig(new DictationController(machine, capture, pipeline, ui, () => settings, NullLog.Instance), capture, whisper, ui, pasted, remembered, machine);
+        return new Rig(new DictationController(machine, capture, pipeline, ui, () => settings, log ?? NullLog.Instance), capture, whisper, ui, pasted, remembered, machine);
     }
 
     private static async Task WaitUntil(Func<bool> condition, string what, int timeoutMs = 5000)
@@ -279,6 +281,34 @@ public class HandsFreeSessionTests
     }
 
     [Fact]
+    public async Task A_clean_up_built_since_the_last_part_gets_none_of_its_words()
+    {
+        // Lens on 93e7e72, 16/10/2026: switching cloud clean-up on mid-session builds a new clean-up (as every settings reload
+        // does), and its first request carried up to 10 words that were said, and cleaned on this PC, before it was switched on.
+        // Whisper runs on this PC and still hears them; the next part, cleaned by the same new clean-up, carries on as usual.
+        var local = new TableLlmClient(new() { ["we should move the meeting to"] = "We should move the meeting to" });
+        var cloud = new TableLlmClient(new() { ["thursday and then we will see"] = "Thursday and then we will see.", ["great"] = "Great." });
+        var current = ModelCleaner(local);
+        var whisper = new PartTranscriber("we should move the meeting to", "thursday and then we will see", "great");
+        using var rig = Make(whisper, cleaners: () => current);
+        await StartHandsFree(rig);
+        rig.Capture.Cut(Part(0));
+        await WaitUntil(() => rig.Pasted.Count == 1, "the first part");
+        current = ModelCleaner(cloud); // cloud clean-up switched on between the parts
+        rig.Capture.Cut(Part(1));
+        await WaitUntil(() => rig.Pasted.Count == 2, "the second part");
+        rig.Capture.Cut(Part(2));
+        await WaitUntil(() => rig.Pasted.Count == 3, "the third part");
+
+        var sent = cloud.Sent.ToList();
+        Assert.Equal(CleanupPrompt.Default, sent[0].System); // no context line: the new clean-up got none of the first part's words
+        Assert.DoesNotContain("We should move the meeting to", sent[0].System + sent[0].User, StringComparison.Ordinal);
+        Assert.Equal(CleanupPrompt.WithCarried(CleanupPrompt.Default, "thursday and then we will see."), sent[1].System); // and then the usual
+        Assert.Equal(["We should move the meeting to", " thursday and then we will see.", " Great."], rig.Pasted); // typing is unchanged
+        Assert.Equal([null, "We should move the meeting to", "thursday and then we will see."], whisper.Heard.Select(h => h.Carried)); // whisper still hears them
+    }
+
+    [Fact]
     public async Task The_boundary_rule_types_each_part_after_the_last_both_ways()
     {
         var llm = new TableLlmClient(new()
@@ -354,6 +384,34 @@ public class HandsFreeSessionTests
         rig.Capture.Cut(Part(0));
         await WaitUntil(() => rig.Ui.Pills.Contains(PillView.Done), "the auto-stop's Done pill");
         Assert.Equal(["The first part.", " The rest at the stop."], rig.Pasted);
+    }
+
+    [Fact]
+    public async Task A_hands_free_auto_stop_logs_hands_free_max_seconds_never_the_hold_limit()
+    {
+        // Lens on 93e7e72, 16/10/2026: nothing pinned which of the two auto-stop lines is logged, so swapping them failed no test.
+        // The hold limit is 1 s here and the hands-free one 2 s: the line must name the limit that fired.
+        var log = new RecordingLog();
+        using var rig = Make(new PartTranscriber("the rest at the stop"), options: new StateMachineOptions(300, 400, HandsFreeMaxSeconds: 2, HoldMaxSeconds: 1), log: log);
+        rig.Capture.Rest = Part(0);
+        await StartHandsFree(rig);
+        await WaitUntil(() => rig.Ui.Pills.Contains(PillView.Done), "the auto-stop's Done pill");
+
+        Assert.Contains("Hands-free recording auto-stopped at hands_free_max_seconds (2 s)", log.All, StringComparison.Ordinal);
+        Assert.DoesNotContain("Held key auto-stopped", log.All, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_held_keys_auto_stop_logs_the_hold_limit_never_hands_free_max_seconds()
+    {
+        var log = new RecordingLog();
+        using var rig = Make(new PartTranscriber("one whole dictation"), options: new StateMachineOptions(300, 400, HandsFreeMaxSeconds: 2, HoldMaxSeconds: 1), log: log);
+        rig.Capture.Rest = Part(0);
+        rig.Controller.Post(new HookEvent(HotkeySignal.Down, Environment.TickCount64)); // and never released
+        await WaitUntil(() => rig.Ui.Pills.Contains(PillView.Done), "the auto-stop's Done pill");
+
+        Assert.Contains("Held key auto-stopped at the hold limit (1 s, not a setting)", log.All, StringComparison.Ordinal);
+        Assert.DoesNotContain("Hands-free recording auto-stopped", log.All, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -572,8 +630,8 @@ public class HandsFreeSettingsTests
     [Fact]
     public void The_README_says_to_stay_in_the_window_and_that_a_held_key_keeps_its_own_limit()
     {
-        // Merge lens findings 3 and 5, 16/10/2026: a part is typed into whatever window is in front (Kyle's decision on holding
-        // parts is due 17/10/2026), so this sentence is the user's only guard; and the field no longer limits a held key.
+        // Merge lens findings 3 and 5, 16/10/2026: a part is typed into whatever window is in front (the product owner's decision on
+        // holding parts is due 17/10/2026), so this sentence is the user's only guard; and the field no longer limits a held key.
         var readme = System.Text.RegularExpressions.Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md")), @"\s+", " ");
         Assert.Contains("Stay in the window you are dictating into until the session stops: each part is typed into whichever window is in " +
                         "front when it is ready, so switching windows mid-session types the next parts there.", readme, StringComparison.Ordinal);
@@ -661,7 +719,8 @@ public class HandsFreeSettingsTests
     public Task Typing_a_value_writes_it_once_never_the_digits_on_the_way(string finish) => UiSession.Run(() =>
     {
         // Merge lens P7, 16/10/2026: typing "1", "2", "0" wrote 30 (the "1", clamped) and then 120, and a reload hands each
-        // write to the state machine. The box now writes once it settles, or on Enter, when it loses focus or the page is left.
+        // write to the state machine. The box now writes on Enter, when it loses focus or when the page is left. The keys here
+        // come back to back; the next test lets the real timer run between them.
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
         var (window, shell) = OpenGeneral(scratch);
         var box = All<NumericUpDown>(window).Single();
@@ -699,6 +758,55 @@ public class HandsFreeSettingsTests
     });
 
     [Fact]
+    public async Task Typing_at_ordinary_speed_never_writes_the_digits_on_the_way_under_the_real_timer() => await UiSession.RunAsync(async () =>
+    {
+        // Lens on 93e7e72, 16/10/2026: ValueChanged does not fire while the clamped value stays the same ("1" and "12" both clamp
+        // to 30), so a settle timer started by the box counted from the first key. At 250 ms a key it wrote 30 at about 500 ms,
+        // then 120, and a reload hands each write to the state machine. The box now waits for Enter, and the real timer may run.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (window, shell) = OpenGeneral(scratch);
+        int Saved() => SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.HandsFreeMaxSeconds;
+        var box = All<NumericUpDown>(window).Single();
+        UnitOf(window).SelectedIndex = 1; // seconds
+        Dispatcher.UIThread.RunJobs();
+        var text = box.GetVisualDescendants().OfType<TextBox>().Single();
+        text.Focus();
+        text.SelectAll();
+        var seen = new List<int> { Saved() };
+        foreach (var key in new[] { "1", "2", "0" })
+        {
+            window.KeyTextInput(key);
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(250);
+            seen.Add(Saved());
+        }
+        Assert.Equal("120", text.Text);
+        await Task.Delay(HandsFreeLimit.SettleMs + 400); // left alone, the box waits for Enter: it does not time out
+        seen.Add(Saved());
+        Assert.Equal([300, 300, 300, 300, 300], seen); // the default throughout: no 30, no 12, not even 120 yet
+
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(120, Saved());
+        Assert.Equal(120, shell.Settings.HandsFreeMaxSeconds); // the state machine gets 120, and only 120
+        window.Close();
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>Waits on the UI thread, whose timers keep running, until the condition holds or the timeout passes.</summary>
+    private static async Task<bool> Eventually(Func<bool> condition, int timeoutMs = 5000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (sw.ElapsedMilliseconds > timeoutMs) return false;
+            await Task.Delay(20);
+        }
+        return true;
+    }
+
+    [Fact]
     public Task The_quick_picks_write_their_minutes() => UiSession.Run(() =>
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
@@ -731,6 +839,22 @@ public class HandsFreeSettingsTests
         Assert.Equal(900, Saved());
         window.Close();
         shell.Dispose();
+    });
+
+    [Fact]
+    public async Task The_slider_timer_writes_the_value_by_itself_with_the_page_still_open() => await UiSession.RunAsync(async () =>
+    {
+        // Lens on 93e7e72, 16/10/2026: the pin above ends by leaving the page, which flushes; nothing let the timer's own write run.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (window, shell) = OpenGeneral(scratch);
+        int Saved() => SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.HandsFreeMaxSeconds;
+        All<Slider>(window).Single().Value = 840;
+        Assert.Equal(300, Saved()); // not before it settles
+        Assert.True(await Eventually(() => Saved() == 840), "the settle timer never wrote the slider's value");
+        Assert.Equal(840, shell.Settings.HandsFreeMaxSeconds); // reloaded: the state machine gets it
+        window.Close();
+        shell.Dispose();
+        return true;
     });
 
     [Theory]

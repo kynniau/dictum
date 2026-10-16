@@ -6,7 +6,7 @@ namespace Dictum.Core;
 /// <summary>
 /// One hands-free part on its way through the pipeline (SPEC §3 amendment, 16/10/2026), with what the last part that typed
 /// something left behind: its text as typed, for the boundary rule, and the closing words of what it said, carried to
-/// whisper's prompt and the clean-up.
+/// whisper's prompt and to the clean-up that cleaned them (<see cref="HandsFreePart.CarriedFrom"/>).
 /// </summary>
 /// <param name="number">1 for the session's first part, and so on (for the log).</param>
 /// <param name="last">The last part of this session that typed something, or null before anything is typed.</param>
@@ -23,6 +23,15 @@ public sealed class HandsFreePart(int number, HandsFreePart? last)
     /// user's own text there (a snippet's address, a correction's name), and a cloud clean-up gets these words in its prompt.
     /// </summary>
     public string? Carried { get; } = last?.Spoken is { } spoken ? SegmentJoin.Tail(spoken) : null;
+
+    /// <summary>
+    /// The clean-up that cleaned the last part. Only that one is given <see cref="Carried"/>: every settings reload builds a
+    /// new one, and cloud clean-up switched on since would otherwise be sent words said before it was.
+    /// </summary>
+    internal TranscriptCleaner? CarriedFrom { get; } = last?.CleanedBy;
+
+    /// <summary>The clean-up this part went through; set with <see cref="Typed"/>.</summary>
+    internal TranscriptCleaner? CleanedBy { get; set; }
 
     /// <summary>What this part typed (without the separator), once it is pasted; null until then, or when nothing was typed.</summary>
     public string? Typed { get; internal set; }

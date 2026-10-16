@@ -9,8 +9,9 @@ namespace Dictum.Core;
 /// <summary>
 /// One recording's journey (SPEC §4): gate → transcribe → optional cleanup → insert. In hands-free each part of the
 /// recording takes the same journey (<see cref="HandsFreePart"/>): whisper and the clean-up also hear the closing words of
-/// what the last part said as context (never its finished text: corrections, the profanity filter and snippets run after),
-/// and the part is typed after the last one by the boundary rule (<see cref="SegmentJoin"/>).
+/// what the last part said as context (never its finished text: corrections, the profanity filter and snippets run after;
+/// and the clean-up only if it is the one that cleaned them, not one built since), and the part is typed after the last one
+/// by the boundary rule (<see cref="SegmentJoin"/>).
 /// Everything honours the session's CancellationToken; a cancelled session inserts nothing.
 /// </summary>
 public sealed class DictationPipeline
@@ -82,7 +83,9 @@ public sealed class DictationPipeline
         var cleaner = _cleaner();
         if (cleaner.UsesModel && !token.IsCancellationRequested) showPill(cleaner.SkipReason(raw) is null ? PillView.Polishing : PillView.PolishingSkipped);
         sw.Restart();
-        var cleaned = await cleaner.CleanAsync(raw, token, carried).ConfigureAwait(false);
+        // The clean-up hears the carried words only if it is the one that cleaned them. A clean-up built since (a settings
+        // reload, such as cloud clean-up switched on mid-session) gets none: they were said before it was switched on.
+        var cleaned = await cleaner.CleanAsync(raw, token, ReferenceEquals(part?.CarriedFrom, cleaner) ? carried : null).ConfigureAwait(false);
         var text = cleaned.Text;
         _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : "the rule-based tidy")} in {sw.ElapsedMilliseconds} ms.");
         if (settings.LogTranscripts) _log.Info($"Cleaned transcript: {text}");
@@ -108,7 +111,7 @@ public sealed class DictationPipeline
         await _insert(separator + text, token).ConfigureAwait(false);
         _log.Info($"Inserted {separator.Length + text.Length} chars via {settings.Insert.Method}.");
         _inserted(text);
-        if (part is not null) (part.Typed, part.Spoken) = (text, spoken);
+        if (part is not null) (part.Typed, part.Spoken, part.CleanedBy) = (text, spoken, cleaner);
         insertedWords?.Invoke(text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
         return ProcessingOutcome.Inserted;
     }
