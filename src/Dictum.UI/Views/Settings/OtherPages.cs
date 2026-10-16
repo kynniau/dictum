@@ -73,10 +73,29 @@ internal sealed class CleanupPage : SettingsPage
         _cloudOff.IsVisible = !on;
         _cloudState.Text = !on ? ""
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
+            : KeyWaitingFor(Shell) is { } waitingFor ? WaitingForKeyLine(waitingFor)
             : $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}";
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
     }
+
+    /// <summary>
+    /// The key variable cloud clean-up is waiting for (OPENAI_API_KEY, GEMINI_API_KEY), or null. Non-null only while the user has
+    /// switched on a service that needs its own key and none is set (environment or .env): nothing is sent until it is added.
+    /// The key is looked up by <see cref="CloudPreset.TryGetKey"/>, as TranscriptCleaner.Create does. Offline only stops the clean-up
+    /// before the key is looked at there, so then this is null and the pages say what they said before. (The settings in use always
+    /// carry the user's consent to a host off this PC: EffectiveSettings repairs them at every load.)
+    /// </summary>
+    internal static string? KeyWaitingFor(AppShell shell)
+    {
+        var llm = shell.Settings.Llm;
+        if (llm.Provider != LlmSettings.OpenAiCompatible || TranscriptCleaner.OfflineRefusal(llm, shell.Settings.OfflineOnly) is not null) return null;
+        var service = CloudPresets.ForAddress(llm.BaseUrl);
+        return service.KeyRequired && !service.TryGetKey(SecretStore.Load(shell.Paths), out _) ? service.KeyVariable : null;
+    }
+
+    /// <summary>The state line while cloud clean-up is waiting for its key. Approved by the product owner on 16/10/2026 as written: never reword it.</summary>
+    internal static string WaitingForKeyLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add it to .env.";
 
     /// <summary>The preset chosen in the Service list; null for Anthropic, which is its own provider.</summary>
     private CloudPreset? Preset => _provider.SelectedIndex > 0 ? CloudPresets.All[_provider.SelectedIndex - 1] : null;
@@ -167,7 +186,8 @@ internal sealed class PrivacyPage : SettingsPage
     {
         var s = Shell.Settings;
         var server = CloudPolicy.LocalServerHost(s.Llm);
-        _summary.Text = Shell.NothingLeaves ? "Nothing leaves this PC: speech recognition and clean-up both run here."
+        _summary.Text = CleanupPage.KeyWaitingFor(Shell) is { } waitingFor ? CleanupPage.WaitingForKeyLine(waitingFor)
+            : Shell.NothingLeaves ? "Nothing leaves this PC: speech recognition and clean-up both run here."
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
             : $"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. {CloudPolicy.StateLineWarning}";
         Ui.SetQuietly(_offline, s.OfflineOnly);

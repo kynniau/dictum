@@ -13,6 +13,18 @@ public sealed record CloudPreset(string Name, string? BaseUrl, string? DefaultMo
 {
     /// <summary>Every preset runs on the existing <see cref="OpenAiCompatibleLlmClient"/>.</summary>
     public string Provider => LlmSettings.OpenAiCompatible;
+
+    /// <summary>
+    /// This service's key from <paramref name="secrets"/> (null when it has none to send: Ollama, or a custom server with no
+    /// LLM_API_KEY). False only when the service needs its key and none is set (environment or .env): nothing is sent to it
+    /// then. The one place that decides this: TranscriptCleaner.Create stops on it, and Settings > Clean-up and Privacy
+    /// name the key they are waiting for from it.
+    /// </summary>
+    public bool TryGetKey(SecretStore secrets, out string? key)
+    {
+        key = KeyVariable is { } variable ? secrets.Get(variable) : null;
+        return key is not null || !KeyRequired;
+    }
 }
 
 /// <summary>

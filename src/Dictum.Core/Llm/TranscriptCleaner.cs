@@ -209,8 +209,7 @@ public sealed class TranscriptCleaner
                 // The server base_url names decides the key: a preset's own only to its own server, LLM_API_KEY only to a custom
                 // address, none to Ollama on this PC. A service that needs its key gets nothing at all without it.
                 var service = CloudPresets.ForAddress(settings.BaseUrl);
-                var key = service.KeyVariable is { } variable ? secrets.Get(variable) : null;
-                if (key is null && service.KeyRequired)
+                if (!service.TryGetKey(secrets, out var key))
                 {
                     log.Warn($"{service.KeyVariable} is not set (environment or .env), so nothing is sent to {new Uri(settings.BaseUrl).Host}; the rule-based tidy is used instead.");
                     return RulesOnly($"rule-based tidy only: {service.KeyVariable} is not set (environment or .env)");

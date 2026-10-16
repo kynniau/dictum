@@ -25,6 +25,10 @@ public class CloudWarningAndPresetsTests
 
     private const string ApprovedStateLine = "Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.";
 
+    // Approved by the product owner on 16/10/2026 as written; pinned word for word, independently of the app's copy. Settings > Clean-up
+    // and Settings > Privacy say it, with the variable of the key they wait for, while a service that needs its key is on and the key is not set.
+    private static string ApprovedWaitingLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add it to .env.";
+
     private const string ApprovedPolicySentence = "This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.";
 
     // Approved by the product owner on 16/10/2026 for the privacy policy's OpenAI-compatible section, pinned word for word. The label
@@ -281,6 +285,67 @@ public class CloudWarningAndPresetsTests
             Assert.Null(shell.EnableCloud(Proposed(Preset("OpenAI"))));
             Assert.Equal("rule-based tidy only: OPENAI_API_KEY is not set (environment or .env)", shell.CleanupStatus);
             Assert.True(shell.NothingLeaves); // nothing is sent, so the tray panel may say so
+            shell.Dispose();
+        });
+    }
+
+    [Theory]
+    [InlineData("OpenAI", "OPENAI_API_KEY")]
+    [InlineData("Google Gemini", "GEMINI_API_KEY")]
+    public Task A_preset_that_is_on_without_its_key_says_it_is_waiting_for_that_key_and_the_warning_returns_once_it_is_set(string name, string variable)
+    {
+        // Before the approved wording (16/10/2026) the Clean-up card still said the text of each dictation is sent to the host while the key
+        // was missing and nothing was. Each service names its own variable, taken from the preset.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)), $"{variable} is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+            var (shell, _, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            dialogs.Answers.Enqueue(0); // Allow
+            Assert.Null(shell.EnableCloud(Proposed(Preset(name))));
+            var window = new SettingsWindow(shell);
+            window.Show();
+            // Every read follows a move from the other page, so the page is drawn from the settings and keys as they are now.
+            string CleanUpLine()
+            {
+                window.ShowPage("Clean-up");
+                return All<TextBlock>(window).Single(t => t.IsEffectivelyVisible && t.Text is { } x && (x.StartsWith("On: ", StringComparison.Ordinal) || x.StartsWith("On, ", StringComparison.Ordinal))).Text!;
+            }
+            IReadOnlyList<string> PrivacyLines()
+            {
+                window.ShowPage("Privacy");
+                return All<TextBlock>(window).Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+            }
+
+            // No key: nothing is sent, and both pages say which key they wait for, in the approved words and no others.
+            Assert.Equal($"rule-based tidy only: {variable} is not set (environment or .env)", shell.CleanupStatus);
+            Assert.True(shell.NothingLeaves);
+            Assert.Equal(ApprovedWaitingLine(variable), CleanUpLine());
+            var waiting = PrivacyLines();
+            Assert.Contains(ApprovedWaitingLine(variable), waiting);
+            Assert.DoesNotContain(waiting, l => l.StartsWith("Nothing leaves this PC: speech", StringComparison.Ordinal) || l.Contains(ApprovedStateLine, StringComparison.Ordinal));
+
+            // The key is set: the text now goes to the host, so both pages say so again, with the approved warning, and no longer say "waiting".
+            File.WriteAllText(scratch.Paths.EnvFile, $"{variable}=k-test\n");
+            shell.Reload(userRequested: false);
+            Assert.EndsWith($"({variable} present)", shell.CleanupStatus);
+            Assert.False(shell.NothingLeaves);
+            var cleanUp = CleanUpLine();
+            Assert.StartsWith("On: the text of each dictation is sent to ", cleanUp);
+            Assert.EndsWith("You agreed to this host in the consent step. " + ApprovedStateLine, cleanUp);
+            Assert.DoesNotContain("waiting", cleanUp);
+            var privacy = Assert.Single(PrivacyLines(), l => l.StartsWith("The text of each dictation goes to ", StringComparison.Ordinal));
+            Assert.EndsWith("Audio never leaves this PC. " + ApprovedStateLine, privacy);
+            Assert.DoesNotContain("waiting", privacy);
+
+            // Offline only refuses the clean-up before the key is looked at, so the key is not what stops it: neither page says it is waiting.
+            File.Delete(scratch.Paths.EnvFile);
+            shell.Write(("offline_only", System.Text.Json.Nodes.JsonValue.Create(true)));
+            Assert.Contains("offline_only", shell.CleanupStatus);
+            Assert.DoesNotContain("waiting", CleanUpLine());
+            Assert.DoesNotContain(PrivacyLines(), l => l.Contains("waiting", StringComparison.Ordinal));
+            window.Close();
             shell.Dispose();
         });
     }
