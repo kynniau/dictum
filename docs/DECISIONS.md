@@ -2463,3 +2463,88 @@ through the production loader on the P630, `whisper.gpu = auto`) are in that ses
   "The graphics driver could not run the model last time; Dictum is using the CPU" (the brief's wording). No other
   user-facing copy is new; log lines: "… failed while the GPU was in use (…); loading it again on the CPU." and
   `GpuLoadMarker`'s warnings (a marker that names the model, or that could not be read, written or deleted).
+
+**Real runs (lens fixes)**, 17/10/2026, this PC, two runs, each once: the P630 alone (`GGML_VK_VISIBLE_DEVICES=1`) with
+`GGML_VK_FORCE_MAX_BUFFER_SIZE=16777216` as in F3, base.en read from `%LOCALAPPDATA%\Dictum\models`, `LOCALAPPDATA` and
+`APPDATA` pointed at a scratch profile, the marker in a scratch folder; the scratch harness's new `marker` mode drives
+`ModelManager` with the production loader and a `ModelIntegrity` on that folder, as the tray app does.
+
+- Run 1: the marker named the model during the GPU load, then "alloc_tensor_range: failed to allocate Vulkan0 buffer of
+  size 147365888" and whisper.cpp ended the process at `GGML_ASSERT(buffer) failed` (stderr the same three lines as F3's
+  run; Git Bash reported exit status 127, and the Windows exit code was not captured). The marker was left, naming
+  base.en.
+- Run 2, the same command: "gpu-load-speech.txt names ggml-base.en.bin: the GPU ended Dictum while it loaded that model,
+  so it loads on the CPU this time.", "Whisper runtime order: Cpu -> CpuNoAvx (whisper.gpu = cpu)", one ggml backend
+  (whisper's Vulkan runtime not loaded), "loaded in 0.4 s on runtime CPU", `RunsOnCpu` true, `Notice` the new line,
+  `CpuMightHelp` false, `GpuMachine` false; the 10.74 s clip transcribed in 2.31 s; the marker still there after the load
+  and after quit. Nothing was written under the scratch profile.
+
+Not intended, and recorded here: before `LocalLlmEngine.Parameters` returned two values, its pin built a `ModelParams`,
+which loaded llama.cpp's Vulkan build DLLs in the test host, without `GGML_VK_VISIBLE_DEVICES` and without a model, in
+four test-host runs on 17/10/2026 (two runs of the 49 related tests, the first full suite, and the probe that found it).
+Whether ggml-vulkan enumerated the Quadro then was not checked; the running copy of Dictum was not touched otherwise.
+
+**Pins and mutation checks (lens fixes).** `tests/Dictum.Tests/RuntimeResilienceTests.Marker.cs`, 22 tests: the marker
+files are the path registry's; for each engine, a start whose marker names the model asks the loader for the CPU only and
+keeps the marker, the marker names the model during a GPU attempt and is gone after it (for speech also after a failed
+one, before the retry), and a marker naming another model leaves this one to the GPU; quitting removes the marker of an
+attempt under way and never one read at the start; the clean-up's GPU and CPU failures leave the CPU's error, no button
+and the new log wording; a marker start that fails inside a GPU runtime offers Try on the CPU once; About's line for the
+plain clean-up (the lens's P5b); the lens's P1 and P2; the clean-up label after the retry (through `cleanupModels`); op offload; the
+device probe; keyboard focus in the panel and About, with `:focus-visible`; the version floor with stand-in probes; the
+floor and DLL names held to `scripts/build-common.ps1`; the load balloon's words and its one balloon for both models.
+Changed in `RuntimeResilienceTests.cs`: the GPU-failed-last-time line pinned word for word, the R1 shape in the panel
+(replacing the test that expected the button after both failures), `CpuMightHelp` false after the CPU failed, the new log
+wording, the runtime check's new probe signature. `StorageTests` writes both markers through `GpuLoadMarker`.
+
+Each mutant reverted one behaviour; Release `--no-incremental` build, then the whole filtered suite with the telemetry
+opt-out; the original bytes written back and their SHA-256 compared after each (scratch runner `runmut.js`). First pass on
+a719e5e (before the rebase, 1,311 tests), final pass on fe052d3 (after it, 1,341 tests). Every mutant was observed failing
+on the reverted behaviour in each pass it ran in, and every source was restored byte for byte:
+
+| Mutant | Reverts | Failed, a719e5e | Failed, fe052d3 |
+|---|---|---|---|
+| N1 | speech: the marker is never read at a start | 6 | 6 |
+| N2 | clean-up: the marker is never read at a start | 1 | 1 |
+| N3 | speech: no marker during a GPU attempt | 3 | 3 |
+| N4 | speech: the marker is left after a GPU attempt | 2 | 2 |
+| N5 | clean-up: no marker during a GPU attempt | 1 | 1 |
+| N6 | clean-up: the marker is left after a GPU attempt | 1 | 1 |
+| N7 | a marker naming another model forces the CPU too | 2 | 2 |
+| N8 | quitting leaves the marker of a GPU attempt under way | 1 | 1 |
+| N9 | quitting also deletes a marker read at the start | 1 | 1 |
+| N10 | speech: the CPU retry's failure is not marked | 2 | 2 |
+| N11 | clean-up: the CPU retry's failure is not marked | 1 | 1 |
+| N12 | Assess ignores a CPU try | 3 | 3 |
+| N13 | the marker start's CPU load counts as a CPU try (no button) | 4 | 4 |
+| N14 | speech: the warning says the GPU failed | 1 | 1 |
+| N15 | clean-up: the warning says the GPU failed | 1 | 1 |
+| N16 | About's failed-model line replaces the plain clean-up's | 1 | 1 |
+| M10 | a later GPU load keeps the GPU-failed notice | 1 | 1 |
+| M14 | About hides Try on the CPU | 2 | 2 |
+| M13 | the clean-up label keeps the build's name after the retry | 1 | 1 |
+| M11 | op offload off on the GPU too | 1 | 1 |
+| M12 | the clean-up probe loads whisper's runtime against whisper.gpu = cpu | 1 | 1 |
+| N17 | the tray panel leaves focus on the hidden button | 1 | 1 |
+| N18 | About leaves focus on the hidden button | 1 | 1 |
+| N19 | an old msvcp140 counts as present | 1 | 1 |
+| N20 | the runtime balloon keeps the model-page hint | 2 | 2 |
+| N21 | a balloon per model for the same runtime reason | 2 | 2 |
+| N22 | the path registry misses the markers | 1 | 1 |
+| N23 | the runtime floor drifts from the build scripts (14.44) | (new) | 2 |
+| N24 | the runtime check forgets vcomp140.dll | (new) | 2 |
+
+N18 reverted About's move to the heading in the first pass and the move to the next control in the final pass (see
+"Keyboard focus" above). No run in either pass failed `FixBatchPrivacyTests`' localhost proxy case.
+
+**Verification (lens fixes)** (17/10/2026, this PC): Release `--no-incremental` build, 0 warnings, 0 errors. Filtered
+suite with the telemetry opt-out: on a719e5e 1,311 total, 1,291 passed, 20 skipped, 0 failed (the 20th skip was the
+floor guard, waiting for PR #10). After the rebase on main 6daff77, on fe052d3, twice: 1,341 total, 1,320 passed, 21
+skipped, 0 failed; and 1,341, 1,319, 21, 1 failed: `OfflineAndDownloadTests.A_slow_but_live_connection_is_not_a_stall`
+expected one download attempt and saw two. Inferred, not traced: its 150 ms stall limit tripped under the suite's
+parallel load; the download code and that test are not in this lane's diff, and the test passed in the other run and in
+all 29 mutated runs of the final pass. The floor guard runs on this head. The 21 skipped are gated: published layouts,
+the download measurement, the desktop, tray and setup tests, and the real-model integration tests. Not run: those,
+Dictum.exe itself, a PC without the Visual C++ runtime or with one older than 14.51, macOS (no test exercises the
+`OperatingSystem.IsWindows()` guard), the clean-up side of the marker with a real llama.cpp end, and a look at the focus
+rings (headless only).
