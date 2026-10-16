@@ -186,6 +186,7 @@ internal sealed class ScriptedDialogs : IShellDialogs
 {
     public Queue<int> Answers { get; } = new();
     public bool ConfirmWord { get; set; }
+    public bool ConfirmDownloads { get; set; } // the answer to the download question: no, until a test says yes
     public List<(string Title, string Text)> Asked { get; } = [];
     public List<string> Told { get; } = [];
 
@@ -207,7 +208,7 @@ internal sealed class ScriptedDialogs : IShellDialogs
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir) => new(recommended, null, false);
     public CleanupPick CleanupPicker(string recommended, string reason, Func<CleanupModelInfo, bool> isDownloaded, string modelsDir) => new(null, null, true, false);
     public MissingModelChoice MissingModel(string shortName, bool canDownload) => MissingModelChoice.Quit;
-    public bool ConfirmDownload(string fileName, string sizeText, string note) => false;
+    public bool ConfirmDownload(string fileName, string sizeText, string note) => ConfirmDownloads;
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;
 }
 

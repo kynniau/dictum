@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia.Controls;
@@ -7,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Dictum.App;
+using Dictum.Settings;
 using Dictum.Transcribe;
 using Dictum.UI.Shell;
 using Dictum.UI.Views;
@@ -119,6 +121,13 @@ public class UpdateCheckTests
         return updates;
     }
 
+    /// <summary>
+    /// The offline_only guard at the top of a client <see cref="AppRules.CreateClients"/> built. HttpClient does not expose its
+    /// handler: read through the invoker's private field, as the TLS pin does.
+    /// </summary>
+    private static OfflineGuardHandler Guard(HttpClient http) =>
+        Assert.IsType<OfflineGuardHandler>(typeof(HttpMessageInvoker).GetField("_handler", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(http));
+
     /// <summary>Between the guard and the real socket handler: sends the request for dictum.kynni.au to a listener on this PC instead.</summary>
     private sealed class ToListener(int port, HttpMessageHandler inner) : DelegatingHandler(inner)
     {
@@ -126,6 +135,54 @@ public class UpdateCheckTests
         {
             request.RequestUri = new Uri($"http://127.0.0.1:{port}{request.RequestUri!.AbsolutePath}");
             return base.SendAsync(request, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Between the guard and the real socket handler: counts the bytes the check reads from the answer. A server cannot say:
+    /// the sockets buffer what it sends before anything is read.
+    /// </summary>
+    private sealed class CountsReads(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        private long _read;
+
+        public long Read => Interlocked.Read(ref _read);
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var response = await base.SendAsync(request, cancellationToken);
+            response.Content = new StreamContent(new CountingStream(await response.Content.ReadAsStreamAsync(cancellationToken), n => Interlocked.Add(ref _read, n)));
+            return response;
+        }
+    }
+
+    /// <summary>A stream with no length (as a chunked answer arrives) that tells <paramref name="counted"/> how much each read returned.</summary>
+    private sealed class CountingStream(Stream inner, Action<int> counted) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override int Read(byte[] buffer, int offset, int count) => Counted(inner.Read(buffer, offset, count));
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            Counted(await inner.ReadAsync(buffer, cancellationToken));
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) inner.Dispose();
+            base.Dispose(disposing);
+        }
+
+        private int Counted(int read)
+        {
+            counted(read);
+            return read;
         }
     }
 
@@ -197,8 +254,11 @@ public class UpdateCheckTests
         var site = OfflineGuardTests.Serve($"HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:{other.Port}/version.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", cts.Token);
         using (var http = UpdateClient())
         {
-            // HttpClient does not expose its handler: read through the invoker's private field, as the TLS pin does.
-            var guard = Assert.IsType<OfflineGuardHandler>(typeof(HttpMessageInvoker).GetField("_handler", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(http));
+            var guard = Guard(http);
+            // The socket handler as production built it, before its address is changed: TLS 1.2 as every download has, and no redirect followed.
+            var sockets = Assert.IsType<SocketsHttpHandler>(guard.InnerHandler);
+            Assert.Equal(SslProtocols.Tls12, sockets.SslOptions.EnabledSslProtocols);
+            Assert.False(sockets.AllowAutoRedirect);
             guard.InnerHandler = new ToListener(site.Port, guard.InnerHandler!);
             var result = await Check(http);
             Assert.Equal(UpdateStatus.Failed, result.Status);
@@ -284,6 +344,57 @@ public class UpdateCheckTests
         var site = new FakeSite(HttpStatusCode.OK, () => contentLength ? new ByteArrayContent(body) : new StreamContent(new NoLengthStream(body)));
         using var http = Client(site);
         Assert.Equal(status, (await Check(http)).Status);
+    }
+
+    /// <summary>1,024 times the limit: far more than the check may read.</summary>
+    private const int Overlong = 1024 * SizeLimit;
+
+    [Fact]
+    public async Task An_answer_without_a_length_is_read_only_up_to_the_limit_however_long_it_goes_on()
+    {
+        // The cases above end in Failed whether the check stops at the limit or reads the whole answer and only then measures
+        // it (the re-lens, 16/10/2026), so the answer alone cannot pin the stop. Here a listener on this PC sends 16 MiB with no
+        // Content-Length to the check's own client over its real socket handler, and what is pinned is how much the check read.
+        // That is counted where it reads (CountsReads), not at the server: 15 runs on 16/10/2026 had the server hand 32,768 to
+        // 245,760 bytes to its socket before the check hung up, because the sockets buffer what is sent before anything is read.
+        const string head = "{\"version\":\"99.0.0\",\"notes\":\"", tail = "\"}";
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var server = Task.Run(async () =>
+        {
+            try
+            {
+                using var client = await listener.AcceptTcpClientAsync(cts.Token);
+                var stream = client.GetStream();
+                if (await stream.ReadAsync(new byte[8192], cts.Token) == 0) return; // the request (small); nothing to answer if the client left
+                await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n" + head), cts.Token);
+                var filler = new byte[SizeLimit];
+                Array.Fill(filler, (byte)'x');
+                for (var sent = 0; sent < Overlong; sent += filler.Length) await stream.WriteAsync(filler, cts.Token);
+                await stream.WriteAsync(Encoding.ASCII.GetBytes(tail), cts.Token);
+            }
+            catch (Exception ex) when (ex is IOException or OperationCanceledException)
+            {
+                // the check hung up, or the test ended
+            }
+        }, cts.Token);
+        try
+        {
+            using var http = UpdateClient();
+            var guard = Guard(http);
+            var reads = new CountsReads(guard.InnerHandler!);
+            guard.InnerHandler = new ToListener(((IPEndPoint)listener.LocalEndpoint).Port, reads);
+            var result = await Check(http, timeout: TimeSpan.FromSeconds(2)); // only a backstop: a check that stops at the limit is done in milliseconds
+            Assert.Equal(UpdateStatus.Failed, result.Status);
+            Assert.Equal(SizeLimit + 1, reads.Read); // one byte past the limit is what shows the answer is over it; nothing past that is read
+        }
+        finally
+        {
+            cts.Cancel();
+            listener.Stop();
+            await server;
+        }
     }
 
     [Fact]
@@ -517,6 +628,33 @@ public class UpdateCheckTests
         Assert.Equal(0, downloads.Requests);
         shell.Dispose();
         return true;
+    });
+
+    [Fact]
+    public Task A_model_download_goes_through_the_download_client_and_never_the_check_s_own() => UiSession.Run(() =>
+    {
+        // The About-page tests above put a counting handler under the download client, so a check sent through it is seen. This is
+        // the other way round: one under the check's own client, so a model download sent through it is seen. The two clients differ
+        // where it matters (the download client follows redirects, as huggingface.co's CDN needs; the check's own follows none).
+        var downloads = new CountingHandler();
+        var updates = new CountingHandler();
+        using var scratch = new Scratch();
+        var (shell, _, dialogs) = scratch.Shell(downloadHandler: downloads, updateHandler: updates);
+        dialogs.ConfirmDownloads = true; // the user presses Download
+        try
+        {
+            var ended = new List<bool>();
+            var spec = new DownloadSpec(new Uri("https://dictate-test.invalid/a.bin"), "a.bin", 4, null); // .invalid can never resolve (RFC 2606)
+            shell.Models.ApplyWithDownloads("A test download", [(spec, Path.Combine(scratch.Root.FullName, "a.bin"))], [], finished: ended.Add);
+            Assert.True(Eventually(() => ended.Count == 1), "the download never ended");
+            Assert.Equal([false], ended); // the counting handler answers 403, so the download fails at once
+            Assert.Equal(1, downloads.Requests);
+            Assert.Equal(0, updates.Requests);
+        }
+        finally
+        {
+            shell.Dispose(); // also stops a download still running
+        }
     });
 
     // ---- The site --------------------------------------------------------------------------------------------------------
