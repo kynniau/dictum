@@ -326,11 +326,13 @@ public sealed partial class RuntimeResilienceTests
         using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, _) => warming = new FakeLocalEngine(p, waitForCancel: true),
             gpuInUse: () => true);
         llm.BeginLoad(local.Model("cleanup-a.gguf"), "auto");
-        Assert.True(await Eventually(() => warming is not null && File.Exists(local.CleanupMarker)), "the clean-up GPU load never began");
+        Assert.True(await Eventually(() => warming?.WarmingUp == true && File.Exists(local.CleanupMarker)), "the clean-up GPU warm-up never began");
         llm.Unload();
         using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => true);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         models.BeginLoad(local.Model("speech-a.bin"), new WhisperSettings());
         Assert.True(await Eventually(() => models.IsReady, 2000), "the speech GPU load still waited behind the stale clean-up warm-up");
+        Assert.True(clock.ElapsedMilliseconds < 4000, $"speech readiness took {clock.ElapsedMilliseconds} ms");
         Assert.False(File.Exists(local.CleanupMarker));
         Assert.True(warming!.Disposed);
         Assert.Null(llm.Ready);
@@ -343,14 +345,16 @@ public sealed partial class RuntimeResilienceTests
         // stale.Cancel() stops it. Without that call the speech model's GPU load waits behind the old warm-up.
         using var local = new LocalFolder();
         FakeLocalEngine? first = null;
-        using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, _) => first ??= new FakeLocalEngine(p, waitForCancel: true),
+        using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, gpu) => { var e = new FakeLocalEngine(p, waitForCancel: gpu != "cpu"); first ??= e; return e; },
             gpuInUse: () => true);
         llm.BeginLoad(local.Model("cleanup-a.gguf"), "auto");
-        Assert.True(await Eventually(() => first is not null && File.Exists(local.CleanupMarker)), "the clean-up GPU load never began");
+        Assert.True(await Eventually(() => first?.WarmingUp == true && File.Exists(local.CleanupMarker)), "the clean-up GPU warm-up never began");
         llm.BeginLoad(local.Model("cleanup-b.gguf"), "cpu"); // a newer choice, on the CPU so it takes no GPU gate itself
         using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => true);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         models.BeginLoad(local.Model("speech-a.bin"), new WhisperSettings());
         Assert.True(await Eventually(() => models.IsReady, 2000), "the speech GPU load still waited behind the stale clean-up warm-up");
+        Assert.True(clock.ElapsedMilliseconds < 4000, $"speech readiness took {clock.ElapsedMilliseconds} ms");
         Assert.False(File.Exists(local.CleanupMarker));
         Assert.True(first!.Disposed);
     }

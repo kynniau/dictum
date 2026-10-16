@@ -34,11 +34,18 @@ internal sealed class FakeLocalEngine(string path, bool waitForCancel = false, s
 
     public string ModelPath { get; } = path;
     public bool Disposed => Volatile.Read(ref _disposed) == 1;
+    private volatile bool _warmingUp;
+    /// <summary>True once the warm-up is waiting on its token (set just before the delay).</summary>
+    public bool WarmingUp => _warmingUp;
     public (double Prompt, double Generation) Rates => (0, 0);
 
     public async Task<TimeSpan> WarmUpAsync(string? systemPrompt = null, CancellationToken cancellationToken = default)
     {
-        if (waitForCancel) await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        if (waitForCancel)
+        {
+            _warmingUp = true;
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        }
         return TimeSpan.Zero;
     }
 
