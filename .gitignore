@@ -29,8 +29,61 @@ models/
 # test artefacts
 TestResults/
 *.trx
+
+# Private material never leaves this PC (public repo)
+# Recordings, transcripts and personal test material live outside the repository. The hooks in .githooks refuse the
+# same things (case-insensitively), and the CI job "private-material" looks for them after the fact.
+private/
+recording/
+recordings/
+transcript/
+transcripts/
+# audio and video (no exception: a .wav is refused wherever it is)
 *.wav
-!tests/fixtures/*.wav
+*.mp4
+*.m4a
+*.mp3
+*.ogg
+*.oga
+*.opus
+*.flac
+*.aac
+*.wma
+*.webm
+*.3gp
+*.amr
+*.mov
+*.mkv
+*.avi
+*.aiff
+*.caf
+*.aif
+*.wmv
+*.m4v
+*.mpg
+*.mpeg
+*.m4b
+*.mka
+*.weba
+*.spx
+*.flv
+*.3g2
+*.pcm
+*.dss
+*.ds2
+# subtitles, documents, archives and mail exports: they can hold a transcript or a recording, and their contents are not read
+*.srt
+*.vtt
+*.docx
+*.doc
+*.rtf
+*.odt
+*.pdf
+*.zip
+*.7z
+*.rar
+*.msg
+*.eml
 
 # local scratch copies and backups
 scratch/

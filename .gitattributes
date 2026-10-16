@@ -1,0 +1,3 @@
+# The hook scripts must keep LF endings in every checkout, whatever core.autocrlf says: a strict POSIX shell (dash, as on
+# Linux and macOS) cannot run a script saved with CRLF. Git for Windows' own sh happens to tolerate it.
+.githooks/* text eol=lf
