@@ -1313,3 +1313,44 @@ source restored byte-identical (SHA-256 compared). Failed per mutant:
 passed, 19 skipped (the same 19 env-gated tests as before), 0 failed; at 193ca49 it was 1,043, 1,024, 19, 0. Not run in
 this lane: any real model or GPU (the merge lens ran its hands-free probes once against real models; their results are
 in its report, not repeated here), the desktop- and tray-gated tests, and Dictum.exe itself.
+
+**Rebase onto main a88e492 (16/10/2026)**, after PR #7 (check for updates) and PR #2 (languages) merged. `git rebase`
+replayed the ten commits; two stopped on conflicts:
+
+| Commit | File | Hunk | Resolution |
+|---|---|---|---|
+| 8bd6fc8 (now 20cc540) | `WhisperEngine.cs` | `DecodeOptions` members: #2's `DescribeLanguage`, this branch's `WithCarried` | Both kept; `WithCarried`'s summary now says only the prompt changes |
+| 8bd6fc8 | `WhisperEngine.cs` | The private constructor | `(factory, threads, decode, modelPath, loadTime, ILog log)`: #2 removed the language, this branch added the log |
+| 8bd6fc8 | `WhisperEngine.cs` | `Load`'s construction | `new WhisperEngine(factory, threads, options, modelPath, TimeSpan.Zero, log)` |
+| 8bd6fc8 | `WhisperEngine.cs` | Not flagged by git: the carried-words build still read `_language`, which #2 removed | `Build(_factory, _threads, decode)`; `decode` is `Decode.WithCarried(…)`, whose `with` keeps the language and translate |
+| 3983d5d (now 8996650) | `DECISIONS.md` | Both appended a section at the end | #2's "Languages and translation", then this section |
+| 3983d5d | `SPEC.md` | #2's new §23 against this branch's two amendment bullets after §22's | The bullets stay in the amendments list; §23 follows them |
+
+Everything else merged by itself and was read afterwards: `TextList.cs` keeps both `WholeWords.IsWordChar` and
+`SentenceStart`; the README's settings table and sections carry both sides; `TranscriptCleaner.CleanAsync` returns the
+plain text before it looks at a part's carried words, so text that is not English never reaches a model with them. Each
+of the ten rebased commits builds (`--no-incremental`, 0 warnings, 0 errors), and the rebased head's test methods are
+main's and this branch's together (main renamed one of the old ones, now `Every_network_client_refuses…`).
+
+Two changes after the rebase:
+
+- **Text that is not English keeps its case where parts join.** The plain clean-up leaves such text exactly as whisper
+  wrote it (SPEC §23), but the boundary rule re-cased each part's first letter: a Tagalog "Maynila" after a part with
+  no sentence end was typed "maynila", and a small letter after a sentence end was capitalised. `SegmentJoin.Join`
+  takes `keepCase` and the pipeline passes the cleaner's `IsPlain`; the separator rules are unchanged. A Devanagari
+  part, or a small letter after a part with no sentence end, comes out the same with or without the rule (Devanagari
+  has no case, and carrying on only lowers a capital), so the pins use a capital after no sentence end and a small
+  letter after one; the Devanagari rows document the behaviour.
+- **README, Privacy:** the cloud row and "Optional cloud polish" say that in hands-free the system prompt also carries
+  up to 10 words of what the last part said (taken before corrections, the profanity filter and snippets). The consent
+  dialog's copy is unchanged: it says every dictation's text is sent.
+
+| Mutant (whole filtered suite, `--no-incremental`; each source restored byte-identical) | Failed |
+|---|---|
+| The boundary rule re-cases regardless of `keepCase` | 2: the `SegmentJoin` pin and the session pin |
+| The pipeline passes `keepCase: false` | 1: the session pin |
+| `WithCarried` builds `new DecodeOptions(prompt, BeamSize)` (language and translate dropped) | 1: `A_parts_whisper_prompt_adds_the_carried_words_and_keeps_the_language_and_translate` |
+| The README row without its hands-free clause | 1: `The_README_privacy_table_says_a_hands_free_cloud_request_carries_the_last_parts_words` |
+
+Filtered suite: the rebased head 1,198 total, 1,179 passed, 19 skipped, 0 failed; with the two changes 1,202, 1,183,
+19, 0 (main a88e492 alone, the same filter: 1,077, 1,058, 19, 0).
