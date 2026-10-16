@@ -30,8 +30,10 @@ public sealed partial class AppShell
         _settings = config.Settings;
         if (_fileLog is not null) _fileLog.MinLevel = LogExtensions.ParseLevel(_settings.LogLevel);
         var personal = Personal.Load(); // dictionary, corrections, profanity list (SPEC §16)
+        var outgoing = _cleaner;
         _cleaner = TranscriptCleaner.Create(_settings.Llm, _settings.OfflineOnly, config.Secrets, _http, _log, () => _llm.Ready,
             personal.ForCleanup(_settings.Profanity), WhisperLanguages.OutputIsEnglish(_settings.Whisper.Language, _settings.Whisper.Translate));
+        outgoing.Retire(); // a request it still has under way is cancelled: that dictation gets the rule-based tidy, nothing waits on the old settings
         _llm.SetPrompt(_cleaner.SystemPrompt); // a loaded model re-evaluates a changed prompt now, not during the next dictation
         _models.SetDecoding(new DecodeOptions(personal.Dictionary.WhisperPrompt, _settings.Whisper.BeamSize, _settings.Whisper.Language, _settings.Whisper.Translate));
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)
@@ -53,8 +55,8 @@ public sealed partial class AppShell
         return _gpuMachine();
     }
 
-    /// <summary>Writes settings.json keys chosen in a window, then reloads (and hot-swaps a changed model).</summary>
-    public void Write(params (string Key, JsonNode? Value)[] values) => Models.Write(values);
+    /// <summary>Writes settings.json keys chosen in a window, then reloads (and hot-swaps a changed model). False: the file could not be written.</summary>
+    public bool Write(params (string Key, JsonNode? Value)[] values) => Models.Write(values);
 
     /// <param name="userRequested">
     /// Settings → About → Reload settings: always re-installs the hook (the documented recovery if Windows removed it). A

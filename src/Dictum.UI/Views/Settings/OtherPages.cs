@@ -47,10 +47,7 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Row(8, _enable, Ui.Button("Open the settings folder", "secondary", () => Say(Shell.OpenPath(Shell.RealPath(Shell.Paths.ConfigDir), folder: true) ?? ""))),
             _offline]);
         _cloudOn.Children.AddRange([_cloudState, Ui.Row(8, Ui.Button("Switch cloud clean-up off", "secondary", () => Run(() =>
-        {
-            Shell.DisableCloud();
-            Say("Cloud clean-up is off; the local model tidies your dictations again.");
-        })))]);
+            Say(Shell.DisableCloud() ?? "Cloud clean-up is off; the local model tidies your dictations again."))))]);
 
         Compose(
             Ui.Card(_now, "Now"),

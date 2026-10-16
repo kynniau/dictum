@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using Dictum.App;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.Storage;
@@ -160,7 +161,8 @@ public sealed partial class AppShell
     /// <summary>
     /// SPEC §22: before any cloud clean-up is switched on, the consent dialog says what is sent and to whom; only "Allow"
     /// records the consent in consent.json (provider, host, time, app version), then writes the provider to settings.json.
-    /// A plain http:// server off this PC is refused outright.
+    /// A plain http:// server off this PC is refused outright. When settings.json cannot be written, the consent just recorded
+    /// is withdrawn again, since the settings do not name that host, and the write failure is returned.
     /// </summary>
     public string? EnableCloud(LlmSettings proposed)
     {
@@ -172,7 +174,8 @@ public sealed partial class AppShell
             ("llm.base_url", proposed.BaseUrl is null ? null : JsonValue.Create(proposed.BaseUrl)),
             ("llm.model", JsonValue.Create(proposed.Model)),
         };
-        if (CloudPolicy.CloudHost(proposed) is { } host)
+        var host = CloudPolicy.CloudHost(proposed);
+        if (host is not null)
         {
             if (Dialogs.Ask("Send dictations to a cloud service?", CloudPolicy.ConsentText(proposed, host),
                     new DialogChoice("Allow cloud clean-up"), new DialogChoice("Cancel", IsDefault: true)) != 0)
@@ -182,16 +185,30 @@ public sealed partial class AppShell
             CloudConsentFile.Write(Paths.ConsentFile, new CloudConsentRecord(proposed.Provider, host, DateTimeOffset.UtcNow, AppVersion));
             _log.Info($"Cloud clean-up agreed to in the consent dialog: {proposed.Provider} at {host}.");
         }
-        Write([.. values]);
-        return null;
+        if (Write([.. values])) return null;
+        if (host is not null)
+        {
+            CloudConsentFile.Delete(Paths.ConsentFile);
+            _log.Info($"Consent to {host} withdrawn again: settings.json could not be written, so cloud clean-up was not switched on.");
+        }
+        return ModelCoordinator.WriteFailed;
     }
 
-    /// <summary>Switches cloud clean-up off: the consent withdrawn (consent.json deleted), back to the local model.</summary>
-    public void DisableCloud()
+    /// <summary>
+    /// Switches cloud clean-up off: the consent withdrawn (consent.json deleted), back to the local model. Returns null, or the
+    /// write failure when settings.json cannot be written: the switch then applies in memory (as <see cref="SetEnabled"/> does
+    /// for "enabled") and the settings reload, so the clean-up in use stops sending at once. A reload that cannot read the file
+    /// keeps these settings; one that can finds no consent and uses the local model too.
+    /// </summary>
+    public string? DisableCloud()
     {
         CloudConsentFile.Delete(Paths.ConsentFile);
         _log.Info("Cloud clean-up switched off; consent withdrawn.");
-        Write(("llm.provider", JsonValue.Create(LlmSettings.Local)), ("llm.model", JsonValue.Create(CleanupCatalog.Recommend(GpuMachine).Model)));
+        var model = CleanupCatalog.Recommend(GpuMachine).Model;
+        if (Write(("llm.provider", JsonValue.Create(LlmSettings.Local)), ("llm.model", JsonValue.Create(model)))) return null;
+        _settings = _settings with { Llm = _settings.Llm with { Provider = LlmSettings.Local, Model = model, CloudConsent = null } };
+        Reload(userRequested: false);
+        return ModelCoordinator.WriteFailed;
     }
 
     /// <summary>"1.0.0": what the consent record, Report a problem and Check for updates name.</summary>
