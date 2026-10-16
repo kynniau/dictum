@@ -1692,8 +1692,11 @@ catalogue's by a test). A restored copy is trusted for nothing: `download-model.
 downloads to a `.part` file, verifies it and replaces the copy (read in the script). actions/cache v6.1.0 is the latest
 release (published 2026-06-26) and its tag points at commit `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (GitHub API,
 17/10/2026), pinned by SHA like the other actions; its `action.yml` at that commit has `path` and `key` inputs and a post
-step that saves only if the job has succeeded. Not observed: a cache hit. The first CI run after this merges saves the
-entry and the second restores it.
+step that saves only if the job has succeeded. Observed in the two CI runs for ad72ef5: "Cache not found for input keys",
+then the publish step downloaded the file ("Done: ...ggml-base.en.bin (147964211 bytes, size and SHA-256 verified)"), then
+"Cache saved with key: model-ggml-base.en-a03779c8..." in each run (the push run's entry belongs to the branch, the
+pull-request run's to the PR). A restore had not been observed when this was written; the next push to the branch should
+show one.
 
 **8. THIRD-PARTY-NOTICES.txt now covers every third-party component in the published folder (needed before
 resubmission).** The inventory comes from the layout the earlier lane published (`dist\Dictum`, 278 files) and the
@@ -1794,5 +1797,7 @@ build writes, and does not read the NuGet cache.
 
 **Verification after the fixes** (this lane, 17/10/2026): Release `--no-incremental` build, 0 warnings, 0 errors. Filtered
 suite (`FullyQualifiedName!~Install_copies_models`): 1,297 total, 1,276 passed, 21 skipped, 0 failed (the rebased head had
-1,279, 1,258, 21, 0; 18 new tests). Not run: the installer, the Store package build, Windows Sandbox, a real CI run, and
-the packaged self-test.
+1,279, 1,258, 21, 0; 18 new tests). CI on ad72ef5 (the push run and the pull-request run, 17/10/2026): both succeeded, with
+1,298 tests (those 1,297 plus `Install_copies_models`, which CI runs), 1,277 passed, 21 skipped, 0 failed; the two
+"GitHub Release" jobs were skipped (tag builds only), so the release job's new checkout and `--notes-file` have not run.
+Not run: the installer, the Store package build, Windows Sandbox, a release build, and the packaged self-test.
