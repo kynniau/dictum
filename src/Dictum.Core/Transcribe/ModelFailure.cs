@@ -26,10 +26,12 @@ public static class ModelFailure
     public const string GpuFailed = "The graphics driver could not run the model; Dictum will use the CPU";
 
     /// <summary>
-    /// The GPU ended Dictum while it loaded this model last time, so this start loads it on the CPU (<see cref="GpuLoadMarker"/>).
-    /// PROPOSED copy (17/10/2026), awaiting the product owner's review: pinned word for word; do not reword.
+    /// The GPU ended Dictum while it loaded this model at an earlier start, so this start loads it on the CPU
+    /// (<see cref="GpuLoadMarker"/>); true at every start while the marker stays. PROPOSED copy (17/10/2026, lens fix replacing
+    /// "… could not run the model last time; Dictum is using the CPU", which was untrue from the second start on), awaiting the
+    /// product owner's review: pinned word for word; do not reword.
     /// </summary>
-    public const string GpuFailedLastTime = "The graphics driver could not run the model last time; Dictum is using the CPU";
+    public const string GpuFailedLastTime = "The graphics driver could not run this model, so Dictum uses the CPU for it.";
 
     /// <summary>
     /// The Visual C++ runtime DLLs the engines import: all 54 whisper.cpp and llama.cpp DLLs under the build's runtimes folder
@@ -117,7 +119,14 @@ public static class ModelFailure
     /// app's framework dependency) or sits in one of the program's native runtime folders (a copy beside the engines), and an
     /// msvcp140.dll found is not older than <see cref="MinRuntime"/>. Always true off Windows, where there is no such runtime.
     /// </summary>
-    public static bool VisualCppRuntimePresent() => !OperatingSystem.IsWindows() || VisualCppRuntimePresent(LoadedPath, AppLocalFolders(), FileVersion);
+    public static bool VisualCppRuntimePresent() => VisualCppRuntimePresent(LoadedPath, AppLocalFolders, FileVersion, OperatingSystem.IsWindows());
+
+    /// <param name="loadedPath">The file a DLL loads from by name, or null when it does not load.</param>
+    /// <param name="appLocalFolders">The program's native runtime folders (asked for only on Windows).</param>
+    /// <param name="fileVersion">A file's version, or null when it cannot be read (the file then counts, as before).</param>
+    /// <param name="isWindows">The platform is Windows; off it the answer is true and nothing is probed.</param>
+    internal static bool VisualCppRuntimePresent(Func<string, string?> loadedPath, Func<IReadOnlyCollection<string>> appLocalFolders, Func<string, Version?> fileVersion,
+        bool isWindows) => !isWindows || VisualCppRuntimePresent(loadedPath, appLocalFolders(), fileVersion);
 
     /// <param name="loadedPath">The file a DLL loads from by name, or null when it does not load.</param>
     /// <param name="appLocalFolders">The program's native runtime folders.</param>

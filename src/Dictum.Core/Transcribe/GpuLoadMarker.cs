@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Dictum.Core;
 using Dictum.Storage;
 
@@ -11,6 +12,16 @@ namespace Dictum.Transcribe;
 /// runs then, so the file outlives the program. The next start that finds it naming the model it loads first loads that model on
 /// the CPU for the whole run and says so (<see cref="ModelFailure.GpuFailedLastTime"/>); the file stays, so starts do not alternate
 /// between the GPU and the CPU. A GPU load of another model replaces it, so a model it does not name tries the GPU again.
+/// Only with the gpu setting <c>auto</c>: a hand-set <c>vulkan</c> always tries the GPU, and <c>cpu</c> never does.
+/// <para>
+/// The speech and clean-up markers share one gate per folder, held from <see cref="Begin"/> to <see cref="End"/>, so at most one
+/// of the two files exists at a time and a file left behind names the load that was under way. Start-up begins both loads at
+/// once; without the gate the clean-up's file was written while its load still queued behind whisper's on
+/// <see cref="NativeLoadGate"/>, so a crash in whisper's load left both files and put the clean-up model on the CPU too (lens on
+/// PR #12, 17/10/2026). GPU loads therefore run one after the other, warm-up included. NativeLoadGate itself cannot hold the
+/// marker: it is a lock around the native load call alone, inside the engines, and the clean-up's warm-up (where shaders
+/// compile) runs after it, across awaits.
+/// </para>
 /// </summary>
 /// <param name="file">The marker file; null for a manager with no local data folder (no marker is read or written).</param>
 internal sealed class GpuLoadMarker(string? file, ILog log)
@@ -18,7 +29,12 @@ internal sealed class GpuLoadMarker(string? file, ILog log)
     public const string SpeechFile = "gpu-load-speech.txt";
     public const string CleanupFile = "gpu-load-cleanup.txt";
 
+    /// <summary>One gate per marker folder (the app has one; tests each have their own), shared by both managers' markers.</summary>
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly SemaphoreSlim? _gate = file is null ? null : Gates.GetOrAdd(Path.GetFullPath(Path.GetDirectoryName(file) ?? file), static _ => new SemaphoreSlim(1, 1));
     private readonly object _lock = new();
+    private bool _held; // this marker holds the gate for a GPU load still under way
     private bool _checked; // the first load has looked for the file
     private string? _cpuModel; // the model the file named at the first load: on the CPU for this run
     private bool _written; // this run wrote the file for a GPU load still under way
@@ -26,7 +42,8 @@ internal sealed class GpuLoadMarker(string? file, ILog log)
 
     /// <summary>
     /// Asked before every load. The first time only, reads the file: when it names <paramref name="model"/> and the gpu setting is
-    /// not cpu, that model loads on the CPU for the rest of this run. True for each load of that model.
+    /// auto, that model loads on the CPU for the rest of this run. True for each load of that model while the setting is auto; a
+    /// hand-set vulkan tries the GPU.
     /// </summary>
     public bool CpuForThisRun(string model, string gpuSetting)
     {
@@ -35,21 +52,30 @@ internal sealed class GpuLoadMarker(string? file, ILog log)
             if (!_checked)
             {
                 _checked = true;
-                if (gpuSetting != "cpu" && Read() is { } named && Same(named, model))
+                if (gpuSetting == "auto" && Read() is { } named && Same(named, model))
                 {
                     _cpuModel = model;
                     log.Warn($"{Path.GetFileName(file)} names {Path.GetFileName(model)}: the GPU ended Dictum while it loaded that model, so it loads on the CPU this time.");
                 }
             }
-            return _cpuModel is { } cpu && Same(cpu, model);
+            return gpuSetting == "auto" && _cpuModel is { } cpu && Same(cpu, model);
         }
     }
 
-    /// <summary>Just before a GPU load: the file names the model until <see cref="End"/>.</summary>
+    /// <summary>
+    /// Just before a GPU load: waits for the other manager's GPU load to end, then the file names the model until <see cref="End"/>,
+    /// which every Begin is paired with (in a finally).
+    /// </summary>
     public void Begin(string model)
     {
+        // simplification: the gate covers the whole GPU load and warm-up, so the two models' warm-ups no longer overlap at start-up
+        // and a GPU load that hangs holds the other model's GPU load behind it (the native loads already queued on NativeLoadGate).
+        // Ceiling: start-up's time to both models ready is the sum of the two GPU loads. Trigger to retire: a measured start-up
+        // that is too slow, or a hung load reported; then record the marker per load step instead of per load.
+        _gate?.Wait(); // outside _lock, so Close at quit never waits for the other manager's load
         lock (_lock)
         {
+            _held = _gate is not null;
             if (file is null || _closed) return;
             try
             {
@@ -63,12 +89,15 @@ internal sealed class GpuLoadMarker(string? file, ILog log)
         }
     }
 
-    /// <summary>After a GPU load, whatever its outcome (in a finally): the file this run wrote goes.</summary>
+    /// <summary>After a GPU load, whatever its outcome (in a finally): the file this run wrote goes, then the gate opens.</summary>
     public void End()
     {
         lock (_lock)
         {
             if (_written) Delete();
+            if (!_held) return;
+            _held = false;
+            _gate!.Release();
         }
     }
 

@@ -70,7 +70,7 @@ public sealed partial class RuntimeResilienceTests
         // PROPOSED copy (17/10/2026), awaiting the product owner's review: pinned word for word.
         Assert.Equal("The Microsoft Visual C++ runtime is missing; install it from Microsoft, then restart Dictum", ModelFailure.RuntimeMissing);
         Assert.Equal("The graphics driver could not run the model; Dictum will use the CPU", ModelFailure.GpuFailed);
-        Assert.Equal("The graphics driver could not run the model last time; Dictum is using the CPU", ModelFailure.GpuFailedLastTime);
+        Assert.Equal("The graphics driver could not run this model, so Dictum uses the CPU for it.", ModelFailure.GpuFailedLastTime); // lens fix, 17/10/2026
         Assert.Equal("Try on the CPU", AppShell.TryOnCpuLabel);
         Assert.Equal("Restart Dictum to use the CPU.", AppShell.RestartForCpuHint);
         Assert.Equal("Clean-up: qwen2.5-1.5b could not be loaded, so the rule-based tidy is used.", AboutPage.CleanupFailedLine("qwen2.5-1.5b"));

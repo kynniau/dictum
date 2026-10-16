@@ -993,8 +993,12 @@ send it on, and `offline_only` cannot see that.
 - **API keys** come only from environment variables or `.env`; never from or into settings.json, the windows, or error
   messages. With the default `local` provider no key is needed for cleanup.
 - **GPU-load markers** (`%LOCALAPPDATA%\Dictum\gpu-load-speech.txt`, `gpu-load-cleanup.txt`) hold the path of a model
-  while it loads on the GPU, and nothing else; one stays only after the GPU ended Dictum during a load (see
-  Troubleshooting). Settings > Storage > Delete all app data and Remove Dictum completely delete them.
+  while it loads on the GPU, and nothing else; at most one exists at a time, since GPU loads run one after the other. One
+  stays whenever Dictum ends during that load without quitting normally: the GPU ending it, but also Task Manager ending
+  it, a power loss, or Windows signing out or shutting down before Dictum quits. Dictum cannot tell these apart, so the
+  next start puts that model on the CPU when its gpu setting is `auto` (see Troubleshooting). To let the model try the
+  GPU again, quit Dictum and delete the file, or set its gpu setting to `vulkan`. Settings > Storage > Delete all app
+  data and Remove Dictum completely delete them.
 - **Model files** are data, not programs (see "Cleanup models"), and downloads are checked against the pinned SHA-256
   where the catalogue has one; Gemma files are size-checked only.
 - **Report a problem** (Settings > About) opens an email to hello@kynni.com.au in your own mail app, with Dictum's
@@ -1156,10 +1160,12 @@ warns, and that file has no size or hash to be checked against. A value is never
 - **Dictum quits by itself while it loads a model on the GPU.** whisper.cpp (and llama.cpp) can end the program, rather
   than report an error, when the GPU refuses the model's memory (seen with an artificial 16 MiB buffer limit, 17/10/2026).
   While a model loads on the GPU, Dictum keeps its path in `gpu-load-speech.txt` or `gpu-load-cleanup.txt` in
-  `%LOCALAPPDATA%\Dictum` and deletes the file when the load ends; if Dictum was ended instead, the next start that loads
-  that model first loads it on the CPU for that run (the CPU-only runtime) and says "The graphics driver could not run
-  the model last time; Dictum is using the CPU". The file stays, so later starts do the same; loading another model on
-  the GPU replaces it, and deleting the file lets that model try the GPU again. To keep a model off the GPU for good,
+  `%LOCALAPPDATA%\Dictum` and deletes the file when the load ends; the two models' GPU loads run one after the other, so
+  only one file exists at a time. If Dictum was ended instead (by the GPU, or by anything else during that load), the next
+  start that loads that model first, with its gpu setting `auto`, loads it on the CPU for that run (the CPU-only
+  runtime) and says "The graphics driver could not run this model, so Dictum uses the CPU for it." The file stays, so
+  later starts do the same; loading another model on the GPU replaces it, deleting the file (with Dictum quit) lets that
+  model try the GPU again, and `"gpu": "vulkan"` always tries the GPU. To keep a model off the GPU for good,
   set `"whisper": { "gpu": "cpu" }` (or `llm.gpu`) in settings.json. Not covered: the GPU ending Dictum during a
   dictation, after the model had loaded.
 - **Slow cleanup.** Check the cleanup backend in the tray panel or `--selftest`. On `CPU`, choose

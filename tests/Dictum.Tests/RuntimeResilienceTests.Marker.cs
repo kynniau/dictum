@@ -203,6 +203,82 @@ public sealed partial class RuntimeResilienceTests
         Assert.Equal(model, Read(local.SpeechMarker));
     }
 
+    // ---- Lens fixes (17/10/2026): one GPU load at a time, and a hand-set vulkan ----
+
+    [Fact]
+    public async Task While_only_the_speech_GPU_load_is_under_way_the_clean_up_marker_is_never_written()
+    {
+        // Start-up begins both loads at once (AppShell). The clean-up's marker used to be written before its load queued behind
+        // whisper's, so a GPU crash during whisper's load left both files, and the next start put the clean-up model on the CPU too.
+        using var local = new LocalFolder();
+        using var release = new ManualResetEventSlim();
+        using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, _, d) =>
+        {
+            release.Wait(TimeSpan.FromSeconds(10)); // the speech GPU load, still under way
+            return new FakeSpeechEngine(p, d);
+        }, gpuInUse: () => true);
+        var bothAtCleanupLoad = new ConcurrentQueue<bool>();
+        using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, _) =>
+        {
+            bothAtCleanupLoad.Enqueue(File.Exists(local.SpeechMarker) && File.Exists(local.CleanupMarker));
+            Thread.Sleep(200); // long enough for the poll below to see a clean-up marker written during the speech load
+            return new FakeLocalEngine(p);
+        }, gpuInUse: () => true);
+        models.BeginLoad(local.Model("speech-a.bin"), new WhisperSettings());
+        Assert.True(await Eventually(() => File.Exists(local.SpeechMarker)), "the speech GPU load wrote no marker");
+        llm.BeginLoad(local.Model("cleanup-a.gguf"), "auto");
+        var bothSeen = await Eventually(() => File.Exists(local.SpeechMarker) && File.Exists(local.CleanupMarker), 500); // only the speech load is under way
+        release.Set();
+        Assert.True(await Eventually(() => models.IsReady && !llm.IsLoading), "the loads never finished");
+        Assert.False(bothSeen, "both markers existed while only the speech GPU load was under way");
+        Assert.Equal(new[] { false }, bothAtCleanupLoad.ToArray()); // the clean-up's GPU load ran after the speech load's ended
+        Assert.False(File.Exists(local.SpeechMarker));
+        Assert.False(File.Exists(local.CleanupMarker));
+    }
+
+    [Fact]
+    public async Task A_hand_set_vulkan_tries_the_GPU_even_when_the_marker_names_the_model()
+    {
+        using var local = new LocalFolder();
+        var speech = local.Model("speech-a.bin");
+        var cleanup = local.Model("cleanup-a.gguf");
+        File.WriteAllText(local.SpeechMarker, speech);
+        File.WriteAllText(local.CleanupMarker, cleanup);
+        var asked = new ConcurrentQueue<string>();
+        using var models = new ModelManager(NullLog.Instance, local.Integrity, (p, s, d) =>
+        {
+            asked.Enqueue(s.Gpu);
+            return new FakeSpeechEngine(p, d);
+        }, gpuInUse: () => true);
+        models.BeginLoad(speech, new WhisperSettings { Gpu = "vulkan" });
+        Assert.True(await Eventually(() => models.IsReady || models.LoadFailed));
+        Assert.Equal(new[] { "vulkan" }, asked.ToArray());
+        Assert.False(models.RunsOnCpu);
+        Assert.Null(models.Notice);
+
+        var askedLlm = new ConcurrentQueue<string>();
+        using var llm = new LocalLlmManager(NullLog.Instance, local.Integrity, (p, gpu) =>
+        {
+            askedLlm.Enqueue(gpu);
+            return new FakeLocalEngine(p);
+        }, gpuInUse: () => true);
+        llm.BeginLoad(cleanup, "vulkan");
+        Assert.True(await Eventually(() => !llm.IsLoading));
+        Assert.Equal(new[] { "vulkan" }, askedLlm.ToArray());
+        Assert.False(llm.RunsOnCpu);
+        Assert.Null(llm.Notice);
+    }
+
+    [Fact]
+    public void Off_Windows_the_runtime_check_is_true_even_when_the_probes_find_nothing()
+    {
+        string[] none = [];
+        var asked = false;
+        Assert.True(ModelFailure.VisualCppRuntimePresent(_ => null, () => { asked = true; return none; }, _ => null, isWindows: false));
+        Assert.False(asked); // nothing is probed off Windows
+        Assert.False(ModelFailure.VisualCppRuntimePresent(_ => null, () => none, _ => null, isWindows: true));
+    }
+
     // ---- Finding 2: Try on the CPU only where the CPU has not been tried ----
 
     [Fact]
