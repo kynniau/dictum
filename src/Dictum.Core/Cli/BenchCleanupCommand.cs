@@ -47,10 +47,7 @@ public static class BenchCleanupCommand
         Console.Out.WriteLine($"input ({raw.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length} words): {raw}");
         Console.Out.WriteLine();
 
-        // The prompt and the checks the tray app uses: base prompt, grammar assist when on, the personal dictionary line,
-        // the words the profanity setting keeps and the dictionary terms a reply may not add (SPEC §16).
-        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.Llm.PromptFile, log.Warn), settings.Llm.GrammarAssist, personal.Dictionary.CleanupLine);
-        var context = new ValidationContext(prompt, personal.WordsTheCleanupMustKeep(settings.Profanity), personal.Dictionary.Terms);
+        var (prompt, context) = Checks(settings, personal, log.Warn);
         DeterministicCleaner.Clean(raw); // first call pays regex start-up; time the second
         var sw = Stopwatch.StartNew();
         var tidy = DeterministicCleaner.Clean(raw);
@@ -83,6 +80,13 @@ public static class BenchCleanupCommand
         }
         return 0;
     }
+
+    /// <summary>
+    /// The prompt and the checks the tray app uses (SPEC §16): base prompt, grammar assist when on, the personal dictionary
+    /// line, the words the profanity setting keeps and the dictionary terms a reply may not add.
+    /// </summary>
+    internal static (string Prompt, ValidationContext Context) Checks(AppSettings settings, PersonalText personal, Action<string> warn) =>
+        personal.ForCleanup(settings.Profanity).Checks(settings.Llm, warn);
 
     private static async Task<Row> RunOneAsync(string name, string path, string raw, string prompt, ValidationContext context, AppSettings settings,
         ModelIntegrity integrity, ILog log)

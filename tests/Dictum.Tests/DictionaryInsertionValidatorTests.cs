@@ -1,4 +1,7 @@
+using System.Net;
+using System.Text;
 using Dictum.Llm;
+using Dictum.Personal;
 using Dictum.Settings;
 
 namespace Dictum.Tests;
@@ -94,12 +97,163 @@ public class DictionaryInsertionValidatorTests
         var log = new RecordingLog();
         var engine = new FakeLocalEngine("qwen2.5-1.5b-instruct-q4_k_m.gguf", reply: "Add Kynni to the dictionary once.");
         var cleaner = TranscriptCleaner.Create(new LlmSettings { Provider = LlmSettings.Local }, offlineOnly: false, SecretStore.Empty,
-            new HttpClient(new CountingHandler()), log, () => engine, dictionaryTerms: TwoTerms);
+            new HttpClient(new CountingHandler()), log, () => engine, new PersonalCleanup(null, null, TwoTerms));
         var result = await cleaner.CleanAsync(raw, CancellationToken.None);
         Assert.False(result.Cleaned);
         Assert.Equal(Added, result.FallbackReason);
         Assert.Equal(DeterministicCleaner.Clean(raw), result.Text);
         Assert.DoesNotContain("kynni", log.All, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(raw, log.All, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Lens on ad38c63 (16/10/2026, bench and probes): counting the reply in any case made every everyday word that spells a
+    // term, or a content word of a multi-word term, count as the term. The reply is counted as the term is spelt.
+    [Theory]
+    [InlineData("Loan Market|Parramatta", "She need a new loans for the house in Parramatta.", "She needs a new loan for the house in Parramatta.")] // bench: all three models
+    [InlineData("Will", "Tomorrow i send the report to the client.", "Tomorrow I will send the report to the client.")] // bench: qwen2.5-1.5b
+    [InlineData("IT", "is not working since monday", "It is not working since Monday.")]
+    [InlineData("US", "please let know by friday", "Please let us know by Friday.")]
+    [InlineData("May", "it be ready by friday or monday", "It may be ready by Friday or Monday.")]
+    [InlineData("The Hub", "check hub for update", "Check the hub for updates.")]
+    [InlineData("Commonwealth Bank|Bank of Melbourne", "he go to the banks tomorrow for sign the form", "He will go to the bank tomorrow to sign the form.")]
+    [InlineData("CFC Finance", "he work in finances", "He works in finance.")]
+    public void An_everyday_word_that_spells_a_term_is_not_the_term(string terms, string raw, string reply) =>
+        Assert.Null(Reject(raw, reply, terms.Split('|')));
+
+    [Fact]
+    public void A_term_that_is_also_an_everyday_word_is_caught_when_written_as_the_term() =>
+        Assert.Equal(Added, Reject("ask him to call me", "Ask Will to call me.", ["Will"]));
+
+    // Respellings that join or split words (lens, 16/10/2026: rejected on ad38c63, accepted before the rule existed).
+    [Theory]
+    [InlineData("PayPal", "Pay the invoice with pay pal before Friday.", "Pay the invoice with PayPal before Friday.")] // bench: all three models
+    [InlineData("McDonald's", "Meet me at mcdonalds at noon.", "Meet me at McDonald's at noon.")] // bench: all three models
+    [InlineData("Dictum|Kynni|dictum.kynni.com.au", "Download it from dictum dot kynni dot com dot au.", "Download it from dictum.kynni.com.au.")] // bench: all three
+    [InlineData("GitHub", "Push the fix to git hub today and tell the team.", "Push the fix to GitHub today and tell the team.")] // bench: qwen2.5-1.5b
+    [InlineData("Dictum|Kynni", "Send it to kinneys office today.", "Send it to Kynni's office today.")] // bench: qwen2.5-1.5b
+    [InlineData("e-mail", "send me an email", "Send me an e-mail.")] // "mail" is covered by the whole term said as "email"
+    [InlineData("Wi-Fi", "the wifi is down again", "The Wi-Fi is down again.")]
+    [InlineData("kyle@kynni.com.au", "email kyle at kynni dot com dot au", "Email kyle@kynni.com.au.")]
+    [InlineData("Salestrekker", "update sales trekker today", "Update Salestrekker today.")]
+    [InlineData("O'Brien", "call o brien today", "Call O'Brien today.")]
+    public void A_respelling_that_joins_or_splits_words_is_accepted(string terms, string raw, string reply) =>
+        Assert.Null(Reject(raw, reply, terms.Split('|')));
+
+    [Theory]
+    [InlineData("Dictum|Kynni", "dictum by kin knee", "Dictum by Kynni.")] // a split mishearing is the corrections' to fix: no letters match
+    [InlineData("Kynni", "can i go now", "Kynni go now.")] // exact letters, not sounds
+    [InlineData("GitHub", "push it to git hub", "Push it to GitHub. GitHub.")] // one run covers one
+    [InlineData("Kynni Pty Ltd", "send it to kynni pty ltd today", "Send it to Kynni Pty Ltd and Kynni today.")] // the larger allowance, not both
+    [InlineData("Ed", "its done now", "Ed, its done now.")] // a three-letter word ending in s is not a plural
+    public void An_allowance_does_not_admit_an_addition(string terms, string raw, string reply) =>
+        Assert.Equal(Added, Reject(raw, reply, terms.Split('|')));
+
+    // The documented cost of counting the reply as the term is spelt: an insertion in other capitals is not caught. Both
+    // insertions observed on 16/10/2026 were spelt as in the dictionary.
+    [Fact]
+    public void A_term_inserted_in_lower_case_is_not_caught() =>
+        Assert.Null(Reject("add a name to the dictionary once", "Add kynni to the dictionary once.", TwoTerms));
+
+    [Theory]
+    [InlineData("Lakshmi", "call laxmi today", "Call Lakshmi today.")] // an x after the first letter sounds "ks"
+    [InlineData("Dixon", "ask dickson to sign it", "Ask Dixon to sign it.")]
+    [InlineData("Aleks", "tell alex the news", "Tell Aleks the news.")]
+    [InlineData("Xero", "the invoice is in zero", "The invoice is in Xero.")] // a first x sounds "z"
+    public void A_respelling_through_an_x_is_accepted(string term, string raw, string reply) => Assert.Null(Reject(raw, reply, [term]));
+
+    // A term typed with a combining accent (decomposed Unicode, as some editors save it) is the same word as the single
+    // accented letter a model writes, and the other way round.
+    [Theory]
+    [InlineData("both composed", "Zo\u00EB", "Add Zo\u00EB to the dictionary once.")]
+    [InlineData("term decomposed", "Zoe\u0308", "Add Zo\u00EB to the dictionary once.")]
+    [InlineData("reply decomposed", "Zo\u00EB", "Add Zoe\u0308 to the dictionary once.")]
+    public void A_term_is_the_same_word_composed_or_decomposed(string form, string term, string reply) =>
+        Assert.Equal((form, Added), (form, Reject("add a name to the dictionary once", reply, [term])));
+
+    // Text that cannot be normalised (an unpaired surrogate makes string.Normalize throw) is read as it is, not thrown.
+    [Fact]
+    public void Text_that_cannot_be_normalised_is_read_as_it_is() =>
+        Assert.Equal(Added, Reject("add a name \uD800 to the dictionary once", "Add Kynni \uD800 to the dictionary once.", TwoTerms));
+
+    private static PersonalText PersonalOf(IEnumerable<string> terms, params string[] keep) =>
+        new(new PersonalDictionary(terms), Corrections.Empty, keep.Length == 0 ? ProfanityFilter.Empty : new ProfanityFilter(keep, "test"));
+
+    private static string? Reject(PersonalText personal, string raw, string reply) =>
+        CleanupValidator.Validate(raw, reply, personal.ForCleanup(new ProfanitySettings()).Checks(new LlmSettings(), _ => { }).Validation).Rejection;
+
+    // The validator checks what the model was shown: the terms in the prompt's 1,000-character line, never the oldest
+    // terms left out of it or a pasted paragraph too long for it.
+    [Fact]
+    public void Only_the_terms_in_the_prompt_line_are_checked()
+    {
+        var terms = new[] { "Will" }.Concat(Enumerable.Range(0, 120).Select(i => $"Zorblax{(char)('a' + i % 26)}{(char)('a' + i / 26)}")).ToList();
+        var dictionary = new PersonalDictionary(terms);
+        Assert.Equal(121, dictionary.Terms.Count);
+        Assert.DoesNotContain("Will", dictionary.CleanupTerms);
+        Assert.Equal(PersonalDictionary.CleanupLinePrefix + string.Join(", ", dictionary.CleanupTerms) + ".", dictionary.CleanupLine);
+        Assert.Null(Reject(PersonalOf(terms), "i send the report tomorrow", "I will send the report tomorrow."));
+
+        var paragraph = string.Concat(Enumerable.Repeat("Please note that every invoice has been checked twice before it goes out to the client. ", 12)).Trim();
+        var withParagraph = PersonalOf([paragraph, "Kynni"]);
+        Assert.Contains(paragraph, withParagraph.Dictionary.Terms);
+        Assert.Equal(["Kynni"], withParagraph.Dictionary.CleanupTerms);
+        Assert.Null(Reject(withParagraph, "it has approved yesterday", "It has been approved yesterday."));
+        Assert.Equal(Added, Reject(withParagraph, "add a name to the dictionary once", "Add Kynni to the dictionary once."));
+    }
+
+    private const string AddedReply = "Add Kynni to the dictionary once.";
+
+    // Wherever a clean-up is built, the terms come from PersonalText.ForCleanup with the dictionary line and the kept words:
+    // --transcribe (the tray app makes the same call, pinned below), every provider of TranscriptCleaner.Create, and the
+    // prompt and checks --bench-cleanup judges with. Removing the terms at any of them fails this test.
+    [Theory]
+    [InlineData(LlmSettings.Local)]
+    [InlineData(LlmSettings.OpenAiCompatible)]
+    [InlineData(LlmSettings.Anthropic)]
+    public async Task Every_clean_up_checks_the_terms_in_its_prompt(string provider)
+    {
+        var personal = PersonalOf(TwoTerms, "damn");
+        var settings = new AppSettings
+        {
+            Llm = provider switch
+            {
+                LlmSettings.OpenAiCompatible => new LlmSettings { Provider = provider, BaseUrl = "http://localhost:11434/v1", Model = "m" },
+                LlmSettings.Anthropic => new LlmSettings { Provider = provider, CloudConsent = "api.anthropic.com" },
+                _ => new LlmSettings { Provider = provider },
+            },
+        };
+        var body = provider == LlmSettings.Anthropic
+            ? $$$"""{"id":"msg_1","type":"message","role":"assistant","model":"claude-haiku-5-5","content":[{"type":"text","text":"{{{AddedReply}}}"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":1}}"""
+            : $$$"""{"choices":[{"message":{"role":"assistant","content":"{{{AddedReply}}}"},"finish_reason":"stop"}]}""";
+        using var http = new HttpClient(new Replying(body));
+        var secrets = SecretStore.FromContents("ANTHROPIC_API_KEY=k-test-123456\n", null, _ => null);
+        var engine = new FakeLocalEngine("qwen2.5-1.5b-instruct-q4_k_m.gguf", reply: AddedReply);
+
+        var cleaner = Dictum.Cli.CliCommands.Cleaner(settings, secrets, http, NullLog.Instance, () => engine, personal);
+        Assert.True(cleaner.UsesModel);
+        Assert.EndsWith("\n" + personal.Dictionary.CleanupLine, cleaner.SystemPrompt);
+        Assert.Equal(personal.Dictionary.CleanupTerms, cleaner.Validation.DictionaryTerms!);
+        Assert.Equal(["damn"], cleaner.Validation.MustKeepWords!);
+        Assert.Equal(Dictum.Cli.BenchCleanupCommand.Checks(settings, personal, _ => { }), (cleaner.SystemPrompt, cleaner.Validation));
+        var result = await cleaner.CleanAsync("add a name to the dictionary once", TestContext.Current.CancellationToken);
+        Assert.Equal(Added, result.FallbackReason);
+    }
+
+    [Fact]
+    public Task The_tray_app_checks_the_terms_in_its_prompt() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        File.WriteAllText(scratch.Paths.DictionaryFile, "Dictum\nKynni\n");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Assert.EndsWith("\nKnown names and terms, keep their spelling: Dictum, Kynni.", shell.Cleaner.SystemPrompt);
+        Assert.Equal(TwoTerms, shell.Cleaner.Validation.DictionaryTerms!);
+        shell.Dispose();
+    });
+
+    private sealed class Replying(string body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
     }
 }

@@ -116,6 +116,9 @@ public sealed partial class AppShell : IDisposable
     /// </summary>
     public string? CleanupWaitingForKey => _cleaner.MissingKey;
 
+    /// <summary>The clean-up step in use, with its prompt and checks.</summary>
+    internal TranscriptCleaner Cleaner => _cleaner;
+
     /// <summary>A speech model is loaded and no load is in progress (the hotkey works).</summary>
     public bool SpeechReady => _models.IsReady;
 

@@ -10,6 +10,25 @@ namespace Dictum.Llm;
 /// <param name="Skipped">True when the model was not asked because the dictation was predicted to exceed the deadline.</param>
 public sealed record CleanupResult(string Text, bool Cleaned, string? FallbackReason, bool Skipped = false);
 
+/// <summary>What the personal files give every clean-up (SPEC §16), from PersonalText.ForCleanup.</summary>
+/// <param name="DictionaryLine">The personal dictionary's "Known names and terms" line (SPEC §16.2), or null.</param>
+/// <param name="MustKeepWords">Dictated words a reply may not drop (the profanity list unless profanity.mode = remove).</param>
+/// <param name="DictionaryTerms">The terms in that line: a reply may not add one the speaker did not say.</param>
+public sealed record PersonalCleanup(string? DictionaryLine, IReadOnlyCollection<string>? MustKeepWords, IReadOnlyCollection<string>? DictionaryTerms)
+{
+    public static readonly PersonalCleanup None = new(null, null, null);
+
+    /// <summary>
+    /// The system prompt (llm.prompt_file or the built-in one, the grammar-assist sentence when on, the dictionary line) and
+    /// the checks every reply to it gets; the same for every provider and for --bench-cleanup.
+    /// </summary>
+    public (string Prompt, ValidationContext Validation) Checks(LlmSettings settings, Action<string> warn)
+    {
+        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, warn), settings.GrammarAssist, DictionaryLine);
+        return (prompt, new ValidationContext(prompt, MustKeepWords, DictionaryTerms));
+    }
+}
+
 /// <summary>
 /// The cleanup step (SPEC §5). With a model (local by default, or an opted-in cloud provider) the reply is
 /// validated; every failure (timeout, error, refusal, truncation, rejected reply, model not loaded yet) falls back
@@ -26,17 +45,16 @@ public sealed class TranscriptCleaner
 
     /// <param name="timeout">llm.timeout_ms: the shortest deadline; longer dictations get longer (<see cref="Deadline"/>).</param>
     /// <param name="deadline">Tests replace the deadline rule; production uses <see cref="Deadline"/>.</param>
-    /// <param name="mustKeepWords">Dictated words a reply may not drop: the profanity list unless profanity.mode = remove.</param>
-    /// <param name="dictionaryTerms">The personal dictionary's terms: a reply may not add one the speaker did not say.</param>
+    /// <param name="validation">The checks for each reply (<see cref="PersonalCleanup.Checks"/>); without them, the prompt only.</param>
     public TranscriptCleaner(ILlmClient? client, string systemPrompt, TimeSpan timeout, ILog log, string status, Func<int, TimeSpan>? deadline = null,
-        IReadOnlyCollection<string>? mustKeepWords = null, IReadOnlyCollection<string>? dictionaryTerms = null)
+        ValidationContext? validation = null)
     {
         _client = client;
         _prompt = systemPrompt;
         _deadline = deadline ?? (words => Deadline(words, timeout));
         _log = log;
         Status = status;
-        _validation = new ValidationContext(systemPrompt, mustKeepWords, dictionaryTerms);
+        _validation = validation ?? new ValidationContext(systemPrompt);
     }
 
     /// <summary>
@@ -70,6 +88,9 @@ public sealed class TranscriptCleaner
 
     /// <summary>The system prompt sent with every cleanup (the local model keeps it evaluated in its cache).</summary>
     public string SystemPrompt => _prompt;
+
+    /// <summary>The checks every reply gets: the prompt, the words it may not drop and the dictionary terms it may not add.</summary>
+    internal ValidationContext Validation => _validation;
 
     private static int WordCount(string raw) => raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 
@@ -181,13 +202,11 @@ public sealed class TranscriptCleaner
 
     /// <summary>Builds the configured provider. A provider that cannot run becomes rules-only, with the reason.</summary>
     /// <param name="local">The loaded local model, if any (null until it has loaded).</param>
-    /// <param name="dictionaryLine">The personal dictionary's "Known names and terms" line (SPEC §16.2), or null.</param>
-    /// <param name="mustKeepWords">Dictated words a reply may not drop (the profanity list unless profanity.mode = remove).</param>
-    /// <param name="dictionaryTerms">The personal dictionary's terms (every one, not only those in the line): a reply may not add one the speaker did not say.</param>
+    /// <param name="personal">The dictionary line, kept words and dictionary terms (PersonalText.ForCleanup), or none.</param>
     public static TranscriptCleaner Create(LlmSettings settings, bool offlineOnly, SecretStore secrets, HttpClient http, ILog log, Func<ILocalLlmEngine?>? local = null,
-        string? dictionaryLine = null, IReadOnlyCollection<string>? mustKeepWords = null, IReadOnlyCollection<string>? dictionaryTerms = null)
+        PersonalCleanup? personal = null)
     {
-        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, log.Warn), settings.GrammarAssist, dictionaryLine);
+        var (prompt, validation) = (personal ?? PersonalCleanup.None).Checks(settings, log.Warn);
         var timeout = TimeSpan.FromMilliseconds(settings.TimeoutMs);
         if (OfflineRefusal(settings, offlineOnly) is { } refusal)
         {
@@ -213,8 +232,7 @@ public sealed class TranscriptCleaner
             case LlmSettings.Local:
                 var name = CleanupCatalog.DisplayName(settings.Model);
                 var client = new LocalLlmClient(local ?? (() => null), name);
-                return new TranscriptCleaner(client, prompt, timeout, log, $"local/{name} on this PC (nothing leaves it)",
-                    mustKeepWords: mustKeepWords, dictionaryTerms: dictionaryTerms);
+                return new TranscriptCleaner(client, prompt, timeout, log, $"local/{name} on this PC (nothing leaves it)", validation: validation);
 
             case LlmSettings.OpenAiCompatible:
                 if (settings.BaseUrl is null) return RulesOnly("rule-based tidy only: llm.base_url is required for openai-compatible");
@@ -228,8 +246,7 @@ public sealed class TranscriptCleaner
                 }
                 var oai = new OpenAiCompatibleLlmClient(http, settings.BaseUrl, settings.Model, key);
                 var keyState = service.KeyVariable is null ? "no key sent" : $"{service.KeyVariable} {(key is null ? "absent" : "present")}";
-                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})",
-                    mustKeepWords: mustKeepWords, dictionaryTerms: dictionaryTerms);
+                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})", validation: validation);
 
             default:
                 if (AnthropicRedirectWarning(settings) is { } redirect) log.Warn(redirect);
@@ -238,8 +255,7 @@ public sealed class TranscriptCleaner
                 // llm.model defaults to a local cleanup model; that is not an Anthropic model id.
                 var model = CleanupCatalog.IsValidSetting(settings.Model) ? LlmSettings.AnthropicDefaultModel : settings.Model;
                 var anthropic = new AnthropicLlmClient(apiKey, model, timeout, settings.BaseUrl, http); // the shared, offline-guarded client
-                return new TranscriptCleaner(anthropic, prompt, timeout, log, $"{anthropic.Name} (ANTHROPIC_API_KEY present)",
-                    mustKeepWords: mustKeepWords, dictionaryTerms: dictionaryTerms);
+                return new TranscriptCleaner(anthropic, prompt, timeout, log, $"{anthropic.Name} (ANTHROPIC_API_KEY present)", validation: validation);
         }
     }
 }

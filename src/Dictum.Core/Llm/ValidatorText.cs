@@ -29,7 +29,23 @@ internal static partial class ValidatorText
     public static string MapQuotes(string text) =>
         text.Replace('’', '\'').Replace('‘', '\'').Replace('ʼ', '\'').Replace('“', '"').Replace('”', '"');
 
-    public static List<string> Words(string lower) => Word().Matches(lower).Select(m => m.Value).ToList();
+    /// <summary>
+    /// The words of a text, read in composed Unicode (NFC): "Zoë" saved as "e" plus a combining accent is the same word as
+    /// "Zoë" typed with the single letter, in a term, the dictation and the reply alike.
+    /// </summary>
+    public static List<string> Words(string lower) => Word().Matches(Composed(lower)).Select(m => m.Value).ToList();
+
+    private static string Composed(string text)
+    {
+        try
+        {
+            return text.Normalize(NormalizationForm.FormC);
+        }
+        catch (ArgumentException)
+        {
+            return text; // an unpaired surrogate cannot be normalised; the text is read as it is
+        }
+    }
 
     public static List<string> Comparable(IEnumerable<string> words) => words.Select(SpellingVariants.Normalise).ToList();
 
@@ -156,17 +172,24 @@ internal static partial class ValidatorText
     /// <summary>A lower-case word's sound classes, or null when it has a character the classes do not cover.</summary>
     // simplification: a spelling-based sound key in the manner of Soundex instead of a pronunciation dictionary or a full
     // phonetic algorithm such as Double Metaphone. Each letter becomes its sound class (vowels and y; b f p v; c g k q;
-    // s x z; d t; m n; j; l; r), h and w are dropped, accents are removed and a run of one class counts once, so the
-    // vowels keep their places but not their spelling: "kinney", "kimmy" and "Kynni" are all k-vowel-n-vowel. Ceiling: a
-    // real word or name that sounds like a term passes as its misspelling ("canny" or "Ginny" for "Kynni", "Sarah" for
-    // "Xero"); a mishearing that adds or drops a sound ("kidney" for "Kynni") or splits the word ("kin knee") is not a
-    // near miss; a word with a digit or a letter outside a-z (after accents are removed) only matches itself. Trigger to
-    // retire: a typed reply that swapped a sound-alike word for a term, or a wanted dictionary fix rejected as an addition.
+    // s z; d t; m n; j; l; r), x is s as the first letter ("Xero" and "zero") and k then s after it ("laxmi" and
+    // "Lakshmi", "dixon" and "dickson"), h and w are dropped, accents are removed and a run of one class counts once, so
+    // the vowels keep their places but not their spelling: "kinney", "kimmy" and "Kynni" are all k-vowel-n-vowel.
+    // Ceiling: a real word or name that sounds like a term passes as its misspelling. Measured 16/10/2026 against the
+    // 49,823 stems of LibreOffice's en_AU.dic: Kynni's key is also the key of 73 of them (come, game, gonna, canny, Kenny,
+    // Connie...), Xero's of 37 (zero, sorry, Sarah...), Priya's of 29 (free, pray...), Dictum's of 3 (diction, tighten,
+    // touchdown) and Parramatta's of none. A mishearing that adds or drops a sound ("kidney" for "Kynni") or splits the
+    // word ("kin knee") is not a near miss; a word with a digit or a letter outside a-z (after accents are removed) only
+    // matches itself. Trigger to retire: a typed reply that swapped a sound-alike word for a term, or a wanted dictionary
+    // fix rejected as an addition.
     private static string? SoundKey(string word)
     {
-        var key = new StringBuilder(word.Length);
-        foreach (var c in word.Normalize(NormalizationForm.FormD))
+        var key = new StringBuilder(word.Length + 1);
+        var letters = word.Normalize(NormalizationForm.FormD);
+        for (var i = 0; i < letters.Length; i++)
         {
+            var c = letters[i];
+            if (c == 'x' && i > 0) Add(key, 'k'); // then its s below
             var sound = c switch
             {
                 'a' or 'e' or 'i' or 'o' or 'u' or 'y' => 'a',
@@ -181,8 +204,13 @@ internal static partial class ValidatorText
                 _ => '?',
             };
             if (sound == '?') return null;
-            if (sound != '\0' && (key.Length == 0 || key[^1] != sound)) key.Append(sound);
+            Add(key, sound);
         }
         return key.ToString();
+
+        static void Add(StringBuilder key, char sound)
+        {
+            if (sound != '\0' && (key.Length == 0 || key[^1] != sound)) key.Append(sound);
+        }
     }
 }

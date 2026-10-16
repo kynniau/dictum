@@ -1,3 +1,4 @@
+using Dictum.Llm;
 using Dictum.Settings;
 
 namespace Dictum.Personal;
@@ -41,6 +42,14 @@ public sealed class PersonalText(PersonalDictionary dictionary, Corrections corr
     /// </summary>
     public IReadOnlyCollection<string>? WordsTheCleanupMustKeep(ProfanitySettings profanity) =>
         profanity.Mode == ProfanitySettings.Remove || Profanity.Words.Count == 0 ? null : Profanity.Words;
+
+    /// <summary>
+    /// What these files give every clean-up (SPEC §16): the dictionary line for the prompt, the dictated words a reply may
+    /// not drop, and the terms of that line a reply may not add. The tray app, --transcribe and --bench-cleanup take all
+    /// three from here, so none of them can leave one out.
+    /// </summary>
+    public PersonalCleanup ForCleanup(ProfanitySettings profanity) =>
+        new(Dictionary.CleanupLine, WordsTheCleanupMustKeep(profanity), Dictionary.CleanupTerms);
 
     /// <summary>Counts only, never the words themselves (they can be names, so they stay out of the log).</summary>
     public string Summary(ProfanitySettings profanity) =>

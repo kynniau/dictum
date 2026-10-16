@@ -95,8 +95,7 @@ public static class CliCommands
                 }
                 using (local)
                 {
-                    var cleaner = TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, () => local, personal.Dictionary.CleanupLine,
-                        personal.WordsTheCleanupMustKeep(settings.Profanity), personal.Dictionary.Terms);
+                    var cleaner = Cleaner(settings, secrets, http, log, () => local, personal);
                     Console.Error.WriteLine($"cleanup: {cleaner.Status}{(settings.Llm.GrammarAssist ? "; grammar assist on" : "")}");
                     sw.Restart();
                     var cleaned = await cleaner.CleanAsync(raw, CancellationToken.None);
@@ -120,6 +119,10 @@ public static class CliCommands
             return 1;
         }
     }
+
+    /// <summary>The clean-up --transcribe runs: the configured provider with the tray app's prompt and checks.</summary>
+    internal static TranscriptCleaner Cleaner(AppSettings settings, SecretStore secrets, HttpClient http, ILog log, Func<ILocalLlmEngine?> local, PersonalText personal) =>
+        TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, local, personal.ForCleanup(settings.Profanity));
 
     /// <summary>The user's dictionary, corrections and profanity list from the config folder (honours --config).</summary>
     internal static PersonalText LoadPersonal(AppPaths paths, ILog log) =>

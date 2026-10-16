@@ -5,7 +5,10 @@ namespace Dictum.Llm;
 
 /// <param name="SystemPrompt">The prompt actually sent, so a reply that echoes a custom or dictionary prompt is caught.</param>
 /// <param name="MustKeepWords">Words the reply may not drop when dictated (the profanity list unless profanity.mode = remove).</param>
-/// <param name="DictionaryTerms">The personal dictionary's terms (SPEC §16.2): the reply may not add one the speaker did not say.</param>
+/// <param name="DictionaryTerms">
+/// The personal dictionary's terms in the prompt's dictionary line (SPEC §16.2, PersonalDictionary.CleanupTerms): the reply
+/// may not add one the speaker did not say. Terms left out of the line are not checked: the model never saw them.
+/// </param>
 public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection<string>? MustKeepWords = null,
     IReadOnlyCollection<string>? DictionaryTerms = null);
 
@@ -99,7 +102,7 @@ public static partial class CleanupValidator
         if (HasNonLatinLetters(text) && !HasNonLatinLetters(raw)) return (null, "reply is in a script the dictation did not use");
 
         if (Unsaid(textLower, rawSet) is { } unsaid) return (null, unsaid);
-        if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(rawWords, replyWords, terms))
+        if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(rawWords, Words(MapQuotes(text)), terms))
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
@@ -159,32 +162,90 @@ public static partial class CleanupValidator
     /// qwen2.5-1.5b turned "Add a name to the dictionary once. ... Dictum, by Kynni." into "Add Kynni Pty Ltd to the
     /// dictionary once. ... Dictum, by Kynni Pty Ltd.", which every other rule accepted and which was typed; with {Dictum,
     /// Kynni} it still wrote "Add Kynni to the dictionary once". Each term is counted whole, and so is each content word of
-    /// a multi-word term: when the reply has more of it than the dictation, and also more of it and the words that sound
-    /// like it together, it was added, not respelt. Writing "kinney" as "Kynni", the fix the dictionary exists for, swaps
-    /// one sound-alike for another, so the second count does not grow. "Sound like" is a spelling-based sound key (the same
-    /// consonant sounds in the same order, vowels in the same places); its measure and ceiling are documented at
-    /// <see cref="ValidatorText.SoundsLike"/>: a real word that sounds like a term ("canny" for "Kynni") passes as its
-    /// misspelling, and a mishearing that adds a sound ("kidney") is rejected as an addition and left to the tidy. Counted
-    /// against everything dictated, retracted clauses included: what "scratch that" retracts is ambiguous ("tell kynni it is
-    /// at 3, scratch that, at 4"), and a retracted word left in the reply is the retraction rule's to judge. A term that is
-    /// also an everyday word ("Will") is counted as the term, so a reply that adds the everyday word is rejected as well.
+    /// a multi-word term. A unit was added when the reply has it more often than the dictation, and also has it and the
+    /// words that sound like it more often than the dictation has it in any form (<see cref="Allowance"/>): writing
+    /// "kinney" as "Kynni", the fix the dictionary exists for, swaps one form for another, so the second count does not grow.
+    /// The reply is counted as the term is spelt in dictionary.txt, capitals included, after the possessive is removed (a
+    /// term with no capital letter matches any case); the dictation, whose case is whisper's, in any case. So the everyday
+    /// words a grammar fix adds or changes are not the term: "will" is not "Will", "it" not "IT", "loan" not "Loan Market".
+    /// Ceilings: a term inserted in other capitals than its own ("Add kynni to the dictionary once.") is not counted;
+    /// an everyday word the reply adds at the start of a sentence is counted when it spells a capitalised term ("Will you");
+    /// "sound like" is a spelling-based sound key whose measure and ceiling are documented at
+    /// <see cref="ValidatorText.SoundsLike"/> (a real word that sounds like a term, "canny" for "Kynni", passes as its
+    /// misspelling, and a mishearing that adds a sound, "kidney", or splits the word, "kin knee", is rejected as an addition
+    /// and left to the tidy and the corrections). Counted against everything dictated, retracted clauses included: what
+    /// "scratch that" retracts is ambiguous ("tell kynni it is at 3, scratch that, at 4"), and a retracted word left in the
+    /// reply is the retraction rule's to judge.
     /// </summary>
     private static bool AddsTerm(List<string> rawWords, List<string> replyWords, IEnumerable<string> terms)
     {
-        var said = Comparable(rawWords.Select(WithoutPossessive));
-        var written = Comparable(replyWords.Select(WithoutPossessive));
+        var dictated = rawWords.Select(WithoutPossessive).ToList();
+        var said = Comparable(dictated);
+        var asWritten = replyWords.Select(WithoutPossessive).ToList();
+        var written = Comparable(asWritten.Select(w => w.ToLowerInvariant()));
         foreach (var term in terms)
         {
-            var words = Comparable(Words(MapQuotes(term).ToLowerInvariant()).Select(WithoutPossessive));
-            var units = new List<IReadOnlyList<string>> { words };
-            if (words.Count > 1) units.AddRange(words.Where(IsCorrectionWord).Select(w => new[] { w }));
-            foreach (var unit in units.Where(u => u.Count > 0))
+            var whole = TermUnit.Of(Words(MapQuotes(term)).Select(WithoutPossessive).ToList());
+            if (whole.Spelt.Count == 0) continue;
+            var caseMatters = term.Any(char.IsUpper);
+            var wholeSaid = Allowance(dictated, said, whole); // a part of the term is covered wherever the whole was said in another form
+            foreach (var unit in whole.WithParts())
             {
-                if (Spans(written, unit, string.Equals) > Spans(said, unit, string.Equals) && Spans(written, unit, SoundsLike) > Spans(said, unit, SoundsLike))
+                var count = caseMatters ? Spans(asWritten, unit.Spelt, string.Equals) : Spans(written, unit.Lower, string.Equals);
+                if (count > Spans(said, unit.Lower, string.Equals) && Spans(written, unit.Lower, SoundsLike) > Math.Max(Allowance(dictated, said, unit), wholeSaid))
                     return true;
             }
         }
         return false;
+    }
+
+    /// <summary>A dictionary term, or one content word of a multi-word term: as spelt, as compared, and its letters joined.</summary>
+    private sealed record TermUnit(List<string> Spelt, List<string> Lower, string Letters)
+    {
+        public static TermUnit Of(List<string> spelt)
+        {
+            var lower = spelt.Select(w => w.ToLowerInvariant()).ToList();
+            return new TermUnit(spelt, Comparable(lower), string.Concat(lower).Replace("'", ""));
+        }
+
+        /// <summary>The term, then each content word of a multi-word term on its own.</summary>
+        public IEnumerable<TermUnit> WithParts() =>
+            Spelt.Count == 1 ? [this] : [this, .. Spelt.Where(w => IsCorrectionWord(w.ToLowerInvariant())).Select(w => Of([w]))];
+    }
+
+    /// <summary>
+    /// How often the dictation has the unit in some form: a word that sounds like it, or would without a final "s"
+    /// ("kinneys" for "Kynni's", "loans" for "Loan", "mcdonalds" for "McDonald's"), or a run of words that spells it
+    /// (<see cref="JoinedRuns"/>).
+    /// </summary>
+    private static int Allowance(List<string> dictated, List<string> said, TermUnit unit) =>
+        Math.Max(Spans(said, unit.Lower, SoundsLikeOrStem), JoinedRuns(dictated, unit));
+
+    private static bool SoundsLikeOrStem(string said, string term) =>
+        SoundsLike(said, term) || said.Length > 3 && said.EndsWith('s') && SoundsLike(said[..^1], term);
+
+    // Spoken between the parts of an address: "dictum dot kynni dot com dot au", "kyle at kynni dot com dot au".
+    private static readonly HashSet<string> SpokenSeparators = new(StringComparer.Ordinal) { "dot", "at", "dash", "hyphen" };
+
+    /// <summary>
+    /// How many runs of consecutive dictated words spell the unit exactly when their letters are joined, with a spoken
+    /// "dot", "at", "dash" or "hyphen" after the first word left out: "pay pal" spells PayPal, "git hub" GitHub, "email"
+    /// e-mail and "dictum dot kynni dot com dot au" dictum.kynni.com.au. Exact letters, not sounds, so "can i" never spells
+    /// Kynni.
+    /// </summary>
+    private static int JoinedRuns(List<string> dictated, TermUnit unit)
+    {
+        var runs = 0;
+        for (var i = 0; i < dictated.Count; i++)
+        {
+            var run = dictated[i].Replace("'", "");
+            for (var j = i + 1; run.Length < unit.Letters.Length && j < dictated.Count; j++)
+            {
+                if (!SpokenSeparators.Contains(dictated[j])) run += dictated[j].Replace("'", "");
+            }
+            if (run == unit.Letters) runs++;
+        }
+        return runs;
     }
 
     /// <summary>"Kynni's" counts as "Kynni".</summary>
