@@ -668,7 +668,10 @@ Users must be able to remove what the app has put on disk, from inside the app.
 - Free space shown next to the models dir; a warning before any download that would leave
   under 2 GB free. Amended 17/10/2026 (§24): a download that would leave under 200 MB is
   refused; Storage lists the three model folders in lookup order and the folder each model
-  is in, and the models that come with Dictum (read-only) have no Delete.
+  is in, and the models that come with Dictum (read-only) have no Delete. After the lens
+  (17/10/2026, §24): the switch offered for a model in use can be to the bundled base.en,
+  "Delete all app data" leaves a chosen folder outside the user's profile alone, and a
+  deletion that fails says "in use or not permitted".
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
   the integrity record, and reports freed bytes; "Delete all app data" never touches
   `.env` or the program folder.
