@@ -23,7 +23,7 @@ re-check every line against the release build before submitting.
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
 | Package version (added 16/10/2026) | `<Version>` 1.1.0, so the package is 1.1.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026 and to 1.1.0 on 17/10/2026, so `package-msix.ps1 -Store` builds. |
-| Visual C++ runtime (added 17/10/2026) | The first submission failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
+| Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
 
@@ -363,7 +363,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |
 | 21 | Listing language does not match the package | Store Policies 10.7 | Use the language the manifest declares (section 4). | Decide |
-| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the first submission) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fix in package; packaged self-test pending (section 10, step 4) |
+| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the second submission, resubmitted 16/10/2026) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fix in package; packaged self-test pending (section 10, step 4) |
 
 ## 10. Go-live
 
@@ -397,7 +397,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
    change the Direct download button to `btn-secondary`, then redeploy. The HTML comment beside the
    button says the same.
 7. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`) in
-   the same deployment as the GitHub release. The app reads only `version` and ignores `published`
+   the same deployment as the GitHub release. The app reads `version` and `notes` (shown under the newer line) and ignores `published`
    (`UpdateCheck.cs`, read 17/10/2026); `version` must be bare digits such as `1.1.0` (no `v`, and a `+sha`
    or `-suffix` is ignored). `published` is for people; an ISO date such as `2026-10-17` is the existing form.
 8. After the deployment, check the file the update check reads: `curl -sI https://dictum.kynni.au/version.json`
@@ -409,7 +409,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 
 | Date | Event |
 |---|---|
-| 16/10/2026 | First submission (1.0.0) failed on Store Policies 10.1.5, "promotes another platform": the description said "A Mac version is coming soon." The sentence was removed and the submission was resubmitted the same day. |
+| 16/10/2026 | First submission (1.0.0) failed on Store Policies 10.1.5, "promotes another platform": the description mentioned an upcoming Mac version. The sentence was removed and the submission was resubmitted the same day. |
 | 16/10/2026 | The resubmission failed on 10.1.2.10, "Unusable Feature: AI models". Cause: the package neither shipped nor declared the Visual C++ runtime, and the whisper.cpp and llama.cpp natives import MSVCP140, VCRUNTIME140 and VCRUNTIME140_1 (section 6; reproduced in Windows Sandbox). |
 | 17/10/2026, 08:10 AEDT | Dictum 1.1.0 resubmitted: the framework dependency `Microsoft.VCLibs.140.00.UWPDesktop` declared, base.en bundled, the clean-up model off by default. Status "In certification". The listing and notes are the text in sections 4 and 7. |
 
