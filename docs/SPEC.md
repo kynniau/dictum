@@ -278,9 +278,7 @@ Providers (`llm.provider`):
 - `local` (default): llama.cpp in-process via LLamaSharp; `llm.model` is a cleanup
   catalogue name or an absolute `.gguf` path.
 - `anthropic`: Anthropic SDK, key from `ANTHROPIC_API_KEY`.
-- `openai-compatible`: `POST {base_url}/chat/completions` with `model`, `messages`
-  (system + user), `temperature: 0`; key from `LLM_API_KEY` (header
-  `Authorization: Bearer`), key optional for local servers.
+- `openai-compatible`: `POST {base_url}/chat/completions` with `model`, `messages` (system + user), `temperature: 0`. Which key goes to which server is in §22 ("§5 keys").
 - `none`: deterministic cleanup only.
 
 Secrets precedence (standard dotenv behaviour): a real process/machine environment
@@ -741,8 +739,9 @@ and adapts, with one code path and a test for each:
 - "Remove Dictum completely": when packaged, it deletes the data it owns and then opens
   Settings → Apps for the package uninstall (a package cannot delete itself); the
   two-warning flow and the path-registry test still apply.
-- Update: none in-app when packaged (the Store updates); the optional update check from
-  §19 applies only to the unpackaged build.
+- Update: none in-app when packaged. The Store updates it, and Settings → About says "Updates
+  come from the Microsoft Store." with no check button. The unpackaged build has the manual
+  Check for updates of §19 (decision 11, 16/10/2026).
 - Installing both the packaged and the unpackaged build on one machine is documented as
   unsupported; the installer and the app warn if the other is present.
 
@@ -777,9 +776,17 @@ the listing is live), "Direct download" linking the latest GitHub Release with t
 SmartScreen note, system requirements (Windows 10/11 x64; 4 GB RAM for small models, a
 GPU optional), the privacy statement in plain words with the exact outbound hosts, FAQ
 (accents and calibration, offline use, staff and VM use, how to remove everything),
-licence and source link, "Dictum by Kynni" footer. The optional in-app update check for
-the unpackaged build reads a tiny `version.json` from this host, opt-in on first run,
-off under `offline_only`, no identifiers sent.
+licence and source link, "Dictum by Kynni" footer. The unpackaged build's Check for updates
+(decision 11, 16/10/2026) reads `version.json` from this host only when the user presses the
+button on Settings → About. Nothing is automatic and there is no first-run prompt. It is one
+HTTPS GET of https://dictum.kynni.au/version.json through its own client, built like the model-download client
+(`offline_only` guard, TLS 1.2) but following no redirect, with no query string and no header of Dictum's own, no retry, a
+10 s timeout and at most 16 KiB read. Only the numeric version is compared with the running one;
+a +sha suffix is ignored, and `published` is ignored. The file must answer 200 directly. The page shows the latest line; or the newer line with "Open the
+download page" (https://github.com/kynniau/dictum/releases/latest, a fixed address) and the
+release notes under it; or the failure line. `offline_only` refuses before any request, and the
+packaged build has no button. Each release updates `version.json` in the same deployment as the
+GitHub release (STORE.md §10).
 
 ## 20. Hotkey discoverability (from a Mac-over-RDP report, 15/10/2026)
 
@@ -914,6 +921,31 @@ These amend earlier sections; where they conflict, this section wins.
   and brackets. The marks are . ! ? … and the Devanagari danda । and double danda ॥ (Hindi
   dictation); the profanity filter's remove mode uses the same marks for the one after a removed
   word ("वह कमीना।" → "वह।", as "It's shit." → "It's.").
+- **§5 validator, dictionary terms (16/10/2026):** a reply is rejected ("reply adds a dictionary term the speaker did not say"; the log never names the term) when two conditions hold.
+  - It has a term of the clean-up prompt's dictionary line, or a content word of a multi-word term, more often than the whole dictation, retracted clauses included.
+  - It also has the term in some form more often than the dictation, counted the same way on both sides.
+
+  A term with a capital letter is counted as spelt, capitals included, in the reply and the dictation alike. A term without capitals matches any case.
+
+  "In some form" means one of:
+  - a word that sounds like the term, or would without a final "s";
+  - a run of words whose letters spell it, with a spoken "dot", "at", "dash" or "hyphen" left out, or with every word kept;
+  - for a part of a multi-word term, the whole term.
+
+  Spoken formatting commands and hesitations are left out of that count on both sides. Only the terms that fit the prompt's line (`PersonalDictionary.CleanupTerms`) are checked. The tray app, --transcribe and --bench-cleanup take the dictionary line, the kept words and the terms from `PersonalText.ForCleanup`. `TranscriptCleaner` checks every reply against the prompt it sends. The check leaves spoken commands and hesitations out of its counts on both sides, in any case, except for a term that is or contains one ("ER", "Comma"), which is counted with them kept.
+- **§5/§22 cloud clean-up (amended 16/10/2026):** cloud clean-up stays an advanced option, behind the warning copy approved on 16/10/2026 (texts in DECISIONS.md, never reworded). The copy appears as a WARNING paragraph in the consent dialog before "Nothing is sent until you agree", a sentence added to the Settings > Clean-up state line and the Settings > Privacy summary while cloud clean-up is on for a host off this PC, and a sentence in both cloud paragraphs of the privacy policy. Settings > Clean-up offers presets for the `openai-compatible` provider from one table (`CloudPresets`): OpenAI, Google Gemini's OpenAI-compatible endpoint, Ollama on this PC, and a custom server. A preset only fills `llm.base_url`, the model hint and the key name; it adds no settings key and never switches cloud clean-up on. The consent step, the refusal of plain `http://` off the PC (and for Anthropic on this PC), and `offline_only` apply as before. Each address and default model comes from the provider's own documentation, with the retrieval date in DECISIONS.md. There is no "MCP" option; the settings and docs say "API". Perplexity has no preset while its Chat Completions endpoint is in private preview.
+- **§5 keys (16/10/2026):** the key goes as `Authorization: Bearer` and is chosen by the server `base_url` names (same host and port; `localhost`, `127.0.0.1` and `::1` are one host): `OPENAI_API_KEY` to `api.openai.com` and `GEMINI_API_KEY` to `generativelanguage.googleapis.com`, each only to its own server and required there (without it nothing is sent and the rule-based tidy is used, and Settings says "On, but waiting for your {KEY}: nothing is sent until you add it to .env.", where `{KEY}` is `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`, per `TranscriptCleaner.MissingKey`, formatted by `CloudPolicy.WaitingForKeyLine`); no key to Ollama on this PC (`localhost:11434`); `LLM_API_KEY`, optional, to any other address when it is set. `ANTHROPIC_API_KEY` for Anthropic as before. Every key name is registered with the log redactor and listed by `--selftest` (names only).
+- **§5 truthful state lines (16/10/2026):** "Nothing leaves this PC" is shown only when the clean-up in use sends nothing and no server is involved; an openai-compatible server on this PC shows "Clean-up via a server on this PC" (tray) and "On: a server on this PC ({host}, model {model}) tidies each dictation. Dictum cannot see whether that server forwards your text elsewhere." (Settings); a host off this PC shows "Cloud clean-up on · text leaves this PC" (tray); with offline only on, "On, but offline only is on: nothing is sent until you switch offline only off."; when cloud was agreed but the clean-up in use cannot send for another reason, "On, but nothing is sent: the clean-up in use runs on this PC." The lines read the cleaner in use (`TranscriptCleaner.MissingKey`, `NothingLeaves`), never the key files on disk.
+- **§18.2/§19 update check (decision 11, 16/10/2026):** manual only, as a Check for updates button on Settings → About in the direct-download build. It replaces "opt-in on first run". The strings are those proposed on 16/10/2026 (`UpdateCheck.cs`: "awaiting the product owner's approval; do not reword"); whether the product owner has approved them is not recorded in the repository.
+- **§16.2/§16.3 built-in vocabulary (Kyle, 16/10/2026; not yet built):** the app is to ship a default
+  dictionary and default corrections in a data file beside `profanity.txt`: dictionary terms
+  `Dictum`, `Kynni`; corrections `dictim => Dictum`, `dictom => Dictum`, `kinney => Kynni`,
+  `kinny => Kynni`, plus case-fixing of `dictum`/`kynni` to the product spellings. They are applied
+  before the user's own dictionary and corrections, the user's entries win on conflict, they survive
+  "Delete all app data", and `--transcribe` of a clip saying "dictum" and "kynni" is pinned by a
+  test. Reason: Kyle's own dictation produced "dictim" and "kinney" on 16/10/2026. Checked
+  17/10/2026 on main ba2ce5f: no such data file or default exists in `src/` (so 1.1.0 does not
+  ship it); this bullet is the requirement, not a description of the shipped app.
 
 ## 23. Languages and translation (amendment, 16/10/2026)
 
@@ -943,6 +975,14 @@ common Filipino and Indian languages".
   (§16.6) still run. In hands-free the boundary rule (§3, "Hands-free segments") changes no
   case in such text; only the separator between parts applies (hands-free amendment,
   16/10/2026).
+  Settings pages for such text (amendment, 17/10/2026, checked against `OtherPages.cs`): Settings >
+  Clean-up reads the cleaner in use, so with cloud clean-up agreed to it shows "On, but nothing is
+  sent: the clean-up in use runs on this PC." and not the offline-only line, which applies only
+  while the cleaner in use is not the plain one (`OfflineOnlyIsWhyNothingIsSent`): switching
+  offline only off would send nothing either way. Settings > Privacy shows "Nothing leaves this PC:
+  speech recognition and clean-up both run here." whenever the cleaner in use sends nothing and no
+  server is involved. A waiting-for-key line still comes first where the cleaner in use found no
+  key.
 - **Catalogue:** the multilingual `small`, `small-q5_1`, `medium`, `medium-q5_0`,
   `large-v3` and `large-v3-q5_0`, sizes and SHA-256 from the HF API tree at the pinned
   commit (four existing entries, small.en, medium.en, large-v3-turbo and its q5_0, served
@@ -961,6 +1001,14 @@ common Filipino and Indian languages".
   would fail (`WhisperLanguages.ModeNote`: Light always writes base.en; Full writes
   small.en on a CPU and large-v3-turbo on a GPU, which hears every language but cannot
   translate).
+- **Language-problem balloon on reload (amendment, 16/10/2026):** the warning balloon for a model that
+  cannot do what the settings ask also appears on a reload that keeps the model
+  (`ModelCoordinator.Ensure`), once per distinct problem text, not only when the model loads.
+- **Words and combining marks (amendment, 16/10/2026):** the whole-word matcher shared by corrections,
+  snippets and the profanity list (`WholeWords`) counts combining marks as word characters (`\p{M}` in the
+  `WholeWords.Pattern` boundaries, TextList.cs:72; `IsWordChar`, TextList.cs:82, which the profanity mask and the
+  Fix-last diff use, counts Unicode Mn and Mc), so a Devanagari vowel sign or virama no longer ends a word; English matching is
+  unchanged.
 - **Picker order:** auto, English, Hindi, Tagalog, then Bengali, Telugu, Marathi, Tamil,
   Urdu, Gujarati, Kannada, Malayalam, Punjabi, Assamese, Nepali, Sindhi, Sinhala, then the
   rest by name, each labelled "Name (code)".

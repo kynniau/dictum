@@ -23,7 +23,7 @@ re-check every line against the release build before submitting.
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
 | Package version (added 16/10/2026) | `<Version>` 1.1.0, so the package is 1.1.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026 and to 1.1.0 on 17/10/2026, so `package-msix.ps1 -Store` builds. |
-| Visual C++ runtime (added 17/10/2026) | The first submission failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
+| Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
 
@@ -98,7 +98,7 @@ Local dictation for Windows. Hold a key, talk, let go, and your words appear in 
 ```text
 Dictum turns your speech into text in any Windows app. Hold the right Ctrl key, talk, let go: your words are transcribed on your PC, tidied up, and pasted at the cursor.
 
-Dictum is ready to use as soon as it is installed: a small English speech model (base.en, about 148 MB) is included, so nothing is downloaded on first run. Larger, more accurate models are optional downloads from Hugging Face in Settings > Models. You also need a microphone. Dictum dictates in English; an optional multilingual model lets it listen in other languages.
+Dictum is ready to use as soon as it is installed: a small English speech model (base.en, about 148 MB) is included, so nothing is downloaded on first run. Larger, more accurate models are optional downloads from the model makers' official download page in Settings > Models. You also need a microphone. Dictum dictates in English; an optional multilingual model lets it listen in other languages.
 
 PRIVATE BY DESIGN
 Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or to your own server, an advanced option; that service's own terms apply. Turn on offline-only mode and it never connects to anything outside your PC.
@@ -225,7 +225,8 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   types what the user says into the user's own apps; nothing is published or shared with anyone.
 - Sharing the user's location: **No.** Digital purchases: **No.**
 - Personal information shared with third parties: **No by default.** Only if the user turns on cloud
-  clean-up with their own Anthropic key or server, the text of each dictation goes to that service.
+  clean-up with their own Anthropic, OpenAI or Google Gemini key, or their own server, the text of each
+  dictation goes to that service.
 - Profanity: the app contains none. It can type swearing the user dictates, and the optional
   profanity filter (off by default) can mask it.
 - Expected result: the lowest, general-audience rating. That is an expectation, not a guarantee.
@@ -307,13 +308,13 @@ CHANGED SINCE THE LAST SUBMISSION: the speech engine could not load on a PC with
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the menu.
 
-NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside the package and starts ready to dictate; the clean-up model is off by default (a rule-based tidy is used). Larger speech models and the optional clean-up model (qwen2.5-1.5b, about 1.1 GB) are downloads from huggingface.co that you can start in Settings > Models; every downloaded file is checked against a pinned SHA-256 before use. On a PC without a discrete graphics card Dictum runs the models on the CPU. Model files are data (ggml and GGUF weights read by whisper.cpp and llama.cpp), not executable code: Dictum never downloads or runs code.
+NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside the package and starts ready to dictate; the clean-up model is off by default (a rule-based tidy is used). Larger speech models and the optional clean-up model (qwen2.5-1.5b, about 1.1 GB) are downloads from huggingface.co that you can start in Settings > Models; every downloaded file is checked against a pinned SHA-256 before use. On a PC without a discrete graphics card Dictum runs the models on the CPU. Model files are data (ggml and GGUF weights read by whisper.cpp and llama.cpp), not executable code: Dictum never downloads or runs code. The package declares a dependency on the Microsoft.VCLibs.140.00.UWPDesktop framework (the Visual C++ runtime used by whisper.cpp and llama.cpp), which the Store installs with the app.
 
-TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json. base.en is already inside the package; to test AI clean-up offline too, copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder (Settings > Storage shows it). Dictum then connects to nothing outside the PC, and download requests are refused with a message.
+TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json (the bundled base.en model needs no copying; optionally copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder). Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
 TO DICTATE: click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
-Cloud clean-up (Anthropic) is optional, off by default, and needs the user's own API key. It is not needed for testing.
+Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) is optional, off by default, and needs the user's own API key. It is not needed for testing.
 
 Launch at login is off until the user turns it on.
 
@@ -351,7 +352,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 8 | Accessibility declared without testing | CF #9, Product declarations | Leave the box unticked unless tested end to end. | Done |
 | 9 | Restricted capability not approved | Submission options page, Store Policies 10.6 | Justification in section 7; only runFullTrust, microphone and the startup task are declared. | Done |
 | 10 | Dynamic inclusion of code | Store Policies 10.2.2 | Models are data, checked by SHA-256; Dictum downloads no code. The Store build has no self-updater (SPEC §18.2). | Done |
-| 11 | Undisclosed dependency | Store Policies 10.2.4 | No longer a first-run download (amended 17/10/2026): base.en is in the package, and the description's second paragraph says so and that the larger models are optional downloads from Hugging Face. | Done |
+| 11 | Undisclosed dependency | Store Policies 10.2.4 | No longer a first-run download (amended 17/10/2026): base.en is in the package, and the description's second paragraph says so and that the larger models are optional downloads from the model makers' official download page (the listing never names Hugging Face). | Done |
 | 12 | Live generative AI not disclosed, or no way to report content | Store Policies 11.16, Product declarations | Tick the generative AI declaration and keep the description's AI paragraph. 11.16 also requires "a means for users to report inappropriate content to the developer": add "Report a problem" (a mail link to hello@kynni.com.au) in the app; the description's email line is a stopgap. | In-app action to do |
 | 13 | Personal information sent to a third party without opt-in consent | Store Policies 10.5.2 | Cloud clean-up is off by default, but today it is switched on by editing settings.json. 10.5.2 wants "express permission in the product user interface" after saying what is shared and with whom, plus a way to opt out later: add a consent prompt when the user picks Anthropic or a non-local server, and an off switch. | Risk: app change needed |
 | 14 | Personal information transmitted insecurely | Store Policies 10.5.4 | Hugging Face, Anthropic and the update check use HTTPS. A user-entered `http://` server that is not on the PC would carry transcripts unencrypted: refuse or warn for non-loopback `http://` addresses. | Risk: app change needed |
@@ -362,7 +363,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |
 | 21 | Listing language does not match the package | Store Policies 10.7 | Use the language the manifest declares (section 4). | Decide |
-| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the first submission) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fix in package; packaged self-test pending (section 10, step 4) |
+| 22 | Does not work on a clean PC: a framework dependency missing (added 17/10/2026; this failed the second submission, resubmitted 16/10/2026) | "MSIX troubleshooting guide", Missing dependencies | The manifest declares `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), which the Store installs. `scripts\sandbox-check.ps1` runs the self-test on a clean Windows Sandbox (docs/TESTING-MSIX.md). | Fix in package; packaged self-test pending (section 10, step 4) |
 
 ## 10. Go-live
 
@@ -395,6 +396,24 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
    `<a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>`,
    change the Direct download button to `btn-secondary`, then redeploy. The HTML comment beside the
    button says the same.
-7. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`;
-   an ISO date such as `2026-10-15` is easiest for the app to parse) in the same deployment as the
-   GitHub release.
+7. For each direct-download release, update `site/version.json` (`version`, `notes`, and `published`) in
+   the same deployment as the GitHub release. The app reads `version` and `notes` (shown under the newer line) and ignores `published`
+   (`UpdateCheck.cs`, read 17/10/2026); `version` must be bare digits such as `1.1.0` (no `v`, and a `+sha`
+   or `-suffix` is ignored). `published` is for people; an ISO date such as `2026-10-17` is the existing form.
+8. After the deployment, check the file the update check reads: `curl -sI https://dictum.kynni.au/version.json`
+   must show `200` and no `Location` header, because the update check follows no redirect (verified 17/10/2026
+   10:55 AEDT: 200, no `Location`). `site/vercel.json` has `cleanUrls: true` and a headers-only rule for
+   `/version.json` (Cache-Control); never add a redirect or rewrite for that path.
+
+## 11. Certification record
+
+| Date | Event |
+|---|---|
+| 16/10/2026 | First submission (1.0.0) failed on Store Policies 10.1.5, "promotes another platform": the description mentioned an upcoming Mac version. The sentence was removed and the submission was resubmitted the same day. |
+| 16/10/2026 | The resubmission failed on 10.1.2.10, "Unusable Feature: AI models". Cause: the package neither shipped nor declared the Visual C++ runtime, and the whisper.cpp and llama.cpp natives import MSVCP140, VCRUNTIME140 and VCRUNTIME140_1 (section 6; reproduced in Windows Sandbox). |
+| 17/10/2026, 08:10 AEDT | Dictum 1.1.0 resubmitted: the framework dependency `Microsoft.VCLibs.140.00.UWPDesktop` declared, base.en bundled, the clean-up model off by default. Status "In certification". The listing and notes are the text in sections 4 and 7. |
+
+Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
+owner in the session briefs; they are not re-read from Partner Center, which this record cannot reach. The
+fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
+for 1.1.0.
