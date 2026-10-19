@@ -197,6 +197,10 @@ internal sealed class ModelsPage : SettingsPage
         var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(Shell.GpuMachine).Model)!;
         _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
         _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider;
+        // While that model downloads or waits its turn, the button is disabled and named for why, as its row is (lens, 19/10/2026).
+        var fetch = Shell.Models.DownloadStateOf(recommended.FileName);
+        _addCleanup.IsEnabled = fetch == DownloadState.None;
+        AutomationProperties.SetName(_addCleanup, fetch == DownloadState.None ? null : BusyButtonName(recommended.Name, fetch));
 
         _speech.Children.Clear();
         for (var i = 0; i < ModelCatalog.Entries.Count; i++)

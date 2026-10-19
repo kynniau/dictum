@@ -6,6 +6,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
+using Avalonia;
 using Dictum.App;
 using Dictum.Core;
 using Dictum.Llm;
@@ -66,7 +67,7 @@ public sealed class NoSilentCancelTests : IDisposable
         file.SetLength(bytes); // the catalogue size, so the lookup counts it as on this PC (nothing reads its bytes here)
     }
 
-    private ModelCoordinator Make(LocalLlmManager? llm = null) =>
+    private ModelCoordinator Make(LocalLlmManager? llm = null, Func<string, long?>? free = null) =>
         new(_paths, new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false),
             llm ?? new LocalLlmManager(NullLog.Instance, loader: (p, _) => new FakeLocalEngine(p)), _client, NullLog.Instance, () => _settings, null, _prompts, _ => null,
             reload: () =>
@@ -74,15 +75,15 @@ public sealed class NoSilentCancelTests : IDisposable
                 _settings = SettingsLoader.LoadFile(_paths.SettingsFile).Settings;
                 _switches.Enqueue(_settings.Whisper.Model);
             },
-            shutdown: () => { }, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Enqueue(text), gpuMachine: () => false)
+            shutdown: () => { }, refreshTooltip: () => { }, balloon: (text, _) => _balloons.Enqueue(text), gpuMachine: () => false, freeBytes: free)
         {
             TestSpecs = s => Spec(s.FileName),
         };
 
     /// <summary>Starts tiny.en (asked, then downloading: the server holds it) and waits until its request is in flight.</summary>
-    private async Task<ModelCoordinator> TinyDownloading()
+    private async Task<ModelCoordinator> TinyDownloading(Func<string, long?>? free = null)
     {
-        var coordinator = Make();
+        var coordinator = Make(free: free);
         coordinator.Select("tiny.en");
         Assert.True(await Eventually(() => _server.InFlight == 1), "tiny.en never started downloading");
         Assert.Equal(1, _prompts.ConfirmCalls);
@@ -135,7 +136,7 @@ public sealed class NoSilentCancelTests : IDisposable
         var (text, buttons) = Assert.Single(_prompts.BusyQuestions);
         Assert.Equal((0, 1), (cancelledWhileAsking, inFlightWhileAsking)); // asked while tiny.en still ran
         Assert.StartsWith($"tiny.en is downloading (0% done). Download ggml-base.en.bin ({ModelCatalog.Find("base.en")!.SizeText}) from huggingface.co after it, or stop tiny.en and download base.en now?", text);
-        Assert.Equal(["Download after it", "Stop tiny.en and download base.en", "Cancel"], buttons);
+        Assert.Equal(["Download after it", "Stop it and download base.en", "Cancel"], buttons);
         Assert.Equal(1, _prompts.ConfirmCalls); // the plain question was not asked as well
 
         await Task.Delay(200, Ct);
@@ -325,6 +326,132 @@ public sealed class NoSilentCancelTests : IDisposable
         Assert.False(AnyCancelBalloon);
     }
 
+    // ---- Lens fixes (19/10/2026), first lens on ada6b37 ----
+
+    /// <summary>Lens 2: Full pressed while its clean-up model downloads asks only about small.en and downloads qwen once.</summary>
+    [Fact]
+    public async Task A_preset_needing_a_file_already_on_its_way_neither_asks_about_it_nor_downloads_it_twice()
+    {
+        var coordinator = Make();
+        var qwen = CleanupCatalog.Find("qwen2.5-1.5b")!;
+        coordinator.SelectCleanup(qwen.Name); // asked, then downloading
+        Assert.True(await Eventually(() => _server.InFlight == 1));
+        var personal = new PersonalService(_paths, NullLog.Instance, () => _settings, coordinator, () => { }, () => false);
+
+        personal.SelectPreset(ModePreset.Full); // CPU: small.en + qwen2.5-1.5b
+        Assert.Equal([qwen.FileName, "ggml-small.en.bin"], _prompts.ConfirmFiles); // the preset's question named only small.en
+        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-small.en.bin"));
+        Assert.Equal(DownloadState.Running, coordinator.DownloadStateOf(qwen.FileName));
+
+        _server.Release("ggml-small.en.bin");
+        _server.Release(qwen.FileName);
+        Assert.True(await Eventually(() => _settings.Whisper.Model == "small.en" && _settings.Llm.Model == qwen.Name), "Full was not applied");
+        Assert.Equal([qwen.FileName, "ggml-small.en.bin"], _server.Requests.ToArray()); // one download of each
+        Assert.Equal(0, _server.Cancelled);
+    }
+
+    /// <summary>Lens 3: the space check counts what the download already running will still write.</summary>
+    [Fact]
+    public async Task The_space_check_counts_the_download_already_running()
+    {
+        // tiny.en still has to write all of its bytes: the test server's size (TestSpecs), as the catalogue size would be in the app.
+        long tiny = Payload.Length, @base = ModelCatalog.Find("base.en")!.Bytes;
+        var free = tiny + @base + Storage.DiskSpace.SpareBytes - 1; // enough for base.en alone, not beside tiny.en
+        var coordinator = await TinyDownloading(_ => free);
+        _prompts.Busy = BusyDownloadChoice.DownloadAfter;
+
+        coordinator.Select("base.en");
+        Assert.Empty(_prompts.BusyQuestions); // refused before it was asked
+        Assert.Contains(Storage.DiskSpace.DownloadRefusal(_paths.DefaultModelsDir, "ggml-base.en.bin", @base, _ => free, tiny), _balloons);
+        Assert.Contains("the downloads already under way need", _balloons.Last(), StringComparison.Ordinal);
+        Assert.Equal(DownloadState.None, coordinator.DownloadStateOf("ggml-base.en.bin"));
+
+        free++; // exactly enough for both
+        coordinator.Select("base.en");
+        Assert.Single(_prompts.BusyQuestions);
+        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-base.en.bin"));
+    }
+
+    /// <summary>Lens 3: a queued download is checked for space again when its turn comes, and refused with the low-space balloon.</summary>
+    [Fact]
+    public async Task A_queued_download_is_checked_for_space_again_when_its_turn_comes()
+    {
+        long free = 100_000_000_000;
+        var coordinator = await TinyDownloading(_ => free);
+        _prompts.Busy = BusyDownloadChoice.DownloadAfter;
+        coordinator.Select("base.en");
+        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-base.en.bin"));
+
+        free = 1_000_000; // the drive filled up meanwhile
+        _server.Release("ggml-tiny.en.bin");
+        _server.Release("ggml-base.en.bin");
+        Assert.True(await Eventually(() => !coordinator.IsDownloading), "the queue never emptied");
+        await Task.Delay(100, Ct);
+        Assert.Equal(["ggml-tiny.en.bin"], _server.Requests.ToArray()); // base.en never started
+        Assert.Contains(_balloons, b => b.StartsWith("Not enough space for ggml-base.en.bin", StringComparison.Ordinal));
+        Assert.False(File.Exists(Model("ggml-base.en.bin")));
+    }
+
+    /// <summary>Lens 4: picking a model on its way again and again adds one arrival action, not one per pick.</summary>
+    [Fact]
+    public async Task Repeat_picks_of_a_model_on_its_way_add_one_arrival_action()
+    {
+        var coordinator = await TinyDownloading();
+        coordinator.Select("tiny.en");
+        coordinator.Select("tiny.en");
+        coordinator.Select("tiny.en");
+        Assert.Equal(1, coordinator.ArrivalActions(Model("ggml-tiny.en.bin")));
+    }
+
+    /// <summary>Lens 5: Stop cancels only the download the question named; one that took its place while the question was open is left alone.</summary>
+    [Fact]
+    public async Task Stop_leaves_alone_a_download_that_started_while_the_question_was_open()
+    {
+        var coordinator = await TinyDownloading();
+        _prompts.Busy = BusyDownloadChoice.DownloadAfter;
+        coordinator.Select("small.en"); // waits behind tiny.en
+        _prompts.Busy = BusyDownloadChoice.StopAndDownload;
+        _prompts.WhenBusyAsked = () =>
+        {
+            _server.Release("ggml-tiny.en.bin"); // tiny.en finishes while the question is open, and small.en starts
+            Assert.True(SpinWait.SpinUntil(() => _server.Requests.Contains("ggml-small.en.bin") && _server.InFlight == 1, TimeSpan.FromSeconds(5)));
+        };
+
+        coordinator.Select("base.en"); // the question names tiny.en
+        Assert.StartsWith("tiny.en is downloading", _prompts.BusyQuestions[^1].Text, StringComparison.Ordinal);
+        await Task.Delay(200, Ct);
+        Assert.Equal(0, _server.Cancelled); // small.en was not stopped
+        Assert.DoesNotContain(_balloons, b => b.Contains("stopped", StringComparison.Ordinal));
+        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-base.en.bin"));
+
+        _server.Release("ggml-small.en.bin");
+        _server.Release("ggml-base.en.bin");
+        Assert.True(await Eventually(() => _settings.Whisper.Model == "base.en"), "base.en, chosen last, was not switched to");
+        Assert.Equal(["ggml-tiny.en.bin", "ggml-small.en.bin", "ggml-base.en.bin"], _server.Requests.ToArray());
+    }
+
+    /// <summary>Lens 6: a preset overtaken after its first file does not download the rest.</summary>
+    [Fact]
+    public async Task A_preset_overtaken_halfway_does_not_download_its_remaining_files()
+    {
+        var coordinator = Make();
+        var qwen = CleanupCatalog.Find("qwen2.5-0.5b")!;
+        var finished = new List<bool>();
+        coordinator.ApplyWithDownloads("Needed for Full mode", [(ModelCatalog.Find("tiny.en")!.Download, Model("ggml-tiny.en.bin")), (qwen.Download, Model(qwen.FileName))],
+            [("whisper.model", JsonValue.Create("tiny.en")), ("llm.provider", JsonValue.Create("local")), ("llm.model", JsonValue.Create(qwen.Name))], finished: finished.Add);
+        Assert.True(await Eventually(() => _server.InFlight == 1));
+        Sized(Model("ggml-small.en.bin"), ModelCatalog.Find("small.en")!.Bytes);
+        coordinator.Select("small.en"); // overtakes the preset
+
+        _server.Release("ggml-tiny.en.bin");
+        _server.Release(qwen.FileName);
+        Assert.True(await Eventually(() => finished.Count == 1), "the preset never finished");
+        await Task.Delay(200, Ct);
+        Assert.Equal([false], finished);
+        Assert.Equal(["ggml-tiny.en.bin"], _server.Requests.ToArray()); // qwen2.5-0.5b was not downloaded
+        Assert.Equal("small.en", _settings.Whisper.Model);
+    }
+
     public void Dispose()
     {
         _client.Dispose();
@@ -424,6 +551,85 @@ public sealed class NoSilentCancelUiTests
         flyout.Close();
 
         Assert.Equal(0, server.Cancelled);
+        shell.Dispose();
+        return true;
+    });
+
+    // ---- Lens fixes (19/10/2026), first lens on ada6b37 ----
+
+    /// <summary>Lens 1: the busy question keeps every button inside the window for the longest catalogue names, speech and clean-up.</summary>
+    [Theory]
+    [InlineData("speech")]
+    [InlineData("cleanup")]
+    public Task The_busy_question_keeps_every_button_inside_the_window(string kind) => UiSession.Run(() =>
+    {
+        var names = (kind == "speech" ? ModelCatalog.Entries.Select(e => e.Name) : CleanupCatalog.Entries.Select(e => e.Name)).OrderByDescending(n => n.Length).ToList();
+        var (chosen, running) = (names[0], names[1]);
+        var window = new QuestionWindow("Download a model",
+            ModelPromptText.BusyText($"{chosen}.bin", "1.6 GB", "A note", chosen, running, "42%"), Dictum.UI.Shell.ShellDialogs.BusyDialogChoices(chosen));
+        window.Show();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var buttons = All<Button>(window).ToList();
+        Assert.Equal(3, buttons.Count);
+        foreach (var button in buttons)
+        {
+            var right = button.TranslatePoint(new Avalonia.Point(button.Bounds.Width, 0), window)!.Value.X;
+            Assert.True(right <= window.ClientSize.Width - 20 + 0.5, $"\"{button.Content}\" ends at {right:0} of {window.ClientSize.Width:0} (20 padding)");
+        }
+        Assert.True(buttons[0].IsDefault); // Download after it: still first, and the one Enter presses
+        window.Close();
+    });
+
+    /// <summary>Lens 8: a progress refresh leaves the tray panel's pickers alone: same list, drop-down still open (speech, clean-up, microphone).</summary>
+    [Fact]
+    public Task A_progress_refresh_leaves_the_tray_pickers_alone() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var server = new GateHandler([1, 2, 3, 4]);
+        var (shell, _) = await TinyDownloading(scratch, server);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        foreach (var name in new[] { "Speech model", "Clean-up", "Microphone" })
+        {
+            var picker = All<ComboBox>(flyout).Single(c => AutomationProperties.GetName(c) == name);
+            var list = picker.ItemsSource;
+            var selected = picker.SelectedIndex;
+            picker.IsDropDownOpen = true;
+            shell.StatusChanged(); // what each progress tick does
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(ReferenceEquals(list, picker.ItemsSource), $"{name}: the list was replaced on a progress refresh");
+            Assert.True(picker.IsDropDownOpen, $"{name}: the open drop-down was closed by a progress refresh");
+            Assert.Equal(selected, picker.SelectedIndex);
+            picker.IsDropDownOpen = false;
+        }
+        flyout.Close();
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>Lens 9: "Add AI clean-up" is disabled, and named for why, while the model it adds downloads.</summary>
+    [Fact]
+    public Task Add_AI_cleanup_is_disabled_while_its_model_downloads() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "llm": { "provider": "none" } }""");
+        var server = new GateHandler([1, 2, 3, 4]);
+        var (shell, _, dialogs) = scratch.Shell(downloadHandler: server);
+        shell.Reload(userRequested: false);
+        dialogs.ConfirmDownloads = true;
+        var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(shell.GpuMachine).Model)!;
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Models");
+        var add = All<Button>(window).Single(b => (b.Content as string)?.StartsWith(ModelsPage.AddCleanupLabel, StringComparison.Ordinal) == true);
+        Assert.True(add.IsEnabled);
+
+        shell.Models.SelectCleanup(recommended.Name);
+        for (var waited = 0; server.InFlight != 1 && waited < 5000; waited += 10) await Task.Delay(10, TestContext.Current.CancellationToken);
+        shell.StatusChanged(); // the refresh a download's start sends
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.False(add.IsEnabled);
+        Assert.Equal($"{recommended.Name} is already downloading", AutomationProperties.GetName(add));
+        window.Close();
         shell.Dispose();
         return true;
     });

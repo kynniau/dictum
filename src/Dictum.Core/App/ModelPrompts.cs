@@ -58,8 +58,11 @@ public static class ModelPromptText
         $"or stop {running} and download {chosen} now? Stopping deletes what {running} has downloaded so far.\n\n" +
         $"{note}. Its size and SHA-256 are checked before use; progress shows in the tray panel and the tray icon's tooltip.";
 
-    /// <summary>PROPOSED copy (19/10/2026): the three buttons of <see cref="BusyText"/>, in the order of <see cref="BusyDownloadChoice"/>.</summary>
-    public static string[] BusyChoices(string chosen, string running) => ["Download after it", $"Stop {running} and download {chosen}", "Cancel"];
+    /// <summary>
+    /// PROPOSED copy (19/10/2026): the three buttons of <see cref="BusyText"/>, in the order of <see cref="BusyDownloadChoice"/>.
+    /// The Stop button says "it" (the text names the running model), so the label stays short (lens, 19/10/2026).
+    /// </summary>
+    public static string[] BusyChoices(string chosen) => ["Download after it", $"Stop it and download {chosen}", "Cancel"];
 
     /// <summary>The answer for the index of the button pressed (-1, the window closed: Cancel).</summary>
     public static BusyDownloadChoice BusyAnswer(int index) => index switch

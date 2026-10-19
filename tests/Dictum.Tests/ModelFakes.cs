@@ -157,9 +157,13 @@ internal sealed class ScriptedPrompts : IModelPrompts
 
     public MissingModelChoice MissingModel(string shortName, bool canDownload) => MissingModelChoice.Quit;
 
+    /// <summary>The file names each plain download question named, in order.</summary>
+    public List<string> ConfirmFiles { get; } = [];
+
     public bool ConfirmDownload(string fileName, string sizeText, string note)
     {
         ConfirmCalls++;
+        ConfirmFiles.Add(fileName);
         LastNote = note;
         return Confirm;
     }
@@ -175,7 +179,7 @@ internal sealed class ScriptedPrompts : IModelPrompts
 
     public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress)
     {
-        BusyQuestions.Add((ModelPromptText.BusyText(fileName, sizeText, note, chosen, running, runningProgress), ModelPromptText.BusyChoices(chosen, running)));
+        BusyQuestions.Add((ModelPromptText.BusyText(fileName, sizeText, note, chosen, running, runningProgress), ModelPromptText.BusyChoices(chosen)));
         LastNote = note;
         WhenBusyAsked?.Invoke(); // while the question is open: a test looks at the running download here
         return Busy;

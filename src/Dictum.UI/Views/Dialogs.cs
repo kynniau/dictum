@@ -29,12 +29,16 @@ internal abstract class DialogWindow : Window
 
     protected string Heading { get; }
 
-    /// <summary>Lays out the window: header, <paramref name="body"/>, then the buttons right-aligned.</summary>
+    /// <summary>
+    /// Lays out the window: header, <paramref name="body"/>, then the buttons right-aligned. The buttons wrap onto another line
+    /// when they do not fit the window's width, so a long label never pushes a button off the window (lens, 19/10/2026: the
+    /// download question's Cancel ended past the edge). Tab order stays the order given.
+    /// </summary>
     protected void Compose(Control body, params Button[] buttons)
     {
         var header = Ui.Row(10, new MarkIcon(24), Ui.Heading(Heading));
-        var row = Ui.Row(8, buttons);
-        row.HorizontalAlignment = HorizontalAlignment.Right;
+        var row = new WrapPanel { ItemSpacing = 8, LineSpacing = 8, ItemsAlignment = WrapPanelItemsAlignment.End };
+        row.Children.AddRange(buttons);
         Content = new Border { Padding = new Thickness(20), Child = Ui.Stack(16, header, body, row) };
     }
 

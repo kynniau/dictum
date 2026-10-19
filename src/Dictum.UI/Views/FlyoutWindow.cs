@@ -278,9 +278,14 @@ internal sealed class FlyoutWindow : Window
     /// </summary>
     private static void Fill(ComboBox picker, List<string> names, List<string> labels, string current)
     {
-        if (picker.ItemsSource is not List<string> shown || !shown.SequenceEqual(labels)) picker.ItemsSource = labels;
         picker.Tag = names;
-        var index = names.IndexOf(current);
+        SetItems(picker, labels, names.IndexOf(current));
+    }
+
+    /// <summary>The compare-before-set of <see cref="Fill"/>, for any picker (the microphone list too).</summary>
+    private static void SetItems(ComboBox picker, List<string> labels, int index)
+    {
+        if (picker.ItemsSource is not List<string> shown || !shown.SequenceEqual(labels)) picker.ItemsSource = labels;
         if (picker.SelectedIndex != index) picker.SelectedIndex = index;
     }
 
@@ -315,8 +320,7 @@ internal sealed class FlyoutWindow : Window
             _micIds.Add(chosen);
             labels.Add($"{chosen} (not connected)");
         }
-        _mic.ItemsSource = labels;
-        _mic.SelectedIndex = Math.Max(0, _micIds.IndexOf(s.Audio.Device));
+        SetItems(_mic, labels, Math.Max(0, _micIds.IndexOf(s.Audio.Device))); // a progress tick leaves an open list alone (lens, 19/10/2026)
     }
 
     private void OnSpeechPicked()

@@ -348,7 +348,7 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   asking. Picking the model being downloaded (marked "(downloading)" or "(waiting to
   download)") only says it is on its way; picking one on disk swaps at once and the download
   carries on; picking another that needs a download asks first, with Download after it
-  (default, queued), Stop <running> and download <new> (the only answer that cancels) and
+  (default, queued), Stop it and download <new> (the only answer that cancels) and
   Cancel. The last choice of each kind (speech, clean-up) wins: a download that arrives
   after a newer choice does not switch to its model. Settings > Models shows the row being
   downloaded as "Downloading <n>%" with its button disabled. See DECISIONS, 19/10/2026.

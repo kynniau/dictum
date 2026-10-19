@@ -32,10 +32,14 @@ public static class DiskSpace
     /// PROPOSED copy (17/10/2026), for the product owner to approve: why a download of <paramref name="bytes"/> into
     /// <paramref name="folder"/> is refused, when the drive has less free than the file plus <see cref="SpareBytes"/>; null
     /// otherwise, or when the free space cannot be read (a network share, say: the download then goes ahead).
+    /// <paramref name="pendingBytes"/> is what the downloads already under way will still write there (lens, 19/10/2026): the
+    /// file must fit beside them, and the message then says so (PROPOSED copy, 19/10/2026).
     /// </summary>
-    public static string? DownloadRefusal(string folder, string fileName, long bytes, Func<string, long?>? freeBytes = null) =>
-        (freeBytes ?? FreeBytes)(folder) is long free && free < bytes + SpareBytes
-            ? $"Not enough space for {fileName} ({ModelCatalog.FormatSize(bytes)}): {ModelCatalog.FormatSize(free)} is free on that drive, and Dictum keeps 200 MB spare. Free some space, or choose another model folder in Settings > Models."
+    public static string? DownloadRefusal(string folder, string fileName, long bytes, Func<string, long?>? freeBytes = null, long pendingBytes = 0) =>
+        (freeBytes ?? FreeBytes)(folder) is long free && free - pendingBytes < bytes + SpareBytes
+            ? pendingBytes > 0
+                ? $"Not enough space for {fileName} ({ModelCatalog.FormatSize(bytes)}): {ModelCatalog.FormatSize(free)} is free on that drive, the downloads already under way need {ModelCatalog.FormatSize(pendingBytes)} of it, and Dictum keeps 200 MB spare. Free some space, or choose another model folder in Settings > Models."
+                : $"Not enough space for {fileName} ({ModelCatalog.FormatSize(bytes)}): {ModelCatalog.FormatSize(free)} is free on that drive, and Dictum keeps 200 MB spare. Free some space, or choose another model folder in Settings > Models."
             : null;
 
     /// <summary>
@@ -67,14 +71,17 @@ public static class DiskSpace
     /// <summary>
     /// "Warning: …" when downloading <paramref name="bytes"/> into <paramref name="folder"/> would leave under 2 GB free; null
     /// otherwise or when the free space cannot be read. No final full stop: the download question adds its own.
+    /// <paramref name="pendingBytes"/>: what the downloads already under way will still write there, counted as used.
     /// </summary>
-    public static string? DownloadWarning(string folder, long bytes, Func<string, long?>? freeBytes = null)
+    public static string? DownloadWarning(string folder, long bytes, Func<string, long?>? freeBytes = null, long pendingBytes = 0)
     {
         if ((freeBytes ?? FreeBytes)(folder) is not long free) return null;
-        var after = free - bytes;
+        var after = free - pendingBytes - bytes;
         if (after >= WarnBelowBytes) return null;
         return after < 0
-            ? $"Warning: only {ModelCatalog.FormatSize(free)} is free on that drive, not enough for this download"
+            ? pendingBytes > 0
+                ? $"Warning: only {ModelCatalog.FormatSize(free)} is free on that drive, not enough for this download beside the downloads already under way" // PROPOSED copy, 19/10/2026
+                : $"Warning: only {ModelCatalog.FormatSize(free)} is free on that drive, not enough for this download"
             : $"Warning: this leaves only {ModelCatalog.FormatSize(after)} free on that drive (under 2 GB)";
     }
 }

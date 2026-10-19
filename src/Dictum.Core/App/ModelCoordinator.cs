@@ -47,7 +47,11 @@ public sealed class ModelCoordinator(
     private readonly HashSet<string> _warnedMissing = [];
     private readonly Dictionary<string, (long Length, DateTime Written, bool Passes)> _bundledChecks = new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<string, long?> _freeBytes = freeBytes ?? Storage.DiskSpace.FreeBytes;
-    private readonly ModelDownloads _downloads = new(http, log, settings, integrity, refreshTooltip, balloon);
+    private ModelDownloads? _downloadQueue;
+
+    /// <summary>The download queue; a queued download is checked for space again when its turn comes (Decision 15).</summary>
+    private ModelDownloads _downloads => _downloadQueue ??= new(http, log, settings, integrity, refreshTooltip, balloon,
+        refuseBeforeStart: (spec, destination) => RefuseLowSpace(destination, spec.FileName, spec.Bytes));
     private string? _launchOverride = launchOverride;
     private string? _firstRunSpeechDownload;
     private string? _firstRunCleanupDownload;
@@ -83,8 +87,11 @@ public sealed class ModelCoordinator(
     private int _choices;
 
     /// <summary>The download question's note, with the low-space warning when the download would leave under 2 GB (SPEC §17).</summary>
-    private string WithSpaceWarning(string note, long? bytes) =>
-        bytes is long b && Storage.DiskSpace.DownloadWarning(paths.ModelsDir(settings()), b, _freeBytes) is { } warning ? $"{note}. {warning}" : note;
+    private string WithSpaceWarning(string note, long? bytes)
+    {
+        var folder = paths.ModelsDir(settings());
+        return bytes is long b && Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder)) is { } warning ? $"{note}. {warning}" : note;
+    }
 
     /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
     public string ModelPath
@@ -130,6 +137,9 @@ public sealed class ModelCoordinator(
     public (string Path, ModelFolderKind Kind)? FindBesides(string fileName, long? bytes, string gone) => Locate(fileName, bytes, except: gone);
 
     private int _lookups;
+
+    /// <summary>How many actions wait on the download to <paramref name="destination"/> besides its own (tests count them).</summary>
+    internal int ArrivalActions(string destination) => _downloads.AlsoCount(destination);
 
     /// <summary>How many folder lookups this coordinator has made (each reads up to three folders, a name resolved by <see cref="ModelPath"/> included): tests count them.</summary>
     internal int Lookups => Volatile.Read(ref _lookups);
@@ -413,10 +423,8 @@ public sealed class ModelCoordinator(
         if (state != DownloadState.None)
         {
             SetChoice(speech, token);
-            _downloads.AlsoOnArrival(destination, Apply); // a calibration or first-run download of it switches too, now that it is chosen
-            balloon(state == DownloadState.Running
-                ? $"{name} is already downloading ({_downloads.Progress})." // PROPOSED copy, 19/10/2026
-                : $"{name} is already waiting to download.", false); // PROPOSED copy, 19/10/2026
+            _downloads.AlsoOnArrival(destination, $"choice {token}", Apply); // a calibration or first-run download of it switches too; a repeat pick adds nothing
+            balloon(OnItsWay(name, state), false);
             return;
         }
         if (RefuseOffline(spec.FileName) || RefuseLowSpace(destination, spec.FileName, spec.Bytes)) return;
@@ -437,13 +445,24 @@ public sealed class ModelCoordinator(
                 Start();
                 break;
             case BusyDownloadChoice.StopAndDownload:
-                _ = CancelThenAsync(name, Start);
+                // Stop cancels the download the question named; one that started while it was open is left alone (lens, 19/10/2026).
+                if (_downloads.CurrentDestination is { } now && SamePath(now, runningTo)) _ = CancelThenAsync(name, Start);
+                else
+                {
+                    log.Info($"{ShortName(runningTo)} is no longer downloading, so nothing is stopped; {name} waits its turn.");
+                    Start();
+                }
                 break;
             default:
                 log.Info($"{name} not downloaded: the user kept the download in progress ({_downloads.CurrentFile}).");
                 break;
         }
     }
+
+    /// <summary>The balloon for a model on its way: downloading now (how far), or waiting its turn. PROPOSED copy, 19/10/2026.</summary>
+    private string OnItsWay(string name, DownloadState state) => state == DownloadState.Running
+        ? $"{name} is already downloading ({_downloads.Progress})."
+        : $"{name} is already waiting to download.";
 
     /// <summary>A download's switch: writes <paramref name="values"/> only while <paramref name="token"/> is still the latest choice of its kind.</summary>
     private void ApplyIfLatest(bool speech, string token, string name, (string, string)[] values)
@@ -536,8 +555,10 @@ public sealed class ModelCoordinator(
             var part = new FileInfo(destination + ".part");
             needed += part.Exists && part.Length < total ? total - part.Length : total; // the downloader resumes a kept .part from its end
         }
-        if (needed == 0 || Storage.DiskSpace.DownloadRefusal(Path.GetDirectoryName(Path.GetFullPath(files[0].Destination))!, fileNames, needed, _freeBytes) is not { } refusal)
-            return false;
+        if (needed == 0) return false;
+        var folder = Path.GetDirectoryName(Path.GetFullPath(files[0].Destination))!;
+        // The downloads already running or waiting on that drive need their space too (lens, 19/10/2026).
+        if (Storage.DiskSpace.DownloadRefusal(folder, fileNames, needed, _freeBytes, _downloads.PendingBytes(folder)) is not { } refusal) return false;
         balloon(refusal, true);
         return true;
     }
@@ -606,9 +627,10 @@ public sealed class ModelCoordinator(
         Action<bool>? finished = null)
     {
         string? speechToken = null, cleanupToken = null; // set once the download is agreed: this preset is then the latest choice of each kind it sets
+        bool Stale() => speechToken is not null && _speechChoice != speechToken || cleanupToken is not null && _cleanupChoice != cleanupToken;
         void Finish()
         {
-            if (speechToken is not null && _speechChoice != speechToken || cleanupToken is not null && _cleanupChoice != cleanupToken)
+            if (Stale())
             {
                 log.Info($"{string.Join(" and ", missing.Select(m => m.Spec.FileName))} arrived, but a later model choice stands, so these settings are not applied.");
                 finished?.Invoke(false);
@@ -623,38 +645,67 @@ public sealed class ModelCoordinator(
             Finish(); // never cancels a download in progress (Store 10.1.2.10, 19/10/2026)
             return;
         }
-        var names = string.Join(" and ", missing.Select(m => m.Spec.FileName));
-        if (RefuseOffline(names))
+        // A file already downloading or waiting its turn is not downloaded twice, asked about again or counted twice for space
+        // (lens, 19/10/2026): the preset waits for that download instead.
+        var toFetch = missing.Where(m => !_downloads.IsFetching(m.Destination)).ToList();
+        if (toFetch.Count > 0)
         {
-            finished?.Invoke(false);
-            return;
+            var names = string.Join(" and ", toFetch.Select(m => m.Spec.FileName));
+            if (RefuseOffline(names))
+            {
+                finished?.Invoke(false);
+                return;
+            }
+            if (toFetch.FirstOrDefault(m => m.Spec.RequiresLogin).Spec is { } gated)
+            {
+                balloon($"{gated.FileName} {ModelDownloader.LoginRequired}.", true);
+                finished?.Invoke(false);
+                return;
+            }
+            if (RefuseLowSpace([.. toFetch.Select(m => (m.Destination, m.Spec.Bytes))], names))
+            {
+                finished?.Invoke(false);
+                return;
+            }
+            var total = toFetch.Sum(m => m.Spec.Bytes ?? 0);
+            if (!prompts.ConfirmDownload(names, ModelCatalog.FormatSize(total), WithSpaceWarning(note, total)))
+            {
+                finished?.Invoke(false);
+                return;
+            }
         }
-        if (missing.FirstOrDefault(m => m.Spec.RequiresLogin).Spec is { } gated)
+        else
         {
-            balloon($"{gated.FileName} {ModelDownloader.LoginRequired}.", true);
-            finished?.Invoke(false);
-            return;
-        }
-        if (RefuseLowSpace([.. missing.Select(m => (m.Destination, m.Spec.Bytes))], names))
-        {
-            finished?.Invoke(false);
-            return;
-        }
-        var total = missing.Sum(m => m.Spec.Bytes ?? 0);
-        if (!prompts.ConfirmDownload(names, ModelCatalog.FormatSize(total), WithSpaceWarning(note, total)))
-        {
-            finished?.Invoke(false);
-            return;
+            foreach (var (_, destination) in missing) balloon(OnItsWay(ShortName(destination), _downloads.StateOf(destination)), false); // nothing new to ask about
         }
         if (values.Any(v => v.Key == "whisper.model")) _speechChoice = speechToken = $"chosen {++_choices}";
         if (values.Any(v => v.Key is "llm.provider" or "llm.model")) _cleanupChoice = cleanupToken = $"chosen {++_choices}";
-        DownloadInTurn(missing, 0, Finish, () => finished?.Invoke(false));
+        DownloadInTurn(missing, 0, $"preset {++_choices}", Stale, Finish, () => finished?.Invoke(false));
     }
 
-    private void DownloadInTurn(IReadOnlyList<(DownloadSpec Spec, string Destination)> files, int index, Action done, Action failed)
+    /// <summary>
+    /// Downloads <paramref name="files"/> one after another, then runs <paramref name="done"/>. A file already on its way is
+    /// waited for (its download's arrival or failure continues the chain), and one that arrived meanwhile is skipped. Once the
+    /// choice is overtaken (<paramref name="stale"/>), the rest is not downloaded and <paramref name="failed"/> runs (lens, 19/10/2026).
+    /// </summary>
+    private void DownloadInTurn(IReadOnlyList<(DownloadSpec Spec, string Destination)> files, int index, string key, Func<bool> stale, Action done, Action failed)
     {
-        if (index >= files.Count) done();
-        else StartDownload(files[index].Spec, files[index].Destination, () => DownloadInTurn(files, index + 1, done, failed), failed);
+        if (index >= files.Count)
+        {
+            done();
+            return;
+        }
+        if (index > 0 && stale())
+        {
+            log.Info($"{string.Join(", ", files.Skip(index).Select(f => f.Spec.FileName))} not downloaded: a later model choice stands.");
+            failed();
+            return;
+        }
+        void Next() => DownloadInTurn(files, index + 1, key, stale, done, failed);
+        var (spec, destination) = files[index];
+        if (_downloads.IsFetching(destination)) _downloads.AlsoOnArrival(destination, $"{key} {index}", Next, failed);
+        else if (index > 0 && File.Exists(destination)) Next(); // it was on its way when asked, and has arrived since
+        else StartDownload(spec, destination, Next, failed);
     }
 
     private void StartDownload(DownloadSpec spec, string destination, Action onSuccess, Action? onFailure = null)

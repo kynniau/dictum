@@ -20,12 +20,16 @@ public enum DownloadState { None, Running, Waiting }
 /// the UI thread; the downloader retries and resumes on its own (8 attempts) before this reports.
 /// </summary>
 internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings> settings, ModelIntegrity? integrity, Action refreshTooltip,
-    Action<string, bool> balloon)
+    Action<string, bool> balloon, Func<DownloadSpec, string, bool>? refuseBeforeStart = null)
 {
     private sealed record Job(DownloadSpec Spec, string Destination, Action OnSuccess, Action? OnFailure)
     {
-        /// <summary>Run after <see cref="OnSuccess"/> when the file arrives: a model chosen again while it was on its way (<see cref="AlsoOnArrival"/>).</summary>
-        public List<Action> Also { get; } = [];
+        /// <summary>
+        /// Run after <see cref="OnSuccess"/> when the file arrives, or after <see cref="OnFailure"/> when it does not: a model chosen
+        /// again while it was on its way, or a preset that needs a file already on its way (<see cref="AlsoOnArrival"/>). Keyed, so
+        /// a repeat of the same choice adds nothing.
+        /// </summary>
+        public List<(string Key, Action OnSuccess, Action? OnFailure)> Also { get; } = [];
     }
 
     private readonly Queue<Job> _queue = new();
@@ -75,14 +79,38 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
     private static bool SameName(Job job, string fileName) => string.Equals(job.Spec.FileName, fileName, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Adds <paramref name="action"/> to what runs when the download to <paramref name="destination"/> (running or waiting)
-    /// arrives, after its own success action. False when no such download is in the queue.
+    /// Adds <paramref name="onSuccess"/> to what runs when the download to <paramref name="destination"/> (running or waiting)
+    /// arrives, after its own success action, and <paramref name="onFailure"/> to what runs when it fails, is cancelled or is
+    /// dropped. A second call with the same <paramref name="key"/> for that download adds nothing (lens, 19/10/2026: repeat
+    /// picks stacked one action each). False when no such download is in the queue.
     /// </summary>
-    public bool AlsoOnArrival(string destination, Action action)
+    public bool AlsoOnArrival(string destination, string key, Action onSuccess, Action? onFailure = null)
     {
         var job = _current is { } running && Same(running.Destination, destination) ? running : _queue.FirstOrDefault(j => Same(j.Destination, destination));
-        job?.Also.Add(action);
-        return job is not null;
+        if (job is null) return false;
+        if (job.Also.All(a => a.Key != key)) job.Also.Add((key, onSuccess, onFailure));
+        return true;
+    }
+
+    /// <summary>How many actions wait on the download to <paramref name="destination"/> besides its own (tests count them).</summary>
+    internal int AlsoCount(string destination) =>
+        (_current is { } running && Same(running.Destination, destination) ? running : _queue.FirstOrDefault(j => Same(j.Destination, destination)))?.Also.Count ?? 0;
+
+    /// <summary>
+    /// The bytes the downloads running and waiting will still write to the drive holding <paramref name="folder"/>: each one's
+    /// size less the partial file it already has there (Decision 15: a new download must fit beside them). Unknown sizes count 0.
+    /// </summary>
+    public long PendingBytes(string folder)
+    {
+        var root = Path.GetPathRoot(Path.GetFullPath(folder));
+        long pending = 0;
+        foreach (var job in (_current is { } running ? [running] : Array.Empty<Job>()).Concat(_queue))
+        {
+            if (job.Spec.Bytes is not long total || !string.Equals(Path.GetPathRoot(Path.GetFullPath(job.Destination)), root, StringComparison.OrdinalIgnoreCase)) continue;
+            var part = new FileInfo(job.Destination + ".part");
+            pending += Math.Max(0, total - (part.Exists ? part.Length : 0));
+        }
+        return pending;
     }
 
     private static bool Same(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
@@ -142,7 +170,17 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
     {
         var succeeded = await DownloadAsync(job.Spec, job.Destination, cts);
         Report(job, succeeded); // a chained download (a preset's second file) starts here, ahead of the queue
-        if (_cts is null && _queue.TryDequeue(out var next)) Run(next);
+        while (_cts is null && _queue.TryDequeue(out var next))
+        {
+            // Decision 15 checks the space again before a download starts: a queued one is checked when its turn comes.
+            if (refuseBeforeStart?.Invoke(next.Spec, next.Destination) != true)
+            {
+                Run(next);
+                break;
+            }
+            log.Info($"Queued download of {next.Spec.FileName} not started: not enough space on its drive.");
+            Report(next, succeeded: false);
+        }
     }
 
     private void Report(Job job, bool succeeded)
@@ -152,9 +190,13 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
             if (succeeded)
             {
                 job.OnSuccess();
-                foreach (var also in job.Also) also();
+                foreach (var also in job.Also) also.OnSuccess();
             }
-            else job.OnFailure?.Invoke();
+            else
+            {
+                job.OnFailure?.Invoke();
+                foreach (var also in job.Also) also.OnFailure?.Invoke();
+            }
         }
         catch (Exception ex)
         {
