@@ -770,4 +770,42 @@ public sealed class NoSilentCancelUiTests
         shell.Dispose();
         return true;
     });
+
+    // ---- Lens fixes (19/10/2026), third lens on d463bf5 ----
+
+    /// <summary>Third lens: the button index maps to the right answer in both layouts, and a closed window (-1) is always Cancel.</summary>
+    [Fact]
+    public void The_busy_answer_maps_each_button_in_both_layouts()
+    {
+        // Two buttons (no room to wait): Stop, Cancel.
+        Assert.Equal(BusyDownloadChoice.StopAndDownload, ModelPromptText.BusyAnswer(0, canWait: false));
+        Assert.Equal(BusyDownloadChoice.Cancel, ModelPromptText.BusyAnswer(1, canWait: false));
+        Assert.Equal(BusyDownloadChoice.Cancel, ModelPromptText.BusyAnswer(-1, canWait: false));
+        // Three buttons: Download after it, Stop, Cancel.
+        Assert.Equal(BusyDownloadChoice.DownloadAfter, ModelPromptText.BusyAnswer(0, canWait: true));
+        Assert.Equal(BusyDownloadChoice.StopAndDownload, ModelPromptText.BusyAnswer(1, canWait: true));
+        Assert.Equal(BusyDownloadChoice.Cancel, ModelPromptText.BusyAnswer(2, canWait: true));
+        Assert.Equal(BusyDownloadChoice.Cancel, ModelPromptText.BusyAnswer(-1, canWait: true));
+    }
+
+    /// <summary>Third lens: without room to wait the dialog offers only Stop (danger, not Enter) and Cancel (Enter); with room, "Download after it" is Enter.</summary>
+    [Fact]
+    public void The_busy_dialog_makes_the_safe_answer_the_default()
+    {
+        var two = Dictum.UI.Shell.ShellDialogs.BusyDialogChoices("small", canWait: false);
+        Assert.Equal(2, two.Length);
+        Assert.Equal("Stop it and download small", two[0].Label);
+        Assert.True(two[0].IsDanger);
+        Assert.False(two[0].IsDefault);
+        Assert.Equal("Cancel", two[1].Label);
+        Assert.True(two[1].IsDefault);
+        Assert.False(two[1].IsDanger);
+
+        var three = Dictum.UI.Shell.ShellDialogs.BusyDialogChoices("small", canWait: true);
+        Assert.Equal(3, three.Length);
+        Assert.Equal("Download after it", three[0].Label);
+        Assert.True(three[0].IsDefault);
+        Assert.Single(three, c => c.IsDefault);
+        Assert.True(three[1].IsDanger);
+    }
 }

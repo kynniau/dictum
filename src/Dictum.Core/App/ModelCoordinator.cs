@@ -523,6 +523,9 @@ public sealed class ModelCoordinator(
         // simplification: Stop also drops any download waiting behind the running one (ModelDownloads.Cancel drops the queue;
         // each is logged, none is ballooned). Ceiling: a model queued with "Download after it" is lost when a third choice
         // answers Stop. Trigger to retire: a report of a queued download vanishing; then cancel only the running job.
+        // The refusal and the 2 GB warning (PendingBytes(exceptRunning: true)) likewise still count the queued downloads that a
+        // Stop answer would drop, so a choice that would fit only with both the running and the queued downloads stopped is
+        // refused before asking (errs on the safe side). Trigger to retire: a user report of a refusal that Stop would have avoided.
         _downloads.Cancel(DownloadCancelReason.Choice, chosen);
         try
         {

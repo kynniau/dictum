@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 and updated 17/10/2026 for 1.1.0 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 19/10/2026 for 1.1.1 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -304,7 +304,7 @@ model-folder change (PR #11): without it the package carries the file but the fi
 ```text
 Notes written 19/10/2026 for Dictum 1.1.1.
 
-CHANGED SINCE THE LAST SUBMISSION: no download is needed to test. The base.en speech model ships inside the package, so dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads. The last submission reported "download cancelled" when downloading a model: choosing a second model while one was downloading cancelled the first. Dictum 1.1.1 never cancels a download unless you press Cancel download or answer "Stop it and download …" to the question it now asks first; choosing the model that is already downloading only says so.
+CHANGED SINCE THE LAST SUBMISSION: no download is needed to test. The base.en speech model ships inside the package, so dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads. The last submission reported "download cancelled" when downloading a model: choosing a second model while one was downloading cancelled the first. Dictum 1.1.1 never cancels a download unless you press Cancel download, answer "Stop it and download …" to the question it now asks first, or quit Dictum; choosing the model that is already downloading only says so.
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the menu.
 
@@ -417,4 +417,4 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
-for 1.1.0.
+for 1.1.0 or 1.1.1 (no packaged run on a clean PC yet).
