@@ -22,9 +22,10 @@ What this means for the user, to be stated plainly in the release notes (all **R
 
 - **Branch:** work on `feature/mac-platform` cut from `origin/main`. Push often. Open a PR. Never merge; the Windows
   orchestrator session lenses and merges. Never rebase or force-push a branch you did not create; never force-push at all.
-- **Private material:** never commit recordings, transcripts, names or test phrases of real people. `E:\Dictum private`
-  on the Windows PC is the only home for that and it is not on the Mac. If Kyle copies `denylist.txt` over by USB, set
-  `git config dictum.privateDenylist <path>` so the commit guard checks it; otherwise the guard warns and skips.
+- **Private material:** never commit recordings, transcripts, names or test phrases of real people. Their only home is
+  the private folder outside the repo on the Windows PC (never named in any tracked file: a test enforces that), and it
+  is not on the Mac. If Kyle copies the private word list over by USB, set `git config dictum.privateDenylist <path>`
+  (or `DICTUM_PRIVATE_DENYLIST`) so the commit guard checks it; otherwise the guard warns and skips.
 - **Hooks:** after cloning run `git config core.hooksPath "$(pwd)/.githooks"` (the hooks are bash; they run on macOS).
 - **No telemetry, ever.** No analytics, crash reporting or automatic update checks. Nothing in Dictum contacts a server
   except the model download the user asks for and the cloud clean-up the user turns on.
