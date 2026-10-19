@@ -35,7 +35,8 @@ public interface IModelPrompts
     /// <paramref name="runningProgress"/> ("42%") of the way; <paramref name="chosen"/> is the short name of the model asked for.
     /// The text and the buttons are <see cref="ModelPromptText.BusyText"/> and <see cref="ModelPromptText.BusyChoices"/>.
     /// </summary>
-    BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress);
+    /// <param name="canWait">False when the file fits only if the running download is stopped: then only Stop and Cancel are offered.</param>
+    BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true);
 
     string? ChooseFile(string initialDir, bool cleanupModel);
 }
@@ -53,19 +54,25 @@ public static class ModelPromptText
     /// PROPOSED copy (19/10/2026), for the product owner to approve: the download question while another download runs. It
     /// says what is downloading and how far it has got, and what each answer does; nothing is cancelled before it is answered.
     /// </summary>
-    public static string BusyText(string fileName, string sizeText, string note, string chosen, string running, string runningProgress) =>
-        $"{running} is downloading ({runningProgress} done). Download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost} after it, " +
-        $"or stop {running} and download {chosen} now? Stopping deletes what {running} has downloaded so far.\n\n" +
+    /// When <paramref name="canWait"/> is false (it fits only if the running download stops; second lens, 19/10/2026), the
+    /// text offers only to stop it and says why (PROPOSED copy, 19/10/2026).
+    public static string BusyText(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true) =>
+        (canWait
+            ? $"{running} is downloading ({runningProgress} done). Download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost} after it, " +
+              $"or stop {running} and download {chosen} now? Stopping deletes what {running} has downloaded so far.\n\n"
+            : $"{running} is downloading ({runningProgress} done). There is not enough space to download it after {running}. " +
+              $"Stop {running} and download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost} now? Stopping deletes what {running} has downloaded so far.\n\n") +
         $"{note}. Its size and SHA-256 are checked before use; progress shows in the tray panel and the tray icon's tooltip.";
 
     /// <summary>
     /// PROPOSED copy (19/10/2026): the three buttons of <see cref="BusyText"/>, in the order of <see cref="BusyDownloadChoice"/>.
     /// The Stop button says "it" (the text names the running model), so the label stays short (lens, 19/10/2026).
     /// </summary>
-    public static string[] BusyChoices(string chosen) => ["Download after it", $"Stop it and download {chosen}", "Cancel"];
+    public static string[] BusyChoices(string chosen, bool canWait = true) =>
+        canWait ? ["Download after it", $"Stop it and download {chosen}", "Cancel"] : [$"Stop it and download {chosen}", "Cancel"];
 
     /// <summary>The answer for the index of the button pressed (-1, the window closed: Cancel).</summary>
-    public static BusyDownloadChoice BusyAnswer(int index) => index switch
+    public static BusyDownloadChoice BusyAnswer(int index, bool canWait = true) => (index < 0 ? -1 : canWait ? index : index + 1) switch
     {
         0 => BusyDownloadChoice.DownloadAfter,
         1 => BusyDownloadChoice.StopAndDownload,

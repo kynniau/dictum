@@ -302,9 +302,9 @@ after the app change that reads the bundled model from `<program folder>\models`
 model-folder change (PR #11): without it the package carries the file but the first run still asks for a download.
 
 ```text
-Notes written 17/10/2026 for Dictum 1.1.0.
+Notes written 19/10/2026 for Dictum 1.1.1.
 
-CHANGED SINCE THE LAST SUBMISSION: the speech engine could not load on a PC without the Microsoft Visual C++ runtime, which showed as "model error". The package now declares Microsoft's framework package for that runtime, Microsoft.VCLibs.140.00.UWPDesktop, which the Store installs with Dictum. No download is needed to test: the base.en speech model ships inside the package.
+CHANGED SINCE THE LAST SUBMISSION: no download is needed to test. The base.en speech model ships inside the package, so dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads. The last submission reported "download cancelled" when downloading a model: choosing a second model while one was downloading cancelled the first. Dictum 1.1.1 never cancels a download unless you press Cancel download or answer "Stop it and download …" to the question it now asks first; choosing the model that is already downloading only says so.
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the menu.
 
@@ -412,8 +412,9 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 16/10/2026 | First submission (1.0.0) failed on Store Policies 10.1.5, "promotes another platform": the description mentioned an upcoming Mac version. The sentence was removed and the submission was resubmitted the same day. |
 | 16/10/2026 | The resubmission failed on 10.1.2.10, "Unusable Feature: AI models". Cause: the package neither shipped nor declared the Visual C++ runtime, and the whisper.cpp and llama.cpp natives import MSVCP140, VCRUNTIME140 and VCRUNTIME140_1 (section 6; reproduced in Windows Sandbox). |
 | 17/10/2026, 08:10 AEDT | Dictum 1.1.0 resubmitted: the framework dependency `Microsoft.VCLibs.140.00.UWPDesktop` declared, base.en bundled, the clean-up model off by default. Status "In certification". The listing and notes are the text in sections 4 and 7. |
+| 19/10/2026 | The 1.1.0 resubmission failed on 10.1.2.10: "Product shows message download cancelled when trying to download any model." Cause: choosing a model while another downloaded cancelled the running download before asking, and the UI invited that retry (DECISIONS, 19/10/2026). Fixed for 1.1.1 in PR #15; the tester notes' CHANGED paragraph in section 7 is rewritten for it. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
-owner in the session briefs; they are not re-read from Partner Center, which this record cannot reach. The
+owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
 for 1.1.0.

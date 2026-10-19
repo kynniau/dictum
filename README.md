@@ -560,7 +560,8 @@ CPUs, Azure VMs.
   Choosing another model that needs a download asks first, saying what is downloading and how far it has got:
   **Download after it** (the default: it waits its turn, and the running download keeps its bytes), **Stop it
   and download <new>** (the only answer that cancels; the balloon says "Download of <file> stopped: you chose <name>."),
-  or **Cancel** (nothing changes). A Mode preset whose models are all on this PC is applied without cancelling anything,
+  or **Cancel** (nothing changes). When the new model would fit only if the running download stopped, the question offers
+  only **Stop it and download <new>** and **Cancel** (Enter presses Cancel). A Mode preset whose models are all on this PC is applied without cancelling anything,
   and pressing the Mode that is already chosen does nothing. **The last choice wins:** a download that arrives after you
   chose another model of the same kind (speech, or clean-up) does not switch you to it, and a Mode preset overtaken
   that way stops downloading the rest of its models. A Mode preset or a calibration download that needs a model already

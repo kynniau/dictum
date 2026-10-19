@@ -2671,3 +2671,22 @@ The first lens on PR #15 (head ada6b37, which adds "Version 1.1.1" on top of ab0
 10. **STORE.md** says version 1.1.1 / package 1.1.1.0.
 
 PROPOSED strings added or changed by these fixes: the Stop label above, and the two pending-space variants. Nothing is approved.
+
+### Lens fixes (19/10/2026), second lens on c5f6ebe
+
+The second lens returned Needs changes (no blockers). All five findings are fixed:
+
+1. **Missing pin for waiting on a file already on its way** (`DownloadInTurn`'s `IsFetching` branch). Two new pins:
+   - small.en is downloading and Full is pressed: the server sees ggml-small.en.bin exactly once.
+   - A preset waiting on a file already downloading, when Cancel download is pressed, is told false exactly once.
+2. **Stop was never offered when only Stop makes room.** A choice is now refused before asking only when the file would not fit even with the running download stopped (`PendingBytes(folder, exceptRunning: true)`). When it fits only that way, the question offers just **Stop it and download <name>** and **Cancel**, and Enter presses Cancel (my choice: the safe answer is the default). The body then reads (PROPOSED): "<running> is downloading (<n>% done). There is not enough space to download it after <running>. Stop <running> and download <file> (<size>) from huggingface.co now? Stopping deletes what <running> has downloaded so far." That is followed by the usual note and checks sentence. Its 2 GB warning counts the waiting downloads but not the running one.
+3. **One owner's action that threw skipped the others.** `ModelDownloads.Report` now runs the download's own action and each other owner's action in its own try. On the failure path, a throw is logged as "After the download of <file> did not complete, what was waiting on it failed: …", with no "downloaded and verified" balloon.
+4. **Pins for the pending space.** New tests cover:
+   - the 2 GB warning counting the running download;
+   - `PendingBytes` subtracting a kept `.part` and counting only the same drive root;
+   - both PROPOSED `DiskSpace` variants and their thresholds.
+5. **STORE.md tester notes.** The header now reads "Notes written 19/10/2026 for Dictum 1.1.1.", the CHANGED paragraph is rewritten, and the 19/10/2026 failure is added to the certification record. **PROPOSED** tester-notes paragraph, for the product owner to approve before it is pasted into Partner Center:
+
+   > CHANGED SINCE THE LAST SUBMISSION: no download is needed to test. The base.en speech model ships inside the package, so dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads. The last submission reported "download cancelled" when downloading a model: choosing a second model while one was downloading cancelled the first. Dictum 1.1.1 never cancels a download unless you press Cancel download or answer "Stop it and download …" to the question it now asks first; choosing the model that is already downloading only says so.
+
+   The orchestrator asked for "every feature works with no download". The paragraph instead says dictation works with no download and that larger models and AI clean-up are optional downloads. AI clean-up and the multilingual models do need a download, so "every feature" would not be accurate.

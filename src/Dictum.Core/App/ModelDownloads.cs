@@ -100,11 +100,12 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
     /// The bytes the downloads running and waiting will still write to the drive holding <paramref name="folder"/>: each one's
     /// size less the partial file it already has there (Decision 15: a new download must fit beside them). Unknown sizes count 0.
     /// </summary>
-    public long PendingBytes(string folder)
+    /// <param name="exceptRunning">Leave the running download out: what would be pending if it were stopped (second lens, 19/10/2026).</param>
+    public long PendingBytes(string folder, bool exceptRunning = false)
     {
         var root = Path.GetPathRoot(Path.GetFullPath(folder));
         long pending = 0;
-        foreach (var job in (_current is { } running ? [running] : Array.Empty<Job>()).Concat(_queue))
+        foreach (var job in (_current is { } running && !exceptRunning ? [running] : Array.Empty<Job>()).Concat(_queue))
         {
             if (job.Spec.Bytes is not long total || !string.Equals(Path.GetPathRoot(Path.GetFullPath(job.Destination)), root, StringComparison.OrdinalIgnoreCase)) continue;
             var part = new FileInfo(job.Destination + ".part");
@@ -183,25 +184,31 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
         }
     }
 
+    /// <summary>
+    /// Runs the download's own action and then each other owner's (<see cref="AlsoOnArrival"/>), each in its own try, so one
+    /// that throws does not stop the rest (second lens, 19/10/2026: a preset waiting on the file would never have finished).
+    /// </summary>
     private void Report(Job job, bool succeeded)
     {
+        Invoke(job, succeeded ? job.OnSuccess : job.OnFailure, succeeded);
+        foreach (var also in job.Also) Invoke(job, succeeded ? also.OnSuccess : also.OnFailure, succeeded);
+    }
+
+    private void Invoke(Job job, Action? action, bool succeeded)
+    {
+        if (action is null) return;
         try
         {
-            if (succeeded)
-            {
-                job.OnSuccess();
-                foreach (var also in job.Also) also.OnSuccess();
-            }
-            else
-            {
-                job.OnFailure?.Invoke();
-                foreach (var also in job.Also) also.OnFailure?.Invoke();
-            }
+            action();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (succeeded)
         {
             log.Error($"Using the downloaded {job.Spec.FileName} failed: {ex}");
             balloon($"{job.Spec.FileName} was downloaded and verified, but using it failed: {ex.Message}", true);
+        }
+        catch (Exception ex)
+        {
+            log.Error($"After the download of {job.Spec.FileName} did not complete, what was waiting on it failed: {ex}");
         }
     }
 

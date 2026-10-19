@@ -358,18 +358,155 @@ public sealed class NoSilentCancelTests : IDisposable
         long tiny = Payload.Length, @base = ModelCatalog.Find("base.en")!.Bytes;
         var free = tiny + @base + Storage.DiskSpace.SpareBytes - 1; // enough for base.en alone, not beside tiny.en
         var coordinator = await TinyDownloading(_ => free);
+        _prompts.Busy = BusyDownloadChoice.Cancel;
+
+        // Second lens: it fits only if tiny.en stops, so it is asked, offering only Stop and Cancel (no Download after it).
+        coordinator.Select("base.en");
+        var (text, buttons) = Assert.Single(_prompts.BusyQuestions);
+        Assert.Equal(["Stop it and download base.en", "Cancel"], buttons);
+        Assert.Contains("There is not enough space to download it after tiny.en.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_balloons, b => b.StartsWith("Not enough space", StringComparison.Ordinal));
+        Assert.Equal(DownloadState.None, coordinator.DownloadStateOf("ggml-base.en.bin")); // Cancel changed nothing
+        Assert.Equal(0, _server.Cancelled);
+
+        free++; // exactly enough for both: Download after it is offered again
         _prompts.Busy = BusyDownloadChoice.DownloadAfter;
+        coordinator.Select("base.en");
+        Assert.Equal(["Download after it", "Stop it and download base.en", "Cancel"], _prompts.BusyQuestions[^1].Buttons);
+        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-base.en.bin"));
+    }
+
+    /// <summary>Second lens 2: a file that would not fit even with the running download stopped is refused before it is asked (a queued download still counts).</summary>
+    [Fact]
+    public async Task A_download_that_would_not_fit_even_with_the_running_one_stopped_is_refused_before_asking()
+    {
+        long free = 100_000_000_000;
+        var coordinator = await TinyDownloading(_ => free);
+        _prompts.Busy = BusyDownloadChoice.DownloadAfter;
+        coordinator.Select("small.en"); // waits its turn: its 4 bytes (TestSpecs) are pending whatever happens to tiny.en
+        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-small.en.bin"));
+        long @base = ModelCatalog.Find("base.en")!.Bytes;
+        free = @base + Storage.DiskSpace.SpareBytes + Payload.Length - 1; // base.en fits beside nothing but itself, not beside small.en
 
         coordinator.Select("base.en");
-        Assert.Empty(_prompts.BusyQuestions); // refused before it was asked
-        Assert.Contains(Storage.DiskSpace.DownloadRefusal(_paths.DefaultModelsDir, "ggml-base.en.bin", @base, _ => free, tiny), _balloons);
-        Assert.Contains("the downloads already under way need", _balloons.Last(), StringComparison.Ordinal);
-        Assert.Equal(DownloadState.None, coordinator.DownloadStateOf("ggml-base.en.bin"));
+        Assert.Single(_prompts.BusyQuestions); // only small.en's question: base.en was not asked about
+        Assert.Contains(Storage.DiskSpace.DownloadRefusal(_paths.DefaultModelsDir, "ggml-base.en.bin", @base, _ => free, Payload.Length), _balloons);
+        Assert.Equal(0, _server.Cancelled);
+    }
 
-        free++; // exactly enough for both
+    /// <summary>Second lens 4: the 2 GB warning in the question counts the download already running.</summary>
+    [Fact]
+    public async Task The_space_warning_counts_the_download_already_running()
+    {
+        long @base = ModelCatalog.Find("base.en")!.Bytes;
+        var free = @base + Storage.DiskSpace.WarnBelowBytes + 2; // 2 GB would be left by base.en alone, but not beside tiny.en's 4 bytes
+        var coordinator = await TinyDownloading(_ => free);
+        _prompts.Busy = BusyDownloadChoice.Cancel;
         coordinator.Select("base.en");
         Assert.Single(_prompts.BusyQuestions);
-        Assert.Equal(DownloadState.Waiting, coordinator.DownloadStateOf("ggml-base.en.bin"));
+        Assert.Contains("Warning: this leaves only", _prompts.LastNote, StringComparison.Ordinal);
+    }
+
+    /// <summary>Second lens 1a: small.en downloading, Full pressed (small.en and qwen2.5-1.5b missing): small.en is downloaded once.</summary>
+    [Fact]
+    public async Task Full_pressed_while_its_speech_model_downloads_downloads_it_once()
+    {
+        var coordinator = Make();
+        coordinator.Select("small.en");
+        Assert.True(await Eventually(() => _server.InFlight == 1));
+        var qwen = CleanupCatalog.Find("qwen2.5-1.5b")!;
+        var personal = new PersonalService(_paths, NullLog.Instance, () => _settings, coordinator, () => { }, () => false);
+
+        personal.SelectPreset(ModePreset.Full);
+        Assert.Equal(["ggml-small.en.bin", qwen.FileName], _prompts.ConfirmFiles); // the preset asked about qwen only
+        _server.Release(qwen.FileName);
+        _server.Release("ggml-small.en.bin");
+        Assert.True(await Eventually(() => _settings.Whisper.Model == "small.en" && _settings.Llm.Model == qwen.Name), "Full was not applied");
+        await Task.Delay(200, Ct);
+        Assert.Equal(1, _server.Requests.Count(r => r == "ggml-small.en.bin")); // exactly once
+        Assert.Equal(1, _server.Requests.Count(r => r == qwen.FileName));
+    }
+
+    /// <summary>Second lens 1b: a preset waiting on a file already downloading is told false exactly once when Cancel download is pressed.</summary>
+    [Fact]
+    public async Task A_preset_waiting_on_a_download_is_told_false_once_when_it_is_cancelled()
+    {
+        var coordinator = await TinyDownloading();
+        var finished = new List<bool>();
+        coordinator.ApplyWithDownloads("Needed for Light mode", [(ModelCatalog.Find("tiny.en")!.Download, Model("ggml-tiny.en.bin"))],
+            [("whisper.model", JsonValue.Create("tiny.en"))], finished: finished.Add);
+        Assert.Equal(1, _prompts.ConfirmCalls); // nothing new to ask about
+        Assert.Equal(1, coordinator.ArrivalActions(Model("ggml-tiny.en.bin")));
+
+        coordinator.CancelDownload(DownloadCancelReason.CancelLink);
+        Assert.True(await Eventually(() => finished.Count > 0), "the waiting preset was never told");
+        await Task.Delay(200, Ct);
+        Assert.Equal([false], finished);
+        Assert.Equal(["ggml-tiny.en.bin"], _server.Requests.ToArray());
+    }
+
+    /// <summary>Second lens 3: one owner's action that throws does not stop another owner's, on arrival or on failure.</summary>
+    [Fact]
+    public async Task One_owner_throwing_does_not_stop_the_others()
+    {
+        var log = new RecordingLog();
+        var downloads = new ModelDownloads(_client, log, () => new AppSettings(), null, () => { }, (text, _) => _balloons.Enqueue(text));
+        var (arrived, failed) = (0, 0);
+        downloads.Start(Spec("a.bin"), Model("a.bin"), onSuccess: () => throw new InvalidOperationException("owner one broke"));
+        Assert.True(downloads.AlsoOnArrival(Model("a.bin"), "two", () => arrived++));
+        downloads.Start(Spec("b.bin"), Model("b.bin"), onSuccess: () => { }, onFailure: () => throw new InvalidOperationException("owner one broke again"));
+        Assert.True(downloads.AlsoOnArrival(Model("b.bin"), "two", () => { }, () => failed++));
+
+        _server.Release("a.bin");
+        Assert.True(await Eventually(() => arrived == 1), "the second owner's arrival action never ran");
+        Assert.Contains(_balloons, b => b.Contains("owner one broke", StringComparison.Ordinal));
+        Assert.True(await Eventually(() => _server.InFlight == 1)); // b.bin started
+        downloads.Cancel(DownloadCancelReason.Quit);
+        Assert.True(await Eventually(() => failed == 1), "the second owner's failure action never ran");
+        Assert.DoesNotContain(_balloons, b => b.Contains("owner one broke again", StringComparison.Ordinal)); // a failure path is logged, not called downloaded
+        Assert.Contains(log.Lines, l => l.Message.Contains("did not complete, what was waiting on it failed", StringComparison.Ordinal));
+    }
+
+    /// <summary>Second lens 4: PendingBytes subtracts each kept .part and counts only downloads on the same drive.</summary>
+    [Fact]
+    public async Task PendingBytes_subtracts_kept_partial_files_and_counts_only_the_same_drive()
+    {
+        var downloads = new ModelDownloads(_client, NullLog.Instance, () => new AppSettings(), null, () => { }, (text, _) => _balloons.Enqueue(text));
+        var running = Model("big.bin");
+        File.WriteAllBytes(running + ".part", new byte[300]); // kept from an earlier attempt: the download resumes from it
+        downloads.Start(new DownloadSpec(new Uri("https://dictate-test.invalid/big.bin"), "big.bin", 1000, null), running, () => { });
+        Assert.True(await Eventually(() => _server.InFlight == 1));
+        var queued = Model("next.bin");
+        File.WriteAllBytes(queued + ".part", new byte[100]);
+        downloads.Start(new DownloadSpec(new Uri("https://dictate-test.invalid/next.bin"), "next.bin", 500, null), queued, () => { });
+        var root = Path.GetPathRoot(Path.GetFullPath(_paths.DefaultModelsDir))!;
+        var otherDrive = (char.ToUpperInvariant(root[0]) == 'Q' ? "R" : "Q") + @":\models\far.bin"; // never started: nothing touches that drive
+        downloads.Start(new DownloadSpec(new Uri("https://dictate-test.invalid/far.bin"), "far.bin", 7000, null), otherDrive, () => { });
+
+        Assert.Equal(700 + 400, downloads.PendingBytes(_paths.DefaultModelsDir));
+        Assert.Equal(400, downloads.PendingBytes(_paths.DefaultModelsDir, exceptRunning: true));
+        Assert.Equal(7000, downloads.PendingBytes(Path.GetDirectoryName(otherDrive)!));
+        downloads.Cancel(DownloadCancelReason.Quit);
+        Assert.True(await Eventually(() => !downloads.IsDownloading));
+    }
+
+    /// <summary>Second lens 4: the two PROPOSED variants of the refusal and the warning, used only while downloads are pending.</summary>
+    [Fact]
+    public void The_space_messages_count_pending_downloads()
+    {
+        const long file = 500_000_000, pending = 300_000_000;
+        var spare = Storage.DiskSpace.SpareBytes;
+        Assert.Equal($"Not enough space for a.bin ({ModelCatalog.FormatSize(file)}): {ModelCatalog.FormatSize(file + pending + spare - 1)} is free on that drive, the downloads already under way need {ModelCatalog.FormatSize(pending)} of it, and Dictum keeps 200 MB spare. Free some space, or choose another model folder in Settings > Models.",
+            Storage.DiskSpace.DownloadRefusal(@"C:\m", "a.bin", file, _ => file + pending + spare - 1, pending));
+        Assert.Null(Storage.DiskSpace.DownloadRefusal(@"C:\m", "a.bin", file, _ => file + pending + spare, pending));
+        Assert.Null(Storage.DiskSpace.DownloadRefusal(@"C:\m", "a.bin", file, _ => file + spare)); // nothing pending: as before
+
+        Assert.Equal($"Warning: only {ModelCatalog.FormatSize(700_000_000)} is free on that drive, not enough for this download beside the downloads already under way",
+            Storage.DiskSpace.DownloadWarning(@"C:\m", file, _ => 700_000_000, pending));
+        var warnBelow = Storage.DiskSpace.WarnBelowBytes;
+        Assert.Null(Storage.DiskSpace.DownloadWarning(@"C:\m", file, _ => file + warnBelow)); // 2 GB left with nothing pending
+        Assert.Equal($"Warning: this leaves only {ModelCatalog.FormatSize(warnBelow - pending)} free on that drive (under 2 GB)",
+            Storage.DiskSpace.DownloadWarning(@"C:\m", file, _ => file + warnBelow, pending));
     }
 
     /// <summary>Lens 3: a queued download is checked for space again when its turn comes, and refused with the low-space balloon.</summary>

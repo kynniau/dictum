@@ -36,7 +36,7 @@ public sealed class ModelCoordinatorTests : IDisposable
             return false;
         }
 
-        public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress)
+        public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true)
         {
             ConfirmCalls++;
             return BusyDownloadChoice.Cancel;

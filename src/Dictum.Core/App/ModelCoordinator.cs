@@ -87,10 +87,11 @@ public sealed class ModelCoordinator(
     private int _choices;
 
     /// <summary>The download question's note, with the low-space warning when the download would leave under 2 GB (SPEC §17).</summary>
-    private string WithSpaceWarning(string note, long? bytes)
+    /// <param name="exceptRunning">Count the downloads waiting but not the running one: the question offers only to stop it.</param>
+    private string WithSpaceWarning(string note, long? bytes, bool exceptRunning = false)
     {
         var folder = paths.ModelsDir(settings());
-        return bytes is long b && Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder)) is { } warning ? $"{note}. {warning}" : note;
+        return bytes is long b && Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder, exceptRunning)) is { } warning ? $"{note}. {warning}" : note;
     }
 
     /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
@@ -427,8 +428,11 @@ public sealed class ModelCoordinator(
             balloon(OnItsWay(name, state), false);
             return;
         }
-        if (RefuseOffline(spec.FileName) || RefuseLowSpace(destination, spec.FileName, spec.Bytes)) return;
-        var question = WithSpaceWarning(note, spec.Bytes);
+        // Refused before asking only when it would not fit even with the running download stopped; when it fits only that
+        // way, the question offers Stop and Cancel, not Download after it (second lens, 19/10/2026).
+        if (RefuseOffline(spec.FileName) || RefuseLowSpace(destination, spec.FileName, spec.Bytes, exceptRunning: true)) return;
+        var canWait = LowSpaceRefusal([(destination, spec.Bytes)], spec.FileName) is null;
+        var question = WithSpaceWarning(note, spec.Bytes, exceptRunning: !canWait);
         void Start()
         {
             SetChoice(speech, token);
@@ -439,7 +443,7 @@ public sealed class ModelCoordinator(
             if (prompts.ConfirmDownload(spec.FileName, sizeText, question)) Start();
             return;
         }
-        switch (prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), _downloads.Progress ?? "0%"))
+        switch (prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), _downloads.Progress ?? "0%", canWait))
         {
             case BusyDownloadChoice.DownloadAfter:
                 Start();
@@ -544,9 +548,21 @@ public sealed class ModelCoordinator(
     /// (<see cref="Storage.DiskSpace.DownloadRefusal"/>), before it is asked and again before it starts. A kept partial download
     /// needs only the rest. Unknown sizes and unknown free space (a network share) go ahead.
     /// </summary>
-    private bool RefuseLowSpace(string destination, string fileNames, long? bytes) => RefuseLowSpace([(destination, bytes)], fileNames);
+    private bool RefuseLowSpace(string destination, string fileNames, long? bytes, bool exceptRunning = false) =>
+        RefuseLowSpace([(destination, bytes)], fileNames, exceptRunning);
 
-    private bool RefuseLowSpace(IReadOnlyList<(string Destination, long? Bytes)> files, string fileNames)
+    private bool RefuseLowSpace(IReadOnlyList<(string Destination, long? Bytes)> files, string fileNames, bool exceptRunning = false)
+    {
+        if (LowSpaceRefusal(files, fileNames, exceptRunning) is not { } refusal) return false;
+        balloon(refusal, true);
+        return true;
+    }
+
+    /// <summary>
+    /// Why <paramref name="files"/> would be refused for space, or null. The downloads already running or waiting on that drive
+    /// need their space too (lens, 19/10/2026); <paramref name="exceptRunning"/> leaves the running one out.
+    /// </summary>
+    private string? LowSpaceRefusal(IReadOnlyList<(string Destination, long? Bytes)> files, string fileNames, bool exceptRunning = false)
     {
         long needed = 0;
         foreach (var (destination, bytes) in files)
@@ -555,12 +571,9 @@ public sealed class ModelCoordinator(
             var part = new FileInfo(destination + ".part");
             needed += part.Exists && part.Length < total ? total - part.Length : total; // the downloader resumes a kept .part from its end
         }
-        if (needed == 0) return false;
+        if (needed == 0) return null;
         var folder = Path.GetDirectoryName(Path.GetFullPath(files[0].Destination))!;
-        // The downloads already running or waiting on that drive need their space too (lens, 19/10/2026).
-        if (Storage.DiskSpace.DownloadRefusal(folder, fileNames, needed, _freeBytes, _downloads.PendingBytes(folder)) is not { } refusal) return false;
-        balloon(refusal, true);
-        return true;
+        return Storage.DiskSpace.DownloadRefusal(folder, fileNames, needed, _freeBytes, _downloads.PendingBytes(folder, exceptRunning));
     }
 
     /// <summary>

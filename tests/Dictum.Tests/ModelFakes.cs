@@ -177,9 +177,9 @@ internal sealed class ScriptedPrompts : IModelPrompts
     /// <summary>Each busy question's text and buttons, as the window would show them.</summary>
     public List<(string Text, string[] Buttons)> BusyQuestions { get; } = [];
 
-    public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress)
+    public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true)
     {
-        BusyQuestions.Add((ModelPromptText.BusyText(fileName, sizeText, note, chosen, running, runningProgress), ModelPromptText.BusyChoices(chosen)));
+        BusyQuestions.Add((ModelPromptText.BusyText(fileName, sizeText, note, chosen, running, runningProgress, canWait), ModelPromptText.BusyChoices(chosen, canWait)));
         LastNote = note;
         WhenBusyAsked?.Invoke(); // while the question is open: a test looks at the running download here
         return Busy;
