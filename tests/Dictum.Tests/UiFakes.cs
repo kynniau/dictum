@@ -240,6 +240,15 @@ internal sealed class ScriptedDialogs : IShellDialogs
         return ConfirmDownloads;
     }
 
+    /// <summary>The answer to the download question asked while another download runs (Cancel, until a test says otherwise).</summary>
+    public BusyDownloadChoice BusyDownload { get; set; } = BusyDownloadChoice.Cancel;
+
+    public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress)
+    {
+        DownloadQuestions.Add(fileName);
+        return BusyDownload;
+    }
+
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;
 
     public string? ChooseFolder(string initialDir)

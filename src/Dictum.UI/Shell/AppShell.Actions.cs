@@ -209,7 +209,7 @@ public sealed partial class AppShell
             return false;
 
         _log.Info("Remove Dictum completely: confirmed twice; deleting.");
-        Models.CancelDownload();
+        Models.CancelDownload(DownloadCancelReason.Remove);
         _models.Unload();
         _llm.Unload();
         _watcher?.Dispose();

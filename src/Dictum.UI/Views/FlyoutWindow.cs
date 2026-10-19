@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Platform;
 using Dictum.Settings;
 using Dictum.UI.Shell;
@@ -79,7 +80,7 @@ internal sealed class FlyoutWindow : Window
         AutomationProperties.SetName(_speech, "Speech model");
         AutomationProperties.SetName(_cleanup, "Clean-up");
         AutomationProperties.SetName(_mic, "Microphone");
-        _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => shell.Models.CancelDownload()));
+        _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // Why a model could not load or runs on the CPU, under the header, with what to do about it (Store investigation, 16/10/2026).
         _tryCpu = Ui.Button(AppShell.TryOnCpuLabel, "link", () =>
         {
@@ -256,15 +257,37 @@ internal sealed class FlyoutWindow : Window
         var current = _shell.Models.CurrentName;
         var names = ModelCatalog.Entries.Select(e => e.Name).ToList();
         if (!names.Contains(current)) names.Insert(0, current); // a model file chosen from disk
-        _speech.ItemsSource = names.Select(n => ModelCatalog.Find(n) is { } info && !_shell.Models.IsDownloaded(info) ? $"{n} (download)" : n).ToList();
-        _speech.Tag = names;
-        _speech.SelectedIndex = names.IndexOf(current);
+        Fill(_speech, names, [.. names.Select(n => ModelCatalog.Find(n) is { } info && !_shell.Models.IsDownloaded(info) ? $"{n}{DownloadMark(info.FileName)}" : n)], current);
+    }
+
+    // PROPOSED copy (19/10/2026), for the product owner to approve: a picker entry whose file is on its way (Store 10.1.2.10).
+    internal const string DownloadingMark = " (downloading)";
+    internal const string WaitingMark = " (waiting to download)";
+
+    /// <summary>What a catalogue entry that is not on this PC carries: downloading, waiting its turn, or "(download)".</summary>
+    private string DownloadMark(string fileName) => _shell.Models.DownloadStateOf(fileName) switch
+    {
+        Dictum.App.DownloadState.Running => DownloadingMark,
+        Dictum.App.DownloadState.Waiting => WaitingMark,
+        _ => " (download)",
+    };
+
+    /// <summary>
+    /// Sets a picker's entries and its selection, touching each only when it changed: a download's progress refreshes the panel
+    /// many times a second, and resetting the list each time closed an open drop-down and put the choice back mid-pick.
+    /// </summary>
+    private static void Fill(ComboBox picker, List<string> names, List<string> labels, string current)
+    {
+        if (picker.ItemsSource is not List<string> shown || !shown.SequenceEqual(labels)) picker.ItemsSource = labels;
+        picker.Tag = names;
+        var index = names.IndexOf(current);
+        if (picker.SelectedIndex != index) picker.SelectedIndex = index;
     }
 
     private void FillCleanup(AppSettings s)
     {
         var names = CleanupCatalog.Entries.Select(e => e.Name).ToList();
-        var labels = names.Select(n => _shell.Models.IsCleanupDownloaded(CleanupCatalog.Find(n)!) ? $"{n} · local" : $"{n} · local (download)").ToList();
+        var labels = names.Select(n => CleanupCatalog.Find(n)! is var info && _shell.Models.IsCleanupDownloaded(info) ? $"{n} · local" : $"{n} · local{DownloadMark(info.FileName)}").ToList();
         names.Add(LlmSettings.NoProvider);
         labels.Add("Rule-based tidy");
         var current = s.Llm.Provider switch
@@ -278,9 +301,7 @@ internal sealed class FlyoutWindow : Window
             names.Insert(0, current);
             labels.Insert(0, s.Llm.Provider == LlmSettings.Local ? $"{System.IO.Path.GetFileName(current)} · local" : $"{_shell.Models.CurrentCleanupName} · cloud");
         }
-        _cleanup.ItemsSource = labels;
-        _cleanup.Tag = names;
-        _cleanup.SelectedIndex = names.IndexOf(current);
+        Fill(_cleanup, names, labels, current);
     }
 
     private void FillMicrophones(AppSettings s)

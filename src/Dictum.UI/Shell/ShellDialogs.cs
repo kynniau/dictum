@@ -89,6 +89,14 @@ public sealed class ShellDialogs : IShellDialogs
     public bool ConfirmDownload(string fileName, string sizeText, string note) =>
         Ask("Download a model", ModelPromptText.ConfirmText(fileName, sizeText, note), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
 
+    /// <summary>The same question window with three answers: Download after it (Enter), Stop … and download … (it deletes progress), Cancel.</summary>
+    public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress)
+    {
+        var labels = ModelPromptText.BusyChoices(chosen, running);
+        return ModelPromptText.BusyAnswer(Ask("Download a model", ModelPromptText.BusyText(fileName, sizeText, note, chosen, running, runningProgress),
+            new DialogChoice(labels[0], IsDefault: true), new DialogChoice(labels[1], IsDanger: true), new DialogChoice(labels[2])));
+    }
+
     /// <summary>The system's file chooser.</summary>
     public string? ChooseFile(string initialDir, bool cleanupModel) => WithStorage(initialDir, (storage, start) =>
     {

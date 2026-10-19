@@ -62,6 +62,26 @@ public sealed class ModelCoordinator(
     /// <summary>How far the running download has got (0-1), or null.</summary>
     public double? DownloadFraction => _downloads.Fraction;
 
+    /// <summary>How far the running download has got, as the status line says it ("42%", or "12 MB" when its size is unknown), or null.</summary>
+    public string? DownloadProgress => _downloads.Progress;
+
+    /// <summary>Whether a download of this model file is running, waiting its turn, or neither (Settings > Models, the tray pickers).</summary>
+    public DownloadState DownloadStateOf(string fileName) => _downloads.StateOfFile(fileName);
+
+    /// <summary>
+    /// Tests only: swaps the spec of every download for one their in-memory server can satisfy (a catalogue file's real size
+    /// and SHA-256 cannot be served by a test). Null in the app.
+    /// </summary>
+    internal Func<DownloadSpec, DownloadSpec>? TestSpecs { get; init; }
+
+    // Last choice wins (decision of 19/10/2026): the latest model choice of each kind, as a token. A choice that downloads
+    // holds its destination's full path; a written choice (TryWrite of whisper.model, or of llm.provider / llm.model) holds a
+    // fresh marker. A download's switch runs only while its token is still the latest, so a download that arrives after the
+    // user chose another model does not switch them away from it. A hand edit of settings.json is not seen here.
+    private string? _speechChoice;
+    private string? _cleanupChoice;
+    private int _choices;
+
     /// <summary>The download question's note, with the low-space warning when the download would leave under 2 GB (SPEC §17).</summary>
     private string WithSpaceWarning(string note, long? bytes) =>
         bytes is long b && Storage.DiskSpace.DownloadWarning(paths.ModelsDir(settings()), b, _freeBytes) is { } warning ? $"{note}. {warning}" : note;
@@ -311,7 +331,13 @@ public sealed class ModelCoordinator(
         if (_firstRunCleanupDownload is { } name && CleanupCatalog.Find(name) is { } info)
         {
             _firstRunCleanupDownload = null;
-            StartDownload(info.Download, path, () => llm.BeginLoad(path, settings().Llm.Gpu));
+            StartDownload(info.Download, path, () =>
+            {
+                // Last choice wins: a clean-up choice made while it downloaded stands (the reload after it loaded that one).
+                var now = settings();
+                if (now.Llm.Provider == LlmSettings.Local && SamePath(SettingsFile.CleanupModelPath(now, paths, BundledCheck), path)) llm.BeginLoad(path, now.Llm.Gpu);
+                else log.Info($"{info.Name} arrived, but another clean-up choice was made meanwhile, so it is not loaded.");
+            });
             return;
         }
         if (_downloads.IsFetching(path)) return; // on its way: it loads when it arrives
@@ -340,41 +366,108 @@ public sealed class ModelCoordinator(
         }
     }
 
-    /// <summary>A speech catalogue entry was chosen (tray panel or Settings > Models).</summary>
+    /// <summary>
+    /// A speech catalogue entry was chosen (tray panel or Settings > Models). A model on this PC is switched to at once; one
+    /// that is not goes through <see cref="ChooseDownload"/>. Neither cancels a download already running (Store 10.1.2.10,
+    /// 19/10/2026): only the Stop answer to the question asked first does.
+    /// </summary>
     public void Select(string name)
     {
         if (ModelCatalog.Find(name) is not { } info) return;
-        if (IsDownloading)
-        {
-            _ = CancelThenAsync(() => Select(name)); // choosing another model cancels the running download (README)
-            return;
-        }
         _launchOverride = null; // a tray choice replaces a --model launch override
         if (EnvOverride) balloon("The DICTUM_MODEL_PATH environment variable is set and still overrides the model choice.", true);
-        var destination = ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings()));
-        if (IsDownloaded(info)) SetValues(("whisper.model", info.Name));
-        else if (!RefuseOffline(info.FileName) && !RefuseLowSpace(destination, info.FileName, info.Bytes)
-                 && prompts.ConfirmDownload(info.FileName, info.SizeText, WithSpaceWarning($"{info.TradeOff}. {SwitchNote}", info.Bytes)))
-            StartDownload(info.Download, destination, () => SetValues(("whisper.model", info.Name)));
+        (string, string)[] values = [("whisper.model", info.Name)];
+        if (IsDownloaded(info)) SetValues(values); // a download running meanwhile carries on; its own switch then defers to this choice
+        else ChooseDownload(info.Name, info.Download, ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), info.SizeText,
+            $"{info.TradeOff}. {SwitchNote}", values, speech: true);
     }
 
-    /// <summary>A cleanup catalogue entry was chosen (tray panel or Settings).</summary>
+    /// <summary>A cleanup catalogue entry was chosen (tray panel or Settings): as <see cref="Select"/>, after the login check.</summary>
     public void SelectCleanup(string name)
     {
         if (CleanupCatalog.Find(name) is not { } info) return;
-        if (IsDownloading)
-        {
-            _ = CancelThenAsync(() => SelectCleanup(name));
-            return;
-        }
         (string, string)[] values = [("llm.provider", LlmSettings.Local), ("llm.model", info.Name)];
-        var destination = CleanupCatalog.ResolvePath(info.Name, paths.ModelsDir(settings()));
         if (IsCleanupDownloaded(info)) SetValues(values);
         else if (info.RequiresLogin) balloon($"{info.Name} {ModelDownloader.LoginRequired}.", true);
-        else if (!RefuseOffline(info.FileName) && !RefuseLowSpace(destination, info.FileName, info.Bytes) && prompts.ConfirmDownload(info.FileName, info.SizeText,
-                     WithSpaceWarning(info.TradeOff + (info.CommercialUse ? "" : ". Licence: " + info.Licence) + ". " + SwitchNote, info.Bytes)))
-            StartDownload(info.Download, destination, () => SetValues(values));
+        else ChooseDownload(info.Name, info.Download, CleanupCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), info.SizeText,
+            info.TradeOff + (info.CommercialUse ? "" : ". Licence: " + info.Licence) + ". " + SwitchNote, values, speech: false);
     }
+
+    /// <summary>
+    /// A model that is not on this PC was chosen (decision of 19/10/2026; nothing here cancels before the user answers):
+    /// <list type="number">
+    /// <item>already downloading or waiting its turn: a balloon says so and nothing else changes, except that it becomes the
+    /// latest choice again, so it is switched to when it arrives;</item>
+    /// <item>offline_only, or too little space: refused with a balloon, as before;</item>
+    /// <item>no other download: the usual question, then the download;</item>
+    /// <item>another download running: one question first, with Download after it (queued behind it, which keeps its bytes),
+    /// Stop … and download … (the only answer that cancels), and Cancel (nothing changes).</item>
+    /// </list>
+    /// When the file arrives its values are written, unless a later choice of the same kind was made meanwhile (last choice wins).
+    /// </summary>
+    private void ChooseDownload(string name, DownloadSpec spec, string destination, string sizeText, string note, (string, string)[] values, bool speech)
+    {
+        var token = Path.GetFullPath(destination);
+        void Apply() => ApplyIfLatest(speech, token, name, values);
+        var state = _downloads.StateOf(destination);
+        if (state != DownloadState.None)
+        {
+            SetChoice(speech, token);
+            _downloads.AlsoOnArrival(destination, Apply); // a calibration or first-run download of it switches too, now that it is chosen
+            balloon(state == DownloadState.Running
+                ? $"{name} is already downloading ({_downloads.Progress})." // PROPOSED copy, 19/10/2026
+                : $"{name} is already waiting to download.", false); // PROPOSED copy, 19/10/2026
+            return;
+        }
+        if (RefuseOffline(spec.FileName) || RefuseLowSpace(destination, spec.FileName, spec.Bytes)) return;
+        var question = WithSpaceWarning(note, spec.Bytes);
+        void Start()
+        {
+            SetChoice(speech, token);
+            StartDownload(spec, destination, Apply); // behind a running download, it waits its turn (ModelDownloads.Start)
+        }
+        if (_downloads.CurrentDestination is not { } runningTo)
+        {
+            if (prompts.ConfirmDownload(spec.FileName, sizeText, question)) Start();
+            return;
+        }
+        switch (prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), _downloads.Progress ?? "0%"))
+        {
+            case BusyDownloadChoice.DownloadAfter:
+                Start();
+                break;
+            case BusyDownloadChoice.StopAndDownload:
+                _ = CancelThenAsync(name, Start);
+                break;
+            default:
+                log.Info($"{name} not downloaded: the user kept the download in progress ({_downloads.CurrentFile}).");
+                break;
+        }
+    }
+
+    /// <summary>A download's switch: writes <paramref name="values"/> only while <paramref name="token"/> is still the latest choice of its kind.</summary>
+    private void ApplyIfLatest(bool speech, string token, string name, (string, string)[] values)
+    {
+        if ((speech ? _speechChoice : _cleanupChoice) != token)
+        {
+            log.Info($"{name} arrived, but a later model choice stands, so Dictum does not switch to it.");
+            return;
+        }
+        SetValues(values);
+    }
+
+    private void SetChoice(bool speech, string token)
+    {
+        if (speech) _speechChoice = token;
+        else _cleanupChoice = token;
+    }
+
+    /// <summary>The short name of the model a download writes (base.en, qwen2.5-1.5b), for the question and its buttons.</summary>
+    private static string ShortName(string destination) => destination.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase)
+        ? CleanupCatalog.DisplayName(Path.GetFullPath(destination))
+        : ModelCatalog.DisplayName(Path.GetFullPath(destination));
+
+    private static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Tray: "No AI cleanup (rule-based tidy)".</summary>
     public void SelectRulesOnly() => SetValues(("llm.provider", LlmSettings.NoProvider));
@@ -395,12 +488,19 @@ public sealed class ModelCoordinator(
         if (file is not null) SetValues(("llm.provider", LlmSettings.Local), ("llm.model", file));
     }
 
-    /// <summary>Tray: "Cancel download" (and quit): the running download and any waiting their turn.</summary>
-    public void CancelDownload() => _downloads.Cancel();
+    /// <summary>
+    /// Stops the running download and any waiting their turn: the Cancel download link (a balloon says it), quit and Remove
+    /// Dictum completely (the log only).
+    /// </summary>
+    public void CancelDownload(DownloadCancelReason reason) => _downloads.Cancel(reason);
 
-    private async Task CancelThenAsync(Action next)
+    /// <summary>A choice's Stop answer: cancels the download in progress (its balloon names <paramref name="chosen"/>), waits for its .part to go, then runs <paramref name="next"/>.</summary>
+    private async Task CancelThenAsync(string chosen, Action next)
     {
-        _downloads.Cancel();
+        // simplification: Stop also drops any download waiting behind the running one (ModelDownloads.Cancel drops the queue;
+        // each is logged, none is ballooned). Ceiling: a model queued with "Download after it" is lost when a third choice
+        // answers Stop. Trigger to retire: a report of a queued download vanishing; then cancel only the running job.
+        _downloads.Cancel(DownloadCancelReason.Choice, chosen);
         try
         {
             if (_downloads.Running is { } running) await running; // lets the cancelled download delete its .part first
@@ -485,32 +585,42 @@ public sealed class ModelCoordinator(
             if (!SettingsFile.SetValue(paths.SettingsFile, key, value?.DeepClone(), out failure)) return false;
         }
         log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
+        // A written model choice is the latest of its kind: a download still on its way no longer switches to its own model.
+        if (values.Any(v => v.Key == "whisper.model")) _speechChoice = $"written {++_choices}";
+        if (values.Any(v => v.Key is "llm.provider" or "llm.model")) _cleanupChoice = $"written {++_choices}";
         if (reloadAfter) reload(); // re-reads settings and hot-swaps the model (hotkey ignored while a speech model loads)
         return true;
     }
 
     /// <summary>
     /// Tray → Mode and the calibration window (SPEC §16.1, §16.5): when every listed model is on disk, writes the values at
-    /// once (cancelling a download in progress, as any other model choice does); otherwise asks once (names, total size,
-    /// host, <paramref name="note"/>), downloads the missing files one after another through the same downloader (refused
-    /// under offline_only, as every download is) behind any download already running, and writes the values only when all
-    /// have arrived.
+    /// once, cancelling nothing (a download in progress carries on, and its own switch defers to this choice: last choice
+    /// wins; decision of 19/10/2026); otherwise asks once (names, total size, host, <paramref name="note"/>), downloads the
+    /// missing files one after another through the same downloader (refused under offline_only, as every download is) behind
+    /// any download already running, and writes the values only when all have arrived, unless a later choice of a model kind
+    /// the values set was made meanwhile (then nothing is written and <paramref name="finished"/> is told false).
     /// </summary>
     /// <param name="note">The question's explanation: what the download is for and whether Dictum then switches to it.</param>
     /// <param name="finished">Told true when the values were applied, false when nothing will be (declined, refused, failed).</param>
     public void ApplyWithDownloads(string note, IReadOnlyList<(DownloadSpec Spec, string Destination)> missing, (string Key, JsonNode? Value)[] values, Action? then = null,
         Action<bool>? finished = null)
     {
+        string? speechToken = null, cleanupToken = null; // set once the download is agreed: this preset is then the latest choice of each kind it sets
         void Finish()
         {
+            if (speechToken is not null && _speechChoice != speechToken || cleanupToken is not null && _cleanupChoice != cleanupToken)
+            {
+                log.Info($"{string.Join(" and ", missing.Select(m => m.Spec.FileName))} arrived, but a later model choice stands, so these settings are not applied.");
+                finished?.Invoke(false);
+                return;
+            }
             Write(values);
             then?.Invoke();
             finished?.Invoke(true);
         }
         if (missing.Count == 0)
         {
-            if (IsDownloading) _ = CancelThenAsync(Finish);
-            else Finish();
+            Finish(); // never cancels a download in progress (Store 10.1.2.10, 19/10/2026)
             return;
         }
         var names = string.Join(" and ", missing.Select(m => m.Spec.FileName));
@@ -536,6 +646,8 @@ public sealed class ModelCoordinator(
             finished?.Invoke(false);
             return;
         }
+        if (values.Any(v => v.Key == "whisper.model")) _speechChoice = speechToken = $"chosen {++_choices}";
+        if (values.Any(v => v.Key is "llm.provider" or "llm.model")) _cleanupChoice = cleanupToken = $"chosen {++_choices}";
         DownloadInTurn(missing, 0, Finish, () => finished?.Invoke(false));
     }
 
@@ -563,6 +675,6 @@ public sealed class ModelCoordinator(
             onFailure?.Invoke();
             return;
         }
-        _downloads.Start(spec, destination, onSuccess, onFailure);
+        _downloads.Start(TestSpecs?.Invoke(spec) ?? spec, destination, onSuccess, onFailure);
     }
 }

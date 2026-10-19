@@ -99,7 +99,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   automatically (see "Model downloads and checks").
 - **Mode**: **Light** | **Full** (see "Mode presets"); neither is selected when settings.json matches neither (Custom).
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
-  (name, size, host), downloads it, then switches. Clean-up also offers **Rule-based tidy**.
+  (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;
+  choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy**.
 - **Microphone** picker (System default, or a named device: `audio.device`) and a level meter that moves while you
   dictate.
 - **Big recording indicator** (Off | Orb | Edge | Both), **Profanity filter** (on = Mask; Remove is in Settings >
@@ -550,8 +551,18 @@ CPUs, Azure VMs.
   tooltip continuing from there. Only then does it say "Model download failed after 8 attempts (…). Check your
   network, then choose it again …: it carries on from where it stopped": the partial file is kept, and the next
   request hashes it and resumes from its end (the final SHA-256 check still covers the whole file; a kept file that
-  does not match is deleted). **Cancel download** (tray panel or Settings > Models; or choosing another model) stops at once and deletes the
+  does not match is deleted). **Cancel download** (tray panel or Settings > Models) stops at once and deletes the
   partial file. The log has one warning per failed attempt with the full exception chain.
+- **Choosing a model never cancels a download by itself** (since 19/10/2026). Choosing the model that is downloading
+  again only says "<name> is already downloading (42%)." (or "…is already waiting to download."); in Settings > Models
+  its row shows "Downloading 42%" (or "Waiting to download") with its button disabled, and the tray pickers mark it
+  "(downloading)". Choosing a model that is already on this PC switches to it at once and the download carries on.
+  Choosing another model that needs a download asks first, saying what is downloading and how far it has got:
+  **Download after it** (the default: it waits its turn, and the running download keeps its bytes), **Stop <running>
+  and download <new>** (the only answer that cancels; the balloon says "Download of <file> stopped: you chose <name>."),
+  or **Cancel** (nothing changes). A Mode preset whose models are all on this PC is applied without cancelling anything,
+  and pressing the Mode that is already chosen does nothing. **The last choice wins:** a download that arrives after you
+  chose another model of the same kind (speech, or clean-up) does not switch you to it.
 - **Files Dictum did not download are checked on first use.** A catalogue model that arrived another way (copied
   with `install.ps1 -ModelsFrom`, fetched with curl, left by an older build) is hashed the first time it is loaded
   and refused if it does not match: a notification, an error in the tooltip, `[FAIL]` in

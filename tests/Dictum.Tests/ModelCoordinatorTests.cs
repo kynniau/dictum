@@ -36,6 +36,12 @@ public sealed class ModelCoordinatorTests : IDisposable
             return false;
         }
 
+        public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress)
+        {
+            ConfirmCalls++;
+            return BusyDownloadChoice.Cancel;
+        }
+
         public string? ChooseFile(string initialDir, bool cleanupModel) => null;
     }
 
