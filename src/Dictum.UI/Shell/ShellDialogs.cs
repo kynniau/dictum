@@ -89,6 +89,23 @@ public sealed class ShellDialogs : IShellDialogs
     public bool ConfirmDownload(string fileName, string sizeText, string note) =>
         Ask("Download a model", ModelPromptText.ConfirmText(fileName, sizeText, note), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
 
+    /// <summary>
+    /// The same question window with three answers: Download after it (Enter), Stop … and download … (it deletes progress),
+    /// Cancel. Without room to wait (<paramref name="canWait"/> false), only Stop and Cancel, and Enter presses Cancel.
+    /// </summary>
+    public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true) =>
+        ModelPromptText.BusyAnswer(Ask("Download a model", ModelPromptText.BusyText(fileName, sizeText, note, chosen, running, runningProgress, canWait),
+            BusyDialogChoices(chosen, canWait)), canWait);
+
+    /// <summary>The busy question's buttons as the window shows them (a layout test builds the same window from these).</summary>
+    internal static DialogChoice[] BusyDialogChoices(string chosen, bool canWait = true)
+    {
+        var labels = ModelPromptText.BusyChoices(chosen, canWait);
+        return canWait
+            ? [new DialogChoice(labels[0], IsDefault: true), new DialogChoice(labels[1], IsDanger: true), new DialogChoice(labels[2])]
+            : [new DialogChoice(labels[0], IsDanger: true), new DialogChoice(labels[1], IsDefault: true)]; // the safe answer is the default
+    }
+
     /// <summary>The system's file chooser.</summary>
     public string? ChooseFile(string initialDir, bool cleanupModel) => WithStorage(initialDir, (storage, start) =>
     {

@@ -152,8 +152,9 @@ internal sealed class Segments : Border
             button.IsCheckedChanged += (_, _) =>
             {
                 if (_quiet) return;
+                var pressedOn = button.IsChecked == true; // false: the chosen one was pressed again
                 Select(index); // pressing the chosen one again keeps it chosen
-                if (button.IsChecked == true) changed(index);
+                if (pressedOn) changed(index); // and does nothing else: re-running a Mode preset once cancelled a download (Store 10.1.2.10, 19/10/2026)
             };
             _buttons[i] = button;
             grid.Children.Add(button);

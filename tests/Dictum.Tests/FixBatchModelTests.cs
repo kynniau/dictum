@@ -172,7 +172,7 @@ public sealed class FixBatchModelTests : IDisposable
         Assert.DoesNotContain(_balloons, b => b.Contains("not downloaded", StringComparison.Ordinal));
         Assert.True(coordinator.IsDownloading);
 
-        coordinator.CancelDownload();
+        coordinator.CancelDownload(DownloadCancelReason.CancelLink);
         Assert.True(await Eventually(() => !coordinator.IsDownloading && _server.InFlight == 0), "a download kept running after Cancel");
         await Task.Delay(300, Ct);
         Assert.Single(_server.Requests); // the queued cleanup download went with it

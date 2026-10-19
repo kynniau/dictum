@@ -1,6 +1,7 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Dictum.App;
 using Dictum.Settings;
 using Dictum.Storage;
 using Dictum.Transcribe;
@@ -22,6 +23,19 @@ internal sealed class ModelsPage : SettingsPage
     internal const string NetworkWarning = "Models load slowly from a network folder; a folder on this PC is faster.";
     internal const string IncludedState = "Included";
     internal const string AddCleanupLabel = "Add AI clean-up";
+
+    // PROPOSED copy (19/10/2026), for the product owner to approve: a catalogue row whose file is downloading or waiting its
+    // turn (Store 10.1.2.10). Its button is disabled, so choosing it again cannot restart or cancel anything.
+    internal const string WaitingState = "Waiting to download";
+    internal const string DownloadingButton = "Downloading…";
+    internal const string WaitingButton = "Waiting…";
+
+    /// <summary>PROPOSED: the state of the row whose file is downloading now, "Downloading 42%".</summary>
+    internal static string DownloadingState(string? progress) => progress is null ? "Downloading" : $"Downloading {progress}";
+
+    /// <summary>PROPOSED: the disabled button's accessible name, saying why it cannot be pressed.</summary>
+    internal static string BusyButtonName(string model, DownloadState state) =>
+        state == DownloadState.Running ? $"{model} is already downloading" : $"{model} is already waiting to download";
 
     /// <summary>PROPOSED: "Add AI clean-up (1.1 GB download)", the size read from the catalogue; without the download part once the model is on this PC.</summary>
     internal static string AddCleanupText(CleanupModelInfo model, bool onThisPc) => onThisPc ? AddCleanupLabel : $"{AddCleanupLabel} ({model.SizeText} download)";
@@ -49,6 +63,7 @@ internal sealed class ModelsPage : SettingsPage
     private (int, int)? _lookedUpAt; // the shell's ModelFilesVersion when the lookups below were made; null: look up at the next redraw
     private List<ModelFolderKind?> _sources = []; // the folder each speech catalogue entry is used from, in catalogue order
     private List<string> _cleanupOnPc = []; // the clean-up catalogue entries on this PC
+    private (TextBlock Detail, string TradeOff)? _downloadingRow; // the row whose file downloads now: its percentage changes on every tick
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -92,7 +107,7 @@ internal sealed class ModelsPage : SettingsPage
             if (Shell.Settings.Whisper.Translate != on) return; // not written (a balloon said why)
             Say(on ? "Dictum writes English whatever language you speak." : "Dictum writes what you say in the language you spoke.");
         });
-        _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload()));
+        _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // The recommended clean-up model, through the catalogue's own path (asked first, then downloaded and switched to).
         _addCleanup = Ui.Button("", "primary", () => Run(() => Shell.Models.SelectCleanup(CleanupCatalog.Recommend(Shell.GpuMachine).Model)));
         AutomationProperties.SetName(_folder, FolderLabel);
@@ -161,15 +176,31 @@ internal sealed class ModelsPage : SettingsPage
             _sources = [.. ModelCatalog.Entries.Select(Shell.Models.Source)];
             _cleanupOnPc = [.. CleanupCatalog.Entries.Where(Shell.Models.IsCleanupDownloaded).Select(e => e.Name)];
         }
-        // The lists are rebuilt only when what they show changes, not on every download-progress tick.
+        // The lists are rebuilt only when what they show changes, not on every download-progress tick (which would also take
+        // keyboard focus off a row's button): a tick only rewrites the downloading row's percentage.
         var downloaded = string.Join(",", _sources) + "|" + string.Join(",", _cleanupOnPc);
-        var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}";
-        if (key == _drawn) return;
-        _drawn = key;
+        var fetching = string.Join(",", ModelCatalog.Entries.Select(e => Shell.Models.DownloadStateOf(e.FileName)))
+                       + "|" + string.Join(",", CleanupCatalog.Entries.Select(e => Shell.Models.DownloadStateOf(e.FileName)));
+        var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}|{fetching}";
+        if (key != _drawn)
+        {
+            _drawn = key;
+            DrawLists(s);
+        }
+        if (_downloadingRow is var (detail, tradeOff)) detail.Text = $"{DownloadingState(Shell.Models.DownloadProgress)} · {tradeOff}";
+    }
+
+    private void DrawLists(AppSettings s)
+    {
+        _downloadingRow = null;
 
         var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(Shell.GpuMachine).Model)!;
         _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
         _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider;
+        // While that model downloads or waits its turn, the button is disabled and named for why, as its row is (lens, 19/10/2026).
+        var fetch = Shell.Models.DownloadStateOf(recommended.FileName);
+        _addCleanup.IsEnabled = fetch == DownloadState.None;
+        AutomationProperties.SetName(_addCleanup, fetch == DownloadState.None ? null : BusyButtonName(recommended.Name, fetch));
 
         _speech.Children.Clear();
         for (var i = 0; i < ModelCatalog.Entries.Count; i++)
@@ -178,8 +209,7 @@ internal sealed class ModelsPage : SettingsPage
             var inUse = e.Name == Shell.Models.CurrentName;
             var have = _sources[i] is not null;
             var state = inUse ? "In use" : !have ? "Not downloaded" : _sources[i] == ModelFolderKind.Bundled ? IncludedState : "Downloaded";
-            _speech.Children.Add(ModelRow($"{e.Name} · {e.SizeText}", $"{state} · {e.TradeOff}",
-                inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.Select(e.Name))));
+            _speech.Children.Add(CatalogueRow(e.Name, $"{e.Name} · {e.SizeText}", state, e.TradeOff, inUse, have, e.FileName, () => Run(() => Shell.Models.Select(e.Name))));
         }
         if (ModelCatalog.Find(Shell.Models.CurrentName) is null)
             _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.CurrentPath}", null, () => { }));
@@ -190,8 +220,8 @@ internal sealed class ModelsPage : SettingsPage
         {
             var inUse = e.Name == current;
             var have = _cleanupOnPc.Contains(e.Name);
-            _cleanup.Children.Add(ModelRow($"{e.Name} · {e.SizeText}{e.Marker}", $"{(inUse ? "In use" : have ? "Downloaded" : "Not downloaded")} · {e.TradeOff}",
-                inUse ? null : have ? "Use" : "Download…", () => Run(() => Shell.Models.SelectCleanup(e.Name))));
+            _cleanup.Children.Add(CatalogueRow(e.Name, $"{e.Name} · {e.SizeText}{e.Marker}", inUse ? "In use" : have ? "Downloaded" : "Not downloaded", e.TradeOff,
+                inUse, have, e.FileName, () => Run(() => Shell.Models.SelectCleanup(e.Name))));
         }
         if (current is null)
             _cleanup.Children.Add(Ui.Text($"In use: {Shell.Models.CurrentCleanupName}{(s.Llm.Provider == LlmSettings.NoProvider ? " (rule-based tidy)" : "")}", "caption"));
@@ -204,12 +234,30 @@ internal sealed class ModelsPage : SettingsPage
         base.Leave();
     }
 
-    private static Grid ModelRow(string title, string detail, string? action, Action click)
+    /// <summary>
+    /// A catalogue row: In use (no action), Use, or Download…; a model whose file is downloading shows "Downloading 42%" (or
+    /// "Waiting to download") with its button disabled and named for why, so it cannot be chosen again mid-download.
+    /// </summary>
+    private Grid CatalogueRow(string name, string title, string state, string tradeOff, bool inUse, bool have, string fileName, Action click)
+    {
+        var fetch = inUse || have ? DownloadState.None : Shell.Models.DownloadStateOf(fileName);
+        if (fetch == DownloadState.None) return ModelRow(title, $"{state} · {tradeOff}", inUse ? null : have ? "Use" : "Download…", click);
+        var running = fetch == DownloadState.Running;
+        var row = ModelRow(title, running ? $"{DownloadingState(Shell.Models.DownloadProgress)} · {tradeOff}" : $"{WaitingState} · {tradeOff}",
+            running ? DownloadingButton : WaitingButton, click, out var detail, enabled: false, name: BusyButtonName(name, fetch));
+        if (running) _downloadingRow = (detail, tradeOff);
+        return row;
+    }
+
+    private static Grid ModelRow(string title, string detail, string? action, Action click) => ModelRow(title, detail, action, click, out _);
+
+    private static Grid ModelRow(string title, string detail, string? action, Action click, out TextBlock detailText, bool enabled = true, string? name = null)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
-        grid.Children.Add(Ui.Stack(2, Ui.Text(title, "body"), Ui.Text(detail, "hint")));
-        var button = Ui.Button(action ?? "In use", action is null ? "quiet" : "secondary", click);
-        button.IsEnabled = action is not null;
+        detailText = Ui.Text(detail, "hint");
+        grid.Children.Add(Ui.Stack(2, Ui.Text(title, "body"), detailText));
+        var button = Ui.Button(action ?? "In use", action is null ? "quiet" : "secondary", click, name: name);
+        button.IsEnabled = enabled && action is not null;
         button.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(button, 1);
         grid.Children.Add(button);
