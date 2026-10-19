@@ -415,6 +415,8 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 16/10/2026 | The resubmission failed on 10.1.2.10, "Unusable Feature: AI models". Cause: the package neither shipped nor declared the Visual C++ runtime, and the whisper.cpp and llama.cpp natives import MSVCP140, VCRUNTIME140 and VCRUNTIME140_1 (section 6; reproduced in Windows Sandbox). |
 | 17/10/2026, 08:10 AEDT | Dictum 1.1.0 resubmitted: the framework dependency `Microsoft.VCLibs.140.00.UWPDesktop` declared, base.en bundled, the clean-up model off by default. Status "In certification". The listing and notes are the text in sections 4 and 7. |
 | 19/10/2026 | The 1.1.0 resubmission failed on 10.1.2.10: "Product shows message download cancelled when trying to download any model." Cause: choosing a model while another downloaded cancelled the running download before asking, and the UI invited that retry (DECISIONS, 19/10/2026). Fixed for 1.1.1 in PR #15; the tester notes' CHANGED paragraph in section 7 is rewritten for it. |
+| 19/10/2026, about 17:30 AEDT | Dictum 1.1.1 resubmitted (package 1.1.1.0, the no-silent-cancel fix, tester notes rewritten). Status "In certification". |
+| 20/10/2026 | Certification passed. Partner Center shows "In Microsoft Store" and https://apps.microsoft.com/detail/9N0DG1DHTR57 answers 200 with the Dictum listing (both checked 20/10/2026, 10:45 AEDT). The landing page's Store button went live the same day. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The

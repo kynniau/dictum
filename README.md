@@ -225,9 +225,8 @@ Three routes, each per user and none needing administrator rights. Pick one: the
 build on the same PC is not supported (see "Store and direct-download builds"). Coming from the earlier build, named
 Dictate: see "Moving from Dictate".
 
-1. **Microsoft Store (coming soon).** The listing, https://apps.microsoft.com/detail/9N0DG1DHTR57, goes live after
-   Microsoft's certification; until then that address answers "not found" (checked 16/10/2026). The Store signs the
-   package and keeps Dictum updated.
+1. **Microsoft Store.** https://apps.microsoft.com/detail/9N0DG1DHTR57 (live since 20/10/2026, version 1.1.1). The
+   Store signs the package and keeps Dictum updated.
 2. **Direct download: `Dictum-Setup-<version>.exe`** from the project's GitHub releases,
    https://github.com/kynniau/dictum/releases (none published yet on 16/10/2026). It installs into
    `%LOCALAPPDATA%\Programs\Dictum` with a Start menu entry, offers a desktop shortcut and launch at login (both off

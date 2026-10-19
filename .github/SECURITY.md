@@ -10,8 +10,8 @@ Never send real API keys, recordings or dictated text: describe them instead.
 
 ## Supported versions
 
-Dictum is at version 0.1.0 and has no published release yet. Fixes go into the next release; older releases are not
-patched.
+The current release is the one on https://github.com/kynniau/dictum/releases/latest and in the Microsoft Store (1.1.1 on
+20/10/2026). Fixes go into the next release; older releases are not patched.
 
 ## What Dictum promises, so what counts as a vulnerability
 
