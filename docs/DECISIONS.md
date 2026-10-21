@@ -2691,6 +2691,159 @@ The second lens returned Needs changes (no blockers). All five findings are fixe
 
    The orchestrator asked for "every feature works with no download". The paragraph instead says dictation works with no download and that larger models and AI clean-up are optional downloads. AI clean-up and the multilingual models do need a download, so "every feature" would not be accurate.
 
+## Launch crash without a working Vulkan driver (live incident, 21/10/2026, branch fix/no-vulkan-crash)
+
+**The failure.** On any PC where Whisper.net cannot load its Vulkan runtime (no Vulkan loader, or any failure in the
+Vulkan DLL graph), Dictum 1.1.1 ends at launch with `ggml.cpp:22: GGML_ASSERT(prev != ggml_uncaught_exception) failed`,
+exit code 0xC0000409, before the tray icon appears. It happens at every start: the crash comes before settings.json is
+written, so every start is a first run again.
+
+**Root cause.** An Opus investigation reproduced it on 21/10/2026 in Windows Sandbox with System32\vulkan-1*.dll renamed.
+Its findings, as relayed to this lane (the parts this lane re-checked are marked):
+
+- Whisper.net 1.9.1's `NativeLibraryLoader` loads ggml-base-whisper, ggml-cpu-whisper and ggml-vulkan-whisper one by
+  one. When one fails, it frees (`NativeLibrary.Free`) the ones already loaded.
+- Its runtime search list holds the same `runtimes\vulkan\win-x64` folder twice: once from `AppDomain.BaseDirectory`,
+  which ends in a separator, and once from the assembly or argv folder, which does not, so `Distinct` keeps both. The
+  second try maps ggml-base-whisper.dll again at the same address.
+- ggml's static initialiser (ggml.cpp) then finds its own stale `ggml_uncaught_exception` as the previous terminate
+  handler, and the `GGML_ASSERT` aborts the process.
+- The initialiser is skipped when the C runtime's `getenv("GGML_NO_BACKTRACE")` returns a value. ggml's backtrace printer
+  is "platform not supported" on Windows in this ggml, so skipping it loses nothing. Re-checked here only as far as the
+  DLLs go: the shipped ggml-base DLLs (whisper's three, and LLamaSharp's) contain the `GGML_NO_BACKTRACE` string and no
+  backtrace text.
+- `Environment.SetEnvironmentVariable` alone did not stop the crash in the investigation (the C runtime keeps its own
+  copy of the environment); P/Invoke `_putenv_s` in ucrtbase.dll did (exit 0, CPU runtime).
+- Separately, `ModelCoordinator.FirstRun` probed the runtime with `new WhisperSettings().Gpu` (auto) even when settings.json
+  said `cpu`, so the documented `whisper.gpu = cpu` escape did not work on a first run, which is exactly when this crash
+  happens.
+
+Re-checked by this lane:
+
+- The crash on the development PC without the sandbox. A copy of the 1.1.1 build (`dist\Dictum` in the main checkout,
+  1.1.1+757e66b) has `ggml-vulkan-whisper.dll`'s import `vulkan-1.dll` patched to `vulkan-X.dll` (same length; the
+  string occurs exactly once in the file). `--selftest` with `whisper.gpu = auto`, APPDATA and LOCALAPPDATA in a
+  temporary folder, exited -1073740791 (0xC0000409) with that `GGML_ASSERT` line on stderr.
+- In Windows Sandbox with `scripts\sandbox-check.ps1 -NoVulkanLoader` (below), the 1.1.1 build crashed the same way.
+- The duplicate folder and the free-then-retry in Whisper.net's loader were not re-read by this lane; the merge lens
+  verified them from source on 21/10/2026: `NativeLibraryLoader.cs` at tag 1.9.1 frees already-loaded dependencies when
+  one fails, and its search list has `AppDomain.BaseDirectory` (trailing separator) and
+  `GetSafeDirectoryName(assemblyLocation)` (a `Path.GetDirectoryName` wrapper; no trailing separator) before an ordinal `Distinct`, so the Vulkan folder appears twice.
+
+**Why the sandbox runs missed it.** `sandbox-check.wsb` turns the virtual GPU off (`VGpu Disable`), and its comments read
+as if that made a PC without a GPU. It does not:
+
+- The sandbox keeps a Vulkan loader in System32. The environment line of the 21/10/2026 run lists `vulkan-1.dll` and
+  `vulkan-1-999-0-0-0.dll`.
+- Vulkan has still found a device there. The investigation saw an Intel device. The 17/10/2026 clean-PC check above
+  records `whisper runtime … Vulkan … [OK]` in the sandbox.
+- So the Vulkan runtime loaded and the failing path was never taken. The comments are corrected, and `-NoVulkanLoader`
+  now takes the loader away.
+
+**Fix.**
+
+1. `src/Dictum.Windows/GgmlEnvironment.cs`: `Apply()` calls `_putenv_s("GGML_NO_BACKTRACE", "1")`, declared in
+   `Interop/Native.cs` with the other native calls. It also sets the variable with `Environment.SetEnvironmentVariable`,
+   so .NET readers agree. A non-zero return is logged as a warning once the log exists; it never throws. The
+   `// simplification:` note names the ceiling (ggml's terminate chain is never installed; no backtrace is lost on
+   Windows) and the trigger to retire it (Whisper.net stops freeing and retrying a ggml library, or ggml drops the
+   assert).
+2. `Program.Main` calls `GgmlEnvironment.Apply()` as its first statement, before the arguments are read. That covers
+   every mode (tray, `--selftest`, transcribe, bench, downloads) before any thread starts. `_putenv_s` is not
+   thread-safe.
+3. The first-run probe honours an explicit `whisper.gpu`. `ModelCoordinator.FirstRunProbeGpu(seeded)` gives the seeded
+   (or in-use) settings' value, else auto, and `ProbeGpuMachine(gpu)` passes it to `WhisperEngine.ProbeRuntime`. Every
+   caller of `ProbeRuntime` was checked: `SelfTestCommand`, `CliCommands` and `AppShell.ProbeGpu` already passed the
+   settings' value, and `ModelCoordinator.FirstRun` was the only one that did not.
+4. Start-up on a PC without a Vulkan loader. `WhisperEngine.RuntimeOrder` gives the CPU order for `whisper.gpu = auto`
+   when `WhisperEngine.VulkanLoaderPresent` says `vulkan-1.dll` does not load, and the order line in the log says why.
+   - Dictum.Windows sets that seam in `Main` to `GgmlEnvironment.VulkanLoaderLoads`, which calls `NativeLibrary.TryLoad`
+     and frees the handle at once. So the native call stays in the platform layer, and the ArchitectureTests still hold.
+   - `vulkan` still tries Vulkan first, and `cpu` never looks.
+   - The cost it removes: in the 21/10/2026 sandbox run, the 1.1.1 build's order line came about 10 s before its exit
+     (the run's timestamps are in whole seconds). The investigation measured about 9.4 s of failing Vulkan tries per start.
+   - A PC with a loader but a broken driver still tries Vulkan, and fix 1 is what keeps that start alive.
+
+**What the merge lens established about `SetEnvironmentVariable` (21/10/2026).** `Environment.SetEnvironmentVariable`
+alone does **not** stop the crash. The investigation observed this, and the merge lens reproduced it on 21/10/2026: a
+published build whose `Apply()` used only `SetEnvironmentVariable` (mutation M2 below) aborted 0xC0000409 in both gated
+(v) cases. Reason, from the lens's .NET 10 console experiment (framework-dependent and self-contained win-x64):
+`ucrtbase.dll` is already loaded at the first line of `Main` with `*__p__environ()` and `*__p__wenviron()` both
+non-null, and after `Environment.SetEnvironmentVariable("LENS_A","1")` ucrtbase `getenv("LENS_A")` returned null. In a
+.NET process the UCRT's environment copy therefore already exists before `Main`, so a change made through the OS
+environment block is never seen by `getenv`; ggml-base-whisper.dll imports `api-ms-win-crt-environment-l1-1-0.dll`, so
+ggml reads ucrtbase's copy. `_putenv_s` is required; `SetEnvironmentVariable` is kept only so .NET code reading the
+variable agrees. (An earlier version of this lane's record said the published M2 build did not crash and inferred that
+the UCRT builds its copy lazily; the lens disproved both, and this paragraph replaces them.)
+
+**Pins** (`tests/Dictum.Tests/NoVulkanCrashTests.cs`):
+
+- (i) After `Apply()`, ucrtbase's own `getenv("GGML_NO_BACKTRACE")` returns "1". The test first removes the variable with
+  `_putenv_s` and checks it is gone.
+- (ii) `Apply()` is the first statement of `Main`, the Vulkan seam the second, and argument parsing the third (a source
+  pin, as other pins read source).
+- (iii) `FirstRunProbeGpu` returns cpu for a seeded cpu, and auto for null or defaults. `FirstRun` itself hands the
+  seeded value to the runtime probe, through the internal `TestRuntimeProbe` stand-in.
+- (iv) `RuntimeOrder`:
+  - auto with a loader that does not load gives the CPU order and a reason;
+  - auto with a loader, or with no check, gives Vulkan first;
+  - vulkan gives Vulkan first;
+  - cpu never calls the check.
+- (v) `PublishedVulkanFailureTests`, gated on `DICTUM_PUBLISHED_DIR` and run by CI after the Publish step. It copies the
+  published layout to a temporary folder, patches the import as above (asserting exactly one occurrence), and runs
+  `Dictum.exe --selftest` with `whisper.gpu` auto and vulkan, APPDATA and LOCALAPPDATA in the temporary folder. It
+  asserts:
+  - the exit code is not 0xC0000409, and 0 or 1;
+  - stderr has no `GGML_ASSERT`;
+  - there is a `whisper runtime … CPU … [OK]` line;
+  - and either the log's order line is Vulkan first (so the CPU line is the fallback from a failed Vulkan load: the path
+    that aborted), or, for auto on a PC with no loader, the log gives the CPU order's reason.
+
+  The vulkan case takes the failing Vulkan load whatever the PC's loader does.
+- A pin that ci.yml runs (v) after the publish step.
+
+**Mutation checks** (each run and read on 21/10/2026; the PR body has the table):
+
+- M1, `Apply()` doing nothing: (i) and both (v) cases failed, and the published build aborted 0xC0000409.
+- M2 (SetEnvironmentVariable only): pin (i) and both (v) cases observed failing on the reverted behaviour (lens, 21/10/2026).
+- M3, `Apply()` moved after argument parsing: (ii) failed.
+- M4, `new WhisperSettings().Gpu` restored in `ProbeGpuMachine`: (iii) failed.
+- M5, the loader check ignored: (iv) failed.
+
+**Sandbox results (21/10/2026).** The command was `scripts\sandbox-check.ps1 -Gpu auto,cpu -NoVulkanLoader`.
+
+- Layouts:
+  - this branch, published with `-VcRuntimeDir` from the development PC's System32 copies (14.51.36247), for this
+    check only, never shipped;
+  - a copy of the 1.1.1 build with the same four DLLs beside its native folders.
+
+  The sandbox has no Visual C++ runtime, so a layout without them loads no runtime at all, and nothing can show the
+  crash. A first run with the plain layouts failed exactly that way, with `Failed to load native whisper library`.
+- The sandbox's System32 had `vulkan-1-999-0-0-0.dll` and `vulkan-1.dll`. Both were renamed, leaving none for the runs.
+- Engine lines:
+  - this branch, auto: `whisper runtime CPU (whisper.gpu = auto; loaded in 0.9 s) [OK]`, exit 1 after 9 s. The log reads
+    `Whisper runtime order: Cpu -> CpuNoAvx (whisper.gpu = auto; the Vulkan loader, vulkan-1.dll, does not load on this
+    PC, so the Vulkan runtime is not tried)`.
+  - this branch, cpu: `CPU (whisper.gpu = cpu; loaded in 0.6 s) [OK]`, exit 1 after 9 s.
+  - 1.1.1, auto: no engine line, exit -1073740791 after 19 s, the `GGML_ASSERT` line as the output's last line.
+  - 1.1.1, cpu: `CPU (whisper.gpu = cpu; loaded in 0.7 s) [OK]`.
+- Exit 1 in every completed run is the microphone line, which fails by design in the sandbox.
+
+**Upstream defects to report** (not reported by this lane):
+
+- Whisper.net's runtime search list keeps the same folder twice when one path ends in a separator and the other does
+  not. It should normalise before `Distinct`.
+- Whisper.net frees a ggml library after a sibling fails and then loads the same library again from the same folder,
+  which ggml's static initialiser does not survive.
+
+**Not verified:**
+
+- On a real PC without Vulkan, or with a broken driver, outside the sandbox.
+- Tray mode, which was never run on the development PC because a copy of Dictum runs there.
+- The first-run probe fix end to end in the tray (it is pinned through `FirstRun` with a stand-in probe).
+- The duplicate-folder mechanics inside Whisper.net.
+- CI's first run of the new step, including whether `--selftest` behaves on a runner without audio devices or a desktop.
+
 ## Warn when the microphone delivers no sound (21/10/2026, branch feat/silence-warning)
 
 **The report** (product owner, 21/10/2026, relayed by the orchestrator): on a virtual desktop whose microphone was not passed through, he pressed the hotkey and the pill showed "Recording" and stayed there. Nothing said the microphone was delivering no audio, so the app looked broken.
