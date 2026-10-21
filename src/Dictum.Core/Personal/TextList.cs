@@ -51,7 +51,7 @@ public static class TextList
 /// <summary>
 /// Whole-word, case-insensitive matching of literal phrases, shared by corrections, snippets and the profanity filter (SPEC
 /// §16.3, §16.4, §16.6). A word character is a letter, a digit or a combining mark: "ER" never matches inside "her", "ass"
-/// never inside "class", and "राम" never inside "विराम", whose vowel sign (a mark, not a letter) belongs to the word.
+/// never inside "class", and a short word never inside a longer one whose combining vowel sign (a mark, not a letter, such as U+093E) belongs to it.
 /// An apostrophe joins letters, except before a possessive "s": "Kinney's" contains Kinney, but "don't", "won't" and
 /// "o'clock" contain no "don", "won" or "clock". Longer phrases are tried first, so overlapping entries resolve
 /// longest-first; whitespace inside a phrase matches any run of whitespace.
@@ -75,8 +75,8 @@ public static class WholeWords
 
     /// <summary>
     /// Part of a word, for the checks that walk a word one character at a time (the Fix-last diff, the profanity mask and
-    /// removal): a letter, a digit, or a combining mark such as a vowel sign, virama or anusvara ("काम" is not
-    /// "कम"; "हैं" is not "है").
+    /// removal): a letter, a digit, or a combining mark such as a vowel sign, virama or anusvara (a word with the
+    /// vowel sign U+093E is not the same word without it).
     /// </summary>
     public static bool IsWordChar(char c) =>
         char.IsLetterOrDigit(c) || char.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark;
@@ -96,10 +96,11 @@ public static class WholeWords
 public static class SentenceStart
 {
     /// <summary>
-    /// A mark that ends a sentence: . ! ? … and the danda । and double danda ॥, which end a sentence in scripts whose
-    /// sentence marks differ from English (orchestrator, 16/10/2026: the languages lens found "वह कमीना।" filtered to "वह ।").
+    /// A mark that ends a sentence: . ! ? … and the danda U+0964 and double danda U+0965, which end a sentence in scripts whose
+    /// sentence marks differ from English (orchestrator, 16/10/2026: the languages lens found a space left before the danda
+    /// when the word before it was removed).
     /// </summary>
-    public static bool IsEndMark(char c) => c is '.' or '!' or '?' or '…' or '।' or '॥';
+    public static bool IsEndMark(char c) => c is '.' or '!' or '?' or '…' or '\u0964' or '\u0965';
 
     /// <summary>A sentence starts at <paramref name="index"/> of <paramref name="text"/> (at its length: whatever comes next).</summary>
     public static bool At(string text, int index) => At(index, i => text[i]);

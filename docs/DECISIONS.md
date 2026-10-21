@@ -1090,13 +1090,15 @@ without the matcher, so the first pin drives the matcher and the state machine d
   as another language. With the options in `DecodeOptions`, calibration's own `DecodeOptions(prompt, beam)` is English by
   construction, so the calibration notes were retired.
 - The clean-up is skipped (`TranscriptCleaner.Plain`, whitespace only) whenever the output is not English: the rules
-  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on Spanish or
-  Polish text would change it. Corrections and the profanity filter still run; they are whole-word matches the user
+  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on text in another language, or on
+  Polish text, would change it. Corrections and the profanity filter still run; they are whole-word matches the user
   wrote. Status "skipped: …" is visible in About and `--selftest`.
 - Combining marks are part of a word (lens, 16/10/2026). A vowel sign, virama or anusvara is a combining mark
   (`\p{M}`), not a letter, so the shared whole-word matcher (`WholeWords`: corrections, snippets, the profanity list)
-  treated it as a word boundary: `राम => श्याम` turned "विराम" into "विश्याम", a snippet on "कम" fired inside "कमाओ", Fix
-  last suggested nothing for "कम" to "काम" or "है" to "हैं", and mask wrote "क*ीना". The matcher's look-arounds now count
+  treated it as a word boundary: a correction on a short word turned a longer word containing it (one with the vowel sign
+  U+093E) into a different word, a snippet on a short word fired inside a longer one, Fix last suggested nothing for an edit
+  that changed only a vowel sign or anusvara (U+093E, U+0902), and mask starred the base letters but left a vowel sign
+  (U+0940) showing. The matcher's look-arounds now count
   `\p{M}` as inside a word, and the Fix-last diff and the profanity mask and removal ask `WholeWords.IsWordChar` (a letter,
   a digit, or a non-spacing or spacing combining mark). English matching (apostrophes, possessive "s", digits, hyphens) is
   unchanged. This extends Batch 2's "a word character is a letter or a digit".
@@ -1132,8 +1134,9 @@ without the matcher, so the first pin drives the matcher and the state machine d
   that result decides whether translation or accented English with a larger model reads better.
 - Observed 16/10/2026 with the published build from this worktree (`dist\Dictum\Dictum.exe`, scratch APPDATA,
   LOCALAPPDATA and `--config`):
-  - `--selftest` with `small.en` + `language: es` prints `language es (Spanish): small.en is an English-only model … [FAIL]`;
-    with `medium` + `es` + `translate: true` it prints `language es (Spanish), translating to English [OK]` (the model file
+  - `--selftest` with `small.en` and a language other than English printed `language <code> (<Name>): small.en is an English-only model … [FAIL]`;
+    with `medium`, a language other than English and `translate: true` it printed `language <code> (<Name>), translating to English [OK]`
+    (the code is withheld under the 21/10/2026 neutrality rule; the model file
     was absent in the scratch profile, so that line failed as expected).
   - `--transcribe` of a 6.37 s synthesised English clip on `ggml-small.en.bin` with `translate: true` and again with
     `language: auto`: both loaded (log "loaded … (language en (English), translating to English, greedy)" and "(language
@@ -1143,8 +1146,9 @@ without the matcher, so the first pin drives the matcher and the state machine d
     lane), not a figure for the feature.
   - No audio in the target languages was available: translation quality is unmeasured and is the owner's test.
 - After the lens round (16/10/2026, same day): build 0 warnings, 0 errors; 743 tests, 725 passed, 18 skipped, 0 failed
-  (the orchestrator's own run, not the lane's report). The re-published build's `--selftest` prints `language es (Spanish),
-  translating to English [OK]` for medium + es + translate, and for small.en + es without translate the `language` line
+  (the orchestrator's own run, not the lane's report). The re-published build's `--selftest` printed `language <code> (<Name>),
+  translating to English [OK]` for medium + a language other than English + translate (code withheld under the 21/10/2026
+  neutrality rule), and for small.en + that language without translate the `language` line
   fails with the English-only reason and the `cleanup` line reads "skipped: the text is not English … whitespace tidied
   only".
 - Rebased onto main 79bffb7 on 16/10/2026, after #1 (mouse hotkeys, snippets), #3 (cloud presets, one key per service),
@@ -1158,7 +1162,7 @@ without the matcher, so the first pin drives the matcher and the state machine d
   after any other, so SPEC §23 and the README now name them beside corrections and the profanity filter. The README's
   settings row for `whisper.language` said a change reloads the model; it rebuilds the decoder, as the section above it
   says, and the row now says so.
-- A new test pins `--transcribe`'s language rule (`CliCommands.Cleaner`: plain for Spanish without translation, the model
+- A new test pins `--transcribe`'s language rule (`CliCommands.Cleaner`: plain for a language other than English without translation, the model
   and the dictionary-term check with it). Observed failing with `englishText` removed from `CliCommands.Cleaner`; the two
   Models-page tests failed with it removed from `AppShell.Config`; the new test and the plain-text test failed with the
   constructor's `_plain = plain` removed. Full suite on the rebased head (this lane's run): build 0 warnings, 0 errors;
@@ -1247,9 +1251,9 @@ floor and the carried-word count each sit under a `// simplification:` note with
   table of its own; and `CorrectionSuggestions.Edge`, the characters trimmed from a suggested correction's ends, which
   is not a sentence rule and is left for its own follow-up (it lacks …, the dandas, « » and [ ]).
 - **The danda ends a sentence** (orchestrator, 16/10/2026, for scripts whose sentence marks differ from English, from the languages PR): the marks are
-  `SentenceStart.IsEndMark`: . ! ? … and the danda । (U+0964) and double danda ॥ (U+0965). The profanity
-  filter's remove mode reads the same marks after a removed word, so "वह कमीना।" becomes "वह।" (the languages lens saw
-  "वह ।", a space left before the danda, while "It's shit." gave "It's.") and a word that was a sentence of its own takes
+  `SentenceStart.IsEndMark`: . ! ? … and the danda (U+0964) and double danda (U+0965). The profanity
+  filter's remove mode reads the same marks after a removed word, so a removed word before a danda leaves no space before the mark (the languages lens saw
+  a space left before the danda U+0964, while "It's shit." gave "It's.") and a word that was a sentence of its own takes
   its danda with it. English pins unchanged; aligned with it, an ellipsis after a removed word now behaves like a full
   stop ("It's shit… really." → "It's… really.", was "It's … really."; "Shit… I forgot." → "I forgot.", was "… I forgot.").
 - **Fix last dictation holds the last part typed** (finding 8, kept by decision): each part is remembered as it is
@@ -2858,7 +2862,10 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
   language is featured any more, so `WhisperLanguages.Featured` is gone and the picker needs no list to maintain.
 - **Pins:** `LanguageTests.The_picker_lists_auto_then_english_then_every_other_language_alphabetically_by_name`, and
   `PublicCopyNeutralityTests`, a sweep of every text file in the repository for the words (spelled in pieces in the test, so
-  the test does not contain them). The one allowance is Whisper's own language table in `WhisperLanguages.cs`, whose
-  `("code", "Name")` entries list all 100 languages alike.
+  the test does not contain them), over the files git lists as public (tracked, plus untracked files that are not ignored),
+  so ignored build output cannot fail it. The one allowance is Whisper's own language table: the `("code", "Name")` entries
+  inside the `Table` initializer of `src/Dictum.Core/Transcribe/WhisperLanguages.cs`, which list all 100 languages alike.
+  Region words are in the list too. Text in the script of the sentence-end marks is allowed in test fixtures under `tests/`
+  (they test a script rule, not a language); everywhere else such examples are described by code point.
 - **Limits:** commit messages and the merged history cannot be rewritten (no force-push), so earlier commits keep their
   wording. The pull-request descriptions were edited instead.

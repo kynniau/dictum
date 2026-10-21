@@ -184,14 +184,13 @@ them (a chord such as `Ctrl+Shift+Space` still counts).
 ### Other languages and translation
 
 Dictum can listen for any of the languages Whisper supports (100 of them) and, if you want, write English whatever you
-speak: a Spanish speaker dictates in Spanish and English is pasted. Recognition and translation run on this PC; if cloud clean-up is on
-(Settings > Clean-up), the English text still goes to that provider, as every dictation does. Settings > Models >
-**Language**:
+speak: a Spanish speaker dictates in Spanish and English is pasted. Recognition and translation run on this PC; if
+cloud clean-up is on (Settings > Clean-up), the English text still goes to that provider, as every dictation does.
+Settings > Models > **Language** shows the full list:
 
-- **Spoken language**: Settings > Models > Language shows the full list: English first, then every other language
-  Whisper supports alphabetically by name (Cantonese, `yue`, only with the large-v3 models), or **Detect automatically**
-  (whisper works it out from the first seconds of each dictation, useful for a mixed team). The code goes into
-  `whisper.language`.
+- **Spoken language**: English first, then every other language Whisper supports alphabetically by name (Cantonese,
+  `yue`, only with the large-v3 models), or **Detect automatically** (whisper works it out from the first seconds of each
+  dictation, useful for a mixed team). The code goes into `whisper.language`.
 - **Translate to English** (`whisper.translate`): the text is written in English whatever was spoken, and the clean-up,
   dictionary and corrections run on that English. With it off and a language other than English (or Detect
   automatically), the text is written in the language spoken and the clean-up is skipped, because its rules and prompt
