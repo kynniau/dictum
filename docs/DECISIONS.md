@@ -3250,3 +3250,22 @@ holds for the next submission (1.2) only. Update it if 1.2 does not ship with th
 protocol handler or the Windows default mail app treat a `%0D%0A` body and a 600-character link was not tested here. The 2,000-character
 limit is the figure the brief gave, not one checked against a mail program. The Settings > Help page was not seen on screen (headless
 tests only), including the two buttons sitting side by side at 150 % scaling. The site change was not deployed or rendered.
+
+### Lens fixes (21/10/2026), lens on 45768fc (PRs #24 and #29: Needs changes, ten Minors, no new blocker)
+
+| # | Finding | Change | Pin, and the mutation observed failing |
+|---|---|---|---|
+| 1 | The no-network source scan did not read `SupportMail.cs` | the scan reads it too | an `HttpClient` field added to `SupportMail.cs` failed the network pin |
+| 2 | `SupportMail.Uri` was public and open | made private; `SupportMail.ReportUri` (public, moved from `AppShell.ReportUri`) is the only other way in, so no code outside the class can make a support email with other content. A source pin: `mailto:` appears in code only in `SupportMail.cs`. A sentinel (`context.txt` in the config folder, standing in for a future personal-context file) in the real-shell and Email support pins | a second `"mailto:" + "x"` constant failed the mailto pin; the sentinel text put in the models line (Email support) and in the speech-model fact (feedback) failed their pins. **Stated:** text appended after the clean-up fact did not fail the feedback pin, because `Fact` clips each fact to 60 characters and the sentinel sat past it; that is the clip working, not a gap in the pin |
+| 3 | The single-address scan needed a `"` on the same line | counts `hello@kynni.com.au` per `.cs` file over code lines only (lines starting `//` or `///` are skipped); exactly one in all code, in `SupportMail.cs` | a raw multi-line literal holding the address failed it |
+| 4 | Local provider with the clean-up model not downloaded: the email said "<model> on this PC", About says "rules until downloaded" | the fact follows the header's order: loaded or loading, else failed, else `rule-based tidy (clean-up model not downloaded)` | the old expression restored failed the pin (it also asserts the header still says "rules until downloaded") |
+| 5 | The Store note clause named a feature the live 1.1.1 lacks | clause now reads "from 1.2, send feedback from Settings > Help …" | none (copy) |
+| 6 | "five lines" | "four lines (five facts)" in SPEC, README, this file, the PR body | none (copy) |
+| 7 | `ReportUri` had no length cap | same `MaxUriLength` fallback: the models line is dropped. `ReportUri` now also cleans the models line itself (`Facts`), so no caller can skip it (this closes the earlier "not killed" `nofacts` case) | the fallback removed failed the report pin; the cleaning removed failed it too |
+| 8 | Help answer order | the Try on the CPU paragraph now comes before "If it still closes, email …" (PROPOSED order change; text unchanged) | none (order; no pin added) |
+| 9 | "Windows 10.0.26100" reads as Windows 10 on Windows 11 | the line is `Windows build 10.0.26100`; the Help note says "your Windows build" (PROPOSED) | the note back to "version" failed the note pin; the word "build" removed failed the real-shell pin; the sample link pin changed with the body |
+| 10 | Tab order of the three buttons unpinned | a pin walks `GetNext` from Open the full guide: guide, Email support, Send feedback | the row's buttons swapped failed it (and the older keyboard pin) |
+
+**PROPOSED copy changes in this round.** The feedback body's second setup line is `Windows build <version>` (was `Windows <version>`);
+the Help note for the feedback button ends "…the version of Dictum, your Windows build and the models in use filled in…"; the Try on the
+CPU paragraph moves one place up in the "Dictum closed straight away" answer.
