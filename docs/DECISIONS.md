@@ -3974,8 +3974,50 @@ Item 9 was not in the brief. Item 16: no version bump. Item 17 (the pill's "Reco
 
 **Not verified:**
 - Any of this on a real desktop, at 150 % or with other fonts (headless on this host only; the layout heights were measured with this host's fonts).
-- The tooltip opening on keyboard focus (set, not observed on a desktop).
+- The tooltip opening on keyboard focus on a desktop (pinned headless by the lens fixes below).
 - Dark mode contrast of the tag and the box's status (theme brushes chosen for it, not measured).
 - Screen-reader output (names and help texts are pinned, not heard).
 - The folder chooser's start folder on Windows (the helper is pinned; the dialog was not opened).
 - Tray mode (not run on this host).
+
+### Lens fixes (22/10/2026), lens on 4abba54
+
+The lens returned Needs changes, with no blocker. It re-ran 18 of the mutations above, all caught, and CI was green. Its findings, and the fixes on the same branch:
+
+1. **Major, privacy.** When the recordings folder could not be opened, calibration printed `OpenPath`'s reason, and that reason contains the full path (the Windows account name). The reason now goes to the log, and the window says "The recordings folder could not be opened." (PROPOSED). `OpenPath` and Settings > Storage are unchanged.
+2. **Major, item 10.** `SimpleView.ModeHint` ignored the language. With German, Detect automatically or translate it read "Full: Custom: small.en and AI clean-up…" and promised AI clean-up where none runs. It now returns the Simple line only while the text is English (`WhisperLanguages.OutputIsEnglish`) and both preset models are tiers; otherwise the panel keeps the model-name line.
+3. **Major, accessibility, item 13.** `PathBox` (a Border) was a tab stop with no automation peer, so a screen reader could not read it. It now has a peer: a read-only Edit, named "Model folder", whose value is the whole path, as the text box it replaced was. The entry above said the path was "part of the accessible name"; that is corrected: the name is "Model folder" and the path is the value. `Ui.Tag` set a name on its Border, which has no peer either; that line is dropped, and the tag's TextBlock, read by its own Text peer, says "In use".
+4. **Major, items 5 and 6.**
+   - There is now one guarded device lister, `MicrophoneChoices.List`, used by the tray panel, the welcome window's test and Settings > Microphone. Settings > Microphone threw COMException with the audio service stopped. Each caller logs a failure in its own words, once where it redraws often.
+   - The dictation controller now treats `NoMicrophoneException` as the no-microphone case, as the wizard and calibration do, even while the list still names a device.
+5. **Major, item 4.** The entry above claimed the logs keep the token. That was untrue at 4abba54: the "Tray tooltip:" log line carried "Right Ctrl". The tooltip is now built for the key it is given (`TooltipLine`): the display name on screen, the settings token (`RightCtrl`) in the log.
+6. **Minor.** Settings > General's fix-hotkey note now reads "F8 or Mouse 5 work well." (PROPOSED).
+7. **Minor.** SPEC is updated: the Simple header and its combinations, the Mode line's condition, the display names, the runtime rule, the no-microphone line, the "In use" tag, the model folder field and Browse…, the Help question list, calibration's intro and its open failure, and the Mac note.
+8. **Minor.** The PROPOSED list is completed below.
+9. **Nit.** The caret overdrew the "G" of the in-box status. The status now starts 16 px into the box (it was 12).
+
+The lens also asked for a pin that keyboard focus opens the `PathBox` tooltip, if cheap. It was cheap and is added; the tooltip opening is therefore no longer under Not verified, but only headless.
+
+**PROPOSED strings added by these fixes** (none approved):
+- "The recordings folder could not be opened."
+- "It must not share a key with the dictation hotkey; F8 or Mouse 5 work well." (was "Mouse5")
+- The model folder's accessible name "Model folder", with the path as its value. At 4abba54 it was the name "Model folder: <path>".
+- The Simple header's combinations:
+  - "<tier> · <clean-up> · <key>", for example "Standard · Tidy my words · Right Ctrl"
+  - "<tier> · loading… · <clean-up> · <key>"
+  - "<tier> · model error · <clean-up> · <key>"
+  - the clean-up as "Tidy my words", "AI clean-up", "AI clean-up · loading…", "AI clean-up · error", "Off" or "Custom: <name>"
+  - the tier as "Standard", "More accurate", "Most accurate" or "Custom: <model>"
+
+**Mutation checks** (each applied alone, rebuilt, run and restored):
+
+| Finding | Mutation | Pin | Observed |
+|---|---|---|---|
+| 1 | the open failure shows `OpenPath`'s reason | Calibration_says_an_open_failure_without_a_path | observed failing |
+| 2 | the Simple Mode line always, whatever the language | The_simple_mode_line_is_only_for_plain_English (7 rows), The_panel_keeps_model_names_in_the_mode_line_for_another_language | observed failing |
+| 3 | `PathBox` without its automation peer | The_model_folder_shows_its_end | observed failing |
+| 3 | keyboard focus not opening the tooltip | The_model_folder_shows_its_end | observed failing |
+| 4 | Settings > Microphone listing without the guard | Settings_microphone_survives_a_list_that_throws | observed failing |
+| 4 | the controller ignoring `NoMicrophoneException` | SilenceWarningTests.The_controller_warns_of_no_microphone_when_the_platform_says_so | observed failing |
+| 5 | the tooltip log line with the display name | The_tooltip_log_keeps_the_token | observed failing |
+| 9 | the in-box status back at 12 px | Try_it_shows_the_wait_inside_the_box | observed failing |
