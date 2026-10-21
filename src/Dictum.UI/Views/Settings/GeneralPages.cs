@@ -101,7 +101,7 @@ internal sealed class GeneralPage : SettingsPage
                 _handsFreeLimit.Slider,
                 _handsFreeLimit.Presets), "Hands-free"),
             Ui.Card(Ui.Stack(12,
-                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse5 work well. " + FixMouseNote),
+                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse 5 work well. " + FixMouseNote),
                 _fixCapture,
                 Ui.Row(8, _saveFix, _clearFix)), "Fix last dictation hotkey"),
             Ui.Card(Ui.Stack(4,
@@ -398,6 +398,7 @@ internal sealed class MicrophonePage : SettingsPage
     private readonly Button _test;
     private readonly TextBlock _result = Ui.Text("", "caption");
     private List<string?> _ids = [];
+    private bool _listFailureLogged;
     private CancellationTokenSource? _testing;
 
     public MicrophonePage(AppShell shell) : base(shell, "Microphone")
@@ -417,7 +418,13 @@ internal sealed class MicrophonePage : SettingsPage
 
     protected override void Redraw()
     {
-        (_ids, var labels) = MicrophoneChoices.Build(Shell.Platform.ListCaptureDevices(), Shell.Settings.Audio.Device);
+        // The guarded lister (lens on 4abba54): with the audio service stopped the list threw here and the page failed to draw.
+        var devices = MicrophoneChoices.List(Shell.Platform, why =>
+        {
+            if (!_listFailureLogged) Shell.Log.Warn($"Settings > Microphone: {why}");
+            _listFailureLogged = true; // once per page: a download redraws it many times a second
+        });
+        (_ids, var labels) = MicrophoneChoices.Build(devices, Shell.Settings.Audio.Device);
         _device.ItemsSource = labels;
         _device.SelectedIndex = Math.Max(0, _ids.IndexOf(Shell.Settings.Audio.Device));
     }

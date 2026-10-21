@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -380,7 +382,7 @@ public class PolishTests
         window.Show();
         var page = OpenModels(window);
         Assert.DoesNotContain(All<Button>(page), b => b.Content as string == ModelsPage.InUseLabel);
-        var tags = All<Border>(page).Where(b => AutomationProperties.GetName(b) == ModelsPage.InUseLabel && b.IsEffectivelyVisible).ToList();
+        var tags = All<Border>(page).Where(b => b.Child is TextBlock { Text: ModelsPage.InUseLabel } && b.IsEffectivelyVisible).ToList();
         Assert.NotEmpty(tags);
         var app = Application.Current!;
         var link = (ISolidColorBrush)app.FindResource(app.ActualThemeVariant, "LinkBrush")!;
@@ -391,6 +393,9 @@ public class PolishTests
             Assert.Equal(ModelsPage.InUseLabel, label.Text);
             Assert.Equal(link.Color, Assert.IsAssignableFrom<ISolidColorBrush>(label.Foreground).Color);
             Assert.True(label.IsEnabled && tag.IsEffectivelyEnabled, "the tag is drawn as disabled");
+            var peer = ControlAutomationPeer.CreatePeerForElement(label); // a Border has no peer: the label is what a screen reader reads
+            Assert.True(peer.IsControlElement());
+            Assert.Equal(ModelsPage.InUseLabel, peer.GetName());
         }
         window.Close();
         shell.Dispose();
@@ -413,9 +418,21 @@ public class PolishTests
         var real = shell.RealPath(shell.ModelsDir);
         Assert.Equal(real, box.Path);
         Assert.Equal(real, ToolTip.GetTip(box));
-        Assert.Equal($"{ModelsPage.FolderLabel}: {real}", AutomationProperties.GetName(box));
+        var peer = ControlAutomationPeer.CreatePeerForElement(box); // a tab stop a screen reader can read (lens on 4abba54)
+        Assert.True(peer.IsControlElement());
+        Assert.Equal(ModelsPage.FolderLabel, peer.GetName());
+        Assert.Equal(AutomationControlType.Edit, peer.GetAutomationControlType());
+        var value = Assert.IsAssignableFrom<IValueProvider>(peer);
+        Assert.Equal(real, value.Value);
+        Assert.True(value.IsReadOnly);
         Assert.Equal(TextTrimming.LeadingCharacterEllipsis, box.Text.TextTrimming);
         Assert.True(box.Focusable && box.IsTabStop);
+        box.Focus(NavigationMethod.Tab); // keyboard focus opens the whole path, as the text box could be read before
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(ToolTip.GetIsOpen(box), "keyboard focus did not open the tooltip");
+        ButtonLabelled(page, ModelsPage.BrowseLabel).Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(ToolTip.GetIsOpen(box));
         Assert.DoesNotContain(All<TextBox>(page), t => t.Text == real); // not the read-only text box that cut the end off
 
         box.Path = @"C:\Users\someone with a long name\AppData\Local\Dictum\a folder with a long name\models";
@@ -494,5 +511,113 @@ public class PolishTests
         }
         window.Close();
         shell.Dispose();
+    });
+
+    // ---- Lens fixes (22/10/2026), lens on 4abba54 ----
+
+    /// <summary>
+    /// Pin (major 1): when the recordings folder cannot be opened (a file stands where the folder goes), the window says so with
+    /// no path; the reason, with the path, goes to the log.
+    /// </summary>
+    [Fact]
+    public Task Calibration_says_an_open_failure_without_a_path() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
+        var log = new RecordingLog();
+        var (shell, platform, _) = scratch.Shell(log: log);
+        shell.Reload(userRequested: false);
+        var window = new CalibrationWindow(shell);
+        window.Show();
+        Directory.CreateDirectory(Path.GetDirectoryName(scratch.Paths.CalibrationDir)!);
+        File.WriteAllText(scratch.Paths.CalibrationDir, "not a folder"); // the folder cannot be made or opened
+        Click(ButtonLabelled(window, CalibrationWindow.OpenRecordingsLabel));
+        Dispatcher.UIThread.RunJobs();
+        var texts = Texts(window);
+        Assert.Contains(CalibrationWindow.OpenRecordingsFailed, texts);
+        Assert.DoesNotContain(texts, t => t is not null && Regex.IsMatch(t, @"[A-Za-z]:\\"));
+        Assert.Empty(platform.Opened);
+        Assert.Contains("the recordings folder could not be opened", log.All, StringComparison.Ordinal);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin (major 2): the Simple Mode line only where it is true. With text that is not plain English (another language, Detect
+    /// automatically) or with translate, the presets' models are no tier and no clean-up model runs on the text, so there is no
+    /// Simple line and the panel keeps the model names; on a CPU and on a GPU machine.
+    /// </summary>
+    [Theory]
+    [InlineData("de", false, false)]
+    [InlineData("de", false, true)]
+    [InlineData("auto", false, false)]
+    [InlineData("auto", false, true)]
+    [InlineData("en", true, false)]
+    [InlineData("en", true, true)]
+    [InlineData("de", true, true)]
+    public void The_simple_mode_line_is_only_for_plain_English(string language, bool translate, bool gpu)
+    {
+        Assert.Null(SimpleView.ModeHint(gpu, language, translate));
+        Assert.NotNull(SimpleView.ModeHint(gpu, "en", translate: false));
+    }
+
+    /// <summary>Pin (major 2): the panel in the Simple view with German speech keeps the model-name Mode line.</summary>
+    [Fact]
+    public Task The_panel_keeps_model_names_in_the_mode_line_for_another_language() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "ui": { "view": "simple" }, "whisper": { "model": "small", "language": "de" }, "llm": { "provider": "none" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        var texts = Texts(flyout);
+        Assert.Contains(texts, t => t is not null && t.EndsWith("Full: small.en and qwen2.5-1.5b. Light: base.en and the rule-based tidy.", StringComparison.Ordinal)); // after "Custom: …" when the settings match neither preset
+        Assert.DoesNotContain(texts, t => t is not null && t.Contains(SimpleView.AiCleanupLabel, StringComparison.Ordinal));
+        flyout.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (major 4): Settings > Microphone draws with the audio service stopped (the list throws) and says no microphone was found.</summary>
+    [Fact]
+    public Task Settings_microphone_survives_a_list_that_throws() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        var (shell, platform, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        platform.ListDevicesThrows = true;
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Microphone");
+        Dispatcher.UIThread.RunJobs();
+        var page = All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl);
+        var picker = All<ComboBox>(page).Single();
+        Assert.Equal([MicrophoneChoices.NoneFound], Assert.IsAssignableFrom<IEnumerable<string>>(picker.ItemsSource));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (major 5): the tooltip on screen names the key by its display name; the log keeps the settings token.</summary>
+    [Fact]
+    public Task The_tooltip_log_keeps_the_token() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
+        File.WriteAllText(model, "");
+        var log = new RecordingLog();
+        var models = new Dictum.Transcribe.ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+        var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model), log: log);
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Dispatcher.UIThread.RunJobs();
+            Assert.EndsWith(" · Right Ctrl", platform.Tray!.Tooltip);
+            var logged = log.Lines.Select(l => l.Message).Where(m => m.StartsWith("Tray tooltip: ", StringComparison.Ordinal)).ToList();
+            Assert.NotEmpty(logged);
+            Assert.All(logged, m => Assert.EndsWith(" · RightCtrl", m));
+        }
+        finally
+        {
+            shell.Dispose();
+        }
     });
 }

@@ -384,6 +384,17 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   is in use and the text is English, then "Off" (no clean-up, §5); a model in use that is none of them is listed first as "Custom: <name>". The
   "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
   lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
+  Amended 22/10/2026 (1.2 polish): in the Simple view the panel's header line is "<tier> · <clean-up> · <key>" from
+  `SimpleView`'s table (for example "Standard · Tidy my words · Right Ctrl"; "<tier> · loading…" or "<tier> · model
+  error" while that holds; the clean-up "Tidy my words", "AI clean-up" (with " · loading…" or " · error"), "Off" or
+  "Custom: <name>"), with no runtime; Advanced and the support email keep "<model> · <runtime> · <clean-up>". The line
+  under Light | Full names the presets by those names ("Full: More accurate and AI clean-up. Light: Standard and Tidy my
+  words.") only while the text is English and both preset models are tiers; otherwise the model names. Keys are shown by
+  their display names everywhere a person reads them (`HotkeyNames`: "Right Ctrl", "Mouse 4"); settings.json, the CLI and
+  the logs keep the token (`RightCtrl`). The runtime is the one that loaded; a Vulkan runtime that reports no device is
+  shown as CPU, where the model then runs. With no microphone listed (or a list that throws) the microphone picker's
+  first entry reads "No microphone found" and the problem line under the header shows the no-microphone sentence
+  (`NoSoundText.NoMicrophoneBalloon`); the state word is unchanged.
 - About (version, runtime, no network statement).
 - Help (amendment, 21/10/2026): opens Settings → Help, the offline "How Dictum works" and questions and answers (§26).
 - Quit.
@@ -491,7 +502,8 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   calibration window), then three rows: Standard, More accurate, Most accurate, each with its
   line, its state (In use, Downloaded, its size when not on this PC, or nothing for the bundled
   base.en, whose line says "Included."), and the catalogue row's Use / Download… / Downloading… /
-  Waiting… button. A row is a catalogue entry chosen through `ModelCoordinator.Select(name,
+  Waiting… button; the row in use has an "In use" tag instead (amended 22/10/2026: link-coloured text in an outlined
+  pill, not focusable, read by its text's own automation peer; in both views). A row is a catalogue entry chosen through `ModelCoordinator.Select(name,
   plainName)`; there is no download logic of its own. Given the tier's name, the download
   question, the busy question and the "already downloading" balloon use it and plain words:
   "Download <tier> (<size>)? It comes from the model makers' official download page and is
@@ -735,6 +747,11 @@ Flow:
    Record/Stop button (the existing capture path). Recordings are kept in
    `%LOCALAPPDATA%\Dictate\calibration\` so the test can be re-run when a new model is
    installed; a "Delete recordings" button and a note in the README privacy section.
+   Amended 22/10/2026 (1.2 polish): the window prints no path (it names the Windows account): the intro says the
+   recordings stay in Dictum's folder on this PC (Settings > Storage lists it), and **Open the recordings folder**
+   opens it; a failure to open it is logged with its reason and shown as "The recordings folder could not be opened."
+   A take that fails (Record, Skip, the hotkey) is said under Record in body text; with no microphone, the words are
+   `NoSoundText.NoMicrophoneBalloon`, as in the welcome window's test.
 2. The app transcribes all ten clips with every installed speech model, each with greedy
    and with beam-search decoding (Whisper.net sampling strategy builder methods; verify
    names), and computes word error rate against the known text after normalisation
@@ -924,8 +941,8 @@ user. Required:
   a keyboard user reaches and presses its buttons. Tab is refused as a hotkey, as Esc is.)
 - First run: the same capture box after the model picker (amended 17/10/2026, §24: or, when
   base.en comes with Dictum, with no model question before it), defaulting to `RightCtrl`, with
-  the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
-  Command (RightWin)". Amended 21/10/2026 (§27): the box, its words and its **Use this hotkey** /
+  the note "On a Mac over Remote Desktop use the right Option key (Right Alt) or right
+  Command (Right Win)" (the keys by their display names since 22/10/2026). Amended 21/10/2026 (§27): the box, its words and its **Use this hotkey** /
   **Skip** buttons are now the "Your hotkey" step of the Welcome to Dictum window, after the
   model-folder and speech steps; the separate first-run window is gone. Its behaviour is unchanged:
   it listens from the start, writes `hotkey` only when another key was chosen, and stops listening
@@ -1174,7 +1191,9 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
-  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
+  system's folder chooser through Avalonia, **Use default**; amended 22/10/2026: the field shows the end of a long path,
+  trimmed from the left, the whole path in its tooltip, which keyboard focus opens, and as its accessible value, named
+  "Model folder"; Browse… starts in the folder or the nearest folder above it that exists, a note that downloads go there and nothing moves, and a
   one-line warning when the folder is on a network share: a UNC path, read from the text alone, or a mapped network
   drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
   ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled
@@ -1271,6 +1290,9 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
   others, and what to do about it), then twelve questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
+  Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
+  themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
+  into view with its focus ring.
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does

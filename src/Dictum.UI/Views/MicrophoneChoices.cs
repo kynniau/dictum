@@ -1,4 +1,5 @@
 using Dictum.Audio;
+using Dictum.Platform;
 
 namespace Dictum.UI.Views;
 
@@ -15,6 +16,25 @@ internal static class MicrophoneChoices
 
     /// <summary>The first entry when the system lists no microphone (PROPOSED, 1.2 polish, 22/10/2026).</summary>
     public const string NoneFound = "No microphone found";
+
+    /// <summary>
+    /// The microphones the system lists, or none when it cannot say (the audio service stopped: the Windows list throws then).
+    /// The one guarded lister for the tray panel, Settings > Microphone and the welcome window's test (lens on 4abba54): a
+    /// failure is handed to <paramref name="failed"/> (each caller logs it in its own words, once where it refreshes often),
+    /// never thrown.
+    /// </summary>
+    public static IReadOnlyList<AudioDeviceInfo> List(IPlatform platform, Action<string> failed)
+    {
+        try
+        {
+            return platform.ListCaptureDevices();
+        }
+        catch (Exception ex)
+        {
+            failed($"the microphones could not be listed: {ex.GetType().Name}: {ex.Message}");
+            return [];
+        }
+    }
 
     /// <summary>The device each entry chooses (null: the system default) and its label, in the same order.</summary>
     public static (List<string?> Ids, List<string> Labels) Build(IReadOnlyList<AudioDeviceInfo> devices, string? chosen)

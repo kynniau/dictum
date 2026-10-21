@@ -361,7 +361,7 @@ public sealed class ModelFolderTests : IDisposable
         window.Show();
         window.ShowPage("Models");
         var field = All<PathBox>(window).Single(); // the folder by its end, the whole path its tooltip (1.2 polish)
-        Assert.Equal($"Model folder: {scratch.Paths.DefaultModelsDir}", AutomationProperties.GetName(field));
+        Assert.Equal("Model folder", AutomationProperties.GetName(field)); // its value is the path (PathBox's automation peer)
         var browse = ButtonNamed(window, "Browse…");
         var useDefault = ButtonNamed(window, "Use default");
         Assert.Equal(scratch.Paths.DefaultModelsDir, field.Path);

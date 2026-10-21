@@ -103,7 +103,7 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   time; cancelling deletes the partial file and drops any download waiting behind it. A dropped connection is resumed
   automatically (see "Model downloads and checks").
 - **Mode**: **Light** | **Full** (see "Mode presets"); neither is selected when settings.json matches neither (Custom).
-  The line under it names the presets' models; in the Simple view by their plain names ("Full: More accurate and AI
+  The line under it names the presets' models; in the Simple view, while the text is English, by their plain names ("Full: More accurate and AI
   clean-up. Light: Standard and Tidy my words.").
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
   (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;

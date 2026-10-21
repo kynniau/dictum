@@ -238,8 +238,8 @@ internal sealed class FlyoutWindow : Window
             _mode.Select(preset switch { ModePreset.Light => 0, ModePreset.Full => 1, _ => -1 });
             var full = ModePresets.For(ModePreset.Full, _shell.GpuMachine);
             _modeHint.Text = (preset == ModePreset.Custom ? "Custom: your settings match neither preset. " : "") +
-                             (s.Ui.IsSimple ? SimpleView.ModeHint(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) // the Simple names (1.2 polish)
-                                 : $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.");
+                             ((s.Ui.IsSimple ? SimpleView.ModeHint(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) : null) // the Simple names where true (1.2 polish)
+                                 ?? $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.");
 
             FillSpeech(s);
             FillCleanup(s);
@@ -392,19 +392,11 @@ internal sealed class FlyoutWindow : Window
     /// The microphones the system lists, read once per refresh for the picker and the problem line; none when it cannot say
     /// (the audio service stopped: the Windows list throws then), as the welcome window's microphone test treats it.
     /// </summary>
-    private IReadOnlyList<Dictum.Audio.AudioDeviceInfo> Microphones()
+    private IReadOnlyList<Dictum.Audio.AudioDeviceInfo> Microphones() => MicrophoneChoices.List(_shell.Platform, why =>
     {
-        try
-        {
-            return _shell.Platform.ListCaptureDevices();
-        }
-        catch (Exception ex)
-        {
-            if (!_listFailureLogged) _shell.Log.Warn($"Tray panel: the microphones could not be listed: {ex.GetType().Name}: {ex.Message}");
-            _listFailureLogged = true; // once per panel: a download refreshes it many times a second
-            return [];
-        }
-    }
+        if (!_listFailureLogged) _shell.Log.Warn($"Tray panel: {why}");
+        _listFailureLogged = true; // once per panel: a download refreshes it many times a second
+    });
 
     /// <summary>
     /// The problem line, with the no-microphone sentence (<see cref="Dictum.Core.NoSoundText.NoMicrophoneBalloon"/>, PR #22's

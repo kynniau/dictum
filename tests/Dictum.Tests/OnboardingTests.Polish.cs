@@ -155,6 +155,8 @@ public sealed partial class OnboardingTests
         var boxTop = tryIt.Box.TranslatePoint(default, window)!.Value.Y;
         var statusTop = tryIt.StatusText.TranslatePoint(default, window)!.Value.Y;
         Assert.InRange(statusTop - boxTop, 0, tryIt.Box.Bounds.Height - tryIt.StatusText.Bounds.Height);
+        var statusLeft = tryIt.StatusText.TranslatePoint(default, tryIt.Box)!.Value.X;
+        Assert.True(statusLeft >= 14, $"the status starts {statusLeft:0} px into the box, under the caret (lens on 4abba54)");
 
         tryIt.Box.Text = "typed";
         Dispatcher.UIThread.RunJobs();

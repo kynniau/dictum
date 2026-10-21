@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -58,7 +60,7 @@ internal static class Ui
         label[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("LinkBrush");
         var tag = new Border { Child = label, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 5), Focusable = false };
         tag[!Border.BorderBrushProperty] = new DynamicResourceExtension("LinkBrush");
-        AutomationProperties.SetName(tag, text);
+        // No name on the border: a Border has no automation peer. The label is a TextBlock, whose own peer (Text) says "In use".
         return tag;
     }
 
@@ -150,18 +152,17 @@ internal static class Ui
 /// <summary>
 /// A read-only folder path in a box like a text box (1.2 polish, 22/10/2026: a read-only text box cut a long path off at its
 /// end, "…\mod"). The path is trimmed from the left, so its end, the folder's own name, stays in view; the whole path is the
-/// tooltip and part of the accessible name. It is a tab stop with a focus ring, and keyboard focus opens the tooltip, so the
+/// tooltip and the automation value (a read-only Edit named for what it is). It is a tab stop with a focus ring, and keyboard focus opens the tooltip, so the
 /// whole path is readable without a mouse, as the text box's was.
 /// </summary>
 internal sealed class PathBox : Border
 {
     private readonly TextBlock _text = new() { TextTrimming = TextTrimming.LeadingCharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-    private readonly string _name;
 
-    /// <param name="name">What the path is ("Model folder"); the accessible name is "Model folder: C:\…".</param>
+    /// <param name="name">What the path is ("Model folder"): the accessible name; the path is the accessible value.</param>
     public PathBox(string name)
     {
-        _name = name;
+        AutomationProperties.SetName(this, name); // the peer's name; its value is the path
         Child = _text;
         MinHeight = 32;
         Padding = new Thickness(10, 5);
@@ -183,7 +184,7 @@ internal sealed class PathBox : Border
             ToolTip.SetIsOpen(this, false);
         };
     }
-
+    /// <summary>The path shown; the tooltip and the automation peer's value follow it.</summary>
     /// <summary>The path shown; the tooltip and the accessible name follow it.</summary>
     public string Path
     {
@@ -191,12 +192,32 @@ internal sealed class PathBox : Border
         set
         {
             _text.Text = value;
-            ToolTip.SetTip(this, value);
-            AutomationProperties.SetName(this, $"{_name}: {value}");
+            ToolTip.SetTip(this, value); // the automation peer reads Path as its value (PathBoxPeer)
         }
     }
 
     internal TextBlock Text => _text;
+
+    /// <summary>
+    /// A Border has no automation peer of its own, so a screen reader would skip this tab stop (lens on 4abba54). Its peer is a
+    /// read-only Edit, as the text box it replaced was: named "Model folder", its value the whole path.
+    /// </summary>
+    protected override AutomationPeer OnCreateAutomationPeer() => new PathBoxPeer(this);
+
+    private sealed class PathBoxPeer(PathBox owner) : ControlAutomationPeer(owner), IValueProvider
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Edit;
+
+        protected override bool IsControlElementCore() => true;
+
+        protected override bool IsContentElementCore() => true;
+
+        public bool IsReadOnly => true;
+
+        public string? Value => owner.Path;
+
+        public void SetValue(string? value) => throw new InvalidOperationException("The model folder is changed with Browse…, not typed.");
+    }
 
     private void Ring(bool on) => this[!BorderBrushProperty] = new DynamicResourceExtension(on ? "LinkBrush" : "ControlBorderBrush");
 }

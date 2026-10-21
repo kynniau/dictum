@@ -36,6 +36,9 @@ internal sealed partial class CalibrationWindow : Window
     /// <summary>The button beside <see cref="RecordingsNote"/> (PROPOSED, 1.2 polish).</summary>
     public const string OpenRecordingsLabel = "Open the recordings folder";
 
+    /// <summary>Said when the recordings folder could not be opened; the reason, with the path, goes to the log (PROPOSED, lens on 4abba54).</summary>
+    public const string OpenRecordingsFailed = "The recordings folder could not be opened.";
+
     private readonly AppShell _shell;
     private readonly CalibrationHost _host;
     private readonly CalibrationRecordings _recordings;
@@ -295,10 +298,16 @@ internal sealed partial class CalibrationWindow : Window
     /// <summary>No microphone: the one no-microphone sentence on its own (<see cref="NoSoundText.NoMicrophoneBalloon"/>); anything else: "That did not work: …".</summary>
     internal static string FailureText(Exception ex) => ex is NoMicrophoneException ? NoSoundText.NoMicrophoneBalloon : $"That did not work: {ex.Message}";
 
-    /// <summary>Opens the recordings folder in the system's file manager (OpenPath makes it first, so it opens before the first recording).</summary>
+    /// <summary>
+    /// Opens the recordings folder in the system's file manager (OpenPath makes it first, so it opens before the first recording).
+    /// A failure is logged with OpenPath's reason, which names the path, and said on screen without it (lens on 4abba54: the
+    /// window shows no path, so the Windows account name stays off screen in a screenshot).
+    /// </summary>
     private void OpenRecordings()
     {
-        if (_shell.OpenPath(_shell.RealPath(_recordings.Directory), folder: true) is { } why) _progress.Text = why;
+        if (_shell.OpenPath(_shell.RealPath(_recordings.Directory), folder: true) is not { } why) return;
+        _host.Log.Warn($"Calibration window: the recordings folder could not be opened: {why}");
+        _progress.Text = OpenRecordingsFailed;
     }
 
     private void WriteGrammar(bool on)

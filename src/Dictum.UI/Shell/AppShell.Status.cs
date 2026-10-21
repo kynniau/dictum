@@ -47,8 +47,6 @@ public sealed partial class AppShell
         get
         {
             var download = Models.DownloadStatus;
-            var speech = Models.CurrentName;
-            var runtime = HeaderRuntime();
             var hotkey = HotkeyNames.Display(_settings.Hotkey);
             var models = $"{(_settings.Ui.IsSimple ? SimpleModelsLine : ModelsLine)} · {hotkey}";
             var (state, tone) = !_settings.Enabled ? ("Off", "off")
@@ -62,10 +60,17 @@ public sealed partial class AppShell
                     _ when !_models.IsReady => (_models.LastError is not null ? "Model error" : "No model", "error"),
                     _ => ("Ready", "ready"),
                 };
-            var tooltip = $"Dictum · {speech} · {download ?? runtime} · {CleanupLabel()} · {hotkey}{(_settings.Enabled ? "" : " (off)")}";
+            var tooltip = TooltipLine(hotkey);
             return new ShellStatus(state, tone, models, tooltip, download, Models.DownloadFraction, WithHeardNothing(ModelProblem, _heardNothing), TryCpuOffered);
         }
     }
+
+    /// <summary>
+    /// The icon's tooltip with the key as <paramref name="hotkey"/> says it: the display name on screen ("Right Ctrl"), the
+    /// settings token in the log ("RightCtrl"), which is what a person types into settings.json (lens on 4abba54).
+    /// </summary>
+    private string TooltipLine(string hotkey) =>
+        $"Dictum · {Models.CurrentName} · {Models.DownloadStatus ?? HeaderRuntime()} · {CleanupLabel()} · {hotkey}{(_settings.Enabled ? "" : " (off)")}";
 
     /// <summary>
     /// The speech runtime: "CPU" for a model kept off the GPU inside a GPU runtime (whisper.gpu = cpu after it loaded, or the retry
@@ -208,7 +213,7 @@ public sealed partial class AppShell
         {
             _lastTooltip = status.Tooltip;
             _tray.SetTooltip(status.Tooltip);
-            if (status.Download is null) _log.Info($"Tray tooltip: {status.Tooltip}");
+            if (status.Download is null) _log.Info($"Tray tooltip: {TooltipLine(_settings.Hotkey)}"); // the log keeps the settings token (RightCtrl)
         }
         Changed?.Invoke();
     }

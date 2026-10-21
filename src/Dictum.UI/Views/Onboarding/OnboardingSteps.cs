@@ -379,18 +379,8 @@ internal sealed class MicrophoneStep : OnboardingStep
     /// The microphones the system lists, or none when it cannot say (the audio service stopped: the Windows device list throws
     /// then; lens on 6bacce9). Logged, never fatal.
     /// </summary>
-    private IReadOnlyList<AudioDeviceInfo> Devices()
-    {
-        try
-        {
-            return Flow.Shell.Platform.ListCaptureDevices();
-        }
-        catch (Exception ex)
-        {
-            Flow.Shell.Log.Warn($"Onboarding microphone test: the microphones could not be listed: {ex.GetType().Name}: {ex.Message}");
-            return [];
-        }
-    }
+    private IReadOnlyList<AudioDeviceInfo> Devices() =>
+        MicrophoneChoices.List(Flow.Shell.Platform, why => Flow.Shell.Log.Warn($"Onboarding microphone test: {why}"));
 
     public override void Enter()
     {
@@ -533,7 +523,7 @@ internal sealed class TryItStep : OnboardingStep
         // polish, 22/10/2026: a status line over an empty box read as a box that does nothing). Not the box's own watermark: the
         // theme's template draws that at half opacity, which a style cannot change, and this status is to be read (body text).
         _status.IsHitTestVisible = false; // a click goes to the box under it
-        _status.Margin = new Thickness(12, 8);
+        _status.Margin = new Thickness(16, 8); // clear of the caret at the box's first column (lens on 4abba54: it overdrew the "G")
         _status.VerticalAlignment = VerticalAlignment.Top;
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         _box.TextChanged += (_, _) => ShowStatus();

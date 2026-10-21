@@ -197,11 +197,18 @@ public static class SimpleView
 
     /// <summary>
     /// The tray panel's line under Light | Full in the Simple view (PROPOSED, 1.2 polish): the presets by their Simple names,
-    /// "Full: More accurate and AI clean-up. Light: Standard and Tidy my words." The Advanced view keeps the model names.
+    /// "Full: More accurate and AI clean-up. Light: Standard and Tidy my words.", or null when that would not be true, and the
+    /// caller keeps the model-name line (lens on 4abba54): the text is not plain English speech (another language, Detect
+    /// automatically, or translate: no clean-up model runs on it, and the presets' English models are no tier then), or a
+    /// preset's model is no tier.
     /// </summary>
-    public static string ModeHint(bool gpuMachine, string language, bool translate) =>
-        $"Full: {SpeechName(ModePresets.For(ModePreset.Full, gpuMachine).SpeechModel, gpuMachine, language, translate)} and {AiCleanupLabel}. " +
-        $"Light: {SpeechName(ModePresets.LightSpeech, gpuMachine, language, translate)} and {TidyLabel}.";
+    public static string? ModeHint(bool gpuMachine, string language, bool translate)
+    {
+        if (!WhisperLanguages.OutputIsEnglish(language, translate)) return null;
+        var full = TierOf(ModePresets.For(ModePreset.Full, gpuMachine).SpeechModel, gpuMachine, language, translate);
+        var light = TierOf(ModePresets.LightSpeech, gpuMachine, language, translate);
+        return full is null || light is null ? null : $"Full: {full.Label} and {AiCleanupLabel}. Light: {light.Label} and {TidyLabel}.";
+    }
 
     /// <summary>The clean-up model "Add AI clean-up" adds, and the Tidy row uses when it is on this PC.</summary>
     public static string TidyModel(bool gpuMachine) => CleanupCatalog.Recommend(gpuMachine).Model;
