@@ -1,4 +1,5 @@
 using Dictum.App;
+using Dictum.UI.Views.Onboarding;
 
 namespace Dictum.UI.Shell;
 
@@ -21,8 +22,12 @@ public interface IShellDialogs : IModelPrompts
     /// <summary>The second warning of "Remove Dictum completely": true only when the user typed <paramref name="word"/> and confirmed.</summary>
     bool TypeToConfirm(string title, string text, string word);
 
-    /// <summary>The first-run hotkey check (SPEC §20): the capture box, defaulting to the current hotkey. Returns the hotkey to keep.</summary>
-    string HotkeyCheck(AppShell shell, string current);
+    /// <summary>
+    /// The first run's "Welcome to Dictum" window (1.2; it replaces the model pickers and the hotkey check, SPEC §20): steps 1-5
+    /// ask through <paramref name="flow"/>, which writes each answer; returns when they are done or the window was closed. Try
+    /// it follows in the same window once the shell calls <see cref="OnboardingFlow.BeginTryIt"/>.
+    /// </summary>
+    void Onboard(OnboardingFlow flow);
 
     /// <summary>Settings > Models > Model folder > Browse…: the system's folder chooser. Returns the folder picked, or null.</summary>
     string? ChooseFolder(string initialDir);

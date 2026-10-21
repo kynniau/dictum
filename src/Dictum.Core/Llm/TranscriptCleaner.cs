@@ -33,7 +33,7 @@ public sealed record PersonalCleanup(string? DictionaryLine, IReadOnlyCollection
 /// The cleanup step (SPEC §5). With a model (local by default, or an opted-in cloud provider) the reply is
 /// validated; every failure (timeout, error, refusal, truncation, rejected reply, model not loaded yet) falls back
 /// to the deterministic tidy and logs the reason, never the text. Without a model the deterministic tidy is the
-/// whole step. Only a user cancellation (Esc) propagates. The paste is never blocked on a model failing.
+/// whole step; with clean-up off (llm.provider = off) only whitespace is tidied. Only a user cancellation (Esc) propagates. The paste is never blocked on a model failing.
 /// </summary>
 public sealed class TranscriptCleaner
 {
@@ -89,7 +89,23 @@ public sealed class TranscriptCleaner
     /// </summary>
     public static TranscriptCleaner Plain(string status) => new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, status, plain: true);
 
-    /// <summary>True when only whitespace is tidied (the text is not English).</summary>
+    /// <summary>
+    /// No clean-up (llm.provider = off, 1.2): the transcript is pasted as whisper wrote it, with whitespace tidied only, the same
+    /// step as <see cref="Plain"/>. No model is built or loaded, nothing is validated and nothing is sent; the rule-based tidy's
+    /// fillers, capitals, full stop and spoken commands do not run, so a spoken "new paragraph" is typed as those words.
+    /// </summary>
+    public static TranscriptCleaner Off() => new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, OffStatus, plain: true);
+
+    /// <summary>
+    /// The off cleaner's <see cref="Status"/>, shown on Settings > Clean-up and About. PROPOSED copy (21/10/2026). It starts "no clean-up",
+    /// not "off", as the tray name does (lens on 787b300): "Clean-up: off" read as Dictum being off.
+    /// </summary>
+    public const string OffStatus = "no clean-up: whitespace tidied only; your corrections, snippets and the profanity filter still apply (llm.provider = off)";
+
+    /// <summary>
+    /// True when only whitespace is tidied: the text is not English (<see cref="Plain"/>), or clean-up is off (<see cref="Off"/>).
+    /// Either way no letter changes case, here or at a hands-free part's boundary (SegmentJoin's keepCase).
+    /// </summary>
     public bool IsPlain => _plain;
 
     /// <summary>True when a model takes part (the pill shows "Polishing…").</summary>
@@ -227,7 +243,7 @@ public sealed class TranscriptCleaner
             : null;
 
     /// <summary>
-    /// Why offline_only forbids this provider, or null if it may run. Local and none never touch the network; an
+    /// Why offline_only forbids this provider, or null if it may run. Local, none and off never touch the network; an
     /// OpenAI-compatible server on this machine (loopback) is allowed; anything else is a network call.
     /// </summary>
     public static string? OfflineRefusal(LlmSettings settings, bool offlineOnly)
@@ -249,6 +265,12 @@ public sealed class TranscriptCleaner
     public static TranscriptCleaner Create(LlmSettings settings, bool offlineOnly, SecretStore secrets, HttpClient http, ILog log, Func<ILocalLlmEngine?>? local = null,
         PersonalCleanup? personal = null, bool englishText = true)
     {
+        // Off first: no prompt file is read, no reply checks are built, and no client is made, so nothing can be sent.
+        if (settings.Provider == LlmSettings.Off)
+        {
+            log.Info("Clean-up is off (llm.provider = off): the text is pasted as whisper wrote it, with whitespace tidied only.");
+            return Off();
+        }
         var (prompt, validation) = (personal ?? PersonalCleanup.None).Checks(settings, log.Warn);
         var timeout = TimeSpan.FromMilliseconds(settings.TimeoutMs);
         if (!englishText)

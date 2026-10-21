@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
@@ -18,7 +19,7 @@ namespace Dictum.UI.Views;
 /// <summary>
 /// The tray panel (docs/design/Flyout.dc.html), opened by a click on the tray icon and closed by another click, Esc, or
 /// focus moving elsewhere: status and the on/off switch, any model problem (with Try on the CPU and Open log folder),
-/// Light/Full, the two model pickers, the microphone with its meter,
+/// Light/Full, the two model pickers (plain tier names in the Simple view, ui.view; model names in Advanced), the microphone with its meter,
 /// the indicator and the three toggles, six actions, the privacy line and Quit. Opened on purpose, so it takes focus.
 /// </summary>
 internal sealed class FlyoutWindow : Window
@@ -52,6 +53,7 @@ internal sealed class FlyoutWindow : Window
     private readonly Control _lock = Ui.Icon(Ui.LockIcon, 14);
     private readonly DispatcherTimer _meterTimer;
     private List<string?> _micIds = [];
+    private Dictionary<string, string>? _speechPlain; // Simple view: each listed model's tier name; null in Advanced
     private bool _refreshing;
 
     public FlyoutWindow(AppShell shell)
@@ -79,6 +81,10 @@ internal sealed class FlyoutWindow : Window
         _mic.SelectionChanged += (_, _) => OnMicPicked();
         AutomationProperties.SetName(_speech, "Speech model");
         AutomationProperties.SetName(_cleanup, "Clean-up");
+        // The two pickers share one row, so a closed one is narrow: a long entry ("Custom: large-v3-turbo-q5_0") ends in an
+        // ellipsis instead of being cut off mid-letter (lens on PR #23, 21/10/2026). The open list shows the same words.
+        foreach (var picker in new[] { _speech, _cleanup })
+            picker.ItemTemplate = new FuncDataTemplate<string>((text, _) => new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis });
         AutomationProperties.SetName(_mic, "Microphone");
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // Why a model could not load or runs on the CPU, under the header, with what to do about it (Store investigation, 16/10/2026).
@@ -231,7 +237,7 @@ internal sealed class FlyoutWindow : Window
             _modeHint.Text = (preset == ModePreset.Custom ? "Custom: your settings match neither preset. " : "") +
                              $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.";
 
-            FillSpeech();
+            FillSpeech(s);
             FillCleanup(s);
             FillMicrophones(s);
             _indicator.Select(Math.Max(0, Array.IndexOf(IndicatorSettings.Modes, s.Indicator.Mode)));
@@ -251,13 +257,38 @@ internal sealed class FlyoutWindow : Window
         }
     }
 
-    private void FillSpeech()
+    private void FillSpeech(AppSettings s)
     {
         var current = _shell.Models.CurrentName;
+        _speechPlain = null;
+        if (s.Ui.IsSimple)
+        {
+            // ui.view = simple: the tiers by their plain names for these language settings, each still marked while its file is on
+            // its way, and a Custom entry for a model in use that is none of them (SimpleView). A tier the language rules out is
+            // not offered (it stays listed only while it is the model in use).
+            var tiers = SimpleView.Tiers(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate)
+                .Where(t => t.Guard is null || string.Equals(t.Model, current, StringComparison.OrdinalIgnoreCase)).ToList();
+            var models = tiers.Select(t => t.Model).ToList();
+            var labels = tiers.Select(t => Marked(t.Label, ModelCatalog.Find(t.Model))).ToList();
+            _speechPlain = tiers.ToDictionary(t => t.Model, t => t.Label, StringComparer.OrdinalIgnoreCase);
+            if (SimpleView.TierOf(current, _shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) is null)
+            {
+                models.Insert(0, current);
+                labels.Insert(0, SimpleView.Custom(current));
+            }
+            Fill(_speech, models, labels, current);
+            return;
+        }
         var names = ModelCatalog.Entries.Select(e => e.Name).ToList();
         if (!names.Contains(current)) names.Insert(0, current); // a model file chosen from disk
-        Fill(_speech, names, [.. names.Select(n => ModelCatalog.Find(n) is { } info && !_shell.Models.IsDownloaded(info) ? $"{n}{DownloadMark(info.FileName)}" : n)], current);
+        Fill(_speech, names, [.. names.Select(n => Marked(n, ModelCatalog.Find(n)))], current);
     }
+
+    /// <summary>A speech entry's label, with its download mark while the catalogue file is not on this PC.</summary>
+    private string Marked(string label, ModelInfo? info) => info is not null && !_shell.Models.IsDownloaded(info) ? $"{label}{DownloadMark(info.FileName)}" : label;
+
+    /// <summary>The Simple clean-up picker's entry for "Tidy my words" (not a catalogue name, so it cannot collide with one).</summary>
+    private const string TidyEntry = "tidy";
 
     // PROPOSED copy (19/10/2026), for the product owner to approve: a picker entry whose file is on its way (Store 10.1.2.10).
     internal const string DownloadingMark = " (downloading)";
@@ -290,14 +321,21 @@ internal sealed class FlyoutWindow : Window
 
     private void FillCleanup(AppSettings s)
     {
+        if (s.Ui.IsSimple)
+        {
+            FillSimpleCleanup(s);
+            return;
+        }
         var names = CleanupCatalog.Entries.Select(e => e.Name).ToList();
         var labels = names.Select(n => CleanupCatalog.Find(n)! is var info && _shell.Models.IsCleanupDownloaded(info) ? $"{n} · local" : $"{n} · local{DownloadMark(info.FileName)}").ToList();
         names.Add(LlmSettings.NoProvider);
         labels.Add("Rule-based tidy");
+        names.Add(LlmSettings.Off);
+        labels.Add(SimpleView.OffAdvancedLabel);
         var current = s.Llm.Provider switch
         {
             LlmSettings.Local => CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model,
-            LlmSettings.NoProvider => LlmSettings.NoProvider,
+            LlmSettings.NoProvider or LlmSettings.Off => s.Llm.Provider,
             _ => s.Llm.Provider,
         };
         if (!names.Contains(current))
@@ -308,17 +346,41 @@ internal sealed class FlyoutWindow : Window
         Fill(_cleanup, names, labels, current);
     }
 
+    /// <summary>
+    /// ui.view = simple: "Tidy my words", "Add AI clean-up" (marked like a catalogue entry) while the rule-based tidy is in use
+    /// and the text is English (no clean-up model runs on any other: lens on 787b300), "Off" (llm.provider = off), and a Custom
+    /// entry for anything else in use. No cloud provider is offered here; one chosen in Advanced shows as Custom.
+    /// </summary>
+    private void FillSimpleCleanup(AppSettings s)
+    {
+        var gpu = _shell.GpuMachine;
+        var ai = CleanupCatalog.Find(SimpleView.TidyModel(gpu))!;
+        var names = new List<string> { TidyEntry };
+        var labels = new List<string> { SimpleView.TidyLabel };
+        if (SimpleView.OffersAddCleanup(s))
+        {
+            names.Add(ai.Name);
+            labels.Add(_shell.Models.IsCleanupDownloaded(ai) ? Settings.ModelsPage.AddCleanupLabel : $"{Settings.ModelsPage.AddCleanupLabel}{DownloadMark(ai.FileName)}");
+        }
+        names.Add(LlmSettings.Off); // a provider value, not a catalogue name, so it cannot collide with one
+        labels.Add(SimpleView.OffLabel);
+        var current = TidyEntry;
+        if (SimpleView.OffInUse(s.Llm))
+        {
+            current = LlmSettings.Off;
+        }
+        else if (!SimpleView.TidyInUse(s.Llm, gpu))
+        {
+            current = s.Llm.Provider == LlmSettings.Local ? s.Llm.Model : s.Llm.Provider;
+            names.Insert(0, current);
+            labels.Insert(0, SimpleView.Custom(_shell.Models.CurrentCleanupName));
+        }
+        Fill(_cleanup, names, labels, current);
+    }
+
     private void FillMicrophones(AppSettings s)
     {
-        var devices = _shell.Platform.ListCaptureDevices();
-        _micIds = [null, .. devices.Select(d => (string?)d.Name)];
-        var labels = new List<string> { "System default" };
-        labels.AddRange(devices.Select(d => d.IsDefault ? $"{d.Name} (default)" : d.Name));
-        if (s.Audio.Device is { } chosen && !_micIds.Contains(chosen))
-        {
-            _micIds.Add(chosen);
-            labels.Add($"{chosen} (not connected)");
-        }
+        (_micIds, var labels) = MicrophoneChoices.Build(_shell.Platform.ListCaptureDevices(), s.Audio.Device);
         SetItems(_mic, labels, Math.Max(0, _micIds.IndexOf(s.Audio.Device))); // a progress tick leaves an open list alone (lens, 19/10/2026)
     }
 
@@ -326,14 +388,18 @@ internal sealed class FlyoutWindow : Window
     {
         if (_refreshing || _speech.Tag is not List<string> names || _speech.SelectedIndex < 0) return;
         var name = names[_speech.SelectedIndex];
-        if (name != _shell.Models.CurrentName && ModelCatalog.Find(name) is not null) Act(() => _shell.Models.Select(name));
+        // In the Simple view the question and balloons use the tier's name ("More accurate"), as the page does.
+        var plain = _speechPlain is { } tiers && tiers.TryGetValue(name, out var label) ? label : null;
+        if (name != _shell.Models.CurrentName && ModelCatalog.Find(name) is not null) Act(() => _shell.Models.Select(name, plain));
     }
 
     private void OnCleanupPicked()
     {
         if (_refreshing || _cleanup.Tag is not List<string> names || _cleanup.SelectedIndex < 0) return;
         var name = names[_cleanup.SelectedIndex];
-        if (name == LlmSettings.NoProvider) Act(_shell.Models.SelectRulesOnly);
+        if (name == TidyEntry) Act(() => Settings.ModelsPage.UseTidy(_shell));
+        else if (name == LlmSettings.NoProvider) Act(_shell.Models.SelectRulesOnly);
+        else if (name == LlmSettings.Off) Act(_shell.Models.SelectOff);
         else if (CleanupCatalog.Find(name) is not null) Act(() => _shell.Models.SelectCleanup(name));
     }
 

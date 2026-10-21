@@ -88,10 +88,27 @@ public sealed class ModelCoordinator(
 
     /// <summary>The download question's note, with the low-space warning when the download would leave under 2 GB (SPEC §17).</summary>
     /// <param name="exceptRunning">Count the downloads waiting but not the running one: the question offers only to stop it.</param>
-    private string WithSpaceWarning(string note, long? bytes, bool exceptRunning = false)
+    private string WithSpaceWarning(string note, long? bytes, bool exceptRunning = false) =>
+        SpaceWarning(bytes, exceptRunning) is { } warning ? $"{note}. {warning}" : note;
+
+    /// <summary>The low-space warning alone (SPEC §17), or null: the Simple view's plain question adds it to its own words.</summary>
+    private string? SpaceWarning(long? bytes, bool exceptRunning = false)
     {
         var folder = paths.ModelsDir(settings());
-        return bytes is long b && Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder, exceptRunning)) is { } warning ? $"{note}. {warning}" : note;
+        return bytes is long b ? Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder, exceptRunning)) : null;
+    }
+
+    /// <summary>
+    /// The Simple view's name for the download running to <paramref name="destination"/> ("More accurate", 1.2), read from the
+    /// tiers in force when the question is asked, or its short name when it is none of them (a clean-up model, or a file the
+    /// language or the machine class no longer maps to a tier). Read each time, not remembered from when it started: a name
+    /// kept from then went stale when the language changed the tiers (lens on 787b300, 21/10/2026).
+    /// </summary>
+    private string PlainNameOf(string destination)
+    {
+        var s = settings();
+        var gpu = gpuMachine is not null ? gpuMachine() : WhisperEngine.GpuMachine;
+        return SimpleView.TierOf(ShortName(destination), gpu, s.Whisper.Language, s.Whisper.Translate)?.Label ?? ShortName(destination);
     }
 
     /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
@@ -112,11 +129,12 @@ public sealed class ModelCoordinator(
 
     public string CurrentName => ModelCatalog.DisplayName(CurrentPath);
 
-    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, or the cloud provider.</summary>
+    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, "no clean-up" for off (PROPOSED, 21/10/2026), or the cloud provider.</summary>
     public string CurrentCleanupName => settings().Llm.Provider switch
     {
         LlmSettings.Local => CleanupCatalog.DisplayName(llm.ModelPath ?? settings().Llm.Model),
         LlmSettings.NoProvider => "rules",
+        LlmSettings.Off => "no clean-up", // not "off": the tray line "base.en · Vulkan · off · F9" read as Dictum being off (lens on d6b4ea8)
         var cloud => cloud,
     };
 
@@ -200,60 +218,106 @@ public sealed class ModelCoordinator(
     /// Settings > Models offers the AI clean-up download; a seeded settings.json that names llm.provider (local, with no
     /// llm.model) keeps it and gets the recommended clean-up model, which is not downloaded: nothing downloads, and
     /// <see cref="EnsureCleanup"/> says the rule-based tidy is used until it is. Returns false if the user chose Quit.
+    /// The onboarding window (1.2) answers the same questions through <see cref="PlanFirstRun"/> and <see cref="AnswerFirstRun"/>.
     /// </summary>
     /// <param name="seeded">The settings.json being completed (a seeded models.folder is looked in too); null: the settings in use.</param>
     /// <param name="keepProvider">settings.json names llm.provider (<see cref="SettingsLoadResult.NamesCleanupProvider"/>).</param>
     public bool FirstRun(bool askSpeech = true, bool askCleanup = true, AppSettings? seeded = null, bool keepProvider = false)
     {
+        var plan = PlanFirstRun(seeded);
+        ModelPick? speechPick = null;
+        CleanupPick? cleanupPick = null;
+        if (plan.AsksPickers)
+        {
+            if (askSpeech)
+            {
+                speechPick = prompts.FirstRunPicker(plan.Speech, plan.SpeechWhy, IsDownloaded, paths.DefaultModelsDir);
+                if (speechPick.Quit) return false;
+            }
+            if (askCleanup)
+            {
+                cleanupPick = prompts.CleanupPicker(plan.Cleanup, plan.CleanupWhy, IsCleanupDownloaded, paths.DefaultModelsDir);
+                if (cleanupPick.Quit) return false;
+            }
+        }
+        AnswerFirstRun(plan, askSpeech, askCleanup, keepProvider, speechPick, cleanupPick);
+        return true;
+    }
+
+    /// <summary>
+    /// The first run's recommendations (the GPU probe, then <see cref="ModelCatalog.Recommend"/> and
+    /// <see cref="CleanupCatalog.Recommend"/>), and whether a model question is open at all: not with a model override, and not
+    /// when base.en is on this PC (<see cref="FirstRunPlan.BundledPath"/>).
+    /// </summary>
+    /// <param name="seeded">The settings.json being completed (a seeded or just-chosen models.folder is looked in too); null: the settings in use.</param>
+    public FirstRunPlan PlanFirstRun(AppSettings? seeded = null)
+    {
         var gpu = gpuMachine is not null ? gpuMachine() : ProbeGpuMachine(FirstRunProbeGpu(seeded ?? settings()));
         var (speech, speechWhy) = ModelCatalog.Recommend(gpu);
         var (cleanup, cleanupWhy) = CleanupCatalog.Recommend(gpu);
         log.Info($"First run: runtime {WhisperEngine.LoadedRuntime}, Vulkan devices {WhisperEngine.DeviceSummary}: recommending {speech} ({speechWhy}) and {cleanup} ({cleanupWhy}).");
+        var overridden = _launchOverride is not null || EnvOverride;
+        var bundled = overridden ? null : Locate(ModelCatalog.FileName(ModelCatalog.Bundled), ModelCatalog.KnownSize(ModelCatalog.Bundled), seeded)?.Path;
+        return new FirstRunPlan(gpu, speech, speechWhy, cleanup, cleanupWhy, overridden, bundled);
+    }
 
-        string chosenSpeech = speech, provider = LlmSettings.Local, chosenCleanup = cleanup;
-        if (_launchOverride is not null || EnvOverride)
+    /// <summary>
+    /// Writes the first run's answers to the open questions (<paramref name="askSpeech"/>, <paramref name="askCleanup"/>): a new
+    /// settings.json with them, or, when settings.json already exists (seeded, or begun by the onboarding's folder step), only
+    /// those keys added. With a model override the recommendations are written; with base.en on this PC, base.en and the
+    /// rule-based tidy (or a seeded llm.provider kept, <paramref name="keepProvider"/>). Otherwise a pick answers its question: a
+    /// catalogue pick that is not on this PC downloads at startup (<see cref="Ensure"/>), because the picker named the host and
+    /// the size. A null speech pick (the onboarding skipped) writes the recommendation and downloads nothing: the startup
+    /// missing-model question asks first (SPEC §10). A null clean-up pick (the onboarding asks no clean-up question) is the
+    /// rule-based tidy, as with base.en, unless <paramref name="keepProvider"/>.
+    /// A speech pick wins over base.en on this PC: the onboarding asks for one when settings.json names a language that is not
+    /// English (lens on 6bacce9); FirstRun passes none when base.en is there, so it is unchanged.
+    /// </summary>
+    public void AnswerFirstRun(FirstRunPlan plan, bool askSpeech, bool askCleanup, bool keepProvider, ModelPick? speechPick = null, CleanupPick? cleanupPick = null)
+    {
+        string chosenSpeech = plan.Speech, provider = LlmSettings.Local, chosenCleanup = plan.Cleanup;
+        if (plan.Overridden)
         {
             log.Info("First run with a model override: pickers skipped.");
         }
-        else if (Locate(ModelCatalog.FileName(ModelCatalog.Bundled), ModelCatalog.KnownSize(ModelCatalog.Bundled), seeded) is { } bundled)
+        else if (plan.BundledPath is { } bundled && speechPick is null) // a pick (the onboarding's, for a language that is not English) wins over base.en
         {
             chosenSpeech = ModelCatalog.Bundled;
             if (!keepProvider) provider = LlmSettings.NoProvider; // the lens, 17/10/2026: a seeded "local" was turned to none without a question
             log.Info(provider == LlmSettings.NoProvider
-                ? $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up)."
-                : $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled}, and settings.json's llm.provider (local) is kept with the recommended {chosenCleanup}, which is not downloaded (Settings > Models).");
+                ? $"First run: {bundled} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up)."
+                : $"First run: {bundled} is on this PC, so no model question is asked: {ModelCatalog.Bundled}, and settings.json's llm.provider (local) is kept with the recommended {chosenCleanup}, which is not downloaded (Settings > Models).");
         }
         else
         {
-            if (askSpeech)
+            if (askSpeech && speechPick is { Quit: false })
             {
-                var pick = prompts.FirstRunPicker(speech, speechWhy, IsDownloaded, paths.DefaultModelsDir);
-                if (pick.Quit) return false;
-                chosenSpeech = pick.Model ?? pick.FilePath!;
-                if (pick.Model is not null && ModelCatalog.Find(pick.Model) is { } info && !IsDownloaded(info)) _firstRunSpeechDownload = pick.Model;
+                chosenSpeech = speechPick.Model ?? speechPick.FilePath!;
+                if (speechPick.Model is not null && ModelCatalog.Find(speechPick.Model) is { } info && !IsDownloaded(info)) _firstRunSpeechDownload = speechPick.Model;
             }
-            if (askCleanup)
+            if (askCleanup && cleanupPick is { Quit: false })
             {
-                var cleanupPick = prompts.CleanupPicker(cleanup, cleanupWhy, IsCleanupDownloaded, paths.DefaultModelsDir);
-                if (cleanupPick.Quit) return false;
                 if (cleanupPick.RulesOnly) provider = LlmSettings.NoProvider;
                 else chosenCleanup = cleanupPick.Model ?? cleanupPick.FilePath!;
                 if (cleanupPick.Model is not null && CleanupCatalog.Find(cleanupPick.Model) is { } c && !IsCleanupDownloaded(c)) _firstRunCleanupDownload = c.Name;
+            }
+            else if (askCleanup && cleanupPick is null && !keepProvider)
+            {
+                provider = LlmSettings.NoProvider;
             }
         }
         if (SettingsFile.CreateIfMissing(paths.SettingsFile, chosenSpeech, provider, chosenCleanup))
         {
             log.Info($"First run: whisper.model = {chosenSpeech}, llm.provider = {provider}, llm.model = {chosenCleanup}; wrote {paths.SettingsFile}.");
-            return true;
+            return;
         }
-        // settings.json was seeded (install.ps1, an admin) without these choices: add them and keep everything else.
+        // settings.json was seeded (install.ps1, an admin, the onboarding's folder step) without these choices: add them and keep everything else.
         var values = new List<(string Key, string Value)>();
         if (askSpeech) values.Add(("whisper.model", chosenSpeech));
         if (askCleanup) values.Add(("llm.provider", provider));
         if (askCleanup && provider == LlmSettings.Local) values.Add(("llm.model", chosenCleanup));
         var written = values.All(v => SettingsFile.SetValue(paths.SettingsFile, v.Key, JsonValue.Create(v.Value)));
         log.Info($"First run on an existing settings.json: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value}"))}{(written ? "" : " could not be written")}.");
-        return true;
     }
 
     /// <summary>
@@ -264,7 +328,7 @@ public sealed class ModelCoordinator(
     internal static string FirstRunProbeGpu(AppSettings? seeded) => (seeded?.Whisper ?? new WhisperSettings()).Gpu;
 
     /// <summary>Tests only: stands in for <see cref="WhisperEngine.ProbeRuntime"/> (which loads the native runtime). Null in the app.</summary>
-    internal Func<string, ILog, string>? TestRuntimeProbe { get; init; }
+    internal Func<string, ILog, string>? TestRuntimeProbe { get; set; } // set, not init: a test shell's coordinator is built inside AppShell
 
     private bool ProbeGpuMachine(string gpu)
     {
@@ -392,7 +456,11 @@ public sealed class ModelCoordinator(
     /// that is not goes through <see cref="ChooseDownload"/>. Neither cancels a download already running (Store 10.1.2.10,
     /// 19/10/2026): only the Stop answer to the question asked first does.
     /// </summary>
-    public void Select(string name)
+    /// <param name="plainName">
+    /// The Simple view's name for the choice ("More accurate", 1.2): the question, the busy question and the "already
+    /// downloading" balloon then use it and plain words instead of the file name and the catalogue's trade-off line.
+    /// </param>
+    public void Select(string name, string? plainName = null)
     {
         if (ModelCatalog.Find(name) is not { } info) return;
         _launchOverride = null; // a tray choice replaces a --model launch override
@@ -400,7 +468,7 @@ public sealed class ModelCoordinator(
         (string, string)[] values = [("whisper.model", info.Name)];
         if (IsDownloaded(info)) SetValues(values); // a download running meanwhile carries on; its own switch then defers to this choice
         else ChooseDownload(info.Name, info.Download, ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), info.SizeText,
-            $"{info.TradeOff}. {SwitchNote}", values, speech: true);
+            $"{info.TradeOff}. {SwitchNote}", values, speech: true, plainName);
     }
 
     /// <summary>A cleanup catalogue entry was chosen (tray panel or Settings): as <see cref="Select"/>, after the login check.</summary>
@@ -426,7 +494,8 @@ public sealed class ModelCoordinator(
     /// </list>
     /// When the file arrives its values are written, unless a later choice of the same kind was made meanwhile (last choice wins).
     /// </summary>
-    private void ChooseDownload(string name, DownloadSpec spec, string destination, string sizeText, string note, (string, string)[] values, bool speech)
+    private void ChooseDownload(string name, DownloadSpec spec, string destination, string sizeText, string note, (string, string)[] values, bool speech,
+        string? plainName = null)
     {
         var token = Path.GetFullPath(destination);
         void Apply() => ApplyIfLatest(speech, token, name, values);
@@ -435,7 +504,7 @@ public sealed class ModelCoordinator(
         {
             SetChoice(speech, token);
             _downloads.AlsoOnArrival(destination, $"choice {token}", Apply); // a calibration or first-run download of it switches too; a repeat pick adds nothing
-            balloon(OnItsWay(name, state), false);
+            balloon(OnItsWay(plainName ?? name, state), false);
             return;
         }
         // Refused before asking only when it would not fit even with the running download stopped; when it fits only that
@@ -450,17 +519,25 @@ public sealed class ModelCoordinator(
         }
         if (_downloads.CurrentDestination is not { } runningTo)
         {
-            if (prompts.ConfirmDownload(spec.FileName, sizeText, question)) Start();
+            var yes = plainName is null
+                ? prompts.ConfirmDownload(spec.FileName, sizeText, question)
+                : prompts.ConfirmPlainDownload(spec.FileName, plainName, sizeText, SpaceWarning(spec.Bytes, exceptRunning: !canWait));
+            if (yes) Start();
             return;
         }
-        switch (prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), _downloads.Progress ?? "0%", canWait))
+        var progress = _downloads.Progress ?? "0%";
+        var answer = plainName is null
+            ? prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), progress, canWait)
+            : prompts.ConfirmPlainDownloadWhileBusy(spec.FileName, plainName, sizeText, SpaceWarning(spec.Bytes, exceptRunning: !canWait),
+                PlainNameOf(runningTo), progress, canWait);
+        switch (answer)
         {
             case BusyDownloadChoice.DownloadAfter:
                 Start();
                 break;
             case BusyDownloadChoice.StopAndDownload:
                 // Stop cancels the download the question named; one that started while it was open is left alone (lens, 19/10/2026).
-                if (_downloads.CurrentDestination is { } now && SamePath(now, runningTo)) _ = CancelThenAsync(name, Start);
+                if (_downloads.CurrentDestination is { } now && SamePath(now, runningTo)) _ = CancelThenAsync(plainName ?? name, Start);
                 else
                 {
                     log.Info($"{ShortName(runningTo)} is no longer downloading, so nothing is stopped; {name} waits its turn.");
@@ -504,6 +581,9 @@ public sealed class ModelCoordinator(
 
     /// <summary>Tray: "No AI cleanup (rule-based tidy)".</summary>
     public void SelectRulesOnly() => SetValues(("llm.provider", LlmSettings.NoProvider));
+
+    /// <summary>Settings > Models or the tray: no clean-up, the text pasted as whisper wrote it (llm.provider = off). Nothing is downloaded or loaded.</summary>
+    public void SelectOff() => SetValues(("llm.provider", LlmSettings.Off));
 
     /// <summary>Tray or startup prompt: pick any whisper ggml file.</summary>
     public void ChooseFile()
@@ -595,14 +675,30 @@ public sealed class ModelCoordinator(
     /// (<see cref="BundledFolderRefused"/>, returned for the page to show). The earlier name whisper.models_dir is cleared when
     /// set, so the folder chosen here is the one in force. A file that cannot be written is ballooned (<see cref="Write"/>).
     /// </summary>
-    public string? SetModelsFolder(string? folder)
+    /// <param name="reloadAfter">
+    /// False for the onboarding (1.2), which runs before the settings are first loaded: writing alone, so nothing reloads or
+    /// loads a model mid-way; a file that cannot be written is then returned (<see cref="WriteFailed"/>) instead of ballooned.
+    /// </param>
+    public string? SetModelsFolder(string? folder, bool reloadAfter = true)
     {
-        if (folder is not null && paths.IsBundled(folder)) return BundledFolderRefused;
+        if (folder is not null && FolderRefusal(folder) is { } refused) return refused;
         var values = new List<(string, JsonNode?)> { ("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))) };
         if (settings().Whisper.ModelsDir is not null) values.Add(("whisper.models_dir", null));
-        Write([.. values]);
+        if (reloadAfter) Write([.. values]);
+        else if (!TryWrite(out _, reloadAfter: false, [.. values])) return WriteFailed;
         return null;
     }
+
+    /// <summary>
+    /// PROPOSED copy (21/10/2026), for the product owner to approve: a folder named by a device path other than \\?\X:\ or
+    /// \\?\UNC\ (a \\?\Volume{GUID}\ path, say), which the settings load refuses for models.folder (SettingsLoader), so it would
+    /// be written and then ignored.
+    /// </summary>
+    public const string DevicePathRefused = "Dictum cannot use a folder named that way. Choose a folder on a drive letter or a network share.";
+
+    /// <summary>Why <paramref name="folder"/> cannot be the model folder (the bundled folder, or a device path the settings load refuses), or null.</summary>
+    public string? FolderRefusal(string folder) =>
+        paths.IsBundled(folder) ? BundledFolderRefused : Storage.PathRegistry.IsUnsupportedDevicePath(folder) ? DevicePathRefused : null;
 
     private void SetValues(params (string Key, string Value)[] values) => Write([.. values.Select(v => (v.Key, (JsonNode?)JsonValue.Create(v.Value)))]);
 

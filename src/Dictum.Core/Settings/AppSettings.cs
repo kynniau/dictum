@@ -34,6 +34,7 @@ public sealed record AppSettings
     public IndicatorSettings Indicator { get; init; } = new();
     public SoundSettings Sounds { get; init; } = new();
     public ProfanitySettings Profanity { get; init; } = new();
+    public UiSettings Ui { get; init; } = new();
 
     /// <summary>Optional second hotkey that opens "Fix last dictation" (SPEC §16.3). Null = unset (the default).</summary>
     public string? FixHotkey { get; init; }
@@ -91,9 +92,16 @@ public sealed record LlmSettings
     public const string Anthropic = "anthropic";
     public const string OpenAiCompatible = "openai-compatible";
     public const string NoProvider = "none";
+
+    /// <summary>
+    /// No clean-up (1.2, 21/10/2026): the transcript is pasted as whisper wrote it, with whitespace tidied only: no model, no
+    /// rules, no spoken commands (<see cref="Llm.TranscriptCleaner.Off"/>). Not <see cref="NoProvider"/>, which stays the rule-based tidy.
+    /// </summary>
+    public const string Off = "off";
+
     public const string AnthropicDefaultModel = "claude-haiku-5-5";
 
-    /// <summary>local (default, llama.cpp in-process), anthropic, openai-compatible, or none (rule-based tidy only).</summary>
+    /// <summary>local (default, llama.cpp in-process), anthropic, openai-compatible, none (rule-based tidy only), or off (no clean-up, whitespace only).</summary>
     public string Provider { get; init; } = Local;
 
     /// <summary>local: a cleanup catalogue name or an absolute .gguf path; cloud providers: the model id.</summary>
@@ -152,6 +160,22 @@ public sealed record IndicatorSettings
 
     public bool ShowsOrb => Mode is Orb or Both;
     public bool ShowsEdge => Mode is Edge or Both;
+}
+
+/// <summary>
+/// ui.view (Dictum 1.2, product owner 21/10/2026): how Settings > Models and the tray panel's pickers list the models.
+/// "simple" (the default) shows three plain speech tiers and "Tidy my words" (<see cref="SimpleView"/>); "advanced" shows
+/// every catalogue model with its details, as before 1.2.
+/// </summary>
+public sealed record UiSettings
+{
+    public const string Simple = "simple";
+    public const string Advanced = "advanced";
+    public static readonly string[] Views = [Simple, Advanced];
+
+    public string View { get; init; } = Simple;
+
+    public bool IsSimple => View == Simple;
 }
 
 /// <summary>A short sound when recording starts and stops.</summary>

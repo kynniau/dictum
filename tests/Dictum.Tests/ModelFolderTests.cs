@@ -442,7 +442,7 @@ public sealed class ModelFolderTests : IDisposable
     [Fact]
     public Task Settings_models_marks_the_bundled_model_as_included() => UiSession.Run(() =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en" } }""");
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en" }, "ui": { "view": "advanced" } }"""); // the catalogue row (1.2)
         Create(scratch.Paths.BundledModelsDir, "ggml-base.en.bin", BaseEnBytes);
         var (shell, _, _) = scratch.Shell();
         new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(Path.Combine(scratch.Paths.BundledModelsDir, "ggml-base.en.bin"));
