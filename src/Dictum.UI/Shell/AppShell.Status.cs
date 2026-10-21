@@ -12,7 +12,8 @@ namespace Dictum.UI.Shell;
 /// <summary>What the tray panel's header shows: the state word, its colour, the models line and, under it, any model problem.</summary>
 /// <param name="Tone">"ready", "recording", "working", "error" or "off": which token colours the dot.</param>
 /// <param name="Problem">Why a model could not load, or runs on the CPU, in plain words when the cause is known
-/// (<see cref="AppShell.ModelProblem"/>); null when nothing is wrong.</param>
+/// (<see cref="AppShell.ModelProblem"/>), and under it "Last dictation heard nothing: check the microphone" while that holds
+/// (21/10/2026); null when nothing is wrong.</param>
 /// <param name="TryCpu">"Try on the CPU" is offered (<see cref="AppShell.TryOnCpu"/>).</param>
 public sealed record ShellStatus(string State, string Tone, string Models, string Tooltip, string? Download, double? DownloadFraction,
     string? Problem = null, bool TryCpu = false);
@@ -29,7 +30,16 @@ public sealed partial class AppShell
     public const string RestartForCpuHint = "Restart Dictum to use the CPU.";
 
     private TrayState _trayState = TrayState.Idle;
+    private volatile bool _heardNothing; // the last dictation heard nothing (NoSoundText.HeardNothingLine), until one types text
     private string? _lastTooltip;
+
+    /// <summary>
+    /// The speech model, its runtime and the clean-up in use, as the header shows them but without the hotkey ("base.en · Vulkan · rules").
+    /// What the support emails carry (Report a problem, Email support): the hotkey is the user's own setting and is not part of "version and models".
+    /// </summary>
+    internal string ModelsLine => $"{Models.CurrentName} · {HeaderRuntime()} · {CleanupLabel()}";
+
+    private string HeaderRuntime() => _models.IsLoading ? "loading…" : _models.LastError is not null ? "model error" : SpeechRuntime();
 
     /// <summary>The header line and the tooltip, built from the models, their runtimes, the hotkey and any download.</summary>
     public ShellStatus Status
@@ -38,9 +48,9 @@ public sealed partial class AppShell
         {
             var download = Models.DownloadStatus;
             var speech = Models.CurrentName;
-            var runtime = _models.IsLoading ? "loading…" : _models.LastError is not null ? "model error" : SpeechRuntime();
+            var runtime = HeaderRuntime();
             var hotkey = HotkeyParser.TryParse(_settings.Hotkey, out var spec, out _) ? spec.Display : _settings.Hotkey;
-            var models = $"{speech} · {runtime} · {CleanupLabel()} · {hotkey}";
+            var models = $"{ModelsLine} · {hotkey}";
             var (state, tone) = !_settings.Enabled ? ("Off", "off")
                 : _trayState switch
                 {
@@ -53,7 +63,7 @@ public sealed partial class AppShell
                     _ => ("Ready", "ready"),
                 };
             var tooltip = $"Dictum · {speech} · {download ?? runtime} · {CleanupLabel()} · {_settings.Hotkey}{(_settings.Enabled ? "" : " (off)")}";
-            return new ShellStatus(state, tone, models, tooltip, download, Models.DownloadFraction, ModelProblem, TryCpuOffered);
+            return new ShellStatus(state, tone, models, tooltip, download, Models.DownloadFraction, WithHeardNothing(ModelProblem, _heardNothing), TryCpuOffered);
         }
     }
 
@@ -87,6 +97,10 @@ public sealed partial class AppShell
     internal string? ModelProblem => ProblemLine(
         _models.IsLoading ? null : Reason(_models.LastError, _models.RestartForCpu, _models.Notice),
         _settings.Llm.Provider != LlmSettings.Local || _llm.IsLoading ? null : Reason(_llm.LastError, _llm.RestartForCpu, _llm.Notice));
+
+    /// <summary>The problem line, with the heard-nothing line under it while the last dictation heard nothing (21/10/2026).</summary>
+    internal static string? WithHeardNothing(string? problem, bool heardNothing) =>
+        !heardNothing ? problem : problem is null ? NoSoundText.HeardNothingLine : $"{problem}\n{NoSoundText.HeardNothingLine}";
 
     /// <summary>A model's failure (with the restart hint when only a restart can put it on the CPU), else its notice.</summary>
     private static string? Reason(string? error, bool restartForCpu, string? notice) =>
@@ -197,5 +211,14 @@ public sealed partial class AppShell
         public void ShowPill(PillState state) => Dispatcher.UIThread.Post(() => shell._overlays?.Show(state));
 
         public void SetTrayState(TrayState state) => shell.SetTrayState(state);
+
+        public void WarnNoSound(NoSoundCause cause) => shell.Notify("Dictum", NoSoundText.Balloon(cause), warning: true);
+
+        public void SetHeardNothing(bool heardNothing)
+        {
+            if (shell._heardNothing == heardNothing) return;
+            shell._heardNothing = heardNothing;
+            shell.StatusChanged();
+        }
     }
 }

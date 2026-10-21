@@ -95,6 +95,9 @@ State machine (pure C#, time injected, fully unit-tested):
 | RecordingHandsFree | elapsed ≥ `hands_free_max_seconds` (default 300; 30–3600, Settings > General) | Processing: stop and type what followed the last cut (auto-stop, never discard) |
 | RecordingHold | elapsed ≥ 300 s (a fixed limit, not `hands_free_max_seconds`: amendment 16/10/2026) | same auto-stop (a stuck key must not record all afternoon) |
 | RecordingHold, RecordingHandsFree | microphone lost (unplugged, battery) | Processing: transcribe what was captured, pill flashes "Mic error"; in hands-free the parts already typed stay and what followed the last cut is typed last (fix batch, 15/10/2026; hands-free 16/10/2026) |
+| RecordingHold, RecordingHandsFree | no sound from the microphone for 2 s after the start (no packets, or every 20 ms block below CaptureBuffer.SoundFloor), and none yet this session | stays recording; pill "No sound from mic"; one balloon per session ("Dictum is not hearing anything. …"); the first sound puts the recording label back, and later pauses never warn (amendment 21/10/2026) |
+| RecordingHold, RecordingHandsFree with "No sound from mic" up | hotkey up (hold), hotkey down (hands-free stop), auto-stop | Idle: discard audio, nothing transcribed or typed; pill flashes "No sound from mic"; the tray panel says "Last dictation heard nothing: check the microphone" until a dictation types text (amendment 21/10/2026) |
+| RecordingHold | microphone cannot be opened and the system lists no microphone | Idle: discard; pill flashes "No sound from mic" (not "Mic error"), balloon "No microphone found. …"; any other open failure stays "Mic error" (amendment 21/10/2026) |
 | RecordingHold, PendingTap | Esc | Idle: discard audio, pill flashes "Cancelled" then hides |
 | RecordingHandsFree | Esc | Idle: stop capture; the text already typed stays; parts in flight or queued and what followed the last cut are dropped; pill flashes "Stopped. Text already typed stays." (amendment 16/10/2026) |
 | Processing | Esc | Idle: cancel whisper and LLM via CancellationToken, nothing more is pasted; after a hands-free stop the parts already typed stay and the pill flashes "Stopped. Text already typed stays." instead of "Cancelled" |
@@ -325,6 +328,9 @@ Ctrl+V.
   Verify with a test that showing the pill does not change `GetForegroundWindow()`.
 - Texts: "Recording · hold", "Recording · hands-free m:ss", "Transcribing…", "Polishing…",
   "Done", "Cancelled", "Busy", "Mic error". Hide after a short fade.
+- No sound (amendment, 21/10/2026; wording PROPOSED, awaiting the product owner): "No sound from mic" replaces the
+  recording label while the microphone has given no sound (the red dot and meter stay: it is still recording), and
+  flashes for 1.8 s with a red "!" badge, like "Mic error", when the recording ends that way or no microphone is listed.
 - Hands-free (amendment, 16/10/2026; wording PROPOSED, awaiting the product owner): after the
   "Hands-free" label and the timer the hint reads "typing as you pause · tap to stop · Esc stops and
   keeps what's typed"; Esc in hands-free flashes "Stopped. Text already typed stays." for 1.8 s with
@@ -1164,8 +1170,18 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
   others, and what to do about it), then eleven questions and answers. All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
-- **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`, and
-  **Email support** passes `mailto:hello@kynni.com.au` to it. The browser or mail app does the rest; Dictum sends nothing.
+- **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
+  **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
+  the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
+  the rest; Dictum sends nothing: no HTTP, no form, no clipboard.
+- **Feedback** (amendment, 21/10/2026): **Send feedback or suggest a feature**, beside Email support. Subject
+  "Dictum feedback". The body is a space to write in, then four lines (five facts): the Dictum version, "Windows build <version>", the speech
+  model and the runtime it loaded on (GPU or CPU), and the clean-up in use. The facts are the ones About shows and nothing
+  else: never a path, dictionary word, transcript, microphone name or machine or user name. Line breaks are CRLF
+  (`%0D%0A`), the text is percent-encoded as UTF-8, and the whole link is kept under 2,000 characters (past that the four
+  setup lines are left off). One builder (`SupportMail`, `src/Dictum.Core/Help/SupportMail.cs`) and one address constant serve
+  Report a problem, Email support and this. The About card that held Report a problem is titled **Support**, so that
+  "Help" names only this page.
 - **Accessibility**:
   - heading levels (page 1, cards 2, the accuracy part and each question 3);
   - each block of text is a tab stop named after its heading, scrolled into view when focused, with a ring only while

@@ -1,3 +1,5 @@
+using Dictum.Core;
+
 namespace Dictum.Help;
 
 /// <summary>
@@ -10,8 +12,8 @@ namespace Dictum.Help;
 /// names ("Calibrate my voice", "Try on the CPU", "Mic error"…) are pinned against the real windows by HelpPageTests, so
 /// renaming one in the app fails a test until this text follows it.
 /// </para>
-/// The page reaches the network only through the two buttons, which hand <see cref="GuideUrl"/> and
-/// <see cref="SupportUri"/> to the system (IPlatform.Open): the browser or mail app does the rest, not Dictum.
+/// The page reaches the network only through its buttons, which hand <see cref="GuideUrl"/> or a mail link built by
+/// <see cref="SupportMail"/> to the system (IPlatform.Open): the browser or mail app does the rest, not Dictum.
 /// </summary>
 public static class HelpText
 {
@@ -19,11 +21,6 @@ public static class HelpText
 
     /// <summary>The full illustrated guide (built and hosted outside the app). Opened by the system browser, never fetched by Dictum.</summary>
     public const string GuideUrl = "https://dictum.kynni.au/help";
-
-    /// <summary>The support address; the same as AppShell.SupportEmail (a test pins that they match).</summary>
-    public const string SupportAddress = "hello@kynni.com.au";
-
-    public const string SupportUri = "mailto:" + SupportAddress;
 
     public const string MoreHelpHeading = "More help";
 
@@ -33,7 +30,15 @@ public static class HelpText
 
     public const string SupportButton = "Email support";
 
-    public const string SupportNote = "Email support opens a new email to " + SupportAddress + " in your own email program. Dictum sends nothing by itself.";
+    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword. Email support opens the same prefilled email as Report a problem.</summary>
+    public const string SupportNote = "Email support opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.";
+
+    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    public const string FeedbackButton = "Send feedback or suggest a feature";
+
+    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum, your Windows build and the models in use filled in. " +
+        "You can read and change it before you send it. Dictum sends nothing by itself.";
 
     public const string HowItWorksHeading = "How Dictum works";
 
@@ -83,8 +88,11 @@ public static class HelpText
             "• To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.",
             "• For better accuracy overall, see \"Why Dictum hears some people better than others\" above.",
         ]),
-        new("It says \"Mic error\", or nothing happens when I talk. What do I check?",
+        new("It says \"Mic error\" or \"" + NoSoundText.Pill + "\", or nothing happens when I talk. What do I check?",
         [
+            // PROPOSED (21/10/2026): the two paragraphs reuse NoSoundText's wording, so the help and the message cannot drift apart.
+            "If Dictum shows \"" + NoSoundText.Pill + "\", it says: " + NoSoundText.SilentBalloon,
+            "If Dictum cannot find a microphone at all, it says: " + NoSoundText.NoMicrophoneBalloon,
             "• Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.",
             "• Open Settings > Microphone. Choose your microphone from the list, then choose Test microphone and speak. The bars move when Dictum hears you.",
             "• In Windows Settings, go to Privacy & security > Microphone. \"Microphone access\" and \"Let desktop apps access your microphone\" must both be on.",
@@ -94,8 +102,8 @@ public static class HelpText
         new("Dictum closed straight away when I opened it. What do I do?",
         [
             "On some PCs, Dictum 1.1.1 closed as soon as it started. The version you are using now has the fix. If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.",
-            "If it still closes, email " + SupportAddress + " and tell us.",
             "If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.",
+            "If it still closes, email " + SupportMail.Address + " and tell us.",
         ]),
         new("How do I change the key I hold?",
         [
@@ -142,7 +150,7 @@ public static class HelpText
     /// <summary>Every sentence on the page, headings and button labels included: what the copy pins read.</summary>
     public static IEnumerable<string> AllText() =>
     [
-        PageTitle, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton,
+        PageTitle, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton, FeedbackNote, FeedbackButton,
         HowItWorksHeading, .. HowItWorks, AccuracyHeading, .. Accuracy,
         QuestionsHeading, .. Questions.SelectMany(q => (IEnumerable<string>)[q.Question, .. q.Answer]),
     ];

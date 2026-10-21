@@ -114,11 +114,11 @@ public partial class PillWindow : Window
         Spinner.IsVisible = PillText.IsProcessing(view) || view == PillView.Busy;
         SpinnerArc.Stroke = view is PillView.Polishing or PillView.PolishingSkipped or PillView.Busy ? Amber : Blue;
         SpinnerTrack.Stroke = view is PillView.Polishing or PillView.PolishingSkipped or PillView.Busy ? AmberTrack : BlueTrack;
-        Badge.IsVisible = view is PillView.Done or PillView.Cancelled or PillView.MicError or PillView.HandsFreeStopped;
+        Badge.IsVisible = view is PillView.Done or PillView.Cancelled or PillView.MicError or PillView.HandsFreeStopped or PillView.NoSoundEnded;
         (BadgeDisc.Fill, BadgeGlyph.Data) = view switch
         {
             PillView.Done => (Green, Geometry.Parse("M4.5,8.5 L6.8,10.8 L11.5,6")),
-            PillView.MicError => (Red, Geometry.Parse("M8,4 L8,9 M8,11.5 L8,12")),
+            PillView.MicError or PillView.NoSoundEnded => (Red, Geometry.Parse("M8,4 L8,9 M8,11.5 L8,12")),
             PillView.HandsFreeStopped => (Grey, Geometry.Parse("M5.5,5.5 L10.5,5.5 L10.5,10.5 L5.5,10.5 Z")), // a stop square: nothing typed is undone
             _ => (Grey, Geometry.Parse("M5.5,5.5 L10.5,10.5 M10.5,5.5 L5.5,10.5")),
         };

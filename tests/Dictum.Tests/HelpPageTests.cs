@@ -92,8 +92,11 @@ public class HelpPageTests
         Assert.Equal(["https://dictum.kynni.au/help"], platform.Opened);
 
         Click(page, "Email support");
-        Assert.Equal(["https://dictum.kynni.au/help", "mailto:hello@kynni.com.au"], platform.Opened);
-        Assert.Equal(AppShell.SupportEmail, HelpText.SupportAddress); // one support address across the app
+        Assert.Equal(2, platform.Opened.Count);
+        Assert.Equal("https://dictum.kynni.au/help", platform.Opened[0]);
+        Assert.StartsWith($"mailto:{AppShell.SupportEmail}?subject=Dictum%20", platform.Opened[1]); // the prefilled email About's Report a problem opens
+        Assert.Contains("problem%20report", platform.Opened[1]);
+        Assert.Equal(SupportMail.Address, AppShell.SupportEmail); // one support address across the app
         window.Close();
         shell.Dispose();
     });
@@ -114,7 +117,11 @@ public class HelpPageTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(0, downloads.Requests);
         Assert.Equal(0, updates.Requests);
-        Assert.Equal([HelpText.GuideUrl, HelpText.SupportUri], platform.Opened); // the two buttons, nothing else
+        Assert.Equal(3, platform.Opened.Count); // the three buttons, one call each, nothing else
+        Assert.Equal(HelpText.GuideUrl, platform.Opened[0]);
+        Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20", platform.Opened[1]); // Email support: the same prefilled email as Report a problem
+        Assert.Contains("problem%20report", platform.Opened[1]);
+        Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20feedback&body=", platform.Opened[2]); // Send feedback: a mail link, handed to the system
         window.Close();
         shell.Dispose();
 
@@ -123,8 +130,9 @@ public class HelpPageTests
         var copy = File.ReadAllText(Path.Combine(root, "src", "Dictum.Core", "Help", "HelpText.cs"));
         var pages = File.ReadAllText(Path.Combine(root, "src", "Dictum.UI", "Views", "Settings", "OtherPages.cs"));
         var helpPage = pages[pages.IndexOf("internal sealed class HelpPage", StringComparison.Ordinal)..];
-        foreach (var source in new[] { copy, helpPage })
-            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute|Download|CheckForUpdates|ReportProblem|Shell\.Models"), source);
+        var mail = File.ReadAllText(Path.Combine(root, "src", "Dictum.Core", "Help", "SupportMail.cs")); // the builder every button's email comes from
+        foreach (var source in new[] { copy, helpPage, mail })
+            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute|Download|CheckForUpdates|Shell\.Models"), source); // Shell.ReportProblem and SendFeedback are allowed: they only build a mail link for the platform seam
         return true;
     });
 
@@ -136,7 +144,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.False(forbidden.IsMatch(text), $"Forbidden in the help: \"{forbidden.Match(text).Value}\" in \"{text}\"");
         Assert.Equal("https://dictum.kynni.au/help", HelpText.GuideUrl);
-        Assert.Equal("mailto:hello@kynni.com.au", HelpText.SupportUri);
+        Assert.Equal("hello@kynni.com.au", SupportMail.Address);
     }
 
     /// <summary>
@@ -179,6 +187,7 @@ public class HelpPageTests
         seen.Add(ModelsPage.FolderLabel); // shown as a small-caps card title, so in capitals on screen
         seen.Add(AppShell.TryOnCpuLabel); // shown only beside a model problem
         seen.Add(PillText.For(PillView.MicError, TimeSpan.Zero)); // on the pill
+        seen.Add(Dictum.Core.NoSoundText.Pill); // the pill when the microphone gives no sound (PR #22); the help quotes it from the same constant
 
         var copy = string.Join("\n", HelpText.AllText());
         string[] named =
@@ -186,7 +195,7 @@ public class HelpPageTests
             "Calibrate my voice", "Dictionary", "Fix last dictation", "Save corrections", "Settings", "Dictation on",
             "General", "Models", "Storage", "Microphone", "Clean-up",
             "Press your hotkey", "Change…", "Use this hotkey", "Test microphone", "Model folder", "Browse…", "Remove Dictum completely…",
-            "Try on the CPU", "Mic error", "Open the full guide", "Email support", "Help",
+            "Try on the CPU", "Mic error", "No sound from mic", "Open the full guide", "Email support", "Help",
         ];
         foreach (var label in named)
         {
@@ -227,6 +236,32 @@ public class HelpPageTests
     });
 
     [Fact]
+    public Task Tab_walks_the_three_buttons_in_order_guide_then_email_support_then_feedback() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var window = new SettingsWindow(shell) { Width = 860, Height = 640 };
+        window.Show();
+        var page = OpenHelp(window);
+        var guide = All<Button>(page).Single(b => b.Content as string == HelpText.GuideButton);
+        guide.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        var order = new List<string?> { guide.Content as string };
+        InputElement current = guide;
+        for (var i = 0; i < 2; i++)
+        {
+            var next = Assert.IsType<Button>(KeyboardNavigationHandler.GetNext(current, NavigationDirection.Next));
+            next.Focus(NavigationMethod.Tab);
+            Dispatcher.UIThread.RunJobs();
+            order.Add(next.Content as string);
+            current = next;
+        }
+        Assert.Equal([HelpText.GuideButton, HelpText.SupportButton, HelpText.FeedbackButton], order);
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
     public Task The_page_has_headings_and_reads_with_the_keyboard() => UiSession.Run(() =>
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
@@ -249,8 +284,8 @@ public class HelpPageTests
         Assert.Equal(2 + HelpText.Questions.Count, blocks.Count); // how it works, why it mishears, and each question
 
         // Tab reaches each block in order, from the last button, and the last block scrolls into view with its ring on.
-        var support = All<Button>(page).Single(b => b.Content as string == HelpText.SupportButton);
-        support.Focus(NavigationMethod.Tab);
+        var lastButton = All<Button>(page).Single(b => b.Content as string == HelpText.FeedbackButton); // after Email support, in the same row
+        lastButton.Focus(NavigationMethod.Tab);
         foreach (var expected in blocks)
         {
             var next = KeyboardNavigationHandler.GetNext(TopLevel.GetTopLevel(window)!.FocusManager!.GetFocusedElement()!, NavigationDirection.Next);

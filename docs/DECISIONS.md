@@ -3136,3 +3136,234 @@ reword without it.** Generated from `HelpText` (the constants are the source; th
 > The full guide is on the Dictum website at dictum.kynni.au/help. Choose Open the full guide at the top of this page.
 >
 > It opens in your web browser and needs the internet. Everything on this page works without the internet.
+
+## Feedback and feature requests through the user's mail program (21/10/2026, branch feat/feedback, lane F, stacked on feat/in-app-help)
+
+**The decision (Kyle, as relayed by the orchestrator, 21/10/2026).** Users need a way to say what they would like Dictum to do.
+It must not break the privacy promise, so Dictum sends nothing: the feedback goes through the user's own mail program.
+
+**What this lane built.**
+
+- **Settings → Help → "Send feedback or suggest a feature"**, beside **Email support**. It builds a `mailto:` link and hands it to
+  `IPlatform.Open`, exactly as Report a problem does. The user's mail program opens a new message; the user reads it, edits it
+  and sends it, or closes it.
+- **No network statement.** Dictum makes no HTTP request, posts no form, and uses no clipboard for this. The only thing it does is
+  `IPlatform.Open(<mailto: link>)`. A source pin and a network pin (both clicked through the real page, with the model-download and
+  update-check clients counting requests) hold this.
+- **One mail builder.** `SupportMail.Uri(subject, body)` in `src/Dictum.Core/Help/SupportMail.cs` is the only place a support
+  `mailto:` link is made. `AppShell.ReportUri` (Report a problem) was changed to call it, with its output pinned identical to what it
+  produced before. Report a problem's body keeps its LF line breaks (unchanged on purpose); the feedback body uses CRLF.
+- **One address constant** (coordinator's addition, PR #24 lens finding 4). `SupportMail.Address` is the only copy of
+  `hello@kynni.com.au` in code. `AppShell.SupportEmail` is an alias of it, and `HelpText` names it directly (`HelpText.SupportAddress`
+  and `HelpText.SupportUri` were removed). A pin scans `src/**/*.cs` and fails on a second quoted copy.
+- **Email support now opens the Report a problem email** (the same builder and the same body: the version, the platform and the
+  models line), not a bare `mailto:`. Its note was reworded (PROPOSED, below). The models line is passed through
+  `SupportMail.Facts` first, which cuts any path down to its last part.
+- **About's card titled "Help" is now titled "Support"** (PROPOSED), so "Help" names only the Settings page.
+
+**Where the support address lives, so the switch to `dictum@kynni.com.au` is known (decision for later; not made here).**
+
+| Place | What to change |
+|---|---|
+| Code: `src/Dictum.Core/Help/SupportMail.cs`, `Address` | the one constant; the About text, Help page notes, Report a problem, Email support and feedback all follow it |
+| `site/index.html` | the footer's plain address link (`mailto:hello@kynni.com.au`, its text) and the feedback link (`mailto:hello@kynni.com.au?subject=Dictum%20feedback`) |
+| `site/privacy.html` | the privacy contact paragraph and the footer link (the site's own copy; **not touched by this lane**) |
+| `packaging/Dictum.iss` | `AppContact=` (the installer; not code that can read the constant) |
+| `.github/SECURITY.md` | the security contact |
+| `docs/STORE.md` | the Partner Center support contact and the listing's support line (approved copy: product owner's call) |
+| README.md, docs/SPEC.md, this file | prose mentions |
+
+A pin (`The_site_links_to_the_same_email_from_its_footer_and_has_no_form`) fails if the site's feedback link and the app's address or
+subject drift apart, so the site and the code cannot be switched half way unnoticed.
+
+**What the email says (PROPOSED copy, awaiting the product owner's review; do not reword).**
+
+- Button: `Send feedback or suggest a feature`
+- Note under Help (screen-reader help text on the button too): `Send feedback or suggest a feature opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum, your Windows build and the models in use filled in. You can read and change it before you send it. Dictum sends nothing by itself.`
+- Email support's note (reworded): `Email support opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.` (it was: `Email support opens a new email to hello@kynni.com.au in your own email program. Dictum sends nothing by itself.`)
+- Subject: `Dictum feedback`
+- Body (CRLF line breaks; `<…>` is filled in):
+
+```
+What I'd like to say:
+
+
+(You can delete the lines below. They help us understand your setup.)
+Dictum <version>
+Windows build <version>
+Speech model: <name> on <GPU or CPU>
+Clean-up: <provider or rule-based tidy>
+```
+
+- About card title: `Support` (was `Help`).
+- Website footer link text: `Feedback and feature requests`, href `mailto:hello@kynni.com.au?subject=Dictum%20feedback`.
+
+**Where each fact comes from (`AppShell.FeedbackFacts`).** The version is `AppShell.AppVersion` (About's "Version"). "Windows
+build <version>" is the platform name About shows ("On Windows…"), the word "build", and `Environment.OSVersion.Version` to three parts (for example 10.0.26100: Windows 11 reports 10.0, so the word "build" stops it reading as a version of Windows 10): **About does not show this, so it is the one new fact** (a number only). The speech model is `Models.CurrentName` (a model's name, or a
+custom file's name without its folder). The runtime is the one About shows (`Vulkan`, `CPU`, `loading`, or `no runtime (model error)`).
+The clean-up is `rule-based tidy` (provider none, or a local model that failed to load), `<model> on this PC` (local), or the cloud
+provider's name alone (with a note when its key is missing): **not** About's full status line, because that names the server host, which
+for a company's own server could be private. Every fact is cleaned by `SupportMail.Fact`: control characters out, only the last part of
+anything path-like kept, 60 characters at most.
+
+**Length.** The whole link is kept at 2,000 characters or fewer (`SupportMail.MaxUriLength`, the common mailto limit as recalled, not
+verified against a specific mail program in this lane). If the four setup lines (five facts) would take it over, they are left off and the writing space and
+note stay. A normal email is under 600 characters.
+
+**Pins (`tests/Dictum.Tests/FeedbackTests.cs`, and edits to `HelpPageTests.cs`), each observed failing on the reverted behaviour
+(21/10/2026, mutation run on c3c0339 and then on the follow-up commit).** Failing tests are the ones named; "also" lists others that failed.
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| The exact link for a sample setup | body line breaks changed from CRLF to LF (intro, then the join) | failed: exact-link pin, encoding pin, length pin, path pin, real-shell pin |
+| `&`, `é` and line breaks encoded (one `&` only, all breaks `%0D%0A`, no raw space or LF) | body left unencoded except spaces | failed: encoding pin, exact-link pin, length pin, and the Report a problem pin |
+| A path, folder or line break in a name never reaches the email | the cut at the last path separator removed | failed: path pin |
+| (same) | control-character removal removed | failed: path pin |
+| Link under 2,000 characters | the over-length fallback removed; the 60-character clip removed | failed: length pin (each) |
+| Button exists, named, Open called exactly once with a mailto | button removed | failed: button pin, the Help keyboard pin, the "every sentence renders" pin and the network pin |
+| (same) | `Open` called twice; `Open` given a GitHub URL instead | failed (each): button pin, real-shell pin and network pin |
+| Nothing private in a real shell's email (dictionary word, dictated text, app name, scratch folders, user and machine name) | the dictionary file's text appended to the clean-up fact | **the first mutation did not fail**: with the path cut in place the file's path is cut to `dictionary.txt`, which is correct behaviour. With the cut also removed (the real leak): failed real-shell, path and `Facts` pins. The same for the config folder's path |
+| Site link present with the exact href and text | link text changed; href's subject changed | failed: site pin (each) |
+| The site has no form | `<form>` added to the footer | failed: site pin |
+| One address constant in code | `AppShell.SupportEmail` given its own literal; `HelpText` given its own literal | failed: single-literal pin (each) |
+| Subject `Dictum feedback` | subject changed to `Feedback` | failed: exact-link, button, site and network pins |
+| Report a problem still builds the link it did before | `?subject=` broken in the shared builder | failed: Report pin, ShellTests' Report a problem, button, exact-link and network pins |
+| Email support opens the Report a problem email | the button opens a bare `mailto:hello@kynni.com.au` again | failed: Email support pin, single-literal pin, Help "full guide" pin, network pin |
+| About's card is titled Support | title put back to Help | failed: About card pin |
+| A models line is cleaned part by part | the split removed | failed: `Facts` pin |
+
+**Not killed (stated, not hidden).** Removing `SupportMail.Facts(...)` from `ReportProblem` fails no test (`nofacts` mutation): there
+is no input today that puts a path into the models line (a speech model shows its file name, and a clean-up model that is not in the
+catalogue or a full `.gguf` path is repaired away by the settings loader), so the call there is defence in depth; the `Facts` function
+itself is pinned.
+
+**Tests adapted from PR #24 (lane C)**, because this lane changes what they pin: the Help page's "network" pin now expects three `Open`
+calls (guide, the Report a problem email, the feedback email) and allows `Shell.ReportProblem` and `SendFeedback` in the page source while
+still forbidding direct network calls (the regex gained `Dns|Ping|NetworkInformation|Process\.Start|ShellExecute`, as the PR #24 lens asked);
+the keyboard pin starts Tab from the last button, which is now Send feedback; the Email support pin expects the prefilled email.
+
+**The Store certification notes (docs/STORE.md, "Notes for certification").** They describe Report a problem ("users can report a problem
+from Settings (Report a problem)…"), so one clause was added about Settings > Help. The live 1.1.1 package has no such button; the clause
+holds for the next submission (1.2) only. Update it if 1.2 does not ship with this feature.
+
+**Not verified.** No mail program was opened: the link was checked as a string, and `Open` is a fake in tests. How Outlook, Gmail's
+protocol handler or the Windows default mail app treat a `%0D%0A` body and a 600-character link was not tested here. The 2,000-character
+limit is the figure the brief gave, not one checked against a mail program. The Settings > Help page was not seen on screen (headless
+tests only), including the two buttons sitting side by side at 150 % scaling. The site change was not deployed or rendered.
+
+### Lens fixes (21/10/2026), lens on 45768fc (PRs #24 and #29: Needs changes, ten Minors, no new blocker)
+
+| # | Finding | Change | Pin, and the mutation observed failing |
+|---|---|---|---|
+| 1 | The no-network source scan did not read `SupportMail.cs` | the scan reads it too | an `HttpClient` field added to `SupportMail.cs` failed the network pin |
+| 2 | `SupportMail.Uri` was public and open | made private; `SupportMail.ReportUri` (public, moved from `AppShell.ReportUri`) is the only other way in, so no code outside the class can make a support email with other content. A source pin: `mailto:` appears in code only in `SupportMail.cs`. A sentinel (`context.txt` in the config folder, standing in for a future personal-context file) in the real-shell and Email support pins | a second `"mailto:" + "x"` constant failed the mailto pin; the sentinel text put in the models line (Email support) and in the speech-model fact (feedback) failed their pins. **Stated:** text appended after the clean-up fact did not fail the feedback pin, because `Fact` clips each fact to 60 characters and the sentinel sat past it; that is the clip working, not a gap in the pin |
+| 3 | The single-address scan needed a `"` on the same line | counts `hello@kynni.com.au` per `.cs` file over code lines only (lines starting `//` or `///` are skipped); exactly one in all code, in `SupportMail.cs` | a raw multi-line literal holding the address failed it |
+| 4 | Local provider with the clean-up model not downloaded: the email said "<model> on this PC", About says "rules until downloaded" | the fact follows the header's order: loaded or loading, else failed, else `rule-based tidy (clean-up model not downloaded)` | the old expression restored failed the pin (it also asserts the header still says "rules until downloaded") |
+| 5 | The Store note clause named a feature the live 1.1.1 lacks | clause now reads "from 1.2, send feedback from Settings > Help …" | none (copy) |
+| 6 | "five lines" | "four lines (five facts)" in SPEC, README, this file, the PR body | none (copy) |
+| 7 | `ReportUri` had no length cap | same `MaxUriLength` fallback: the models line is dropped. `ReportUri` now also cleans the models line itself (`Facts`), so no caller can skip it (this closes the earlier "not killed" `nofacts` case) | the fallback removed failed the report pin; the cleaning removed failed it too |
+| 8 | Help answer order | the Try on the CPU paragraph now comes before "If it still closes, email …" (PROPOSED order change; text unchanged) | none (order; no pin added) |
+| 9 | "Windows 10.0.26100" reads as Windows 10 on Windows 11 | the line is `Windows build 10.0.26100`; the Help note says "your Windows build" (PROPOSED) | the note back to "version" failed the note pin; the word "build" removed failed the real-shell pin; the sample link pin changed with the body |
+| 10 | Tab order of the three buttons unpinned | a pin walks `GetNext` from Open the full guide: guide, Email support, Send feedback | the row's buttons swapped failed it (and the older keyboard pin) |
+
+**PROPOSED copy changes in this round.** The feedback body's second setup line is `Windows build <version>` (was `Windows <version>`);
+the Help note for the feedback button ends "…the version of Dictum, your Windows build and the models in use filled in…"; the Try on the
+CPU paragraph moves one place up in the "Dictum closed straight away" answer.
+
+## Warn when the microphone delivers no sound (21/10/2026, branch feat/silence-warning)
+
+**The report** (product owner, 21/10/2026, relayed by the orchestrator): on a virtual desktop whose microphone was not passed through, he pressed the hotkey and the pill showed "Recording" and stayed there. Nothing said the microphone was delivering no audio, so the app looked broken.
+
+**What the code did** (read at main 033809f):
+
+- A microphone that opened and delivered only silence showed "Recording" for the whole hold. The pipeline then rejected the recording as silent (`RecordingGate`) and the pill hid without saying why.
+- A microphone that could not be opened (`WasapiCapture.Start` throws, which includes no default capture device: `CaptureDevices.Resolve`) flashed "Mic error". The controller then went on to execute the rest of the key-down's effects, which included the "Recording · hold" pill. So "Mic error" was replaced at once by "Recording · hold", and that label stayed with nothing recording. This is the most likely cause of the "no device at all in some paths" symptom. It is fixed here: after a failed open, the rest of that batch is skipped (`DictationController.Execute`), and the open-failure pins check that the last pill is the flash.
+
+**Decision (built as briefed, with the choices below):**
+
+1. **Detection layer.** `CaptureBuffer` meters every 20 ms block already; it now calls back once per recording at the first block louder than `CaptureBuffer.SoundFloor`. `WasapiCapture` raises this as `IAudioCapture.SoundHeard`. The controller posts it to its inbox, and the pure state machine decides on its existing 50 ms `Tick`, using `DictationStateMachine.NoSoundGraceMs`. Nothing polls from the UI. The interface defaults (`ReportsSound => false`, a `SoundHeard` that never fires) keep every other capture, and every existing test fake, on the old behaviour: the machine only watches a session after `WatchForSound`, which the controller calls when the capture opened and `ReportsSound` is true.
+2. **Grace period: 2000 ms**, hold-to-talk and hands-free alike, a constant with a comment, not a setting (the brief).
+3. **The floor: 1e-5 RMS** (corrected by the lens on dc4e121; see "Lens fixes" below). 1e-5 is the 20 ms block RMS after decoding, downmixing and resampling to 16 kHz, not the level at the device: the 48 to 16 kHz resample lowers white noise by about 6 dB (mono) or 9 dB (stereo). Measured 21/10/2026 through `CaptureBuffer.Append` with 16-bit Gaussian noise at 48 kHz: digital zeros, and white noise quieter than about −91 dBFS (stereo) or −94 dBFS (mono) at the device, read as no sound; −84 dBFS passes. Real microphones were not measured; the warning's log line now gives the session's peak block RMS, so their noise floors can be read from logs.
+4. **The grace counts only until the first sound of the session.** Once the microphone has been heard, a pause is the speaker pausing, so a hands-free session never warns between parts. This is stricter than "no audio for 2 s at any time", which would warn on every long pause with a microphone whose noise suppression sends exact zeros. Ceiling: a microphone muted halfway through a session is not caught.
+5. **While the warning is up, recording goes on.** The pill reads "No sound from mic" with the red dot, meter, orb and edge glow kept, since it is still recording. The first sound puts the recording label back. The balloon shows once per session.
+6. **Ending with the warning up** (key released, hands-free stop, auto-stop): the capture is discarded and nothing is transcribed or typed. The pill flashes "No sound from mic" for 1.8 s with a red "!" badge, instead of "Transcribing…". A hands-free session's token is cancelled (it has typed nothing). A hold shorter than the grace period is transcribed as before, and the pipeline rejects it if it is silent, so a fumbled press never claims the microphone is dead.
+7. **No microphone at all.** The device list is checked only after the microphone could not be opened, so a press that opens it pays nothing for the check. If `IPlatform.ListCaptureDevices()` is empty, the pill flashes the warning at once with the no-microphone balloon, and nothing stays on Recording. Any other open failure, or a list that cannot be read, stays "Mic error". **This differs from the brief's wording**, which said to check the list when recording starts. Checking before every `Start` would add a device enumeration to each press's capture latency. With WASAPI, an empty list always makes `Start` throw (`CaptureDevices.Resolve`), so the outcome is the same. A list that is empty while `Start` somehow succeeds still gets the silence warning after 2 s.
+8. **Mic error is unchanged**, both for an open failure with a microphone listed and for a microphone lost mid-recording, including with the warning up. The only change is that its flash is no longer overwritten by "Recording · hold" (see above).
+9. **Tray panel line (item 2, small enough to build).** After a session that ended with no sound (point 6 or 7), the problem line in the tray panel and on Settings > About also reads "Last dictation heard nothing: check the microphone". It goes when a dictation types text (`ProcessingOutcome.Inserted`). It is held in memory only, so a restart clears it.
+
+**PROPOSED strings, for the product owner's approval (none is approved; do not treat them as final copy):**
+
+- Pill: "No sound from mic"
+- Balloon (silence): "Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on."
+- Balloon (no microphone listed): "No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again."
+- Tray panel and Settings > About line: "Last dictation heard nothing: check the microphone"
+
+They live in `NoSoundText` (Core), and one pin checks them verbatim. No approved copy (CloudPolicy, consent dialog, state lines) was changed.
+
+**What it might break.** A Bluetooth headset whose first packet takes longer than 2 s to arrive will show the warning and one balloon, then go back to Recording when its audio starts (not measured). A microphone whose own noise suppression sends exact zeros until speech can show the warning if the speaker waits more than 2 s before talking.
+
+**Pins** (`tests/Dictum.Tests/SilenceWarningTests.cs`, 13 tests: pure state-machine pins in the style of `StateMachineTests`, a `CaptureBuffer` pin, and 4 controller pins with a stand-in microphone). Each was observed failing on the reverted behaviour; the PR body has the mutation table.
+
+**Not verified:** on a real virtual desktop or Remote Desktop session without microphone redirection; with a real muted microphone, a Bluetooth headset, or a microphone with its own noise suppression; how the balloon looks on Windows 10 and 11; the pill's look with the new label (no screenshot was taken, and no Dictum build was launched on this PC).
+
+### Lens fixes (21/10/2026), lens on dc4e121
+
+The lens returned Needs changes, with no blockers. Its findings and what was done:
+
+1. **Major (figure honesty): the floor's wording was false.** "Any real signal quantised to 16 bits or more should pass" ignored that the floor applies after the downmix and the 48 to 16 kHz resample. The lens measured through `CaptureBuffer.Append` with 16-bit Gaussian noise at 48 kHz. A probe in this lane, with another random seed, gave the same heard or silent result at each level, with block peaks within about 5 % of the lens's:
+
+   | Level | Mono | Stereo |
+   |---|---|---|
+   | −84.2 dBFS | heard | heard |
+   | −90.0 dBFS | heard (peak 1.61e-5) | heard (peak 1.15e-5) |
+   | −92.7 dBFS | heard (peak 1.21e-5) | silent (peak 8.68e-6) |
+   | −95.2 dBFS | silent | silent |
+
+   The value stays 1e-5, as the orchestrator directed. The wording is corrected in `CaptureBuffer.SoundFloor`, decision 3 above, the README and the PR body. A new pin checks the clear ends: −84.2 dBFS heard and −96 dBFS silent, mono and stereo. The warning's log line now carries the session's peak block RMS and how many 20 ms blocks arrived. These are numbers only, so real microphones' floors, and "no audio at all", can be read from logs. A pin checks the line.
+2. **Minor, accepted: the end-of-recording decision can miss a very late first sound.** It reads the warning flag when the key event is handled, before a first-sound report that may still be queued (the capture's 50 ms buffer plus the inbox). A first sound shorter than that, arriving after 2 s of silence and just before the release, is discarded with the warning instead of transcribed. This is inferred, not measured. It is marked `// simplification:` at `EndRecording`. Trigger to retire: a report of a dropped first word.
+3. **Minor: the README's "No sound from mic" entry** now also says to check that Windows allows desktop apps to use the microphone (Settings > Privacy & security > Microphone). The balloon is unchanged. **Not verified:** whether a microphone privacy denial gives silence (the warning) or an open failure ("Mic error").
+4. **Nit, left as a known gap:** in hands-free, while the warning is up, the pill's "tap to stop · Esc stops and keeps what's typed" hint is hidden, because the hint shows only with the hands-free label.
+5. **Minor test race:** the second dictation in `The_controller_warns_once_for_a_silent_microphone…` reported its sound before the new session had started, so the sound could be counted against the old one. The test now waits for the new recording's pill first. It still proves its claim: a dictation that types text clears the heard-nothing line.
+
+### Lens fixes (21/10/2026), lens on 28d16b7
+
+The lens returned Needs changes with three minors and no change to src behaviour wanted. All three are fixed:
+
+1. **Test race.** `WarnNoSound` emits the pill before the balloon and log effects. So a test that waited for the "No sound from mic" pill could read the balloon list or the log before they were written. The effect order is unchanged. Instead, the two tests now wait for the balloon (`The_controller_warns_once_for_a_silent_microphone…`) and for the log line (`The_warning_log_line…`) themselves. To check the wait, I added a temporary `Thread.Sleep(50)` before the warning's log line and balloon in `DictationController`: all 17 tests in the class passed with it. It was then removed.
+2. **Pin gap.** `CaptureBuffer.PeakLevel` and `BlocksMeasured` now have their own pin. A fresh buffer reads 0 and 0. One block at RMS 0.3 followed by three at 0.01 reads a peak of 0.3 and 4 blocks.
+3. **README basis restored.** The entry now reads "digital silence, or white noise at a 48 kHz microphone below about −91 dBFS in stereo or −94 dBFS in mono". The −91 and −94 dBFS figures hold only for a 48 kHz device:
+   - A 16 kHz device skips the resampler (`MonoResampler` returns early when the input rate is the output rate), so its floor at the device is the raw 1e-5, which is −100 dBFS for a mono device. This is inferred from the code, not measured. A 16 kHz stereo device still goes through the downmix, which was not measured either.
+   - 44.1 kHz devices were not measured.
+
+### After merging main (21/10/2026, main at de944cc: PR #22's "No sound from mic" and release 1.1.2)
+
+- **Merge.** `git merge origin/main` into feat/feedback (no rebase). The only conflict was this file; both sides' sections are kept
+  (the warning section from PR #22 follows this one). `Directory.Build.props` came in with main's version change: this lane did not touch it.
+- **The Help question about the microphone** now reads `It says "Mic error" or "No sound from mic", or nothing happens when I talk. What do I check?`
+  (PROPOSED), and its answer starts with two paragraphs built from `NoSoundText` itself, so the help and the message cannot drift apart:
+  `If Dictum shows "No sound from mic", it says: <NoSoundText.SilentBalloon>` and
+  `If Dictum cannot find a microphone at all, it says: <NoSoundText.NoMicrophoneBalloon>`. The bullet checks that were there stay below them.
+  Pins: the "labels the help names exist in the app" pin now includes "No sound from mic" (the help copy and the pill constant), and
+  `The_mic_help_answer_quotes_the_no_sound_message_from_the_same_constants`.
+
+### Lens fixes (21/10/2026), re-lens on 4dc2ad7: the hotkey comes out of the support email
+
+**The finding (Major, privacy and disclosure).** Report a problem and Email support sent `Status.Models` as the "Models:" line, and
+`Status.Models` is the header line: `{speech} · {runtime} · {clean-up} · {hotkey}` (the raw `hotkey` text if it does not parse). The copy
+says only the version and the models go in (`HelpText.SupportNote`, this file's Report a problem entry, SPEC, README). **The email never
+carried the hotkey by design; main had sent it since Report a problem shipped; fixed 21/10/2026.** Decision: the hotkey comes out of the
+email and the copy stays as it is.
+
+**The fix, in one place.** `AppShell.ModelsLine` (speech · runtime · clean-up, no hotkey) is now what the header builds on
+(`Status.Models` = `ModelsLine` + ` · ` + the hotkey) and what `ReportProblem` passes to `SupportMail.ReportUri`. Callers of
+`Status.Models` checked first: the tray panel (`FlyoutWindow`) and About's runtime line keep the full header, hotkey included; only the email
+loses it. The runtime wording was lifted into one private helper (`HeaderRuntime`) used by both.
+
+**Pins.** `Email_support_opens_the_report_email_with_the_version_and_models_and_nothing_private` and ShellTests' Report a problem pin now
+refuse the hotkey: the test text "F24" and the key as the header actually shows it. (ShellTests' Report pin and the header pin use an unstarted
+shell, which shows its default `RightCtrl` rather than the file's `F24`, so they check the header's own last segment; the Email support pin
+opens Settings, where the shell shows `F24`, and checks both.) `The_header_keeps_the_hotkey_and_the_support_models_line_does_not` pins that the header still ends with the key and that
+`ModelsLine` is the header without it. The sample models line in the Report-link pin no longer has a hotkey.
+
+**Mutation.** `ReportProblem` put back to pass `Status.Models` (the hotkey back in the email line): **observed failing**: the Email support pin and
+ShellTests' Report a problem pin. Restored.
