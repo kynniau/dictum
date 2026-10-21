@@ -3268,3 +3268,36 @@ The lens on 36fa43e (and a854a41) verified the merge and the constant swaps and 
 | Opening_the_window_fits_it_to_its_screen | the Opened hook removed | observed failing: values differ (0 runs) |
 | The_window_is_fitted_to_the_work_area_of_its_screen | `Fit` returns the position unchanged | observed failing: values differ |
 | One_late_tick_is_not_three_seconds_of_speech | the gap uncapped | observed failing: strings differ (Heard you.) |
+
+## Integration round on feat/simple-view (21/10/2026): merged main 8419f10; findings from the 787b300 and 86132af lenses
+
+**Merge.** `origin/main` at 8419f10 (PRs #30, #34, #32/#33, #22, #21) merged into the branch at ffb388a with a plain merge: no conflicts. DECISIONS keeps both tails, main's entries first. The public-copy sweep (`PublicCopyNeutralityTests`) passes on the merged tree; a grep for its word list found nothing to reword.
+
+**Simple view (lens on 787b300).**
+
+1. **(Major) Pins for the plain download question.** `A_plain_question_warns_when_little_space_would_be_left` checks the low-space warning reaches the plain question in its own words (and is absent with 2 GB to spare); `A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops` checks the `canWait = false` wording and its two buttons. The test prompts (`ScriptedPrompts`) now record the plain questions' words and then answer as the interface's defaults do.
+2. **(Minor) `GuardLine` is `WhisperLanguages.Problem`.** Its English-only branch could not be reached: `SimpleView.Tiers` offers an English-only model only for plain English without translate, which it can do. The two PROPOSED "English only: …" lines are removed.
+3. **(Minor) The busy question's name for the running download was remembered from when it started.** `ModelCoordinator` kept the tier name of each download it started from the Simple view; after a language change (English to es, say) it still called a running small.en "More accurate". The name is now read from the tiers in force when the question is asked (`PlainNameOf`), and nothing is remembered: a file that is no tier any more is named by its short name.
+4. **(Minor) "Add AI clean-up" is not offered in the Simple view, page or tray, while the text is not English.** No clean-up model runs on it (`TranscriptCleaner.Plain`), so the download would change nothing. English keeps it, and the Advanced view keeps it with every other detail.
+5. **Off.** `TranscriptCleaner.OffStatus` starts "no clean-up:", not "off:", as the tray name does ("Clean-up: off" read as Dictum being off). PROPOSED copy. Owner decision, not changed: for text that is not English, the Tidy row's line ("Tidies spacing only for <language>.") and Off do the same thing (whitespace only).
+
+**Onboarding (lens on 86132af).**
+
+1. **(Minor) The clamp's result had no pin.** `FitToWorkArea` now records `Fit`'s result (`LastFit`) and hands it to `Apply((double Height, PixelPoint Position))`, which holds the two assignments. `Opening_the_window_fits_it_to_its_screen` opens a window taller than the headless screen and below it, and checks the window's height and position equal `Fit`'s result; it then applies a 1366 × 768 at 175 % placement and checks it again.
+2. **(Minor) The 1 DIP floor in `Fit`** is kept, with a comment: it only keeps the height positive for a degenerate work area. 1366 × 768 at 175 % leaves about 359 DIP (inferred from the recalled 48 DIP taskbar and 32 DIP caption, not measured). The nav row's height is not a constant (it follows the 17 px text), so it was not used as the floor.
+3. **(Nit) `MicrophoneStep.Tick`'s clamp** carries a `// simplification:` naming its ceiling (a timer that always fires later than 100 ms makes "about 3 s" take longer) and its retire trigger (feed the check the capture's own sample time, or a report of the test running long).
+
+**Pins and mutation checks (this round).** Each was applied alone, the test project rebuilt, the pin run, the file restored:
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| A_plain_question_warns_when_little_space_would_be_left | the plain question is passed no warning | observed failing |
+| A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops | `PlainBusyText` ignores `canWait` | observed failing |
+| same | the coordinator passes `canWait: true` to the plain busy question | observed failing |
+| The_running_download_is_named_by_its_tier_in_force_when_asked | the name read with the English tiers whatever the language | observed failing |
+| same | `ModelCoordinator.cs` reverted to the branch's previous head (the remembered name) | observed failing |
+| Add_ai_clean_up_is_not_offered_in_simple_for_text_that_is_not_english | the page's language condition removed | observed failing |
+| same | the tray's language condition removed | observed failing |
+| CleanupOffTests.Off_wins_over_the_language_skip | `OffStatus` back to "off:" | observed failing |
+| Opening_the_window_fits_it_to_its_screen | `Apply`'s two assignments made no-ops (all 43 onboarding tests run) | observed failing (that pin only) |
+| same | the `Apply(fit)` call removed from `FitToWorkArea` | observed failing |
