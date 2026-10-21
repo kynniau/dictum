@@ -89,7 +89,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 - **Status**: the models in use with their runtimes and the hotkey (in the Simple view, the plain names instead: for
   example "Standard · Tidy my words · Right Ctrl", with "AI clean-up" or "Off" for the clean-up; keys are shown by name,
   "Right Ctrl", while settings.json keeps `RightCtrl`), a coloured state (Ready, Recording, Working,
-  Loading, Downloading, No model, Error, Off) and the **Dictation on** switch (saved as `enabled`).
+  Loading, Downloading, No model, Error, Off) and the **Dictation on** switch (saved as `enabled`). The models line
+  sits on its own row under them, on one line; one too long for the panel ends in "…", and its tooltip shows it whole.
 - **A model problem**, under the status when there is one: why a model could not load (in plain words for a missing
   Visual C++ runtime, else the engine's own message), or that it runs on the CPU because the graphics driver could not
   run it, now or the last time it started (see Troubleshooting). A model that fails on the GPU is tried once more on the
@@ -113,7 +114,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   tidy is in use and the text is English) and **Off** for clean-up, with the same download marks; a model chosen in the Advanced view shows as
   "Custom: <name>". The Advanced view shows the model names as above.
 - **Microphone** picker (System default, or a named device: `audio.device`; "No microphone found" when Windows lists
-  none, and then the no-microphone sentence shows under the status) and a level meter that moves while you
+  none, and then the no-microphone sentence shows under the status, without **Open log folder**, which is for model
+  problems) and a level meter that moves while you
   dictate.
 - **Big recording indicator** (Off | Orb | Edge | Both), **Profanity filter** (on = Mask; Remove is in Settings >
   Clean-up), **Grammar assist**, **Start and stop sounds** (`sounds.enabled`, off by default).
@@ -395,7 +397,7 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
       redirection on a remote or virtual desktop; with no microphone listed it says so. The microphone is open only
       while this step is on screen, and closes by itself about five seconds after "Heard you." or after a minute;
       **Test again** opens it again. **Skip** is fine.
-   6. **Try it**: a box in the window, which has the keyboard focus. Click in it if you have moved away, hold your hotkey, say a sentence and let go: the real dictation path
+   6. **Try it**: a box in the window, which takes the keyboard focus once the speech model is ready (until then it shows "Getting the speech model ready…" and has no cursor). Click in it if you have moved away, hold your hotkey, say a sentence and let go: the real dictation path
       types into it. After your first dictation the window explains that accents, voices and microphones differ, with
       **Calibrate my voice** and **Finish**. If nothing arrives within 30 seconds of the model being ready, it says so,
       and **Finish** still works.
@@ -1001,7 +1003,8 @@ entries. It does not train or change the model.* Nothing is uploaded and it work
    adding a model (the window does not print that path, which names your Windows account: **Open the recordings folder**
    opens it); **Delete recordings** removes them all, including any left by a save that failed. A take stops by
    itself after 30 s and is discarded (each sentence takes about 5–10 s), and one whose microphone fails is discarded
-   too; either way the row says to record it again.
+   too; either way the row says to record it again. With no microphone listed, **Record** is greyed out and the window
+   says so under it; plug one in and come back to the window, and Record works again.
 2. **Run test** (not while a take is being recorded): every installed speech model transcribes every recording twice,
    with greedy and with beam-search decoding (5 beams), using your dictionary prompt. For each combination you see the
    word error rate (WER: words substituted, dropped or added, against the script, after lower-casing and removing

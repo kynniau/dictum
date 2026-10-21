@@ -4021,3 +4021,73 @@ The lens also asked for a pin that keyboard focus opens the `PathBox` tooltip, i
 | 4 | the controller ignoring `NoMicrophoneException` | SilenceWarningTests.The_controller_warns_of_no_microphone_when_the_platform_says_so | observed failing |
 | 5 | the tooltip log line with the display name | The_tooltip_log_keeps_the_token | observed failing |
 | 9 | the in-box status back at 12 px | Try_it_shows_the_wait_inside_the_box | observed failing |
+
+## 1.2 polish round 2 (22/10/2026, branch fix/1.2-polish-2)
+
+**Why.** A second Windows Sandbox recording, of the round-1 build (main at 4ab800e, PR #38), showed six small defects, and the round-1 lens left two nits. This branch fixes them. The version is not bumped.
+
+**What changed, per item.**
+
+1. **The tray panel's header wrapped the key onto a second line** ("…Right" / "Ctrl", first-run-poster.png), **and the Mode line wrapped "Tidy my / words."**
+   - Cause: the models line shared a row with the state word and the switch, and wrapped (the caption style).
+   - The header now has two rows: the mark, "Dictum", the state and the switch, then the models line under the last three. The line never wraps; one longer than the panel ends in an ellipsis, whole in its tooltip.
+   - Measured headless at the panel's 380 px, with the longest state word ("Downloading"): every Simple line (each tier, each clean-up, "Right Ctrl" and "Mouse 5") and each preset's model-name line on a CPU and a GPU machine fit whole. With the old layout restored, 25 of the 26 lines broke, "Standard · Tidy my words · Right Ctrl" among them.
+   - The Mode line's rule: one sentence per line. `SimpleView.ModeHint` now returns its two sentences. The panel joins them with line breaks, after "Custom: your settings match neither preset." when that applies (`FlyoutWindow.ModeLine`). So a line breaks between presets, never inside a name. At the panel's width each sentence fits on its line, in both views, on both machine classes, with and without the Custom note. The words are unchanged; only the space between the sentences became a line break.
+2. **"Open log folder" stood under the no-microphone sentence.** The link now shows only while `ShellStatus.Problem` is set (a model problem, or "Last dictation heard nothing"), as before round 1 added the no-microphone line. The sentence alone has no link.
+3. **In Try it the caret blinked in front of "Getting the speech model ready…".** While the status shows, `TryItStep.InitialFocus` gives focus to nothing. When the status goes (the model is ready, or failed to load, or the person typed), the box takes the focus, unless the person has put it somewhere else meanwhile (Tab to Finish, say). Hiding the caret instead was considered and not chosen: the box would still have the focus, and nothing on screen would show it.
+4. **A Help index jump left the answer at the bottom edge with its last line cut off** (help/07, help/09). Focus alone scrolls only as far as needed. The link now scrolls the page so the answer's heading is 8 px below the top of the view (`HelpPage.JumpGap`). The answers near the end, which the page cannot scroll that far, show whole.
+   - The position is measured against the scrolled content, not the view. Focus has already moved the offset, and the view's coordinates follow only at the next layout pass.
+   - The first try measured against the view and overshot by the earlier offset. The pin caught it.
+5. **The Simple view said "In use" twice on a row** (the tag and the line, change-model/05-standard.png). Cause: round 1 added the tag to `ModelRow` while the lines still began with the state. A row with the tag now says it once, in both views and for every kind of row that can be in use:
+   - the catalogue row (`CatalogueRow` drops the state when the row is in use);
+   - a tier the language rules out;
+   - Tidy: "With AI clean-up · …" when the model does it, else the line alone;
+   - Off;
+   - the Custom rows ("Not one of the choices above.");
+   - the Advanced row for a model file from disk (its path).
+
+   The Advanced view had the same duplicate and is fixed with it, since it is the same cause.
+6. **Calibration's Record stayed active with no microphone** (test-setup/04-sentence.png).
+   - The window now looks for a microphone when it opens, when it is activated, before a take the hotkey starts (a disabled button does not stop the hotkey), and after a take fails for want of a microphone.
+   - With none listed, or a list that throws (the one guarded lister, `MicrophoneChoices.List`), Record is disabled. The no-microphone sentence stands under it, and the sentence to read stays. Once a microphone is listed, Record works again and the line goes. Stop is never disabled.
+   - A take that fails with `NoMicrophoneException` while the list still names a device leaves Record on, with the sentence. A first version disabled Record then too, so only the next activation turned it back on. The round-1 pin (Calibration_says_no_microphone_next_to_Record) caught that activation clearing the line. The list is what says a microphone is there.
+7. **Nits from the round-1 lens.**
+   - `PathBox.Path` had two summaries. The stale one is gone and the blank line is back.
+   - In SPEC §24 the Browse… amendment was spliced into the middle of the Settings window sentence. It now follows that sentence.
+
+**PROPOSED strings (22/10/2026)**, for the product owner's approval; none is approved:
+- "With AI clean-up" (`SimpleView.TidyWithAiState`, the Tidy row's line start; was "In use, with AI clean-up")
+- "Not one of the choices above." (`SimpleView.CustomNote`; was "In use. Not one of the choices above.")
+- Lines whose "In use · " prefix is dropped, the rest unchanged: the tiers' and the catalogue's lines, Tidy's, Off's, and a tier the language rules out.
+- The Mode line's sentences, one per line. The words are unchanged from round 1's PROPOSED line.
+
+No approved copy is touched. CloudPolicy, the consent dialog, the pill and tray state lines, the Store listing, the 1.1.2 note, FreeLine, FreeLaterNote and the name line are unchanged.
+
+**Pins** (`Polish2Tests.cs`, and `OnboardingTests.Window.cs` for Try it; headless). Each was observed failing with its mutation applied alone, rebuilt and run, and passing once restored:
+
+| Item | Mutation | Pin | Observed |
+|---|---|---|---|
+| 1 | the models line back beside the state and the switch, wrapping | The_panel_header_is_one_whole_line (26 lines) | observed failing (25 of 26; "Standard · Tidy my words · Right Ctrl" broke before "Right Ctrl") |
+| 1 | the models line wrapping, on its own row | The_panel_header_never_wraps | observed failing (3 lines, not 1) |
+| 1 | the Mode line joined with a space | The_mode_line_breaks_between_presets_only (8 rows) | observed failing (8 of 8) |
+| 2 | the log link for any line under the header | Open_log_folder_is_for_errors_not_the_microphone_line | observed failing |
+| 3 | Try it focusing the box while it loads | Try_it_focuses_the_practice_box_once_the_model_is_ready | observed failing |
+| 3 | no focus to the box when the model is ready | Try_it_focuses_the_practice_box_once_the_model_is_ready | observed failing |
+| 4 | the jump without the scroll to the top | A_help_jump_puts_the_answer_at_the_top | observed failing (the answer 439 px into a 640 px view) |
+| 5 | the catalogue row's line keeping "In use" | In_use_is_said_once_on_a_row; SimpleViewTests.The_default_view_is_simple, A_user_whose_language_is_not_english_is_never_switched_to_an_english_only_model | observed failing (6 tests) |
+| 5 | Off's line starting "In use · " again | In_use_is_said_once_on_a_row (Off); CleanupOffTests.The_simple_rows_switch_between_tidy_and_off | observed failing |
+| 6 | Record enabled whatever the list says | Calibration_record_waits_for_a_microphone, Calibration_with_a_list_that_throws_waits_for_a_microphone | observed failing |
+
+Not pinned:
+- the hotkey path's re-check (the hotkey is redirected through the shell's listener, which these headless tests do not drive);
+- item 7 (comments and docs).
+
+**Changed pins.** Round 1's pins that asserted the old text were updated to the new rule, not deleted:
+- PolishTests: the Mode line's text now has a line break between its sentences.
+- CleanupOffTests and SimpleViewTests: they checked the "In use · …" lines; they now check the tagged rows (`Polish2Tests.InUseRows`).
+- OnboardingTests: lens 4's Try_it_focuses_the_practice_box asserted the box had focus while the model loaded. It is now Try_it_focuses_the_practice_box_once_the_model_is_ready, and Try_it_leaves_focus_the_person_moved is added.
+
+**Not verified.**
+- Nothing here was run on a desktop or in Windows Sandbox.
+- The measurements use Avalonia's headless platform with Skia and this host's system fonts (Segoe UI Variable). A desktop at another scale, or a PC without that font, may set the lines differently.
+- A new Sandbox recording would confirm all six items on screen.
