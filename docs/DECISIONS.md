@@ -2863,7 +2863,7 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 | More accurate | small.en | medium.en |
 | Most accurate | medium.en | large-v3-turbo |
 
-The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in the middle tier: the code already recommends medium.en to a GPU machine, so medium.en is used. No measurement in this repository compares large-v3-turbo with medium.en for English accuracy; the order follows the Full preset, not a measurement.
+The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in the middle tier: the code already recommends medium.en to a GPU machine, so medium.en is used. The order follows the Full preset. One measurement supports it, weakly: the real-voice calibration result of 15/10/2026 (above; one voice, ten sentences, about a hundred words, so one error is about one point, and the word error rules of that build, since changed) had large-v3-turbo greedy at 4.7% against medium.en beam at 6.3% and greedy at 9.4%. (Corrected by the lens of 21/10/2026: this section first said no such measurement existed.)
 
 **Clean-up and the Mode presets.** The Mode presets (Light, Full) set speech and clean-up together; the tiers are speech only, so the Mode page and the tray's Mode segments do not express the same choice and Simple could not reuse them as its mechanism. Simple reuses their constants instead (above), and the Mode segments stay in both views unchanged. "Tidy my words" is in use while `llm.provider` is `none` or `local` with the recommended clean-up model (`CleanupCatalog.Recommend`); from anything else, its **Use** selects that model when it is on this PC, else the rule-based tidy. A cloud provider is never offered in Simple. One chosen in Advanced shows as a "Custom: <provider>" row with no button, because hiding a provider that sends text off the PC would be less honest than naming it.
 
@@ -2871,7 +2871,7 @@ The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in t
 
 **Deviation from the brief's explainer.** The brief's text sends people to "Settings > Test my setup", which does not exist in this build (no such text on main or on any remote branch, checked 21/10/2026). The explainer names the existing calibration test instead, with a **Calibrate my voice** button under it that opens the same window as the tray panel's button. When a "Test my setup" page lands, the sentence and the button can point there.
 
-**Ceilings marked `// simplification:`.** `SimpleView`: the tiers are the English ladder; a user whose `whisper.language` is not English gets the existing language warning after choosing an English-only tier. Retire it when Simple-view users dictate in another language: map the tiers to the multilingual entries when the language is not `en`.
+**Ceilings marked `// simplification:`.** First commit: `SimpleView` mapped only the English ladder. Retired by the lens fixes below (multilingual tiers and the guard).
 
 **File paths in the brief.** The brief named `src/Dictum.Core/Transcribe/ModelCatalog.cs` and `src/Dictum.Core/Llm/CleanupCatalog.cs`; both catalogues live in `src/Dictum.Core/Settings/`. Neither was changed: the plain names live in `SimpleView`, so the catalogues needed no display-name additions.
 
@@ -2881,13 +2881,52 @@ The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in t
 - Help line under them: "Simple shows what each choice means. Advanced shows every model and its details."
 - Explainer: "Dictum turns your voice into text on this PC. The speech model does the listening. Standard works for most people. If words come out wrong, try a more accurate model, or press Calibrate my voice to see which hears you best." (the brief's wording, with "run the test in Settings > Test my setup" replaced as explained above). The button under it reuses the existing label "Calibrate my voice".
 - Tier names: "Standard", "More accurate", "Most accurate".
-- Tier lines: "Included. Works well for most people."; "Works well for most people." (Standard when base.en did not come with this copy, so "Included" would be untrue); "Bigger download, a bit slower."; "Best results. Needs a strong PC or patience."
-- Tier state for a file not on this PC: "<size> download" (for example "487 MB download"). The other states reuse the existing words: "In use", "Downloaded", "Downloading <n>%", "Waiting to download", and the buttons "Use", "Download…", "Downloading…", "Waiting…", "In use".
+- Tier lines: "Included. Works well for most people."; "Works well for most people." (Standard when its model did not come with this copy, so "Included" would be untrue); on a GPU machine "Bigger download, a bit slower." and "Best results. Needs a strong PC or patience."; on a CPU see the lens fixes below.
+- Tier state for a file not on this PC: its size alone (for example "487 MB"; first commit "487 MB download", changed by the lens fixes). The other states reuse the existing words: "In use", "Downloaded", "Downloading <n>%", "Waiting to download", and the buttons "Use", "Download…", "Downloading…", "Waiting…", "In use".
 - Tier buttons' accessible names: "Use <tier>", "Download <tier>" (for example "Download More accurate"); a busy one reuses the 1.1.1 pattern with the tier name: "More accurate is already downloading".
-- Custom row: "Custom: <name>", with the line "In use · Chosen in Advanced view".
+- Custom row: "Custom: <name>", with the line "In use. Not one of the choices above." (first commit "In use · Chosen in Advanced view", changed by the lens fixes).
 - Clean-up row: "Tidy my words (recommended)", line "Fixes punctuation and removes ums and ahs. Runs on this PC."; state "In use, with AI clean-up" while the recommended model tidies; its button's accessible name "Use Tidy my words".
 - Tray clean-up picker (Simple): "Tidy my words"; "Add AI clean-up" reuses the existing label, with the existing marks.
 
 **Pins** (`tests/Dictum.Tests/SimpleViewTests.cs`, headless as `UiWindowTests`; no model is downloaded: an in-memory server holds the one download). Each was observed failing with its mutation applied and passing without it; the PR body has the table. Two existing UI tests that check Advanced catalogue rows now set `"ui": { "view": "advanced" }` (`NoSilentCancelUiTests.The_downloading_model_shows_as_downloading_with_a_disabled_button`, `ModelFolderTests.Settings_models_marks_the_bundled_model_as_included`); their assertions are unchanged. The test shell (`Scratch.Shell`) gained a `gpuMachine` option for the GPU mapping pin.
 
 **Not verified:** the views on a real desktop, at 150 % scaling, or in dark mode (headless only); screen-reader output (the accessible names are pinned, not heard); the GPU mapping on a real GPU machine (pinned with a stand-in machine class); a real download; tray mode, never run on the development PC.
+
+### Lens fixes (21/10/2026), first lens on 1316ea6
+
+The lens on PR #23 (head 1316ea6) returned Needs changes with three majors, six minors and one nit, and no blockers. All ten are fixed on the same branch, with the orchestrator's decisions where it gave one:
+
+1. **Major: a user whose language is not English could be switched to an English-only model, and the multilingual model in use vanished from Simple.** Orchestrator's decision: when the text is not plain English speech (`whisper.language` is not `en`, or Translate is on), the tiers map to multilingual models. Standard is `small` and More accurate is `medium`. On a GPU, Most accurate is `large-v3-turbo`, or `large-v3` when translating, because turbo cannot translate (OpenAI, as `WhisperLanguages` cites). On a CPU there is **no multilingual Most accurate**. The catalogue has nothing above `medium` whose trade-off line does not say "needs a GPU", and a second `medium` row would repeat More accurate, so the CPU shows two rows.
+
+   As a guard, every tier carries `WhisperLanguages.Problem` for its model with the language settings in force. A tier with a problem gets no button on the page, only its line, and is left out of the tray picker unless it is the model in use. For an English-only model the line is the PROPOSED "English only: switch to Advanced to choose a model for <language>." (or "…a model that detects the language." for Detect automatically); any other problem (Cantonese, which only the large-v3 models have) shows the existing `Problem` sentence. The `// simplification:` is retired.
+2. **Major: the CPU lines understated the measured slowness.** README "Measured speed" (15/10/2026, a 10.46 s clip, CPU forced) gives base.en 1.90 s, small.en 6.43 s and medium.en 20.1 s; calibration's ceiling is 2.5 s per 10 s. The lines now follow the machine class. CPU More accurate: "Bigger download. Takes a few seconds longer on this PC." CPU Most accurate, and the multilingual `medium` on a CPU: "Slow without a graphics card: can take longer than you spoke." The GPU keeps "Bigger download, a bit slower." and "Best results. Needs a strong PC or patience." The multilingual `medium` was not timed; the same line is used for it because it is the same size as medium.en (inferred, not measured).
+3. **Major: "Download More accurate" opened the catalogue question** ("Download ggml-small.en.bin (487 MB) from huggingface.co? …"). That text is not approved copy. A Simple choice now passes its tier name to `ModelCoordinator.Select(name, plainName)`, which asks through two new `IModelPrompts` members with default implementations (`ConfirmPlainDownload`, `ConfirmPlainDownloadWhileBusy`; the defaults ask the catalogue question, so other stand-ins are unchanged).
+
+   The question reads "Download <tier> (<size>)? It comes from the model makers' official download page and is checked before use.", followed by the existing low-space warning when there is one. The busy question names both models by their tier names where the Simple view started them. The "already downloading" balloon and the Stop balloon also use the tier name. Advanced keeps today's wording.
+
+   **Known Simple gaps, for a later lane** (deliberately not changed here):
+   - Calibration still speaks in catalogue terms (for example "large-v3-turbo-q5_0 · beam" and error counts).
+   - "Add AI clean-up" still asks the catalogue clean-up question (file name, host, licence line).
+4. **Minor: "In use · Chosen in Advanced view" was untrue** for a model applied by calibration, a Mode preset, the first run, `--model` or `DICTUM_MODEL_PATH`. The Custom line is now "In use. Not one of the choices above."
+5. **Minor: with text that is not English the clean-up is skipped** (`TranscriptCleaner.Plain`: whitespace only), so the Tidy line now reads "Tidies spacing only for <language>.", or "Tidies spacing only while the language is detected automatically." for Detect automatically. "In use, with AI clean-up" is not shown then, because no clean-up model runs.
+6. **Minor: the closed tray pickers cut long entries off** ("Custom: large-v3-turbo-q5_0"). Both model pickers now use an item template whose text ends in an ellipsis (`TextTrimming.CharacterEllipsis`).
+7. **Minor: choosing "Tidy my words" in the tray was unpinned.** It is now pinned.
+8. **Minor: `A_progress_refresh_leaves_the_tray_pickers_alone` ran only in Simple.** It is now a Theory over both views.
+9. **Minor: the claim that no measurement compared large-v3-turbo with medium.en was wrong.** It is corrected above, citing the real-voice calibration result with its caveats.
+10. **Nit: "1.5 GB download · Bigger download, …" repeated "download".** A tier not on this PC now shows its size alone ("1.5 GB · Bigger download, a bit slower.").
+
+**PROPOSED strings added or changed by these fixes** (none approved):
+- "Bigger download. Takes a few seconds longer on this PC."
+- "Slow without a graphics card: can take longer than you spoke."
+- "English only: switch to Advanced to choose a model for <language>."
+- "English only: switch to Advanced to choose a model that detects the language."
+- "Download <tier> (<size>)? It comes from the model makers' official download page and is checked before use." (plus the existing low-space warning)
+- Busy question, Simple: "<running> is downloading (<n>% done). Download <tier> (<size>) after it, or stop <running> and download <tier> now? Stopping deletes what <running> has downloaded so far." then a blank line and "It comes from the model makers' official download page and is checked before use."
+- Busy question, Simple, without room to wait: "<running> is downloading (<n>% done). There is not enough space to download it after <running>. Stop <running> and download <tier> (<size>) now? Stopping deletes what <running> has downloaded so far." then the same sentence.
+- The existing busy buttons and balloons, with the tier name in place of the model name: "Stop it and download <tier>", "<tier> is already downloading (<n>%).", "<tier> is already waiting to download.", "Download of <file> stopped: you chose <tier>."
+- "In use. Not one of the choices above." (replaces "In use · Chosen in Advanced view")
+- "Tidies spacing only for <language>."
+- "Tidies spacing only while the language is detected automatically."
+- The tier state for a file not on this PC is its size alone (replaces "<size> download").
+
+**Not verified (these fixes):** the plain question in the real question window (only its text is pinned, through the test dialogs); the ellipsis at 150 % scaling or with other fonts (headless only); the multilingual `small` and `medium` speed on a CPU.

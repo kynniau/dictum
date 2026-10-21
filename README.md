@@ -371,9 +371,16 @@ Which model each plain choice is depends on whether Dictum found a discrete GPU:
 | Most accurate | medium.en | large-v3-turbo |
 
 The mapping reuses the existing recommendation (base.en, or medium.en on a GPU) and the Mode presets' models
-(small.en, or large-v3-turbo on a GPU, for Full). A model in use that is none of the three shows as "Custom: <name>".
-The plain choices are English-only models (and large-v3-turbo); for another language use the Advanced view (see
-"Other languages and translation"). Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
+(small.en, or large-v3-turbo on a GPU, for Full).
+
+When you speak another language, choose Detect automatically, or turn Translate on (see "Other languages and
+translation"), the choices are multilingual: Standard is small, More accurate is medium, and with a discrete GPU Most
+accurate is large-v3-turbo (large-v3 when translating, which turbo cannot do). Without a GPU there is no multilingual
+Most accurate, because every catalogue model above medium is marked as needing a GPU. A choice that cannot hear your
+language is never offered. On a PC without a GPU the lines say how slow the bigger models are there (see "Measured
+speed"). Choosing a model to download asks in plain words: "Download More accurate (487 MB)? It comes from the model
+makers' official download page and is checked before use." A model in use that is none of the choices shows as
+"Custom: <name>". Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
 recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model. Cloud clean-up is
 never offered in the Simple view.
 

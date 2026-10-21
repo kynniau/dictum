@@ -89,6 +89,15 @@ public sealed class ShellDialogs : IShellDialogs
     public bool ConfirmDownload(string fileName, string sizeText, string note) =>
         Ask("Download a model", ModelPromptText.ConfirmText(fileName, sizeText, note), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
 
+    /// <summary>The Simple view's download question (1.2): the same window and buttons, in plain words.</summary>
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning) =>
+        Ask("Download a model", ModelPromptText.PlainConfirmText(plainName, sizeText, warning), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
+
+    /// <summary>The Simple view's busy question (1.2): the same window and answers as <see cref="ConfirmDownloadWhileBusy"/>, in plain words.</summary>
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true) =>
+        ModelPromptText.BusyAnswer(Ask("Download a model", ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait),
+            BusyDialogChoices(plainName, canWait)), canWait);
+
     /// <summary>
     /// The same question window with three answers: Download after it (Enter), Stop … and download … (it deletes progress),
     /// Cancel. Without room to wait (<paramref name="canWait"/> false), only Stop and Cancel, and Enter presses Cancel.

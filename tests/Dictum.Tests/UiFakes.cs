@@ -249,6 +249,23 @@ internal sealed class ScriptedDialogs : IShellDialogs
         return BusyDownload;
     }
 
+    /// <summary>The words of every plain (Simple view) question, as the window would show them; each also adds its file to <see cref="DownloadQuestions"/>.</summary>
+    public List<string> PlainQuestions { get; } = [];
+
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainConfirmText(plainName, sizeText, warning));
+        DownloadQuestions.Add(fileName);
+        return ConfirmDownloads;
+    }
+
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait));
+        DownloadQuestions.Add(fileName);
+        return BusyDownload;
+    }
+
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;
 
     public string? ChooseFolder(string initialDir)

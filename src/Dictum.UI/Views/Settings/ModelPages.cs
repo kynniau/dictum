@@ -209,7 +209,7 @@ internal sealed class ModelsPage : SettingsPage
         var fetching = string.Join(",", ModelCatalog.Entries.Select(e => Shell.Models.DownloadStateOf(e.FileName)))
                        + "|" + string.Join(",", CleanupCatalog.Entries.Select(e => Shell.Models.DownloadStateOf(e.FileName)));
         var gpu = Shell.GpuMachine;
-        var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}|{fetching}|{s.Ui.View}|{gpu}";
+        var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}|{fetching}|{s.Ui.View}|{gpu}|{s.Whisper.Language}|{s.Whisper.Translate}";
         if (key != _drawn)
         {
             _drawn = key;
@@ -265,37 +265,51 @@ internal sealed class ModelsPage : SettingsPage
     }
 
     /// <summary>
-    /// The Simple view (ui.view = simple): the three speech tiers of <see cref="SimpleView.Tiers"/> for this machine class, a
-    /// Custom row for a model in use that is none of them, and "Tidy my words". Each row is a catalogue row (the same states,
-    /// Downloading 42% included, and the same Select path); no cloud provider is offered here.
+    /// The Simple view (ui.view = simple): the speech tiers of <see cref="SimpleView.Tiers"/> for this machine class and these
+    /// language settings, a Custom row for a model in use that is none of them, and "Tidy my words". Each row is a catalogue row
+    /// (the same states, Downloading 42% included, and the same Select path, given the tier's name for its question); a tier
+    /// the language rules out has no button, only its reason. No cloud provider is offered here.
     /// </summary>
     private void DrawSimple(AppSettings s, bool gpu)
     {
         var current = Shell.Models.CurrentName;
-        foreach (var tier in SimpleView.Tiers(gpu))
+        var (language, translate) = (s.Whisper.Language, s.Whisper.Translate);
+        foreach (var tier in SimpleView.Tiers(gpu, language, translate))
         {
             var i = IndexOfModel(tier.Model);
             var e = ModelCatalog.Entries[i];
             var inUse = e.Name == current;
+            if (tier.Guard is { } guard) // never offered: choosing it would switch to a model that cannot hear this language
+            {
+                _simpleSpeech.Children.Add(inUse ? ModelRow(tier.Label, $"In use · {guard}", null, () => { }) : TextRow(tier.Label, guard));
+                continue;
+            }
             var source = _sources[i];
             var bundled = source == ModelFolderKind.Bundled;
-            // "Included" only when it is: a build without the bundled base.en says what Standard means without it.
+            // "Included" only when it is: a multilingual Standard, or a build without the bundled base.en, says it without.
             var subLine = tier.Tier == SpeechTier.Standard && !bundled ? SimpleView.StandardSubLineNotIncluded : tier.SubLine;
-            string? state = inUse ? "In use" : bundled ? null : source is not null ? "Downloaded" : SimpleView.DownloadSize(e.SizeText);
+            // Not on this PC: its size alone, as the line itself may say "download" (lens nit, 21/10/2026).
+            string? state = inUse ? "In use" : bundled ? null : source is not null ? "Downloaded" : e.SizeText;
             _simpleSpeech.Children.Add(CatalogueRow(tier.Label, tier.Label, state, subLine, inUse, source is not null, e.FileName,
-                () => Run(() => Shell.Models.Select(e.Name)), simple: true));
+                () => Run(() => Shell.Models.Select(e.Name, tier.Label)), simple: true));
         }
-        if (SimpleView.TierOf(current, gpu) is null)
-            _simpleSpeech.Children.Add(ModelRow(SimpleView.Custom(current), $"In use · {SimpleView.CustomNote}", null, () => { }));
+        if (SimpleView.TierOf(current, gpu, language, translate) is null)
+            _simpleSpeech.Children.Add(ModelRow(SimpleView.Custom(current), SimpleView.CustomNote, null, () => { }));
 
         var tidy = SimpleView.TidyInUse(s.Llm, gpu);
-        var tidyState = !tidy ? null : s.Llm.Provider == LlmSettings.Local ? SimpleView.TidyWithAiState : "In use";
-        _simpleCleanup.Children.Add(ModelRow(SimpleView.TidyTitle, tidyState is null ? SimpleView.TidySubLine : $"{tidyState} · {SimpleView.TidySubLine}",
+        var english = Dictum.Transcribe.WhisperLanguages.OutputIsEnglish(language, translate);
+        var tidyLine = SimpleView.TidyLine(language, translate);
+        // With text that is not English no clean-up model runs (whitespace only), so "with AI clean-up" would be untrue.
+        var tidyState = !tidy ? null : s.Llm.Provider == LlmSettings.Local && english ? SimpleView.TidyWithAiState : "In use";
+        _simpleCleanup.Children.Add(ModelRow(SimpleView.TidyTitle, tidyState is null ? tidyLine : $"{tidyState} · {tidyLine}",
             tidy ? null : "Use", () => Run(() => UseTidy(Shell)), out _, name: tidy ? null : SimpleView.ActionName("Use", SimpleView.TidyLabel)));
         if (!tidy)
-            _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), $"In use · {SimpleView.CustomNote}", null, () => { }));
+            _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), SimpleView.CustomNote, null, () => { }));
         // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use, sits under this row.
     }
+
+    /// <summary>A row with a title and a line and no button: a tier the Simple view cannot offer, with why.</summary>
+    private static Control TextRow(string title, string line) => Ui.Stack(2, Ui.Text(title, "body"), Ui.Text(line, "hint"));
 
     private static int IndexOfModel(string name)
     {

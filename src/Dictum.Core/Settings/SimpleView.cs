@@ -1,24 +1,35 @@
+using Dictum.Transcribe;
+
 namespace Dictum.Settings;
 
-/// <summary>The three plain speech choices of the Simple view (ui.view = "simple"), from the least to the most accurate.</summary>
+/// <summary>The plain speech choices of the Simple view (ui.view = "simple"), from the least to the most accurate.</summary>
 public enum SpeechTier { Standard, MoreAccurate, MostAccurate }
 
-/// <param name="Tier">Which of the three it is.</param>
+/// <param name="Tier">Which choice it is.</param>
 /// <param name="Label">The plain name the Simple view shows ("More accurate").</param>
-/// <param name="SubLine">The line under it that says what choosing it means.</param>
-/// <param name="Model">The speech catalogue entry it selects on this machine class (<see cref="ModelCatalog"/>).</param>
-public sealed record TierChoice(SpeechTier Tier, string Label, string SubLine, string Model);
+/// <param name="SubLine">The line under it that says what choosing it means on this machine class.</param>
+/// <param name="Model">The speech catalogue entry it selects (<see cref="ModelCatalog"/>).</param>
+/// <param name="Guard">
+/// Why the Simple view cannot offer it with the language settings in force (the row shows this line and no button, and the tray
+/// leaves it out), or null when it can.
+/// </param>
+public sealed record TierChoice(SpeechTier Tier, string Label, string SubLine, string Model, string? Guard = null);
 
 /// <summary>
-/// The Simple view of Settings > Models and of the tray panel's pickers (Dictum 1.2, product owner 21/10/2026): three plain
-/// speech tiers mapped onto the catalogue, and "Tidy my words" for clean-up. It holds no models and no download logic of its
-/// own: a tier is one catalogue entry, chosen through the same Select path as the Advanced list. The mapping reuses the
-/// catalogue's recommendation and the Mode presets' models rather than a second rule (DECISIONS, 21/10/2026):
+/// The Simple view of Settings > Models and of the tray panel's pickers (Dictum 1.2, product owner 21/10/2026): plain speech
+/// tiers mapped onto the catalogue, and "Tidy my words" for clean-up. It holds no models and no download logic of its own: a
+/// tier is one catalogue entry, chosen through the same Select path as the Advanced list. The mapping reuses the catalogue's
+/// recommendation and the Mode presets' models rather than a second rule (DECISIONS, 21/10/2026):
 /// <code>
-/// | Tier          | CPU only (no discrete GPU) | GPU machine (WhisperEngine.GpuMachine) |
-/// | Standard      | base.en                    | base.en                                |
-/// | More accurate | small.en                   | medium.en                              |
-/// | Most accurate | medium.en                  | large-v3-turbo                         |
+/// | whisper.language "en" (no translate) | CPU only  | GPU machine (WhisperEngine.GpuMachine) |
+/// | Standard                             | base.en   | base.en                                |
+/// | More accurate                        | small.en  | medium.en                              |
+/// | Most accurate                        | medium.en | large-v3-turbo                         |
+///
+/// | any other language, or translate     | CPU only  | GPU machine                            |
+/// | Standard                             | small     | small                                  |
+/// | More accurate                        | medium    | medium                                 |
+/// | Most accurate                        | (none)    | large-v3-turbo; large-v3 to translate  |
 /// </code>
 /// </summary>
 public static class SimpleView
@@ -41,11 +52,21 @@ public static class SimpleView
     public const string MostAccurateLabel = "Most accurate";
     public const string StandardSubLine = "Included. Works well for most people.";
 
-    /// <summary>Standard's line when base.en did not come with this copy of Dictum (a build without the bundled model): "Included" would be untrue.</summary>
+    /// <summary>Standard's line when its model did not come with this copy of Dictum (a multilingual Standard, or a build without base.en).</summary>
     public const string StandardSubLineNotIncluded = "Works well for most people.";
 
+    /// <summary>
+    /// The lines on a GPU machine. On a CPU (lens on PR #23, 21/10/2026) the measured times say more: on the development PC's
+    /// CPU (README "Measured speed", 15/10/2026, a 10.46 s clip) base.en took 1.90 s, small.en 6.43 s and medium.en 20.1 s.
+    /// </summary>
     public const string MoreAccurateSubLine = "Bigger download, a bit slower.";
     public const string MostAccurateSubLine = "Best results. Needs a strong PC or patience.";
+
+    /// <summary>A small model on a CPU: small.en measured 6.43 s for a 10.46 s clip, 4.5 s more than base.en.</summary>
+    public const string CpuMoreAccurateSubLine = "Bigger download. Takes a few seconds longer on this PC.";
+
+    /// <summary>A medium model on a CPU: medium.en measured 20.1 s for a 10.46 s clip, longer than the speech itself.</summary>
+    public const string CpuMostAccurateSubLine = "Slow without a graphics card: can take longer than you spoke.";
 
     public const string TidyLabel = "Tidy my words";
     public const string TidyTitle = "Tidy my words (recommended)";
@@ -54,45 +75,84 @@ public static class SimpleView
     /// <summary>The Tidy row's state while the recommended clean-up model (not the rule-based tidy) does the tidying.</summary>
     public const string TidyWithAiState = "In use, with AI clean-up";
 
-    /// <summary>The line under a Custom row: the model was chosen in the Advanced view (or from a file) and is not one of the plain choices.</summary>
-    public const string CustomNote = "Chosen in Advanced view";
+    /// <summary>
+    /// The line of a Custom row (lens on PR #23): the model in use is none of the choices above. It may have come from the
+    /// Advanced view, calibration, a Mode preset, the first run, --model or DICTUM_MODEL_PATH, so the line does not say which.
+    /// </summary>
+    public const string CustomNote = "In use. Not one of the choices above.";
 
     /// <summary>A model in use that is none of the plain choices, so nothing is hidden: "Custom: tiny.en".</summary>
     public static string Custom(string name) => $"Custom: {name}";
-
-    /// <summary>A tier whose file is not on this PC: "487 MB download".</summary>
-    public static string DownloadSize(string sizeText) => $"{sizeText} download";
 
     /// <summary>A Simple row's button, named for its tier so a screen reader hears more than "Use": "Use More accurate", "Download More accurate".</summary>
     public static string ActionName(string action, string label) => action == "Use" ? $"Use {label}" : $"Download {label}";
 
     /// <summary>
-    /// The CPU's most accurate choice. The catalogue's own trade-off says "high accuracy; wants a GPU or a fast desktop CPU", and
-    /// every larger entry says "needs a GPU"; it is also the model <see cref="ModelCatalog.Recommend"/> gives a GPU machine.
+    /// The Tidy row's line. Clean-up is written for English: a dictation whose text is not English gets whitespace tidied only
+    /// (TranscriptCleaner.Plain), so the line says so (lens on PR #23).
+    /// </summary>
+    public static string TidyLine(string language, bool translate) =>
+        WhisperLanguages.OutputIsEnglish(language, translate) ? TidySubLine
+        : language == WhisperLanguages.Auto ? "Tidies spacing only while the language is detected automatically."
+        : $"Tidies spacing only for {WhisperLanguages.Name(language)}.";
+
+    /// <summary>
+    /// The line of a tier the Simple view cannot offer with these language settings, or null. An English-only model gets the
+    /// PROPOSED line below; any other problem (Cantonese on a model without it, say) shows <see cref="WhisperLanguages.Problem"/>.
+    /// </summary>
+    public static string? GuardLine(string model, string language, bool translate)
+    {
+        if (WhisperLanguages.Problem(model, language, translate) is not { } problem) return null;
+        if (!WhisperLanguages.IsEnglishOnlyModel(model)) return problem;
+        return language == WhisperLanguages.Auto
+            ? "English only: switch to Advanced to choose a model that detects the language."
+            : $"English only: switch to Advanced to choose a model for {WhisperLanguages.Name(language)}.";
+    }
+
+    /// <summary>
+    /// The CPU's most accurate English choice. The catalogue's own trade-off says "high accuracy; wants a GPU or a fast desktop
+    /// CPU", and every larger entry says "needs a GPU"; it is also the model <see cref="ModelCatalog.Recommend"/> gives a GPU machine.
     /// </summary>
     public const string MostAccurateCpu = "medium.en";
 
-    // simplification: the tiers are the English ladder (".en" models, and large-v3-turbo on a GPU). A user whose
-    // whisper.language is not English gets the existing language warning after choosing an English-only tier, as in the Advanced
-    // list. Retire it when Simple-view users dictate in another language (the Hindi-speaking staff, say): map the tiers to the
-    // multilingual entries (small, medium, large-v3-turbo) when whisper.language is not "en".
+    /// <summary>The multilingual choices (lens on PR #23, orchestrator's decision, 21/10/2026): small, then medium.</summary>
+    public const string MultilingualStandard = "small";
+    public const string MultilingualMoreAccurate = "medium";
+
+    /// <summary>The tiers are the multilingual ones: the text is not plain English speech (another language, Detect automatically, or translate).</summary>
+    public static bool Multilingual(string language, bool translate) => language != WhisperLanguages.English || translate;
 
     /// <summary>
-    /// The three tiers on this machine class. Standard is the bundled model (<see cref="ModelCatalog.Bundled"/>, also the Light
-    /// preset's). On a CPU, More accurate is the model the catalogue's recommendation offers as "more accurate, a few seconds
-    /// slower" (the Full preset's CPU model); on a GPU machine it is the catalogue's GPU recommendation, and Most accurate is the
-    /// Full preset's GPU model.
+    /// The tiers on this machine class for these language settings. English: Standard is the bundled model
+    /// (<see cref="ModelCatalog.Bundled"/>, also the Light preset's); on a CPU, More accurate is the model the catalogue's
+    /// recommendation offers as "more accurate, a few seconds slower" (the Full preset's CPU model); on a GPU machine it is the
+    /// catalogue's GPU recommendation, and Most accurate is the Full preset's GPU model. Any other language: small and medium,
+    /// and on a GPU large-v3-turbo (large-v3 when translating, which turbo cannot do). A CPU has no multilingual Most accurate:
+    /// the catalogue has nothing above medium whose trade-off line does not say "needs a GPU". Every tier carries a
+    /// <see cref="TierChoice.Guard"/> when the language settings rule its model out.
     /// </summary>
-    public static IReadOnlyList<TierChoice> Tiers(bool gpuMachine) =>
-    [
-        new(SpeechTier.Standard, StandardLabel, StandardSubLine, ModePresets.LightSpeech),
-        new(SpeechTier.MoreAccurate, MoreAccurateLabel, MoreAccurateSubLine, gpuMachine ? ModelCatalog.Recommend(gpuRuntime: true).Model : ModePresets.FullSpeechCpu),
-        new(SpeechTier.MostAccurate, MostAccurateLabel, MostAccurateSubLine, gpuMachine ? ModePresets.FullSpeechGpu : MostAccurateCpu),
-    ];
+    public static IReadOnlyList<TierChoice> Tiers(bool gpuMachine, string language = WhisperLanguages.English, bool translate = false)
+    {
+        List<TierChoice> tiers = Multilingual(language, translate)
+            ?
+            [
+                new(SpeechTier.Standard, StandardLabel, StandardSubLine, MultilingualStandard),
+                new(SpeechTier.MoreAccurate, MoreAccurateLabel, gpuMachine ? MoreAccurateSubLine : CpuMostAccurateSubLine, MultilingualMoreAccurate),
+                .. gpuMachine ? [new TierChoice(SpeechTier.MostAccurate, MostAccurateLabel, MostAccurateSubLine, translate ? "large-v3" : ModePresets.FullSpeechGpu)] : Array.Empty<TierChoice>(),
+            ]
+            :
+            [
+                new(SpeechTier.Standard, StandardLabel, StandardSubLine, ModePresets.LightSpeech),
+                new(SpeechTier.MoreAccurate, MoreAccurateLabel, gpuMachine ? MoreAccurateSubLine : CpuMoreAccurateSubLine,
+                    gpuMachine ? ModelCatalog.Recommend(gpuRuntime: true).Model : ModePresets.FullSpeechCpu),
+                new(SpeechTier.MostAccurate, MostAccurateLabel, gpuMachine ? MostAccurateSubLine : CpuMostAccurateSubLine, gpuMachine ? ModePresets.FullSpeechGpu : MostAccurateCpu),
+            ];
+        return [.. tiers.Select(t => t with { Guard = GuardLine(t.Model, language, translate) })];
+    }
 
-    /// <summary>The tier whose model this is on this machine class, or null (a Custom row).</summary>
-    public static TierChoice? TierOf(string model, bool gpuMachine) =>
-        Tiers(gpuMachine).FirstOrDefault(t => string.Equals(t.Model, model, StringComparison.OrdinalIgnoreCase));
+    /// <summary>The tier whose model this is with these settings, or null (a Custom row).</summary>
+    public static TierChoice? TierOf(string model, bool gpuMachine, string language = WhisperLanguages.English, bool translate = false) =>
+        Tiers(gpuMachine, language, translate).FirstOrDefault(t => string.Equals(t.Model, model, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The clean-up model "Add AI clean-up" adds, and the Tidy row uses when it is on this PC.</summary>
     public static string TidyModel(bool gpuMachine) => CleanupCatalog.Recommend(gpuMachine).Model;
