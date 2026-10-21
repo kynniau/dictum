@@ -74,36 +74,42 @@
       <li>Click the file whose name starts with <b>Dictum-Setup</b>. It downloads to your PC.</li>
       <li>Open your Downloads folder. Double-click <b>Dictum-Setup</b>.</li>
       <li>If Windows says “Windows protected your PC”, see <a href="#smartscreen">the box below</a>.</li>
-      <li>Setup may say your PC needs the Microsoft Visual C++ Redistributable. This is a free add-on from Microsoft that Dictum needs. Click <b>Yes</b>. Microsoft’s download opens. Install it too. Installing it needs an administrator account on this PC.</li>
+      <li>Setup may say your PC needs the Microsoft Visual C++ Redistributable. This is a free part from Microsoft that Dictum needs to work. If you see that message, click <b>Yes</b>.</li>
+      <li>Your web browser downloads a file called <b>vc_redist.x64.exe</b>. Open it and install it. This needs an administrator account.</li>
+      <li>Go back to Dictum’s Setup.</li>
       <li>Setup offers a desktop shortcut, and starting Dictum when Windows starts. Both are off unless you tick them. Click <b>Next</b>.</li>
       <li>Click <b>Install</b>.</li>
-      <li>When it has finished, leave <b>Launch Dictum</b> ticked.</li>
+      <li>If you see <b>Launch Dictum</b>, leave it ticked.</li>
       <li>Click <b>Finish</b>. Dictum starts.</li>
     </ol>
 
-    <figure class="demo-video">
+    <!-- Demo video "install": restore this <video> once img/demos/install.mp4, .gif and -poster.png are committed.
       <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/install-poster.png" aria-describedby="install-steps">
         <source src="img/demos/install.mp4" type="video/mp4">
         <img src="img/demos/install.gif" width="800" height="558" alt="Installing Dictum from the Downloads folder, one click at a time.">
       </video>
-      <figcaption><span class="tag">Video coming</span> Installing Dictum. The video has no sound: each step is written on the screen.</figcaption>
+    -->
+    <figure class="demo-video">
+      <figcaption><span class="tag">Video coming</span> Installing Dictum. The steps above say the same in words.</figcaption>
     </figure>
 
     <div class="card callout" id="smartscreen">
       <h3>“Windows protected your PC”: is this safe?</h3>
-      <p>For the direct download, this message is expected. The installer is not code-signed yet, so Windows SmartScreen does not recognise it. The Microsoft Store version does not show this message, because Microsoft signs Store apps.</p>
+      <p>For the direct download, this message is expected. Windows shows it for programs that are not code-signed yet. Code-signed means the file carries a digital signature: a seal that says who made it. Dictum’s installer does not have one yet, so Windows SmartScreen (the part of Windows that checks downloads) does not recognise it.</p>
+      <p>The Microsoft Store version does not show this message, because Microsoft signs Store apps.</p>
       <p>Only carry on if you downloaded the file from <a href="https://github.com/kynniau/dictum/releases/latest">github.com/kynniau/dictum</a>.</p>
       <ol>
         <li>Click <b>More info</b>.</li>
         <li>Click <b>Run anyway</b>.</li>
       </ol>
-      <p>If your web browser held the download back, or there is no <b>Run anyway</b> button, see <a href="/#faq-smartscreen">what to click</a> on the front page. On a work PC, your IT team may have turned these options off. Ask them, or use the Microsoft Store version instead.</p>
+      <p>If Microsoft Edge held the download back: select <b>…</b> (More actions) next to the file, then <b>Keep</b>, then <b>Show more</b>, then <b>Keep anyway</b>.</p>
+      <p>On a work PC, your IT team may have turned these options off. Ask them, or <a href="https://apps.microsoft.com/detail/9N0DG1DHTR57">get Dictum from the Microsoft Store</a> instead.</p>
     </div>
   </section>
 
   <section id="first-run" aria-labelledby="first-run-title">
     <h2 id="first-run-title">2. The first time you start Dictum</h2>
-    <p>The first time Dictum starts, a window called <b>Welcome to Dictum</b> opens. It takes you through six short steps. The top of the window says which step you are on, for example “Step 2 of 6: Model files”.</p>
+    <p>The first time Dictum starts, a window called <b>Welcome to Dictum</b> opens. It takes you through a few short steps. The top of the window says which step you are on, for example “Step 2 of 6: Model files”.</p>
     <p>Click <b>Next</b> to go on. Click <b>Back</b> to go back.</p>
 
     <ol class="guide-steps" id="first-run-steps">
@@ -157,47 +163,54 @@
     </ol>
     <p>If you close the window early, Dictum uses its usual settings for the steps you missed. You can change every one of them later in Settings.</p>
 
-    <figure class="demo-video">
+    <!-- Demo video "first-run": restore this <video> once img/demos/first-run.mp4, .gif and -poster.png are committed.
       <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/first-run-poster.png" aria-describedby="first-run-steps">
         <source src="img/demos/first-run.mp4" type="video/mp4">
         <img src="img/demos/first-run.gif" width="800" height="558" alt="Starting Dictum for the first time and going through the Welcome to Dictum window.">
       </video>
-      <figcaption><span class="tag">Video coming</span> Starting Dictum for the first time.</figcaption>
+    -->
+    <figure class="demo-video">
+      <figcaption><span class="tag">Video coming</span> Starting Dictum for the first time. The steps above say the same in words.</figcaption>
     </figure>
   </section>
 
   <section id="dictate" aria-labelledby="dictate-title">
     <h2 id="dictate-title">3. Dictate: hold, speak, let go</h2>
     <figure class="infographic infographic-steps">
-      <svg class="ig ig-steps" viewBox="0 0 360 530" width="360" height="530" role="img" aria-label="Hold a key, speak, and your words appear where your cursor is." focusable="false"><g><rect class="ig-panel" x="1" y="1" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="36" r="17"/><text class="ig-num" x="36" y="42" text-anchor="middle">1</text><text class="ig-title" x="64" y="44">Hold a key</text><rect class="ig-key" x="110" y="62" width="140" height="52" rx="10"/><text class="ig-keytext" x="180" y="95" text-anchor="middle">Right Ctrl</text><text class="ig-sub" x="180" y="136" text-anchor="middle">Hold it while you talk</text></g><g><rect class="ig-panel" x="1" y="191" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="226" r="17"/><text class="ig-num" x="36" y="232" text-anchor="middle">2</text><text class="ig-title" x="64" y="234">Speak</text><rect class="ig-accent" x="166" y="252" width="28" height="38" rx="14"/><path class="ig-line" d="M160 274 a20 20 0 0 0 40 0 M180 294 v8 M170 302 h20"/><rect class="ig-bar" x="124" y="264" width="6" height="16" rx="3"/><rect class="ig-bar" x="136" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="148" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="206" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="218" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="230" y="264" width="6" height="16" rx="3"/><text class="ig-sub" x="180" y="326" text-anchor="middle">In your normal voice</text></g><g><rect class="ig-panel" x="1" y="381" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="416" r="17"/><text class="ig-num" x="36" y="422" text-anchor="middle">3</text><text class="ig-title" x="64" y="424">Your words appear</text><rect class="ig-doc" x="60" y="442" width="240" height="52" rx="10"/><text class="ig-typed" x="76" y="475">See you at ten.</text><rect class="ig-accent" x="214" y="455" width="2.5" height="26"/><text class="ig-sub" x="180" y="516" text-anchor="middle">where your cursor is</text></g><path class="ig-line" d="M180 156 v26 M170 172 l10 10 l10 -10"/><path class="ig-line" d="M180 346 v26 M170 362 l10 10 l10 -10"/></svg>
+      <svg class="ig ig-steps" viewBox="0 0 360 530" width="360" height="530" role="img" aria-label="Hold a key, speak, and your words appear in any program, where your cursor is." focusable="false"><g><rect class="ig-panel" x="1" y="1" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="36" r="17"/><text class="ig-num" x="36" y="42" text-anchor="middle">1</text><text class="ig-title" x="64" y="44">Hold a key</text><rect class="ig-key" x="110" y="62" width="140" height="52" rx="10"/><text class="ig-keytext" x="180" y="95" text-anchor="middle">Right Ctrl</text><text class="ig-sub" x="180" y="136" text-anchor="middle">Hold it while you talk</text></g><g><rect class="ig-panel" x="1" y="191" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="226" r="17"/><text class="ig-num" x="36" y="232" text-anchor="middle">2</text><text class="ig-title" x="64" y="234">Speak</text><rect class="ig-accent" x="166" y="252" width="28" height="38" rx="14"/><path class="ig-line" d="M160 274 a20 20 0 0 0 40 0 M180 294 v8 M170 302 h20"/><rect class="ig-bar" x="124" y="264" width="6" height="16" rx="3"/><rect class="ig-bar" x="136" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="148" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="206" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="218" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="230" y="264" width="6" height="16" rx="3"/><text class="ig-sub" x="180" y="326" text-anchor="middle">In your normal voice</text></g><g><rect class="ig-panel" x="1" y="381" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="416" r="17"/><text class="ig-num" x="36" y="422" text-anchor="middle">3</text><text class="ig-title" x="64" y="424">Your words appear</text><rect class="ig-doc" x="60" y="442" width="240" height="52" rx="10"/><text class="ig-typed" x="76" y="475">See you at ten.</text><rect class="ig-accent" x="214" y="455" width="2.5" height="26"/><text class="ig-sub" x="180" y="516" text-anchor="middle">in any program, where your cursor is</text></g><path class="ig-line" d="M180 156 v26 M170 172 l10 10 l10 -10"/><path class="ig-line" d="M180 346 v26 M170 362 l10 10 l10 -10"/></svg>
     </figure>
     <ol id="dictate-steps">
       <li>Click where you want the words to go, for example in an email.</li>
       <li>Hold down your hotkey. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard.</li>
-      <li>Speak in your normal voice. A small bar above the taskbar shows that Dictum is listening.</li>
+      <li>Speak in your normal voice. A small bar shows that Dictum is listening. It sits just above the taskbar, the strip along the bottom of the screen.</li>
       <li>Let go of the key. A moment later, your words appear where you clicked.</li>
     </ol>
-    <p>Unless you turned clean-up off, Dictum puts in punctuation and capital letters, and takes out ums and ahs. Say “new paragraph” to start a new paragraph.</p>
+    <p>Dictum then tidies your words. This step is called clean-up. It puts in full stops, commas and capital letters, and takes out ums and ahs. You can turn clean-up off (see <a href="#faq-cleanup">the clean-up question</a>).</p>
+    <p>Say “new paragraph” to start a new paragraph.</p>
 
     <h3>Talking for a while? Use hands-free</h3>
     <ol>
       <li>Tap the hotkey twice, quickly. Dictum keeps listening without you holding the key.</li>
-      <li>Speak.</li>
+      <li>Speak. Your words appear each time you pause.</li>
       <li>Tap the hotkey once more to stop.</li>
     </ol>
+    <p>Hands-free stops by itself after 5 minutes. To change this, open Settings &gt; General and change <b>Hands-free stops after</b>.</p>
 
     <h3>Changed your mind? Press Esc</h3>
-    <p>Press <kbd>Esc</kbd> before your words appear, while you are holding the key or just after you let go. Nothing is typed. In hands-free, <kbd>Esc</kbd> stops listening, and what is already typed stays.</p>
+    <p>Press <kbd>Esc</kbd> before your words appear, while you are holding the key or just after you let go. Nothing is typed.</p>
+    <p>In hands-free, <kbd>Esc</kbd> stops listening. What is already typed stays. What you said since the last pause is dropped.</p>
 
     <h3>Turn Dictum off for a while</h3>
-    <p>Open the Dictum menu and use the <b>Dictation on</b> switch.</p>
+    <p>Open the Dictum menu. Use the on/off switch at the top right of the Dictum menu.</p>
 
-    <figure class="demo-video">
+    <!-- Demo video "dictation-stills": restore this <video> once img/demos/dictation-stills.mp4, .gif and -poster.png are committed.
       <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/dictation-stills-poster.png" aria-describedby="dictate-steps">
         <source src="img/demos/dictation-stills.mp4" type="video/mp4">
         <img src="img/demos/dictation-stills.gif" width="800" height="558" alt="Holding the hotkey, speaking, and letting go: the bar says Recording, then the words appear.">
       </video>
-      <figcaption><span class="tag">Video coming</span> A dictation from start to finish.</figcaption>
+    -->
+    <figure class="demo-video">
+      <figcaption><span class="tag">Video coming</span> A dictation from start to finish. The steps above say the same in words.</figcaption>
     </figure>
   </section>
 
@@ -217,28 +230,34 @@
     <ol id="calibrate-steps">
       <li>Open the Dictum menu.</li>
       <li>Click <b>Calibrate my voice</b>.</li>
-      <li>Dictum shows a short sentence. Click <b>Record</b>, then read it aloud in your normal voice.</li>
+      <li>Dictum shows a short sentence. Click <b>Record</b>.</li>
+      <li>Read the sentence aloud in your normal voice.</li>
+      <li>Click <b>Stop</b>. The next sentence appears.</li>
       <li>Do the same for each sentence. There are ten.</li>
-      <li>Dictum tells you which of the speech models on this PC hears you best.</li>
+      <li>Click <b>Run test</b>.</li>
+      <li>Dictum shows which of the speech models on this PC hears you best.</li>
     </ol>
     <p>Calibrate my voice measures the models. It does not change them. The recordings it makes stay on this PC until you delete them.</p>
 
-    <figure class="demo-video">
+    <!-- Demo video "test-setup": restore this <video> once img/demos/test-setup.mp4, .gif and -poster.png are committed.
       <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/test-setup-poster.png" aria-describedby="calibrate-steps">
         <source src="img/demos/test-setup.mp4" type="video/mp4">
         <img src="img/demos/test-setup.gif" width="800" height="558" alt="Opening Calibrate my voice from the Dictum menu and recording the first sentence.">
       </video>
-      <figcaption><span class="tag">Video coming</span> Calibrate my voice.</figcaption>
+    -->
+    <figure class="demo-video">
+      <figcaption><span class="tag">Video coming</span> Calibrate my voice. The steps above say the same in words.</figcaption>
     </figure>
 
     <h3>Choose a more accurate model</h3>
     <ol>
       <li>Open Settings &gt; Models.</li>
       <li>Find <b>More accurate</b>.</li>
-      <li>Click <b>Download…</b> next to it. If it is already on this PC, the button says <b>Use</b>.</li>
-      <li>When it has finished, it says <b>In use</b>.</li>
+      <li>Click <b>Download…</b> next to More accurate. If that model is already on this PC, the button says <b>Use</b> instead.</li>
+      <li>When the download has finished, the button next to More accurate says <b>In use</b>.</li>
     </ol>
-    <p>Bigger models are more accurate, but slower, and each one is a download you choose. <b>Most accurate</b> needs a strong PC, or patience. On a PC without a graphics card (the part of a computer that draws the screen, also called a GPU), it can take longer than you spoke.</p>
+    <p>Bigger models are more accurate, but slower. Each one is a download you choose.</p>
+    <p><b>Most accurate</b> needs a strong PC, or patience. A graphics card helps a lot. A graphics card is the part of a computer that draws the screen; it is also called a GPU. On a PC without one, Most accurate can take longer than you spoke.</p>
 
     <h3>Teach Dictum a word</h3>
     <p>If a name or word keeps coming out wrong, see <a href="#faq-words">how to add words and spellings</a>.</p>
@@ -270,12 +289,14 @@
     <h3>What Advanced adds</h3>
     <p>Advanced lists every speech model and clean-up model, with its details. It also lets you choose a model file of your own. Most people never need it.</p>
 
-    <figure class="demo-video">
+    <!-- Demo video "change-model": restore this <video> once img/demos/change-model.mp4, .gif and -poster.png are committed.
       <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/change-model-poster.png" aria-describedby="views-title">
         <source src="img/demos/change-model.mp4" type="video/mp4">
         <img src="img/demos/change-model.gif" width="800" height="558" alt="Opening Settings, choosing Models, and clicking Use next to a speech model.">
       </video>
-      <figcaption><span class="tag">Video coming</span> Changing the speech model.</figcaption>
+    -->
+    <figure class="demo-video">
+      <figcaption><span class="tag">Video coming</span> Changing the speech model. The steps under “Choose a more accurate model” say the same in words.</figcaption>
     </figure>
   </section>
 
@@ -296,18 +317,22 @@
     <p>To free up space on the first drive, copy the models across yourself, or download them again. Then delete the old copies in Settings &gt; Storage, with <b>Delete…</b> next to each one.</p>
     <p>A folder on a network drive works, but models load slowly from it. A folder on this PC is faster. To go back to the usual folder, click <b>Use default</b>.</p>
 
-    <figure class="demo-video">
+    <!-- Demo video "model-folder": restore this <video> once img/demos/model-folder.mp4, .gif and -poster.png are committed.
       <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/model-folder-poster.png" aria-describedby="folder-steps">
         <source src="img/demos/model-folder.mp4" type="video/mp4">
         <img src="img/demos/model-folder.gif" width="800" height="558" alt="Choosing a model folder on drive D in Settings, Models.">
       </video>
-      <figcaption><span class="tag">Video coming</span> Keeping the models on another drive.</figcaption>
+    -->
+    <figure class="demo-video">
+      <figcaption><span class="tag">Video coming</span> Keeping the models on another drive. The steps above say the same in words.</figcaption>
     </figure>
   </section>
 
   <section id="privacy" aria-labelledby="privacy-title">
     <h2 id="privacy-title">7. Your privacy</h2>
-    <p>Dictum turns your voice into text on this PC, then throws the recording away. Nothing you say is sent anywhere unless you turn on cloud clean-up, and it is off unless you turn it on. In the words of our privacy policy:</p>
+    <p>Dictum turns your voice into text on this PC, then throws the recording away. Your voice never leaves this PC.</p>
+    <p>Cloud clean-up is off unless you turn it on. If you turn it on, the text of each dictation, and the words in your dictionary, are sent to the service you chose.</p>
+    <p>In the words of our privacy policy:</p>
     <blockquote class="card">
       <p>We collect nothing. Dictum has no account, no analytics, no telemetry and no crash reporting. We never receive your audio or your text.</p>
     </blockquote>
@@ -357,7 +382,7 @@
         <div class="answer">
           <p>Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.</p>
           <p>The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.</p>
-          <p>If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation is sent to the service you chose. Your voice still stays here.</p>
+          <p>Cloud clean-up is off unless you turn it on. If you turn it on, the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here.</p>
         </div>
       </details>
 
@@ -383,7 +408,7 @@
             <li>Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.</li>
             <li>Open Settings &gt; Microphone. Choose your microphone from the list, then choose <b>Test microphone</b> and speak. The bars move when Dictum hears you.</li>
             <li>In Windows Settings, go to Privacy &amp; security &gt; Microphone. “Microphone access” and “Let desktop apps access your microphone” must both be on.</li>
-            <li>On a remote or virtual desktop (a computer you use over the internet or your office network), your own microphone has to be passed through to it. This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.</li>
+            <li>A remote or virtual desktop is a computer you use over the internet or your office network. Your own microphone has to be passed through to it. This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.</li>
           </ul>
         </div>
       </details>
@@ -392,7 +417,7 @@
         <summary>Nothing happens when I press the key. What do I check?</summary>
         <div class="answer">
           <ul>
-            <li>Open the Dictum menu. Check that the <b>Dictation on</b> switch is on.</li>
+            <li>Open the Dictum menu. Check that the on/off switch at the top right of the Dictum menu is on.</li>
             <li>Check which key Dictum is listening for. Open Settings &gt; General. The <b>Press your hotkey</b> box shows exactly what Windows receives when you press a key.</li>
             <li>Windows does not let Dictum type into a program running as administrator (with extra permissions). Try another program, such as Notepad.</li>
             <li>Open Settings &gt; About and click <b>Reload settings</b>. This also sets up the hotkey again if Windows removed it.</li>
@@ -404,7 +429,7 @@
         <summary>My keyboard has no Ctrl key on the right. What do I do?</summary>
         <div class="answer">
           <p>Choose another key. See <a href="#faq-change-key">How do I change the key I hold?</a></p>
-          <p>On a Mac over Remote Desktop use the right Option key (RightAlt) or right Command (RightWin).</p>
+          <p>If you use a Mac to reach a Windows PC, hold the Option or Command key on the right.</p>
         </div>
       </details>
 
@@ -426,8 +451,21 @@
         <div class="answer">
           <p>Let go of the key. Dictum stops listening and types what you said.</p>
           <p>To cancel instead, press <kbd>Esc</kbd> before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc.</p>
-          <p>If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.</p>
-          <p>To turn Dictum off for a while, use the <b>Dictation on</b> switch in the Dictum menu.</p>
+          <p>If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free. What is already typed stays; what you said since the last pause is dropped.</p>
+          <p>To turn Dictum off for a while, use the on/off switch at the top right of the Dictum menu.</p>
+        </div>
+      </details>
+
+      <details id="faq-long">
+        <summary>Can I talk for a long time without holding the key?</summary>
+        <div class="answer">
+          <p>Yes. Use hands-free.</p>
+          <ol>
+            <li>Tap the hotkey twice, quickly.</li>
+            <li>Speak. Each time you pause, Dictum types what you said so far, while you keep talking.</li>
+            <li>Tap the hotkey once more to stop. What you said since the last pause is typed last.</li>
+          </ol>
+          <p>Hands-free stops by itself after 5 minutes. To change this, open Settings &gt; General and change <b>Hands-free stops after</b>. You can choose from 30 seconds to 60 minutes.</p>
         </div>
       </details>
 
@@ -442,7 +480,9 @@
       <details id="faq-closed">
         <summary>Dictum closed straight away when I opened it. What do I do?</summary>
         <div class="answer">
-          <p>On some PCs, Dictum 1.1.1 closed as soon as it started. Newer versions have the fix. Install the latest version from the Microsoft Store, or from this website.</p>
+          <p>On some PCs, Dictum 1.1.1 closed as soon as it started. The note for Dictum 1.1.2 says:</p>
+          <blockquote><p>Fixes Dictum closing straight away on PCs without a working graphics driver, such as virtual desktops.</p></blockquote>
+          <p>Install the latest version from the Microsoft Store, or from this website.</p>
           <p>If the Dictum menu, or Settings &gt; About, shows a button called <b>Try on the CPU</b>, choose it. Dictum then runs the speech model on the computer’s main chip (the CPU) instead of the graphics card. This can be slower.</p>
           <p>If it still closes, email <a href="mailto:hello@kynni.com.au">hello@kynni.com.au</a> and tell us.</p>
         </div>
@@ -459,10 +499,22 @@
         </div>
       </details>
 
+      <details id="faq-speed">
+        <summary>How much faster is Dictum with a graphics card?</summary>
+        <div class="answer">
+          <p>Much faster, especially for the bigger models. Here is what one test PC measured on 15/10/2026, for the same 10-second recording. Your PC will differ.</p>
+          <ul>
+            <li><b>Standard:</b> 0.26 seconds with the graphics card, 1.9 seconds without.</li>
+            <li><b>The biggest model measured:</b> 0.73 seconds with the graphics card, 20.1 seconds without.</li>
+          </ul>
+          <p>That test PC had an NVIDIA Quadro RTX 4000 graphics card. Without a graphics card, <b>Standard</b> is the quickest choice.</p>
+        </div>
+      </details>
+
       <details id="faq-languages">
         <summary>Which languages can I speak?</summary>
         <div class="answer">
-          <p>English, or any of the languages Whisper supports. Whisper is the speech technology Dictum uses.</p>
+          <p>Dictum can listen in 100 languages, English included. They are the languages supported by Whisper, the speech technology Dictum uses.</p>
           <ol>
             <li>Open Settings &gt; Models.</li>
             <li>Find <b>Language</b>.</li>
@@ -509,7 +561,7 @@
       <details id="faq-cloud">
         <summary>What is cloud clean-up? Is it safe?</summary>
         <div class="answer">
-          <p>Cloud clean-up is an advanced option. It is off unless you turn it on, in Settings &gt; Clean-up, after a consent step. While it is on, the text of every dictation is sent to the service you chose. Your voice still stays on this PC.</p>
+          <p>Cloud clean-up is an advanced option. It is off unless you turn it on, in Settings &gt; Clean-up, after a consent step. While it is on, the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays on this PC.</p>
           <p>Dictum shows this warning while it is on:</p>
           <blockquote><p>Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.</p></blockquote>
           <p>Most people do not need it. <b>Tidy my words</b> runs on this PC.</p>
@@ -519,16 +571,22 @@
       <details id="faq-internet">
         <summary>Does Dictum need the internet?</summary>
         <div class="answer">
-          <p>No. The Standard speech model comes with Dictum, so you can dictate with the internet off.</p>
-          <p>Dictum goes online only when you ask it to: to download a model you choose, to check for updates in the direct-download version, or to use cloud clean-up if you turn it on. <b>Offline only</b>, in Settings &gt; Privacy, stops all of these.</p>
+          <p>Not for English: the Standard English model comes with Dictum, so you can dictate in English with the internet off. For any other language, Dictum needs the internet once, to download a model that understands it.</p>
+          <p>Dictum goes online only when you ask it to. That means three things:</p>
+          <ul>
+            <li>downloading a model you choose;</li>
+            <li>checking for updates, in the direct-download version;</li>
+            <li>cloud clean-up, if you turn it on.</li>
+          </ul>
+          <p><b>Offline only</b>, in Settings &gt; Privacy, stops all three.</p>
         </div>
       </details>
 
       <details id="faq-learn">
         <summary>Does Dictum learn my voice?</summary>
         <div class="answer">
-          <p>No. Nothing is trained, and your voice never leaves this PC. Calibrate my voice measures which model hears you best. It does not change the model.</p>
-          <p>What Dictum does keep is your dictionary and your corrections, on this PC.</p>
+          <p>No. Nothing is trained, and your voice never leaves this PC. Calibrate my voice measures which model hears you best, and can suggest words for your dictionary. It does not train or change the model.</p>
+          <p>What Dictum does keep is yours, in plain text files you can read, edit or delete: a dictionary of your names and terms, and corrections such as <code>kinney =&gt; Kynni</code>.</p>
         </div>
       </details>
 
@@ -562,7 +620,9 @@
             <li>Open Settings &gt; Storage.</li>
             <li>At the bottom, choose <b>Remove Dictum completely…</b></li>
             <li>Dictum lists everything it will delete, with sizes. Read it.</li>
+            <li>Click <b>Continue</b>.</li>
             <li>Type DELETE to confirm.</li>
+            <li>Click <b>Remove everything</b>.</li>
           </ol>
           <p>It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself. Otherwise Dictum removes the program too, unless its first warning says it cannot.</p>
         </div>
@@ -573,7 +633,16 @@
         <div class="answer">
           <p><b>Microsoft Store version:</b> Windows deletes Dictum’s data when you uninstall it.</p>
           <p><b>Direct download:</b> uninstalling from Windows Settings &gt; Apps asks whether to delete your models, settings and recordings too. If you say no, they stay on this PC.</p>
-          <p>If you chose a model folder on another drive, Settings &gt; Storage shows which models are in it. Delete them there first if you no longer want them. To delete everything in one step, see <a href="#faq-remove">How do I remove Dictum completely?</a></p>
+          <p>To uninstall by hand, search Start for “Add or remove programs”, find Dictum and choose <b>Uninstall</b>. For the direct download, then delete the folders <code>%APPDATA%\Dictum</code> and <code>%LOCALAPPDATA%\Dictum</code> if they are still there.</p>
+          <p>A model folder you chose on another drive is not touched by Windows’ uninstall of the direct download. See <a href="#faq-other-drive">the next question</a>.</p>
+        </div>
+      </details>
+
+      <details id="faq-other-drive">
+        <summary>I keep my models on another drive. What happens to them when I remove Dictum?</summary>
+        <div class="answer">
+          <p><b>Remove Dictum completely</b> deletes Dictum’s own model files in that folder. The folder itself stays, and so does anything else you keep in it.</p>
+          <p>Uninstalling the direct download from Windows Settings &gt; Apps leaves that folder alone. Its question says: “Folders you chose yourself in Settings are not touched.”</p>
         </div>
       </details>
 

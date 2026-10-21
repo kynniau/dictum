@@ -1135,7 +1135,7 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-/* Infographic: inline SVG, coloured by the same tokens, so it follows light and dark. A wide version from 720 px, a tall one below. */
+/* Infographic: inline SVG, coloured by the same tokens, so it follows light and dark. A wide version from a 1000 px viewport (badge text measured 14.4 px there), a tall one below. */
 
 .infographic {
   margin-top: 28px;
@@ -1151,7 +1151,7 @@ h1 {
   display: none;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 1000px) {
   .ig-wide {
     display: block;
   }
