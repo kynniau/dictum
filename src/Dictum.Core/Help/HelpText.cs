@@ -150,6 +150,8 @@ public static class HelpText
             // PROPOSED (21/10/2026): FreeLine is the Store-listing feature line (owner's nod needed to reuse it here); FreeLaterNote is new.
             FreeLine,
             FreeLaterNote,
+            // The earlier answer, kept word for word (it was already in the branch at 5252096): the facts the two new paragraphs do not carry.
+            "Yes. There is no charge, no subscription and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.",
         ]),
         new("Where is the full guide?",
         [

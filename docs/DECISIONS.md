@@ -3174,10 +3174,10 @@ All PROPOSED, awaiting the product owner's review; the three strings are constan
   sentence about installing the latest version. The old "Dictum 1.1.1 closed..." and "The version you are using now has
   the fix" sentences are gone. The microphone answer already reused `NoSoundText` (PR #29) and no literal in `HelpText.cs`
   repeats a `NoSoundText` sentence.
-- **Is Dictum free?** The answer is two paragraphs: `HelpText.FreeLine` ("Free: no subscription, no account, no ads, no
-  analytics, no telemetry.") and `HelpText.FreeLaterNote` (new). The earlier answer (no charge, open source, MIT, Kynni Pty
-  Ltd) was replaced, not added to. **Source check:** `FreeLine` was supplied by the orchestrator as an approved Store
-  line, but on origin/main docs/STORE.md has "No account, no analytics, no telemetry" and no "Free:" line; the nearest
+- **Is Dictum free?** The answer is three paragraphs: `HelpText.FreeLine` ("Free: no subscription, no account, no ads, no
+  analytics, no telemetry.") and `HelpText.FreeLaterNote` (new). The third is the earlier answer (no charge, no word limit, open source, MIT, Kynni Pty
+  Ltd), kept word for word. **Source check:** `FreeLine` is the wording submitted in the Store listing on the owner's instruction (21/10/2026), not a line he approved verbatim, per the orchestrator. On origin/main
+  docs/STORE.md has "No account, no analytics, no telemetry" and no "Free:" line; the nearest
   text is PR #25's unmerged, PROPOSED line "Free: no subscription, no account, no ads". So the string is not verified as
   approved anywhere in the repository; it needs the owner's nod either way.
 - **Test exemption.** The old pin forbade the words telemetry and analytics anywhere in the Help. It now removes the one

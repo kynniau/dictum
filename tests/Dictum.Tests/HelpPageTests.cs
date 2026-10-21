@@ -166,7 +166,8 @@ public class HelpPageTests
 
         var free = HelpText.Questions.Single(q => q.Question == "Is Dictum free?");
         Assert.Equal(["Free: no subscription, no account, no ads, no analytics, no telemetry.",
-            "The base product stays free to keep on your PC; optional paid extras may come later."], free.Answer);
+            "The base product stays free to keep on your PC; optional paid extras may come later.",
+            "Yes. There is no charge, no subscription and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence."], free.Answer);
 
         // Calibration is "Calibrate my voice" in 1.1.x; the help uses that name and no other (a 1.2 rename must change both together).
         var calibration = new Regex(@"calibrat\w*", RegexOptions.IgnoreCase);
