@@ -187,6 +187,7 @@ public class HelpPageTests
         seen.Add(ModelsPage.FolderLabel); // shown as a small-caps card title, so in capitals on screen
         seen.Add(AppShell.TryOnCpuLabel); // shown only beside a model problem
         seen.Add(PillText.For(PillView.MicError, TimeSpan.Zero)); // on the pill
+        seen.Add(Dictum.Core.NoSoundText.Pill); // the pill when the microphone gives no sound (PR #22); the help quotes it from the same constant
 
         var copy = string.Join("\n", HelpText.AllText());
         string[] named =
@@ -194,7 +195,7 @@ public class HelpPageTests
             "Calibrate my voice", "Dictionary", "Fix last dictation", "Save corrections", "Settings", "Dictation on",
             "General", "Models", "Storage", "Microphone", "Clean-up",
             "Press your hotkey", "Change…", "Use this hotkey", "Test microphone", "Model folder", "Browse…", "Remove Dictum completely…",
-            "Try on the CPU", "Mic error", "Open the full guide", "Email support", "Help",
+            "Try on the CPU", "Mic error", "No sound from mic", "Open the full guide", "Email support", "Help",
         ];
         foreach (var label in named)
         {

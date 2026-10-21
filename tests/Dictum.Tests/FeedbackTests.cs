@@ -248,6 +248,15 @@ public class FeedbackTests
     });
 
     [Fact]
+    public void The_mic_help_answer_quotes_the_no_sound_message_from_the_same_constants()
+    {
+        var answer = HelpText.Questions.Single(q => q.Question.Contains("Mic error")).Answer;
+        Assert.Contains(answer, p => p.Contains(Dictum.Core.NoSoundText.Pill) && p.Contains(Dictum.Core.NoSoundText.SilentBalloon));
+        Assert.Contains(answer, p => p.Contains(Dictum.Core.NoSoundText.NoMicrophoneBalloon));
+        Assert.Contains(Dictum.Core.NoSoundText.Pill, HelpText.Questions.Single(q => q.Question.Contains("Mic error")).Question);
+    }
+
+    [Fact]
     public void The_feedback_note_says_build_so_Windows_11_users_are_not_confused()
     {
         Assert.Contains("your Windows build", HelpText.FeedbackNote);

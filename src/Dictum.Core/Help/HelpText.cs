@@ -1,3 +1,5 @@
+using Dictum.Core;
+
 namespace Dictum.Help;
 
 /// <summary>
@@ -86,8 +88,11 @@ public static class HelpText
             "• To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.",
             "• For better accuracy overall, see \"Why Dictum hears some people better than others\" above.",
         ]),
-        new("It says \"Mic error\", or nothing happens when I talk. What do I check?",
+        new("It says \"Mic error\" or \"" + NoSoundText.Pill + "\", or nothing happens when I talk. What do I check?",
         [
+            // PROPOSED (21/10/2026): the two paragraphs reuse NoSoundText's wording, so the help and the message cannot drift apart.
+            "If Dictum shows \"" + NoSoundText.Pill + "\", it says: " + NoSoundText.SilentBalloon,
+            "If Dictum cannot find a microphone at all, it says: " + NoSoundText.NoMicrophoneBalloon,
             "• Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.",
             "• Open Settings > Microphone. Choose your microphone from the list, then choose Test microphone and speak. The bars move when Dictum hears you.",
             "• In Windows Settings, go to Privacy & security > Microphone. \"Microphone access\" and \"Let desktop apps access your microphone\" must both be on.",

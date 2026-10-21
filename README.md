@@ -61,6 +61,7 @@ A small dark pill appears bottom-centre of the monitor with the focused window, 
 | Stopped. Text already typed stays. | Esc pressed in hands-free: the parts already typed stay (a grey square). |
 | Busy | Hotkey pressed while still processing. |
 | Mic error | The microphone could not be opened (see Troubleshooting), or it was lost mid-recording (a headset unplugged or out of battery): what was captured until then is still transcribed and pasted. |
+| No sound from mic | While recording: the microphone has given no sound at all for 2 seconds (a muted or unplugged microphone, or a remote or virtual desktop whose microphone is not redirected). Recording goes on, and the pill goes back to Recording as soon as a sound arrives; a balloon says what to check, once per dictation. When the recording ends that way (a red "!"), nothing is transcribed or typed. It also flashes at once, with its own balloon, when Windows lists no microphone at all (see Troubleshooting). |
 
 `pill.enabled: false` hides it.
 
@@ -94,6 +95,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   model failed inside the GPU runtime before any try on the CPU, **Try on the CPU**, which saves `whisper.gpu` or
   `llm.gpu` = `cpu` and loads the model again off the GPU; if it fails again, the line asks you to restart Dictum, which
   then loads the CPU-only runtime. Settings > About shows the same line.
+- **Last dictation heard nothing: check the microphone**, in the same place, after a dictation that ended with "No sound
+  from mic"; it goes when a dictation types text again.
 - **Download progress** with **Cancel download** while a model downloads or waits its turn. Downloads run one at a
   time; cancelling deletes the partial file and drops any download waiting behind it. A dropped connection is resumed
   automatically (see "Model downloads and checks").
@@ -1180,6 +1183,20 @@ warns, and that file has no size or hash to be checked against. A value is never
   `"insert": { "method": "type" }` for apps that block paste. Legacy console windows may not honour Ctrl+V; use
   `type` there too.
 - **Wrong microphone.** Run `--selftest` to list devices and set `audio.device` to part of the name.
+- **"No sound from mic" (pill), "Dictum is not hearing anything" (balloon).** The microphone opened but gave no sound at
+  all for 2 seconds after the key was pressed: every 20 ms of audio was silent (digital silence, or white noise
+  at a 48 kHz microphone below about −91 dBFS in stereo or −94 dBFS in mono), or no audio arrived. Check that the
+  microphone is plugged in, not muted (its own switch, and Windows Sound settings), is the one Dictum uses
+  (`--selftest`, `audio.device`), and that Windows allows desktop apps to use the microphone (Settings > Privacy &
+  security > Microphone). On a remote or virtual desktop (Remote Desktop, Azure Virtual Desktop) the
+  microphone must be redirected from your own PC: see "Remote Desktop microphone" under "Deploying to staff machines and
+  Azure VMs". Once the microphone has been heard in a dictation, later pauses never bring the warning back. A microphone
+  whose own noise suppression sends exact silence between words can show it until you start speaking (not seen; inferred
+  from how the check works). The log line is `No sound from the microphone 2000 ms into the recording: peak block RMS … over … block(s) of 20 ms`
+  (0 blocks means no audio arrived at all; the peak is a level, never what was said).
+- **"No microphone found" (balloon).** The microphone could not be opened and Windows lists no microphone at all. Plug
+  one in, or on a remote or virtual desktop turn on microphone redirection, then press the hotkey again. On Windows
+  Server, also check the Windows Audio service (see "Deploying to staff machines and Azure VMs").
 - **"Mic error".** Check the microphone privacy settings above and that the device is enabled in Sound settings. If
   it appeared mid-dictation, the device was lost (unplugged, out of battery); what was recorded until then was still
   transcribed and pasted.

@@ -44,6 +44,16 @@ internal sealed class FakeUi : IDictationUi
     }
 
     public void SetTrayState(TrayState state) { }
+
+    /// <summary>Each "No sound from mic" balloon the controller asked for.</summary>
+    public ConcurrentQueue<NoSoundCause> NoSoundWarnings { get; } = new();
+
+    /// <summary>The tray panel's heard-nothing line, as last set (null: never set).</summary>
+    public bool? HeardNothing { get; private set; }
+
+    public void WarnNoSound(NoSoundCause cause) => NoSoundWarnings.Enqueue(cause);
+
+    public void SetHeardNothing(bool heardNothing) => HeardNothing = heardNothing;
 }
 
 /// <summary>Microphone stand-in: Stop returns two seconds of "speech".</summary>
