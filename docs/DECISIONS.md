@@ -2690,3 +2690,39 @@ The second lens returned Needs changes (no blockers). All five findings are fixe
    > CHANGED SINCE THE LAST SUBMISSION: no download is needed to test. The base.en speech model ships inside the package, so dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads. The last submission reported "download cancelled" when downloading a model: choosing a second model while one was downloading cancelled the first. Dictum 1.1.1 never cancels a download unless you press Cancel download, answer "Stop it and download …" to the question it now asks first, or quit Dictum; choosing the model that is already downloading only says so.
 
    The orchestrator asked for "every feature works with no download". The paragraph instead says dictation works with no download and that larger models and AI clean-up are optional downloads. AI clean-up and the multilingual models do need a download, so "every feature" would not be accurate.
+
+## Warn when the microphone delivers no sound (21/10/2026, branch feat/silence-warning)
+
+**The report** (product owner, 21/10/2026, relayed by the orchestrator): on a virtual desktop whose microphone was not passed through, he pressed the hotkey and the pill showed "Recording" and stayed there. Nothing said the microphone was delivering no audio, so the app looked broken.
+
+**What the code did** (read at main 033809f):
+
+- A microphone that opened and delivered only silence showed "Recording" for the whole hold. The pipeline then rejected the recording as silent (`RecordingGate`) and the pill hid without saying why.
+- A microphone that could not be opened (`WasapiCapture.Start` throws, which includes no default capture device: `CaptureDevices.Resolve`) flashed "Mic error". The controller then went on to execute the rest of the key-down's effects, which included the "Recording · hold" pill. So "Mic error" was replaced at once by "Recording · hold", and that label stayed with nothing recording. This is the most likely cause of the "no device at all in some paths" symptom. It is fixed here: after a failed open, the rest of that batch is skipped (`DictationController.Execute`), and the open-failure pins check that the last pill is the flash.
+
+**Decision (built as briefed, with the choices below):**
+
+1. **Detection layer.** `CaptureBuffer` meters every 20 ms block already; it now calls back once per recording at the first block louder than `CaptureBuffer.SoundFloor`. `WasapiCapture` raises this as `IAudioCapture.SoundHeard`. The controller posts it to its inbox, and the pure state machine decides on its existing 50 ms `Tick`, using `DictationStateMachine.NoSoundGraceMs`. Nothing polls from the UI. The interface defaults (`ReportsSound => false`, a `SoundHeard` that never fires) keep every other capture, and every existing test fake, on the old behaviour: the machine only watches a session after `WatchForSound`, which the controller calls when the capture opened and `ReportsSound` is true.
+2. **Grace period: 2000 ms**, hold-to-talk and hands-free alike, a constant with a comment, not a setting (the brief).
+3. **The floor: 1e-5 RMS (−100 dBFS).** One 16-bit step is 1/32768, about −90 dBFS. A stream of digital zeros (a muted endpoint, WASAPI's silent flag, an unredirected virtual microphone) stays under the floor, while any real signal quantised to 16 bits or more should pass it. This is inferred from that arithmetic, not measured on hardware.
+4. **The grace counts only until the first sound of the session.** Once the microphone has been heard, a pause is the speaker pausing, so a hands-free session never warns between parts. This is stricter than "no audio for 2 s at any time", which would warn on every long pause with a microphone whose noise suppression sends exact zeros. Ceiling: a microphone muted halfway through a session is not caught.
+5. **While the warning is up, recording goes on.** The pill reads "No sound from mic" with the red dot, meter, orb and edge glow kept, since it is still recording. The first sound puts the recording label back. The balloon shows once per session.
+6. **Ending with the warning up** (key released, hands-free stop, auto-stop): the capture is discarded and nothing is transcribed or typed. The pill flashes "No sound from mic" for 1.8 s with a red "!" badge, instead of "Transcribing…". A hands-free session's token is cancelled (it has typed nothing). A hold shorter than the grace period is transcribed as before, and the pipeline rejects it if it is silent, so a fumbled press never claims the microphone is dead.
+7. **No microphone at all.** The device list is checked only after the microphone could not be opened, so a press that opens it pays nothing for the check. If `IPlatform.ListCaptureDevices()` is empty, the pill flashes the warning at once with the no-microphone balloon, and nothing stays on Recording. Any other open failure, or a list that cannot be read, stays "Mic error". **This differs from the brief's wording**, which said to check the list when recording starts. Checking before every `Start` would add a device enumeration to each press's capture latency. With WASAPI, an empty list always makes `Start` throw (`CaptureDevices.Resolve`), so the outcome is the same. A list that is empty while `Start` somehow succeeds still gets the silence warning after 2 s.
+8. **Mic error is unchanged**, both for an open failure with a microphone listed and for a microphone lost mid-recording, including with the warning up. The only change is that its flash is no longer overwritten by "Recording · hold" (see above).
+9. **Tray panel line (item 2, small enough to build).** After a session that ended with no sound (point 6 or 7), the problem line in the tray panel and on Settings > About also reads "Last dictation heard nothing: check the microphone". It goes when a dictation types text (`ProcessingOutcome.Inserted`). It is held in memory only, so a restart clears it.
+
+**PROPOSED strings, for the product owner's approval (none is approved; do not treat them as final copy):**
+
+- Pill: "No sound from mic"
+- Balloon (silence): "Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on."
+- Balloon (no microphone listed): "No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again."
+- Tray panel and Settings > About line: "Last dictation heard nothing: check the microphone"
+
+They live in `NoSoundText` (Core), and one pin checks them verbatim. No approved copy (CloudPolicy, consent dialog, state lines) was changed.
+
+**What it might break.** A Bluetooth headset whose first packet takes longer than 2 s to arrive will show the warning and one balloon, then go back to Recording when its audio starts (not measured). A microphone whose own noise suppression sends exact zeros until speech can show the warning if the speaker waits more than 2 s before talking.
+
+**Pins** (`tests/Dictum.Tests/SilenceWarningTests.cs`, 13 tests: pure state-machine pins in the style of `StateMachineTests`, a `CaptureBuffer` pin, and 4 controller pins with a stand-in microphone). Each was observed failing on the reverted behaviour; the PR body has the mutation table.
+
+**Not verified:** on a real virtual desktop or Remote Desktop session without microphone redirection; with a real muted microphone, a Bluetooth headset, or a microphone with its own noise suppression; how the balloon looks on Windows 10 and 11; the pill's look with the new label (no screenshot was taken, and no Dictum build was launched on this PC).

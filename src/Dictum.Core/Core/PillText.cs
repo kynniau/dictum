@@ -18,6 +18,7 @@ public static class PillText
         PillView.Busy => "Busy",
         PillView.MicError => "Mic error",
         PillView.HandsFreeStopped => HandsFreeStopped,
+        PillView.NoSound or PillView.NoSoundEnded => NoSoundText.Pill,
         _ => "",
     };
 
@@ -50,10 +51,12 @@ public static class PillText
         PillView.Busy => 700,
         PillView.MicError => 1800,
         PillView.HandsFreeStopped => 1800, // a sentence to read, like "Mic error"'s flash
+        PillView.NoSoundEnded => 1800, // as long as "Mic error"; the balloon carries the explanation
         _ => null,
     };
 
-    public static bool IsRecording(PillView view) => view is PillView.RecordingHold or PillView.RecordingHandsFree;
+    /// <summary>Recording is going on: the red dot, the meter, the orb and the edge glow. "No sound from mic" is still recording.</summary>
+    public static bool IsRecording(PillView view) => view is PillView.RecordingHold or PillView.RecordingHandsFree or PillView.NoSound;
 
     public static bool IsProcessing(PillView view) => view is PillView.Transcribing or PillView.Polishing or PillView.PolishingSkipped;
 }

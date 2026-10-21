@@ -3,10 +3,15 @@ namespace Dictum.Core;
 public enum DictationState { Idle, RecordingHold, PendingTap, RecordingHandsFree, Processing }
 
 /// <summary>
-/// What the pill should show. Cancelled, Busy, MicError and HandsFreeStopped are short flashes. HandsFreeStopped is Esc
-/// ending a hands-free session: the parts already typed stay.
+/// What the pill should show. Cancelled, Busy, MicError, HandsFreeStopped and NoSoundEnded are short flashes. HandsFreeStopped
+/// is Esc ending a hands-free session: the parts already typed stay. NoSound replaces the recording label while the microphone
+/// has given no sound (recording goes on); NoSoundEnded is the same words when the recording ends that way, or when no
+/// microphone is listed at all (21/10/2026).
 /// </summary>
-public enum PillView { Hidden, RecordingHold, RecordingHandsFree, Transcribing, Polishing, Done, Cancelled, Busy, MicError, PolishingSkipped, HandsFreeStopped }
+public enum PillView { Hidden, RecordingHold, RecordingHandsFree, Transcribing, Polishing, Done, Cancelled, Busy, MicError, PolishingSkipped, HandsFreeStopped, NoSound, NoSoundEnded }
+
+/// <summary>Why the microphone gave no sound: it delivered only silence, or the system lists no microphone at all.</summary>
+public enum NoSoundCause { Silent, NoMicrophone }
 
 public enum ProcessingOutcome { Inserted, Discarded, Failed }
 
@@ -33,6 +38,15 @@ public sealed record CancelProcessingEffect(long SessionId, bool KeepsTyped = fa
 
 public sealed record PillEffect(PillView View) : Effect;
 
+/// <summary>
+/// The microphone gave no sound in this session (<paramref name="Cause"/>): a balloon says why and what to check. At most one per
+/// session (21/10/2026).
+/// </summary>
+public sealed record NoSoundEffect(long SessionId, NoSoundCause Cause) : Effect;
+
+/// <summary>The session ended without any sound from the microphone: the tray panel says so until a dictation types text again.</summary>
+public sealed record HeardNothingEffect(long SessionId) : Effect;
+
 /// <param name="HandsFreeMaxSeconds">hands_free_max_seconds: a hands-free session stops by itself after this long.</param>
 /// <param name="HoldMaxSeconds">
 /// A held key stops by itself after this long, so a stuck key cannot record all afternoon. Not hands_free_max_seconds
@@ -49,12 +63,21 @@ public sealed record StateMachineOptions(int TapMs, int DoubleTapMs, int HandsFr
 /// <summary>
 /// The hold / double-tap / hands-free state machine from SPEC §3. Pure: no threads, no timers, no I/O.
 /// Time is injected as a monotonic millisecond clock value on every call; the owner calls
-/// <see cref="Tick"/> periodically so deadlines (double-tap window, auto-stop) fire.
+/// <see cref="Tick"/> periodically so deadlines (double-tap window, auto-stop, the no-sound grace) fire.
 /// Not thread-safe: the owner confines it to one thread.
 /// </summary>
 public sealed class DictationStateMachine
 {
     private static readonly IReadOnlyList<Effect> None = [];
+
+    /// <summary>
+    /// How long a recording may go with no sound at all from the microphone (no packets, or only blocks below
+    /// CaptureBuffer.SoundFloor) before the pill says "No sound from mic" and a balloon says why. Hold-to-talk and hands-free
+    /// alike; a constant, not a setting (orchestrator brief, 21/10/2026, after a virtual desktop without microphone redirection
+    /// recorded silence with nothing on screen to say so). It counts only until the first sound of the session: once the
+    /// microphone has been heard, later pauses are the speaker pausing, never a warning.
+    /// </summary>
+    public const int NoSoundGraceMs = 2000;
 
     private StateMachineOptions _options;
     private bool _keyDown;            // physical state of the hotkey as seen through events
@@ -64,6 +87,10 @@ public sealed class DictationStateMachine
     private long _pendingSince;
     private CancellationTokenSource? _processingCts;
     private bool _handsFree;          // this session went hands-free: its parts are typed as it records, under _processingCts
+    private bool _watchingSound;      // this session's capture reports its first sound (WatchForSound); else no warning can fire
+    private bool _heard;              // the microphone gave a sound this session
+    private bool _noSound;            // the pill says "No sound from mic" while recording goes on
+    private bool _noSoundNoticed;     // this session's balloon has been asked for (at most one per session)
 
     public DictationStateMachine(StateMachineOptions options, bool enabled = true)
     {
@@ -103,6 +130,7 @@ public sealed class DictationStateMachine
                 _captureStartedAt = nowMs;
                 _ignoreNextUp = false;
                 _handsFree = false;
+                _watchingSound = _heard = _noSound = _noSoundNoticed = false;
                 State = DictationState.RecordingHold;
                 return Concat(expired, new StartCaptureEffect(SessionId), new PillEffect(PillView.RecordingHold));
 
@@ -114,10 +142,10 @@ public sealed class DictationStateMachine
                 State = DictationState.RecordingHandsFree;
                 ReleaseProcessingToken();
                 _processingCts = new CancellationTokenSource();
-                return [new BeginSegmentsEffect(SessionId, _processingCts.Token), new PillEffect(PillView.RecordingHandsFree)];
+                return [new BeginSegmentsEffect(SessionId, _processingCts.Token), new PillEffect(_noSound ? PillView.NoSound : PillView.RecordingHandsFree)];
 
             case DictationState.RecordingHandsFree:
-                return BeginProcessing(autoStopped: false);
+                return EndRecording(autoStopped: false);
 
             case DictationState.Processing:
                 return [new PillEffect(PillView.Busy)];
@@ -137,7 +165,7 @@ public sealed class DictationStateMachine
         switch (State)
         {
             case DictationState.RecordingHold:
-                if (nowMs - _keyDownAt >= _options.TapMs) return BeginProcessing(autoStopped: false);
+                if (nowMs - _keyDownAt >= _options.TapMs) return EndRecording(autoStopped: false);
                 State = DictationState.PendingTap;
                 _pendingSince = nowMs;
                 return None;
@@ -194,9 +222,47 @@ public sealed class DictationStateMachine
             // Auto-stop: a stuck key or a forgotten hands-free session is transcribed, never discarded. The key is
             // forgotten too: if its key-up was lost (secure desktop), the next press must start a recording.
             _keyDown = false;
-            return BeginProcessing(autoStopped: true);
+            return EndRecording(autoStopped: true);
+        }
+        if ((State is DictationState.RecordingHold or DictationState.RecordingHandsFree) && _watchingSound && !_heard && !_noSound
+            && nowMs - _captureStartedAt >= NoSoundGraceMs)
+        {
+            // Recording goes on (the speaker may only be slow to start); the warning stays until a sound or the end.
+            _noSound = true;
+            return WarnNoSound(NoSoundCause.Silent, PillView.NoSound);
         }
         return None;
+    }
+
+    /// <summary>
+    /// The capture for <paramref name="sessionId"/> reports its first sound (<see cref="SoundHeard"/>), so the "No sound from
+    /// mic" warning may fire for it after <see cref="NoSoundGraceMs"/>. A capture that cannot tell never calls this, and its
+    /// sessions behave as before.
+    /// </summary>
+    public void WatchForSound(long sessionId)
+    {
+        if (sessionId == SessionId && IsRecording) _watchingSound = true;
+    }
+
+    /// <summary>The microphone gave its first sound in <paramref name="sessionId"/>: a "No sound from mic" warning goes back to the recording label.</summary>
+    public IReadOnlyList<Effect> SoundHeard(long sessionId)
+    {
+        if (sessionId != SessionId || !IsRecording || _heard) return None;
+        _heard = true;
+        if (!_noSound) return None;
+        _noSound = false;
+        return [new PillEffect(State == DictationState.RecordingHandsFree ? PillView.RecordingHandsFree : PillView.RecordingHold)];
+    }
+
+    /// <summary>
+    /// The microphone could not be opened and the system lists none: the warning at once ("No sound from mic" and the
+    /// no-microphone balloon) instead of "Mic error", and nothing stays on Recording. Other open failures stay
+    /// <see cref="CaptureFailed"/>'s.
+    /// </summary>
+    public IReadOnlyList<Effect> NoMicrophone(long sessionId)
+    {
+        if (!IsRecording || sessionId != SessionId) return None;
+        return EndUnheard(NoSoundCause.NoMicrophone);
     }
 
     /// <summary>The pipeline for <paramref name="sessionId"/> finished. Stale sessions are ignored.</summary>
@@ -264,6 +330,32 @@ public sealed class DictationStateMachine
         if (State != DictationState.PendingTap || nowMs - _pendingSince <= _options.DoubleTapMs) return None;
         State = DictationState.Idle;
         return [new DiscardCaptureEffect(SessionId), new PillEffect(PillView.Hidden)];
+    }
+
+    /// <summary>A recording ends (the key released, the hands-free stop, the auto-stop): transcribed, unless the "No sound from mic" warning is up.</summary>
+    private IReadOnlyList<Effect> EndRecording(bool autoStopped) => _noSound ? EndUnheard(NoSoundCause.Silent) : BeginProcessing(autoStopped);
+
+    /// <summary>
+    /// The session ends with nothing from the microphone: nothing is transcribed or typed, the pill flashes "No sound from mic"
+    /// instead of "Transcribing…", the balloon shows if this session has not had it, and the tray panel says the last
+    /// dictation heard nothing. A hands-free session has typed nothing (no sound, no part), so its token is cancelled.
+    /// </summary>
+    private IReadOnlyList<Effect> EndUnheard(NoSoundCause cause)
+    {
+        if (_handsFree) CancelProcessingToken();
+        State = DictationState.Idle;
+        _handsFree = false;
+        _ignoreNextUp = false;
+        _noSound = false;
+        return [new DiscardCaptureEffect(SessionId), .. WarnNoSound(cause, PillView.NoSoundEnded), new HeardNothingEffect(SessionId)];
+    }
+
+    /// <summary>The warning's pill view, with the balloon the first time in a session.</summary>
+    private IReadOnlyList<Effect> WarnNoSound(NoSoundCause cause, PillView view)
+    {
+        if (_noSoundNoticed) return [new PillEffect(view)];
+        _noSoundNoticed = true;
+        return [new PillEffect(view), new NoSoundEffect(SessionId, cause)];
     }
 
     private IReadOnlyList<Effect> BeginProcessing(bool autoStopped)

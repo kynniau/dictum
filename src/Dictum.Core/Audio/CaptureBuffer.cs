@@ -19,6 +19,15 @@ public sealed class CaptureBuffer
     /// <summary>Samples in one 20 ms block (<see cref="SpeechSegmenter.BlockMs"/>): the unit of metering and of every cut.</summary>
     public const int BlockSamples = MonoResampler.WhisperRate * SpeechSegmenter.BlockMs / 1000;
 
+    /// <summary>
+    /// A 20 ms block louder than this (RMS, 0-1) is a sound from the microphone, for the "No sound from mic" warning
+    /// (21/10/2026). 1e-5 is -100 dBFS: below one 16-bit step (1/32768, about -90 dBFS), so a stream of digital zeros (a muted
+    /// endpoint, WASAPI's silent flag, a virtual desktop whose microphone is not redirected) stays under it, while any real
+    /// signal quantised to 16 bits or more should pass. Inferred from that arithmetic, not measured on hardware: a microphone whose
+    /// own noise suppression sends exact zeros between words reads as silent until the speaker talks.
+    /// </summary>
+    public const float SoundFloor = 1e-5f;
+
     private readonly object _gate = new();
     private readonly List<float> _samples = new(MonoResampler.WhisperRate * 30);
     private readonly SampleEncoding _encoding;
@@ -35,9 +44,14 @@ public sealed class CaptureBuffer
     private long _firstBlock;      // the block _samples[0] starts (parts before it were handed over)
     private SpeechSegmenter? _segmenter;
     private Action<CapturedAudio, CutReason>? _onPart;
+    private readonly Action? _firstSound;
+    private bool _heard;
 
-    public CaptureBuffer(SampleEncoding encoding, int channels, int sampleRate)
+    /// <param name="firstSound">Called once, on the capture thread and under this buffer's lock, at the first block louder than
+    /// <see cref="SoundFloor"/>. Must not block or call back into the buffer.</param>
+    public CaptureBuffer(SampleEncoding encoding, int channels, int sampleRate, Action? firstSound = null)
     {
+        _firstSound = firstSound;
         _encoding = encoding;
         _channels = Math.Max(1, channels);
         _resampler = new MonoResampler(sampleRate);
@@ -103,6 +117,11 @@ public sealed class CaptureBuffer
             var rms = (float)Math.Sqrt(_blockSumSquares / _blockCount);
             Volatile.Write(ref _level, rms);
             if (rms > _peak) _peak = rms;
+            if (!_heard && rms > SoundFloor)
+            {
+                _heard = true;
+                _firstSound?.Invoke();
+            }
             _blockSumSquares = 0;
             _blockCount = 0;
             _blocks++;

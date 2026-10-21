@@ -25,6 +25,11 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
 
     public event Action<Exception>? Failed;
 
+    /// <summary>The first sound of each recording (CaptureBuffer.SoundFloor), for the "No sound from mic" warning.</summary>
+    public event Action? SoundHeard;
+
+    public bool ReportsSound => true;
+
     public float CurrentLevel => Volatile.Read(ref _buffer)?.CurrentLevel ?? 0f;
 
     public void Start(string? deviceSetting, long keyDownStamp)
@@ -46,7 +51,7 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
                     .WithBufferLength(50)
                     .Build();
                 var format = recorder.WaveFormat;
-                var buffer = new CaptureBuffer(SampleDecoder.EncodingOf(format), format.Channels, format.SampleRate);
+                var buffer = new CaptureBuffer(SampleDecoder.EncodingOf(format), format.Channels, format.SampleRate, () => SoundHeard?.Invoke());
                 recorder.DataAvailable += OnData;
                 recorder.RecordingStopped += OnStopped;
                 Volatile.Write(ref _buffer, buffer);

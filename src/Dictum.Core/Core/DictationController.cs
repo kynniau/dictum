@@ -18,6 +18,19 @@ public interface IDictationUi
     void ShowPill(PillState state);
 
     void SetTrayState(TrayState state);
+
+    /// <summary>The microphone gave no sound (<paramref name="cause"/>): a balloon says why (NoSoundText). At most once per session. Default: nothing.</summary>
+    void WarnNoSound(NoSoundCause cause)
+    {
+    }
+
+    /// <summary>
+    /// True: the last dictation heard nothing, and the tray panel says so (NoSoundText.HeardNothingLine); false: a dictation has
+    /// typed text since. Default: nothing.
+    /// </summary>
+    void SetHeardNothing(bool heardNothing)
+    {
+    }
 }
 
 /// <summary>
@@ -37,6 +50,7 @@ public sealed class DictationController : IDisposable
     private readonly Func<AppSettings> _settings;
     private readonly ILog _log;
     private readonly Func<bool> _hotkeyBlocked;
+    private readonly Func<bool> _microphoneListed; // the system lists a microphone (asked only after one could not be opened)
     private readonly Timer _ticker;
     private readonly Task _loop;
     private long _captureStartTick;
@@ -60,6 +74,7 @@ public sealed class DictationController : IDisposable
     private sealed record TickInput(long NowMs);
     private sealed record DoneInput(long SessionId, ProcessingOutcome Outcome, int Words);
     private sealed record CaptureLostInput(long SessionId);
+    private sealed record SoundInput(long SessionId);
     private sealed record EnableInput(bool Enabled);
     private sealed record OptionsInput(StateMachineOptions Options);
     private sealed record PolishingInput(long SessionId, PillView View);
@@ -71,7 +86,8 @@ public sealed class DictationController : IDisposable
         IDictationUi ui,
         Func<AppSettings> settings,
         ILog log,
-        Func<bool>? hotkeyBlocked = null)
+        Func<bool>? hotkeyBlocked = null,
+        Func<bool>? microphoneListed = null)
     {
         _machine = machine;
         _capture = capture;
@@ -80,7 +96,9 @@ public sealed class DictationController : IDisposable
         _settings = settings;
         _log = log;
         _hotkeyBlocked = hotkeyBlocked ?? (() => false);
+        _microphoneListed = microphoneListed ?? (() => true);
         _capture.Failed += _ => _inbox.Writer.TryWrite(new CaptureLostInput(_machine.SessionId));
+        _capture.SoundHeard += () => _inbox.Writer.TryWrite(new SoundInput(_machine.SessionId));
         _loop = Task.Run(RunAsync);
         _ticker = new Timer(_ => _inbox.Writer.TryWrite(new TickInput(Environment.TickCount64)), null, 50, 50);
     }
@@ -129,6 +147,7 @@ public sealed class DictationController : IDisposable
         TickInput t => _machine.Tick(t.NowMs),
         DoneInput d => Finished(d),
         CaptureLostInput c => CaptureLost(c.SessionId),
+        SoundInput s => _machine.SoundHeard(s.SessionId),
         EnableInput e => SetEnabledCore(e.Enabled),
         OptionsInput o => UpdateOptionsCore(o.Options),
         PolishingInput p => _machine.State == DictationState.Processing && p.SessionId == _machine.SessionId
@@ -157,6 +176,7 @@ public sealed class DictationController : IDisposable
         // the pipeline task, before this message was even queued, a UI that reads IsIdle on that news (the mouse-hotkey gate,
         // AppShell.ApplyHookEnabled) could still see the dictation under way and keep a mouse button swallowed after it.
         _ui.SetTrayState(done.Outcome == ProcessingOutcome.Failed ? TrayState.Error : TrayState.Idle);
+        if (done.Outcome == ProcessingOutcome.Inserted) _ui.SetHeardNothing(false); // a dictation typed text: the microphone works
         return effects;
     }
 
@@ -187,7 +207,10 @@ public sealed class DictationController : IDisposable
             switch (effect)
             {
                 case StartCaptureEffect start:
-                    StartCapture(start.SessionId);
+                    // A microphone that could not be opened has already ended the session ("Mic error" or the no-microphone
+                    // warning): the rest of this batch (the "Recording · hold" pill) belonged to the recording that never started,
+                    // and shown after the flash it stayed on screen with nothing recording (found 21/10/2026).
+                    if (!StartCapture(start.SessionId)) return;
                     break;
                 case BeginSegmentsEffect segments:
                     BeginSegments(segments);
@@ -208,6 +231,16 @@ public sealed class DictationController : IDisposable
                         : $"Session {cancel.SessionId} cancelled during processing; nothing will be inserted.");
                     _ui.SetTrayState(_machine.Enabled ? TrayState.Idle : TrayState.Disabled);
                     break;
+                case NoSoundEffect noSound:
+                    _log.Warn(noSound.Cause == NoSoundCause.NoMicrophone
+                        ? "No microphone is listed; the recording did not start."
+                        : $"No sound from the microphone {DictationStateMachine.NoSoundGraceMs} ms into the recording (every 20 ms block below {CaptureBuffer.SoundFloor}); recording goes on.");
+                    _ui.WarnNoSound(noSound.Cause);
+                    break;
+                case HeardNothingEffect:
+                    _log.Info("The recording ended with no sound from the microphone; nothing was transcribed.");
+                    _ui.SetHeardNothing(true);
+                    break;
                 case PillEffect pill:
                     if (_settings().ShowsDictationState || pill.View == PillView.Hidden)
                         _ui.ShowPill(new PillState(pill.View, _captureStartTick, pill.View == PillView.Done ? _lastWords : 0));
@@ -216,19 +249,38 @@ public sealed class DictationController : IDisposable
         }
     }
 
-    private void StartCapture(long sessionId)
+    /// <summary>Opens the microphone; false when it could not be opened (the session has ended, its effects executed).</summary>
+    private bool StartCapture(long sessionId)
     {
         try
         {
             _captureStartTick = Environment.TickCount64;
             _capture.Start(_settings().Audio.Device, _lastKeyDownStamp);
+            if (_capture.ReportsSound) _machine.WatchForSound(sessionId); // its first sound arrives through the inbox, after this
             _ui.SetTrayState(TrayState.Recording);
+            return true;
         }
         catch (Exception ex)
         {
             _log.Error($"Microphone could not be opened: {ex.GetType().Name}: {ex.Message}");
             _ui.SetTrayState(TrayState.Error);
-            Execute(_machine.CaptureFailed(sessionId));
+            // No microphone listed at all: the no-microphone warning instead of "Mic error". Asked only now, so a press that opens
+            // the microphone pays nothing for the check.
+            Execute(MicrophoneListed() ? _machine.CaptureFailed(sessionId) : _machine.NoMicrophone(sessionId));
+            return false;
+        }
+    }
+
+    private bool MicrophoneListed()
+    {
+        try
+        {
+            return _microphoneListed();
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"Could not list the microphones: {ex.GetType().Name}: {ex.Message}");
+            return true; // unknown: the existing "Mic error"
         }
     }
 
