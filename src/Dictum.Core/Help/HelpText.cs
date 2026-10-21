@@ -52,7 +52,12 @@ public static class HelpText
         "4. Let go of the key. A moment later, your words appear where you clicked.",
         "In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. " +
         "Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.",
-        "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on.",
+        // PROPOSED (21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
+        "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. " +
+        "To paste exactly what was heard, with no tidying at all, choose Off there instead.",
+        // PROPOSED (21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does.
+        "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. " +
+        "If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here.",
         "The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. " +
         "The menu has Settings, Help and more.",
         "In this help, \"Settings > Models\" means: open Settings from the Dictum menu, then choose Models on the left.",
@@ -64,8 +69,10 @@ public static class HelpText
     public static readonly IReadOnlyList<string> Accuracy =
     [
         "Everyone's voice, accent and microphone are different, so a speech model hears some people better than others.",
-        "The speech model that comes with Dictum is a good place to start.",
-        "If words often come out wrong, choose a bigger speech model in Settings > Models. Bigger models are more accurate, but slower, and each one is a download you choose.",
+        // PROPOSED (21/10/2026, final round on the Simple view): the speech choices as the Simple view of Settings > Models names them.
+        "For English, the speech model that comes with Dictum is a good place to start: it is Standard in Settings > Models. For other languages, Standard is a multilingual model, a download you choose.",
+        "If words often come out wrong, open Settings > Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. " +
+        "To see every model by its name and size, choose Advanced at the top of that page.",
         "Not sure which one to choose? Open the Dictum menu and choose Calibrate my voice. You read ten short sentences aloud, and Dictum tells you which of the speech models on this PC hears you best.",
     ];
 
@@ -135,7 +142,9 @@ public static class HelpText
         new("Where are the model files, and how big are they?",
         [
             "Settings > Models shows the Model folder, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.",
-            "Bigger speech models and AI clean-up are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
+            // PROPOSED (21/10/2026, final round on the Simple view): names the choices as Settings > Models shows them.
+            "Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words when the text is English) are downloads you choose. " +
+            "If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
             "To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.",
         ]),
         new("How do I remove Dictum completely?",
@@ -158,7 +167,14 @@ public static class HelpText
             "The full guide is on the Dictum website at dictum.kynni.au/help. Choose Open the full guide at the top of this page.",
             "It opens in your web browser and needs the internet. Everything on this page works without the internet.",
         ]),
+        new(NameQuestion, [NameLine]),
     ];
+
+    /// <summary>PROPOSED (21/10/2026): the question that carries the approved name line.</summary>
+    public const string NameQuestion = "What does the name Dictum mean?";
+
+    /// <summary>APPROVED verbatim (owner, 21/10/2026 22:21 AEDT): do not reword.</summary>
+    public const string NameLine = "The name: a dictum is a saying, something stated. From the Latin dictum, “something said”.";
 
     /// <summary>Every sentence on the page, headings and button labels included: what the copy pins read.</summary>
     public static IEnumerable<string> AllText() =>

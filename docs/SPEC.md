@@ -1267,7 +1267,7 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
-  others, and what to do about it), then eleven questions and answers. All of it comes from
+  others, and what to do about it), then twelve questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
