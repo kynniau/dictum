@@ -339,7 +339,7 @@ public sealed partial class RuntimeResilienceTests
         using var models = new ModelManager(NullLog.Instance, loader: (p, s, d) =>
             s.Gpu == "cpu" ? throw new InvalidOperationException("out of memory") : onGpu = new FailingSpeechEngine(p, d), gpuInUse: () => true);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
-        Assert.True(await Eventually(() => models.LoadFailed));
+        Assert.True(await Eventually(() => models.LoadFailed && models.LastError is not null)); // the failure is recorded just after the load faults (ModelManager.Finished)
         Assert.True(onGpu!.Disposed, "the engine whose warm-up failed was left loaded");
         Assert.Equal("out of memory", models.LastError); // the CPU's own failure
         Assert.False(models.CpuMightHelp); // the CPU was tried for this failure: Try on the CPU would only repeat it
@@ -358,7 +358,7 @@ public sealed partial class RuntimeResilienceTests
             throw new InvalidOperationException("ggml_vulkan: device lost");
         }, gpuInUse: () => false);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
-        Assert.True(await Eventually(() => models.LoadFailed));
+        Assert.True(await Eventually(() => models.LoadFailed && models.LastError is not null)); // the failure is recorded just after the load faults (ModelManager.Finished)
         Assert.Equal(1, calls);
         Assert.Equal("ggml_vulkan: device lost", models.LastError);
         Assert.False(models.CpuMightHelp); // the model already ran on the CPU
@@ -366,7 +366,7 @@ public sealed partial class RuntimeResilienceTests
 
         using var onCpu = new ModelManager(NullLog.Instance, loader: (_, _, _) => throw new InvalidOperationException("bad file"), gpuInUse: () => true);
         onCpu.BeginLoad("ggml-small.en.bin", new WhisperSettings { Gpu = "cpu" }); // on the CPU inside a GPU runtime
-        Assert.True(await Eventually(() => onCpu.LoadFailed));
+        Assert.True(await Eventually(() => onCpu.LoadFailed && onCpu.LastError is not null)); // the failure is recorded just after the load faults (ModelManager.Finished)
         Assert.False(onCpu.CpuMightHelp); // whisper.gpu is cpu already
         Assert.True(onCpu.RestartForCpu); // only a restart loads the CPU runtime
     }
@@ -381,7 +381,7 @@ public sealed partial class RuntimeResilienceTests
             throw new Exception(WhisperNativeFailure);
         }, gpuInUse: () => true, visualCppRuntime: () => false);
         models.BeginLoad("ggml-small.en.bin", new WhisperSettings());
-        Assert.True(await Eventually(() => models.LoadFailed));
+        Assert.True(await Eventually(() => models.LoadFailed && models.LastError is not null)); // the failure is recorded just after the load faults (ModelManager.Finished)
         Assert.Equal(1, calls);
         Assert.Equal(ModelFailure.RuntimeMissing, models.LastError);
         Assert.False(models.CpuMightHelp);
