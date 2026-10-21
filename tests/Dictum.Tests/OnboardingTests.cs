@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Avalonia;
 using Dictum.App;
 using Dictum.Audio;
+using Dictum.Core;
 using Dictum.Hotkey;
 using Dictum.Llm;
 using Dictum.Settings;
@@ -434,8 +435,8 @@ public sealed class OnboardingTests
         platform.Devices.Clear();
         var captures = platform.Captures.Count; // the shell's own, made when it was built
         var (step, window, mic, _) = MicTest(scratch, shell, platform);
-        Assert.Equal(OnboardingText.NoMicrophone, step.Result);
-        Assert.Contains(OnboardingText.NoMicrophone, Visible(window));
+        Assert.Equal(NoSoundText.NoMicrophoneBalloon, step.Result);
+        Assert.Contains(NoSoundText.NoMicrophoneBalloon, Visible(window));
         Assert.Equal(captures, platform.Captures.Count);
         Assert.False(mic.Open);
         window.Close();
@@ -948,10 +949,26 @@ public sealed class OnboardingTests
         platform.ListDevicesThrows = true;
         var captures = platform.Captures.Count;
         var (step, window, mic, _) = MicTest(scratch, shell, platform);
-        Assert.Equal(OnboardingText.NoMicrophone, step.Result);
+        Assert.Equal(NoSoundText.NoMicrophoneBalloon, step.Result);
         Assert.Equal(captures, platform.Captures.Count);
         Assert.False(mic.Open);
         window.Close();
         shell.Dispose();
     });
+
+    /// <summary>
+    /// Pin (merge with PR #22): the onboarding's no-microphone sentence and digital-silence floor are now PR #22's own constants,
+    /// byte for byte what this lane shipped before the merge, so the words and the rule live in one place.
+    /// </summary>
+    [Fact]
+    public void The_no_microphone_sentence_and_the_floor_are_PR_22s_unchanged()
+    {
+        Assert.Equal("No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.", NoSoundText.NoMicrophoneBalloon);
+        Assert.Equal(1e-5f, CaptureBuffer.SoundFloor);
+        var check = new MicCheck(0.01);
+        Assert.Equal(MicResult.NothingHeard, check.Feed(CaptureBuffer.SoundFloor, MicCheck.NothingAfterMs)); // at the floor: silence
+        var sound = new MicCheck(0.01);
+        sound.Feed(CaptureBuffer.SoundFloor * 2, MicCheck.NothingAfterMs); // above the floor: not silence (and not heard)
+        Assert.Equal(MicResult.Listening, sound.Result);
+    }
 }

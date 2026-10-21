@@ -78,13 +78,6 @@ internal static class OnboardingText
     public const string NothingHeard =
         "Nothing heard. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.";
 
-    /// <summary>
-    /// merge: PR #22's NoSoundText.NoMicrophoneBalloon, word for word. When main has PR #22, this constant is replaced by a
-    /// reference to it (the orchestrator's "git merge origin/main" step), so the words live in one place.
-    /// </summary>
-    public const string NoMicrophone =
-        "No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.";
-
     /// <summary>The words Settings > Microphone uses when the device cannot be opened (MicrophonePage).</summary>
     public static string CouldNotOpen(string reason) => $"The microphone could not be opened: {reason}";
 

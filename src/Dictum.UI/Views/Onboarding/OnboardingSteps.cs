@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Threading;
 using Dictum.App;
 using Dictum.Audio;
+using Dictum.Core;
 using Dictum.Hotkey;
 using Dictum.Settings;
 using Dictum.Storage;
@@ -282,16 +283,13 @@ internal enum MicResult { Listening, Heard, NothingHeard }
 /// The microphone test's rule, apart from the window (lens on 6bacce9, 21/10/2026). "Heard you." needs about three seconds in
 /// all at or above <c>silence_threshold</c> (settings.json, 0.01 by default: below it a dictation is discarded as silence), so a
 /// microphone that delivers only background hiss is not "heard". "Nothing heard." is digital silence: five seconds in a row at
-/// or below <see cref="SoundFloor"/>, the "No sound from mic" rule (PR #22); a level between the two is neither. "Nothing
+/// or below <see cref="CaptureBuffer.SoundFloor"/>, the "No sound from mic" rule; a level between the two is neither. "Nothing
 /// heard." can still become "Heard you." while the test listens.
 /// </summary>
 internal sealed class MicCheck(double threshold)
 {
     public const long HeardAfterMs = 3000;
     public const long NothingAfterMs = 5000;
-
-    /// <summary>merge: PR #22's CaptureBuffer.SoundFloor (1e-5, -100 dBFS: below one 16-bit step), the "No sound from mic" floor.</summary>
-    public const float SoundFloor = 1e-5f;
 
     private long _loudMs;
     private long _silentMs;
@@ -301,7 +299,7 @@ internal sealed class MicCheck(double threshold)
     public MicResult Feed(float level, long elapsedMs)
     {
         if (level >= threshold) _loudMs += elapsedMs;
-        _silentMs = level > SoundFloor ? 0 : _silentMs + elapsedMs;
+        _silentMs = level > CaptureBuffer.SoundFloor ? 0 : _silentMs + elapsedMs;
         if (_loudMs >= HeardAfterMs) Result = MicResult.Heard;
         else if (Result != MicResult.Heard && _silentMs >= NothingAfterMs) Result = MicResult.NothingHeard;
         return Result;
@@ -412,7 +410,7 @@ internal sealed class MicrophoneStep : OnboardingStep
         {
             StopTest();
             _testAgain.IsVisible = false;
-            _result.Text = OnboardingText.NoMicrophone; // nothing to open
+            _result.Text = NoSoundText.NoMicrophoneBalloon; // nothing to open
             return;
         }
         StartTest();
@@ -433,7 +431,7 @@ internal sealed class MicrophoneStep : OnboardingStep
         catch (Exception ex)
         {
             (capture as IDisposable)?.Dispose();
-            _result.Text = Devices().Count == 0 ? OnboardingText.NoMicrophone : OnboardingText.CouldNotOpen(ex.Message);
+            _result.Text = Devices().Count == 0 ? NoSoundText.NoMicrophoneBalloon : OnboardingText.CouldNotOpen(ex.Message);
             _testAgain.IsVisible = true;
             return;
         }
