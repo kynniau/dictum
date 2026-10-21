@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -378,18 +379,8 @@ internal sealed class MicrophoneStep : OnboardingStep
     /// The microphones the system lists, or none when it cannot say (the audio service stopped: the Windows device list throws
     /// then; lens on 6bacce9). Logged, never fatal.
     /// </summary>
-    private IReadOnlyList<AudioDeviceInfo> Devices()
-    {
-        try
-        {
-            return Flow.Shell.Platform.ListCaptureDevices();
-        }
-        catch (Exception ex)
-        {
-            Flow.Shell.Log.Warn($"Onboarding microphone test: the microphones could not be listed: {ex.GetType().Name}: {ex.Message}");
-            return [];
-        }
-    }
+    private IReadOnlyList<AudioDeviceInfo> Devices() =>
+        MicrophoneChoices.List(Flow.Shell.Platform, why => Flow.Shell.Log.Warn($"Onboarding microphone test: {why}"));
 
     public override void Enter()
     {
@@ -424,7 +415,7 @@ internal sealed class MicrophoneStep : OnboardingStep
         catch (Exception ex)
         {
             (capture as IDisposable)?.Dispose();
-            _result.Text = Devices().Count == 0 ? NoSoundText.NoMicrophoneBalloon : OnboardingText.CouldNotOpen(ex.Message);
+            _result.Text = ex is NoMicrophoneException || Devices().Count == 0 ? NoSoundText.NoMicrophoneBalloon : OnboardingText.CouldNotOpen(ex.Message);
             _testAgain.IsVisible = true;
             return;
         }
@@ -511,11 +502,13 @@ internal sealed class TryItStep : OnboardingStep
 
     private readonly TextBlock _instruction = Ui.Text("");
     private readonly TextBox _box = new() { AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 90 };
+    private readonly TextBlock _status = Ui.Text(OnboardingText.TryLoading);
     private readonly TextBlock _explainer = Ui.Text(OnboardingText.AccentExplainer);
     private readonly TextBlock _nothing = Ui.Text(OnboardingText.NothingCame, "caption");
     private readonly DispatcherTimer _timer;
     private LastDictation? _before;
     private long? _readyAt;
+    private bool _waiting = true;
 
     public TryItStep(OnboardingFlow flow) : base(flow, OnboardingText.TryName, OnboardingText.TryHeading)
     {
@@ -526,7 +519,15 @@ internal sealed class TryItStep : OnboardingStep
         _explainer.IsVisible = false;
         _nothing.IsVisible = false;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
-        Content = Ui.Stack(12, _instruction, _box, _explainer, _nothing);
+        // While the model gets ready its status sits inside the practice box, over the empty box as a placeholder does (1.2
+        // polish, 22/10/2026: a status line over an empty box read as a box that does nothing). Not the box's own watermark: the
+        // theme's template draws that at half opacity, which a style cannot change, and this status is to be read (body text).
+        _status.IsHitTestVisible = false; // a click goes to the box under it
+        _status.Margin = new Thickness(16, 8); // clear of the caret at the box's first column (lens on 4abba54: it overdrew the "G")
+        _status.VerticalAlignment = VerticalAlignment.Top;
+        AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
+        _box.TextChanged += (_, _) => ShowStatus();
+        Content = Ui.Stack(12, _instruction, new Grid { Children = { _box, _status } }, _explainer, _nothing);
     }
 
     public override string PrimaryLabel => OnboardingText.Finish;
@@ -559,20 +560,34 @@ internal sealed class TryItStep : OnboardingStep
         var shell = Flow.Shell;
         var ready = Flow.TryItLive && shell.SpeechReady;
         if (ready && _readyAt is null) _readyAt = Flow.Clock();
-        _instruction.Text = ready || Succeeded ? OnboardingText.TryInstruction(HotkeyName(shell.Settings.Hotkey)) : OnboardingText.TryLoading;
+        var failedLoad = Flow.TryItLive && !shell.SpeechLoading && !shell.SpeechReady && shell.SpeechError is not null;
+        // The instruction names the key from the start (the one chosen on the hotkey step until the settings are loaded); the
+        // model's status is in the box until it is ready. A model that cannot load gets the try-later line instead.
+        _instruction.Text = OnboardingText.TryInstruction(HotkeyNames.Display(Flow.TryItLive ? shell.Settings.Hotkey : Flow.Hotkey));
+        _waiting = !ready && !Succeeded && !failedLoad;
         if (!Succeeded && Flow.TryItLive && !ReferenceEquals(shell.Personal.Last, _before) && shell.Personal.Last is not null)
         {
             Succeeded = true;
+            _waiting = false;
+            ShowStatus();
             _explainer.Text = Explainer(shell.Settings);
             _explainer.IsVisible = true;
             _nothing.IsVisible = false;
             RaiseButtonsChanged();
             return;
         }
+        ShowStatus();
         if (Succeeded) return;
-        var failedLoad = Flow.TryItLive && !shell.SpeechLoading && !shell.SpeechReady && shell.SpeechError is not null;
         if (failedLoad || _readyAt is long at && Flow.Clock() - at >= NothingAfterMs) _nothing.IsVisible = true;
     }
+
+    /// <summary>The status over the practice box: shown while the model gets ready and the box is empty.</summary>
+    private void ShowStatus() => _status.IsVisible = _waiting && string.IsNullOrEmpty(_box.Text);
+
+    /// <summary>What the empty practice box shows: the model's status while it gets ready, else null (tests).</summary>
+    internal string? Placeholder => _status.IsVisible ? _status.Text : null;
+
+    internal TextBlock StatusText => _status;
 
     /// <summary>The Standard model's explainer only when the model in use is the Standard choice for its language; else "the model you chose".</summary>
     internal string Explainer(AppSettings s) =>
@@ -583,7 +598,6 @@ internal sealed class TryItStep : OnboardingStep
     /// <summary>The practice box: a hotkey held without clicking first pastes there, not into a button (lens on 6bacce9).</summary>
     public override Control? InitialFocus(Button primary) => _box;
 
-    private static string HotkeyName(string hotkey) => HotkeyParser.TryParse(hotkey, out var spec, out _) ? spec.Display : hotkey;
 
     public override bool Secondary()
     {

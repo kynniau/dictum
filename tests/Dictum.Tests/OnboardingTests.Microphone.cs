@@ -346,6 +346,6 @@ public sealed partial class OnboardingTests
         Assert.Equal(["System default", "Headset", "Laptop mic (default)", "USB mic (not connected)"], labels);
         var (none, plain) = MicrophoneChoices.Build([], null);
         Assert.Equal([null], none);
-        Assert.Equal(["System default"], plain);
+        Assert.Equal(["No microphone found"], plain); // none listed: the first entry says so (1.2 polish), the same id (the system default)
     }
 }

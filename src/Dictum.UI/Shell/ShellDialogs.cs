@@ -143,7 +143,19 @@ public sealed class ShellDialogs : IShellDialogs
     });
 
     /// <summary>
-    /// Runs a system chooser on the UI thread, starting in <paramref name="initialDir"/> when it exists. A tray app has no window
+    /// Where a chooser starts: <paramref name="dir"/>, or the nearest folder above it that exists (1.2 polish, 22/10/2026: the
+    /// default model folder is made only by a download (ModelDownloader), and the demo PC had downloaded nothing (its log), so
+    /// the chooser opened in Documents); null when none of it exists (the system's own choice).
+    /// </summary>
+    internal static string? StartFolder(string dir, Func<string, bool> exists)
+    {
+        for (var path = dir; !string.IsNullOrEmpty(path); path = Path.GetDirectoryName(path))
+            if (exists(path)) return path;
+        return null;
+    }
+
+    /// <summary>
+    /// Runs a system chooser on the UI thread, starting in <paramref name="initialDir"/>, or the nearest folder above it that exists. A tray app has no window
     /// to own it, so a window that is never shown lends its handle.
     /// </summary>
     private static string? WithStorage(string initialDir, Func<IStorageProvider, IStorageFolder?, string?> choose) => Modal.OnUi(() =>
@@ -152,7 +164,7 @@ public sealed class ShellDialogs : IShellDialogs
         try
         {
             var storage = owner.StorageProvider;
-            var start = Directory.Exists(initialDir) ? Modal.Wait(storage.TryGetFolderFromPathAsync(initialDir)) : null;
+            var start = StartFolder(initialDir, Directory.Exists) is { } dir ? Modal.Wait(storage.TryGetFolderFromPathAsync(dir)) : null;
             return choose(storage, start);
         }
         finally

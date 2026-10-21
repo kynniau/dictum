@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Dictum.Audio;
 using Dictum.Calibration;
+using Dictum.Core;
 using Dictum.Hotkey;
 using Dictum.UI.Shell;
 
@@ -26,6 +27,18 @@ internal sealed partial class CalibrationWindow : Window
 {
     public const string Framing = "Calibration measures which installed model hears you best and suggests words for your dictionary. It does not train or change the model.";
 
+    /// <summary>
+    /// Where the recordings are, without the path (PROPOSED, 1.2 polish, 22/10/2026). The folder is Dictum's own
+    /// (AppPaths.CalibrationDir), not one the user chose, and Settings > Storage lists it under "Models, logs, calibration recordings".
+    /// </summary>
+    public const string RecordingsNote = "Nothing is uploaded: the recordings stay in Dictum's folder on this PC (Settings > Storage lists it), so the test can be re-run when you add a model.";
+
+    /// <summary>The button beside <see cref="RecordingsNote"/> (PROPOSED, 1.2 polish).</summary>
+    public const string OpenRecordingsLabel = "Open the recordings folder";
+
+    /// <summary>Said when the recordings folder could not be opened; the reason, with the path, goes to the log (PROPOSED, lens on 4abba54).</summary>
+    public const string OpenRecordingsFailed = "The recordings folder could not be opened.";
+
     private readonly AppShell _shell;
     private readonly CalibrationHost _host;
     private readonly CalibrationRecordings _recordings;
@@ -34,7 +47,7 @@ internal sealed partial class CalibrationWindow : Window
     private readonly TextBlock _counter = Ui.Text("", "caption");
     private readonly StackPanel _dots = new() { Orientation = Orientation.Horizontal, Spacing = 4 };
     private readonly TextBlock _sentence = new() { FontSize = 22, LineHeight = 30, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _takeStatus = Ui.Text("", "caption");
+    private readonly TextBlock _takeStatus = Ui.Text(""); // body size, under Record: what happened to the take, and why one failed (1.2 polish)
     private readonly Button _record;
     private readonly Button _skip;
     private readonly TextBlock _holdHint = Ui.Text("", "caption");
@@ -59,9 +72,9 @@ internal sealed partial class CalibrationWindow : Window
         MinWidth = 640;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        _record = Ui.Button("Record", "danger", () => Toggle(), Failed);
+        _record = Ui.Button("Record", "danger", () => Toggle(), TakeFailed);
         _record.MinHeight = 44;
-        _skip = Ui.Button("Skip", "secondary", () => MoveNext(), Failed);
+        _skip = Ui.Button("Skip", "secondary", () => MoveNext(), TakeFailed);
         _skip.MinHeight = 44;
         _run = Ui.Button("Run test", "primary", () => _ = RunAsync(_host.InstalledModels()), Failed);
         _cancel = Ui.Button("Cancel test", "secondary", () => _runCts?.Cancel(), Failed);
@@ -69,7 +82,10 @@ internal sealed partial class CalibrationWindow : Window
         AutomationProperties.SetLiveSetting(_progress, AutomationLiveSetting.Polite);
         AutomationProperties.SetLiveSetting(_takeStatus, AutomationLiveSetting.Polite);
 
-        var framing = Ui.Card(Ui.Text($"{Framing} Nothing is uploaded: recordings stay in {_recordings.Directory} so the test can be re-run when you add a model."));
+        // No folder path on screen (1.2 polish, 22/10/2026): a path names the Windows user, and a screenshot of this window
+        // would carry it. The button opens the folder instead; Settings > Storage lists it with the rest.
+        var openRecordings = Ui.Button(OpenRecordingsLabel, "secondary", OpenRecordings, Failed);
+        var framing = Ui.Card(Ui.Stack(10, Ui.Text($"{Framing} {RecordingsNote}"), Ui.Row(8, openRecordings)));
         var counterRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         Grid.SetColumn(_dots, 1);
         counterRow.Children.AddRange([_counter, _dots]);
@@ -144,7 +160,7 @@ internal sealed partial class CalibrationWindow : Window
         }
         catch (Exception ex)
         {
-            Failed(ex);
+            TakeFailed(ex);
         }
     }
 
@@ -227,7 +243,7 @@ internal sealed partial class CalibrationWindow : Window
             _record.IsEnabled = _session.CanRecord(_current);
             _skip.IsEnabled = !recording;
         }
-        _holdHint.Text = HotkeyParser.TryParse(_host.Settings().Hotkey, out var spec, out _) ? $"or hold {spec.Display}" : "";
+        _holdHint.Text = HotkeyParser.TryParse(_host.Settings().Hotkey, out var spec, out _) ? $"or hold {HotkeyNames.Display(spec)}" : "";
         var stale = _recordings.StaleTakes();
         _dots.Children.Clear();
         for (var i = 1; i <= Count; i++)
@@ -255,12 +271,43 @@ internal sealed partial class CalibrationWindow : Window
         _progress.Text = $"Deleted {deleted} recording(s).";
     }
 
+    /// <summary>A failure of Run test, Delete recordings, Save or the folder button: said under Run test, where the results are.</summary>
     private void Failed(Exception ex)
+    {
+        Recover(ex);
+        _progress.Text = FailureText(ex);
+    }
+
+    /// <summary>
+    /// A take that failed to start, stop or save (Record, Skip or the hotkey): said under Record in the body text size, where
+    /// the person is looking, not in the results' small print (1.2 polish, 22/10/2026).
+    /// </summary>
+    private void TakeFailed(Exception ex)
+    {
+        Recover(ex);
+        _takeStatus.Text = FailureText(ex);
+    }
+
+    private void Recover(Exception ex)
     {
         _host.Log.Error($"Calibration window: {ex.GetType().Name}: {ex.Message}");
         if (_session.Recording != 0) AbandonTake("Not saved: record it again.");
         else RefreshTake(); // a take that failed to start or to save leaves the controls as they were
-        _progress.Text = $"That did not work: {ex.Message}";
+    }
+
+    /// <summary>No microphone: the one no-microphone sentence on its own (<see cref="NoSoundText.NoMicrophoneBalloon"/>); anything else: "That did not work: …".</summary>
+    internal static string FailureText(Exception ex) => ex is NoMicrophoneException ? NoSoundText.NoMicrophoneBalloon : $"That did not work: {ex.Message}";
+
+    /// <summary>
+    /// Opens the recordings folder in the system's file manager (OpenPath makes it first, so it opens before the first recording).
+    /// A failure is logged with OpenPath's reason, which names the path, and said on screen without it (lens on 4abba54: the
+    /// window shows no path, so the Windows account name stays off screen in a screenshot).
+    /// </summary>
+    private void OpenRecordings()
+    {
+        if (_shell.OpenPath(_shell.RealPath(_recordings.Directory), folder: true) is not { } why) return;
+        _host.Log.Warn($"Calibration window: the recordings folder could not be opened: {why}");
+        _progress.Text = OpenRecordingsFailed;
     }
 
     private void WriteGrammar(bool on)

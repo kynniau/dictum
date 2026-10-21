@@ -80,6 +80,15 @@ public static class HelpText
 
     public const string QuestionsHeading = "Questions and answers";
 
+    /// <summary>
+    /// The list at the top of the page, each question a link to its answer (PROPOSED, 1.2 polish, 22/10/2026). The questions are
+    /// <see cref="Questions"/> themselves: the list holds no words of its own but this heading and the links' screen-reader hint.
+    /// </summary>
+    public const string IndexHeading = "Questions on this page";
+
+    /// <summary>What a screen reader says with each link in the list (PROPOSED, 1.2 polish).</summary>
+    public const string IndexLinkHelp = "Moves to the answer, further down this page.";
+
     /// <summary>PROPOSED (21/10/2026): the 1.1.2 note's sentence on the start-up crash, word for word (docs/STORE.md). The one place the Help describes it.</summary>
     public const string CrashFixLine = "Dictum 1.1.2 fixes a start-up crash on PCs without a working Vulkan graphics driver (the app closed before its tray icon appeared; it now runs the speech model on the CPU there).";
 
@@ -181,7 +190,7 @@ public static class HelpText
     /// <summary>Every sentence on the page, headings and button labels included: what the copy pins read.</summary>
     public static IEnumerable<string> AllText() =>
     [
-        PageTitle, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton, FeedbackNote, FeedbackButton,
+        PageTitle, IndexHeading, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton, FeedbackNote, FeedbackButton,
         HowItWorksHeading, .. HowItWorks, AccuracyHeading, .. Accuracy,
         QuestionsHeading, .. Questions.SelectMany(q => (IEnumerable<string>)[q.Question, .. q.Answer]),
     ];

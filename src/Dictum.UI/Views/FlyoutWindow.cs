@@ -55,6 +55,7 @@ internal sealed class FlyoutWindow : Window
     private List<string?> _micIds = [];
     private Dictionary<string, string>? _speechPlain; // Simple view: each listed model's tier name; null in Advanced
     private bool _refreshing;
+    private bool _listFailureLogged;
 
     public FlyoutWindow(AppShell shell)
     {
@@ -213,8 +214,10 @@ internal sealed class FlyoutWindow : Window
             var s = _shell.Settings;
             var status = _shell.Status;
             _models.Text = status.Models;
-            _problem.Text = status.Problem ?? "";
-            _problemBox.IsVisible = status.Problem is not null;
+            var devices = Microphones();
+            var problem = WithNoMicrophone(status.Problem, devices.Count == 0);
+            _problem.Text = problem ?? "";
+            _problemBox.IsVisible = problem is not null;
             _tryCpu.IsVisible = status.TryCpu;
             _state.Text = status.State;
             _dot[!Shape.FillProperty] = new DynamicResourceExtension(status.Tone switch
@@ -235,11 +238,12 @@ internal sealed class FlyoutWindow : Window
             _mode.Select(preset switch { ModePreset.Light => 0, ModePreset.Full => 1, _ => -1 });
             var full = ModePresets.For(ModePreset.Full, _shell.GpuMachine);
             _modeHint.Text = (preset == ModePreset.Custom ? "Custom: your settings match neither preset. " : "") +
-                             $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.";
+                             ((s.Ui.IsSimple ? SimpleView.ModeHint(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) : null) // the Simple names where true (1.2 polish)
+                                 ?? $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.");
 
             FillSpeech(s);
             FillCleanup(s);
-            FillMicrophones(s);
+            FillMicrophones(s, devices);
             _indicator.Select(Math.Max(0, Array.IndexOf(IndicatorSettings.Modes, s.Indicator.Mode)));
             Ui.SetQuietly(_profanity, s.Profanity.Mode != ProfanitySettings.Off);
             Ui.SetQuietly(_grammar, s.Llm.GrammarAssist);
@@ -378,11 +382,28 @@ internal sealed class FlyoutWindow : Window
         Fill(_cleanup, names, labels, current);
     }
 
-    private void FillMicrophones(AppSettings s)
+    private void FillMicrophones(AppSettings s, IReadOnlyList<Dictum.Audio.AudioDeviceInfo> devices)
     {
-        (_micIds, var labels) = MicrophoneChoices.Build(_shell.Platform.ListCaptureDevices(), s.Audio.Device);
+        (_micIds, var labels) = MicrophoneChoices.Build(devices, s.Audio.Device);
         SetItems(_mic, labels, Math.Max(0, _micIds.IndexOf(s.Audio.Device))); // a progress tick leaves an open list alone (lens, 19/10/2026)
     }
+
+    /// <summary>
+    /// The microphones the system lists, read once per refresh for the picker and the problem line; none when it cannot say
+    /// (the audio service stopped: the Windows list throws then), as the welcome window's microphone test treats it.
+    /// </summary>
+    private IReadOnlyList<Dictum.Audio.AudioDeviceInfo> Microphones() => MicrophoneChoices.List(_shell.Platform, why =>
+    {
+        if (!_listFailureLogged) _shell.Log.Warn($"Tray panel: {why}");
+        _listFailureLogged = true; // once per panel: a download refreshes it many times a second
+    });
+
+    /// <summary>
+    /// The problem line, with the no-microphone sentence (<see cref="Dictum.Core.NoSoundText.NoMicrophoneBalloon"/>, PR #22's
+    /// own) under it while the system lists no microphone (1.2 polish, 22/10/2026: the panel said only "Ready").
+    /// </summary>
+    internal static string? WithNoMicrophone(string? problem, bool none) =>
+        !none ? problem : problem is null ? Dictum.Core.NoSoundText.NoMicrophoneBalloon : $"{problem}\n{Dictum.Core.NoSoundText.NoMicrophoneBalloon}";
 
     private void OnSpeechPicked()
     {

@@ -25,3 +25,10 @@ public static class NoSoundText
 
     public static string Balloon(NoSoundCause cause) => cause == NoSoundCause.NoMicrophone ? NoMicrophoneBalloon : SilentBalloon;
 }
+
+/// <summary>
+/// The platform has no microphone to open (Windows: no default capture device). Its message is the one no-microphone sentence,
+/// <see cref="NoSoundText.NoMicrophoneBalloon"/>, so the welcome window's microphone test, calibration and every other window that
+/// shows a capture failure say the same words (1.2 polish, 22/10/2026: calibration showed the WASAPI layer's own sentence).
+/// </summary>
+public sealed class NoMicrophoneException() : InvalidOperationException(NoSoundText.NoMicrophoneBalloon);
