@@ -104,8 +104,11 @@ try {
         $last = "c$i"
         foreach ($click in @($step.clicks)) {
             if (-not $click -or $null -eq $click.x) { continue }
-            $until = if ($click.kind -eq "point") { $to } else { [math]::Min($to, (VideoTime ([double]$click.epoch + 1.4))) }
-            $highlights += [pscustomobject]@{ Click = $click; From = (VideoTime ([double]$click.epoch - 1.0)); To = $until }
+            # A click's ring ends 0.3 s after the click: the click often closes the element's window or scrolls the page, and a
+            # ring left there circles unrelated content (lens on 7900e49). steps.json does not say when a window went, so the
+            # short fixed tail stands in for it. A "point" ring lasts until the next step's caption starts, never into it.
+            $until = if ($click.kind -eq "point") { $to } else { [math]::Min($to, (VideoTime ([double]$click.epoch + 0.3))) }
+            $highlights += [pscustomobject]@{ Click = $click; From = [math]::Max($from, (VideoTime ([double]$click.epoch - 1.0))); To = $until }
         }
     }
 
