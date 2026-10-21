@@ -19,7 +19,7 @@ namespace Dictum.UI.Views;
 /// The tray panel (docs/design/Flyout.dc.html), opened by a click on the tray icon and closed by another click, Esc, or
 /// focus moving elsewhere: status and the on/off switch, any model problem (with Try on the CPU and Open log folder),
 /// Light/Full, the two model pickers, the microphone with its meter,
-/// the indicator and the three toggles, four actions, the privacy line and Quit. Opened on purpose, so it takes focus.
+/// the indicator and the three toggles, six actions, the privacy line and Quit. Opened on purpose, so it takes focus.
 /// </summary>
 internal sealed class FlyoutWindow : Window
 {

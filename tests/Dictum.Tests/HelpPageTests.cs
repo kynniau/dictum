@@ -124,7 +124,7 @@ public class HelpPageTests
         var pages = File.ReadAllText(Path.Combine(root, "src", "Dictum.UI", "Views", "Settings", "OtherPages.cs"));
         var helpPage = pages[pages.IndexOf("internal sealed class HelpPage", StringComparison.Ordinal)..];
         foreach (var source in new[] { copy, helpPage })
-            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Download|CheckForUpdates|ReportProblem|Shell\.Models"), source);
+            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute|Download|CheckForUpdates|ReportProblem|Shell\.Models"), source);
         return true;
     });
 
