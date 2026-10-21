@@ -165,4 +165,21 @@ public sealed partial class OnboardingTests
         window.Close();
         shell.Dispose();
     });
+
+    /// <summary>
+    /// Pin (item 6): when the platform cannot open a microphone because there is none (the Windows capture's no-device failure)
+    /// the test says the one no-microphone sentence, as calibration does, even while the list still names a device.
+    /// </summary>
+    [Fact]
+    public Task A_capture_with_no_microphone_says_the_one_sentence() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        Assert.NotEmpty(platform.Devices);
+        var (step, window, _, _) = MicTest(scratch, shell, platform, new LevelCapture { Refuse = new Dictum.Core.NoMicrophoneException() });
+        Assert.Equal(Dictum.Core.NoSoundText.NoMicrophoneBalloon, step.Result);
+        window.Close();
+        shell.Dispose();
+    });
 }
