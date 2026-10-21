@@ -118,8 +118,7 @@ internal sealed class FlyoutWindow : Window
             Wide(Ui.Button("Dictionary", "secondary", shell.OpenAddWord)),
             Wide(Ui.Button("Snippets", "secondary", shell.OpenAddSnippet)),
             Wide(Ui.Button("Fix last dictation", "secondary", () => shell.OpenFixLast())),
-            settings);
-        Grid.SetColumnSpan(settings, 2); // the odd one out takes the whole last row
+            settings, Wide(Ui.Button("Help", "secondary", () => shell.OpenSettings("Help")))); // six buttons: three full rows
 
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         footer.Children.Add(Ui.Row(6, _lock, _privacy));
