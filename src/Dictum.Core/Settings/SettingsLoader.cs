@@ -104,6 +104,7 @@ public static class SettingsLoader
             Indicator = BindIndicator(r.Child("indicator")),
             Sounds = BindSounds(r.Child("sounds")),
             Profanity = BindProfanity(r.Child("profanity")),
+            Ui = BindUi(r.Child("ui")),
             FixHotkey = r.NullableString("fix_hotkey", v => HotkeyParser.TryParse(v, out _, out var e) ? null : e),
             LogLevel = r.String("log_level", d.LogLevel, OneOf("debug", "info", "warning", "error")).ToLowerInvariant(),
             LogTranscripts = r.Bool("log_transcripts", d.LogTranscripts),
@@ -147,6 +148,15 @@ public static class SettingsLoader
         {
             Mode = r.String("mode", ProfanitySettings.Off, OneOf(ProfanitySettings.Off, ProfanitySettings.Mask, ProfanitySettings.Remove)).ToLowerInvariant(),
         };
+        r.WarnUnknown();
+        return s;
+    }
+
+    private static UiSettings BindUi(ObjectReader? r)
+    {
+        var d = new UiSettings();
+        if (r is null) return d;
+        var s = new UiSettings { View = r.String("view", d.View, OneOf(UiSettings.Views)).ToLowerInvariant() };
         r.WarnUnknown();
         return s;
     }
@@ -225,7 +235,7 @@ public static class SettingsLoader
         if (r is null) return d;
         var s = new LlmSettings
         {
-            Provider = r.String("provider", d.Provider, OneOf(LlmSettings.Local, LlmSettings.Anthropic, LlmSettings.OpenAiCompatible, LlmSettings.NoProvider)).ToLowerInvariant(),
+            Provider = r.String("provider", d.Provider, OneOf(LlmSettings.Local, LlmSettings.Anthropic, LlmSettings.OpenAiCompatible, LlmSettings.NoProvider, LlmSettings.Off)).ToLowerInvariant(),
             Model = r.String("model", d.Model, v => string.IsNullOrWhiteSpace(v) ? "expected a model id" : null),
             BaseUrl = r.NullableString("base_url", BaseUrlProblem),
             TimeoutMs = r.Int("timeout_ms", d.TimeoutMs, 1000, 120000),

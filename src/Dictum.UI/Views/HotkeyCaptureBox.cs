@@ -129,7 +129,7 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
 
     private void Render()
     {
-        _key.Text = _spec?.Display ?? (Hotkey.Length > 0 ? Hotkey : "None");
+        _key.Text = _spec is not null ? HotkeyNames.Display(_spec) : Hotkey.Length > 0 ? Hotkey : "None";
         _received.Text = _monitor is null ? "Not listening. Press Change… to try a key."
             : _capture.LastReceived is { } last ? $"Windows received: {last}"
             : _prompt;

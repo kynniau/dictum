@@ -848,9 +848,18 @@ h1 {
   color: var(--text-3);
 }
 
+.status-done {
+  background: rgba(48, 164, 108, 0.18);
+  color: #1B6E46;
+}
+
 @media (prefers-color-scheme: dark) {
   .status-testing {
     color: #FFC96B;
+  }
+
+  .status-done {
+    color: #7EE0AE;
   }
 }
 
@@ -942,13 +951,13 @@ h1 {
   margin-top: 24px;
 }
 
-.faq details {
+.faq > details {
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
 }
 
-.faq summary {
+.faq > details > summary {
   position: relative;
   padding: 16px 52px 16px 20px;
   border-radius: var(--radius-card);
@@ -959,11 +968,11 @@ h1 {
   cursor: pointer;
 }
 
-.faq summary::-webkit-details-marker {
+.faq > details > summary::-webkit-details-marker {
   display: none;
 }
 
-.faq summary::after {
+.faq > details > summary::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -976,7 +985,7 @@ h1 {
   transition: transform var(--fade);
 }
 
-.faq details[open] summary::after {
+.faq > details[open] > summary::after {
   transform: translateY(-30%) rotate(225deg);
 }
 
@@ -1126,6 +1135,308 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* Infographic: inline SVG, coloured by the same tokens, so it follows light and dark. A wide version from a 1000 px viewport (badge text measured 14.4 px there), a tall one below. */
+
+.infographic {
+  margin-top: 28px;
+}
+
+.ig {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ig-wide {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  .ig-wide {
+    display: block;
+  }
+
+  .ig-narrow {
+    display: none;
+  }
+}
+
+.ig-narrow {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.infographic-steps .ig {
+  max-width: 360px;
+}
+
+.ig text {
+  font-family: var(--font-display);
+}
+
+.ig-panel {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.ig-accent {
+  fill: var(--accent);
+}
+
+.ig-bar {
+  fill: var(--accent);
+  opacity: 0.55;
+}
+
+.ig-num {
+  fill: var(--on-accent);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ig-title {
+  fill: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.ig-sub {
+  fill: var(--text-2);
+  font-size: 16px;
+}
+
+.ig-key {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+
+.ig-keytext {
+  fill: var(--text);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.ig-doc {
+  fill: var(--bg);
+  stroke: var(--border-strong);
+}
+
+.ig-typed {
+  fill: var(--text);
+  font-size: 18px;
+}
+
+.ig-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ig-badge {
+  fill: var(--accent-soft);
+}
+
+.ig-badge-text {
+  fill: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ig-tick {
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Help guide page (help.html): the privacy page's reading column, a little larger for easy reading. */
+
+.guide {
+  font-size: 1.0625rem;
+}
+
+.guide > section {
+  scroll-margin-top: 16px;
+}
+
+.guide > .card {
+  margin-top: 28px;
+}
+
+.guide .card h2 {
+  font-size: 1.25rem;
+}
+
+.guide .card > :first-child {
+  margin-top: 0;
+}
+
+.guide .card h3 {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  overflow-wrap: normal;
+}
+
+.toc ol {
+  margin-top: 8px;
+}
+
+@media (min-width: 640px) {
+  .toc ol {
+    columns: 2;
+    column-gap: 32px;
+  }
+}
+
+.toc li {
+  break-inside: avoid;
+}
+
+.toc li + li {
+  margin-top: 0;
+  padding-top: 6px;
+}
+
+.toc a {
+  display: inline-block;
+  padding: 4px 0;
+}
+
+.guide-steps > li {
+  padding-left: 4px;
+}
+
+.guide-steps > li + li {
+  margin-top: 20px;
+}
+
+.guide-steps h3 {
+  margin-top: 0;
+}
+
+.guide-steps ol,
+.guide-steps ul {
+  margin-top: 8px;
+}
+
+.callout {
+  border-left: 4px solid var(--accent);
+}
+
+.guide blockquote {
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--border-strong);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.guide blockquote.card {
+  border-left: 4px solid var(--accent);
+  background: var(--surface);
+}
+
+.guide blockquote p {
+  margin-top: 0;
+  color: var(--text);
+}
+
+/* Demos (help.html): a still poster with a Play button; the GIF loads and plays only when the person opens it. No script.
+   The button sits at the top: the bottom of each poster is the demo's own caption band. */
+
+.demo-figure {
+  margin-top: 20px;
+}
+
+.demo-play summary {
+  position: relative;
+  display: block;
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--radius-card);
+}
+
+.demo-play summary::-webkit-details-marker {
+  display: none;
+}
+
+.demo-play img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1600 / 1116;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.demo-play-label {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.demo-play-label::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 12px solid currentColor;
+}
+
+.demo-when-open {
+  display: none;
+}
+
+.demo-play[open] .demo-poster {
+  display: none;
+}
+
+.demo-play[open] .demo-play-label {
+  position: static;
+  margin-bottom: 10px;
+  box-shadow: none;
+}
+
+.demo-play[open] .demo-play-label::before {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  background: currentColor;
+}
+
+.demo-play[open] .demo-when-closed {
+  display: none;
+}
+
+.demo-play[open] .demo-when-open {
+  display: inline;
+}
+
+.demo-figure figcaption {
+  margin-top: 10px;
+  color: var(--text-2);
+  font-size: 0.9375rem;
+}
+
 /* Motion: the red dot breathes, everything else is a 150 ms fade; both off under reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -1138,7 +1449,7 @@ h1 {
 
   a,
   .btn,
-  .faq summary::after {
+  .faq > details > summary::after {
     transition: none;
   }
 }

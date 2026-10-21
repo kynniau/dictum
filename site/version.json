@@ -1,1 +1,1 @@
-{"version":"1.1.2","notes":"Fixes Dictum closing straight away on PCs without a working graphics driver, such as virtual desktops.","published":"2026-10-21"}
+{"version":"1.2.0","notes":"Adds a Welcome window with a microphone test, a Simple view with plain model choices, a Help page in Settings, and feedback buttons.","published":"2026-10-22"}

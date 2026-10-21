@@ -98,7 +98,7 @@ try {
     $mp4 = Join-Path $Out "$name.mp4"
     Invoke-Ffmpeg $Ffmpeg @("-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", "parts.txt", "-c", "copy", "-movflags", "+faststart", $mp4) $work
     $gif = Join-Path $Out "$name.gif"
-    New-DemoGif $Ffmpeg $mp4 $gif $GifWidth $GifFps $MaxGifMB $work
+    New-DemoGif $Ffmpeg $mp4 $gif $GifWidth $GifFps $MaxGifMB $work -FullPalette # stills: keep each slide's colours
     $poster = Join-Path $Out "$name-poster.png"
     $posterFrame = Get-ChildItem -LiteralPath $frames -Filter "*.png" | Sort-Object Name | Select-Object -Last 1
     Copy-Item -LiteralPath $posterFrame.FullName -Destination $poster -Force

@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Dictum.Help;
 using Dictum.Llm;
 using Dictum.Settings;
@@ -349,13 +350,54 @@ internal sealed class HelpPage : SettingsPage
         AutomationProperties.SetHelpText(guide, HelpText.GuideNote); // a screen reader says it with the button
         AutomationProperties.SetHelpText(support, HelpText.SupportNote);
         AutomationProperties.SetHelpText(feedback, HelpText.FeedbackNote);
+        var answers = HelpText.Questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)])).ToList();
+        // The questions first, each a link to its answer (1.2 polish, 22/10/2026: one long page with no list of what it answers).
+        var index = Section(HelpText.IndexHeading, [.. HelpText.Questions.Select((q, i) => JumpLink(q.Question, answers[i]))]);
         Compose(
+            index,
             Section(HelpText.MoreHelpHeading, Paragraph(HelpText.GuideNote), Ui.Row(8, guide), Paragraph(HelpText.SupportNote), Paragraph(HelpText.FeedbackNote), Ui.Row(8, support, feedback)),
             Section(HelpText.HowItWorksHeading,
                 Readable(HelpText.HowItWorksHeading, null, [.. HelpText.HowItWorks.Select(Paragraph)]),
                 Readable(HelpText.AccuracyHeading, Heading(HelpText.AccuracyHeading, 3, 15), [.. HelpText.Accuracy.Select(Paragraph)])),
-            Section(HelpText.QuestionsHeading, [.. HelpText.Questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)]))]));
+            Section(HelpText.QuestionsHeading, [.. answers]));
         if (Content is Panel { Children: [TextBlock title, ..] }) AutomationProperties.SetHeadingLevel(title, 1); // the page title Compose put first
+    }
+
+    /// <summary>
+    /// A question in the list at the top: a link button (a tab stop with the theme's focus ring) whose label wraps, so a long
+    /// question stays inside a narrow window. Pressing it moves keyboard focus to the answer, which, as with Tab, shows its ring,
+    /// and scrolls the page so the answer's heading is at the top (<see cref="ScrollToTop"/>).
+    /// </summary>
+    private static Button JumpLink(string question, Border answer)
+    {
+        var link = Ui.Button("", "link", () =>
+        {
+            answer.Focus(NavigationMethod.Tab);
+            ScrollToTop(answer);
+        });
+        link.Content = new TextBlock { Text = question, TextWrapping = TextWrapping.Wrap, FontSize = 14 };
+        link.HorizontalContentAlignment = HorizontalAlignment.Left;
+        link.HorizontalAlignment = HorizontalAlignment.Left;
+        AutomationProperties.SetName(link, question);
+        AutomationProperties.SetHelpText(link, HelpText.IndexLinkHelp);
+        return link;
+    }
+
+    /// <summary>Space left above an answer scrolled to the top, so its focus ring is not on the window's edge.</summary>
+    internal const double JumpGap = 8;
+
+    /// <summary>
+    /// Scrolls the page so <paramref name="answer"/> starts <see cref="JumpGap"/> below the top of the view (as far as the page
+    /// goes: the last answers stop where the page ends). Focus alone scrolled only as far as needed, which left the answer at
+    /// the bottom edge with its last line cut off (1.2 polish round 2).
+    /// </summary>
+    private static void ScrollToTop(Control answer)
+    {
+        // Measured against the scrolled content, not the view: focus has already moved the offset, and the view's coordinates
+        // follow it only at the next layout pass.
+        if (answer.FindAncestorOfType<ScrollViewer>() is not { Content: Visual content } scroll || answer.TranslatePoint(default, content) is not { } at) return;
+        var max = Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height);
+        scroll.Offset = new Vector(scroll.Offset.X, Math.Clamp(at.Y - JumpGap, 0, max));
     }
 
     /// <summary>Nothing on the page depends on the settings.</summary>

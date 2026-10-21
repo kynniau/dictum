@@ -1,12 +1,22 @@
 {
   "name": "test-setup",
   "title": "Calibrate my voice",
-  "summary": "Today's build calls this Calibrate my voice (the 1.2 build is to rename it Test my setup). The sandbox has no microphone, so no sentence can be recorded there.",
+  "summary": "The 1.2 build keeps the name Calibrate my voice (the tray panel, Settings > Models, the welcome's Try it step and Help all use it). The sandbox has no microphone, so Record is off and the no-microphone sentence stands under it; no sentence can be recorded there.",
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "installSilently" },
     { "do": "launch" },
-    { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 120 } },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Use this hotkey" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Finish", "timeout": 60 } },
     { "do": "wait", "seconds": 10 }
   ],
   "steps": [
@@ -30,19 +40,24 @@
       "id": "sentence",
       "caption": "Dictum shows a sentence to read aloud.",
       "do": [ { "do": "point", "target": { "window": "calibrate my voice$", "type": "Text", "name": "Sentence 1", "match": "prefix", "timeout": 30 } } ],
-      "after": 2.5
+      "after": 2.5,
+      "poster": true
     },
     {
       "id": "record",
-      "caption": "Click Record, then read the sentence in your normal voice.",
-      "do": [ { "do": "click", "target": { "window": "calibrate my voice$", "type": "Button", "name": "Record sentence", "match": "prefix" } } ],
-      "after": 4
+      "caption": "With a microphone, you would click Record and read the sentence aloud.",
+      "do": [ { "do": "point", "target": { "window": "calibrate my voice$", "type": "Button", "name": "Record sentence", "match": "prefix" } } ],
+      "after": 2.5
     },
     {
       "id": "result",
-      "caption": "This test PC has no microphone, so Dictum says so here.",
-      "poster": true,
-      "do": [ { "do": "point", "target": { "window": "calibrate my voice$", "type": "Text", "name": "That did not work", "match": "prefix", "timeout": 15 } } ],
+      "caption": "This test PC has none, so Record is off and Dictum says why.",
+      "do": [
+        {
+          "do": "point",
+          "target": { "window": "calibrate my voice$", "type": "Text", "name": "^(No microphone found|That did not work)", "match": "regex", "timeout": 15 }
+        }
+      ],
       "after": 3
     }
   ]

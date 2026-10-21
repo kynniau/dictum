@@ -27,24 +27,40 @@ internal sealed class FakeSpeechEngine(string path, DecodeOptions decode, bool w
     public void Dispose() => Volatile.Write(ref _disposed, 1);
 }
 
-/// <summary>A loaded cleanup model stand-in that echoes the dictation, or gives a set reply; its warm-up can wait for its token (up to 5 s).</summary>
+/// <summary>
+/// A loaded cleanup model stand-in that echoes the dictation, or gives a set reply. With <c>waitForCancel</c> its warm-up never
+/// ends on its own, only when its token is cancelled, so a test proves a cancellation by the warm-up ending rather than by a clock.
+/// </summary>
 internal sealed class FakeLocalEngine(string path, bool waitForCancel = false, string? reply = null) : ILocalLlmEngine
 {
     private int _disposed;
+    private readonly TaskCompletionSource _warmUpStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _warmUpCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public string ModelPath { get; } = path;
     public bool Disposed => Volatile.Read(ref _disposed) == 1;
-    private volatile bool _warmingUp;
-    /// <summary>True once the warm-up is waiting on its token (set just before the delay).</summary>
-    public bool WarmingUp => _warmingUp;
+    /// <summary>True once the warm-up is waiting on its token.</summary>
+    public bool WarmingUp => _warmUpStarted.Task.IsCompleted;
+    /// <summary>Completes when the warm-up starts waiting on its token.</summary>
+    public Task WarmUpStarted => _warmUpStarted.Task;
+    /// <summary>Completes when the warm-up's token is cancelled, before the cancellation leaves <see cref="WarmUpAsync"/>.</summary>
+    public Task WarmUpCancelled => _warmUpCancelled.Task;
     public (double Prompt, double Generation) Rates => (0, 0);
 
     public async Task<TimeSpan> WarmUpAsync(string? systemPrompt = null, CancellationToken cancellationToken = default)
     {
         if (waitForCancel)
         {
-            _warmingUp = true;
-            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            _warmUpStarted.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _warmUpCancelled.TrySetResult();
+                throw;
+            }
         }
         return TimeSpan.Zero;
     }
@@ -183,6 +199,23 @@ internal sealed class ScriptedPrompts : IModelPrompts
         LastNote = note;
         WhenBusyAsked?.Invoke(); // while the question is open: a test looks at the running download here
         return Busy;
+    }
+
+    /// <summary>The words of every plain (Simple view) question, as the window would show them.</summary>
+    public List<string> PlainQuestions { get; } = [];
+
+    /// <summary>Records the plain question's words, then answers as the interface's default does (through <see cref="ConfirmDownload"/>).</summary>
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainConfirmText(plainName, sizeText, warning));
+        return ConfirmDownload(fileName, sizeText, warning is null ? ModelPromptText.PlainCheck : $"{ModelPromptText.PlainCheck}. {warning}");
+    }
+
+    /// <summary>Records the plain busy question's words, then answers as the interface's default does (through <see cref="ConfirmDownloadWhileBusy"/>).</summary>
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait));
+        return ConfirmDownloadWhileBusy(fileName, sizeText, warning is null ? ModelPromptText.PlainCheck : $"{ModelPromptText.PlainCheck}. {warning}", plainName, running, runningProgress, canWait);
     }
 
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;

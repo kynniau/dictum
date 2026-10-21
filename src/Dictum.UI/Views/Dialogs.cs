@@ -144,32 +144,23 @@ internal sealed class ModelPickerWindow : DialogWindow
 }
 
 /// <summary>
-/// SPEC §20 at first run: the capture box after the model pickers, defaulting to the configured hotkey, with the note for
-/// Mac keyboards over Remote Desktop. <see cref="Result"/> is the hotkey to keep.
+/// SPEC §20 at first run: the hotkey check's words, now the "Your hotkey" step of the Welcome to Dictum window
+/// (Onboarding.HotkeyStep, 1.2): the capture box defaulting to the configured hotkey, the note for Mac keyboards over Remote
+/// Desktop, and the two buttons. Moved from the separate first-run window unchanged.
 /// </summary>
-internal sealed class HotkeyCheckWindow : DialogWindow
+internal static class HotkeyCheck
 {
-    public const string MacNote = "On a Mac over Remote Desktop use the right Option key (RightAlt) or right Command (RightWin).";
+    public const string Heading = "Check your hotkey";
 
-    public HotkeyCheckWindow(AppShell shell, string current) : base("Check your hotkey")
-    {
-        Result = current;
-        var box = new HotkeyCaptureBox(shell, current, listenAtOnce: true);
-        var use = Ui.Button("Use this hotkey", "primary", () =>
-        {
-            Result = box.Hotkey;
-            Close();
-        });
-        use.IsDefault = true;
-        var skip = Ui.Button("Skip", "secondary", Close);
-        Compose(Ui.Stack(12,
-            Ui.Text("Dictum records while you hold this key and pastes when you let go. Press it now: the box shows exactly what Windows " +
-                    "receives, and the light comes on while the key is held. Press a different key, or a mouse button other than the left " +
-                    "one, to choose it instead."),
-            box,
-            Ui.Text(MacNote, "caption")), skip, use);
-        Closed += (_, _) => box.Dispose();
-    }
+    public const string Intro =
+        "Dictum records while you hold this key and pastes when you let go. Press it now: the box shows exactly what Windows " +
+        "receives, and the light comes on while the key is held. Press a different key, or a mouse button other than the left " +
+        "one, to choose it instead.";
 
-    public string Result { get; private set; }
+    /// <summary>The keys by the names the box shows them (HotkeyNames: "Right Alt"; until 1.2 polish, 22/10/2026, the settings tokens). PROPOSED.</summary>
+    public const string MacNote = "On a Mac over Remote Desktop use the right Option key (Right Alt) or right Command (Right Win).";
+
+    public const string UseLabel = "Use this hotkey";
+
+    public const string SkipLabel = "Skip";
 }

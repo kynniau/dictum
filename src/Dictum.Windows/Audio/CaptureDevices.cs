@@ -46,7 +46,7 @@ public static class CaptureDevices
         }
         if (!enumerator.TryGetDefaultAudioEndpoint(DataFlow.Capture, Role.Console, out var device) || device is null)
         {
-            throw new InvalidOperationException("No microphone found. Check Settings > Privacy & security > Microphone and that a recording device is enabled.");
+            throw new NoMicrophoneException(); // the one no-microphone sentence (NoSoundText.NoMicrophoneBalloon)
         }
         return device;
     }

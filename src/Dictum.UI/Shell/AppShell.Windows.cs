@@ -116,18 +116,6 @@ public sealed partial class AppShell
         _addSnippet.Activate();
     }
 
-    /// <summary>SPEC §20 at first run: the hotkey capture box after the model pickers, writing the key the user keeps.</summary>
-    private void FirstRunHotkeyCheck()
-    {
-        var current = Dictum.Settings.SettingsLoader.LoadFile(Paths.SettingsFile).Settings.Hotkey;
-        var chosen = Dialogs.HotkeyCheck(this, current);
-        if (!string.Equals(chosen, current, StringComparison.Ordinal))
-        {
-            Dictum.Settings.SettingsFile.SetValue(Paths.SettingsFile, "hotkey", System.Text.Json.Nodes.JsonValue.Create(chosen));
-            _log.Info($"First run: hotkey set to {chosen}.");
-        }
-    }
-
     private void CloseWindows()
     {
         foreach (var window in new Window?[] { _flyout, _settingsWindow, _calibration, _fixLast, _addWord, _addSnippet })

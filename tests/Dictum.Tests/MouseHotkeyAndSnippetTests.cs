@@ -51,7 +51,7 @@ public class MouseHotkeyTests
         Assert.Equal("Mouse5", HotkeyParser.NameOf(Vk.XButton2));
         Assert.Equal("LeftMouse", HotkeyParser.NameOf(Vk.LButton)); // named for the capture box, never accepted as a hotkey
         Assert.Equal("RightMouse", HotkeyParser.Parse("rbutton").Display);
-        Assert.Null(HotkeyParser.SideOf(Vk.RButton));
+        Assert.Equal("Right Mouse", HotkeyNames.Display("RightMouse")); // shown by its display name; the token stays (HotkeyNames, 1.2 polish)
     }
 
     [Theory]
@@ -212,12 +212,12 @@ public class MouseHotkeyTests
     {
         var capture = new HotkeyCapture();
         Assert.Null(capture.Feed(new RawKeyEvent(Vk.XButton2, true, false)));
-        Assert.Equal("Mouse5 down", capture.LastReceived);
+        Assert.Equal("Mouse 5 down", capture.LastReceived);
         Assert.Equal("Mouse5", capture.Feed(new RawKeyEvent(Vk.XButton2, false, false)));
 
         Assert.Null(capture.Feed(new RawKeyEvent(Vk.LButton, true, false)));
         Assert.Null(capture.Feed(new RawKeyEvent(Vk.LButton, false, false))); // "LeftMouse" parses to nothing
-        Assert.Equal("LeftMouse up", capture.LastReceived);
+        Assert.Equal("Left Mouse up", capture.LastReceived);
 
         capture.Feed(new RawKeyEvent(Vk.LControl, true, false));
         capture.Feed(new RawKeyEvent(Vk.RButton, true, false));
@@ -694,13 +694,13 @@ public class MouseHotkeyAndSnippetUiTests
         monitor.Press(Vk.XButton2, down: false);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("Mouse5", fix.Hotkey);
-        Assert.Contains("Windows received: Mouse5 up", Texts(fix));
+        Assert.Contains("Windows received: Mouse 5 up", Texts(fix));
 
         Click(window, "Use for Fix last dictation");
         Assert.False(fix.Listening); // saving stops the box
         shell.Reload(userRequested: false);
         Assert.Equal("Mouse5", shell.Settings.FixHotkey);
-        Assert.Contains("Mouse5 now opens Fix last dictation.", Texts(window));
+        Assert.Contains("Mouse 5 now opens Fix last dictation.", Texts(window));
 
         Click(window, "Turn off");
         shell.Reload(userRequested: false);
