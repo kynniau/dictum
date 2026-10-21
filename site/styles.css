@@ -1126,6 +1126,125 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* Infographic: inline SVG, coloured by the same tokens, so it follows light and dark. A wide version from 720 px, a tall one below. */
+
+.infographic {
+  margin-top: 28px;
+}
+
+.ig {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ig-wide {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .ig-wide {
+    display: block;
+  }
+
+  .ig-narrow {
+    display: none;
+  }
+}
+
+.ig-narrow {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.infographic-steps .ig {
+  max-width: 360px;
+}
+
+.ig text {
+  font-family: var(--font-display);
+}
+
+.ig-panel {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.ig-accent {
+  fill: var(--accent);
+}
+
+.ig-bar {
+  fill: var(--accent);
+  opacity: 0.55;
+}
+
+.ig-num {
+  fill: var(--on-accent);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ig-title {
+  fill: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.ig-sub {
+  fill: var(--text-2);
+  font-size: 16px;
+}
+
+.ig-key {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+
+.ig-keytext {
+  fill: var(--text);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.ig-doc {
+  fill: var(--bg);
+  stroke: var(--border-strong);
+}
+
+.ig-typed {
+  fill: var(--text);
+  font-size: 18px;
+}
+
+.ig-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ig-badge {
+  fill: var(--accent-soft);
+}
+
+.ig-badge-text {
+  fill: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ig-tick {
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* Help guide page (help.html): the privacy page's reading column, a little larger for easy reading. */
 
 .guide {
