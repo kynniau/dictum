@@ -3179,7 +3179,7 @@ subject drift apart, so the site and the code cannot be switched half way unnoti
 **What the email says (PROPOSED copy, awaiting the product owner's review; do not reword).**
 
 - Button: `Send feedback or suggest a feature`
-- Note under Help (screen-reader help text on the button too): `Send feedback or suggest a feature opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum, your Windows version and the models in use filled in. You can read and change it before you send it. Dictum sends nothing by itself.`
+- Note under Help (screen-reader help text on the button too): `Send feedback or suggest a feature opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum, your Windows build and the models in use filled in. You can read and change it before you send it. Dictum sends nothing by itself.`
 - Email support's note (reworded): `Email support opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.` (it was: `Email support opens a new email to hello@kynni.com.au in your own email program. Dictum sends nothing by itself.`)
 - Subject: `Dictum feedback`
 - Body (CRLF line breaks; `<…>` is filled in):
@@ -3190,7 +3190,7 @@ What I'd like to say:
 
 (You can delete the lines below. They help us understand your setup.)
 Dictum <version>
-Windows <version>
+Windows build <version>
 Speech model: <name> on <GPU or CPU>
 Clean-up: <provider or rule-based tidy>
 ```
@@ -3199,8 +3199,7 @@ Clean-up: <provider or rule-based tidy>
 - Website footer link text: `Feedback and feature requests`, href `mailto:hello@kynni.com.au?subject=Dictum%20feedback`.
 
 **Where each fact comes from (`AppShell.FeedbackFacts`).** The version is `AppShell.AppVersion` (About's "Version"). "Windows
-<version>" is the platform name About shows ("On Windows…") plus `Environment.OSVersion.Version` to three parts: **About does not show the
-Windows version, so this one fact is new** (a version number only). The speech model is `Models.CurrentName` (a model's name, or a
+build <version>" is the platform name About shows ("On Windows…"), the word "build", and `Environment.OSVersion.Version` to three parts (for example 10.0.26100: Windows 11 reports 10.0, so the word "build" stops it reading as a version of Windows 10): **About does not show this, so it is the one new fact** (a number only). The speech model is `Models.CurrentName` (a model's name, or a
 custom file's name without its folder). The runtime is the one About shows (`Vulkan`, `CPU`, `loading`, or `no runtime (model error)`).
 The clean-up is `rule-based tidy` (provider none, or a local model that failed to load), `<model> on this PC` (local), or the cloud
 provider's name alone (with a note when its key is missing): **not** About's full status line, because that names the server host, which
@@ -3208,7 +3207,7 @@ for a company's own server could be private. Every fact is cleaned by `SupportMa
 anything path-like kept, 60 characters at most.
 
 **Length.** The whole link is kept at 2,000 characters or fewer (`SupportMail.MaxUriLength`, the common mailto limit as recalled, not
-verified against a specific mail program in this lane). If the five lines would take it over, they are left off and the writing space and
+verified against a specific mail program in this lane). If the four setup lines (five facts) would take it over, they are left off and the writing space and
 note stay. A normal email is under 600 characters.
 
 **Pins (`tests/Dictum.Tests/FeedbackTests.cs`, and edits to `HelpPageTests.cs`), each observed failing on the reverted behaviour

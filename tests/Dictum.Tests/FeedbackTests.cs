@@ -17,11 +17,17 @@ namespace Dictum.Tests;
 /// </summary>
 public class FeedbackTests
 {
-    private static readonly FeedbackSetup Sample = new("1.2.0", "Windows 10.0.26100", "base.en", "Vulkan", "qwen2.5-1.5b on this PC");
+    private static readonly FeedbackSetup Sample = new("1.2.0", "Windows build 10.0.26100", "base.en", "Vulkan", "qwen2.5-1.5b on this PC");
+
+    /// <summary>Text standing in for a personal-context file a later feature might add (a context.txt of names, clients or notes): no support email may carry it.</summary>
+    private const string ContextSentinel = "SENTINEL-CONTEXT-Quillfeather-7f3a";
+
+    private static void WriteContextFile(Scratch scratch) =>
+        File.WriteAllText(Path.Combine(scratch.Paths.ConfigDir, "context.txt"), ContextSentinel + " Acme Holdings, client Jane Citizen");
 
     private const string SampleUri = "mailto:hello@kynni.com.au?subject=Dictum%20feedback&body=" +
         "What%20I%27d%20like%20to%20say%3A%0D%0A%0D%0A%0D%0A%28You%20can%20delete%20the%20lines%20below.%20They%20help%20us%20understand%20your%20setup.%29%0D%0A" +
-        "Dictum%201.2.0%0D%0AWindows%2010.0.26100%0D%0ASpeech%20model%3A%20base.en%20on%20Vulkan%0D%0AClean-up%3A%20qwen2.5-1.5b%20on%20this%20PC";
+        "Dictum%201.2.0%0D%0AWindows%20build%2010.0.26100%0D%0ASpeech%20model%3A%20base.en%20on%20Vulkan%0D%0AClean-up%3A%20qwen2.5-1.5b%20on%20this%20PC";
 
     /// <summary>The message lines: "What I'd like to say:", two blank lines, the note, then the four facts' lines (Dictum, system, speech model, clean-up).</summary>
     private const int BodyLines = 8;
@@ -41,7 +47,7 @@ public class FeedbackTests
         Assert.Equal(SampleUri, SupportMail.FeedbackUri(Sample));
         Assert.Equal("Dictum feedback", SupportMail.FeedbackSubject);
         Assert.Equal(
-            "What I'd like to say:\r\n\r\n\r\n(You can delete the lines below. They help us understand your setup.)\r\nDictum 1.2.0\r\nWindows 10.0.26100\r\nSpeech model: base.en on Vulkan\r\nClean-up: qwen2.5-1.5b on this PC",
+            "What I'd like to say:\r\n\r\n\r\n(You can delete the lines below. They help us understand your setup.)\r\nDictum 1.2.0\r\nWindows build 10.0.26100\r\nSpeech model: base.en on Vulkan\r\nClean-up: qwen2.5-1.5b on this PC",
             BodyOf(SampleUri));
     }
 
@@ -122,12 +128,13 @@ public class FeedbackTests
         var (shell, platform, _) = scratch.Shell();
         shell.Personal.AddDictionaryTerms(["Zorblaxquintet"]); // a dictionary word and a dictated sentence: neither may go
         shell.Personal.Remember("the secret merger figures", 42, "Outlook");
+        WriteContextFile(scratch);
         shell.SendFeedback();
         var uri = Assert.Single(platform.Opened);
         var body = BodyOf(uri);
-        Assert.Matches(@"^What I'd like to say:\r\n\r\n\r\n\(You can delete the lines below\. They help us understand your setup\.\)\r\nDictum \d+\.\d+\.\d+\r\nTest \d+\.\d+\.\d+\r\nSpeech model: [^\r\n]+ on [^\r\n]+\r\nClean-up: [^\r\n]+$", body);
+        Assert.Matches(@"^What I'd like to say:\r\n\r\n\r\n\(You can delete the lines below\. They help us understand your setup\.\)\r\nDictum \d+\.\d+\.\d+\r\nTest build \d+\.\d+\.\d+\r\nSpeech model: [^\r\n]+ on [^\r\n]+\r\nClean-up: [^\r\n]+$", body);
         Assert.Equal(BodyLines, body.Split("\r\n").Length);
-        foreach (var private1 in new[] { "Zorblaxquintet", "secret", "merger", "Outlook", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile, Environment.UserName, Environment.MachineName })
+        foreach (var private1 in new[] { ContextSentinel, "Acme", "Citizen", "Zorblaxquintet", "secret", "merger", "Outlook", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile, Environment.UserName, Environment.MachineName })
             Assert.DoesNotContain(private1, body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(@"\", body.Replace("\r\n", ""));
         Assert.True(uri.Length <= SupportMail.MaxUriLength);
@@ -140,6 +147,7 @@ public class FeedbackTests
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
         var (shell, platform, _) = scratch.Shell();
         shell.Personal.AddDictionaryTerms(["Zorblaxquintet"]);
+        WriteContextFile(scratch);
         var window = new SettingsWindow(shell);
         window.Show();
         window.ShowPage(HelpText.PageTitle);
@@ -151,7 +159,7 @@ public class FeedbackTests
         Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20", uri);
         Assert.Contains("problem%20report", uri);
         Assert.Matches(@"Dictum \d+\.\d+\.\d+ on Test\nModels: [^\n]+", body); // the version and the models line, as Report a problem fills them
-        foreach (var private1 in new[] { "Zorblaxquintet", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile })
+        foreach (var private1 in new[] { ContextSentinel, "Acme", "Citizen", "Zorblaxquintet", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile })
             Assert.DoesNotContain(private1, body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Dictum sends nothing by itself", HelpText.SupportNote);
         Assert.Contains("version of Dictum and the models", HelpText.SupportNote);
@@ -191,21 +199,66 @@ public class FeedbackTests
         var body = "What happened (and what you expected):\n\n\nDictum 1.2.0 on Windows\nModels: base.en · Vulkan · rules · F24\n\n" +
                    "To report text Dictum produced that should not have been there, describe it here; nothing is attached automatically.";
         Assert.Equal($"mailto:hello@kynni.com.au?subject={Uri.EscapeDataString("Dictum 1.2.0: problem report")}&body={Uri.EscapeDataString(body)}",
-            AppShell.ReportUri("1.2.0", "Windows", "base.en · Vulkan · rules · F24"));
+            SupportMail.ReportUri("1.2.0", "Windows", "base.en · Vulkan · rules · F24"));
     }
 
     [Fact]
-    public void The_support_address_is_written_once_in_code()
+    public void The_report_email_is_cleaned_and_kept_under_the_link_limit_too()
+    {
+        // A path in the models line is cut to its last part inside the builder, so no caller can skip that.
+        var cleaned = Uri.UnescapeDataString(SupportMail.ReportUri("1.2.0", "Windows", @"C:\Users\Kyle\models\ggml-x.bin · rules"));
+        Assert.Contains("Models: ggml-x.bin · rules", cleaned);
+        Assert.DoesNotContain("Users", cleaned);
+
+        // Past 2,000 characters the models line goes and the rest stays.
+        var wide = string.Join(" · ", Enumerable.Repeat(new string('€', 60), 6));
+        var uri = SupportMail.ReportUri("1.2.0", "Windows", wide);
+        Assert.True(uri.Length <= SupportMail.MaxUriLength, $"{uri.Length} characters");
+        var body = Uri.UnescapeDataString(uri);
+        Assert.DoesNotContain("Models:", body);
+        Assert.Contains("Dictum 1.2.0 on Windows", body);
+        Assert.Contains("nothing is attached automatically", body);
+    }
+
+    [Fact]
+    public void Only_SupportMail_makes_a_mailto_link_and_the_support_address_is_written_once_in_code()
+    {
+        var bin = $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}";
+        var obj = $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}";
+        var files = Directory.EnumerateFiles(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(bin) && !f.Contains(obj)).ToList();
+        // Code lines only: a line whose first characters are // or /// is a comment.
+        IEnumerable<string> Code(string file) => File.ReadAllLines(file).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal));
+
+        var address = files.Select(f => (File: Path.GetFileName(f), Count: Code(f).Sum(l => Regex.Matches(l, @"hello@kynni\.com\.au").Count))).Where(x => x.Count > 0).ToList();
+        Assert.Equal([("SupportMail.cs", 1)], address); // exactly one occurrence in all code, a raw multi-line literal included
+
+        var mailto = files.Where(f => Code(f).Any(l => l.Contains("mailto:", StringComparison.OrdinalIgnoreCase))).Select(Path.GetFileName).ToList();
+        Assert.Equal(["SupportMail.cs"], mailto); // no other code writes a mailto link, so nothing else can email other content
+    }
+
+    [Fact]
+    public Task The_cleanup_fact_matches_the_header_when_the_local_model_is_not_downloaded() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        Assert.Equal("rules until downloaded", Regex.Match(shell.Status.Models, "rules until downloaded").Value); // what the header says
+        Assert.Equal("rule-based tidy (clean-up model not downloaded)", shell.FeedbackFacts().Cleanup); // so the email does not claim a model is in use
+        shell.Dispose();
+    });
+
+    [Fact]
+    public void The_feedback_note_says_build_so_Windows_11_users_are_not_confused()
+    {
+        Assert.Contains("your Windows build", HelpText.FeedbackNote);
+        Assert.DoesNotContain("Windows version", HelpText.FeedbackNote);
+    }
+
+    [Fact]
+    public void The_support_address_constants_agree()
     {
         Assert.Equal("hello@kynni.com.au", SupportMail.Address);
         Assert.Equal(SupportMail.Address, AppShell.SupportEmail);
-        var bin = $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}";
-        var obj = $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}";
-        var copies = Directory.EnumerateFiles(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains(bin) && !f.Contains(obj))
-            .Where(f => Regex.IsMatch(File.ReadAllText(f), @"""[^""\r\n]*hello@kynni\.com\.au"))
-            .Select(Path.GetFileName).ToList();
-        Assert.Equal(["SupportMail.cs"], copies); // the one literal; everything else in code is an alias of it
     }
 
     [Fact]

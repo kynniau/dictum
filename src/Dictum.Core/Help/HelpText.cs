@@ -35,7 +35,7 @@ public static class HelpText
     public const string FeedbackButton = "Send feedback or suggest a feature";
 
     /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
-    public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum, your Windows version and the models in use filled in. " +
+    public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum, your Windows build and the models in use filled in. " +
         "You can read and change it before you send it. Dictum sends nothing by itself.";
 
     public const string HowItWorksHeading = "How Dictum works";
@@ -97,8 +97,8 @@ public static class HelpText
         new("Dictum closed straight away when I opened it. What do I do?",
         [
             "On some PCs, Dictum 1.1.1 closed as soon as it started. The version you are using now has the fix. If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.",
-            "If it still closes, email " + SupportMail.Address + " and tell us.",
             "If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.",
+            "If it still closes, email " + SupportMail.Address + " and tell us.",
         ]),
         new("How do I change the key I hold?",
         [

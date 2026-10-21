@@ -1169,11 +1169,11 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
   the rest; Dictum sends nothing: no HTTP, no form, no clipboard.
 - **Feedback** (amendment, 21/10/2026): **Send feedback or suggest a feature**, beside Email support. Subject
-  "Dictum feedback". The body is a space to write in, then five lines: the Dictum version, "Windows <version>", the speech
+  "Dictum feedback". The body is a space to write in, then four lines (five facts): the Dictum version, "Windows build <version>", the speech
   model and the runtime it loaded on (GPU or CPU), and the clean-up in use. The facts are the ones About shows and nothing
   else: never a path, dictionary word, transcript, microphone name or machine or user name. Line breaks are CRLF
-  (`%0D%0A`), the text is percent-encoded as UTF-8, and the whole link is kept under 2,000 characters (past that the five
-  lines are left off). One builder (`SupportMail`, `src/Dictum.Core/Help/SupportMail.cs`) and one address constant serve
+  (`%0D%0A`), the text is percent-encoded as UTF-8, and the whole link is kept under 2,000 characters (past that the four
+  setup lines are left off). One builder (`SupportMail`, `src/Dictum.Core/Help/SupportMail.cs`) and one address constant serve
   Report a problem, Email support and this. The About card that held Report a problem is titled **Support**, so that
   "Help" names only this page.
 - **Accessibility**:

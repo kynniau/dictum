@@ -151,8 +151,8 @@ The Help page's words are PROPOSED (docs/DECISIONS.md, 21/10/2026) and live in `
 ### Feedback and feature requests
 
 Settings > Help has **Send feedback or suggest a feature**. It opens a new email to hello@kynni.com.au in your own mail
-app, with the subject "Dictum feedback" and a space to write in. Below that space are five lines about your setup,
-which you can delete: the Dictum version, your Windows version, the speech model and whether it runs on the GPU or the
+app, with the subject "Dictum feedback" and a space to write in. Below that space are four lines about your setup
+(five facts), which you can delete: the Dictum version, your Windows build, the speech model and whether it runs on the GPU or the
 CPU, and the clean-up in use. Nothing else goes in: no folder or file path, no dictionary words, nothing you dictated,
 no microphone name and no PC or user name.
 

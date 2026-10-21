@@ -362,14 +362,7 @@ public sealed partial class AppShell
     /// SPEC §22 "Report a problem": a prefilled email to the support address (the user's own mail app sends it, or not).
     /// Nothing is sent by Dictum; no dictation text is included.
     /// </summary>
-    public void ReportProblem() => Platform.Open(ReportUri(AppVersion, Platform.Name, Help.SupportMail.Facts(Status.Models)));
-
-    internal static string ReportUri(string version, string platform, string models)
-    {
-        var body = $"What happened (and what you expected):\n\n\nDictum {version} on {platform}\nModels: {models}\n\n" +
-                   "To report text Dictum produced that should not have been there, describe it here; nothing is attached automatically.";
-        return Help.SupportMail.Uri($"Dictum {version}: problem report", body);
-    }
+    public void ReportProblem() => Platform.Open(Help.SupportMail.ReportUri(AppVersion, Platform.Name, Status.Models));
 
     /// <summary>
     /// Settings → Help → "Send feedback or suggest a feature" (lane F): a new email to the support address in the user's own mail
@@ -378,7 +371,7 @@ public sealed partial class AppShell
     public void SendFeedback() => Platform.Open(Help.SupportMail.FeedbackUri(FeedbackFacts()));
 
     /// <summary>
-    /// The five facts the feedback email carries, taken from what About shows: the version, the system and its version, the
+    /// The five facts the feedback email carries (four lines), taken from what About shows: the version, the system and its build, the
     /// speech model and the runtime it loaded on, and the clean-up in use. Never a path, a mic, a dictionary word, text
     /// that was dictated, or a machine or user name.
     /// </summary>
@@ -389,9 +382,12 @@ public sealed partial class AppShell
         var cleanup = _settings.Llm.Provider switch
         {
             LlmSettings.NoProvider => "rule-based tidy",
-            LlmSettings.Local => CleanupError is not null && !CleanupLoading ? "rule-based tidy (the clean-up model could not be loaded)" : $"{Models.CurrentCleanupName} on this PC",
+            // The same order as the header's clean-up label: loaded or loading, else failed, else not downloaded (rules until it is).
+            LlmSettings.Local => _llm.Ready is not null || _llm.IsLoading ? $"{Models.CurrentCleanupName} on this PC"
+                : _llm.LastError is not null ? "rule-based tidy (the clean-up model could not be loaded)"
+                : "rule-based tidy (clean-up model not downloaded)",
             var cloud => cloud + (_cleaner.MissingKey is null ? "" : " (no key, so rule-based tidy)"),
         };
-        return new Help.FeedbackSetup(AppVersion, $"{Platform.Name} {Environment.OSVersion.Version.ToString(3)}", Models.CurrentName, speechRuntime, cleanup);
+        return new Help.FeedbackSetup(AppVersion, $"{Platform.Name} build {Environment.OSVersion.Version.ToString(3)}", Models.CurrentName, speechRuntime, cleanup);
     }
 }

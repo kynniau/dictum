@@ -130,7 +130,8 @@ public class HelpPageTests
         var copy = File.ReadAllText(Path.Combine(root, "src", "Dictum.Core", "Help", "HelpText.cs"));
         var pages = File.ReadAllText(Path.Combine(root, "src", "Dictum.UI", "Views", "Settings", "OtherPages.cs"));
         var helpPage = pages[pages.IndexOf("internal sealed class HelpPage", StringComparison.Ordinal)..];
-        foreach (var source in new[] { copy, helpPage })
+        var mail = File.ReadAllText(Path.Combine(root, "src", "Dictum.Core", "Help", "SupportMail.cs")); // the builder every button's email comes from
+        foreach (var source in new[] { copy, helpPage, mail })
             Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute|Download|CheckForUpdates|Shell\.Models"), source); // Shell.ReportProblem and SendFeedback are allowed: they only build a mail link for the platform seam
         return true;
     });
@@ -229,6 +230,32 @@ public class HelpPageTests
             Assert.True(right <= scroll.Viewport.Width + 0.5, $"\"{(control as TextBlock)?.Text ?? (control as Button)?.Content}\" ends at {right:0} of {scroll.Viewport.Width:0}");
             if (control is TextBlock text && text.FindLogicalAncestorOfType<Button>() is null) Assert.Equal(TextWrapping.Wrap, text.TextWrapping); // a button label is one line by design
         }
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task Tab_walks_the_three_buttons_in_order_guide_then_email_support_then_feedback() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var window = new SettingsWindow(shell) { Width = 860, Height = 640 };
+        window.Show();
+        var page = OpenHelp(window);
+        var guide = All<Button>(page).Single(b => b.Content as string == HelpText.GuideButton);
+        guide.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        var order = new List<string?> { guide.Content as string };
+        InputElement current = guide;
+        for (var i = 0; i < 2; i++)
+        {
+            var next = Assert.IsType<Button>(KeyboardNavigationHandler.GetNext(current, NavigationDirection.Next));
+            next.Focus(NavigationMethod.Tab);
+            Dispatcher.UIThread.RunJobs();
+            order.Add(next.Content as string);
+            current = next;
+        }
+        Assert.Equal([HelpText.GuideButton, HelpText.SupportButton, HelpText.FeedbackButton], order);
         window.Close();
         shell.Dispose();
     });

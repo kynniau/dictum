@@ -35,8 +35,25 @@ public static class SupportMail
     /// "mailto:&lt;support address&gt;?subject=…&amp;body=…" with both parts percent-encoded as UTF-8 (so "&amp;", "é" and line
     /// breaks survive). A line break in <paramref name="body"/> is encoded as it is written: write CRLF for %0D%0A.
     /// </summary>
-    public static string Uri(string subject, string body) =>
+    private static string Uri(string subject, string body) =>
         $"mailto:{Address}?subject={System.Uri.EscapeDataString(subject)}&body={System.Uri.EscapeDataString(body)}";
+
+    /// <summary>
+    /// Settings → About → Report a problem, and Settings → Help → Email support: the version, the platform and the models line
+    /// (already cleaned by <see cref="Facts"/>), and a sentence on what is not attached. The link is kept to <see cref="MaxUriLength"/>:
+    /// past it the models line is left off. The only caller of the private builder besides <see cref="FeedbackUri"/>, so no
+    /// other code can make a support email with other content.
+    /// </summary>
+    public static string ReportUri(string version, string platform, string models)
+    {
+        models = Facts(models); // cleaned here, so no caller can skip it
+        string Body(string? line) =>
+            $"What happened (and what you expected):\n\n\nDictum {version} on {platform}\n" + (line is null ? "" : $"Models: {line}\n") +
+            "\nTo report text Dictum produced that should not have been there, describe it here; nothing is attached automatically.";
+        var subject = $"Dictum {version}: problem report";
+        var uri = Uri(subject, Body(models));
+        return uri.Length <= MaxUriLength ? uri : Uri(subject, Body(null));
+    }
 
     /// <summary>
     /// The feedback email. Only the five facts in <paramref name="setup"/> are included: nothing is read from the disk, the
