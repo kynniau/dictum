@@ -3805,3 +3805,38 @@ The lens on 36fa43e (and a854a41) verified the merge and the constant swaps and 
 | CleanupOffTests.Off_wins_over_the_language_skip | `OffStatus` back to "off:" | observed failing |
 | Opening_the_window_fits_it_to_its_screen | `Apply`'s two assignments made no-ops (all 43 onboarding tests run) | observed failing (that pin only) |
 | same | the `Apply(fit)` call removed from `FitToWorkArea` | observed failing |
+
+## Final round on feat/simple-view (21/10/2026): merged main 500148a (PR #24, in-app Help); Help made true for the Simple view
+
+**Merge.** `origin/main` at 500148a merged with a plain merge (7d8d4be). Three conflicts:
+- This file's tail: both kept, main's entries first.
+- SPEC: both sides added "## 26." Main's In-app Help keeps §26. Onboarding is now **§27**, and its four references elsewhere in SPEC say §27. The two places above that cite "SPEC §26" for onboarding now read "SPEC §26, now §27".
+- `FlyoutWindow`'s class summary: this branch's tier wording and main's "six actions".
+
+**Help and the Simple view (all PROPOSED unless marked).** `HelpText` now holds for a user in the Simple view, which is the default:
+- "How Dictum works" gains a paragraph: "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. To paste exactly what was heard, with no tidying at all, choose Off there instead."
+- Its cloud sentence now also says what cloud clean-up sends, as "Where does my voice go?" does: "… and it is off unless you turn it on. If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here."
+- Accuracy: "For English, the speech model that comes with Dictum is a good place to start: it is Standard in Settings > Models. For other languages, Standard is a multilingual model, a download you choose." and "If words often come out wrong, open Settings > Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. To see every model by its name and size, choose Advanced at the top of that page." "Where it is listed" is there because a CPU with a language other than English has no Most accurate tier.
+- Model files: "Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words when the text is English) are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes)."
+- A twelfth question, "What does the name Dictum mean?" (PROPOSED), answered by the name line, **APPROVED verbatim by the owner 21/10/2026 22:21 AEDT** (`HelpText.NameLine`).
+- `FreeLine` and `FreeLaterNote` are unchanged (approved).
+
+`Every_label_the_help_names_exists_in_the_app` now runs in the Simple view with the rule-based tidy, the state the first run leaves with base.en. It also collects the tray pickers' entries, which the app shows. It checks Standard, More accurate, Most accurate, Advanced, Tidy my words, Off and Translate to English as exact labels, and "Add AI clean-up" as the start of a shown label, because the app appends its size or download mark.
+
+**Nits.**
+- `SimpleView.OffersAddCleanup(AppSettings)` is the one predicate for "Add AI clean-up", used by the page and the tray.
+- The busy question without room to wait now names the model asked for: "There is not enough space to download <tier> after <running>." in the Simple view, and "… download <model> after <running>." in the catalogue question (both PROPOSED; pins updated).
+
+**Mutation checks (this round).** Each was applied alone, the tests rebuilt and run, and the file restored:
+
+| Mutation | Pins | Observed |
+|---|---|---|
+| The name line's curly quotes made straight | The_name_question_carries_the_approved_line_verbatim | observed failing |
+| Accuracy reverted to "choose a bigger speech model in Settings > Models…" | Every_label_the_help_names_exists_in_the_app, The_help_names_the_simple_view_choices_as_the_app_does | observed failing (both) |
+| The app's tier renamed ("More accurate model") | the same two | observed failing (both) |
+| `OffersAddCleanup` ignores the language | The_help_names_the_simple_view_choices_as_the_app_does, SimpleViewTests.Add_ai_clean_up_is_not_offered_in_simple_for_text_that_is_not_english | observed failing (both) |
+| `OffersAddCleanup` always false | The_help_names_the_simple_view_choices_as_the_app_does | observed failing |
+| "Tidy my words" misnamed in the help | The_help_names_the_simple_view_choices_as_the_app_does | observed failing |
+| The cloud sentence's dictionary clause removed | Every_mention_of_turning_on_cloud_clean_up_says_what_it_sends | observed failing |
+| Simple busy text back to "download it after" | A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops | observed failing |
+| Catalogue busy text back to "download it after" | The_space_check_counts_the_download_already_running | observed failing |
