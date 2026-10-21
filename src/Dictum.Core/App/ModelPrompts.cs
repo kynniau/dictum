@@ -90,7 +90,7 @@ public static class ModelPromptText
         (canWait
             ? $"{running} is downloading ({runningProgress} done). Download {plainName} ({sizeText}) after it, " +
               $"or stop {running} and download {plainName} now? Stopping deletes what {running} has downloaded so far.\n\n"
-            : $"{running} is downloading ({runningProgress} done). There is not enough space to download it after {running}. " +
+            : $"{running} is downloading ({runningProgress} done). There is not enough space to download {plainName} after {running}. " +
               $"Stop {running} and download {plainName} ({sizeText}) now? Stopping deletes what {running} has downloaded so far.\n\n") +
         $"{PlainCheck}." + (warning is null ? "" : $" {warning}.");
 
@@ -99,12 +99,12 @@ public static class ModelPromptText
     /// says what is downloading and how far it has got, and what each answer does; nothing is cancelled before it is answered.
     /// </summary>
     /// When <paramref name="canWait"/> is false (it fits only if the running download stops; second lens, 19/10/2026), the
-    /// text offers only to stop it and says why (PROPOSED copy, 19/10/2026).
+    /// text offers only to stop it and says why, naming the model asked for (PROPOSED copy, 19/10/2026; the name, 21/10/2026).
     public static string BusyText(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true) =>
         (canWait
             ? $"{running} is downloading ({runningProgress} done). Download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost} after it, " +
               $"or stop {running} and download {chosen} now? Stopping deletes what {running} has downloaded so far.\n\n"
-            : $"{running} is downloading ({runningProgress} done). There is not enough space to download it after {running}. " +
+            : $"{running} is downloading ({runningProgress} done). There is not enough space to download {chosen} after {running}. " +
               $"Stop {running} and download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost} now? Stopping deletes what {running} has downloaded so far.\n\n") +
         $"{note}. Its size and SHA-256 are checked before use; progress shows in the tray panel and the tray icon's tooltip.";
 

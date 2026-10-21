@@ -226,9 +226,7 @@ internal sealed class ModelsPage : SettingsPage
 
         var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(gpu).Model)!;
         _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
-        // Not in the Simple view while the text is not English: no clean-up model runs on it (TranscriptCleaner.Plain), so the
-        // 1.1 GB download would change nothing (lens on 787b300, 21/10/2026). Advanced keeps it, with every other detail.
-        _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider && (!s.Ui.IsSimple || WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate));
+        _addCleanup.IsVisible = SimpleView.OffersAddCleanup(s); // not in Simple while the text is not English: the download would change nothing
         // While that model downloads or waits its turn, the button is disabled and named for why, as its row is (lens, 19/10/2026).
         var fetch = Shell.Models.DownloadStateOf(recommended.FileName);
         _addCleanup.IsEnabled = fetch == DownloadState.None;

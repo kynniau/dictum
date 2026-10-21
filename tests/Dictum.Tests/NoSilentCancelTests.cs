@@ -375,7 +375,7 @@ public sealed class NoSilentCancelTests : IDisposable
         coordinator.Select("base.en");
         var (text, buttons) = Assert.Single(_prompts.BusyQuestions);
         Assert.Equal(["Stop it and download base.en", "Cancel"], buttons);
-        Assert.Contains("There is not enough space to download it after tiny.en.", text, StringComparison.Ordinal);
+        Assert.Contains("There is not enough space to download base.en after tiny.en.", text, StringComparison.Ordinal);
         Assert.DoesNotContain(_balloons, b => b.StartsWith("Not enough space", StringComparison.Ordinal));
         Assert.Equal(DownloadState.None, coordinator.DownloadStateOf("ggml-base.en.bin")); // Cancel changed nothing
         Assert.Equal(0, _server.Cancelled);
@@ -451,7 +451,7 @@ public sealed class NoSilentCancelTests : IDisposable
         coordinator.Select("base.en", "Standard");
         var text = Assert.Single(_prompts.PlainQuestions);
         Assert.StartsWith("tiny.en is downloading (", text, StringComparison.Ordinal);
-        Assert.Contains($"There is not enough space to download it after tiny.en. Stop tiny.en and download Standard ({ModelCatalog.Find("base.en")!.SizeText}) now?", text, StringComparison.Ordinal);
+        Assert.Contains($"There is not enough space to download Standard after tiny.en. Stop tiny.en and download Standard ({ModelCatalog.Find("base.en")!.SizeText}) now?", text, StringComparison.Ordinal);
         Assert.DoesNotContain("after it, or stop", text, StringComparison.Ordinal);
         Assert.Equal(["Stop it and download Standard", "Cancel"], _prompts.BusyQuestions[^1].Buttons);
         Assert.Equal(DownloadState.None, coordinator.DownloadStateOf("ggml-base.en.bin")); // Cancel changed nothing

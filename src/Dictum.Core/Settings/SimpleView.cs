@@ -87,6 +87,14 @@ public static class SimpleView
     /// <summary>The Advanced view's "In use:" line suffix while clean-up is off, after the tray name "no clean-up".</summary>
     public const string OffInUseNote = " (paste exactly what was heard)";
 
+    /// <summary>
+    /// "Add AI clean-up" is offered (Settings > Models and the tray panel): while the rule-based tidy is in use, and, in the
+    /// Simple view, only while the text is English, since no clean-up model runs on any other (TranscriptCleaner.Plain; lens
+    /// on 787b300). The Advanced view offers it whatever the language, with every other detail. One predicate for both places.
+    /// </summary>
+    public static bool OffersAddCleanup(AppSettings s) =>
+        s.Llm.Provider == LlmSettings.NoProvider && (!s.Ui.IsSimple || WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate));
+
     /// <summary>"Off" is in use: no clean-up, the text pasted as whisper wrote it with whitespace tidied only.</summary>
     public static bool OffInUse(LlmSettings llm) => llm.Provider == LlmSettings.Off;
 

@@ -357,7 +357,7 @@ internal sealed class FlyoutWindow : Window
         var ai = CleanupCatalog.Find(SimpleView.TidyModel(gpu))!;
         var names = new List<string> { TidyEntry };
         var labels = new List<string> { SimpleView.TidyLabel };
-        if (s.Llm.Provider == LlmSettings.NoProvider && Dictum.Transcribe.WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate))
+        if (SimpleView.OffersAddCleanup(s))
         {
             names.Add(ai.Name);
             labels.Add(_shell.Models.IsCleanupDownloaded(ai) ? Settings.ModelsPage.AddCleanupLabel : $"{Settings.ModelsPage.AddCleanupLabel}{DownloadMark(ai.FileName)}");
