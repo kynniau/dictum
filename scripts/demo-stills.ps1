@@ -31,13 +31,14 @@ param(
     [double]$MaxGifMB = 15
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "demo-common.ps1")
 . (Join-Path $PSScriptRoot "build-common.ps1")
 $root = Split-Path -Parent $PSScriptRoot
 $file = if (Test-Path -LiteralPath $Demo) { (Resolve-Path -LiteralPath $Demo).Path } else { Join-Path $PSScriptRoot "demos\$Demo.json" }
 $data = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($data.kind -ne "stills") { throw "$file is not a stills walkthrough (kind ""stills""): record it with demo-record.ps1." }
+if ((Get-Prop $data "kind") -ne "stills") { throw "$file is not a stills walkthrough (kind ""stills""): record it with demo-record.ps1." }
 if (-not $Out) { $Out = Join-Path $root "dist\demos" }
 $Ffmpeg = Find-Ffmpeg $Ffmpeg
 $ffprobe = Join-Path (Split-Path -Parent $Ffmpeg) "ffprobe.exe"
@@ -101,8 +102,8 @@ try {
     $poster = Join-Path $Out "$name-poster.png"
     $posterFrame = Get-ChildItem -LiteralPath $frames -Filter "*.png" | Sort-Object Name | Select-Object -Last 1
     Copy-Item -LiteralPath $posterFrame.FullName -Destination $poster -Force
-    $summary = [ordered]@{ demo = $name; kind = "stills"; mp4 = $mp4; seconds = [math]::Round((Get-MediaSeconds $ffprobe $mp4), 1); mp4Bytes = (Get-Item -LiteralPath $mp4).Length
-        gif = $gif; gifBytes = (Get-Item -LiteralPath $gif).Length; poster = $poster; frames = $frames; slides = $total; size = "${Width}x$($Height + $layout.Band)" }
+    $summary = [ordered]@{ demo = $name; kind = "stills"; mp4 = (Get-OutRelative $mp4 $Out); seconds = [math]::Round((Get-MediaSeconds $ffprobe $mp4), 1); mp4Bytes = (Get-Item -LiteralPath $mp4).Length
+        gif = (Get-OutRelative $gif $Out); gifBytes = (Get-Item -LiteralPath $gif).Length; poster = (Get-OutRelative $poster $Out); frames = (Get-OutRelative $frames $Out); slides = $total; size = "${Width}x$($Height + $layout.Band)" }
     Write-Utf8 (Join-Path (Join-Path $Out $name) "summary.json") ($summary | ConvertTo-Json)
     [pscustomobject]$summary | Format-List | Out-String | Write-Host
 } finally {

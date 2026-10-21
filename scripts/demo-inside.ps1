@@ -4,6 +4,8 @@
 # Windows UI Automation with deliberate pauses. It writes steps.json (one entry per step: when it started, its caption, where it clicked, any fallback) and
 # done.txt beside job.json, then shuts the sandbox down. Never run it anywhere else: it installs software, changes
 # System32 and the registry, moves the mouse and presses keys, which is harmless only in a sandbox discarded on close.
+Set-StrictMode -Version Latest
+if ($env:USERNAME -ne 'WDAGUtilityAccount') { throw "demo-inside.ps1 runs only inside Windows Sandbox." }
 $ErrorActionPreference = "Stop"
 $out = "C:\sbx\out"
 $work = "C:\demo"
@@ -25,15 +27,16 @@ function Value($Object, [string]$Name, $Default) {
 $job = Get-Content -LiteralPath "$out\job.json" -Raw | ConvertFrom-Json
 $demo = $job.demo
 $installedExe = Join-Path $env:LOCALAPPDATA "Programs\Dictum\Dictum.exe"
+$demoPace = Value $demo "pace" $null # strict mode: a demo without "pace" has no such property
 $pace = [ordered]@{
-    lead = [double](Value $demo.pace "lead" 2.0)    # caption on screen before the pointer moves
-    glide = [double](Value $demo.pace "glide" 0.8)  # the pointer's travel to its target
-    hover = [double](Value $demo.pace "hover" 0.4)  # resting on the target before the click
-    after = [double](Value $demo.pace "after" 1.6)  # the result stays on screen before the next step
-    typing = [int](Value $demo.pace "typing" 70)    # milliseconds per typed character
+    lead = [double](Value $demoPace "lead" 2.0)    # caption on screen before the pointer moves
+    glide = [double](Value $demoPace "glide" 0.8)  # the pointer's travel to its target
+    hover = [double](Value $demoPace "hover" 0.4)  # resting on the target before the click
+    after = [double](Value $demoPace "after" 1.6)  # the result stays on screen before the next step
+    typing = [int](Value $demoPace "typing" 70)    # milliseconds per typed character
 }
 $log = [ordered]@{
-    demo = $demo.name; title = $demo.title; clock = "sandbox"
+    demo = $demo.name; title = (Value $demo "title" $null); clock = "sandbox"
     screen = $null; videoStartEpoch = $null; recordingRequestedEpoch = $null
     environment = @(); prepare = @(); steps = @(); fallbacks = @(); result = "not started"
 }
@@ -205,7 +208,8 @@ function Invoke-Action($Action, [string]$Label) {
                 if (Value $Action "replace" $true) { [DemoUi]::Press("Ctrl+A", 60) }
             }
             [DemoUi]::TypeText((Expand $Action.text), $pace.typing)
-            if ($Action.PSObject.Properties["into"]) { return $click }
+            # When the typing ended: demo-post.ps1 takes this step's still then, so it shows the typed text, not the empty field.
+            if ($Action.PSObject.Properties["into"]) { $click["typedEpoch"] = Epoch; return $click }
             return "typed"
         }
         "key" { [DemoUi]::Press($Action.keys, 80); return "pressed $($Action.keys)" }
@@ -284,11 +288,11 @@ try {
     $log.environment += "audio capture devices (PnP AudioEndpoint, capture): $(@(Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue | Where-Object { $_.FriendlyName -match 'Microphone|Input' }).Count)"
 
     $i = 0
-    foreach ($action in @($demo.prepare)) {
+    foreach ($action in @(Value $demo "prepare" @())) {
         if (-not $action) { continue }
         $i++
         $result = Invoke-Action $action "prepare-$i"
-        $text = if ($result -is [string]) { $result } else { "$($action.do) $(Describe $action.target)" }
+        $text = if ($result -is [string]) { $result } else { "$($action.do) $(Describe (Value $action "target" $null))" }
         $log.prepare += "$($action.do): $text"
         Note "prepare ${i}: $text"
         Start-Sleep -Milliseconds 300
@@ -306,7 +310,7 @@ try {
     foreach ($step in @($demo.steps)) {
         $n++
         $label = "{0:00}-{1}" -f $n, (Value $step "id" "step")
-        $entry = [ordered]@{ index = $n; id = (Value $step "id" $null); caption = $step.caption; start = $null; end = $null; clicks = @(); actions = @(); ok = $false; skipped = $false; error = $null }
+        $entry = [ordered]@{ index = $n; id = (Value $step "id" $null); caption = (Value $step "caption" $null); start = $null; end = $null; clicks = @(); actions = @(); ok = $false; skipped = $false; error = $null }
         try {
             if ($step.PSObject.Properties["skipIf"] -and (Find-Target $step.skipIf 1500)) {
                 $entry.skipped = $true; $entry.ok = $true; $entry.actions += "skipped: present $(Describe $step.skipIf)"
@@ -332,7 +336,7 @@ try {
             foreach ($action in @($step.do)) {
                 if (-not $action) { continue }
                 $result = Invoke-Action $action $label
-                if ($result -is [System.Collections.IDictionary]) { $entry.clicks += $result; $entry.actions += "$($action.do) $(Describe $(if ($action.target) { $action.target } else { $action.into }))" }
+                if ($result -is [System.Collections.IDictionary]) { $entry.clicks += $result; $entry.actions += "$($action.do) $(Describe (Value $action "target" (Value $action "into" $null)))" }
                 else { $entry.actions += "$($action.do): $result" }
             }
             Start-Sleep -Milliseconds ([int]([double](Value $step "after" $pace.after) * 1000))

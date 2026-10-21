@@ -1,6 +1,6 @@
 {
   "name": "test-setup",
-  "title": "Test your setup",
+  "title": "Calibrate my voice",
   "summary": "Today's build calls this Calibrate my voice (the 1.2 build is to rename it Test my setup). The sandbox has no microphone, so no sentence can be recorded there.",
   "prepare": [
     { "do": "plainDesktop" },

@@ -39,6 +39,7 @@ param(
     [double]$MaxGifMB = 15
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "demo-common.ps1")
 $root = Split-Path -Parent $PSScriptRoot
@@ -64,12 +65,12 @@ $cropW = [math]::Min($videoW, $screenW - ($screenW % 2)); $cropH = [math]::Min($
 $cropTop = 0
 $scale = $cropW / $screenW # screen pixels to video pixels (1 unless the capture was scaled)
 $duration = Get-MediaSeconds $ffprobe $raw
-function VideoTime([double]$Epoch) { return [math]::Max(0, [math]::Round($Epoch - [double]$steps.videoStartEpoch, 3)) }
+function VideoTime([double]$Epoch) { return [math]::Max(0.0, [math]::Round($Epoch - [double]$steps.videoStartEpoch, 3)) } # 0.0, not 0: in Windows PowerShell 5.1 [math]::Max(0, 7.3) returns 7
 function Between([double]$From, [double]$To) { return "enable='between(t,{0},{1})'" -f $From.ToString($inv), $To.ToString($inv) }
 
 # Captions, by step id from the data file (the step log's copy when the file has no such id).
 $captionById = @{}
-foreach ($s in @($data.steps)) { if ($s.id) { $captionById[$s.id] = $s.caption } }
+foreach ($s in @(Get-Prop $data "steps" @())) { if (Get-Prop $s "id") { $captionById[$s.id] = Get-Prop $s "caption" } }
 $shown = @($steps.steps | Where-Object { -not $_.skipped -and $_.start })
 if (-not $shown) { throw "steps.json records no step that ran." }
 
@@ -84,7 +85,7 @@ try {
     $inputs = @("-i", $raw)
     # The demo's title in the band until the first step begins.
     $firstStart = VideoTime $shown[0].start
-    if ($data.title -and $firstStart -gt 0.5) {
+    if ((Get-Prop $data "title") -and $firstStart -gt 0.5) {
         Write-Utf8 (Join-Path $work "title.txt") ([string]$data.title)
         $filters += "[$last]drawtext=fontfile=caption.ttf:expansion=none:textfile=title.txt:fontsize=$([int]($layout.Font * 1.1)):fontcolor=0xFFD400:x=(w-text_w)/2:y=${cropH}+($($layout.Band)-text_h)/2:$(Between 0 $firstStart)[title]"
         $last = "title"
@@ -113,7 +114,7 @@ try {
     $n = 0
     foreach ($h in $highlights) {
         $n++
-        $pad = 12; $edge = 7
+        $pad = 4; $edge = 7
         $c = $h.Click
         $box = $c.rect -and $c.x -ge $c.rect.x - 1 -and $c.x -le $c.rect.x + $c.rect.w + 1 -and $c.y -ge $c.rect.y - 1 -and $c.y -le $c.rect.y + $c.rect.h + 1
         if ($box) {
@@ -130,7 +131,7 @@ try {
         $yellow = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 255, 212, 0)), $edge
         $inner = New-Object System.Drawing.RectangleF ($edge / 2 + 2), ($edge / 2 + 2), ($w - $edge - 4), ($hh - $edge - 4)
         if ($box) {
-            $radius = [math]::Min(18, [math]::Min($inner.Width, $inner.Height) / 2)
+            $radius = [math]::Min(18.0, [math]::Min($inner.Width, $inner.Height) / 2)
             $d = 2 * $radius
             $path = New-Object System.Drawing.Drawing2D.GraphicsPath
             $path.AddArc($inner.X, $inner.Y, $d, $d, 180, 90); $path.AddArc($inner.Right - $d, $inner.Y, $d, $d, 270, 90)
@@ -170,23 +171,26 @@ try {
         $to = if ($i + 1 -lt $total) { VideoTime $shown[$i + 1].start } else { $duration }
         $click = @($step.clicks | Where-Object { $_ -and $null -ne $_.epoch }) | Select-Object -First 1
         # Just before the click: the pointer rests on the target and the highlight is on; the click itself may close it.
-        $at = if ($click) { [math]::Max($from, (VideoTime ([double]$click.epoch)) - 0.35) } else { ($from + $to) / 2 }
-        $at = [math]::Max(0, [math]::Min($at, $duration - 0.1))
+        $typed = Get-Prop $click "typedEpoch" # a "type" step that clicked into a field: the still shows the typed text
+        $at = if ($null -ne $typed) { [math]::Min([math]::Max($from, (VideoTime ([double]$typed)) + 0.3), $to - 0.1) }
+              elseif ($click) { [math]::Max($from, (VideoTime ([double]$click.epoch)) - 0.35) } else { ($from + $to) / 2 }
+        $at = [math]::Max(0.0, [math]::Min($at, $duration - 0.1))
         $label = "{0:00}-{1}" -f ($i + 1), $(if ($step.id) { $step.id } else { "step" })
         $stamp = $at.ToString("0.000", $inv)
         Invoke-Ffmpeg $Ffmpeg @("-hide_banner", "-y", "-ss", $stamp, "-i", $mp4, "-frames:v", "1", (Join-Path $frames "$label.png")) $work
         Invoke-Ffmpeg $Ffmpeg @("-hide_banner", "-y", "-ss", $stamp, "-i", $raw, "-frames:v", "1", "-vf", "crop=${cropW}:${cropH}:0:${cropTop}", (Join-Path $frames "raw\$label.png")) $work
-        if (@($data.steps | Where-Object { $_.id -eq $step.id -and $_.PSObject.Properties["poster"] -and $_.poster })) { $posterTime = $stamp }
+        if (@(@(Get-Prop $data "steps" @()) | Where-Object { (Get-Prop $_ "id") -eq $step.id -and (Get-Prop $_ "poster") })) { $posterTime = $stamp }
     }
-    if (-not $posterTime) { $posterTime = ([math]::Max(0, $duration - 1.5)).ToString("0.000", $inv) }
+    if (-not $posterTime) { $posterTime = ([math]::Max(0.0, $duration - 1.5)).ToString("0.000", $inv) }
     $poster = Join-Path $Out "$name-poster.png"
     Invoke-Ffmpeg $Ffmpeg @("-hide_banner", "-y", "-ss", $posterTime, "-i", $mp4, "-frames:v", "1", $poster) $work
     Copy-Item -LiteralPath (Join-Path $Run "steps.json") -Destination (Join-Path $folder "steps.json") -Force
 
+    # summary.json holds paths relative to $Out (Get-OutRelative), so no host profile path is in it.
     $summary = [ordered]@{
-        demo = $name; result = $steps.result; mp4 = $mp4; seconds = [math]::Round((Get-MediaSeconds $ffprobe $mp4), 1); mp4Bytes = (Get-Item -LiteralPath $mp4).Length
-        gif = $gif; gifBytes = (Get-Item -LiteralPath $gif).Length; poster = $poster; frames = $frames; steps = $total
-        fallbacks = @($steps.fallbacks | Where-Object { $_ }).Count; size = "${cropW}x$($cropH + $layout.Band)"; run = $Run
+        demo = $name; result = $steps.result; mp4 = (Get-OutRelative $mp4 $Out); seconds = [math]::Round((Get-MediaSeconds $ffprobe $mp4), 1); mp4Bytes = (Get-Item -LiteralPath $mp4).Length
+        gif = (Get-OutRelative $gif $Out); gifBytes = (Get-Item -LiteralPath $gif).Length; poster = (Get-OutRelative $poster $Out); frames = (Get-OutRelative $frames $Out); steps = $total
+        fallbacks = @($steps.fallbacks | Where-Object { $_ }).Count; size = "${cropW}x$($cropH + $layout.Band)"; run = (Get-OutRelative $Run $Out)
     }
     Write-Utf8 (Join-Path $folder "summary.json") ($summary | ConvertTo-Json)
     [pscustomobject]$summary | Format-List | Out-String | Write-Host

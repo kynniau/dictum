@@ -4,9 +4,10 @@
   file in scripts\demos, then captioned by demo-post.ps1 into dist\demos\<name>.mp4, .gif and -poster.png.
 
 .DESCRIPTION
-  For each -Demo, this script writes a .wsb (from demo-record.wsb) that maps, read-only, the scripts folder, a staged
-  copy of the Setup exe, the published folder (-App, when given), the host's model folder (only when the demo asks for
-  extra models), the Visual C++ runtime files from this PC's System32 and ffmpeg; and, writable, the run's own folder.
+  For each -Demo, this script writes a .wsb (from demo-record.wsb, into the staging folder in %TEMP%, so the run folder
+  never holds a host path) that maps, read-only, the scripts folder, a staged copy of the Setup exe, the published folder
+  (-App, when given), a staged folder holding copies of only the extra models the demo names (never the host's whole
+  model folder), the Visual C++ runtime files from this PC's System32 and ffmpeg; and, writable, the run's own folder.
   It starts the sandbox, sizes its window so the sandbox desktop is -Width x -Height, and waits for the driver
   (demo-inside.ps1, run hidden at logon) to write done.txt. The driver prepares the clean Windows, records the steps and
   shuts the sandbox down; this script closes it if it is still open after a minute.
@@ -20,8 +21,10 @@
   The sandbox gets the Visual C++ runtime from this PC (DLLs and registry key), so it is a PC with the redistributable
   installed, as Dictum needs (docs\DECISIONS.md, "Visual C++ runtime"); -NoVcRuntime records a PC without it.
 
-  Needs Windows Sandbox, ffmpeg (winget install Gyan.FFmpeg) and no other sandbox open. Changes nothing on the host
-  except the run folders, dist\demos and a staging folder in %TEMP% that is deleted afterwards.
+  Needs Windows Sandbox, ffmpeg (winget install Gyan.FFmpeg), 100 % display scaling on the host (the sandbox's title bar
+  is taken as 33 px), a host screen that fits a Width x (Height + 33) window plus borders (1600 x 933 by default: a
+  1366 x 768 screen cannot), and no other sandbox open. Changes nothing on the host except the run folders, dist\demos
+  and a staging folder in %TEMP% that is deleted afterwards.
 
 .PARAMETER Demo
   Demo names (scripts\demos\<name>.json) or paths, comma-separated. Default: every file in scripts\demos.
@@ -30,7 +33,8 @@
 .PARAMETER App
   A published folder holding Dictum.exe ({app} in a demo file). Optional.
 .PARAMETER ModelsDir
-  Where a demo's environment.extraModels are read from (read-only). Default: %LOCALAPPDATA%\Dictum\models.
+  Where a demo's environment.extraModels are read from. Only the files a demo names are copied (to the staging folder,
+  which is mapped read-only); the folder itself is never mapped. Default: %LOCALAPPDATA%\Dictum\models.
 .PARAMETER Width
   The sandbox desktop's width in pixels. Default 1600.
 .PARAMETER Height
@@ -38,8 +42,14 @@
 .PARAMETER RunsDir
   Where each run's folder (job.json, steps.json, raw.mp4, logs) is made. Default: dist\demos\runs.
 .PARAMETER SizeAttempts
-  How many times a sandbox that came up at another desktop size is started again before recording at that size.
-  Default 6.
+  How many times a sandbox that came up at another desktop size is started (in all, counting the first) before the
+  script gives up. Default 6.
+.PARAMETER AllowOtherSize
+  When the attempts run out and the sandbox desktop is still not Width x Height, record at the size it has (with a
+  warning) instead of throwing.
+.PARAMETER SkipDpiCheck
+  Do not refuse to run when the host's display scaling is not 100 %. The title bar height is then a guess, so the
+  sandbox desktop may never reach Width x Height.
 .PARAMETER NoPost
   Record only; run demo-post.ps1 later.
 
@@ -60,11 +70,14 @@ param(
     [string]$Ffmpeg,
     [switch]$NoVcRuntime,
     [switch]$NoPost,
+    [switch]$AllowOtherSize,
+    [switch]$SkipDpiCheck,
     [int]$Fps = 30,
     [int]$SizeAttempts = 6,
     [int]$TimeoutMinutes = 15
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot "demo-common.ps1")
@@ -102,6 +115,14 @@ public static class DemoHostWindow {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] static extern IntPtr GetDesktopWindow();
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h, uint flags);
+    [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr m, int type, out uint x, out uint y);
+    // The primary monitor's effective DPI (96 = 100 % scaling), or 0 when Windows cannot say.
+    public static int PrimaryMonitorDpi() {
+        uint x, y;
+        return GetDpiForMonitor(MonitorFromWindow(GetDesktopWindow(), 1), 0, out x, out y) == 0 ? (int)x : 0;
+    }
     public static IntPtr Find(uint pid, string title) {
         IntPtr found = IntPtr.Zero;
         EnumWindows(delegate (IntPtr h, IntPtr l) {
@@ -114,6 +135,19 @@ public static class DemoHostWindow {
     }
 }
 '@
+
+# Display scaling: the window sizing below assumes the sandbox's title bar is 33 px, which holds at 100 % scaling only.
+# Two reads, either of which stops the run: the primary monitor's effective DPI (shcore GetDpiForMonitor; 96 is 100 %)
+# and the registry value HKCU:\Control Panel\Desktop\LogPixels, which Windows writes when a custom scaling is set (absent
+# at the default). Not verified here: that GetDpiForMonitor reports the true DPI to this DPI-unaware PowerShell process
+# when the scaling is not 100 %; -SkipDpiCheck exists for a wrong refusal.
+if (-not $SkipDpiCheck) {
+    $monitorDpi = [DemoHostWindow]::PrimaryMonitorDpi()
+    $logPixels = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -ErrorAction SilentlyContinue).PSObject.Properties["LogPixels"]
+    if (($monitorDpi -ne 0 -and $monitorDpi -ne 96) -or ($logPixels -and $logPixels.Value -and [int]$logPixels.Value -ne 96)) {
+        throw "demo-record.ps1 needs 100 % display scaling on the host (title bar assumed 33 px); this PC reports monitor DPI $monitorDpi, registry LogPixels $(if ($logPixels) { $logPixels.Value } else { 'unset' }). Set Settings > System > Display > Scale to 100 %, or pass -SkipDpiCheck."
+    }
+}
 
 function Close-Sandbox([int]$Seconds) {
     $deadline = (Get-Date).AddSeconds($Seconds)
@@ -173,8 +207,12 @@ foreach ($name in $Demo) {
     $extra = @(if ($data.PSObject.Properties["environment"] -and $data.environment.PSObject.Properties["extraModels"]) { $data.environment.extraModels })
     if ($extra) {
         foreach ($m in $extra) { if (-not (Test-Path -LiteralPath (Join-Path $ModelsDir $m))) { throw "$($data.name) needs $m in $ModelsDir (no downloads)." } }
-        $maps["C:\sbx\models"] = (Resolve-Path -LiteralPath $ModelsDir).Path
-        $job.extraModels = @($extra | ForEach-Object { "C:\sbx\models\$_" })
+        # Only the files the demo names, copied to the staging folder, which is what the sandbox sees (read-only): the
+        # host's whole model folder is never mapped. Names are the files' leaf names, so the sandbox paths stay flat.
+        New-Item -ItemType Directory -Force -Path "$stage\models" | Out-Null
+        foreach ($m in $extra) { Copy-Item -LiteralPath (Join-Path $ModelsDir $m) -Destination "$stage\models" }
+        $maps["C:\sbx\models"] = "$stage\models"
+        $job.extraModels = @($extra | ForEach-Object { "C:\sbx\models\" + (Split-Path -Leaf $_) })
     }
     if ($vcInfo) {
         New-Item -ItemType Directory -Force -Path "$stage\vcrt" | Out-Null
@@ -193,7 +231,7 @@ foreach ($name in $Demo) {
     $mapped += "    <MappedFolder><HostFolder>{0}</HostFolder><SandboxFolder>C:\sbx\out</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>" -f
         [Security.SecurityElement]::Escape($run)
     $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "demo-record.wsb")) -replace '(?s)^\s*<!--.*?-->\s*', ''
-    $wsb = Join-Path $run "demo.wsb"
+    $wsb = Join-Path $stage "demo.wsb" # not in $run: the sandbox can write to $run, and demo.wsb lists host paths
     Write-Utf8 $wsb $template.Replace("{{MappedFolders}}", ($mapped -join "`r`n"))
 
     Write-Host "Recording $($data.name) in Windows Sandbox; run folder $run"
@@ -206,12 +244,14 @@ foreach ($name in $Demo) {
         # again, up to -SizeAttempts times (inside the sandbox, ChangeDisplaySettings returns success and changes nothing,
         # observed 21/10/2026). The client area includes the sandbox's own title bar (33 px at 100 % scaling,
         # observed 21/10/2026). steps.json records the size that resulted.
-        $titleBar = 33
+        $titleBar = 33 # 100 % scaling only: checked above
         $wanted = "${Width}x${Height}"
         $r = New-Object DemoHostWindow+RECT; $c = New-Object DemoHostWindow+RECT
         $screenFile = Join-Path $run "screen.txt"
+        $doneFile = Join-Path $run "done.txt"
         for ($attempt = 1; ; $attempt++) {
-            Remove-Item -LiteralPath $screenFile, (Join-Path $run "progress.txt") -ErrorAction SilentlyContinue
+            # Everything the previous attempt's driver left: a stale done.txt or steps.json would read as a finished run.
+            Remove-Item -LiteralPath $screenFile, (Join-Path $run "progress.txt"), $doneFile, (Join-Path $run "steps.json"), (Join-Path $run "raw.mp4") -ErrorAction SilentlyContinue
             Start-Process -FilePath $sandbox -ArgumentList "`"$wsb`""
             $deadline = (Get-Date).AddSeconds(120)
             $window = [IntPtr]::Zero
@@ -226,6 +266,7 @@ foreach ($name in $Demo) {
             $matched = 0; $nudged = [datetime]::MinValue; $reported = ""; $wrongSince = $null
             $deadline = (Get-Date).AddSeconds(120)
             while ($matched -lt 2 -and (Get-Date) -lt $deadline) {
+                if (Test-Path -LiteralPath $doneFile) { throw "The driver ended before recording: $((Get-Content -LiteralPath $doneFile -Raw).Trim())" }
                 [void][DemoHostWindow]::GetWindowRect($window, [ref]$r); [void][DemoHostWindow]::GetClientRect($window, [ref]$c)
                 $reported = if (Test-Path -LiteralPath $screenFile) { "$(Get-Content -LiteralPath $screenFile -Raw -ErrorAction SilentlyContinue)".Trim() } else { "" }
                 if ($reported -eq $wanted) { $matched++ } else {
@@ -248,10 +289,13 @@ foreach ($name in $Demo) {
             Get-Process -Name "WindowsSandboxRemoteSession", "WindowsSandboxClient" -ErrorAction SilentlyContinue | Stop-Process -Force
             Close-Sandbox 1
         }
+        if ($reported -ne $wanted -and -not $AllowOtherSize) {
+            throw "The sandbox desktop is '$reported', not ${wanted}, after $attempt attempt(s): not recording. The host screen must fit a $Width x $($Height + $titleBar) window plus its borders (a 1366 x 768 screen cannot); or pass -AllowOtherSize to record at the size it got, or raise -SizeAttempts."
+        }
         [void][DemoHostWindow]::SetForegroundWindow($window)
         [void][DemoHostWindow]::GetClientRect($window, [ref]$c)
         Write-Utf8 (Join-Path $run "window.txt") "client $($c.R)x$($c.B); sandbox desktop $reported; attempt $attempt"
-        if ($reported -ne $wanted) { Write-Warning "The sandbox desktop is '$reported', not ${wanted}: recording at that size." }
+        if ($reported -ne $wanted) { Write-Warning "The sandbox desktop is '$reported', not ${wanted}: recording at that size (-AllowOtherSize)." }
         Write-Host "  Sandbox window client area $($c.R)x$($c.B); sandbox desktop $reported (attempt $attempt)."
 
         $deadline = (Get-Date).AddMinutes($TimeoutMinutes)

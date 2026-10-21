@@ -1,6 +1,22 @@
 # Shared by demo-record.ps1, demo-post.ps1 and demo-stills.ps1 (dot-sourced): finding ffmpeg, running it, the caption
 # layout and the GIF. Host side only; nothing here runs inside the sandbox.
 
+Set-StrictMode -Version Latest
+
+# A property of a parsed JSON object, or $Default when it has none (strict mode throws on a missing property).
+function Get-Prop($Object, [string]$Name, $Default = $null) {
+    if ($null -ne $Object -and $Object.PSObject.Properties[$Name]) { return $Object.$Name }
+    return $Default
+}
+
+# $Path relative to $Out, for summary.json (no host profile path in it); a path outside $Out is given by its last
+# segment only.
+function Get-OutRelative([string]$Path, [string]$Out) {
+    $base = $Out.TrimEnd('\') + '\'
+    if ($Path.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)) { return $Path.Substring($base.Length) }
+    return Split-Path -Leaf $Path
+}
+
 function Write-Utf8([string]$Path, [string]$Text) { [IO.File]::WriteAllText($Path, $Text, (New-Object System.Text.UTF8Encoding $false)) }
 
 function Find-Ffmpeg([string]$Given) {
@@ -20,8 +36,12 @@ function Invoke-Ffmpeg([string]$Exe, [string[]]$Arguments, [string]$WorkDir) {
     $info.RedirectStandardError = $true
     $info.CreateNoWindow = $true
     $p = [System.Diagnostics.Process]::Start($info)
-    $err = $p.StandardError.ReadToEnd()
-    $p.WaitForExit()
+    # stderr is read in the background: a synchronous ReadToEnd() would block until ffmpeg closes it, so a hung ffmpeg
+    # would never reach the timeout below.
+    $errRead = $p.StandardError.ReadToEndAsync()
+    if (-not $p.WaitForExit(600000)) { $p.Kill(); throw "ffmpeg timed out after 600 s: $($info.Arguments)" }
+    $p.WaitForExit() # flushes the redirected stream
+    $err = $errRead.Result
     if ($p.ExitCode -ne 0) { throw "ffmpeg failed (exit $($p.ExitCode)): $($info.Arguments)`n$err" }
 }
 

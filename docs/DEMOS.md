@@ -24,7 +24,17 @@ For each demo, in `dist\demos\` (git-ignored):
 
 Needs Windows Sandbox (the Windows feature), ffmpeg (`winget install Gyan.FFmpeg`; 9.0.2 was used), Inno Setup for
 the Setup exe, and no other sandbox open. The host PC must have the Microsoft Visual C++ Redistributable (x64)
-installed: the sandbox borrows it (below).
+installed: the sandbox borrows it (below). The host also needs:
+
+- **100 % display scaling.** The window sizing assumes the sandbox's title bar is 33 px, which holds at 100 % only.
+  `demo-record.ps1` stops with "needs 100 % display scaling on the host" when the primary monitor's DPI (shcore
+  `GetDpiForMonitor`) or the registry value `HKCU:\Control Panel\Desktop\LogPixels` says otherwise. `-SkipDpiCheck` turns
+  the check off (the sandbox desktop may then never reach 1600 x 900). Not verified: that `GetDpiForMonitor` reports the
+  true DPI to Windows PowerShell 5.1 at a scaling other than 100 %; the check was only run on a PC reporting 96.
+- **A screen that fits the window.** The sandbox desktop is 1600 x 900 inside a 1600 x 933 window (the title bar adds
+  33 px) plus borders, so the host screen must be larger than that: a 1366 x 768 screen cannot. If the sandbox still
+  comes up at another size after `-SizeAttempts` tries, the script stops (below); `-AllowOtherSize` records at that size
+  anyway.
 
 ```powershell
 # 1. The Setup exe of the build to show (publishes dist\Dictum first)
@@ -51,8 +61,9 @@ read-only except the run's own folder.
 
 ```
 demo-record.ps1 (host)                         demo-inside.ps1 (inside Windows Sandbox, hidden at logon)
-  stage Setup exe, VC++ DLLs  ── read-only ──▶   reports the desktop size (screen.txt)
-  write job.json, demo.wsb                     ◀─ sizes the window until the desktop is 1600 x 900 (window.txt)
+  stage Setup exe, VC++ DLLs,  ── read-only ──▶  reports the desktop size (screen.txt)
+  extra model files (copies)                   ◀─ sizes the window until the desktop is 1600 x 900 (window.txt)
+  write job.json (run folder), demo.wsb (staging folder)
   start the sandbox                              installs the VC++ runtime, then the "prepare" actions (not recorded)
   size its window                                starts ffmpeg gdigrab on its own desktop
                                                  runs each step: find the target, show the caption, glide, click
@@ -84,8 +95,17 @@ demo-post.ps1 (host): captions + highlights from steps.json → mp4, gif, poster
   window afterwards (with `SetWindowPos`, and even with the end of a drag, `WM_ENTERSIZEMOVE` / `WM_EXITSIZEMOVE`, sent)
   left it at the window's earlier size (2736 x 1111 or 2752 x 1120) in five of twelve runs on 21/10/2026. So the host
   holds the window at 1600 x 933 from the moment it appears (every 150 ms), and when the driver still reports another
-  desktop size 20 s later, it closes the sandbox and starts it again, up to three times; after that it warns and
-  records at the size it got. `window.txt` in the run folder says which attempt held.
+  desktop size 20 s later, it closes the sandbox and starts it again, up to `-SizeAttempts` (default 6) in all; after
+  that it **stops with an error** rather than record at the wrong size, unless `-AllowOtherSize` is given (then it warns
+  and records at the size it got). Each attempt first deletes the previous attempt's `screen.txt`, `progress.txt`,
+  `done.txt`, `steps.json` and `raw.mp4`, so nothing stale is read as a finished run; and if the driver writes
+  `done.txt` before any recording (it failed early), the script stops with its message. `window.txt` in the run folder
+  says which attempt held.
+- **What is shared with the sandbox.** Read-only: the scripts folder, a staged copy of the Setup exe, the Visual C++
+  files, ffmpeg, and, when a demo names extra models, a staging folder holding copies of only those model files (the
+  host's own model folder is never mapped). Writable: the run folder, which holds no host path (`demo.wsb`, which lists
+  them, is written to the staging folder in `%TEMP%`, deleted after the run). `summary.json` also holds paths relative
+  to the output folder only.
 - **A clean desktop.** Each demo's first prepare action is `plainDesktop`: a plain blue background and the desktop
   icons hidden. The sandbox's "Windows 11 Enterprise Insider Preview, Evaluation copy" watermark (bottom right) stays:
   Windows draws it.
@@ -127,8 +147,9 @@ Inside, nothing on the host can appear in a video, and the host PC stays usable 
 `prepare` runs before recording starts; `steps` are recorded, one caption each. A step can carry `"optional": true`
 (skipped, and not shown, when its first target does not appear), `"skipIf": <target>` (skipped when that is already
 on screen), `"poster": true`, and its own `lead` and `after`. `environment.extraModels` names files in the host's model
-folder (`-ModelsDir`, default `%LOCALAPPDATA%\Dictum\models`), mapped read-only and copied in by `modelsFromHost`: no
-model is ever downloaded.
+folder (`-ModelsDir`, default `%LOCALAPPDATA%\Dictum\models`). Only those files are copied, to a staging folder that is
+mapped read-only, and then copied in by `modelsFromHost`: the folder itself is never mapped and no model is ever
+downloaded.
 
 A **target** is `window` (a regular expression on the top-level window's title), `windowClass`, `type` (Button, Edit,
 Text, ListItem, CheckBox, ...), `name` with `match` (`exact`, the default and case-insensitive, `prefix`,
@@ -181,6 +202,9 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
 - **No network.** SmartScreen cannot reach Microsoft, so the install demo shows "SmartScreen can't be reached right
   now" (Run / Don't run) where a real download shows "Windows protected your PC" (More info, then Run anyway). The data
   file has optional steps for both; only the offline one has been seen in the sandbox.
+- **The SmartScreen frame is Windows' own text for an unsigned file.** It shows the placeholder string
+  "File Type: @@FileType@@" and "Publisher: Unknown Publisher" because the local build is unsigned. The published Setup
+  may differ, so re-check this frame on the build that is shown.
 - **The Visual C++ runtime is borrowed.** Dictum's speech engine needs the Microsoft Visual C++ Redistributable, which
   a clean Windows lacks (docs\DECISIONS.md, "Visual C++ runtime"). The sandbox gets this PC's copy (the four DLLs
   into its System32 and the registry key Setup checks), so it is a PC with the redistributable installed. Nothing is
@@ -203,6 +227,25 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
 | 5. Models on another drive | `model-folder.json` | Settings, Models, scroll to Model folder, Browse, type D:\Dictum models, Select Folder, the new folder shown |
 | 6. Microphone not heard | none yet | Not recordable until the silence warning lands (above) |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
+
+## Changes in 1.2
+
+What the 1.2 redesign changes for each demo; none is applied yet, so each data file is to be re-checked against the 1.2
+build (a failed lookup saves the window's UI Automation tree, "Adding a demo" below).
+
+- **Install** (`install.json`): onboarding replaces the first-run dialogs, so the last step, "First it asks about your
+  hotkey" (waits for the "Check your hotkey" window), is to be reworded and retargeted at onboarding's first screen.
+- **First run** (`first-run.json`): onboarding replaces the first-run dialogs, so steps 4 and 5 (the hotkey check and
+  "Use this hotkey") go, and the steps after them start from onboarding's end. The `prepare` lists of
+  `change-model.json`, `model-folder.json` and `test-setup.json` also click "Use this hotkey" in the "Check your hotkey"
+  window and need the same change.
+- **Change the speech model** (`change-model.json`): the Simple view renames the model tiers, so the
+  `"sameRowAs": "tiny.en"` anchor of its "Use" and "In use" targets must be re-checked on the 1.2 build.
+- **Calibrate my voice / Test my setup** (`test-setup.json`): calibration is renamed (the demo's title now says
+  "Calibrate my voice", the name on screen in 1.1.x); its caption, its "Calibrate my voice" target and the title become
+  "Test my setup" with the 1.2 build.
+- **Keep the models on another drive** (`model-folder.json`): no 1.2 change is known beyond the shared `prepare` change
+  above.
 
 ## PROPOSED caption copy
 
@@ -233,7 +276,7 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
    4. Click Models, on the left.
    5. Find the model you want. Click Use next to it.
    6. That's it. The model you chose now says In use.
-4. **Test your setup** (today: Calibrate my voice)
+4. **Calibrate my voice** (the 1.2 build: Test my setup)
    1. Click the little up-arrow near the clock, at the bottom right of the screen.
    2. Click the Dictum icon.
    3. Click Calibrate my voice.
