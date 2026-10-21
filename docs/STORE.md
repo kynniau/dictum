@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 and updated 21/10/2026 for 1.1.2 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 22/10/2026 for 1.2.0 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.1.2, so the package is 1.1.2.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026 and to 1.1.1 on 19/10/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.2.0, so the package is 1.2.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026 and to 1.2.0 on 22/10/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -125,6 +125,9 @@ GOOD TO KNOW
 - Windows does not let Dictum paste into apps running as administrator, or into sign-in and UAC screens.
 - The Fn key cannot be used as the hotkey.
 
+FREE
+Free: no subscription, no account, no ads, no analytics, no telemetry. The base product stays free to keep on your PC; optional paid extras may come later.
+
 Free and open source under the MIT licence, by Kynni Pty Ltd.
 ```
 
@@ -139,9 +142,17 @@ Calibration finds the installed model that hears you best
 Personal dictionary and corrections for names and jargon
 Grammar assist for speakers whose first language is not English
 Offline-only mode: no connection to anything outside your PC
-No account, no analytics, no telemetry
+Free: no subscription, no account, no ads, no analytics, no telemetry.
 Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
+```
+
+### What's new in this version (1.2.0)
+
+PROPOSED (22/10/2026), for the owner to approve. Paste it in "What's new in this version" on the 1.2.0 submission.
+
+```text
+Adds a Welcome window with a microphone test, a Simple view with plain model choices, a Help page in Settings, and feedback buttons. Also includes the 1.1.2 fix for PCs without a working graphics driver.
 ```
 
 ### Search terms (if Partner Center shows the field)
@@ -242,7 +253,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.1.2 (set 21/10/2026; 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.2.0 (set 22/10/2026; 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -302,9 +313,9 @@ after the app change that reads the bundled model from `<program folder>\models`
 model-folder change (PR #11): without it the package carries the file but the first run still asks for a download.
 
 ```text
-Notes written 21/10/2026 for Dictum 1.1.2.
+Notes written 22/10/2026 for Dictum 1.2.0.
 
-CHANGED SINCE THE LAST SUBMISSION: Dictum 1.1.2 fixes a start-up crash on PCs without a working Vulkan graphics driver (the app closed before its tray icon appeared; it now runs the speech model on the CPU there), and warns "No sound from mic" when the microphone delivers no audio instead of staying on "Recording". No download is needed to test: the base.en speech model ships inside the package, so dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads. Choosing a second model while one is downloading never cancels the first: Dictum asks first.
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.2.0 adds a Welcome window on first run (a hotkey check, a microphone test and a choice of where model files are kept), a Simple view that names speech models by plain tiers (Standard, More accurate, Most accurate) with an Advanced view that shows model names, a clean-up Off option that pastes what was heard, a Help page in Settings, and Send feedback and Email support buttons that open the user's own mail program (Dictum itself sends nothing). No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads.
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the panel.
 
@@ -312,7 +323,7 @@ NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside
 
 TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json (the bundled base.en model needs no copying; optionally copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder). Settings > Storage shows both folders. Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
-TO DICTATE: click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
+TO DICTATE: on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
 GENERATIVE AI: the clean-up step runs a local language model on the user's own dictated words only; it is instructed not to add or answer anything, its output is checked against the dictation, and users can report a problem from Settings (Report a problem), from 1.2, send feedback from Settings > Help (Send feedback or suggest a feature; both open an email in the user's own mail app, and Dictum sends nothing itself), or write by email.
 
@@ -418,8 +429,10 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 19/10/2026, about 17:30 AEDT | Dictum 1.1.1 resubmitted (package 1.1.1.0, the no-silent-cancel fix, tester notes rewritten). Status "In certification". |
 | 20/10/2026 | Certification passed. Partner Center shows "In Microsoft Store" and https://apps.microsoft.com/detail/9N0DG1DHTR57 answers 200 with the Dictum listing (both checked 20/10/2026, 10:45 AEDT). The landing page's Store button went live the same day. |
 | 21/10/2026 | Dictum 1.1.2 prepared: launch crash without a working Vulkan driver fixed (PR #21), "No sound from mic" warning (PR #22). Published to GitHub and dictum.kynni.au first; the Store package is staged for the owner's upload. |
+| 21/10/2026 | 1.1.2 submitted (Submission 2), marked mandatory, in certification. |
+| 22/10/2026 | Dictum 1.2.0 prepared (version bump, tester notes, listing text); all new wording is PROPOSED until the owner approves it. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
-for 1.1.0, 1.1.1 or 1.1.2 (no packaged run on a clean PC yet).
+for 1.1.0, 1.1.1, 1.1.2 or 1.2.0 (no packaged run on a clean PC yet).

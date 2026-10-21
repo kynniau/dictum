@@ -3889,3 +3889,14 @@ The re-lens closed every finding of the final lens and raised one minor and one 
 - **Minor:** the Off status now says what still applies (PROPOSED): "no clean-up: whitespace tidied only; your corrections, snippets and the profanity filter still apply (llm.provider = off)". It still starts with "no clean-up:".
 - **Nit:** the settings.json help text for `llm` (off) now reads "off (no clean-up: spaces tidied only; your corrections, snippets and the profanity filter still apply; spoken commands such as "new paragraph" are typed as words)".
 - **Pin:** `The_off_lines_say_what_still_applies` checks the status word for word. Mutation, with the old status put back: **observed failing**.
+
+## Release 1.2.0 prepared (22/10/2026)
+
+Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOSED until the owner approves it. `site/version.json` is not touched (set at release time) and no tag is created.
+
+1. `Directory.Build.props`: `<Version>` 1.1.2 to 1.2.0 (package 1.2.0.0).
+2. `docs/STORE.md` certification notes (PROPOSED): header "Notes written 22/10/2026 for Dictum 1.2.0." and a new CHANGED SINCE THE LAST SUBMISSION paragraph (the Welcome window, the Simple and Advanced views, clean-up Off, the Help page, the Send feedback and Email support buttons). Every other paragraph of the block is unchanged, except one sentence added to TO DICTATE (PROPOSED): "on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then" before "click into any text field". The block had no first-run hotkey dialog sentence to replace.
+3. `docs/STORE.md` listing (PROPOSED): a "What's new in this version (1.2.0)" note; the feature line "No account, no analytics, no telemetry" replaced by the approved line "Free: no subscription, no account, no ads, no analytics, no telemetry."; a FREE paragraph in the description with the two approved lines ("Free: no subscription, no account, no ads, no analytics, no telemetry." and "The base product stays free to keep on your PC; optional paid extras may come later.").
+4. `docs/STORE.md` version references (section 1 package-version row, section 6) say 1.2.0 / 1.2.0.0; the certification record gains "21/10/2026 1.1.2 submitted (Submission 2), marked mandatory, in certification" and "22/10/2026 Dictum 1.2.0 prepared".
+5. `README.md`: a bullet under the opening list carries the two approved lines verbatim, plus open source, MIT and Kynni Pty Ltd. No other fact was removed.
+6. Not changed, for the owner: section 9 row 17 of `docs/STORE.md` still says the first run shows "only the hotkey check"; with the 1.2 Welcome window it now also shows a model-folder choice and a microphone test.
