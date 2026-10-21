@@ -1191,14 +1191,14 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
-  system's folder chooser through Avalonia, **Use default**; amended 22/10/2026: the field shows the end of a long path,
-  trimmed from the left, the whole path in its tooltip, which keyboard focus opens, and as its accessible value, named
-  "Model folder"; Browse… starts in the folder or the nearest folder above it that exists, a note that downloads go there and nothing moves, and a
+  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
   one-line warning when the folder is on a network share: a UNC path, read from the text alone, or a mapped network
   drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
   ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled
   folder. Storage (§17) lists the three folders in lookup order and the folder each model is in; bundled models have no
-  Delete. All new sentences are PROPOSED for the product owner.
+  Delete. All new sentences are PROPOSED for the product owner. Amended 22/10/2026: the field shows the end of a long
+  path, trimmed from the left, the whole path in its tooltip, which keyboard focus opens, and as its accessible value,
+  named "Model folder"; Browse… starts in the folder or the nearest folder above it that exists.
 - **Recommended layout for shared virtual desktops:** one local folder per VM shared by its users, on a persistent data
   disk, readable by every user and writable only by administrators, seeded as `models.folder` for every user and filled by
   an administrator with `install.ps1 -ModelsFrom`; a user who wants another model uses **Use default**. Dictum then looks

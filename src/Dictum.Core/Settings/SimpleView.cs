@@ -72,8 +72,11 @@ public static class SimpleView
     public const string TidyTitle = "Tidy my words (recommended)";
     public const string TidySubLine = "Fixes punctuation and removes ums and ahs. Runs on this PC.";
 
-    /// <summary>The Tidy row's state while the recommended clean-up model (not the rule-based tidy) does the tidying.</summary>
-    public const string TidyWithAiState = "In use, with AI clean-up";
+    /// <summary>
+    /// The Tidy row's state while the recommended clean-up model (not the rule-based tidy) does the tidying, after the row's
+    /// "In use" tag (PROPOSED, 1.2 polish round 2: it was "In use, with AI clean-up" beside the tag).
+    /// </summary>
+    public const string TidyWithAiState = "With AI clean-up";
 
     // PROPOSED copy (21/10/2026, the clean-up Off lane), for the product owner to approve before release (DECISIONS, 21/10/2026).
     /// <summary>The Simple view's no-clean-up row (llm.provider = off), and the tray panel's Simple clean-up entry.</summary>
@@ -105,8 +108,9 @@ public static class SimpleView
     /// <summary>
     /// The line of a Custom row (lens on PR #23): the model in use is none of the choices above. It may have come from the
     /// Advanced view, calibration, a Mode preset, the first run, --model or DICTUM_MODEL_PATH, so the line does not say which.
+    /// The row's "In use" tag says it is in use (PROPOSED, 1.2 polish round 2: it was "In use. Not one of the choices above.").
     /// </summary>
-    public const string CustomNote = "In use. Not one of the choices above.";
+    public const string CustomNote = "Not one of the choices above.";
 
     /// <summary>A model in use that is none of the plain choices, so nothing is hidden: "Custom: tiny.en".</summary>
     public static string Custom(string name) => $"Custom: {name}";
@@ -197,17 +201,17 @@ public static class SimpleView
 
     /// <summary>
     /// The tray panel's line under Light | Full in the Simple view (PROPOSED, 1.2 polish): the presets by their Simple names,
-    /// "Full: More accurate and AI clean-up. Light: Standard and Tidy my words.", or null when that would not be true, and the
-    /// caller keeps the model-name line (lens on 4abba54): the text is not plain English speech (another language, Detect
-    /// automatically, or translate: no clean-up model runs on it, and the presets' English models are no tier then), or a
-    /// preset's model is no tier.
+    /// one sentence each ("Full: More accurate and AI clean-up.", "Light: Standard and Tidy my words."; the panel puts each on
+    /// its own line, 1.2 polish round 2), or null when that would not be true, and the caller keeps the model-name line (lens
+    /// on 4abba54): the text is not plain English speech (another language, Detect automatically, or translate: no clean-up
+    /// model runs on it, and the presets' English models are no tier then), or a preset's model is no tier.
     /// </summary>
-    public static string? ModeHint(bool gpuMachine, string language, bool translate)
+    public static string[]? ModeHint(bool gpuMachine, string language, bool translate)
     {
         if (!WhisperLanguages.OutputIsEnglish(language, translate)) return null;
         var full = TierOf(ModePresets.For(ModePreset.Full, gpuMachine).SpeechModel, gpuMachine, language, translate);
         var light = TierOf(ModePresets.LightSpeech, gpuMachine, language, translate);
-        return full is null || light is null ? null : $"Full: {full.Label} and {AiCleanupLabel}. Light: {light.Label} and {TidyLabel}.";
+        return full is null || light is null ? null : [$"Full: {full.Label} and {AiCleanupLabel}.", $"Light: {light.Label} and {TidyLabel}."];
     }
 
     /// <summary>The clean-up model "Add AI clean-up" adds, and the Tidy row uses when it is on this PC.</summary>

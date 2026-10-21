@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Dictum.Help;
 using Dictum.Llm;
 using Dictum.Settings;
@@ -364,18 +365,39 @@ internal sealed class HelpPage : SettingsPage
 
     /// <summary>
     /// A question in the list at the top: a link button (a tab stop with the theme's focus ring) whose label wraps, so a long
-    /// question stays inside a narrow window. Pressing it moves keyboard focus to the answer, which scrolls it into view and,
-    /// as with Tab, shows its ring.
+    /// question stays inside a narrow window. Pressing it moves keyboard focus to the answer, which, as with Tab, shows its ring,
+    /// and scrolls the page so the answer's heading is at the top (<see cref="ScrollToTop"/>).
     /// </summary>
     private static Button JumpLink(string question, Border answer)
     {
-        var link = Ui.Button("", "link", () => answer.Focus(NavigationMethod.Tab));
+        var link = Ui.Button("", "link", () =>
+        {
+            answer.Focus(NavigationMethod.Tab);
+            ScrollToTop(answer);
+        });
         link.Content = new TextBlock { Text = question, TextWrapping = TextWrapping.Wrap, FontSize = 14 };
         link.HorizontalContentAlignment = HorizontalAlignment.Left;
         link.HorizontalAlignment = HorizontalAlignment.Left;
         AutomationProperties.SetName(link, question);
         AutomationProperties.SetHelpText(link, HelpText.IndexLinkHelp);
         return link;
+    }
+
+    /// <summary>Space left above an answer scrolled to the top, so its focus ring is not on the window's edge.</summary>
+    internal const double JumpGap = 8;
+
+    /// <summary>
+    /// Scrolls the page so <paramref name="answer"/> starts <see cref="JumpGap"/> below the top of the view (as far as the page
+    /// goes: the last answers stop where the page ends). Focus alone scrolled only as far as needed, which left the answer at
+    /// the bottom edge with its last line cut off (1.2 polish round 2).
+    /// </summary>
+    private static void ScrollToTop(Control answer)
+    {
+        // Measured against the scrolled content, not the view: focus has already moved the offset, and the view's coordinates
+        // follow it only at the next layout pass.
+        if (answer.FindAncestorOfType<ScrollViewer>() is not { Content: Visual content } scroll || answer.TranslatePoint(default, content) is not { } at) return;
+        var max = Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height);
+        scroll.Offset = new Vector(scroll.Offset.X, Math.Clamp(at.Y - JumpGap, 0, max));
     }
 
     /// <summary>Nothing on the page depends on the settings.</summary>

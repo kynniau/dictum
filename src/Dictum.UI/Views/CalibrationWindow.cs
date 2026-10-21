@@ -59,6 +59,8 @@ internal sealed partial class CalibrationWindow : Window
     private IDisposable? _hotkey;
     private CancellationTokenSource? _runCts;
     private int _current = 1;
+    private bool _noMicrophone; // the system lists none (CheckMicrophone)
+    private bool _listFailureLogged;
 
     public CalibrationWindow(AppShell shell)
     {
@@ -117,7 +119,11 @@ internal sealed partial class CalibrationWindow : Window
         _takeLimit = new DispatcherTimer { Interval = CalibrationSession.TakeLimit };
         _takeLimit.Tick += (_, _) => AbandonTake($"Longer than {CalibrationSession.TakeLimit.TotalSeconds:0} s, so it was not kept: record it again.");
         _capture.Failed += _ => Dispatcher.UIThread.Post(() => AbandonTake("The microphone failed: record it again."));
-        Activated += (_, _) => _hotkey ??= shell.RedirectHotkey(OnHotkey); // the hotkey records here only while this window is active
+        Activated += (_, _) =>
+        {
+            _hotkey ??= shell.RedirectHotkey(OnHotkey); // the hotkey records here only while this window is active
+            CheckMicrophone(); // one plugged in while the person was elsewhere turns Record back on
+        };
         Deactivated += (_, _) =>
         {
             _hotkey?.Dispose();
@@ -132,6 +138,7 @@ internal sealed partial class CalibrationWindow : Window
             (_capture as IDisposable)?.Dispose();
         };
         _current = FirstUnrecorded(1);
+        CheckMicrophone();
         RefreshTake();
         RenderResults();
         RenderMissing();
@@ -170,6 +177,7 @@ internal sealed partial class CalibrationWindow : Window
         var settings = _host.Settings();
         if (_session.Recording == 0)
         {
+            if (!CheckMicrophone()) return; // the hotkey, which a disabled Record does not stop: the sentence is already shown
             _capture.Start(settings.Audio.Device, Stopwatch.GetTimestamp());
             _session.StartTake(_current);
             _takeLimit.Start();
@@ -240,7 +248,7 @@ internal sealed partial class CalibrationWindow : Window
             _sentence.Text = $"“{_recordings.Script[_current - 1]}”";
             _record.Content = recording ? "Stop" : _recordings.Has(_current) ? "Record again" : "Record";
             AutomationProperties.SetName(_record, $"{(recording ? "Stop recording" : "Record")} sentence {_current}");
-            _record.IsEnabled = _session.CanRecord(_current);
+            _record.IsEnabled = _session.CanRecord(_current) && !(_noMicrophone && !recording); // Stop always works
             _skip.IsEnabled = !recording;
         }
         _holdHint.Text = HotkeyParser.TryParse(_host.Settings().Hotkey, out var spec, out _) ? $"or hold {HotkeyNames.Display(spec)}" : "";
@@ -286,6 +294,32 @@ internal sealed partial class CalibrationWindow : Window
     {
         Recover(ex);
         _takeStatus.Text = FailureText(ex);
+        // The capture found no microphone: look again, so a list that is now empty disables Record. One that still names a
+        // device leaves Record on (the sentence says what to check), as the list is what says one is there.
+        if (ex is NoMicrophoneException) CheckMicrophone();
+    }
+
+    /// <summary>
+    /// Looks for a microphone (on opening, on activation, and before a take the hotkey starts). With none listed, Record is
+    /// disabled and the one no-microphone sentence (<see cref="NoSoundText.NoMicrophoneBalloon"/>) stands under it, the
+    /// sentence to read still shown; when one appears, Record works again and the sentence goes (1.2 polish round 2: Record
+    /// stayed active on a PC with none). True when there is one.
+    /// </summary>
+    internal bool CheckMicrophone()
+    {
+        var none = MicrophoneChoices.List(_shell.Platform, why =>
+        {
+            if (!_listFailureLogged) _host.Log.Warn($"Calibration window: {why}");
+            _listFailureLogged = true;
+        }).Count == 0;
+        if (none) _takeStatus.Text = NoSoundText.NoMicrophoneBalloon;
+        else if (_noMicrophone && _takeStatus.Text == NoSoundText.NoMicrophoneBalloon) _takeStatus.Text = "";
+        if (none != _noMicrophone)
+        {
+            _noMicrophone = none;
+            RefreshTake();
+        }
+        return !none;
     }
 
     private void Recover(Exception ex)

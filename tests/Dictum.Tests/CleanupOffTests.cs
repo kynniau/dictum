@@ -239,7 +239,7 @@ public sealed class CleanupOffTests
         var lines = Lines(window);
         Assert.Contains(SimpleView.OffLabel, lines);
         Assert.Contains(SimpleView.OffSubLine, lines); // not in use: the line alone
-        Assert.Contains($"In use · {SimpleView.TidySubLine}", lines);
+        Assert.Contains((SimpleView.TidyTitle, SimpleView.TidySubLine), Polish2Tests.InUseRows(window)); // the tag says in use; the line once (round 2)
 
         Click(Named(window, SimpleView.ActionName("Use", SimpleView.OffLabel)));
         Assert.Equal(LlmSettings.Off, FileProvider(scratch)); // written
@@ -247,8 +247,9 @@ public sealed class CleanupOffTests
         Assert.True(shell.Cleaner.IsPlain);
         Assert.False(shell.Cleaner.UsesModel);
         lines = Lines(window);
-        Assert.Contains($"In use · {SimpleView.OffSubLine}", lines);
-        Assert.Contains(SimpleView.TidySubLine, lines); // Tidy is no longer in use
+        Assert.Contains((SimpleView.OffLabel, SimpleView.OffSubLine), Polish2Tests.InUseRows(window));
+        Assert.Contains(SimpleView.TidySubLine, lines);
+        Assert.DoesNotContain(Polish2Tests.InUseRows(window), r => r.Title == SimpleView.TidyTitle); // Tidy is no longer in use
         Assert.DoesNotContain(lines, l => l.StartsWith("Custom: ", StringComparison.Ordinal)); // Off is a row of its own, not Custom
         Assert.DoesNotContain(All<Button>(window), b => b.IsEffectivelyVisible && (b.Content as string ?? "").StartsWith(ModelsPage.AddCleanupLabel, StringComparison.Ordinal));
 

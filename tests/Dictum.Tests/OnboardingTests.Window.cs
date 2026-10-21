@@ -235,19 +235,77 @@ public sealed partial class OnboardingTests
         shell.Dispose();
     });
 
-    /// <summary>Pin (lens 4): Try it puts the keyboard focus in the practice box, not on Finish.</summary>
+    /// <summary>
+    /// Pin (lens 4; 1.2 polish round 2, item 3): Try it puts the keyboard focus in the practice box, not on Finish, once the
+    /// model is ready. While "Getting the speech model ready…" shows in the box, nothing has focus, so no caret blinks in front
+    /// of it (first-run/11-loading.png).
+    /// </summary>
     [Fact]
-    public Task Try_it_focuses_the_practice_box() => UiSession.Run(() =>
+    public Task Try_it_focuses_the_practice_box_once_the_model_is_ready() => UiSession.Run(() =>
     {
         using var scratch = new Scratch();
         Bundle(scratch);
-        var (shell, _, _) = scratch.Shell();
-        var (_, window) = Open(shell, scratch);
-        var tryIt = GoTo<TryItStep>(window);
-        Dispatcher.UIThread.RunJobs();
-        Assert.Same(tryIt.Box, window.FocusManager!.GetFocusedElement());
-        window.Close();
-        shell.Dispose();
+        var (shell, _, dialogs) = scratch.Shell(FakeModels());
+        OnboardingWindow? window = null;
+        TryItStep? tryIt = null;
+        dialogs.Onboarding = flow =>
+        {
+            window = new OnboardingWindow(flow);
+            window.Show();
+            while (window.Current is not TryItStep) Next(window);
+            tryIt = (TryItStep)window.Current;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(OnboardingText.TryLoading, tryIt.Placeholder); // still loading
+            Assert.False(tryIt.Box.IsFocused, "the caret blinks in front of the loading line");
+            Assert.False(window.FocusManager!.GetFocusedElement() is Button, $"focus is on {window.FocusManager.GetFocusedElement()}");
+        };
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            tryIt!.Tick();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(tryIt.Placeholder);
+            Assert.Same(tryIt.Box, window!.FocusManager!.GetFocusedElement());
+        }
+        finally
+        {
+            if (window?.IsVisible == true) window.Close();
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>Pin (item 3): focus the person put elsewhere while the model loaded stays there when it is ready.</summary>
+    [Fact]
+    public Task Try_it_leaves_focus_the_person_moved() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, _, dialogs) = scratch.Shell(FakeModels());
+        OnboardingWindow? window = null;
+        dialogs.Onboarding = flow =>
+        {
+            window = new OnboardingWindow(flow);
+            window.Show();
+            while (window.Current is not TryItStep) Next(window);
+            Dispatcher.UIThread.RunJobs();
+            window.PrimaryButton.Focus(Avalonia.Input.NavigationMethod.Tab); // Tab to Finish while it loads
+        };
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            var tryIt = Assert.IsType<TryItStep>(window!.Current);
+            tryIt.Tick();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(tryIt.Placeholder);
+            Assert.Same(window.PrimaryButton, window.FocusManager!.GetFocusedElement());
+        }
+        finally
+        {
+            if (window?.IsVisible == true) window.Close();
+            shell.Dispose();
+        }
     });
 
     /// <summary>Pin (lens 5): the hotkey step gives focus to nothing, as the old hotkey window did, so Space cannot press a button.</summary>
