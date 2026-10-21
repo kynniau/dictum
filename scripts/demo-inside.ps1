@@ -321,6 +321,7 @@ try {
                 continue
             }
             # The first pointer target is found before the caption appears, so a caption never names something not yet shown.
+            $found = $null
             $first = @($step.do | Where-Object { $_.PSObject.Properties["target"] -and $_.do -in "click", "doubleClick", "point" } | Select-Object -First 1)
             if ($first) {
                 $wait = [int]([double](Value $first[0].target "timeout" 30) * 1000)
@@ -332,14 +333,17 @@ try {
                         Note "step ${label}: optional target absent"
                         continue
                     }
-                } elseif (Value $step "scrollFirst" $false) {
-                    # "scrollFirst": scroll the target into view before the caption appears, so a caption about text further
-                    # down a page is never shown over the part above it.
-                    [void][DemoUi]::EnsureVisible($found, [int]($pace.glide * 1000))
-                    $entry.actions += "scrolled into view before the caption: $(Describe $first[0].target)"
                 }
             }
+            # The step starts (its caption shows) now: a "scrollFirst" scroll comes after this, so the caption changes first and
+            # the old caption never sits over the scroll (lens on 7900e49).
             $entry.start = Epoch
+            if ($first -and $found -and (Value $step "scrollFirst" $false)) {
+                # "scrollFirst": scroll the target into view as the caption appears, before the lead pause, so a caption about text
+                # further down a page is read with that text on screen.
+                [void][DemoUi]::EnsureVisible($found, [int]($pace.glide * 1000))
+                $entry.actions += "scrolled into view as the caption appeared: $(Describe $first[0].target)"
+            }
             $script:typedEpoch = $null
             Start-Sleep -Milliseconds ([int]([double](Value $step "lead" $pace.lead) * 1000))
             foreach ($action in @($step.do)) {

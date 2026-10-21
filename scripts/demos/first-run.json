@@ -93,7 +93,7 @@
     },
     {
       "id": "try",
-      "caption": "Last, try it: click in the box, hold Right Ctrl, say a sentence, let go.",
+      "caption": "Last, Try it: with a microphone, you would dictate into this box.",
       "lead": 3,
       "do": [
         { "do": "point", "target": { "window": "^Welcome to Dictum$", "type": "Text", "name": "Click in the box", "match": "prefix", "timeout": 30 } }

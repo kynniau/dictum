@@ -92,7 +92,8 @@ demo-post.ps1 (host): captions + highlights from steps.json → mp4, gif, poster
   title in yellow before the first step. Captions come from the data file by step id, so rewording one needs only
   `demo-post.ps1`, not a new recording.
 - **Highlights**: a yellow rounded rectangle with a dark edge around the clicked element (its UI Automation
-  rectangle), from a second before the click until 1.4 s after; a "point" step keeps it until its step ends.
+  rectangle), from a second before the click (never before the step's caption) until 0.3 s after it, since a click often
+  closes the window or scrolls the page; a "point" step keeps it until the next step's caption starts.
 - **The sandbox's size.** The sandbox desktop takes its size from its window when the sandbox connects; resizing the
   window afterwards (with `SetWindowPos`, and even with the end of a drag, `WM_ENTERSIZEMOVE` / `WM_EXITSIZEMOVE`, sent)
   left it at the window's earlier size (2736 x 1111 or 2752 x 1120) in five of twelve runs on 21/10/2026. So the host
@@ -148,8 +149,8 @@ Inside, nothing on the host can appear in a video, and the host PC stays usable 
 
 `prepare` runs before recording starts; `steps` are recorded, one caption each. A step can carry `"optional": true`
 (skipped, and not shown, when its first target does not appear), `"skipIf": <target>` (skipped when that is already
-on screen), `"poster": true`, `"scrollFirst": true` (its first target is scrolled into view before the caption
-appears, for text further down a page), and its own `lead` and `after`. `environment.extraModels` names files in the host's model
+on screen), `"poster": true`, `"scrollFirst": true` (its first target is scrolled into view as the caption
+appears: the caption changes first, then the page scrolls, for text further down a page), and its own `lead` and `after`. `environment.extraModels` names files in the host's model
 folder (`-ModelsDir`, default `%LOCALAPPDATA%\Dictum\models`). Only those files are copied, to a staging folder that is
 mapped read-only, and then copied in by `modelsFromHost`: the folder itself is never mapped and no model is ever
 downloaded.
@@ -223,6 +224,8 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   the welcome's Try it step and Help all use that name), so the demo does too; its file stays `test-setup.json`. With
   no microphone, Record is off and "No microphone found. Plug one in, ..." stands under it (the same sentence as the welcome window
   and the tray panel).
+- **Not yet shown: the Help paragraph "In this help, … Simple view …".** The help demo jumps past it, so that sentence
+  is never on screen. Noted for a later recording (lens on 7900e49).
 - **The help demo does not press Send feedback**: it opens the user's own mail program, and the sandbox has none. The
   demo shows the button and says what it does.
 - **The Setup's version is 1.1.2.** The 1.2 build (main at d47e7f9) still carries version 1.1.2, so the Setup file,
@@ -278,7 +281,7 @@ window, and first-run records it.
    9. Dictum tests your microphone. This test PC has none, so it says so.
    10. Click Next. With a microphone, you would say a few words first.
    11. Dictum gets the speech model ready. This takes a moment.
-   12. Last, try it: click in the box, hold Right Ctrl, say a sentence, let go.
+   12. Last, Try it: with a microphone, you would dictate into this box.
    13. Click Finish.
    14. Dictum now waits by the clock. Click the little up-arrow there. *(skipped when the icon is already on the taskbar)*
    15. Click the Dictum icon.
