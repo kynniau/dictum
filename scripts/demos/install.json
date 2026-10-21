@@ -1,0 +1,66 @@
+{
+  "name": "install",
+  "title": "Install Dictum",
+  "summary": "From the downloaded Setup file to Dictum's first window. The Setup copy is marked as downloaded from the internet (Zone.Identifier), as a browser leaves it.",
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "copyDownloaded", "from": "{setup}", "to": "%USERPROFILE%\\Downloads" },
+    { "do": "openFolder", "path": "%USERPROFILE%\\Downloads" },
+    { "do": "waitFor", "target": { "window": "^Downloads", "type": "ListItem", "name": "Dictum-Setup", "match": "prefix", "timeout": 30 } }
+  ],
+  "steps": [
+    {
+      "id": "open",
+      "caption": "Open your Downloads folder. Double-click Dictum-Setup.",
+      "do": [
+        { "do": "doubleClick", "target": { "window": "^Downloads", "type": "ListItem", "name": "Dictum-Setup", "match": "prefix" } },
+        { "do": "waitFor", "optional": true, "target": { "windowClass": "ApplicationFrameWindow", "type": "Button", "name": "^(More info|Run|Don't run)$", "match": "regex", "timeout": 12 } }
+      ]
+    },
+    {
+      "id": "smartscreen-more",
+      "caption": "If Windows says it protected your PC, click More info.",
+      "optional": true,
+      "do": [ { "do": "click", "target": { "windowClass": "ApplicationFrameWindow", "name": "More info", "timeout": 1 } } ]
+    },
+    {
+      "id": "smartscreen-run-anyway",
+      "caption": "Then click Run anyway.",
+      "optional": true,
+      "do": [ { "do": "click", "target": { "windowClass": "ApplicationFrameWindow", "type": "Button", "name": "Run anyway", "timeout": 3 } } ]
+    },
+    {
+      "id": "smartscreen-offline",
+      "caption": "If Windows says SmartScreen can't be reached, click Run.",
+      "optional": true,
+      "do": [ { "do": "click", "target": { "windowClass": "ApplicationFrameWindow", "type": "Button", "name": "Run", "timeout": 1 } } ]
+    },
+    {
+      "id": "next",
+      "caption": "Setup opens. Click Next.",
+      "do": [ { "do": "click", "target": { "window": "^Setup", "type": "Button", "name": "Next", "match": "prefix", "timeout": 60 } } ]
+    },
+    {
+      "id": "install",
+      "caption": "Click Install.",
+      "do": [ { "do": "click", "target": { "window": "^Setup", "type": "Button", "name": "Install" } } ]
+    },
+    {
+      "id": "launch",
+      "caption": "When it has finished, leave Launch Dictum ticked.",
+      "do": [ { "do": "point", "target": { "window": "^Setup", "type": "ListItem", "name": "Launch Dictum", "timeout": 180 } } ]
+    },
+    {
+      "id": "finish",
+      "caption": "Click Finish.",
+      "do": [ { "do": "click", "target": { "window": "^Setup", "type": "Button", "name": "Finish" } } ]
+    },
+    {
+      "id": "started",
+      "caption": "Dictum is installed and starts. First it asks about your hotkey.",
+      "poster": true,
+      "do": [ { "do": "point", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 90 } } ],
+      "after": 3
+    }
+  ]
+}

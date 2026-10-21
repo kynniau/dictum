@@ -1,0 +1,59 @@
+{
+  "name": "model-folder",
+  "title": "Keep the models on another drive",
+  "summary": "Settings > Models > Model folder > Browse: choose a folder on drive D. Dictum looks there first and downloads go there; files already on the PC are not moved.",
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" },
+    { "do": "secondDrive", "letter": "D", "label": "Data", "folder": "Dictum models" },
+    { "do": "launch" },
+    { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 120 } },
+    { "do": "wait", "seconds": 10 }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "settings",
+      "caption": "Click Settings.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum$", "type": "Button", "name": "Settings" } } ]
+    },
+    {
+      "id": "models",
+      "caption": "Click Models, on the left.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Models" } } ]
+    },
+    {
+      "id": "browse",
+      "caption": "Scroll down to Model folder. Click Browse.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Browse for a model folder" } } ]
+    },
+    {
+      "id": "type-folder",
+      "caption": "Type the folder you want, for example D:\\Dictum models.",
+      "do": [ { "do": "type", "into": { "window": "models$", "type": "Edit", "name": "Folder:", "timeout": 30 }, "text": "D:\\Dictum models" } ],
+      "after": 1.5
+    },
+    {
+      "id": "select",
+      "caption": "Click Select Folder.",
+      "do": [ { "do": "click", "target": { "window": "models$", "type": "Button", "name": "Select Folder" } } ]
+    },
+    {
+      "id": "done",
+      "caption": "Done. Dictum now keeps new models on drive D.",
+      "poster": true,
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Edit", "name": "Model folder", "timeout": 30 } } ],
+      "after": 3
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "change-model",
+  "title": "Change the speech model",
+  "summary": "Settings > Models: switch from the included base.en to another model already on this PC (tiny.en).",
+  "environment": { "extraModels": ["ggml-tiny.en.bin"] },
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" },
+    { "do": "modelsFromHost" },
+    { "do": "launch" },
+    { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 120 } },
+    { "do": "wait", "seconds": 10 }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "settings",
+      "caption": "Click Settings.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum$", "type": "Button", "name": "Settings" } } ]
+    },
+    {
+      "id": "models",
+      "caption": "Click Models, on the left.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Models" } } ]
+    },
+    {
+      "id": "use",
+      "caption": "Find the model you want. Click Use next to it.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Use", "sameRowAs": "tiny.en" } } ]
+    },
+    {
+      "id": "in-use",
+      "caption": "That's it. The model you chose now says In use.",
+      "poster": true,
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Button", "name": "In use", "sameRowAs": "tiny.en", "timeout": 60 } } ],
+      "after": 3
+    }
+  ]
+}

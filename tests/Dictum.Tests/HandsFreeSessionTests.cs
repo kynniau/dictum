@@ -336,8 +336,8 @@ public class HandsFreeSessionTests
     {
         // SPEC §23 (rebase onto main, 16/10/2026): the plain clean-up leaves text that is not English exactly as written, so the
         // boundary rule changes no case: a capital after a part with no sentence end stays, and so does a small letter after
-        // one. The separator is the usual one; a Devanagari part has no case to change.
-        using var rig = Make(new PartTranscriber("Pumunta kami sa", "Maynila kahapon.", "salamat po", "वह आ गया"), TranscriptCleaner.Plain("test"));
+        // one. The separator is the usual one; a part in a script without case has no case to change.
+        using var rig = Make(new PartTranscriber("Fuimos a", "Madrid ayer.", "gracias", "वह आ गया"), TranscriptCleaner.Plain("test"));
         await StartHandsFree(rig);
         rig.Capture.Cut(Part(0));
         rig.Capture.Cut(Part(1));
@@ -347,7 +347,7 @@ public class HandsFreeSessionTests
         StopTap(rig);
         await WaitUntil(() => rig.Pasted.Count == 4, "the rest");
 
-        Assert.Equal(["Pumunta kami sa", " Maynila kahapon.", " salamat po", " वह आ गया"], rig.Pasted);
+        Assert.Equal(["Fuimos a", " Madrid ayer.", " gracias", " वह आ गया"], rig.Pasted);
     }
 
     [Fact]
