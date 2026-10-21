@@ -3152,3 +3152,5 @@ The lens on PR #28 (head 6bacce9) returned Needs changes, no blockers: three maj
 | A_microphone_list_that_throws_says_no_microphone | the exception not caught | failed: COMException "The audio service is not running." |
 
 The existing microphone pins still use levels at or above 0.01 for "Heard you." (0.02, 0.05, 0.1), so they pass unchanged.
+
+**Verified after the lens fixes and the merge with c7d736d (head b097f03).** Full Release build (`--no-incremental`, no warning lines) and the full suite: 1597 tests, 1574 passed, 23 skipped (gated), 0 failed. The only change after that run is this line.
