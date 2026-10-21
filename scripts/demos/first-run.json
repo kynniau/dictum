@@ -98,7 +98,8 @@
       "do": [
         { "do": "point", "target": { "window": "^Welcome to Dictum$", "type": "Text", "name": "Click in the box", "match": "prefix", "timeout": 30 } }
       ],
-      "after": 2.5
+      "after": 2.5,
+      "poster": true
     },
     {
       "id": "finish",
@@ -130,8 +131,7 @@
       "id": "no-mic",
       "caption": "This test PC has no microphone, so the panel says so here.",
       "do": [ { "do": "point", "target": { "window": "^Dictum$", "type": "Text", "name": "No microphone found", "match": "prefix", "timeout": 15 } } ],
-      "after": 3,
-      "poster": true
+      "after": 3
     },
     {
       "id": "close",

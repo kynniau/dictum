@@ -253,6 +253,13 @@ videos are hosted is the product owner's decision.
 | 6. Find help | `help.json` | Settings > Help: the "Questions on this page" list, two questions opened from it and their answers, Send feedback (shown, not pressed) |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
 
+Posters (the step marked `"poster": true`): install, step 9 (the welcome window's first step); first-run, step 12 (Try it,
+the box ready); change-model, step 7 (More accurate In use); test-setup, step 4 (the sentence to read); model-folder, step 8
+(the new folder shown); help, step 10 (Send feedback); dictation-stills, its last slide (Pasted 12 words). None is an
+error screen, except that the no-microphone sentence under the disabled Record is visible in test-setup's: on the 1.2
+build it shows from the moment the calibration window opens on a PC with no microphone, so no frame of that demo is
+without it.
+
 change-model, test-setup, model-folder and help go through the welcome window with its defaults (Next, Next, Next,
 Use this hotkey, Next, Finish) before recording starts. install and first-run do not: install ends on the welcome
 window, and first-run records it.
