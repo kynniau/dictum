@@ -51,7 +51,7 @@ public sealed class ProfanityFilter
 
     /// <summary>
     /// "fucking" → "f******": the first letter of each word kept, every other letter starred, and so every combining mark
-    /// (<see cref="WholeWords.IsWordChar"/>): "कमीना" → "क****", never "क*ीना".
+    /// (<see cref="WholeWords.IsWordChar"/>): a vowel sign such as U+0940 is starred with the letters, never left showing.
     /// </summary>
     private static string Mask(string match)
     {
@@ -91,7 +91,7 @@ public sealed class ProfanityFilter
             }
             else if (next >= text.Length || SentenceStart.IsEndMark(text[next]) || text[next] is ',' or ';' or ':' or '\n' or '\r')
             {
-                TrimEndSpaces(sb); // "It's shit." → "It's."; "वह कमीना।" → "वह।"
+                TrimEndSpaces(sb); // "It's shit." → "It's."; a removed word before U+0964 leaves no space before it
             }
             if (start)
             {

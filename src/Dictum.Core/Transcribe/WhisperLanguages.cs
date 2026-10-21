@@ -8,9 +8,8 @@ namespace Dictum.Transcribe;
 /// multilingual models (small, medium, large-v3…) hear all of them; the ".en" models hear English only, and every
 /// multilingual model except large-v3-turbo can be asked to write English for any of them
 /// (<see cref="WhisperSettings.Translate"/>): OpenAI's README says the turbo model "is not trained for translation tasks".
-/// Not in the table, so not possible with Whisper: Cebuano, Ilocano, Hiligaynon and the other Philippine languages
-/// apart from Tagalog. <see cref="Problem"/> is the one place that knows these limits; Settings, the engine's load
-/// warning, every speech-model load and --selftest all ask it.
+/// Some languages are not in Whisper's list, so they cannot be chosen. <see cref="Problem"/> is the one place that knows
+/// the model limits; Settings, the engine's load warning, every speech-model load and --selftest all ask it.
 /// </summary>
 public static class WhisperLanguages
 {
@@ -55,23 +54,16 @@ public static class WhisperLanguages
 
     private static readonly Dictionary<string, string> Names = Table.ToDictionary(t => t.Code, t => t.Name, StringComparer.Ordinal);
 
-    /// <summary>
-    /// The languages offshore teams most often speak, first in the picker: English, then Hindi and Tagalog (the two the
-    /// request named), then the other Indian-subcontinent languages Whisper has. Tagalog is the only Philippine language
-    /// in Whisper.
-    /// </summary>
-    public static readonly string[] Featured = ["en", "hi", "tl", "bn", "te", "mr", "ta", "ur", "gu", "kn", "ml", "pa", "as", "ne", "sd", "si"];
-
     /// <summary>Every code the table has, in its order.</summary>
     public static IReadOnlyList<string> Codes { get; } = Table.Select(t => t.Code).ToList();
 
     /// <summary>True for "auto" or a code in the table.</summary>
     public static bool IsValid(string code) => code == Auto || Names.ContainsKey(code);
 
-    /// <summary>"Hindi" for "hi"; "Detect automatically" for "auto"; the code itself when unknown.</summary>
+    /// <summary>"Spanish" for "es"; "Detect automatically" for "auto"; the code itself when unknown.</summary>
     public static string Name(string code) => code == Auto ? "Detect automatically" : Names.TryGetValue(code, out var name) ? name : code;
 
-    /// <summary>"hi (Hindi)" for logs and --selftest; "auto (detected per dictation)".</summary>
+    /// <summary>"es (Spanish)" for logs and --selftest; "auto (detected per dictation)".</summary>
     public static string Describe(string code) => code == Auto ? "auto (detected per dictation)" : $"{code} ({Name(code)})";
 
     /// <summary>
@@ -81,13 +73,13 @@ public static class WhisperLanguages
     public static bool OutputIsEnglish(string language, bool translate) => translate || language == English;
 
     /// <summary>
-    /// The picker's order: "auto", the featured languages, then the rest by name. Each item is (code, label), the label
-    /// "Hindi (hi)" so the settings.json value is visible.
+    /// The picker's order: "auto", English, then every other language alphabetically by its English name (none is
+    /// featured). Each item is (code, label), the label "Spanish (es)" so the settings.json value is visible.
     /// </summary>
     public static IReadOnlyList<(string Code, string Label)> PickerItems()
     {
-        var rest = Table.Where(t => !Featured.Contains(t.Code)).OrderBy(t => t.Name, StringComparer.Ordinal).Select(t => t.Code);
-        return new[] { Auto }.Concat(Featured).Concat(rest).Select(c => (c, c == Auto ? Name(c) : $"{Name(c)} ({c})")).ToList();
+        var rest = Table.Where(t => t.Code != English).OrderBy(t => t.Name, StringComparer.Ordinal).Select(t => t.Code);
+        return new[] { Auto, English }.Concat(rest).Select(c => (c, c == Auto ? Name(c) : $"{Name(c)} ({c})")).ToList();
     }
 
     /// <summary>Whether a catalogue model name or file is one of the English-only ".en" models.</summary>

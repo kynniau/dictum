@@ -1,0 +1,12 @@
+{
+  "name": "dictation-stills",
+  "title": "Dictate: hold, speak, let go",
+  "summary": "Stills of the pill, rendered by Dictum's own code on Avalonia's headless platform (PillStillsTests): Windows Sandbox has no microphone, so a real dictation cannot be recorded there. An illustration of the indicator, not a recording.",
+  "kind": "stills",
+  "background": "0x1F3A60",
+  "slides": [
+    { "id": "hold", "still": "recording-hold", "caption": "Hold Right Ctrl and speak. The bar at the bottom of the screen says Recording.", "seconds": 5 },
+    { "id": "transcribing", "still": "transcribing", "caption": "Let go of the key when you have finished. Dictum turns your words into text.", "seconds": 5 },
+    { "id": "done", "still": "done", "caption": "Your words appear where your cursor was. The bar says how many.", "seconds": 5 }
+  ]
+}

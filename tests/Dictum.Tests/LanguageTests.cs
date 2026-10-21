@@ -19,55 +19,53 @@ public class LanguageTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public void The_table_is_whispers_list_with_hindi_and_tagalog_but_no_cebuano()
+    public void The_table_is_whispers_list_and_has_no_code_outside_it()
     {
         Assert.Equal(100, WhisperLanguages.Codes.Count); // openai/whisper tokenizer.py LANGUAGES, read 16/10/2026
-        Assert.Equal("Hindi", WhisperLanguages.Name("hi"));
-        Assert.Equal("Tagalog", WhisperLanguages.Name("tl"));
+        Assert.Equal("Spanish", WhisperLanguages.Name("es"));
+        Assert.Equal("German", WhisperLanguages.Name("de"));
         Assert.Equal("English", WhisperLanguages.Name("en"));
         Assert.Equal("Detect automatically", WhisperLanguages.Name("auto"));
         Assert.True(WhisperLanguages.IsValid("auto"));
-        Assert.True(WhisperLanguages.IsValid("bn"));
-        Assert.False(WhisperLanguages.IsValid("ceb")); // Cebuano is not in Whisper
-        Assert.False(WhisperLanguages.IsValid("fil"));
-        Assert.False(WhisperLanguages.IsValid("HI")); // the loader lower-cases before asking
-        Assert.All(WhisperLanguages.Featured, code => Assert.True(WhisperLanguages.IsValid(code), code));
-        Assert.Equal("hi (Hindi)", WhisperLanguages.Describe("hi"));
+        Assert.True(WhisperLanguages.IsValid("ja"));
+        Assert.False(WhisperLanguages.IsValid("eo")); // Esperanto: chosen only as an example of a code that is not in Whisper's list
+        Assert.False(WhisperLanguages.IsValid("xx"));
+        Assert.False(WhisperLanguages.IsValid("ES")); // the loader lower-cases before asking
+        Assert.Equal("es (Spanish)", WhisperLanguages.Describe("es"));
         Assert.Equal("auto (detected per dictation)", WhisperLanguages.Describe("auto"));
     }
 
     [Fact]
-    public void The_picker_lists_auto_then_english_hindi_tagalog_then_the_indian_languages_then_the_rest_by_name()
+    public void The_picker_lists_auto_then_english_then_every_other_language_alphabetically_by_name()
     {
         var items = WhisperLanguages.PickerItems();
         Assert.Equal(101, items.Count);
         Assert.Equal(("auto", "Detect automatically"), items[0]);
         Assert.Equal(("en", "English (en)"), items[1]);
-        Assert.Equal(("hi", "Hindi (hi)"), items[2]);
-        Assert.Equal(("tl", "Tagalog (tl)"), items[3]);
-        Assert.Equal(WhisperLanguages.Featured, items.Skip(1).Take(WhisperLanguages.Featured.Length).Select(i => i.Code));
-        var rest = items.Skip(1 + WhisperLanguages.Featured.Length).Select(i => i.Label).ToList();
-        Assert.Equal(rest.OrderBy(l => l, StringComparer.Ordinal), rest);
+        Assert.Equal(("af", "Afrikaans (af)"), items[2]); // no language is featured: the first after English is the first by name
+        var rest = items.Skip(2).Select(i => WhisperLanguages.Name(i.Code)).ToList();
+        Assert.Equal(rest.OrderBy(n => n, StringComparer.Ordinal), rest);
+        Assert.DoesNotContain("en", items.Skip(2).Select(i => i.Code));
         Assert.Equal(items.Count, items.Select(i => i.Code).Distinct().Count());
     }
 
     [Theory]
     [InlineData("medium.en", "en", false, null)]
-    [InlineData("medium.en", "hi", false, "English-only")]
-    [InlineData(@"C:\models\ggml-small.en-q5_1.bin", "tl", false, "English-only")]
-    [InlineData(@"C:\my.en.models\ggml-medium.bin", "tl", false, null)] // ".en" in a folder name is not the model's
+    [InlineData("medium.en", "es", false, "English-only")]
+    [InlineData(@"C:\models\ggml-small.en-q5_1.bin", "de", false, "English-only")]
+    [InlineData(@"C:\my.en.models\ggml-medium.bin", "de", false, null)] // ".en" in a folder name is not the model's
     [InlineData("medium.en", "en", true, "turn Translate off")]
-    [InlineData("medium", "hi", false, null)]
-    [InlineData("medium", "hi", true, null)]
+    [InlineData("medium", "es", false, null)]
+    [InlineData("medium", "es", true, null)]
     [InlineData("small", "auto", true, null)]
-    [InlineData("large-v3-turbo", "hi", false, null)]
-    [InlineData("large-v3-turbo", "hi", true, "not trained for translation")]
+    [InlineData("large-v3-turbo", "es", false, null)]
+    [InlineData("large-v3-turbo", "es", true, "not trained for translation")]
     [InlineData("large-v3-turbo-q5_0", "en", true, "not trained for translation")]
-    [InlineData("large-v3", "bn", true, null)]
+    [InlineData("large-v3", "ja", true, null)]
     [InlineData("medium", "yue", false, "Cantonese")]
     [InlineData("large-v3", "yue", false, null)]
     [InlineData("large-v3-turbo", "yue", false, null)]
-    [InlineData("my-own-model", "hi", true, null)] // an unknown name is trusted
+    [InlineData("my-own-model", "es", true, null)] // an unknown name is trusted
     [InlineData(@"D:\models\ggml-my-large-v3-yue.bin", "yue", false, "Cantonese")] // but Cantonese is allowed only for names starting with large-v3
     public void The_model_is_checked_against_the_language_and_the_translate_switch(string model, string language, bool translate, string? fragment)
     {
@@ -79,8 +77,8 @@ public class LanguageTests
     [Theory]
     [InlineData("en", false, true)]
     [InlineData("en", true, true)]
-    [InlineData("hi", true, true)]
-    [InlineData("hi", false, false)]
+    [InlineData("es", true, true)]
+    [InlineData("es", false, false)]
     [InlineData("auto", false, false)]
     [InlineData("auto", true, true)]
     public void The_output_is_english_with_translate_on_or_language_en(string language, bool translate, bool english) =>
@@ -105,17 +103,17 @@ public class LanguageTests
         Assert.Null(WhisperLanguages.ModeNote("en", false, gpuMachine: false));
         Assert.Null(WhisperLanguages.ModeNote("en", false, gpuMachine: true));
 
-        var cpuHindi = WhisperLanguages.ModeNote("hi", false, gpuMachine: false)!;
-        Assert.Contains("Light would write base.en", cpuHindi);
-        Assert.Contains("Full would write small.en", cpuHindi);
+        var cpuSpanish = WhisperLanguages.ModeNote("es", false, gpuMachine: false)!;
+        Assert.Contains("Light would write base.en", cpuSpanish);
+        Assert.Contains("Full would write small.en", cpuSpanish);
 
-        var gpuHindi = WhisperLanguages.ModeNote("hi", false, gpuMachine: true)!;
-        Assert.Contains("Light would write base.en", gpuHindi);
-        Assert.DoesNotContain("Full", gpuHindi); // large-v3-turbo hears Hindi
+        var gpuSpanish = WhisperLanguages.ModeNote("es", false, gpuMachine: true)!;
+        Assert.Contains("Light would write base.en", gpuSpanish);
+        Assert.DoesNotContain("Full", gpuSpanish); // large-v3-turbo hears Spanish
 
-        var gpuHindiTranslated = WhisperLanguages.ModeNote("hi", true, gpuMachine: true)!;
-        Assert.Contains("Full would write large-v3-turbo", gpuHindiTranslated);
-        Assert.Contains("not trained for translation", gpuHindiTranslated);
+        var gpuSpanishTranslated = WhisperLanguages.ModeNote("es", true, gpuMachine: true)!;
+        Assert.Contains("Full would write large-v3-turbo", gpuSpanishTranslated);
+        Assert.Contains("not trained for translation", gpuSpanishTranslated);
 
         var englishTranslated = WhisperLanguages.ModeNote("en", true, gpuMachine: false)!;
         Assert.Contains("turn Translate off", englishTranslated);
@@ -124,17 +122,17 @@ public class LanguageTests
     [Fact]
     public void Language_and_translate_load_from_settings_and_an_unknown_code_falls_back_with_a_warning()
     {
-        var load = SettingsLoader.Parse("""{ "whisper": { "language": "HI", "translate": true } }""");
-        Assert.Equal("hi", load.Settings.Whisper.Language);
+        var load = SettingsLoader.Parse("""{ "whisper": { "language": "ES", "translate": true } }""");
+        Assert.Equal("es", load.Settings.Whisper.Language);
         Assert.True(load.Settings.Whisper.Translate);
         Assert.Empty(load.Warnings);
 
         Assert.Equal("auto", SettingsLoader.Parse("""{ "whisper": { "language": " AUTO " } }""").Settings.Whisper.Language);
 
-        var bad = SettingsLoader.Parse("""{ "whisper": { "language": "ceb" } }""");
+        var bad = SettingsLoader.Parse("""{ "whisper": { "language": "xx" } }""");
         Assert.Equal("en", bad.Settings.Whisper.Language);
         Assert.False(bad.Settings.Whisper.Translate);
-        Assert.Contains(bad.Warnings, w => w.Contains("language", StringComparison.OrdinalIgnoreCase) && w.Contains("\"tl\"", StringComparison.Ordinal));
+        Assert.Contains(bad.Warnings, w => w.Contains("language", StringComparison.OrdinalIgnoreCase) && w.Contains("\"de\"", StringComparison.Ordinal));
 
         var defaults = new AppSettings();
         Assert.Equal("en", defaults.Whisper.Language);
@@ -168,8 +166,8 @@ public class LanguageTests
         Assert.Equal("en", engine.Decode.Language);
         Assert.False(engine.Decode.Translate);
 
-        models.SetDecoding(new DecodeOptions(null, 0, "hi", true)); // what AppShell.Reload sends after settings.json changed
-        Assert.True(await Eventually(() => engine.Decode.Language == "hi" && engine.Decode.Translate), "the decoder was not rebuilt with Hindi and translate");
+        models.SetDecoding(new DecodeOptions(null, 0, "es", true)); // what AppShell.Reload sends after settings.json changed
+        Assert.True(await Eventually(() => engine.Decode.Language == "es" && engine.Decode.Translate), "the decoder was not rebuilt with Spanish and translate");
         Assert.Equal(1, loads); // the model was not loaded again
         Assert.Same(engine, await models.GetAsync(Ct));
 
@@ -181,12 +179,12 @@ public class LanguageTests
 
     /// <summary>
     /// The dictionary (SPEC §16.2) is whisper's prompt whatever the language: the tray app gives the decoder the prompt with the
-    /// language (AppShell.LoadConfiguration), so names and terms are still spelled the user's way in Hindi dictation.
+    /// language (AppShell.LoadConfiguration), so names and terms are still spelled the user's way in Spanish dictation.
     /// </summary>
     [Fact]
-    public async Task The_dictionary_prompt_reaches_the_decoder_for_hindi()
+    public async Task The_dictionary_prompt_reaches_the_decoder_for_spanish()
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "medium", "language": "hi" } }""");
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "medium", "language": "es" } }""");
         var modelsDir = scratch.Paths.ModelsDir(new AppSettings());
         Directory.CreateDirectory(modelsDir);
         File.WriteAllBytes(Path.Combine(modelsDir, "ggml-medium.bin"), new byte[16]); // present; the fake loader never reads it
@@ -201,7 +199,7 @@ public class LanguageTests
         try
         {
             var engine = Assert.IsType<FakeSpeechEngine>(await models.GetAsync(Ct));
-            Assert.Equal("hi", engine.Decode.Language);
+            Assert.Equal("es", engine.Decode.Language);
             Assert.False(engine.Decode.Translate);
             Assert.Equal("Kynni, Parramatta", engine.Decode.Prompt);
         }
@@ -227,10 +225,10 @@ public class LanguageTests
         var shell = new AppShell(new FakePlatform(scratch.Paths), scratch.Paths, log, new SecretRedactor(), new ShellOptions(), new ScriptedDialogs(),
             gpuMachine: () => false, speechModels: models);
         shell.Reload(userRequested: true);
-        File.WriteAllText(scratch.Paths.SettingsFile, """{ "hotkey": "F24", "whisper": { "model": "small.en", "language": "hi" } }"""); // the hand edit
+        File.WriteAllText(scratch.Paths.SettingsFile, """{ "hotkey": "F24", "whisper": { "model": "small.en", "language": "es" } }"""); // the hand edit
         shell.Reload(userRequested: false);
         shell.Reload(userRequested: false); // the next save of any setting
-        var notices = log.Lines.Count(l => l.Message.StartsWith("Notice: small.en is an English-only model, so language \"hi\" cannot be heard", StringComparison.Ordinal));
+        var notices = log.Lines.Count(l => l.Message.StartsWith("Notice: small.en is an English-only model, so language \"es\" cannot be heard", StringComparison.Ordinal));
         shell.Dispose();
         Assert.Equal(1, notices);
     });
@@ -243,10 +241,10 @@ public class LanguageTests
     public async Task Calibration_decodes_english_without_translation_whatever_dictation_uses()
     {
         using var scratch = new Scratch();
-        var hindiTranslated = new AppSettings { Whisper = new WhisperSettings { Model = "medium", Language = "hi", Translate = true } };
+        var spanishTranslated = new AppSettings { Whisper = new WhisperSettings { Model = "medium", Language = "es", Translate = true } };
         var loads = new List<DecodeOptions>();
         FakeSpeechEngine? engine = null;
-        var host = new CalibrationHost(scratch.Paths, () => hindiTranslated, () => PersonalText.Empty,
+        var host = new CalibrationHost(scratch.Paths, () => spanishTranslated, () => PersonalText.Empty,
             new ModelIntegrity(Path.Combine(scratch.Root.FullName, "verified-models.json"), NullLog.Instance), NullLog.Instance,
             FindSpeechModel: _ => null, Write: _ => { }, DownloadSpeechModel: (_, _, _) => { }, AddDictionaryTerms: _ => { }, AddCorrections: _ => { },
             LoadSpeech: (path, _, decode) =>
@@ -296,11 +294,11 @@ public class LanguageTests
     }
 
     // Text that is not English still goes through the corrections, the profanity filter and the snippets (SPEC §23), so they must
-    // keep to whole words in its script. A Devanagari vowel sign, virama or anusvara is a combining mark, not a letter: it belongs
+    // keep to whole words in its script. A vowel sign, virama or anusvara is a combining mark, not a letter: it belongs
     // to the word it is written in. Each case below changed the text, or suggested nothing, before marks counted (lens, 16/10/2026).
 
     [Fact]
-    public void A_devanagari_correction_replaces_the_whole_word_and_never_the_inside_of_another_word()
+    public void A_combining_mark_correction_replaces_the_whole_word_and_never_the_inside_of_another_word()
     {
         var rules = new Corrections(Corrections.Parse(["राम => श्याम", "कम => काम"]));
         Assert.Equal("श्याम आया", rules.Apply("राम आया"));
@@ -310,7 +308,7 @@ public class LanguageTests
     }
 
     [Fact]
-    public void A_devanagari_snippet_fires_on_its_own_word_only()
+    public void A_combining_mark_snippet_fires_on_its_own_word_only()
     {
         var snippets = new Corrections(Corrections.Parse(["ईमेल => kyle@example.com"], null, "snippets.txt", lineBreaks: true), verbatim: true);
         var personal = new PersonalText(PersonalDictionary.Empty, Corrections.Empty, ProfanityFilter.Empty, snippets);
@@ -321,11 +319,11 @@ public class LanguageTests
     [Theory]
     [InlineData("मुझे कम है", "मुझे काम है", "कम => काम")] // only the vowel sign ा differs
     [InlineData("वे यहाँ है", "वे यहाँ हैं", "है => हैं")] // only the anusvara differs: "is" to "are"
-    public void Fix_last_suggests_a_devanagari_correction_that_changes_only_a_mark(string pasted, string fixedText, string suggested) =>
+    public void Fix_last_suggests_a_combining_mark_correction_that_changes_only_a_mark(string pasted, string fixedText, string suggested) =>
         Assert.Equal(suggested, Assert.Single(CorrectionSuggestions.Suggest(pasted, fixedText)).ToString());
 
     [Fact]
-    public void A_devanagari_word_on_the_profanity_list_is_masked_after_its_first_letter()
+    public void A_combining_mark_word_on_the_profanity_list_is_masked_after_its_first_letter()
     {
         var filter = new ProfanityFilter(["कमीना"], "test");
         Assert.Equal("वह क**** है", filter.Apply("वह कमीना है", ProfanitySettings.Mask)); // it became "क*ीना"
@@ -359,7 +357,7 @@ public class LanguageTests
 
     /// <summary>
     /// --transcribe builds its clean-up in CliCommands.Cleaner with the tray app's checks (PersonalText.ForCleanup) and the
-    /// tray app's language rule. Hindi written as Hindi gets the plain cleaner: no model is asked, so no validator rule runs
+    /// tray app's language rule. Spanish written as Spanish gets the plain cleaner: no model is asked, so no validator rule runs
     /// on the text, the dictionary-term rule included. The same settings with translation on are English again: the model
     /// and every check, the dictionary terms included.
     /// </summary>
@@ -369,15 +367,15 @@ public class LanguageTests
         var personal = new PersonalText(new PersonalDictionary(["Dictum", "Kynni"]), Corrections.Empty, ProfanityFilter.Empty);
         var engine = new FakeLocalEngine("qwen2.5-1.5b-instruct-q4_k_m.gguf", reply: "Add Kynni to the dictionary once."); // adds a term
         using var http = new HttpClient();
-        var hindi = new AppSettings { Whisper = new WhisperSettings { Model = "medium", Language = "hi" } }; // llm.provider local, the default
+        var spanish = new AppSettings { Whisper = new WhisperSettings { Model = "medium", Language = "es" } }; // llm.provider local, the default
 
-        var plain = Dictum.Cli.CliCommands.Cleaner(hindi, SecretStore.Empty, http, NullLog.Instance, () => engine, personal);
+        var plain = Dictum.Cli.CliCommands.Cleaner(spanish, SecretStore.Empty, http, NullLog.Instance, () => engine, personal);
         Assert.True(plain.IsPlain);
         Assert.False(plain.UsesModel);
         Assert.Contains("skipped", plain.Status);
         Assert.Equal(new CleanupResult("नाम एक बार", false, null), await plain.CleanAsync("नाम  एक बार ", Ct)); // whitespace only: no full stop
 
-        var english = Dictum.Cli.CliCommands.Cleaner(hindi with { Whisper = hindi.Whisper with { Translate = true } }, SecretStore.Empty, http,
+        var english = Dictum.Cli.CliCommands.Cleaner(spanish with { Whisper = spanish.Whisper with { Translate = true } }, SecretStore.Empty, http,
             NullLog.Instance, () => engine, personal);
         Assert.False(english.IsPlain);
         Assert.True(english.UsesModel);
@@ -401,7 +399,7 @@ public class LanguageUiTests
     private static int IndexOf(string code) => WhisperLanguages.PickerItems().ToList().FindIndex(i => i.Code == code);
 
     [Fact]
-    public Task Choosing_hindi_is_refused_with_an_english_only_model_and_written_with_a_multilingual_one() => UiSession.Run(() =>
+    public Task Choosing_spanish_is_refused_with_an_english_only_model_and_written_with_a_multilingual_one() => UiSession.Run(() =>
     {
         using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "small.en" } }""");
         var (shell, _, _) = scratch.Shell();
@@ -412,16 +410,16 @@ public class LanguageUiTests
         var picker = LanguagePicker(window);
         Assert.Equal(IndexOf("en"), picker.SelectedIndex);
 
-        picker.SelectedIndex = IndexOf("hi");
+        picker.SelectedIndex = IndexOf("es");
         Assert.Contains("small.en is an English-only model", Texts(window));
         Assert.Equal(IndexOf("en"), picker.SelectedIndex); // put back by the page itself, before any reload
         Assert.Equal("en", shell.Settings.Whisper.Language);
 
         shell.Write(("whisper.model", System.Text.Json.Nodes.JsonValue.Create("medium")));
-        picker.SelectedIndex = IndexOf("hi");
-        Assert.Equal("hi", shell.Settings.Whisper.Language); // the in-app write reloads at once
-        Assert.Contains("Dictum listens for Hindi (hi). The decoder switches now; the model stays loaded.", Texts(window));
-        Assert.Contains("skipped", shell.CleanupStatus); // Hindi written as Hindi: the English clean-up is off
+        picker.SelectedIndex = IndexOf("es");
+        Assert.Equal("es", shell.Settings.Whisper.Language); // the in-app write reloads at once
+        Assert.Contains("Dictum listens for Spanish (es). The decoder switches now; the model stays loaded.", Texts(window));
+        Assert.Contains("skipped", shell.CleanupStatus); // Spanish written as Spanish: the English clean-up is off
 
         window.Close();
         shell.Dispose();
@@ -447,8 +445,8 @@ public class LanguageUiTests
         Assert.Contains("Dictum works out the language from the first seconds of each dictation. The decoder switches now; the model stays loaded.", Texts(window));
 
         shell.Write(("whisper.translate", System.Text.Json.Nodes.JsonValue.Create(true)));
-        picker.SelectedIndex = IndexOf("tl");
-        Assert.Contains("Dictum listens for Tagalog (tl) and writes English. The decoder switches now; the model stays loaded.", Texts(window));
+        picker.SelectedIndex = IndexOf("de");
+        Assert.Contains("Dictum listens for German (de) and writes English. The decoder switches now; the model stays loaded.", Texts(window));
         picker.SelectedIndex = IndexOf("auto");
         Assert.Contains("Dictum works out the language from the first seconds of each dictation and writes English. The decoder switches now; the model stays loaded.", Texts(window));
 
@@ -459,7 +457,7 @@ public class LanguageUiTests
     [Fact]
     public Task Translate_is_refused_on_turbo_and_written_on_medium() => UiSession.Run(() =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "large-v3-turbo", "language": "hi" } }""");
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "large-v3-turbo", "language": "es" } }""");
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: true);
         Assert.Contains("skipped", shell.CleanupStatus);
@@ -487,7 +485,7 @@ public class LanguageUiTests
     [Fact]
     public Task The_mode_page_names_the_presets_that_cannot_hear_the_language_on_cpu_and_gpu_machines() => UiSession.Run(() =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "medium", "language": "tl" } }""");
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "medium", "language": "de" } }""");
         var (cpuShell, _, _) = scratch.Shell();
         cpuShell.Reload(userRequested: true);
         var cpuWindow = new SettingsWindow(cpuShell);
@@ -506,7 +504,7 @@ public class LanguageUiTests
         gpuWindow.ShowPage("Mode");
         var gpuText = Texts(gpuWindow);
         Assert.Contains("Light would write base.en", gpuText);
-        Assert.DoesNotContain("Full would write", gpuText); // large-v3-turbo hears Tagalog
+        Assert.DoesNotContain("Full would write", gpuText); // large-v3-turbo hears German
         gpuWindow.Close();
         gpuShell.Dispose();
     });
@@ -538,9 +536,9 @@ public class LanguageUiTests
     /// server tidies each dictation while Settings > Privacy says nothing leaves this PC (rebase lane, 7b0a809, 16/10/2026).
     /// </summary>
     [Theory]
-    [InlineData("hi", false, false)]   // Hindi written as Hindi
+    [InlineData("es", false, false)]   // Spanish written as Spanish
     [InlineData("auto", false, false)] // detected per dictation, written as spoken
-    [InlineData("hi", true, true)]     // translated: English comes out, so the server tidies it
+    [InlineData("es", true, true)]     // translated: English comes out, so the server tidies it
     [InlineData("en", false, true)]
     public Task The_clean_up_page_says_a_server_on_this_PC_tidies_each_dictation_only_while_it_does(string language, bool translate, bool serverTidies) => UiSession.Run(() =>
     {
@@ -597,7 +595,7 @@ public class LanguageUiTests
     /// provider whatever offline only says, so switching it off would send nothing: the line must not promise that it would.
     /// </summary>
     [Theory]
-    [InlineData("hi", ApprovedNothingSentLine)]
+    [InlineData("es", ApprovedNothingSentLine)]
     [InlineData("en", ApprovedOfflineOnlyLine)]
     public async Task The_clean_up_page_names_offline_only_as_the_reason_only_for_English_text(string language, string expected)
     {
@@ -607,7 +605,7 @@ public class LanguageUiTests
 
     /// <summary>Settings > Privacy decides as Settings > Clean-up does (its own comment says so): the two pages must not disagree.</summary>
     [Theory]
-    [InlineData("hi", ApprovedNothingLeavesLine, ApprovedOfflineOnlyLine)]
+    [InlineData("es", ApprovedNothingLeavesLine, ApprovedOfflineOnlyLine)]
     [InlineData("en", ApprovedOfflineOnlyLine, ApprovedNothingLeavesLine)]
     public async Task The_privacy_page_names_offline_only_as_the_reason_only_for_English_text(string language, string said, string notSaid)
     {
