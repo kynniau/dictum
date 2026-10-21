@@ -223,13 +223,20 @@ public sealed class OfflineAndDownloadTests : IDisposable
     [Fact]
     public async Task A_slow_but_live_connection_is_not_a_stall()
     {
+        // The stall limit is a real timer (CancelAfter in ModelDownloader), so this test cannot be free of the clock; it is built so
+        // that scheduling delay on a loaded runner cannot reach it. Seven reads (six of 512 KiB, then the end of the file) arrive
+        // 250 ms apart: 1.75 s in all, longer than the 1.4 s limit, yet no gap is longer than 250 ms. Only restarting the timer on
+        // every read lets it pass, and a read would have to be held up 1.15 s beyond its delay to be misreported as a stall.
+        // (Before: 12 reads 40 ms apart against a 150 ms limit, so a 110 ms hiccup on a CI runner failed it.)
         var (content, spec) = Sample();
-        var server = new FileServer(content) { Slow = (256 << 10, 40) }; // 12 reads 40 ms apart: 0.5 s in all, never 150 ms idle
+        var gap = TimeSpan.FromMilliseconds(250);
+        var stallLimit = TimeSpan.FromMilliseconds(1400);
+        var server = new FileServer(content) { Slow = (512 << 10, (int)gap.TotalMilliseconds) };
         var target = Path.Combine(_dir.FullName, "x.gguf");
         var sw = System.Diagnostics.Stopwatch.StartNew();
         Assert.Equal(1, await ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, NullLog.Instance,
-            Fast with { StallTimeout = TimeSpan.FromMilliseconds(150) }));
-        Assert.True(sw.Elapsed > TimeSpan.FromMilliseconds(150), $"took {sw.Elapsed}"); // longer than the stall limit overall
+            Fast with { StallTimeout = stallLimit }));
+        Assert.True(sw.Elapsed > stallLimit, $"took {sw.Elapsed}"); // longer than the stall limit overall, by construction
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));
     }
 
