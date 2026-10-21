@@ -187,6 +187,35 @@ public class SilenceWarningTests
         Assert.Equal(1, heard);
     }
 
+    /// <summary>1 s of 16-bit Gaussian white noise at 48 kHz and <paramref name="dbfs"/> RMS, through Append: was it heard?</summary>
+    private static bool HeardNoise(double dbfs, int channels)
+    {
+        var heard = false;
+        var buffer = new CaptureBuffer(SampleEncoding.Int16, channels, 48000, () => heard = true);
+        var random = new Random(21102026);
+        var sigma = Math.Pow(10, dbfs / 20) * 32768;
+        var bytes = new byte[48000 * channels * 2];
+        for (var i = 0; i < bytes.Length; i += 2)
+        {
+            var gaussian = Math.Sqrt(-2 * Math.Log(1 - random.NextDouble())) * Math.Cos(2 * Math.PI * random.NextDouble());
+            var sample = (short)Math.Clamp(Math.Round(gaussian * sigma), short.MinValue, short.MaxValue);
+            BitConverter.TryWriteBytes(bytes.AsSpan(i, 2), sample);
+        }
+        buffer.Append(bytes);
+        return heard;
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void The_floor_reads_at_the_device_as_measured_at_its_clear_ends(int channels)
+    {
+        // The floor applies after the downmix and the 48 to 16 kHz resample, which lower white noise by about 6 dB (mono) or
+        // 9 dB (stereo): -84.2 dBFS at the device is heard; -96 dBFS is not, though it is above one 16-bit step (about -90).
+        Assert.True(HeardNoise(-84.2, channels));
+        Assert.False(HeardNoise(-96, channels));
+    }
+
     [Fact]
     public void The_proposed_strings_are_the_ones_listed_for_approval()
     {
@@ -212,6 +241,8 @@ public class SilenceWarningTests
     {
         public bool ReportsSound => true;
         public float CurrentLevel => 0f;
+        public float PeakLevel { get; init; }
+        public long BlocksMeasured { get; init; }
         public Exception? OpenFails { get; init; }
 
         public event Action<Exception>? Failed { add { } remove { } }
@@ -237,7 +268,7 @@ public class SilenceWarningTests
         public void Up() => Controller.Post(new HookEvent(HotkeySignal.Up, Environment.TickCount64));
     }
 
-    private static Rig Make(QuietCapture? capture = null, bool microphoneListed = true)
+    private static Rig Make(QuietCapture? capture = null, bool microphoneListed = true, ILog? log = null)
     {
         var settings = new AppSettings();
         var whisper = new FakeTranscriber("hello there");
@@ -247,7 +278,7 @@ public class SilenceWarningTests
             (text, _) => { inserted.Enqueue(text); return Task.CompletedTask; }, () => settings, NullLog.Instance);
         capture ??= new QuietCapture();
         var ui = new FakeUi();
-        var controller = new DictationController(new DictationStateMachine(StateMachineOptions.Default), capture, pipeline, ui, () => settings, NullLog.Instance,
+        var controller = new DictationController(new DictationStateMachine(StateMachineOptions.Default), capture, pipeline, ui, () => settings, log ?? NullLog.Instance,
             microphoneListed: () => microphoneListed);
         return new Rig(controller, capture, ui, whisper, inserted);
     }
@@ -285,13 +316,28 @@ public class SilenceWarningTests
         Assert.True(rig.Controller.IsIdle);
 
         // The next dictation hears its microphone and types: the tray panel's line goes.
+        // The sound is reported only once the new session's recording has started, so it cannot be counted against the old one.
+        var recordings = rig.Ui.Pills.Count(p => p == PillView.RecordingHold);
         rig.Down();
+        await WaitUntil(() => rig.Ui.Pills.Count(p => p == PillView.RecordingHold) > recordings, "the next recording");
         rig.Capture.Hear();
         await Task.Delay(400, Ct);
         rig.Up();
         await WaitUntil(() => !rig.Inserted.IsEmpty, "the paste");
         await WaitUntil(() => rig.Ui.HeardNothing == false, "the line cleared");
         Assert.Equal(["Hello there."], rig.Inserted.ToArray());
+    }
+
+    [Fact]
+    public async Task The_warning_log_line_gives_the_sessions_peak_block_level_and_block_count()
+    {
+        var log = new RecordingLog();
+        using var rig = Make(new QuietCapture { PeakLevel = 3.5e-6f, BlocksMeasured = 97 }, log: log);
+        rig.Down();
+        await WaitUntil(() => rig.Ui.Pills.Contains(PillView.NoSound), "the warning");
+        var line = Assert.Single(log.Lines, l => l.Message.StartsWith("No sound from the microphone", StringComparison.Ordinal)).Message;
+        Assert.Contains("peak block RMS 3.50E-6 over 97 block(s) of 20 ms", line); // numbers only: nothing of what was said
+        rig.Up();
     }
 
     [Fact]

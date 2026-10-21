@@ -32,6 +32,10 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
 
     public float CurrentLevel => Volatile.Read(ref _buffer)?.CurrentLevel ?? 0f;
 
+    public float PeakLevel => Volatile.Read(ref _buffer)?.PeakLevel ?? 0f;
+
+    public long BlocksMeasured => Volatile.Read(ref _buffer)?.BlocksMeasured ?? 0;
+
     public void Start(string? deviceSetting, long keyDownStamp)
     {
         lock (_gate)

@@ -333,6 +333,11 @@ public sealed class DictationStateMachine
     }
 
     /// <summary>A recording ends (the key released, the hands-free stop, the auto-stop): transcribed, unless the "No sound from mic" warning is up.</summary>
+    // simplification: this reads _noSound when the key event is handled, before a first-sound report the capture thread may
+    // still have queued for the last moments of audio (the capture's buffer length, about 50 ms, plus the inbox). Ceiling: a
+    // first sound shorter than that, arriving after 2 s of silence and just before the release, is discarded with the
+    // warning instead of transcribed (inferred, not measured). Trigger to retire: a report of a dropped first word; the fix
+    // would be to ask the capture whether it heard anything when it stops (CaptureBuffer.PeakLevel) instead of the event.
     private IReadOnlyList<Effect> EndRecording(bool autoStopped) => _noSound ? EndUnheard(NoSoundCause.Silent) : BeginProcessing(autoStopped);
 
     /// <summary>

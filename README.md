@@ -1152,13 +1152,15 @@ warns, and that file has no size or hash to be checked against. A value is never
   `type` there too.
 - **Wrong microphone.** Run `--selftest` to list devices and set `audio.device` to part of the name.
 - **"No sound from mic" (pill), "Dictum is not hearing anything" (balloon).** The microphone opened but gave no sound at
-  all: every 20 ms of audio was digital silence, or no audio arrived, for 2 seconds after the key was pressed. Check that
-  the microphone is plugged in, not muted (its own switch, and Windows Sound settings), and is the one Dictum
-  uses (`--selftest`, `audio.device`). On a remote or virtual desktop (Remote Desktop, Azure Virtual Desktop) the
+  all for 2 seconds after the key was pressed: every 20 ms of audio was silent (digital silence or below about −91 dBFS),
+  or no audio arrived. Check that the microphone is plugged in, not muted (its own switch, and Windows Sound settings), is
+  the one Dictum uses (`--selftest`, `audio.device`), and that Windows allows desktop apps to use the microphone
+  (Settings > Privacy & security > Microphone). On a remote or virtual desktop (Remote Desktop, Azure Virtual Desktop) the
   microphone must be redirected from your own PC: see "Remote Desktop microphone" under "Deploying to staff machines and
   Azure VMs". Once the microphone has been heard in a dictation, later pauses never bring the warning back. A microphone
   whose own noise suppression sends exact silence between words can show it until you start speaking (not seen; inferred
-  from how the check works). The log line is `No sound from the microphone 2000 ms into the recording`.
+  from how the check works). The log line is `No sound from the microphone 2000 ms into the recording: peak block RMS … over … block(s) of 20 ms`
+  (0 blocks means no audio arrived at all; the peak is a level, never what was said).
 - **"No microphone found" (balloon).** The microphone could not be opened and Windows lists no microphone at all. Plug
   one in, or on a remote or virtual desktop turn on microphone redirection, then press the hotkey again. On Windows
   Server, also check the Windows Audio service (see "Deploying to staff machines and Azure VMs").

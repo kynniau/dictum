@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Threading.Channels;
 using Dictum.Audio;
 using Dictum.Hotkey;
@@ -234,7 +235,7 @@ public sealed class DictationController : IDisposable
                 case NoSoundEffect noSound:
                     _log.Warn(noSound.Cause == NoSoundCause.NoMicrophone
                         ? "No microphone is listed; the recording did not start."
-                        : $"No sound from the microphone {DictationStateMachine.NoSoundGraceMs} ms into the recording (every 20 ms block below {CaptureBuffer.SoundFloor}); recording goes on.");
+                        : NoSoundLogLine(_capture.PeakLevel, _capture.BlocksMeasured));
                     _ui.WarnNoSound(noSound.Cause);
                     break;
                 case HeardNothingEffect:
@@ -270,6 +271,13 @@ public sealed class DictationController : IDisposable
             return false;
         }
     }
+
+    /// <summary>
+    /// The warning's log line, with the session's peak block RMS and how many blocks arrived (numbers only, nothing of what was
+    /// said), so real microphones' noise floors and "no packets at all" can be read from logs.
+    /// </summary>
+    internal static string NoSoundLogLine(float peak, long blocks) =>
+        $"No sound from the microphone {DictationStateMachine.NoSoundGraceMs} ms into the recording: peak block RMS {peak.ToString("0.00E+0", CultureInfo.InvariantCulture)} over {blocks} block(s) of 20 ms, floor {CaptureBuffer.SoundFloor.ToString("0.00E+0", CultureInfo.InvariantCulture)}; recording goes on.";
 
     private bool MicrophoneListed()
     {

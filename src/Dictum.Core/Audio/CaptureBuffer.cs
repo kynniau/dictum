@@ -21,10 +21,13 @@ public sealed class CaptureBuffer
 
     /// <summary>
     /// A 20 ms block louder than this (RMS, 0-1) is a sound from the microphone, for the "No sound from mic" warning
-    /// (21/10/2026). 1e-5 is -100 dBFS: below one 16-bit step (1/32768, about -90 dBFS), so a stream of digital zeros (a muted
-    /// endpoint, WASAPI's silent flag, a virtual desktop whose microphone is not redirected) stays under it, while any real
-    /// signal quantised to 16 bits or more should pass. Inferred from that arithmetic, not measured on hardware: a microphone whose
-    /// own noise suppression sends exact zeros between words reads as silent until the speaker talks.
+    /// (21/10/2026). 1e-5 is the 20 ms block RMS after decoding, downmixing and resampling to 16 kHz, not the level at the
+    /// device: resampling 48 kHz white noise to 16 kHz drops it by about 6 dB (mono) or 9 dB (stereo, after the downmix).
+    /// Measured by the PR #22 lens on 21/10/2026 through <see cref="Append"/> with 16-bit Gaussian noise at 48 kHz, and pinned
+    /// in SilenceWarningTests at its clear ends: digital zeros, and white noise quieter than about -91 dBFS (stereo) or
+    /// -94 dBFS (mono) at the device, read as no sound; -84 dBFS passes. Not measured on real microphones: the warning's log
+    /// line gives each session's peak block RMS, so real noise floors can be read from logs. A microphone whose own noise
+    /// suppression sends exact zeros between words reads as silent until the speaker talks.
     /// </summary>
     public const float SoundFloor = 1e-5f;
 
@@ -59,6 +62,18 @@ public sealed class CaptureBuffer
 
     /// <summary>Most recent 20 ms RMS, 0-1. Read by the pill's level meter.</summary>
     public float CurrentLevel => Volatile.Read(ref _level);
+
+    /// <summary>The loudest 20 ms block RMS so far this recording (0 before the first block), for the no-sound log line.</summary>
+    public float PeakLevel
+    {
+        get { lock (_gate) return _peak; }
+    }
+
+    /// <summary>Whole 20 ms blocks measured so far this recording (0: no audio has arrived).</summary>
+    public long BlocksMeasured
+    {
+        get { lock (_gate) return _blocks; }
+    }
 
     public int SampleCount
     {

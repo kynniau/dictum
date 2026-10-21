@@ -34,6 +34,12 @@ public interface IAudioCapture
     /// </summary>
     bool ReportsSound => false;
 
+    /// <summary>The loudest 20 ms block RMS so far this recording, after resampling (<see cref="CaptureBuffer.PeakLevel"/>); this default: 0.</summary>
+    float PeakLevel => 0f;
+
+    /// <summary>Whole 20 ms blocks measured so far this recording (<see cref="CaptureBuffer.BlocksMeasured"/>); this default: 0.</summary>
+    long BlocksMeasured => 0;
+
     /// <summary>
     /// Raised once per recording, from the capture thread, at the first 20 ms block louder than
     /// <see cref="CaptureBuffer.SoundFloor"/>. Handlers must not block. This default never raises it.
