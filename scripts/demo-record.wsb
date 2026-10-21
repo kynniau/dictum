@@ -1,8 +1,9 @@
 <!--
   Windows Sandbox configuration for scripts\demo-record.ps1, which fills the {{...}} tokens and writes the result into
-  the run's folder. The same clean Windows as sandbox-check.wsb: networking, the virtual GPU, the microphone, the camera,
-  the clipboard and printers off; every mapped folder read-only except the run's folder (C:\sbx\out). The driver runs
-  hidden, so no console window appears in the recording.
+  its staging folder in %TEMP% (deleted after the run), not into the run's folder: the sandbox can write to that folder,
+  and the result lists host paths. The same clean Windows as sandbox-check.wsb: networking, the virtual GPU, the
+  microphone, the camera, the clipboard and printers off; every mapped folder read-only except the run's folder
+  (C:\sbx\out). The driver runs hidden, so no console window appears in the recording.
 -->
 <Configuration>
   <VGpu>Disable</VGpu>

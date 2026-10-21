@@ -114,9 +114,11 @@ try {
     $n = 0
     foreach ($h in $highlights) {
         $n++
-        $pad = 4; $edge = 7
+        $edge = 7
         $c = $h.Click
         $box = $c.rect -and $c.x -ge $c.rect.x - 1 -and $c.x -le $c.rect.x + $c.rect.w + 1 -and $c.y -ge $c.rect.y - 1 -and $c.y -le $c.rect.y + $c.rect.h + 1
+        # The ring sits 4 px outside the element; a small control (a 33 x 16 status label) gets 8 so the ring does not cut into its words or cover its dot.
+        $pad = if ($box -and $c.rect.h -lt 24) { 8 } else { 4 }
         if ($box) {
             $w = [int]($c.rect.w * $scale) + 2 * ($pad + $edge); $hh = [int]($c.rect.h * $scale) + 2 * ($pad + $edge)
             $x = [int]($c.rect.x * $scale) - $pad - $edge; $y = [int]($c.rect.y * $scale) - $pad - $edge
@@ -131,7 +133,7 @@ try {
         $yellow = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 255, 212, 0)), $edge
         $inner = New-Object System.Drawing.RectangleF ($edge / 2 + 2), ($edge / 2 + 2), ($w - $edge - 4), ($hh - $edge - 4)
         if ($box) {
-            $radius = [math]::Min(18.0, [math]::Min($inner.Width, $inner.Height) / 2)
+            $radius = [math]::Min(18.0, [math]::Min([math]::Min($inner.Width, $inner.Height) / 2, ($c.rect.h * $scale) / 4)) # a quarter of the element height at most: no stadium ring on a small control
             $d = 2 * $radius
             $path = New-Object System.Drawing.Drawing2D.GraphicsPath
             $path.AddArc($inner.X, $inner.Y, $d, $d, 180, 90); $path.AddArc($inner.Right - $d, $inner.Y, $d, $d, 270, 90)
@@ -170,8 +172,10 @@ try {
         $from = VideoTime $step.start
         $to = if ($i + 1 -lt $total) { VideoTime $shown[$i + 1].start } else { $duration }
         $click = @($step.clicks | Where-Object { $_ -and $null -ne $_.epoch }) | Select-Object -First 1
-        # Just before the click: the pointer rests on the target and the highlight is on; the click itself may close it.
-        $typed = Get-Prop $click "typedEpoch" # a "type" step that clicked into a field: the still shows the typed text
+        # Just before the click: the pointer rests on the target and the highlight is on; the click itself may close it. A step that types is taken after the typing.
+        # When typing ended (every "type" action, with or without a field to click into): the still shows the typed text, not the empty field.
+        $typed = Get-Prop $click "typedEpoch"
+        if ($null -eq $typed) { $typed = Get-Prop $step "typedEpoch" }
         $at = if ($null -ne $typed) { [math]::Min([math]::Max($from, (VideoTime ([double]$typed)) + 0.3), $to - 0.1) }
               elseif ($click) { [math]::Max($from, (VideoTime ([double]$click.epoch)) - 0.35) } else { ($from + $to) / 2 }
         $at = [math]::Max(0.0, [math]::Min($at, $duration - 0.1))

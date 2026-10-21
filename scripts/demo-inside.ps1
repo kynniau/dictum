@@ -41,6 +41,7 @@ $log = [ordered]@{
     environment = @(); prepare = @(); steps = @(); fallbacks = @(); result = "not started"
 }
 $ffmpeg = $null
+$typedEpoch = $null # when the last "type" action of the current step finished typing (every type action, with or without "into")
 
 # ---- the target of a pointer action, found by UI Automation ----
 
@@ -208,7 +209,8 @@ function Invoke-Action($Action, [string]$Label) {
                 if (Value $Action "replace" $true) { [DemoUi]::Press("Ctrl+A", 60) }
             }
             [DemoUi]::TypeText((Expand $Action.text), $pace.typing)
-            # When the typing ended: demo-post.ps1 takes this step's still then, so it shows the typed text, not the empty field.
+            # When the typing ended, for every type action: demo-post.ps1 takes this step's still then, so it shows the typed text, not the empty field.
+            $script:typedEpoch = Epoch
             if ($Action.PSObject.Properties["into"]) { $click["typedEpoch"] = Epoch; return $click }
             return "typed"
         }
@@ -310,7 +312,7 @@ try {
     foreach ($step in @($demo.steps)) {
         $n++
         $label = "{0:00}-{1}" -f $n, (Value $step "id" "step")
-        $entry = [ordered]@{ index = $n; id = (Value $step "id" $null); caption = (Value $step "caption" $null); start = $null; end = $null; clicks = @(); actions = @(); ok = $false; skipped = $false; error = $null }
+        $entry = [ordered]@{ index = $n; id = (Value $step "id" $null); caption = (Value $step "caption" $null); start = $null; end = $null; typedEpoch = $null; clicks = @(); actions = @(); ok = $false; skipped = $false; error = $null }
         try {
             if ($step.PSObject.Properties["skipIf"] -and (Find-Target $step.skipIf 1500)) {
                 $entry.skipped = $true; $entry.ok = $true; $entry.actions += "skipped: present $(Describe $step.skipIf)"
@@ -332,6 +334,7 @@ try {
                 }
             }
             $entry.start = Epoch
+            $script:typedEpoch = $null
             Start-Sleep -Milliseconds ([int]([double](Value $step "lead" $pace.lead) * 1000))
             foreach ($action in @($step.do)) {
                 if (-not $action) { continue }
@@ -339,6 +342,7 @@ try {
                 if ($result -is [System.Collections.IDictionary]) { $entry.clicks += $result; $entry.actions += "$($action.do) $(Describe (Value $action "target" (Value $action "into" $null)))" }
                 else { $entry.actions += "$($action.do): $result" }
             }
+            $entry.typedEpoch = $script:typedEpoch
             Start-Sleep -Milliseconds ([int]([double](Value $step "after" $pace.after) * 1000))
             $entry.ok = $true
         } catch {

@@ -118,10 +118,18 @@ public static class DemoHostWindow {
     [DllImport("user32.dll")] static extern IntPtr GetDesktopWindow();
     [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h, uint flags);
     [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr m, int type, out uint x, out uint y);
-    // The primary monitor's effective DPI (96 = 100 % scaling), or 0 when Windows cannot say.
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    // The primary monitor's effective DPI (96 = 100 % scaling), or 0 when Windows cannot say. powershell.exe is DPI-unaware
+    // and Windows tells an unaware process 96 whatever the scaling, so this thread is made per-monitor-v2 aware (context
+    // -4) for the one call and put back afterwards.
     public static int PrimaryMonitorDpi() {
-        uint x, y;
-        return GetDpiForMonitor(MonitorFromWindow(GetDesktopWindow(), 1), 0, out x, out y) == 0 ? (int)x : 0;
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try {
+            uint x, y;
+            return GetDpiForMonitor(MonitorFromWindow(GetDesktopWindow(), 1), 0, out x, out y) == 0 ? (int)x : 0;
+        } finally {
+            if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous);
+        }
     }
     public static IntPtr Find(uint pid, string title) {
         IntPtr found = IntPtr.Zero;
@@ -137,15 +145,17 @@ public static class DemoHostWindow {
 '@
 
 # Display scaling: the window sizing below assumes the sandbox's title bar is 33 px, which holds at 100 % scaling only.
-# Two reads, either of which stops the run: the primary monitor's effective DPI (shcore GetDpiForMonitor; 96 is 100 %)
-# and the registry value HKCU:\Control Panel\Desktop\LogPixels, which Windows writes when a custom scaling is set (absent
-# at the default). Not verified here: that GetDpiForMonitor reports the true DPI to this DPI-unaware PowerShell process
-# when the scaling is not 100 %; -SkipDpiCheck exists for a wrong refusal.
+# Two reads, either of which stops the run: the primary monitor's effective DPI (shcore GetDpiForMonitor, asked as a
+# per-monitor-aware thread because this process is DPI-unaware and would be told 96 whatever the scaling; 96 is 100 %) and
+# the registry value HKCU:\Control Panel\Desktop\WindowMetrics\AppliedDPI, the DPI Windows applied to the desktop (read
+# when present). Only a PC at 100 % has been tried (both reads gave 96); a scaled host has not been tested.
+# -SkipDpiCheck exists for a wrong refusal.
 if (-not $SkipDpiCheck) {
     $monitorDpi = [DemoHostWindow]::PrimaryMonitorDpi()
-    $logPixels = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -ErrorAction SilentlyContinue).PSObject.Properties["LogPixels"]
-    if (($monitorDpi -ne 0 -and $monitorDpi -ne 96) -or ($logPixels -and $logPixels.Value -and [int]$logPixels.Value -ne 96)) {
-        throw "demo-record.ps1 needs 100 % display scaling on the host (title bar assumed 33 px); this PC reports monitor DPI $monitorDpi, registry LogPixels $(if ($logPixels) { $logPixels.Value } else { 'unset' }). Set Settings > System > Display > Scale to 100 %, or pass -SkipDpiCheck."
+    $applied = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -ErrorAction SilentlyContinue)
+    $appliedDpi = if ($applied -and $applied.PSObject.Properties["AppliedDPI"]) { [int]$applied.AppliedDPI } else { 0 }
+    if (($monitorDpi -ne 0 -and $monitorDpi -ne 96) -or ($appliedDpi -ne 0 -and $appliedDpi -ne 96)) {
+        throw "demo-record.ps1 needs 100 % display scaling on the host (title bar assumed 33 px); this PC reports monitor DPI $monitorDpi, registry AppliedDPI $(if ($appliedDpi) { $appliedDpi } else { 'unset' }). Set Settings > System > Display > Scale to 100 %, or pass -SkipDpiCheck."
     }
 }
 
@@ -187,56 +197,56 @@ foreach ($name in $Demo) {
     $run = (Resolve-Path -LiteralPath $run).Path
     $stage = Join-Path $env:TEMP "dictum-demo-stage-$stamp"
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
-
-    $maps = [ordered]@{ "C:\sbx\scripts" = $PSScriptRoot }
-    $job = [ordered]@{ demo = $data; demoFile = (Split-Path -Leaf $file); capture = "inside"; fps = $Fps
-        setupExe = $null; app = $null; ffmpeg = $null; vcRuntime = $null; extraModels = @(); target = @{ width = $Width; height = $Height } }
-    $usesSetup = ($data | ConvertTo-Json -Depth 20) -match '"installSilently"|\{setup\}'
-    if ($usesSetup) {
-        if (-not $Setup -or -not (Test-Path -LiteralPath $Setup)) { throw "$($data.name) installs Dictum: build dist\Dictum-Setup-<version>.exe (scripts\build-installer.ps1) or pass -Setup." }
-        New-Item -ItemType Directory -Force -Path "$stage\setup" | Out-Null
-        Copy-Item -LiteralPath $Setup -Destination "$stage\setup" # staged: the run folder (under dist) is mapped writable, dist itself is not mapped
-        $maps["C:\sbx\setup"] = "$stage\setup"
-        $job.setupExe = "C:\sbx\setup\" + (Split-Path -Leaf $Setup)
-    }
-    if ($App) {
-        if (-not (Test-Path -LiteralPath (Join-Path $App "Dictum.exe"))) { throw "$App holds no Dictum.exe." }
-        $maps["C:\sbx\app"] = (Resolve-Path -LiteralPath $App).Path
-        $job.app = "C:\sbx\app"
-    }
-    $extra = @(if ($data.PSObject.Properties["environment"] -and $data.environment.PSObject.Properties["extraModels"]) { $data.environment.extraModels })
-    if ($extra) {
-        foreach ($m in $extra) { if (-not (Test-Path -LiteralPath (Join-Path $ModelsDir $m))) { throw "$($data.name) needs $m in $ModelsDir (no downloads)." } }
-        # Only the files the demo names, copied to the staging folder, which is what the sandbox sees (read-only): the
-        # host's whole model folder is never mapped. Names are the files' leaf names, so the sandbox paths stay flat.
-        New-Item -ItemType Directory -Force -Path "$stage\models" | Out-Null
-        foreach ($m in $extra) { Copy-Item -LiteralPath (Join-Path $ModelsDir $m) -Destination "$stage\models" }
-        $maps["C:\sbx\models"] = "$stage\models"
-        $job.extraModels = @($extra | ForEach-Object { "C:\sbx\models\" + (Split-Path -Leaf $_) })
-    }
-    if ($vcInfo) {
-        New-Item -ItemType Directory -Force -Path "$stage\vcrt" | Out-Null
-        $vcInfo.Dlls | ForEach-Object { Copy-Item -LiteralPath $_ -Destination "$stage\vcrt" }
-        $maps["C:\sbx\vcrt"] = "$stage\vcrt"
-        $job.vcRuntime = [ordered]@{ dir = "C:\sbx\vcrt"; major = $vcInfo.Major; minor = $vcInfo.Minor; bld = $vcInfo.Bld }
-    }
-    $maps["C:\sbx\ffmpeg"] = Split-Path -Parent $ffmpegReal
-    $job.ffmpeg = "C:\sbx\ffmpeg\" + (Split-Path -Leaf $ffmpegReal)
-    Write-Utf8 (Join-Path $run "job.json") ($job | ConvertTo-Json -Depth 20)
-
-    $mapped = foreach ($inside in $maps.Keys) {
-        "    <MappedFolder><HostFolder>{0}</HostFolder><SandboxFolder>{1}</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>" -f
-            [Security.SecurityElement]::Escape($maps[$inside]), $inside
-    }
-    $mapped += "    <MappedFolder><HostFolder>{0}</HostFolder><SandboxFolder>C:\sbx\out</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>" -f
-        [Security.SecurityElement]::Escape($run)
-    $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "demo-record.wsb")) -replace '(?s)^\s*<!--.*?-->\s*', ''
-    $wsb = Join-Path $stage "demo.wsb" # not in $run: the sandbox can write to $run, and demo.wsb lists host paths
-    Write-Utf8 $wsb $template.Replace("{{MappedFolders}}", ($mapped -join "`r`n"))
-
-    Write-Host "Recording $($data.name) in Windows Sandbox; run folder $run"
-    $maps.GetEnumerator() | ForEach-Object { Write-Host ("  {0} <- {1} (read-only)" -f $_.Key, $_.Value) }
+    # From here on, anything that throws (a missing extra model, say) still deletes the staging folder and closes the sandbox.
     try {
+        $maps = [ordered]@{ "C:\sbx\scripts" = $PSScriptRoot }
+        $job = [ordered]@{ demo = $data; demoFile = (Split-Path -Leaf $file); capture = "inside"; fps = $Fps
+            setupExe = $null; app = $null; ffmpeg = $null; vcRuntime = $null; extraModels = @(); target = @{ width = $Width; height = $Height } }
+        $usesSetup = ($data | ConvertTo-Json -Depth 20) -match '"installSilently"|\{setup\}'
+        if ($usesSetup) {
+            if (-not $Setup -or -not (Test-Path -LiteralPath $Setup)) { throw "$($data.name) installs Dictum: build dist\Dictum-Setup-<version>.exe (scripts\build-installer.ps1) or pass -Setup." }
+            New-Item -ItemType Directory -Force -Path "$stage\setup" | Out-Null
+            Copy-Item -LiteralPath $Setup -Destination "$stage\setup" # staged: the run folder (under dist) is mapped writable, dist itself is not mapped
+            $maps["C:\sbx\setup"] = "$stage\setup"
+            $job.setupExe = "C:\sbx\setup\" + (Split-Path -Leaf $Setup)
+        }
+        if ($App) {
+            if (-not (Test-Path -LiteralPath (Join-Path $App "Dictum.exe"))) { throw "$App holds no Dictum.exe." }
+            $maps["C:\sbx\app"] = (Resolve-Path -LiteralPath $App).Path
+            $job.app = "C:\sbx\app"
+        }
+        $extra = @(if ($data.PSObject.Properties["environment"] -and $data.environment.PSObject.Properties["extraModels"]) { $data.environment.extraModels })
+        if ($extra) {
+            foreach ($m in $extra) { if (-not (Test-Path -LiteralPath (Join-Path $ModelsDir $m))) { throw "$($data.name) needs $m in $ModelsDir (no downloads)." } }
+            # Only the files the demo names, copied to the staging folder, which is what the sandbox sees (read-only): the
+            # host's whole model folder is never mapped. Names are the files' leaf names, so the sandbox paths stay flat.
+            New-Item -ItemType Directory -Force -Path "$stage\models" | Out-Null
+            foreach ($m in $extra) { Copy-Item -LiteralPath (Join-Path $ModelsDir $m) -Destination "$stage\models" }
+            $maps["C:\sbx\models"] = "$stage\models"
+            $job.extraModels = @($extra | ForEach-Object { "C:\sbx\models\" + (Split-Path -Leaf $_) })
+        }
+        if ($vcInfo) {
+            New-Item -ItemType Directory -Force -Path "$stage\vcrt" | Out-Null
+            $vcInfo.Dlls | ForEach-Object { Copy-Item -LiteralPath $_ -Destination "$stage\vcrt" }
+            $maps["C:\sbx\vcrt"] = "$stage\vcrt"
+            $job.vcRuntime = [ordered]@{ dir = "C:\sbx\vcrt"; major = $vcInfo.Major; minor = $vcInfo.Minor; bld = $vcInfo.Bld }
+        }
+        $maps["C:\sbx\ffmpeg"] = Split-Path -Parent $ffmpegReal
+        $job.ffmpeg = "C:\sbx\ffmpeg\" + (Split-Path -Leaf $ffmpegReal)
+        Write-Utf8 (Join-Path $run "job.json") ($job | ConvertTo-Json -Depth 20)
+
+        $mapped = foreach ($inside in $maps.Keys) {
+            "    <MappedFolder><HostFolder>{0}</HostFolder><SandboxFolder>{1}</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>" -f
+                [Security.SecurityElement]::Escape($maps[$inside]), $inside
+        }
+        $mapped += "    <MappedFolder><HostFolder>{0}</HostFolder><SandboxFolder>C:\sbx\out</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>" -f
+            [Security.SecurityElement]::Escape($run)
+        $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "demo-record.wsb")) -replace '(?s)^\s*<!--.*?-->\s*', ''
+        $wsb = Join-Path $stage "demo.wsb" # not in $run: the sandbox can write to $run, and demo.wsb lists host paths
+        Write-Utf8 $wsb $template.Replace("{{MappedFolders}}", ($mapped -join "`r`n"))
+
+        Write-Host "Recording $($data.name) in Windows Sandbox; run folder $run"
+        $maps.GetEnumerator() | ForEach-Object { Write-Host ("  {0} <- {1} (read-only)" -f $_.Key, $_.Value) }
         # The sandbox desktop takes its size from the window when the sandbox connects. Resizing the window later (even
         # with the end of a drag, WM_ENTERSIZEMOVE / WM_EXITSIZEMOVE, sent) left the desktop at the window's earlier size
         # in some runs on 21/10/2026, so the window is held at Width x Height from the moment it appears, and if the

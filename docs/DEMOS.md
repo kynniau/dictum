@@ -15,7 +15,7 @@ For each demo, in `dist\demos\` (git-ignored):
 | `<name>.mp4` | H.264, 30 fps, no audio. The sandbox screen (1600 x 900) with a caption band below it (1600 x 1116 in all). |
 | `<name>.gif` | For the web: 800 px wide, 8 frames a second, made smaller until it is under 15 MB. |
 | `<name>-poster.png` | The frame of the step marked `"poster": true` (else the last second). |
-| `<name>\frames\NN-<step>.png` | One still per step, just before its click, with caption and highlight: for the website guide. |
+| `<name>\frames\NN-<step>.png` | One still per step, with caption and highlight: for the website guide. Taken 0.35 s before the click (halfway through a step with no click); for a step that types, 0.3 s after the typing ended, so it shows the typed text. |
 | `<name>\frames\raw\NN-<step>.png` | The same moments without caption or highlight. |
 | `<name>\steps.json` | The step log the video was made from (below). |
 | `runs\<date-time>-<name>\` | Each recording run: `raw.mp4`, `steps.json`, `job.json`, `progress.txt`, ffmpeg's log, Dictum's own log, and a UI Automation tree for any lookup that failed. |
@@ -27,10 +27,12 @@ the Setup exe, and no other sandbox open. The host PC must have the Microsoft Vi
 installed: the sandbox borrows it (below). The host also needs:
 
 - **100 % display scaling.** The window sizing assumes the sandbox's title bar is 33 px, which holds at 100 % only.
-  `demo-record.ps1` stops with "needs 100 % display scaling on the host" when the primary monitor's DPI (shcore
-  `GetDpiForMonitor`) or the registry value `HKCU:\Control Panel\Desktop\LogPixels` says otherwise. `-SkipDpiCheck` turns
-  the check off (the sandbox desktop may then never reach 1600 x 900). Not verified: that `GetDpiForMonitor` reports the
-  true DPI to Windows PowerShell 5.1 at a scaling other than 100 %; the check was only run on a PC reporting 96.
+  `demo-record.ps1` stops with "needs 100 % display scaling on the host" when either of two reads is not 96: the
+  primary monitor's effective DPI (shcore `GetDpiForMonitor`, asked from a thread switched to per-monitor-v2 DPI
+  awareness for that one call, because `powershell.exe` is DPI-unaware and Windows then reports 96 whatever the
+  scaling), or the registry value `HKCU:\Control Panel\Desktop\WindowMetrics\AppliedDPI`. `-SkipDpiCheck` turns the
+  check off (the sandbox desktop may then never reach 1600 x 900). Not verified: any host at a scaling other than
+  100 %; the check has only been run on a PC where both reads gave 96, so that it stops a scaled host is untested here.
 - **A screen that fits the window.** The sandbox desktop is 1600 x 900 inside a 1600 x 933 window (the title bar adds
   33 px) plus borders, so the host screen must be larger than that: a 1366 x 768 screen cannot. If the sandbox still
   comes up at another size after `-SizeAttempts` tries, the script stops (below); `-AllowOtherSize` records at that size
