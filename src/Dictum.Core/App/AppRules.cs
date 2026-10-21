@@ -17,6 +17,20 @@ public static class AppRules
     public static (bool AskSpeech, bool AskCleanup) FirstRunQuestions(SettingsLoadResult file) =>
         file.Usable ? (!file.NamesSpeechModel, !file.NamesCleanupModel) : (false, false);
 
+    /// <summary>
+    /// The onboarding window (Dictum 1.2) is the first-run UI while the speech choice is open (<see cref="FirstRunQuestions"/>)
+    /// and no model override names the model (a scripted launch), exactly when the first-run hotkey check was shown before it.
+    /// Its speech step writes whisper.model, so a start after that step (a crash, say) does not show it again; the steps after
+    /// it are not shown again either, as the hotkey check was not.
+    /// </summary>
+    public static bool Onboards(SettingsLoadResult file, bool modelOverride) => FirstRunQuestions(file).AskSpeech && !modelOverride;
+
+    /// <summary>
+    /// The onboarding's model-folder step: only while settings.json names no model folder (models.folder, or its earlier name
+    /// whisper.models_dir), so an admin's seeded folder, or one chosen before a crash, is not asked about again.
+    /// </summary>
+    public static bool AsksFolder(SettingsLoadResult file) => file.Settings.Models.Folder is null && file.Settings.Whisper.ModelsDir is null;
+
     public static StateMachineOptions Options(AppSettings s) => new(s.TapMs, s.DoubleTapMs, s.HandsFreeMaxSeconds, StateMachineOptions.DefaultHoldMaxSeconds);
 
     /// <summary>

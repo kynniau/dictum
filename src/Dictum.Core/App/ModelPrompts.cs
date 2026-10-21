@@ -17,6 +17,18 @@ public sealed record ModelPick(string? Model, string? FilePath, bool Quit);
 public sealed record CleanupPick(string? Model, string? FilePath, bool RulesOnly, bool Quit);
 
 /// <summary>
+/// What the first run recommends on this PC and whether a model question is open (ModelCoordinator.PlanFirstRun): the pickers
+/// and the onboarding's speech choice are shown only when <see cref="AsksPickers"/>.
+/// </summary>
+/// <param name="Gpu">The machine counts as a GPU machine (WhisperEngine.GpuMachine): the Simple view's tiers follow it.</param>
+/// <param name="Overridden">A --model or DICTUM_MODEL override: the recommendations are written without a question.</param>
+/// <param name="BundledPath">base.en on this PC (it comes with Dictum, Decision 16): answered with it, without a question; else null.</param>
+public sealed record FirstRunPlan(bool Gpu, string Speech, string SpeechWhy, string Cleanup, string CleanupWhy, bool Overridden, string? BundledPath)
+{
+    public bool AsksPickers => !Overridden && BundledPath is null;
+}
+
+/// <summary>
 /// The model dialogs, behind an interface so the model logic can be tested without UI. The UI implements them as modal
 /// windows (the first-run picker, the missing-model prompt, the download question, the file chooser).
 /// </summary>

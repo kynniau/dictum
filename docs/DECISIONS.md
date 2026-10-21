@@ -2891,3 +2891,113 @@ The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in t
 **Pins** (`tests/Dictum.Tests/SimpleViewTests.cs`, headless as `UiWindowTests`; no model is downloaded: an in-memory server holds the one download). Each was observed failing with its mutation applied and passing without it; the PR body has the table. Two existing UI tests that check Advanced catalogue rows now set `"ui": { "view": "advanced" }` (`NoSilentCancelUiTests.The_downloading_model_shows_as_downloading_with_a_disabled_button`, `ModelFolderTests.Settings_models_marks_the_bundled_model_as_included`); their assertions are unchanged. The test shell (`Scratch.Shell`) gained a `gpuMachine` option for the GPU mapping pin.
 
 **Not verified:** the views on a real desktop, at 150 % scaling, or in dark mode (headless only); screen-reader output (the accessible names are pinned, not heard); the GPU mapping on a real GPU machine (pinned with a stand-in machine class); a real download; tray mode, never run on the development PC.
+
+## Onboarding: the Welcome to Dictum window (Dictum 1.2, 21/10/2026, branch feat/onboarding, stacked on feat/simple-view)
+
+**The product decision (Kyle, 21/10/2026, relayed in the lane brief):** onboarding must explain how Dictum works, ask where to keep the model files (Kyle is low on C: on his VM; the models take 200 MB to 10 GB), test the microphone (a VM with no microphone passthrough showed only "Recording"), and explain that accents and microphones differ, so people try a more accurate model or the calibration test when words come out wrong. A 95-year-old must be able to complete it.
+
+**What was built** (SPEC §26).
+
+1. `OnboardingWindow` (`src/Dictum.UI/Views/Onboarding/`): one window, six steps (Welcome, Model files, Speech model, Your hotkey, Microphone, Try it), a step line and dots, Back and the step's own buttons, larger text than the other windows, 640 × 470 DIP. It replaces the speech picker, the clean-up picker and `HotkeyCheckWindow` at first run.
+2. `OnboardingFlow`: the writes, apart from the window, so the shell and the tests drive the same code. Each step writes its own key when completed, only when it changed (`models.folder`, `whisper.model` with the clean-up answer, `hotkey`, `audio.device`). `SkipRest` (Esc, closing the window) writes the speech answer with today's defaults and nothing else.
+3. `ModelCoordinator.FirstRun` is split into `PlanFirstRun` (the GPU probe, the recommendations, whether base.en is on this PC) and `AnswerFirstRun` (the writes), with `FirstRun` unchanged in behaviour on top of them (its pins, in ModelFolderTests, FixBatchModelTests, NoVulkanCrashTests, ModelCoordinatorTests and ModelFolderSafetyTests, all pass). The window's speech step calls the two halves.
+4. `ModelCoordinator.SetModelsFolder` gains `reloadAfter` (false for the window: nothing is loaded yet, and a reload before `Start` loads the configuration would start a model load and a hotkey listener mid-wizard) and a shared `FolderRefusal` (the bundled folder, as before, and now a device path, below).
+5. `AppRules.Onboards` (the window shows exactly when the first-run hotkey check did: the speech choice is open and no model override) and `AppRules.AsksFolder` (no folder named), beside `FirstRunQuestions`, which is unchanged.
+6. `IShellDialogs.HotkeyCheck` is replaced by `IShellDialogs.Onboard(OnboardingFlow)`. `AppShell.Start` opens the window instead of `FirstRun` + `FirstRunHotkeyCheck` (removed), and calls `OnboardingFlow.BeginTryIt` at its end, once the hotkey listens.
+7. `HotkeyCheckWindow` is gone; its strings live in `HotkeyCheck` (Dialogs.cs) and are reused word for word by the hotkey step and by Settings > General (`HotkeyCheck.MacNote`, one reference changed in GeneralPages.cs).
+
+**Decisions made in this lane, and why.**
+
+- **No clean-up question in the window.** The brief's six steps have none, and "Skip everywhere leaves today's defaults". With base.en (every package) the first run already wrote the rule-based tidy without a question; without base.en the window now does the same, instead of the clean-up picker. The Simple view's "Tidy my words" and "Add AI clean-up" are where AI clean-up is chosen. The clean-up picker stays for a seeded settings.json that names `whisper.model` but leaves the clean-up choice open, without base.en (no window then).
+- **Interruption.** The brief: "a crash mid-way does not repeat finished steps; use the existing FirstRunQuestions mechanism and extend it minimally". The window shows while settings.json names no `whisper.model`; the folder step only while it names no folder. So a start after the folder step skips it, and a start after the speech step opens no window at all. simplification (`AppRules.Onboards`): the hotkey and microphone steps are not shown again after a crash that follows the speech step, exactly as the hotkey check was not before 1.2. Ceiling: a person whose PC stops between steps 3 and 6 does not see steps 4-6. Trigger to retire: a report of it; then record the steps finished (a settings.json key, which needs the loader to know it).
+- **A folder chosen first makes a sparse settings.json.** The folder step writes `models.folder` before the speech step, so with no settings.json yet the file starts with that key alone (no `_doc` comments); the speech step then adds its keys, as for a seeded file. The loader takes defaults for the rest. Ceiling: that file lacks the comment block. Trigger: a request for it; then write the full default file at the folder step without `whisper.model`.
+- **Device paths refused.** The brief: "refuse the bundled folder and device paths; show their existing messages". The bundled folder's sentence exists (`BundledFolderRefused`); a device path had none in the UI (the settings load ignores such a `models.folder` with a log warning), so `DevicePathRefused` is new and PROPOSED. `SetModelsFolder` uses the same rule, so Settings > Models' Browse… now refuses such a path too instead of writing one the load then ignores.
+- **Try it watches `PersonalService.Last`.** The paste goes through the normal path into the focused box; "a successful dictation" is the shell recording a pasted dictation, not text appearing in the box (which typing would also do). Any dictation counts, including one pasted into another program while the window is open.
+- **Waiting for the model.** Try it says "Getting the speech model ready…" until the model is ready, and only then starts the 30-second "nothing came through" clock ("a reasonable time" in the brief; 30 s is this lane's choice). A speech model that fails to load shows the try-later line at once.
+- **The microphone test's floor** is 1e-5 RMS, PR #22's `CaptureBuffer.SoundFloor` ("No sound from mic"), so the test and the warning agree on what silence is. It is a constant here (`MicCheck.SoundFloor`) until main has PR #22; see "Merge with PR #22".
+- **The meter and reduced motion.** With `WindowFlags.ReducedMotion` (Windows' "Show animations" setting off) the meter is redrawn at most every 500 ms, showing the loudest level since, instead of every 50 ms.
+- **The capture runs while the step is on screen**, not only until the first result, so a person who unmutes after "Nothing heard." sees it turn into "Heard you."; it is stopped on every way out of the step.
+- **Calibrate my voice closes the window** and opens the calibration window, so the two do not compete for the person's attention.
+- **Size at 150 %.** 1366 × 768 at 150 % is 911 × 512 DIP; the window is 640 × 470 so it fits with a 48 px taskbar (32 DIP). Its body scrolls. Measured headless (the pin below), not on a 150 % display.
+
+**Merge with PR #22 (feat/silence-warning, not on main yet).** Three things are written to match it and must be joined when the orchestrator asks for `git merge origin/main`: `OnboardingText.NoMicrophone` becomes a reference to `NoSoundText.NoMicrophoneBalloon` (same words today); `MicCheck.SoundFloor` becomes `CaptureBuffer.SoundFloor`; `OnboardingText.NothingHeard` repeats the advice of `NoSoundText.SilentBalloon` after a different opening ("Nothing heard." is the brief's) and stays its own constant unless the product owner wants one sentence for both. The microphone step's note ("If Dictum hears nothing when you dictate, it will tell you.") is true only once PR #22 is on main: it is the "No sound from mic" warning. Merge PR #22 before this lane, or the note is untrue in a build of this branch alone.
+
+**PROPOSED strings (21/10/2026), for the product owner to approve; word for word.**
+
+| Where | String |
+|---|---|
+| Window title and header | Welcome to Dictum |
+| Buttons | Back · Next · Finish · Skip |
+| Step line | Step {n} of {total}: {name} (names: Welcome · Model files · Speech model · Your hotkey · Microphone · Try it) |
+| 1 heading | How Dictum works |
+| 1 text | Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. Everything happens on this PC. Nothing you say is sent anywhere. |
+| 1 text | The next few steps take a minute or two. Press Next to begin. |
+| 2 heading | Where to keep the model files |
+| 2 text (the brief's words) | Dictum keeps its speech models on this PC. The included one is about 150 MB; adding the most accurate models can take up to 10 GB. |
+| 2 free space | {drive} has {size} free (for example "C: has 41.0 GB free") |
+| 2 buttons | Choose another drive or folder… · Use the suggested folder |
+| 2 field name (screen readers) | Folder for the model files |
+| 2 refusal (new) | Dictum cannot use a folder named that way. Choose a folder on a drive letter or a network share. |
+| 3 heading | Speech model |
+| 3 with base.en | The Standard model is included and ready. |
+| 3 without base.en | Choose how carefully Dictum listens. Bigger models are more accurate but slower. A model that is not on this PC yet is downloaded from huggingface.co when you finish. You can change this later in Settings > Models. |
+| 3 link | Show every model |
+| 5 heading | Test your microphone |
+| 5 lines | Say a few words. · Heard you. |
+| 5 silence | Nothing heard. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on. |
+| 5 no microphone (PR #22's words) | No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again. |
+| 5 note | You can skip this test. If Dictum hears nothing when you dictate, it will tell you. |
+| 5 meter name (screen readers) | Microphone level |
+| 6 heading | Try it |
+| 6 waiting | Getting the speech model ready… |
+| 6 instruction | Click in the box, hold {hotkey}, say a sentence, then let go. |
+| 6 box name (screen readers) | Practice box |
+| 6 explainer | Everyone's accent, voice and microphone are different. The Standard model works well for most people. If words come out wrong, choose More accurate in Settings > Models, or press Calibrate my voice to find which model hears you best. |
+| 6 nothing | Nothing came through. You can try again later from Settings > Help. |
+
+Reused, not new: the hotkey step's heading, text, Mac note and buttons (`HotkeyCheck`, unchanged since 15/10/2026); the tier names, sub-lines and "{size} download" (`SimpleView`, PROPOSED in lane A); "Choose model file…" and "· recommended" (the first-run picker); "Microphone", "System default", "(default)", "(not connected)" and "The microphone could not be opened: {reason}" (Settings > Microphone); "Calibrate my voice" (`ModelsPage.CalibrateLabel`); `BundledFolderRefused` and the network-folder note (Settings > Models).
+
+**Questions for the product owner (one each, with a recommendation).**
+
+1. "Nothing you say is sent anywhere." is true of every default; cloud clean-up, off by default and behind its own consent step, sends text when switched on. Recommendation: keep it for the first-run audience, since the consent dialog is where cloud is explained; or add "unless you turn on cloud clean-up" if counsel prefers it absolute.
+2. "Settings > Help" (the brief's wording) does not exist on this branch: Help is a card in Settings > About, and nothing there re-runs this window. Recommendation: if lane C adds a Help page with a way to try again, keep the sentence; otherwise change it to "You can try again any time: click in any text box, hold {hotkey} and speak."
+3. "Up to 10 GB": inferred from the catalogue, not measured: the largest speech model (large-v3, 3.10 GB) and the largest clean-up model (gemma-3-4b, 3.16 GB) together are 6.25 GB; every speech model is 13.19 GB and every clean-up model 8.93 GB. Recommendation: keep the brief's "up to 10 GB" as a typical ceiling.
+
+**Pins and mutation checks** (`tests/Dictum.Tests/OnboardingTests.cs`, headless). Each pin was observed failing on the reverted behaviour: the mutation was applied alone, the test project rebuilt, the pin run, the file restored (26 mutations, 21/10/2026).
+
+| Pin | Mutation (reverted behaviour) | Observed |
+|---|---|---|
+| Each_step_renders_and_advances_to_Try_it | leaving the microphone step does not end steps 1-5 (`FinishFirstSteps` removed) | failed: `Assert.True` (FirstStepsDone) |
+| Back_returns_to_the_step_before | Back does nothing | failed: `Assert.IsType` |
+| The_folder_step_writes_models_folder_only_when_changed | the "only when changed" guard removed | failed: `Assert.False` (settings.json written on an unchanged Next) |
+| The_folder_step_refuses_the_bundled_folder_and_a_device_path | `FolderRefusal` refuses nothing | failed: refusal text not found |
+| A_named_model_folder_skips_the_folder_step | the folder step always added | failed: `Assert.DoesNotContain` |
+| The_free_space_line_names_the_drive | the drive root shown untrimmed | failed: strings differ |
+| The_speech_step_asks_nothing_when_base_en_is_on_this_PC | the choice shown with base.en present | failed: "included and ready" not found |
+| Without_base_en_the_speech_step_offers_the_three_tiers | the full catalogue instead of the tiers | failed: collections differ |
+| The_hotkey_step_keeps_the_key_pressed_or_the_current_one (moved from DialogTests) | the hotkey never written | failed: strings differ |
+| The_microphone_test_hears_a_level_above_the_floor | sound only above 0.5 RMS | failed: strings differ |
+| The_microphone_test_gives_the_advice_after_five_seconds_of_silence | no silence result | failed: strings differ |
+| With_no_microphone_listed_the_test_says_so_and_opens_nothing | no early return for an empty list | failed: strings differ |
+| The_test_capture_is_stopped_on_leaving_the_step (Next, Skip, Back, close) | `Leave` does not stop the capture | failed: all 4 cases (microphone still open) |
+| The_microphone_chosen_is_tested_and_written_at_Next | audio.device never written | failed: strings differ |
+| The_meter_respects_reduced_motion | the reduced-motion rate removed | failed: the reduced case (40 redraws, not 4); the normal case passes, as it should |
+| A_microphone_that_cannot_be_opened_says_why | the reason replaced by "Say a few words." | failed: strings differ |
+| Try_it_after_the_first_dictation_shows_the_accent_explainer | (a) the explainer not shown; (b) a dictation never noticed | (a) failed: explainer not found; (b) failed: `Assert.True` (Succeeded) |
+| Try_it_says_nothing_came_through_after_thirty_seconds | the 30-second rule removed | failed: `Assert.True` (NothingShown) |
+| Try_it_waits_for_the_shell | the instruction shown before the shell is ready | failed: strings differ |
+| Esc_mid_way_leaves_the_defaults_and_a_valid_settings_file | closing the window does not skip the rest | failed: `Assert.True` (no usable settings.json) |
+| A_first_run_with_every_step_skipped_starts_on_the_defaults | `AppShell.Start` does not call `SkipRest` | failed: values differ (no base.en written) |
+| A_seeded_model_or_a_model_override_opens_no_window | `Onboards` ignores the model override | failed: values differ (the window opened) |
+| The_window_and_its_folder_step_follow_settings_json | `AsksFolder` ignores whisper.models_dir | failed: `Assert.False` |
+| Every_step_fits_at_150_percent_and_names_its_controls | (a) the window 600 DIP high; (b) the folder field's accessible name removed | (a) failed: `Assert.True` (size); (b) failed at the name check |
+
+The first-run pins in ModelFolderTests and ModelFolderSafetyTests (`(0, 0, 1)`: no model question, the hotkey step shown once) pass unchanged: `ScriptedDialogs.Onboard` counts as the hotkey step. The model-picker and question-window pins in DialogTests are unchanged.
+
+**Verified.** Full Release build (`--no-incremental`, no warning lines in its output) and the full suite on this branch before the docs-only DECISIONS edit: 1552 tests, 1529 passed, 23 skipped (gated), 0 failed, with the `Install_copies_models` filter.
+
+**Not verified.**
+- The window on a real desktop: the nested frame of `RunFirstSteps`, the system folder chooser, visible keyboard focus rendering, a real 150 % display, a screen reader reading the live regions. All pins are headless.
+- A real microphone or WASAPI capture in the microphone test (a fake capture stands in), and a real paste into the Try it box (the pin drives a dictation through the real controller and pipeline, with a fake clipboard and input sender, and watches `PersonalService.Last`).
+- A Dictum build launched in tray mode on this PC (not allowed by the lane brief), so no first run end to end.
+- The merge with PR #22 (above).

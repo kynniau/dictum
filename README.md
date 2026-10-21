@@ -175,7 +175,7 @@ key, so the default `RightCtrl` never fires there. **On a Mac over Remote Deskto
 (`RightAlt`) or right Command (`RightWin`).** Single keys that reach a Remote Desktop session: `RightAlt`, `RightWin`,
 `CapsLock` and the F-keys. Fn never reaches Windows (above).
 
-To see what Windows actually receives, use the **Press your hotkey** box (Settings > General, and at first run): press
+To see what Windows actually receives, use the **Press your hotkey** box (Settings > General, and the Welcome to Dictum window at first run): press
 **Change…**, then the key or mouse button. The box names exactly what arrived, with its side ("RightAlt (right side)
 down", "Mouse5 down"), and its **Hold to test** light is on for as long as the chosen key is held; a key that never
 arrives is obvious in seconds. While the box listens, both hotkeys are paused, so testing does not start a dictation.
@@ -323,31 +323,54 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 
 ### First run
 
-1. **base.en comes with Dictum** (`models\ggml-base.en.bin` beside `Dictum.exe`; inside the package for the Store
-   build), so with no `settings.json` yet the first run asks **no model question**. It writes `whisper.model` =
-   `base.en` and `llm.provider` = `none` (the rule-based tidy: exactly what the pickers below write for base.en and
-   "No AI cleanup (rule-based tidy)") to `%APPDATA%\Dictum\settings.json`, and Dictum starts ready to dictate with
-   nothing downloaded. Bigger speech models and AI clean-up are downloads you choose in Settings > Models; **Add AI
-   clean-up (1.1 GB download)** fetches the recommended cleanup model, `qwen2.5-1.5b`, after asking (see "Cleanup
-   models"). A base.en in your own models folder, or in the one you chose, counts the same (see "Model folder").
-   **Without base.en** (a build without its `models` folder, or the file removed or failing its check) Dictum shows
-   **two pickers**, as before: the speech model, then the cleanup model (or "No AI cleanup (rule-based tidy)"). Each
-   lists every catalogue entry with its size and whether it is on this PC, the recommendation for this PC pre-selected,
-   and one sentence on the trade-off. Your choices are written to settings.json; a model that is not on disk yet is
-   then downloaded from huggingface.co (progress in the tray panel and the icon's tooltip; the two one after the other)
-   and checked against the catalogue's size and SHA-256. Nothing is downloaded without that choice.
-   A `settings.json` seeded by an administrator gets only the choices it leaves open, answered without a question when
-   base.en is on the PC and asked in the pickers when it is not: one without `whisper.model` the speech choice, one
-   without `llm.model` or `llm.provider` the cleanup choice, and only those answers are added to it. One that names
+1. **Welcome to Dictum (1.2).** With no `settings.json` yet (or a seeded one that names no `whisper.model`), Dictum opens
+   one window that walks through the first run in large text, with a step line ("Step 2 of 6: Model files"), **Back**
+   and **Next**. Every step is reachable by keyboard; **Esc** or closing the window skips the rest and keeps the
+   defaults below, and the settings file is always left complete and valid. Each step writes its own setting when you
+   finish it, and only when you changed something:
+   1. **How Dictum works**: hold your hotkey, speak, let go, and the words appear where you were typing; everything
+      happens on this PC.
+   2. **Where to keep the model files**: the suggested folder (`%LOCALAPPDATA%\Dictum\models`) with its drive's free
+      space ("C: has 41.0 GB free"), and **Choose another drive or folder…** for a PC that is short of space on C:. It
+      follows Settings > Models > Model folder's rules: the folder of the models that come with Dictum is refused, and so
+      is a `\\?\Volume{…}` style path. Writes `models.folder` only when you choose another folder. Not shown when
+      `settings.json` already names a folder.
+   3. **Speech model**: base.en comes with Dictum (`models\ggml-base.en.bin` beside `Dictum.exe`; inside the package
+      for the Store build), so this step just says "The Standard model is included and ready." It writes
+      `whisper.model` = `base.en` and `llm.provider` = `none` (the rule-based tidy), and Dictum starts with nothing
+      downloaded. Bigger speech models and AI clean-up are downloads you choose later in Settings > Models; **Add AI
+      clean-up (1.1 GB download)** fetches the recommended cleanup model, `qwen2.5-1.5b`, after asking (see "Cleanup
+      models"). A base.en in your own models folder, or in the one you chose in step 2, counts the same.
+      **Without base.en** (a build without its `models` folder, or the file removed or failing its check) the step
+      offers the Simple view's three choices (Standard, More accurate, Most accurate), the recommendation for this PC
+      chosen, and **Show every model** for the whole catalogue and **Choose model file…**. A model that is not on disk yet
+      is downloaded from huggingface.co when the window reaches Try it (progress in the tray panel and the icon's
+      tooltip) and checked against the catalogue's size and SHA-256. The window asks no clean-up question: it writes the
+      rule-based tidy, as with base.en. Nothing is downloaded without your choice.
+   4. **Your hotkey**: the hotkey check (SPEC §20), unchanged: the "Press your hotkey" box with `RightCtrl` chosen, the
+      note for Mac keyboards over Remote Desktop, and **Use this hotkey** or **Skip** (see "Keyboards and Remote
+      Desktop").
+   5. **Test your microphone**: the microphone list from Settings > Microphone, a live level meter (it moves at most
+      twice a second when Windows' "Show animations" setting is off), and "Say a few words." After about three seconds of
+      sound it says "Heard you."; after five seconds of silence it explains what to check, including microphone
+      redirection on a remote or virtual desktop; with no microphone listed it says so. The microphone is open only
+      while this step is on screen. **Skip** is fine.
+   6. **Try it**: a box in the window. Click in it, hold your hotkey, say a sentence and let go: the real dictation path
+      types into it. After your first dictation the window explains that accents, voices and microphones differ, with
+      **Calibrate my voice** and **Finish**. If nothing arrives within 30 seconds of the model being ready, it says so,
+      and **Finish** still works.
+
+   A `settings.json` seeded by an administrator gets only the choices it leaves open. One that names `whisper.model`
+   opens no window; one without `llm.model` or `llm.provider` (but with `whisper.model`) gets the clean-up choice alone,
+   answered without a question when base.en is on the PC and in the clean-up picker when it is not. One that names
    `llm.provider` = `local` but no `llm.model` keeps `local` when base.en is on the PC: it gets the recommended cleanup
    model written, which is not downloaded, so nothing downloads and a notice says the rule-based tidy is used until you
-   download it in Settings > Models. A `settings.json` that cannot be read gets neither. Recommendations: speech `medium.en` when a discrete GPU is found, `base.en`
-   otherwise, integrated graphics included (`small.en` offered as more accurate, a few seconds slower); cleanup
-   `qwen2.5-1.5b` on every machine (see "Cleanup models" for why). `--selftest` prints both, with the Vulkan devices it
-   found.
-   Then comes the **hotkey check** (SPEC §20), with or without the pickers: the "Press your hotkey" box with
-   `RightCtrl` chosen, the note for Mac keyboards over Remote Desktop, and **Use this hotkey** or **Skip** (see
-   "Keyboards and Remote Desktop"). With `DICTUM_MODEL_PATH` or `--model` set it is not shown.
+   download it in Settings > Models. A `settings.json` that cannot be read gets neither. With `DICTUM_MODEL_PATH` or
+   `--model` set no window opens and the recommendations are written. If Dictum stops after the speech step (a crash,
+   say), the next start opens no window: the hotkey and microphone steps were not shown again before 1.2 either.
+   Recommendations: speech `medium.en` when a discrete GPU is found, `base.en` otherwise, integrated graphics included
+   (`small.en` offered as more accurate, a few seconds slower); cleanup `qwen2.5-1.5b` on every machine (see "Cleanup
+   models" for why). `--selftest` prints both, with the Vulkan devices it found.
 2. If the configured speech model file is missing when Dictum starts, it asks: **Download**, **Choose file…** or
    **Quit**. (While running, a missing model only produces a notification; the loaded model stays in use.) A missing
    cleanup model produces one notification and the rule-based tidy until you download it (tray panel > Clean-up, or
@@ -985,7 +1008,7 @@ network connection only in these cases, and only to these hosts:
 
 | When | Host |
 |---|---|
-| Only when you ask for a model download (first-run picker, shown only when base.en is not on the PC; the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
+| Only when you ask for a model download (the Welcome to Dictum window's speech step, a choice only when base.en is not on the PC; the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
 | Only when you click **Check for updates** in Settings > About (the direct download; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
 | After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms and, in hands-free, up to 10 words of what you said in the last part: taken before corrections, the profanity filter and snippets, so never their text), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
 | After each dictation, only if you set up an `openai-compatible` server (one off this PC also needs the consent step and `https://`) | the host in `llm.base_url` (the same text). With `localhost`, Dictum's request stays on this PC; what that server does with it is up to the server. |
@@ -1314,7 +1337,7 @@ model offline, put the `.gguf` in the `-ModelsFrom` folder, or run `scripts\down
 and supply the clean-up model file, and any speech model other than base.en (which comes with Dictum), with
 `-ModelsFrom`. Name
 the models: with base.en beside `Dictum.exe` a seed that leaves them out gets base.en and the rule-based tidy; without
-it, the first-run pickers, and settings.json's own default speech model is `medium.en`. Dictum itself then connects to
+it, the Welcome to Dictum window's speech choice (or, when the seed names the speech model, the clean-up picker), and settings.json's own default speech model is `medium.en`. Dictum itself then connects to
 no other machine.
 
 **Shared virtual desktops (Azure Virtual Desktop and similar: no GPU, little space on C:):** give each VM one local

@@ -200,60 +200,104 @@ public sealed class ModelCoordinator(
     /// Settings > Models offers the AI clean-up download; a seeded settings.json that names llm.provider (local, with no
     /// llm.model) keeps it and gets the recommended clean-up model, which is not downloaded: nothing downloads, and
     /// <see cref="EnsureCleanup"/> says the rule-based tidy is used until it is. Returns false if the user chose Quit.
+    /// The onboarding window (1.2) answers the same questions through <see cref="PlanFirstRun"/> and <see cref="AnswerFirstRun"/>.
     /// </summary>
     /// <param name="seeded">The settings.json being completed (a seeded models.folder is looked in too); null: the settings in use.</param>
     /// <param name="keepProvider">settings.json names llm.provider (<see cref="SettingsLoadResult.NamesCleanupProvider"/>).</param>
     public bool FirstRun(bool askSpeech = true, bool askCleanup = true, AppSettings? seeded = null, bool keepProvider = false)
     {
+        var plan = PlanFirstRun(seeded);
+        ModelPick? speechPick = null;
+        CleanupPick? cleanupPick = null;
+        if (plan.AsksPickers)
+        {
+            if (askSpeech)
+            {
+                speechPick = prompts.FirstRunPicker(plan.Speech, plan.SpeechWhy, IsDownloaded, paths.DefaultModelsDir);
+                if (speechPick.Quit) return false;
+            }
+            if (askCleanup)
+            {
+                cleanupPick = prompts.CleanupPicker(plan.Cleanup, plan.CleanupWhy, IsCleanupDownloaded, paths.DefaultModelsDir);
+                if (cleanupPick.Quit) return false;
+            }
+        }
+        AnswerFirstRun(plan, askSpeech, askCleanup, keepProvider, speechPick, cleanupPick);
+        return true;
+    }
+
+    /// <summary>
+    /// The first run's recommendations (the GPU probe, then <see cref="ModelCatalog.Recommend"/> and
+    /// <see cref="CleanupCatalog.Recommend"/>), and whether a model question is open at all: not with a model override, and not
+    /// when base.en is on this PC (<see cref="FirstRunPlan.BundledPath"/>).
+    /// </summary>
+    /// <param name="seeded">The settings.json being completed (a seeded or just-chosen models.folder is looked in too); null: the settings in use.</param>
+    public FirstRunPlan PlanFirstRun(AppSettings? seeded = null)
+    {
         var gpu = gpuMachine is not null ? gpuMachine() : ProbeGpuMachine(FirstRunProbeGpu(seeded ?? settings()));
         var (speech, speechWhy) = ModelCatalog.Recommend(gpu);
         var (cleanup, cleanupWhy) = CleanupCatalog.Recommend(gpu);
         log.Info($"First run: runtime {WhisperEngine.LoadedRuntime}, Vulkan devices {WhisperEngine.DeviceSummary}: recommending {speech} ({speechWhy}) and {cleanup} ({cleanupWhy}).");
+        var overridden = _launchOverride is not null || EnvOverride;
+        var bundled = overridden ? null : Locate(ModelCatalog.FileName(ModelCatalog.Bundled), ModelCatalog.KnownSize(ModelCatalog.Bundled), seeded)?.Path;
+        return new FirstRunPlan(gpu, speech, speechWhy, cleanup, cleanupWhy, overridden, bundled);
+    }
 
-        string chosenSpeech = speech, provider = LlmSettings.Local, chosenCleanup = cleanup;
-        if (_launchOverride is not null || EnvOverride)
+    /// <summary>
+    /// Writes the first run's answers to the open questions (<paramref name="askSpeech"/>, <paramref name="askCleanup"/>): a new
+    /// settings.json with them, or, when settings.json already exists (seeded, or begun by the onboarding's folder step), only
+    /// those keys added. With a model override the recommendations are written; with base.en on this PC, base.en and the
+    /// rule-based tidy (or a seeded llm.provider kept, <paramref name="keepProvider"/>). Otherwise a pick answers its question: a
+    /// catalogue pick that is not on this PC downloads at startup (<see cref="Ensure"/>), because the picker named the host and
+    /// the size. A null speech pick (the onboarding skipped) writes the recommendation and downloads nothing: the startup
+    /// missing-model question asks first (SPEC §10). A null clean-up pick (the onboarding asks no clean-up question) is the
+    /// rule-based tidy, as with base.en, unless <paramref name="keepProvider"/>.
+    /// </summary>
+    public void AnswerFirstRun(FirstRunPlan plan, bool askSpeech, bool askCleanup, bool keepProvider, ModelPick? speechPick = null, CleanupPick? cleanupPick = null)
+    {
+        string chosenSpeech = plan.Speech, provider = LlmSettings.Local, chosenCleanup = plan.Cleanup;
+        if (plan.Overridden)
         {
             log.Info("First run with a model override: pickers skipped.");
         }
-        else if (Locate(ModelCatalog.FileName(ModelCatalog.Bundled), ModelCatalog.KnownSize(ModelCatalog.Bundled), seeded) is { } bundled)
+        else if (plan.BundledPath is { } bundled)
         {
             chosenSpeech = ModelCatalog.Bundled;
             if (!keepProvider) provider = LlmSettings.NoProvider; // the lens, 17/10/2026: a seeded "local" was turned to none without a question
             log.Info(provider == LlmSettings.NoProvider
-                ? $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up)."
-                : $"First run: {bundled.Path} is on this PC, so no model question is asked: {ModelCatalog.Bundled}, and settings.json's llm.provider (local) is kept with the recommended {chosenCleanup}, which is not downloaded (Settings > Models).");
+                ? $"First run: {bundled} is on this PC, so no model question is asked: {ModelCatalog.Bundled} and the rule-based tidy (Settings > Models adds AI clean-up)."
+                : $"First run: {bundled} is on this PC, so no model question is asked: {ModelCatalog.Bundled}, and settings.json's llm.provider (local) is kept with the recommended {chosenCleanup}, which is not downloaded (Settings > Models).");
         }
         else
         {
-            if (askSpeech)
+            if (askSpeech && speechPick is { Quit: false })
             {
-                var pick = prompts.FirstRunPicker(speech, speechWhy, IsDownloaded, paths.DefaultModelsDir);
-                if (pick.Quit) return false;
-                chosenSpeech = pick.Model ?? pick.FilePath!;
-                if (pick.Model is not null && ModelCatalog.Find(pick.Model) is { } info && !IsDownloaded(info)) _firstRunSpeechDownload = pick.Model;
+                chosenSpeech = speechPick.Model ?? speechPick.FilePath!;
+                if (speechPick.Model is not null && ModelCatalog.Find(speechPick.Model) is { } info && !IsDownloaded(info)) _firstRunSpeechDownload = speechPick.Model;
             }
-            if (askCleanup)
+            if (askCleanup && cleanupPick is { Quit: false })
             {
-                var cleanupPick = prompts.CleanupPicker(cleanup, cleanupWhy, IsCleanupDownloaded, paths.DefaultModelsDir);
-                if (cleanupPick.Quit) return false;
                 if (cleanupPick.RulesOnly) provider = LlmSettings.NoProvider;
                 else chosenCleanup = cleanupPick.Model ?? cleanupPick.FilePath!;
                 if (cleanupPick.Model is not null && CleanupCatalog.Find(cleanupPick.Model) is { } c && !IsCleanupDownloaded(c)) _firstRunCleanupDownload = c.Name;
+            }
+            else if (askCleanup && cleanupPick is null && !keepProvider)
+            {
+                provider = LlmSettings.NoProvider;
             }
         }
         if (SettingsFile.CreateIfMissing(paths.SettingsFile, chosenSpeech, provider, chosenCleanup))
         {
             log.Info($"First run: whisper.model = {chosenSpeech}, llm.provider = {provider}, llm.model = {chosenCleanup}; wrote {paths.SettingsFile}.");
-            return true;
+            return;
         }
-        // settings.json was seeded (install.ps1, an admin) without these choices: add them and keep everything else.
+        // settings.json was seeded (install.ps1, an admin, the onboarding's folder step) without these choices: add them and keep everything else.
         var values = new List<(string Key, string Value)>();
         if (askSpeech) values.Add(("whisper.model", chosenSpeech));
         if (askCleanup) values.Add(("llm.provider", provider));
         if (askCleanup && provider == LlmSettings.Local) values.Add(("llm.model", chosenCleanup));
         var written = values.All(v => SettingsFile.SetValue(paths.SettingsFile, v.Key, JsonValue.Create(v.Value)));
         log.Info($"First run on an existing settings.json: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value}"))}{(written ? "" : " could not be written")}.");
-        return true;
     }
 
     /// <summary>
@@ -595,14 +639,30 @@ public sealed class ModelCoordinator(
     /// (<see cref="BundledFolderRefused"/>, returned for the page to show). The earlier name whisper.models_dir is cleared when
     /// set, so the folder chosen here is the one in force. A file that cannot be written is ballooned (<see cref="Write"/>).
     /// </summary>
-    public string? SetModelsFolder(string? folder)
+    /// <param name="reloadAfter">
+    /// False for the onboarding (1.2), which runs before the settings are first loaded: writing alone, so nothing reloads or
+    /// loads a model mid-way; a file that cannot be written is then returned (<see cref="WriteFailed"/>) instead of ballooned.
+    /// </param>
+    public string? SetModelsFolder(string? folder, bool reloadAfter = true)
     {
-        if (folder is not null && paths.IsBundled(folder)) return BundledFolderRefused;
+        if (folder is not null && FolderRefusal(folder) is { } refused) return refused;
         var values = new List<(string, JsonNode?)> { ("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))) };
         if (settings().Whisper.ModelsDir is not null) values.Add(("whisper.models_dir", null));
-        Write([.. values]);
+        if (reloadAfter) Write([.. values]);
+        else if (!TryWrite(out _, reloadAfter: false, [.. values])) return WriteFailed;
         return null;
     }
+
+    /// <summary>
+    /// PROPOSED copy (21/10/2026), for the product owner to approve: a folder named by a device path other than \\?\X:\ or
+    /// \\?\UNC\ (a \\?\Volume{GUID}\ path, say), which the settings load refuses for models.folder (SettingsLoader), so it would
+    /// be written and then ignored.
+    /// </summary>
+    public const string DevicePathRefused = "Dictum cannot use a folder named that way. Choose a folder on a drive letter or a network share.";
+
+    /// <summary>Why <paramref name="folder"/> cannot be the model folder (the bundled folder, or a device path the settings load refuses), or null.</summary>
+    public string? FolderRefusal(string folder) =>
+        paths.IsBundled(folder) ? BundledFolderRefused : Storage.PathRegistry.IsUnsupportedDevicePath(folder) ? DevicePathRefused : null;
 
     private void SetValues(params (string Key, string Value)[] values) => Write([.. values.Select(v => (v.Key, (JsonNode?)JsonValue.Create(v.Value)))]);
 
