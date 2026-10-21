@@ -63,8 +63,20 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     public IInputSender CreateInputSender(ILog log) => Desktop;
     public IClipboard Clipboard => Desktop;
     public FakeDesktop Desktop { get; } = new();
-    public IAudioCapture CreateCapture(ILog log) => new FakeCapture();
-    public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => [new("id-1", "Test microphone", true)];
+    /// <summary>Makes every capture created from now on (the shell's own is made when it is built): a test's level-reporting one, say.</summary>
+    public Func<IAudioCapture>? CaptureFactory { get; set; }
+    public List<IAudioCapture> Captures { get; } = [];
+    public IAudioCapture CreateCapture(ILog log)
+    {
+        var capture = CaptureFactory?.Invoke() ?? new FakeCapture();
+        Captures.Add(capture);
+        return capture;
+    }
+    /// <summary>The microphones the system lists; one by default.</summary>
+    public List<AudioDeviceInfo> Devices { get; } = [new("id-1", "Test microphone", true)];
+    /// <summary>Listing the microphones throws, as the Windows device list does with the audio service stopped.</summary>
+    public bool ListDevicesThrows { get; set; }
+    public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => ListDevicesThrows ? throw new System.Runtime.InteropServices.COMException("The audio service is not running.") : Devices;
     public IStartupRegistration Startup { get; } = new FakeStartup();
     public IInstanceLock AcquireSingleInstance(TimeSpan wait) => throw new NotSupportedException();
     public IWindowFlags WindowFlags => Flags;
@@ -211,11 +223,20 @@ internal sealed class ScriptedDialogs : IShellDialogs
     public string? Folder { get; set; }
     public List<string> FolderChooserOpenedIn { get; } = [];
 
-    public string HotkeyCheck(AppShell shell, string current)
+    /// <summary>
+    /// The Welcome to Dictum window: counted as the hotkey step (it holds the first-run hotkey check), then <see cref="Onboarding"/>
+    /// answers through the flow if a test set it; otherwise every step is skipped (the shell then writes today's defaults).
+    /// </summary>
+    public void Onboard(Dictum.UI.Views.Onboarding.OnboardingFlow flow)
     {
         FirstRunSteps = FirstRunSteps with { Hotkey = FirstRunSteps.Hotkey + 1 };
-        return current;
+        LastOnboarding = flow;
+        Onboarding?.Invoke(flow);
     }
+
+    public Action<Dictum.UI.Views.Onboarding.OnboardingFlow>? Onboarding { get; set; }
+
+    public Dictum.UI.Views.Onboarding.OnboardingFlow? LastOnboarding { get; private set; }
 
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir)
     {
@@ -245,6 +266,23 @@ internal sealed class ScriptedDialogs : IShellDialogs
 
     public BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true)
     {
+        DownloadQuestions.Add(fileName);
+        return BusyDownload;
+    }
+
+    /// <summary>The words of every plain (Simple view) question, as the window would show them; each also adds its file to <see cref="DownloadQuestions"/>.</summary>
+    public List<string> PlainQuestions { get; } = [];
+
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainConfirmText(plainName, sizeText, warning));
+        DownloadQuestions.Add(fileName);
+        return ConfirmDownloads;
+    }
+
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait));
         DownloadQuestions.Add(fileName);
         return BusyDownload;
     }
@@ -282,13 +320,18 @@ internal sealed class Scratch : IDisposable
     /// <param name="updateHandler">The same for the Check for updates client.</param>
     /// <param name="log">Where the shell logs (a <see cref="RecordingLog"/>, say); nowhere by default.</param>
     /// <param name="cleanupModels">A clean-up model manager with a fake loader; else the real one.</param>
+    /// <param name="gpuMachine">What the shell takes the machine for (WhisperEngine.GpuMachine): a CPU-only PC by default.</param>
     public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null,
-        HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null, ILog? log = null, Dictum.Llm.LocalLlmManager? cleanupModels = null)
+        HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null, ILog? log = null, Dictum.Llm.LocalLlmManager? cleanupModels = null,
+        bool? gpuMachine = false, Func<string, ILog, string>? runtimeProbe = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
-        var shell = new AppShell(platform, Paths, log ?? NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs, gpuMachine: () => false,
+        // gpuMachine null: the app's own path, which probes the whisper runtime (runtimeProbe stands in for it, so nothing native loads).
+        var shell = new AppShell(platform, Paths, log ?? NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs,
+            gpuMachine: gpuMachine is { } gpu ? () => gpu : null,
             speechModels: speechModels, downloadHandler: downloadHandler, updateHandler: updateHandler, cleanupModels: cleanupModels);
+        if (runtimeProbe is not null) shell.Models.TestRuntimeProbe = runtimeProbe;
         return (shell, platform, dialogs);
     }
 

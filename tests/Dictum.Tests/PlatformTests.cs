@@ -130,7 +130,7 @@ public class HotkeyCaptureTests
     {
         var capture = new HotkeyCapture();
         Assert.Null(capture.Feed(Down(Vk.RMenu)));
-        Assert.Equal("RightAlt (right side) down", capture.LastReceived);
+        Assert.Equal("Right Alt down", capture.LastReceived); // the display name says the side (HotkeyNames, 1.2 polish)
         Assert.True(capture.IsHeld(HotkeyParser.Parse("RightAlt")));
         Assert.False(capture.IsHeld(HotkeyParser.Parse("RightCtrl")));
         Assert.Equal("RightAlt", capture.Feed(Up(Vk.RMenu)));

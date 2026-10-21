@@ -47,10 +47,8 @@ public sealed partial class AppShell
         get
         {
             var download = Models.DownloadStatus;
-            var speech = Models.CurrentName;
-            var runtime = HeaderRuntime();
-            var hotkey = HotkeyParser.TryParse(_settings.Hotkey, out var spec, out _) ? spec.Display : _settings.Hotkey;
-            var models = $"{ModelsLine} · {hotkey}";
+            var hotkey = HotkeyNames.Display(_settings.Hotkey);
+            var models = $"{(_settings.Ui.IsSimple ? SimpleModelsLine : ModelsLine)} · {hotkey}";
             var (state, tone) = !_settings.Enabled ? ("Off", "off")
                 : _trayState switch
                 {
@@ -62,19 +60,58 @@ public sealed partial class AppShell
                     _ when !_models.IsReady => (_models.LastError is not null ? "Model error" : "No model", "error"),
                     _ => ("Ready", "ready"),
                 };
-            var tooltip = $"Dictum · {speech} · {download ?? runtime} · {CleanupLabel()} · {_settings.Hotkey}{(_settings.Enabled ? "" : " (off)")}";
+            var tooltip = TooltipLine(hotkey);
             return new ShellStatus(state, tone, models, tooltip, download, Models.DownloadFraction, WithHeardNothing(ModelProblem, _heardNothing), TryCpuOffered);
         }
     }
 
     /// <summary>
+    /// The icon's tooltip with the key as <paramref name="hotkey"/> says it: the display name on screen ("Right Ctrl"), the
+    /// settings token in the log ("RightCtrl"), which is what a person types into settings.json (lens on 4abba54).
+    /// </summary>
+    private string TooltipLine(string hotkey) =>
+        $"Dictum · {Models.CurrentName} · {Models.DownloadStatus ?? HeaderRuntime()} · {CleanupLabel()} · {hotkey}{(_settings.Enabled ? "" : " (off)")}";
+
+    /// <summary>
     /// The speech runtime: "CPU" for a model kept off the GPU inside a GPU runtime (whisper.gpu = cpu after it loaded, or the retry
     /// after the GPU failed), otherwise the runtime that loaded ("CPU (no AVX)" stays as it is).
     /// </summary>
-    private string SpeechRuntime()
+    private string SpeechRuntime() => RuntimeLabel(WhisperEngine.LoadedRuntime, _models.RunsOnCpu, WhisperEngine.VulkanDevices);
+
+    /// <summary>
+    /// The runtime the speech model runs on, from the runtime that loaded (<see cref="WhisperEngine.LoadedRuntime"/>, never the
+    /// configured order): "CPU" when the model is kept off the GPU, and (1.2 polish, 22/10/2026) when the Vulkan runtime loaded
+    /// but reported no device, which leaves ggml on the CPU inside it (<see cref="WhisperEngine.VulkanActive"/>). A Vulkan
+    /// runtime whose devices were never reported (-1) stays "Vulkan", as VulkanActive treats it.
+    /// </summary>
+    internal static string RuntimeLabel(string loaded, bool runsOnCpu, int vulkanDevices) =>
+        loaded.StartsWith("CPU", StringComparison.Ordinal) ? loaded
+        : runsOnCpu || loaded == "Vulkan" && vulkanDevices == 0 ? "CPU"
+        : loaded;
+
+    /// <summary>
+    /// The Simple view's header line (1.2 polish, 22/10/2026), in the names Settings > Models and the pickers use, from
+    /// <see cref="SimpleView"/>'s one table: the speech tier ("Standard", or "Custom: tiny.en"), "loading…" or "model error"
+    /// while that holds, and the clean-up ("Tidy my words", "AI clean-up", "Off"). No runtime: "Vulkan" and "CPU" are Advanced
+    /// detail, and a model kept on the CPU has its own problem line.
+    /// </summary>
+    internal string SimpleModelsLine
     {
-        var loaded = WhisperEngine.LoadedRuntime;
-        return _models.RunsOnCpu && !loaded.StartsWith("CPU", StringComparison.Ordinal) ? "CPU" : loaded;
+        get
+        {
+            var s = _settings;
+            var speech = SimpleView.SpeechName(Models.CurrentName, GpuMachine, s.Whisper.Language, s.Whisper.Translate);
+            var state = _models.IsLoading ? " · loading…" : _models.LastError is not null ? " · model error" : "";
+            var cleanup = SimpleView.CleanupName(s.Llm, GpuMachine, s.Whisper.Language, s.Whisper.Translate, Models.CurrentCleanupName);
+            if (cleanup == SimpleView.AiCleanupLabel)
+            {
+                cleanup = _llm.IsLoading ? $"{cleanup} · loading…"
+                    : _llm.Ready is not null ? cleanup
+                    : _llm.LastError is not null ? $"{cleanup} · error"
+                    : SimpleView.TidyLabel; // the rule-based tidy does the tidying until the model is on this PC
+            }
+            return $"{speech}{state} · {cleanup}";
+        }
     }
 
     /// <summary>"qwen2.5-1.5b · Vulkan", "rules", "anthropic"…; the backend only for the local provider.</summary>
@@ -176,7 +213,7 @@ public sealed partial class AppShell
         {
             _lastTooltip = status.Tooltip;
             _tray.SetTooltip(status.Tooltip);
-            if (status.Download is null) _log.Info($"Tray tooltip: {status.Tooltip}");
+            if (status.Download is null) _log.Info($"Tray tooltip: {TooltipLine(_settings.Hotkey)}"); // the log keeps the settings token (RightCtrl)
         }
         Changed?.Invoke();
     }

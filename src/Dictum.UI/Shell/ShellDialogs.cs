@@ -3,6 +3,7 @@ using Avalonia.Platform.Storage;
 using Dictum.App;
 using Dictum.Settings;
 using Dictum.UI.Views;
+using Dictum.UI.Views.Onboarding;
 
 namespace Dictum.UI.Shell;
 
@@ -28,11 +29,10 @@ public sealed class ShellDialogs : IShellDialogs
         return window.Confirmed;
     });
 
-    public string HotkeyCheck(AppShell shell, string current) => Modal.OnUi(() =>
+    public void Onboard(OnboardingFlow flow) => Modal.OnUi(() =>
     {
-        var window = new HotkeyCheckWindow(shell, current);
-        Modal.Run(window);
-        return window.Result;
+        new OnboardingWindow(flow).RunFirstSteps();
+        return true;
     });
 
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir)
@@ -89,6 +89,15 @@ public sealed class ShellDialogs : IShellDialogs
     public bool ConfirmDownload(string fileName, string sizeText, string note) =>
         Ask("Download a model", ModelPromptText.ConfirmText(fileName, sizeText, note), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
 
+    /// <summary>The Simple view's download question (1.2): the same window and buttons, in plain words.</summary>
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning) =>
+        Ask("Download a model", ModelPromptText.PlainConfirmText(plainName, sizeText, warning), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
+
+    /// <summary>The Simple view's busy question (1.2): the same window and answers as <see cref="ConfirmDownloadWhileBusy"/>, in plain words.</summary>
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true) =>
+        ModelPromptText.BusyAnswer(Ask("Download a model", ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait),
+            BusyDialogChoices(plainName, canWait)), canWait);
+
     /// <summary>
     /// The same question window with three answers: Download after it (Enter), Stop … and download … (it deletes progress),
     /// Cancel. Without room to wait (<paramref name="canWait"/> false), only Stop and Cancel, and Enter presses Cancel.
@@ -134,7 +143,19 @@ public sealed class ShellDialogs : IShellDialogs
     });
 
     /// <summary>
-    /// Runs a system chooser on the UI thread, starting in <paramref name="initialDir"/> when it exists. A tray app has no window
+    /// Where a chooser starts: <paramref name="dir"/>, or the nearest folder above it that exists (1.2 polish, 22/10/2026: the
+    /// default model folder is made only by a download (ModelDownloader), and the demo PC had downloaded nothing (its log), so
+    /// the chooser opened in Documents); null when none of it exists (the system's own choice).
+    /// </summary>
+    internal static string? StartFolder(string dir, Func<string, bool> exists)
+    {
+        for (var path = dir; !string.IsNullOrEmpty(path); path = Path.GetDirectoryName(path))
+            if (exists(path)) return path;
+        return null;
+    }
+
+    /// <summary>
+    /// Runs a system chooser on the UI thread, starting in <paramref name="initialDir"/>, or the nearest folder above it that exists. A tray app has no window
     /// to own it, so a window that is never shown lends its handle.
     /// </summary>
     private static string? WithStorage(string initialDir, Func<IStorageProvider, IStorageFolder?, string?> choose) => Modal.OnUi(() =>
@@ -143,7 +164,7 @@ public sealed class ShellDialogs : IShellDialogs
         try
         {
             var storage = owner.StorageProvider;
-            var start = Directory.Exists(initialDir) ? Modal.Wait(storage.TryGetFolderFromPathAsync(initialDir)) : null;
+            var start = StartFolder(initialDir, Directory.Exists) is { } dir ? Modal.Wait(storage.TryGetFolderFromPathAsync(dir)) : null;
             return choose(storage, start);
         }
         finally

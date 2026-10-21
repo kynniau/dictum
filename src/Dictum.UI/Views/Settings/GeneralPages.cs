@@ -21,7 +21,7 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ToggleSwitch _login;
     private readonly TextBlock _loginHint = Ui.Text("", "hint");
     // The sentence pointing at hands_free_max_seconds in settings.json went with the Hands-free card below (16/10/2026).
-    public const string MouseNote = "A mouse button works too: hold the right or middle button or a side button (Mouse4, Mouse5), and double-tap it for " +
+    public const string MouseNote = "A mouse button works too: hold the right or middle button or a side button (Mouse 4, Mouse 5), and double-tap it for " +
                                     "hands-free. The left button cannot be used. " +
                                     "While Dictum is on and a speech model is ready, that button no longer reaches other apps at all (no right-click menu, no middle-click, " +
                                     "no Back); a side button you do not use is the best choice.";
@@ -95,13 +95,13 @@ internal sealed class GeneralPage : SettingsPage
                 _capture,
                 Ui.Row(8, _saveHotkey),
                 Ui.Text(MouseNote, "caption"),
-                Ui.Text(HotkeyCheckWindow.MacNote, "caption")), "Hotkey"),
+                Ui.Text(HotkeyCheck.MacNote, "caption")), "Hotkey"),
             Ui.Card(Ui.Stack(10,
                 Ui.Line(HandsFreeLabel, _handsFreeLimit.Value, HandsFreeHelp),
                 _handsFreeLimit.Slider,
                 _handsFreeLimit.Presets), "Hands-free"),
             Ui.Card(Ui.Stack(12,
-                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse5 work well. " + FixMouseNote),
+                Ui.Text("Optional: a key or mouse button that opens Fix last dictation. It must not share a key with the dictation hotkey; F8 or Mouse 5 work well. " + FixMouseNote),
                 _fixCapture,
                 Ui.Row(8, _saveFix, _clearFix)), "Fix last dictation hotkey"),
             Ui.Card(Ui.Stack(4,
@@ -166,12 +166,12 @@ internal sealed class GeneralPage : SettingsPage
         }
         if (Shell.Settings.FixHotkey is { } fix && HotkeyParser.TryParse(fix, out var fixSpec, out _) && spec.CanFireTogether(fixSpec))
         {
-            Say($"{spec.Display} shares keys with the fix-last hotkey ({fixSpec.Display}); one press would do both. Choose another key.");
+            Say($"{HotkeyNames.Display(spec)} shares keys with the fix-last hotkey ({HotkeyNames.Display(fixSpec)}); one press would do both. Choose another key.");
             return;
         }
         _capture.Stop();
         Write(("hotkey", Json(key)));
-        Say($"The hotkey is now {spec.Display}.");
+        Say($"The hotkey is now {HotkeyNames.Display(spec)}.");
     }
 
     private void SaveFixHotkey()
@@ -189,12 +189,12 @@ internal sealed class GeneralPage : SettingsPage
         }
         if (HotkeyParser.TryParse(Shell.Settings.Hotkey, out var main, out _) && spec.CanFireTogether(main))
         {
-            Say($"{spec.Display} shares keys with the dictation hotkey ({main.Display}); one press would do both. Choose another key.");
+            Say($"{HotkeyNames.Display(spec)} shares keys with the dictation hotkey ({HotkeyNames.Display(main)}); one press would do both. Choose another key.");
             return;
         }
         _fixCapture.Stop();
         Write(("fix_hotkey", Json(text)));
-        Say($"{spec.Display} now opens Fix last dictation.");
+        Say($"{HotkeyNames.Display(spec)} now opens Fix last dictation.");
     }
 
     private void ClearFixHotkey()
@@ -398,6 +398,7 @@ internal sealed class MicrophonePage : SettingsPage
     private readonly Button _test;
     private readonly TextBlock _result = Ui.Text("", "caption");
     private List<string?> _ids = [];
+    private bool _listFailureLogged;
     private CancellationTokenSource? _testing;
 
     public MicrophonePage(AppShell shell) : base(shell, "Microphone")
@@ -417,15 +418,13 @@ internal sealed class MicrophonePage : SettingsPage
 
     protected override void Redraw()
     {
-        var devices = Shell.Platform.ListCaptureDevices();
-        _ids = [null, .. devices.Select(d => (string?)d.Name)];
-        var labels = new List<string> { "System default" };
-        labels.AddRange(devices.Select(d => d.IsDefault ? $"{d.Name} (default)" : d.Name));
-        if (Shell.Settings.Audio.Device is { } chosen && !_ids.Contains(chosen))
+        // The guarded lister (lens on 4abba54): with the audio service stopped the list threw here and the page failed to draw.
+        var devices = MicrophoneChoices.List(Shell.Platform, why =>
         {
-            _ids.Add(chosen);
-            labels.Add($"{chosen} (not connected)");
-        }
+            if (!_listFailureLogged) Shell.Log.Warn($"Settings > Microphone: {why}");
+            _listFailureLogged = true; // once per page: a download redraws it many times a second
+        });
+        (_ids, var labels) = MicrophoneChoices.Build(devices, Shell.Settings.Audio.Device);
         _device.ItemsSource = labels;
         _device.SelectedIndex = Math.Max(0, _ids.IndexOf(Shell.Settings.Audio.Device));
     }

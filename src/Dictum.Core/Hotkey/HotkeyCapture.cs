@@ -12,7 +12,10 @@ public sealed class HotkeyCapture
     private readonly List<int> _down = []; // held now, in press order
     private List<int> _peak = [];
 
-    /// <summary>What the system delivered last, in words: "RightAlt (right side) down".</summary>
+    /// <summary>
+    /// What the system delivered last, in words, the key by its display name (<see cref="HotkeyNames.Key"/>), which already
+    /// says the side: "Right Alt down" (until 1.2 polish, 22/10/2026: "RightAlt (right side) down").
+    /// </summary>
     public string? LastReceived { get; private set; }
 
     /// <summary>Feeds one key event; returns the hotkey text once every key of a gesture is released, else null.</summary>
@@ -23,8 +26,7 @@ public sealed class HotkeyCapture
     /// </remarks>
     public string? Feed(RawKeyEvent e)
     {
-        var side = HotkeyParser.SideOf(e.Vk) is { } s ? $" ({s} side)" : "";
-        LastReceived = $"{(e.Vk == Vk.Escape ? "Esc" : HotkeyParser.NameOf(e.Vk))}{side} {(e.Down ? "down" : "up")}{(e.Injected ? ", sent by a program" : "")}";
+        LastReceived = $"{(e.Vk == Vk.Escape ? "Esc" : HotkeyNames.Key(HotkeyParser.NameOf(e.Vk)))} {(e.Down ? "down" : "up")}{(e.Injected ? ", sent by a program" : "")}";
         if (e.Down)
         {
             if (!_down.Contains(e.Vk)) _down.Add(e.Vk);
