@@ -412,10 +412,7 @@ internal sealed class FlyoutWindow : Window
         _listFailureLogged = true; // once per panel: a download refreshes it many times a second
     });
 
-    /// <summary>
-    /// The problem line, with the no-microphone sentence (<see cref="Dictum.Core.NoSoundText.NoMicrophoneBalloon"/>, PR #22's
-    /// own) under it while the system lists no microphone (1.2 polish, 22/10/2026: the panel said only "Ready").
-    /// </summary>
+    /// <summary>The first line of the Mode line when the settings match neither preset.</summary>
     internal const string CustomPresetNote = "Custom: your settings match neither preset.";
 
     /// <summary>
@@ -433,6 +430,10 @@ internal sealed class FlyoutWindow : Window
         return [$"Full: {full.SpeechModel} and {full.CleanupModel}.", $"Light: {ModePresets.LightSpeech} and the rule-based tidy."];
     }
 
+    /// <summary>
+    /// The problem line, with the no-microphone sentence (<see cref="Dictum.Core.NoSoundText.NoMicrophoneBalloon"/>, PR #22's
+    /// own) under it while the system lists no microphone (1.2 polish, 22/10/2026: the panel said only "Ready").
+    /// </summary>
     internal static string? WithNoMicrophone(string? problem, bool none) =>
         !none ? problem : problem is null ? Dictum.Core.NoSoundText.NoMicrophoneBalloon : $"{problem}\n{Dictum.Core.NoSoundText.NoMicrophoneBalloon}";
 
