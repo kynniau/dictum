@@ -3840,3 +3840,45 @@ The lens on 36fa43e (and a854a41) verified the merge and the constant swaps and 
 | The cloud sentence's dictionary clause removed | Every_mention_of_turning_on_cloud_clean_up_says_what_it_sends | observed failing |
 | Simple busy text back to "download it after" | A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops | observed failing |
 | Catalogue busy text back to "download it after" | The_space_check_counts_the_download_already_running | observed failing |
+
+### Final-lens fixes (21/10/2026), lens on 4b5ee4f
+
+The lens returned Needs changes, with no blockers. Its findings and the fixes:
+
+1. **Off's line was untrue (orchestrator's decision: keep the behaviour, make the copy accurate).** Off skips the tidy only: the user's own corrections, snippets and the profanity filter (when on) still run after it (`DictationPipeline`). The lines now read (PROPOSED):
+   - Off's line: "Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply."
+   - The Advanced button and tray entry: "Off (paste what was heard)".
+   - The Advanced "In use:" suffix: " (paste what was heard; your corrections, snippets and the profanity filter still apply)".
+   - The Help's Off sentence: "To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply."
+   - README and SPEC follow.
+2. **The Help was true only in the Simple view.**
+   - Added (PROPOSED): "This help names the choices as the Simple view shows them; if you see model names instead, choose Simple at the top of that page."
+   - The model files answer now reads "(Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English)".
+   - The labels pin also opens the Advanced view and checks "Simple" is shown there.
+   - The onboarding's accent explainer now reads "choose More accurate in the Simple view of Settings > Models" (PROPOSED), so it holds when a seeded settings.json opens the Advanced view.
+3. **PR #21's safety was unpinned on the wizard path.**
+   - `Scratch.Shell` now takes a null `gpuMachine` (the app's own probe path) and a stand-in runtime probe. `ModelCoordinator.TestRuntimeProbe` is settable for that.
+   - `The_wizard_probes_the_runtime_with_the_seeded_gpu_setting` seeds `whisper.gpu = cpu` and checks the probe sees "cpu".
+4. **Two first-run rules were unpinned.**
+   - Without base.en and with no clean-up question, the wizard writes the rule-based tidy: an assertion was added to `Without_base_en_the_speech_step_offers_the_three_tiers`.
+   - The plan is looked up again after a folder is chosen: `The_plan_is_looked_up_again_after_a_folder_is_chosen` picks a folder already holding ggml-base.en.bin, and the speech step then says the Standard model is ready.
+5. **Shared builders, bytes unchanged.**
+   - `MicrophoneChoices.Build(devices, chosen)` serves the tray, Settings > Microphone and the onboarding test.
+   - `NoSoundText.SilentAdvice` is the tail of both "Nothing heard. …" and the "No sound from mic" balloon.
+   - Pins check the labels and both sentences byte for byte.
+6. **`OnboardingTests.cs` was 1,131 lines.** It is now one partial class in three files: `OnboardingTests.cs` (the steps and the first run), `OnboardingTests.Microphone.cs` and `OnboardingTests.Window.cs` (Try it, size, placement and focus). No test was renamed, and the class still runs 48 tests.
+
+**Mutation checks.** Each was applied alone, rebuilt, run and restored:
+
+| Mutation | Pin | Observed |
+|---|---|---|
+| The Help's "choose Simple" sentence removed | Every_label_the_help_names_exists_in_the_app, The_help_names_the_simple_view_choices_as_the_app_does | observed failing (both) |
+| The model files answer back to "when the text is English" | The_help_names_the_simple_view_choices_as_the_app_does | observed failing |
+| The Simple / Advanced switch hidden in the Advanced view | Every_label_the_help_names_exists_in_the_app | observed failing |
+| The accent explainer back to "in Settings > Models" | The_accent_explainer_says_where_More_accurate_is | observed failing |
+| `OnboardingFlow.Plan` calls `PlanFirstRun(null)` | The_wizard_probes_the_runtime_with_the_seeded_gpu_setting | observed failing |
+| The no-clean-up-pick branch in `AnswerFirstRun` made unreachable | Without_base_en_the_speech_step_offers_the_three_tiers | observed failing |
+| `_plan = null` removed from `CompleteFolder` | The_plan_is_looked_up_again_after_a_folder_is_chosen | observed failing |
+| Off's line back to "Paste exactly what was heard." | The_off_lines_say_what_still_applies | observed failing |
+| `SilentAdvice` reworded | The_nothing_heard_line_and_the_no_sound_balloon_share_their_advice | observed failing |
+| "(not connected)" changed in `MicrophoneChoices` | The_microphone_lists_are_built_in_one_place | observed failing |
