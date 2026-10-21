@@ -290,13 +290,13 @@ public class PolishTests
             Assert.StartsWith($"{SimpleView.StandardLabel} · ", models);
             Assert.EndsWith($" · {SimpleView.TidyLabel} · Right Ctrl", models);
             Assert.DoesNotMatch(@"base\.en|Vulkan|CPU|rules", models);
-            Assert.Contains("Full: More accurate and AI clean-up. Light: Standard and Tidy my words.", texts);
+            Assert.Contains("Full: More accurate and AI clean-up.\nLight: Standard and Tidy my words.", texts);
         }
         else
         {
             Assert.StartsWith("base.en · ", models);
             Assert.Contains(" · rules · Right Ctrl", models);
-            Assert.Contains("Full: small.en and qwen2.5-1.5b. Light: base.en and the rule-based tidy.", texts);
+            Assert.Contains("Full: small.en and qwen2.5-1.5b.\nLight: base.en and the rule-based tidy.", texts);
         }
         flyout.Close();
         shell.Dispose();
@@ -318,7 +318,7 @@ public class PolishTests
         Assert.Equal(SimpleView.TidyLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.Local, Model = tidy }, false, "es", false, tidy)); // no model runs on it
         Assert.Equal(SimpleView.OffLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.Off }, false, "en", false, "no clean-up"));
         Assert.Equal("Custom: anthropic", SimpleView.CleanupName(new LlmSettings { Provider = "anthropic" }, false, "en", false, "anthropic"));
-        Assert.Equal("Full: Most accurate and AI clean-up. Light: Standard and Tidy my words.", SimpleView.ModeHint(gpuMachine: true, "en", false));
+        Assert.Equal(["Full: Most accurate and AI clean-up.", "Light: Standard and Tidy my words."], SimpleView.ModeHint(gpuMachine: true, "en", false)!);
     }
 
     /// <summary>
@@ -571,7 +571,7 @@ public class PolishTests
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
         var texts = Texts(flyout);
-        Assert.Contains(texts, t => t is not null && t.EndsWith("Full: small.en and qwen2.5-1.5b. Light: base.en and the rule-based tidy.", StringComparison.Ordinal)); // after "Custom: …" when the settings match neither preset
+        Assert.Contains(texts, t => t is not null && t.EndsWith("Full: small.en and qwen2.5-1.5b.\nLight: base.en and the rule-based tidy.", StringComparison.Ordinal)); // after "Custom: …" when the settings match neither preset
         Assert.DoesNotContain(texts, t => t is not null && t.Contains(SimpleView.AiCleanupLabel, StringComparison.Ordinal));
         flyout.Close();
         shell.Dispose();

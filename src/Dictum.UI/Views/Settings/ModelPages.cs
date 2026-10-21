@@ -269,7 +269,7 @@ internal sealed class ModelsPage : SettingsPage
             _speech.Children.Add(CatalogueRow(e.Name, $"{e.Name} · {e.SizeText}", state, e.TradeOff, inUse, have, e.FileName, () => Run(() => Shell.Models.Select(e.Name))));
         }
         if (ModelCatalog.Find(Shell.Models.CurrentName) is null)
-            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.CurrentPath}", null, () => { }));
+            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, Shell.Models.CurrentPath, null, () => { })); // the tag says "In use"
 
         var current = s.Llm.Provider == LlmSettings.Local ? CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model : null;
         foreach (var e in CleanupCatalog.Entries)
@@ -303,7 +303,7 @@ internal sealed class ModelsPage : SettingsPage
             var inUse = e.Name == current;
             if (tier.Guard is { } guard) // never offered: choosing it would switch to a model that cannot hear this language
             {
-                _simpleSpeech.Children.Add(inUse ? ModelRow(tier.Label, $"In use · {guard}", null, () => { }) : TextRow(tier.Label, guard));
+                _simpleSpeech.Children.Add(inUse ? ModelRow(tier.Label, guard, null, () => { }) : TextRow(tier.Label, guard)); // the tag says "In use"
                 continue;
             }
             var source = _sources[i];
@@ -322,7 +322,8 @@ internal sealed class ModelsPage : SettingsPage
         var english = Dictum.Transcribe.WhisperLanguages.OutputIsEnglish(language, translate);
         var tidyLine = SimpleView.TidyLine(language, translate);
         // With text that is not English no clean-up model runs (whitespace only), so "with AI clean-up" would be untrue.
-        var tidyState = !tidy ? null : s.Llm.Provider == LlmSettings.Local && english ? SimpleView.TidyWithAiState : "In use";
+        // In use, the row has the "In use" tag, so its line does not say it again (1.2 polish round 2).
+        var tidyState = tidy && s.Llm.Provider == LlmSettings.Local && english ? SimpleView.TidyWithAiState : null;
         _simpleCleanup.Children.Add(ModelRow(SimpleView.TidyTitle, tidyState is null ? tidyLine : $"{tidyState} · {tidyLine}",
             tidy ? null : "Use", () => Run(() => UseTidy(Shell)), out _, name: tidy ? null : SimpleView.ActionName("Use", SimpleView.TidyLabel)));
         var off = SimpleView.OffInUse(s.Llm);
@@ -330,7 +331,7 @@ internal sealed class ModelsPage : SettingsPage
             _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), SimpleView.CustomNote, null, () => { }));
         // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use on English text, sits under this row; Off under it.
         // Off has no language dependency (it never runs a clean-up), so unlike the tiers it is offered for every language.
-        _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, off ? $"In use · {SimpleView.OffSubLine}" : SimpleView.OffSubLine,
+        _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, SimpleView.OffSubLine,
             off ? null : "Use", () => Run(Shell.Models.SelectOff), out _, name: off ? null : SimpleView.ActionName("Use", SimpleView.OffLabel)));
     }
 
@@ -366,7 +367,7 @@ internal sealed class ModelsPage : SettingsPage
     /// A catalogue row: In use (no action), Use, or Download…; a model whose file is downloading shows "Downloading 42%" (or
     /// "Waiting to download") with its button disabled and named for why, so it cannot be chosen again mid-download.
     /// </summary>
-    /// <param name="state">The row's state before its line ("In use", "Downloaded"), or null for none (the bundled Standard tier says "Included" in its line).</param>
+    /// <param name="state">The row's state before its line ("Downloaded"), or null for none (the bundled Standard tier says "Included" in its line). A row in use shows its tag instead, and its line drops the state.</param>
     /// <param name="simple">A Simple-view row: its Use or Download… button is named for its tier ("Use More accurate").</param>
     private Grid CatalogueRow(string name, string title, string? state, string tradeOff, bool inUse, bool have, string fileName, Action click, bool simple = false)
     {
@@ -374,7 +375,8 @@ internal sealed class ModelsPage : SettingsPage
         if (fetch == DownloadState.None)
         {
             var action = inUse ? null : have ? "Use" : "Download…";
-            return ModelRow(title, state is null ? tradeOff : $"{state} · {tradeOff}", action, click, out _,
+            // The model in use has the "In use" tag, so its line does not say it again (1.2 polish round 2: "In use" twice on a row).
+            return ModelRow(title, state is null || inUse ? tradeOff : $"{state} · {tradeOff}", action, click, out _,
                 name: simple && action is not null ? SimpleView.ActionName(action, name) : null);
         }
         var running = fetch == DownloadState.Running;

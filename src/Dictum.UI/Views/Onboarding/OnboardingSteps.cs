@@ -581,8 +581,20 @@ internal sealed class TryItStep : OnboardingStep
         if (failedLoad || _readyAt is long at && Flow.Clock() - at >= NothingAfterMs) _nothing.IsVisible = true;
     }
 
-    /// <summary>The status over the practice box: shown while the model gets ready and the box is empty.</summary>
-    private void ShowStatus() => _status.IsVisible = _waiting && string.IsNullOrEmpty(_box.Text);
+    /// <summary>
+    /// The status over the practice box: shown while the model gets ready and the box is empty. While it shows, the box has no
+    /// keyboard focus, so no caret blinks in front of "Getting the speech model ready…" (1.2 polish round 2); when it goes,
+    /// the box gets the focus, unless the person has put it somewhere else meanwhile.
+    /// </summary>
+    private void ShowStatus()
+    {
+        var was = _status.IsVisible;
+        _status.IsVisible = _waiting && string.IsNullOrEmpty(_box.Text);
+        if (!was || _status.IsVisible || _box.IsFocused) return;
+        if (TopLevel.GetTopLevel(this) is not { FocusManager: { } focus } window) return;
+        var focused = focus.GetFocusedElement();
+        if (focused is null || ReferenceEquals(focused, window)) _box.Focus();
+    }
 
     /// <summary>What the empty practice box shows: the model's status while it gets ready, else null (tests).</summary>
     internal string? Placeholder => _status.IsVisible ? _status.Text : null;
@@ -595,8 +607,12 @@ internal sealed class TryItStep : OnboardingStep
             ? OnboardingText.AccentExplainer
             : OnboardingText.AccentExplainerChosen;
 
-    /// <summary>The practice box: a hotkey held without clicking first pastes there, not into a button (lens on 6bacce9).</summary>
-    public override Control? InitialFocus(Button primary) => _box;
+    /// <summary>
+    /// The practice box: a hotkey held without clicking first pastes there, not into a button (lens on 6bacce9). While the
+    /// model gets ready, nothing (the status sits in the box, and a caret would blink in front of it); the box takes the focus
+    /// when the status goes (<see cref="ShowStatus"/>).
+    /// </summary>
+    public override Control? InitialFocus(Button primary) => _status.IsVisible ? null : _box;
 
 
     public override bool Secondary()

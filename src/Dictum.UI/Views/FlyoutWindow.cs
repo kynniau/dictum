@@ -24,13 +24,17 @@ namespace Dictum.UI.Views;
 /// </summary>
 internal sealed class FlyoutWindow : Window
 {
-    private const double PanelWidth = 380;
+    internal const double PanelWidth = 380;
     private const double Shadow = 14; // room around the panel for its shadow
     private static readonly string[] IndicatorLabels = ["Off", "Orb", "Edge", "Both"];
 
     private readonly AppShell _shell;
-    private readonly TextBlock _models = Ui.Text("", "caption");
+    // One line, never wrapped (1.2 polish round 2: "Right" and "Ctrl" fell on two lines). It has the header's width under
+    // "Dictum", the state and the switch; a line longer than that (a custom model's file name) ends in an ellipsis, whole in
+    // its tooltip.
+    private readonly TextBlock _models = new() { TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, Classes = { "caption" } };
     private readonly TextBlock _problem = Ui.Text("", "caption");
+    private readonly Button _openLogs;
     private readonly Button _tryCpu;
     private readonly StackPanel _problemBox;
     private readonly Ellipse _dot = new() { Width = 8, Height = 8 };
@@ -95,21 +99,28 @@ internal sealed class FlyoutWindow : Window
             if (_tryCpu!.IsFocused) _enabled.Focus(NavigationMethod.Tab); // set by then: the button exists before it can be pressed
             Act(() => shell.TryOnCpu());
         });
-        var openLogs = Ui.Button("Open log folder", "link", () => Act(() =>
+        _openLogs = Ui.Button("Open log folder", "link", () => Act(() =>
         {
             if (shell.OpenPath(shell.RealPath(shell.Paths.LogsDir), folder: true) is { } why) shell.Notify("Dictum", why, warning: true);
         }));
         AutomationProperties.SetLiveSetting(_problem, AutomationLiveSetting.Polite);
-        _problemBox = Ui.Stack(4, _problem, Ui.Row(12, _tryCpu, openLogs));
+        _problemBox = Ui.Stack(4, _problem, Ui.Row(12, _tryCpu, _openLogs));
 
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"), ColumnSpacing = 10 };
-        header.Children.Add(new MarkIcon(28));
-        var titles = Ui.Stack(1, new TextBlock { Text = "Dictum", FontSize = 15, FontWeight = FontWeight.SemiBold }, _models);
-        Grid.SetColumn(titles, 1);
+        // Two rows: "Dictum", the state and the switch, then the models line under all three, so it has the panel's width
+        // less the mark (1.2 polish round 2: beside the state and the switch it wrapped the key's name onto a second line).
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto"), ColumnSpacing = 10, RowSpacing = 1 };
+        var mark = new MarkIcon(28) { VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetRowSpan(mark, 2);
+        var title = new TextBlock { Text = "Dictum", FontSize = 15, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(title, 1);
         var state = Ui.Row(6, _dot, _state);
+        state.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(state, 2);
         Grid.SetColumn(_enabled, 3);
-        header.Children.AddRange([titles, state, _enabled]);
+        Grid.SetRow(_models, 1);
+        Grid.SetColumn(_models, 1);
+        Grid.SetColumnSpan(_models, 3);
+        header.Children.AddRange([mark, title, state, _enabled, _models]);
 
         var micRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), ColumnSpacing = 10 };
         micRow.Children.Add(Ui.Icon(Ui.MicIcon, 18, "SecondaryTextBrush"));
@@ -214,11 +225,15 @@ internal sealed class FlyoutWindow : Window
             var s = _shell.Settings;
             var status = _shell.Status;
             _models.Text = status.Models;
+            ToolTip.SetTip(_models, status.Models); // the whole line, when a long one is trimmed
             var devices = Microphones();
             var problem = WithNoMicrophone(status.Problem, devices.Count == 0);
             _problem.Text = problem ?? "";
             _problemBox.IsVisible = problem is not null;
             _tryCpu.IsVisible = status.TryCpu;
+            // The log is for a problem the log explains (a model that failed, a dictation that heard nothing), not for the
+            // no-microphone sentence alone, which says what to do (1.2 polish round 2).
+            _openLogs.IsVisible = status.Problem is not null;
             _state.Text = status.State;
             _dot[!Shape.FillProperty] = new DynamicResourceExtension(status.Tone switch
             {
@@ -236,10 +251,9 @@ internal sealed class FlyoutWindow : Window
 
             var preset = _shell.Personal.CurrentPreset;
             _mode.Select(preset switch { ModePreset.Light => 0, ModePreset.Full => 1, _ => -1 });
-            var full = ModePresets.For(ModePreset.Full, _shell.GpuMachine);
-            _modeHint.Text = (preset == ModePreset.Custom ? "Custom: your settings match neither preset. " : "") +
-                             ((s.Ui.IsSimple ? SimpleView.ModeHint(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) : null) // the Simple names where true (1.2 polish)
-                                 ?? $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.");
+            _modeHint.Text = ModeLine(preset == ModePreset.Custom,
+                (s.Ui.IsSimple ? SimpleView.ModeHint(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) : null) // the Simple names where true (1.2 polish)
+                ?? ModelModeHint(_shell.GpuMachine));
 
             FillSpeech(s);
             FillCleanup(s);
@@ -402,6 +416,23 @@ internal sealed class FlyoutWindow : Window
     /// The problem line, with the no-microphone sentence (<see cref="Dictum.Core.NoSoundText.NoMicrophoneBalloon"/>, PR #22's
     /// own) under it while the system lists no microphone (1.2 polish, 22/10/2026: the panel said only "Ready").
     /// </summary>
+    internal const string CustomPresetNote = "Custom: your settings match neither preset.";
+
+    /// <summary>
+    /// The line under Light | Full: one sentence per line ("Full: …", "Light: …", after the Custom note when the settings match
+    /// neither preset), so a narrow panel breaks it between presets, never inside a name such as "Tidy my words" (1.2 polish
+    /// round 2: it wrapped "Tidy my / words."). Each sentence fits the panel's width on its own line (pinned).
+    /// </summary>
+    internal static string ModeLine(bool custom, IReadOnlyList<string> presets) =>
+        string.Join("\n", custom ? [CustomPresetNote, .. presets] : presets);
+
+    /// <summary>The presets by their model names (the Advanced view, and the Simple view where its names would not be true).</summary>
+    internal static string[] ModelModeHint(bool gpuMachine)
+    {
+        var full = ModePresets.For(ModePreset.Full, gpuMachine);
+        return [$"Full: {full.SpeechModel} and {full.CleanupModel}.", $"Light: {ModePresets.LightSpeech} and the rule-based tidy."];
+    }
+
     internal static string? WithNoMicrophone(string? problem, bool none) =>
         !none ? problem : problem is null ? Dictum.Core.NoSoundText.NoMicrophoneBalloon : $"{problem}\n{Dictum.Core.NoSoundText.NoMicrophoneBalloon}";
 

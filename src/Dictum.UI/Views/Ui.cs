@@ -184,8 +184,8 @@ internal sealed class PathBox : Border
             ToolTip.SetIsOpen(this, false);
         };
     }
+
     /// <summary>The path shown; the tooltip and the automation peer's value follow it.</summary>
-    /// <summary>The path shown; the tooltip and the accessible name follow it.</summary>
     public string Path
     {
         get => _text.Text ?? "";
