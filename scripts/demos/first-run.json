@@ -1,0 +1,64 @@
+{
+  "name": "first-run",
+  "title": "Start Dictum for the first time",
+  "summary": "Open Dictum from Start, keep the suggested hotkey, and find Dictum's icon by the clock.",
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" }
+  ],
+  "steps": [
+    {
+      "id": "start",
+      "caption": "Click the Start button.",
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "automationId": "StartButton" } } ]
+    },
+    {
+      "id": "type",
+      "caption": "Type Dictum.",
+      "lead": 1.5,
+      "do": [ { "do": "wait", "seconds": 1 }, { "do": "type", "text": "Dictum" } ]
+    },
+    {
+      "id": "enter",
+      "caption": "Press Enter to open it.",
+      "do": [ { "do": "key", "keys": "Enter" } ],
+      "after": 2.5
+    },
+    {
+      "id": "hotkey",
+      "caption": "Dictum asks which key you hold while you speak. Right Ctrl is already chosen.",
+      "do": [ { "do": "point", "target": { "window": "Check your hotkey$", "type": "Text", "name": "RightCtrl", "timeout": 120 } } ],
+      "after": 2.5
+    },
+    {
+      "id": "use",
+      "caption": "Click Use this hotkey.",
+      "do": [ { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey" } } ],
+      "after": 4
+    },
+    {
+      "id": "arrow",
+      "caption": "Dictum now waits by the clock. Click the little up-arrow there.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "ready",
+      "caption": "This is Dictum's panel. Ready means you can dictate.",
+      "poster": true,
+      "do": [ { "do": "point", "target": { "window": "^Dictum$", "type": "Text", "name": "Ready", "timeout": 60 } } ],
+      "after": 3
+    },
+    {
+      "id": "close",
+      "caption": "Press Esc to close the panel.",
+      "do": [ { "do": "key", "keys": "Escape" } ],
+      "after": 2
+    }
+  ]
+}
