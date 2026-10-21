@@ -151,7 +151,8 @@ public class HelpPageTests
 
     /// <summary>
     /// The reconciliation with main (21/10/2026), all PROPOSED copy: the crash answer carries the 1.1.2 note's sentence, the
-    /// free answer is the two approved paragraphs plus the licence and no-limit facts, and the calibration feature goes by the name its button shows.
+    /// free answer is the two approved paragraphs plus the licence and no-limit facts, the calibration feature goes by the name its button shows,
+    /// the cloud answer names the dictionary and the on/off switch is described rather than named.
     /// </summary>
     [Fact]
     public void The_crash_free_and_calibration_answers_carry_the_reconciled_copy()
@@ -174,6 +175,14 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Equal(calibration.Matches(text).Count, Regex.Matches(text, "Calibrate my voice").Count); // every "calibrat…" word sits inside "Calibrate my voice"
         Assert.Contains(HelpText.AllText(), t => t.Contains("Calibrate my voice", StringComparison.Ordinal));
+
+        // Cloud clean-up sends the dictionary line too (CleanupPrompt.Build), so the answer says so (PROPOSED, 21/10/2026).
+        var voice = HelpText.Questions.Single(q => q.Question == "Where does my voice go?");
+        Assert.Contains(voice.Answer, p => p.Contains("cloud clean-up", StringComparison.Ordinal) && p.Contains("the words in your dictionary", StringComparison.Ordinal));
+
+        // "Dictation on" is only the switch's screen-reader name (it shows no text), so the help describes where the switch is (PROPOSED, 21/10/2026).
+        Assert.DoesNotContain(HelpText.AllText(), x => x.Contains("Dictation on", StringComparison.Ordinal));
+        Assert.Contains(HelpText.AllText(), x => x.Contains("the on/off switch at the top right of the Dictum menu", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -221,7 +230,7 @@ public class HelpPageTests
         var copy = string.Join("\n", HelpText.AllText());
         string[] named =
         [
-            "Calibrate my voice", "Dictionary", "Fix last dictation", "Save corrections", "Settings", "Dictation on",
+            "Calibrate my voice", "Dictionary", "Fix last dictation", "Save corrections", "Settings",
             "General", "Models", "Storage", "Microphone", "Clean-up",
             "Press your hotkey", "Change…", "Use this hotkey", "Test microphone", "Model folder", "Browse…", "Remove Dictum completely…",
             "Try on the CPU", "Mic error", "No sound from mic", "Open the full guide", "Email support", "Help",

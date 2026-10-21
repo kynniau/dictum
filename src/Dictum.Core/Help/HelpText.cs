@@ -87,7 +87,7 @@ public static class HelpText
         [
             "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.",
             "The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.",
-            "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation is sent to the service you chose. Your voice still stays here.",
+            "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here.",
         ]),
         new("Why did it type the wrong words?",
         [
@@ -125,7 +125,7 @@ public static class HelpText
             "Let go of the key. Dictum stops listening and types what you said.",
             "To cancel instead, press Esc before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc.",
             "If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.",
-            "To turn Dictum off for a while, use the Dictation on switch in the Dictum menu.",
+            "To turn Dictum off for a while, use the on/off switch at the top right of the Dictum menu.",
         ]),
         new("Can I use it in Word, Outlook, Teams or a web browser?",
         [
