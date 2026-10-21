@@ -92,8 +92,11 @@ public class HelpPageTests
         Assert.Equal(["https://dictum.kynni.au/help"], platform.Opened);
 
         Click(page, "Email support");
-        Assert.Equal(["https://dictum.kynni.au/help", "mailto:hello@kynni.com.au"], platform.Opened);
-        Assert.Equal(AppShell.SupportEmail, HelpText.SupportAddress); // one support address across the app
+        Assert.Equal(2, platform.Opened.Count);
+        Assert.Equal("https://dictum.kynni.au/help", platform.Opened[0]);
+        Assert.StartsWith($"mailto:{AppShell.SupportEmail}?subject=Dictum%20", platform.Opened[1]); // the prefilled email About's Report a problem opens
+        Assert.Contains("problem%20report", platform.Opened[1]);
+        Assert.Equal(SupportMail.Address, AppShell.SupportEmail); // one support address across the app
         window.Close();
         shell.Dispose();
     });
@@ -115,7 +118,9 @@ public class HelpPageTests
         Assert.Equal(0, downloads.Requests);
         Assert.Equal(0, updates.Requests);
         Assert.Equal(3, platform.Opened.Count); // the three buttons, one call each, nothing else
-        Assert.Equal([HelpText.GuideUrl, HelpText.SupportUri], platform.Opened.Take(2));
+        Assert.Equal(HelpText.GuideUrl, platform.Opened[0]);
+        Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20", platform.Opened[1]); // Email support: the same prefilled email as Report a problem
+        Assert.Contains("problem%20report", platform.Opened[1]);
         Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20feedback&body=", platform.Opened[2]); // Send feedback: a mail link, handed to the system
         window.Close();
         shell.Dispose();
@@ -126,7 +131,7 @@ public class HelpPageTests
         var pages = File.ReadAllText(Path.Combine(root, "src", "Dictum.UI", "Views", "Settings", "OtherPages.cs"));
         var helpPage = pages[pages.IndexOf("internal sealed class HelpPage", StringComparison.Ordinal)..];
         foreach (var source in new[] { copy, helpPage })
-            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Download|CheckForUpdates|ReportProblem|Shell\.Models"), source);
+            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Download|CheckForUpdates|Shell\.Models|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute"), source); // Shell.ReportProblem and SendFeedback are allowed: they only build a mail link for the platform seam
         return true;
     });
 
@@ -138,7 +143,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.False(forbidden.IsMatch(text), $"Forbidden in the help: \"{forbidden.Match(text).Value}\" in \"{text}\"");
         Assert.Equal("https://dictum.kynni.au/help", HelpText.GuideUrl);
-        Assert.Equal("mailto:hello@kynni.com.au", HelpText.SupportUri);
+        Assert.Equal("hello@kynni.com.au", SupportMail.Address);
     }
 
     /// <summary>

@@ -262,7 +262,7 @@ internal sealed class AboutPage : SettingsPage
                 Ui.Row(8,
                     Ui.Button("Report a problem", "primary", () => Run(Shell.ReportProblem)),
                     Ui.Button("GitHub issues", "secondary", () => Run(() => Shell.Platform.Open(AppShell.IssuesUrl))),
-                    Ui.Button("Privacy policy", "secondary", () => Run(() => Shell.Platform.Open(AppShell.PrivacyUrl))))), "Help"),
+                    Ui.Button("Privacy policy", "secondary", () => Run(() => Shell.Platform.Open(AppShell.PrivacyUrl))))), "Support"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("settings.json is the source of truth: every change here is written to it, and an edit there is picked up within a second. " +
                         "Reload settings also re-installs the hotkey if Windows removed it."),
@@ -344,7 +344,7 @@ internal sealed class HelpPage : SettingsPage
     public HelpPage(AppShell shell) : base(shell, HelpText.PageTitle)
     {
         var guide = Ui.Button(HelpText.GuideButton, "primary", () => Run(() => Shell.Platform.Open(HelpText.GuideUrl)));
-        var support = Ui.Button(HelpText.SupportButton, "secondary", () => Run(() => Shell.Platform.Open(HelpText.SupportUri)));
+        var support = Ui.Button(HelpText.SupportButton, "secondary", () => Run(Shell.ReportProblem)); // the prefilled email About's Report a problem opens
         var feedback = Ui.Button(HelpText.FeedbackButton, "secondary", () => Run(Shell.SendFeedback));
         AutomationProperties.SetHelpText(guide, HelpText.GuideNote); // a screen reader says it with the button
         AutomationProperties.SetHelpText(support, HelpText.SupportNote);

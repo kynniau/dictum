@@ -10,8 +10,8 @@ namespace Dictum.Help;
 /// names ("Calibrate my voice", "Try on the CPU", "Mic error"…) are pinned against the real windows by HelpPageTests, so
 /// renaming one in the app fails a test until this text follows it.
 /// </para>
-/// The page reaches the network only through the two buttons, which hand <see cref="GuideUrl"/> and
-/// <see cref="SupportUri"/> to the system (IPlatform.Open): the browser or mail app does the rest, not Dictum.
+/// The page reaches the network only through its buttons, which hand <see cref="GuideUrl"/> or a mail link built by
+/// <see cref="SupportMail"/> to the system (IPlatform.Open): the browser or mail app does the rest, not Dictum.
 /// </summary>
 public static class HelpText
 {
@@ -19,11 +19,6 @@ public static class HelpText
 
     /// <summary>The full illustrated guide (built and hosted outside the app). Opened by the system browser, never fetched by Dictum.</summary>
     public const string GuideUrl = "https://dictum.kynni.au/help";
-
-    /// <summary>The support address: an alias of the one constant, <see cref="SupportMail.Address"/>.</summary>
-    public const string SupportAddress = SupportMail.Address;
-
-    public const string SupportUri = "mailto:" + SupportAddress;
 
     public const string MoreHelpHeading = "More help";
 
@@ -33,13 +28,14 @@ public static class HelpText
 
     public const string SupportButton = "Email support";
 
-    public const string SupportNote = "Email support opens a new email to " + SupportAddress + " in your own email program. Dictum sends nothing by itself.";
+    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword. Email support opens the same prefilled email as Report a problem.</summary>
+    public const string SupportNote = "Email support opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.";
 
     /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
     public const string FeedbackButton = "Send feedback or suggest a feature";
 
     /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
-    public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportAddress + " in your own email program, with the version of Dictum, your Windows version and the models in use filled in. " +
+    public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum, your Windows version and the models in use filled in. " +
         "You can read and change it before you send it. Dictum sends nothing by itself.";
 
     public const string HowItWorksHeading = "How Dictum works";

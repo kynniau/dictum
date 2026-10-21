@@ -135,6 +135,57 @@ public class FeedbackTests
     });
 
     [Fact]
+    public Task Email_support_opens_the_report_email_with_the_version_and_models_and_nothing_private() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, platform, _) = scratch.Shell();
+        shell.Personal.AddDictionaryTerms(["Zorblaxquintet"]);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage(HelpText.PageTitle);
+        Dispatcher.UIThread.RunJobs();
+        var page = All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl);
+        All<Button>(page).Single(b => b.Content as string == "Email support").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var uri = Assert.Single(platform.Opened);
+        var body = BodyOf(uri);
+        Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20", uri);
+        Assert.Contains("problem%20report", uri);
+        Assert.Matches(@"Dictum \d+\.\d+\.\d+ on Test\nModels: [^\n]+", body); // the version and the models line, as Report a problem fills them
+        foreach (var private1 in new[] { "Zorblaxquintet", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile })
+            Assert.DoesNotContain(private1, body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Dictum sends nothing by itself", HelpText.SupportNote);
+        Assert.Contains("version of Dictum and the models", HelpText.SupportNote);
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public void A_models_line_is_cleaned_part_by_part_so_a_path_cannot_reach_the_report()
+    {
+        Assert.Equal("base.en · Vulkan · rules · Right Ctrl", SupportMail.Facts("base.en · Vulkan · rules · Right Ctrl"));
+        Assert.Equal("ggml-base.en.bin · qwen.gguf · ok", SupportMail.Facts(@"C:\Users\Kyle\models\ggml-base.en.bin · D:/priv/qwen.gguf · ok"));
+        Assert.Equal("a  b", SupportMail.Facts("a\r\nb"));
+        Assert.Equal("", SupportMail.Facts(null));
+    }
+
+    [Fact]
+    public Task About_calls_its_card_Support_so_that_Help_means_only_the_Help_page() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("About");
+        Dispatcher.UIThread.RunJobs();
+        var about = All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl);
+        var texts = All<TextBlock>(about).Select(t => t.Text).ToList();
+        Assert.Contains("SUPPORT", texts); // card titles are upper-cased overlines
+        Assert.DoesNotContain("HELP", texts);
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
     public void Report_a_problem_still_builds_the_link_it_built_before_the_builder_was_shared()
     {
         var body = "What happened (and what you expected):\n\n\nDictum 1.2.0 on Windows\nModels: base.en · Vulkan · rules · F24\n\n" +
@@ -148,7 +199,6 @@ public class FeedbackTests
     {
         Assert.Equal("hello@kynni.com.au", SupportMail.Address);
         Assert.Equal(SupportMail.Address, AppShell.SupportEmail);
-        Assert.Equal(SupportMail.Address, HelpText.SupportAddress);
         var bin = $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}";
         var obj = $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}";
         var copies = Directory.EnumerateFiles(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src"), "*.cs", SearchOption.AllDirectories)

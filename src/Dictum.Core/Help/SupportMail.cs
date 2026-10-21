@@ -14,7 +14,7 @@ namespace Dictum.Help;
 /// </summary>
 public static class SupportMail
 {
-    /// <summary>The support address: the only copy in code. HelpText.SupportAddress and AppShell.SupportEmail are aliases of it.</summary>
+    /// <summary>The support address: the only copy in code. AppShell.SupportEmail is an alias of it and HelpText names it directly.</summary>
     public const string Address = "hello@kynni.com.au";
 
     /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
@@ -54,6 +54,12 @@ public static class SupportMail
         var uri = Uri(FeedbackSubject, body);
         return uri.Length <= MaxUriLength ? uri : Uri(FeedbackSubject, FeedbackIntro);
     }
+
+    /// <summary>
+    /// A line of facts joined with " · " (the models line of the header): each part cleaned as a <see cref="Fact"/>, so a path or
+    /// line break in a model's name cannot reach the email.
+    /// </summary>
+    public static string Facts(string? line) => string.Join(" · ", (line ?? "").Split(" · ").Select(Fact));
 
     /// <summary>A fact as it may appear in the email: no control characters, only the last part of anything path-like, at most 60 characters.</summary>
     internal static string Fact(string? value)
