@@ -1,13 +1,23 @@
 {
   "name": "model-folder",
   "title": "Keep the models on another drive",
-  "summary": "Settings > Models > Model folder > Browse: choose a folder on drive D. Dictum looks there first and downloads go there; files already on the PC are not moved.",
+  "summary": "Settings > Models > Model folder > Browse: choose a folder on drive D. Dictum looks there first and downloads go there; files already on the PC are not moved. (The welcome's Model files step offers the same choice on the first run.)",
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "installSilently" },
     { "do": "secondDrive", "letter": "D", "label": "Data", "folder": "Dictum models" },
     { "do": "launch" },
-    { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 120 } },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Use this hotkey" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Finish", "timeout": 60 } },
     { "do": "wait", "seconds": 10 }
   ],
   "steps": [
@@ -34,7 +44,7 @@
     },
     {
       "id": "browse",
-      "caption": "Scroll down to Model folder. Click Browse.",
+      "caption": "Click Browse, under Model folder.",
       "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Browse for a model folder" } } ]
     },
     {
@@ -51,9 +61,9 @@
     {
       "id": "done",
       "caption": "Done. Dictum now keeps new models on drive D.",
-      "poster": true,
       "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Edit", "name": "Model folder", "timeout": 30 } } ],
-      "after": 3
+      "after": 3,
+      "poster": true
     }
   ]
 }
