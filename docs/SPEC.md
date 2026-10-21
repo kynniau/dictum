@@ -95,6 +95,9 @@ State machine (pure C#, time injected, fully unit-tested):
 | RecordingHandsFree | elapsed ≥ `hands_free_max_seconds` (default 300; 30–3600, Settings > General) | Processing: stop and type what followed the last cut (auto-stop, never discard) |
 | RecordingHold | elapsed ≥ 300 s (a fixed limit, not `hands_free_max_seconds`: amendment 16/10/2026) | same auto-stop (a stuck key must not record all afternoon) |
 | RecordingHold, RecordingHandsFree | microphone lost (unplugged, battery) | Processing: transcribe what was captured, pill flashes "Mic error"; in hands-free the parts already typed stay and what followed the last cut is typed last (fix batch, 15/10/2026; hands-free 16/10/2026) |
+| RecordingHold, RecordingHandsFree | no sound from the microphone for 2 s after the start (no packets, or every 20 ms block below CaptureBuffer.SoundFloor), and none yet this session | stays recording; pill "No sound from mic"; one balloon per session ("Dictum is not hearing anything. …"); the first sound puts the recording label back, and later pauses never warn (amendment 21/10/2026) |
+| RecordingHold, RecordingHandsFree with "No sound from mic" up | hotkey up (hold), hotkey down (hands-free stop), auto-stop | Idle: discard audio, nothing transcribed or typed; pill flashes "No sound from mic"; the tray panel says "Last dictation heard nothing: check the microphone" until a dictation types text (amendment 21/10/2026) |
+| RecordingHold | microphone cannot be opened and the system lists no microphone | Idle: discard; pill flashes "No sound from mic" (not "Mic error"), balloon "No microphone found. …"; any other open failure stays "Mic error" (amendment 21/10/2026) |
 | RecordingHold, PendingTap | Esc | Idle: discard audio, pill flashes "Cancelled" then hides |
 | RecordingHandsFree | Esc | Idle: stop capture; the text already typed stays; parts in flight or queued and what followed the last cut are dropped; pill flashes "Stopped. Text already typed stays." (amendment 16/10/2026) |
 | Processing | Esc | Idle: cancel whisper and LLM via CancellationToken, nothing more is pasted; after a hands-free stop the parts already typed stay and the pill flashes "Stopped. Text already typed stays." instead of "Cancelled" |
@@ -325,6 +328,9 @@ Ctrl+V.
   Verify with a test that showing the pill does not change `GetForegroundWindow()`.
 - Texts: "Recording · hold", "Recording · hands-free m:ss", "Transcribing…", "Polishing…",
   "Done", "Cancelled", "Busy", "Mic error". Hide after a short fade.
+- No sound (amendment, 21/10/2026; wording PROPOSED, awaiting the product owner): "No sound from mic" replaces the
+  recording label while the microphone has given no sound (the red dot and meter stay: it is still recording), and
+  flashes for 1.8 s with a red "!" badge, like "Mic error", when the recording ends that way or no microphone is listed.
 - Hands-free (amendment, 16/10/2026; wording PROPOSED, awaiting the product owner): after the
   "Hands-free" label and the timer the hint reads "typing as you pause · tap to stop · Esc stops and
   keeps what's typed"; Esc in hands-free flashes "Stopped. Text already typed stays." for 1.8 s with

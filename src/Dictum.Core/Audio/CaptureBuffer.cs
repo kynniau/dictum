@@ -19,6 +19,18 @@ public sealed class CaptureBuffer
     /// <summary>Samples in one 20 ms block (<see cref="SpeechSegmenter.BlockMs"/>): the unit of metering and of every cut.</summary>
     public const int BlockSamples = MonoResampler.WhisperRate * SpeechSegmenter.BlockMs / 1000;
 
+    /// <summary>
+    /// A 20 ms block louder than this (RMS, 0-1) is a sound from the microphone, for the "No sound from mic" warning
+    /// (21/10/2026). 1e-5 is the 20 ms block RMS after decoding, downmixing and resampling to 16 kHz, not the level at the
+    /// device: resampling 48 kHz white noise to 16 kHz drops it by about 6 dB (mono) or 9 dB (stereo, after the downmix).
+    /// Measured by the PR #22 lens on 21/10/2026 through <see cref="Append"/> with 16-bit Gaussian noise at 48 kHz, and pinned
+    /// in SilenceWarningTests at its clear ends: digital zeros, and white noise quieter than about -91 dBFS (stereo) or
+    /// -94 dBFS (mono) at the device, read as no sound; -84 dBFS passes. Not measured on real microphones: the warning's log
+    /// line gives each session's peak block RMS, so real noise floors can be read from logs. A microphone whose own noise
+    /// suppression sends exact zeros between words reads as silent until the speaker talks.
+    /// </summary>
+    public const float SoundFloor = 1e-5f;
+
     private readonly object _gate = new();
     private readonly List<float> _samples = new(MonoResampler.WhisperRate * 30);
     private readonly SampleEncoding _encoding;
@@ -35,9 +47,14 @@ public sealed class CaptureBuffer
     private long _firstBlock;      // the block _samples[0] starts (parts before it were handed over)
     private SpeechSegmenter? _segmenter;
     private Action<CapturedAudio, CutReason>? _onPart;
+    private readonly Action? _firstSound;
+    private bool _heard;
 
-    public CaptureBuffer(SampleEncoding encoding, int channels, int sampleRate)
+    /// <param name="firstSound">Called once, on the capture thread and under this buffer's lock, at the first block louder than
+    /// <see cref="SoundFloor"/>. Must not block or call back into the buffer.</param>
+    public CaptureBuffer(SampleEncoding encoding, int channels, int sampleRate, Action? firstSound = null)
     {
+        _firstSound = firstSound;
         _encoding = encoding;
         _channels = Math.Max(1, channels);
         _resampler = new MonoResampler(sampleRate);
@@ -45,6 +62,18 @@ public sealed class CaptureBuffer
 
     /// <summary>Most recent 20 ms RMS, 0-1. Read by the pill's level meter.</summary>
     public float CurrentLevel => Volatile.Read(ref _level);
+
+    /// <summary>The loudest 20 ms block RMS so far this recording (0 before the first block), for the no-sound log line.</summary>
+    public float PeakLevel
+    {
+        get { lock (_gate) return _peak; }
+    }
+
+    /// <summary>Whole 20 ms blocks measured so far this recording (0: no audio has arrived).</summary>
+    public long BlocksMeasured
+    {
+        get { lock (_gate) return _blocks; }
+    }
 
     public int SampleCount
     {
@@ -103,6 +132,11 @@ public sealed class CaptureBuffer
             var rms = (float)Math.Sqrt(_blockSumSquares / _blockCount);
             Volatile.Write(ref _level, rms);
             if (rms > _peak) _peak = rms;
+            if (!_heard && rms > SoundFloor)
+            {
+                _heard = true;
+                _firstSound?.Invoke();
+            }
             _blockSumSquares = 0;
             _blockCount = 0;
             _blocks++;

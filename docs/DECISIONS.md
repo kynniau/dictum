@@ -2869,3 +2869,68 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
   (they test a script rule, not a language); everywhere else such examples are described by code point.
 - **Limits:** commit messages and the merged history cannot be rewritten (no force-push), so earlier commits keep their
   wording. The pull-request descriptions were edited instead.
+
+## Warn when the microphone delivers no sound (21/10/2026, branch feat/silence-warning)
+
+**The report** (product owner, 21/10/2026, relayed by the orchestrator): on a virtual desktop whose microphone was not passed through, he pressed the hotkey and the pill showed "Recording" and stayed there. Nothing said the microphone was delivering no audio, so the app looked broken.
+
+**What the code did** (read at main 033809f):
+
+- A microphone that opened and delivered only silence showed "Recording" for the whole hold. The pipeline then rejected the recording as silent (`RecordingGate`) and the pill hid without saying why.
+- A microphone that could not be opened (`WasapiCapture.Start` throws, which includes no default capture device: `CaptureDevices.Resolve`) flashed "Mic error". The controller then went on to execute the rest of the key-down's effects, which included the "Recording · hold" pill. So "Mic error" was replaced at once by "Recording · hold", and that label stayed with nothing recording. This is the most likely cause of the "no device at all in some paths" symptom. It is fixed here: after a failed open, the rest of that batch is skipped (`DictationController.Execute`), and the open-failure pins check that the last pill is the flash.
+
+**Decision (built as briefed, with the choices below):**
+
+1. **Detection layer.** `CaptureBuffer` meters every 20 ms block already; it now calls back once per recording at the first block louder than `CaptureBuffer.SoundFloor`. `WasapiCapture` raises this as `IAudioCapture.SoundHeard`. The controller posts it to its inbox, and the pure state machine decides on its existing 50 ms `Tick`, using `DictationStateMachine.NoSoundGraceMs`. Nothing polls from the UI. The interface defaults (`ReportsSound => false`, a `SoundHeard` that never fires) keep every other capture, and every existing test fake, on the old behaviour: the machine only watches a session after `WatchForSound`, which the controller calls when the capture opened and `ReportsSound` is true.
+2. **Grace period: 2000 ms**, hold-to-talk and hands-free alike, a constant with a comment, not a setting (the brief).
+3. **The floor: 1e-5 RMS** (corrected by the lens on dc4e121; see "Lens fixes" below). 1e-5 is the 20 ms block RMS after decoding, downmixing and resampling to 16 kHz, not the level at the device: the 48 to 16 kHz resample lowers white noise by about 6 dB (mono) or 9 dB (stereo). Measured 21/10/2026 through `CaptureBuffer.Append` with 16-bit Gaussian noise at 48 kHz: digital zeros, and white noise quieter than about −91 dBFS (stereo) or −94 dBFS (mono) at the device, read as no sound; −84 dBFS passes. Real microphones were not measured; the warning's log line now gives the session's peak block RMS, so their noise floors can be read from logs.
+4. **The grace counts only until the first sound of the session.** Once the microphone has been heard, a pause is the speaker pausing, so a hands-free session never warns between parts. This is stricter than "no audio for 2 s at any time", which would warn on every long pause with a microphone whose noise suppression sends exact zeros. Ceiling: a microphone muted halfway through a session is not caught.
+5. **While the warning is up, recording goes on.** The pill reads "No sound from mic" with the red dot, meter, orb and edge glow kept, since it is still recording. The first sound puts the recording label back. The balloon shows once per session.
+6. **Ending with the warning up** (key released, hands-free stop, auto-stop): the capture is discarded and nothing is transcribed or typed. The pill flashes "No sound from mic" for 1.8 s with a red "!" badge, instead of "Transcribing…". A hands-free session's token is cancelled (it has typed nothing). A hold shorter than the grace period is transcribed as before, and the pipeline rejects it if it is silent, so a fumbled press never claims the microphone is dead.
+7. **No microphone at all.** The device list is checked only after the microphone could not be opened, so a press that opens it pays nothing for the check. If `IPlatform.ListCaptureDevices()` is empty, the pill flashes the warning at once with the no-microphone balloon, and nothing stays on Recording. Any other open failure, or a list that cannot be read, stays "Mic error". **This differs from the brief's wording**, which said to check the list when recording starts. Checking before every `Start` would add a device enumeration to each press's capture latency. With WASAPI, an empty list always makes `Start` throw (`CaptureDevices.Resolve`), so the outcome is the same. A list that is empty while `Start` somehow succeeds still gets the silence warning after 2 s.
+8. **Mic error is unchanged**, both for an open failure with a microphone listed and for a microphone lost mid-recording, including with the warning up. The only change is that its flash is no longer overwritten by "Recording · hold" (see above).
+9. **Tray panel line (item 2, small enough to build).** After a session that ended with no sound (point 6 or 7), the problem line in the tray panel and on Settings > About also reads "Last dictation heard nothing: check the microphone". It goes when a dictation types text (`ProcessingOutcome.Inserted`). It is held in memory only, so a restart clears it.
+
+**PROPOSED strings, for the product owner's approval (none is approved; do not treat them as final copy):**
+
+- Pill: "No sound from mic"
+- Balloon (silence): "Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on."
+- Balloon (no microphone listed): "No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again."
+- Tray panel and Settings > About line: "Last dictation heard nothing: check the microphone"
+
+They live in `NoSoundText` (Core), and one pin checks them verbatim. No approved copy (CloudPolicy, consent dialog, state lines) was changed.
+
+**What it might break.** A Bluetooth headset whose first packet takes longer than 2 s to arrive will show the warning and one balloon, then go back to Recording when its audio starts (not measured). A microphone whose own noise suppression sends exact zeros until speech can show the warning if the speaker waits more than 2 s before talking.
+
+**Pins** (`tests/Dictum.Tests/SilenceWarningTests.cs`, 13 tests: pure state-machine pins in the style of `StateMachineTests`, a `CaptureBuffer` pin, and 4 controller pins with a stand-in microphone). Each was observed failing on the reverted behaviour; the PR body has the mutation table.
+
+**Not verified:** on a real virtual desktop or Remote Desktop session without microphone redirection; with a real muted microphone, a Bluetooth headset, or a microphone with its own noise suppression; how the balloon looks on Windows 10 and 11; the pill's look with the new label (no screenshot was taken, and no Dictum build was launched on this PC).
+
+### Lens fixes (21/10/2026), lens on dc4e121
+
+The lens returned Needs changes, with no blockers. Its findings and what was done:
+
+1. **Major (figure honesty): the floor's wording was false.** "Any real signal quantised to 16 bits or more should pass" ignored that the floor applies after the downmix and the 48 to 16 kHz resample. The lens measured through `CaptureBuffer.Append` with 16-bit Gaussian noise at 48 kHz. A probe in this lane, with another random seed, gave the same heard or silent result at each level, with block peaks within about 5 % of the lens's:
+
+   | Level | Mono | Stereo |
+   |---|---|---|
+   | −84.2 dBFS | heard | heard |
+   | −90.0 dBFS | heard (peak 1.61e-5) | heard (peak 1.15e-5) |
+   | −92.7 dBFS | heard (peak 1.21e-5) | silent (peak 8.68e-6) |
+   | −95.2 dBFS | silent | silent |
+
+   The value stays 1e-5, as the orchestrator directed. The wording is corrected in `CaptureBuffer.SoundFloor`, decision 3 above, the README and the PR body. A new pin checks the clear ends: −84.2 dBFS heard and −96 dBFS silent, mono and stereo. The warning's log line now carries the session's peak block RMS and how many 20 ms blocks arrived. These are numbers only, so real microphones' floors, and "no audio at all", can be read from logs. A pin checks the line.
+2. **Minor, accepted: the end-of-recording decision can miss a very late first sound.** It reads the warning flag when the key event is handled, before a first-sound report that may still be queued (the capture's 50 ms buffer plus the inbox). A first sound shorter than that, arriving after 2 s of silence and just before the release, is discarded with the warning instead of transcribed. This is inferred, not measured. It is marked `// simplification:` at `EndRecording`. Trigger to retire: a report of a dropped first word.
+3. **Minor: the README's "No sound from mic" entry** now also says to check that Windows allows desktop apps to use the microphone (Settings > Privacy & security > Microphone). The balloon is unchanged. **Not verified:** whether a microphone privacy denial gives silence (the warning) or an open failure ("Mic error").
+4. **Nit, left as a known gap:** in hands-free, while the warning is up, the pill's "tap to stop · Esc stops and keeps what's typed" hint is hidden, because the hint shows only with the hands-free label.
+5. **Minor test race:** the second dictation in `The_controller_warns_once_for_a_silent_microphone…` reported its sound before the new session had started, so the sound could be counted against the old one. The test now waits for the new recording's pill first. It still proves its claim: a dictation that types text clears the heard-nothing line.
+
+### Lens fixes (21/10/2026), lens on 28d16b7
+
+The lens returned Needs changes with three minors and no change to src behaviour wanted. All three are fixed:
+
+1. **Test race.** `WarnNoSound` emits the pill before the balloon and log effects. So a test that waited for the "No sound from mic" pill could read the balloon list or the log before they were written. The effect order is unchanged. Instead, the two tests now wait for the balloon (`The_controller_warns_once_for_a_silent_microphone…`) and for the log line (`The_warning_log_line…`) themselves. To check the wait, I added a temporary `Thread.Sleep(50)` before the warning's log line and balloon in `DictationController`: all 17 tests in the class passed with it. It was then removed.
+2. **Pin gap.** `CaptureBuffer.PeakLevel` and `BlocksMeasured` now have their own pin. A fresh buffer reads 0 and 0. One block at RMS 0.3 followed by three at 0.01 reads a peak of 0.3 and 4 blocks.
+3. **README basis restored.** The entry now reads "digital silence, or white noise at a 48 kHz microphone below about −91 dBFS in stereo or −94 dBFS in mono". The −91 and −94 dBFS figures hold only for a 48 kHz device:
+   - A 16 kHz device skips the resampler (`MonoResampler` returns early when the input rate is the output rate), so its floor at the device is the raw 1e-5, which is −100 dBFS for a mono device. This is inferred from the code, not measured. A 16 kHz stereo device still goes through the downmix, which was not measured either.
+   - 44.1 kHz devices were not measured.
