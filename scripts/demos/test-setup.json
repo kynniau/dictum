@@ -1,7 +1,7 @@
 {
   "name": "test-setup",
   "title": "Calibrate my voice",
-  "summary": "The 1.2 build keeps the name Calibrate my voice (the tray panel, Settings > Models, the welcome's Try it step and Help all use it). The sandbox has no microphone, so no sentence can be recorded there: the demo ends on the message Dictum shows then.",
+  "summary": "The 1.2 build keeps the name Calibrate my voice (the tray panel, Settings > Models, the welcome's Try it step and Help all use it). The sandbox has no microphone, so Record is off and the no-microphone sentence stands under it; no sentence can be recorded there.",
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "installSilently" },
@@ -44,13 +44,13 @@
     },
     {
       "id": "record",
-      "caption": "Click Record and read the sentence aloud.",
-      "do": [ { "do": "click", "target": { "window": "calibrate my voice$", "type": "Button", "name": "Record sentence", "match": "prefix" } } ],
-      "after": 4
+      "caption": "With a microphone, you would click Record and read the sentence aloud.",
+      "do": [ { "do": "point", "target": { "window": "calibrate my voice$", "type": "Button", "name": "Record sentence", "match": "prefix" } } ],
+      "after": 2.5
     },
     {
       "id": "result",
-      "caption": "This test PC has no microphone, so Dictum says so under Record.",
+      "caption": "This test PC has none, so Record is off and Dictum says why.",
       "do": [
         {
           "do": "point",

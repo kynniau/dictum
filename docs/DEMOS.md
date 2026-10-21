@@ -2,7 +2,7 @@
 
 Short captioned walkthrough videos of Dictum, recorded unattended on a clean Windows (Windows Sandbox) with no
 narration, for people who have never used it. Every caption names one thing to do. Pipeline written 21/10/2026 on
-main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build with its polish (PR #38 at 4abba54), below.
+main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build on main at d47e7f9 (both polish rounds), below.
 
 All caption copy below is **PROPOSED**, for the product owner to approve.
 
@@ -221,20 +221,21 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   that build's.
 - **Calibration keeps its name.** The 1.2 build still calls it "Calibrate my voice" (the tray panel, Settings > Models,
   the welcome's Try it step and Help all use that name), so the demo does too; its file stays `test-setup.json`. With
-  no microphone it shows "No microphone found. Plug one in, ..." under Record (the same sentence as the welcome window
+  no microphone, Record is off and "No microphone found. Plug one in, ..." stands under it (the same sentence as the welcome window
   and the tray panel).
 - **The help demo does not press Send feedback**: it opens the user's own mail program, and the sandbox has none. The
   demo shows the button and says what it does.
-- **The Setup's version is 1.1.2.** The 1.2 build (PR #38 at 4abba54) still carries version 1.1.2, so the Setup file,
+- **The Setup's version is 1.1.2.** The 1.2 build (main at d47e7f9) still carries version 1.1.2, so the Setup file,
   the SmartScreen dialog and Setup's title say 1.1.2 in these recordings.
 
 ## What each demo shows (1.2 build, 21/10/2026)
 
-Recorded on 22/10/2026 from PR #38's head 4abba54 (the 1.2 build of PR #23 plus its polish: the welcome window at 720 x 500, key
-names such as "Right Ctrl", the no-microphone state, the Help index, "In use" as a tag). CI on a branch
+Recorded on 22/10/2026 from main at d47e7f9 (the 1.2 build of PR #23 and both polish rounds, PRs #38 and #39). install was recorded
+at 4abba54 (PR #38): its screens (Setup and the welcome's first step) did not change in #39. CI on a branch
 publishes only the zip (`.github/workflows/ci.yml` builds the Setup on tags), so the Setup exe was built locally from
 that commit with `scripts\build-installer.ps1` (Inno Setup 7.1.0): `Dictum-Setup-1.1.2.exe`, SHA-256
-`D12A9D96DCD5906DD70A7AADF023A87D91DAA0C62F794691883A4A2D9200DB20`, `Dictum.exe` version `1.1.2+4abba54`. The web copies are in `site\img\demos\`:
+`3AC40A529606027DA11524AD447B467BC8E57CAFEBFB37938B87AF3594121AF8`, `Dictum.exe` version `1.1.2+d47e7f9` (install: the
+Setup built at 4abba54, SHA-256 `D12A9D96DCD5906DD70A7AADF023A87D91DAA0C62F794691883A4A2D9200DB20`). The web copies are in `site\img\demos\`:
 `<name>.gif` and `<name>-poster.png` are committed; `<name>.mp4` is not, because the private-material guard
 (`.githooks/private-guard.sh`, and `.gitignore`) refuses every `.mp4` in the repository, with no exception. Where the
 videos are hosted is the product owner's decision.
@@ -244,7 +245,7 @@ videos are hosted is the product owner's decision.
 | 1. Install | `install.json` | Downloads folder, double-click Setup, SmartScreen (offline variant), Next, Install, Launch Dictum ticked, Finish, the "Welcome to Dictum" window |
 | 2. First run | `first-run.json` | Start, type Dictum, Enter, the six-step welcome (Welcome, Model files, Speech model, Your hotkey, Microphone with the no-microphone message, Try it while the model gets ready), Finish, the tray icon, the panel showing Ready and the no-microphone sentence |
 | 3. Change the speech model | `change-model.json` | Settings > Models in the Simple view: Standard in use, Use next to More accurate (small.en, copied in from the host's model folder, read-only), In use, then Advanced showing every model by name |
-| 4. Calibrate my voice | `test-setup.json` | Tray icon, Calibrate my voice, the first sentence, Record, and the no-microphone message under Record |
+| 4. Calibrate my voice | `test-setup.json` | Tray icon, Calibrate my voice, the first sentence, Record, and Record switched off, with the no-microphone message under it |
 | 5. Models on another drive | `model-folder.json` | Settings, Models, Browse, type D:\Dictum models, Select Folder, the new folder shown |
 | 6. Find help | `help.json` | Settings > Help: the "Questions on this page" list, two questions opened from it and their answers, Send feedback (shown, not pressed) |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
@@ -299,8 +300,8 @@ window, and first-run records it.
    2. Click the Dictum icon.
    3. Click Calibrate my voice.
    4. Dictum shows a sentence to read aloud.
-   5. Click Record and read the sentence aloud.
-   6. This test PC has no microphone, so Dictum says so under Record.
+   5. With a microphone, you would click Record and read the sentence aloud.
+   6. This test PC has none, so Record is off and Dictum says why.
 5. **Keep the models on another drive** (`model-folder.json`)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
