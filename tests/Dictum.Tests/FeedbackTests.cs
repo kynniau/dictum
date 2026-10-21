@@ -262,7 +262,7 @@ public class FeedbackTests
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
         var (shell, _, _) = scratch.Shell();
-        var hotkey = shell.Status.Models.Split(" · ")[^1]; // the key as the header shows it (this unstarted shell has its default, not the file's F24)
+        var hotkey = shell.Status.Models.Split(" · ")[^1]; // the key as the header shows it (this unstarted shell shows its default RightCtrl, not the file's F24; the Email support pin opens Settings, where the shell shows F24, and checks both)
         Assert.False(string.IsNullOrWhiteSpace(hotkey));
         Assert.Equal(shell.Status.Models, shell.ModelsLine + " · " + hotkey); // the header and the tray panel still show the key
         Assert.DoesNotContain(hotkey, shell.ModelsLine);

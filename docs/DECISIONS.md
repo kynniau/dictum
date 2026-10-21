@@ -3360,9 +3360,9 @@ email and the copy stays as it is.
 loses it. The runtime wording was lifted into one private helper (`HeaderRuntime`) used by both.
 
 **Pins.** `Email_support_opens_the_report_email_with_the_version_and_models_and_nothing_private` and ShellTests' Report a problem pin now
-refuse the hotkey: the test text "F24" and the key as the header actually shows it. (A scratch shell is not started, so it shows its default,
-`RightCtrl`, not the `F24` in its settings file: the pins use the header's own last segment, not just "F24", or they would pass without
-testing anything.) `The_header_keeps_the_hotkey_and_the_support_models_line_does_not` pins that the header still ends with the key and that
+refuse the hotkey: the test text "F24" and the key as the header actually shows it. (ShellTests' Report pin and the header pin use an unstarted
+shell, which shows its default `RightCtrl` rather than the file's `F24`, so they check the header's own last segment; the Email support pin
+opens Settings, where the shell shows `F24`, and checks both.) `The_header_keeps_the_hotkey_and_the_support_models_line_does_not` pins that the header still ends with the key and that
 `ModelsLine` is the header without it. The sample models line in the Report-link pin no longer has a hotkey.
 
 **Mutation.** `ReportProblem` put back to pass `Status.Models` (the hotkey back in the email line): **observed failing**: the Email support pin and
