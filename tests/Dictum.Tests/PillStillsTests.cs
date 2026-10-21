@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Dictum.UI.Overlays;
 
 namespace Dictum.Tests;
@@ -46,15 +47,33 @@ public class PillStillsTests
         foreach (var (view, name, words) in States)
         {
             pill.Present(new PillState(view, start, words));
-            using var frame = pill.CaptureRenderedFrame();
-            Assert.NotNull(frame);
-            var (navy, hash) = Inspect(frame!);
+            using var frame = CaptureAfterRender(pill, name);
+            var (navy, hash) = Inspect(frame);
             Assert.True(navy > 2_000, $"{name}: only {navy} pixels of the pill's navy were drawn");
             Assert.True(seen.Add(hash), $"{name} rendered the same pixels as an earlier state");
-            if (!string.IsNullOrWhiteSpace(folder)) frame!.Save(Path.Combine(folder, $"pill-{name}.png"));
+            if (!string.IsNullOrWhiteSpace(folder)) frame.Save(Path.Combine(folder, $"pill-{name}.png"));
         }
         pill.Close();
     });
+
+    /// <summary>
+    /// The headless platform draws only when its render timer ticks, and CaptureRenderedFrame returns null until a frame
+    /// has been drawn: on a slow runner the capture right after Present found none (CI, 52dacee). So run the queued jobs
+    /// (layout), tick the render timer at least once (so the frame is of this state, not an earlier one), and tick up to
+    /// ten times while there is still no frame.
+    /// </summary>
+    private static WriteableBitmap CaptureAfterRender(PillWindow pill, string name)
+    {
+        for (var tick = 0; tick < 10; tick++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            var frame = pill.CaptureRenderedFrame();
+            if (frame is not null) return frame;
+        }
+        Assert.Fail($"{name}: no frame was rendered after 10 render ticks");
+        return null!; // not reached: Assert.Fail throws
+    }
 
     /// <summary>How many pixels are the pill's rgba(11,18,32,0.92), and a hash of every pixel.</summary>
     private static (int Navy, string Hash) Inspect(WriteableBitmap frame)
