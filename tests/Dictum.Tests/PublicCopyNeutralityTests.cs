@@ -75,8 +75,15 @@ public class PublicCopyNeutralityTests
         return text[..open] + TableEntry.Replace(text[open..close], "") + text[close..];
     }
 
-    internal static List<string> Offences(string relativePath, string text) =>
-        Words.Where(w => Scanned(relativePath, text).Contains(w, StringComparison.OrdinalIgnoreCase)).ToList();
+    /// <summary>What the script rule reports: text in that block is allowed in test fixtures only (they test a script rule, not a language).</summary>
+    internal const string ScriptRule = "a character in U+0900-U+097F outside tests/";
+
+    internal static List<string> Offences(string relativePath, string text)
+    {
+        var found = Words.Where(w => Scanned(relativePath, text).Contains(w, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!relativePath.StartsWith("tests/", StringComparison.Ordinal) && text.Any(c => c is >= '\u0900' and <= '\u097F')) found.Add(ScriptRule);
+        return found;
+    }
 
     /// <summary>Every "path: word" offence in the files <paramref name="root"/> lists as public.</summary>
     internal static List<string> Sweep(string root)
@@ -131,6 +138,14 @@ public class PublicCopyNeutralityTests
             File.Delete(Path.Combine(dir.FullName, "tracked.md"));
             File.WriteAllText(Path.Combine(dir.FullName, "new.txt"), "a " + Words[1] + " word"); // untracked and not ignored: public once added
             Assert.Equal(["new.txt: " + Words[1]], Sweep(dir.FullName));
+
+            File.Delete(Path.Combine(dir.FullName, "new.txt"));
+            Directory.CreateDirectory(Path.Combine(dir.FullName, "src"));
+            Directory.CreateDirectory(Path.Combine(dir.FullName, "tests"));
+            File.WriteAllText(Path.Combine(dir.FullName, "src", "a.cs"), "// " + (char)0x0964 + " mark");
+            File.WriteAllText(Path.Combine(dir.FullName, "tests", "a.cs"), "// " + (char)0x0964 + " mark"); // a test fixture may use the script
+            Git(dir.FullName, "add", "src/a.cs", "tests/a.cs");
+            Assert.Equal(["src/a.cs: " + ScriptRule], Sweep(dir.FullName)); // anywhere else it is described by code point
         }
         finally
         {
@@ -143,6 +158,10 @@ public class PublicCopyNeutralityTests
     public void The_sweep_catches_every_word_and_forgives_only_the_language_table()
     {
         Assert.All(Words, word => Assert.NotEmpty(Offences("README.md", "a " + word.ToUpperInvariant() + " here")));
+        Assert.Equal([ScriptRule], Offences("docs/SPEC.md", "end mark " + (char)0x0964)); // the script rule: any file outside tests/
+        Assert.Equal([ScriptRule], Offences("src/Dictum.Core/X.cs", "'" + (char)0x097F + "'"));
+        Assert.Empty(Offences("tests/Dictum.Tests/X.cs", "end mark " + (char)0x0964)); // a test fixture may use the script
+        Assert.Empty(Offences("docs/SPEC.md", "next to the block: " + (char)0x08FF + (char)0x0980)); // only U+0900-U+097F
         string[] regionWords = ["ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "ceb" + "u"];
         Assert.All(regionWords, word => Assert.Contains(word, Words)); // the region words stay on the list
 

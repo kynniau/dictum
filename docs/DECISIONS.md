@@ -1090,8 +1090,8 @@ without the matcher, so the first pin drives the matcher and the state machine d
   as another language. With the options in `DecodeOptions`, calibration's own `DecodeOptions(prompt, beam)` is English by
   construction, so the calibration notes were retired.
 - The clean-up is skipped (`TranscriptCleaner.Plain`, whitespace only) whenever the output is not English: the rules
-  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on text in another language, or on
-  Polish text, would change it. Corrections and the profanity filter still run; they are whole-word matches the user
+  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on any text other than English
+  would change it. Corrections and the profanity filter still run; they are whole-word matches the user
   wrote. Status "skipped: …" is visible in About and `--selftest`.
 - Combining marks are part of a word (lens, 16/10/2026). A vowel sign, virama or anusvara is a combining mark
   (`\p{M}`), not a letter, so the shared whole-word matcher (`WholeWords`: corrections, snippets, the profanity list)
@@ -1149,7 +1149,7 @@ without the matcher, so the first pin drives the matcher and the state machine d
   (the orchestrator's own run, not the lane's report). The re-published build's `--selftest` printed `language <code> (<Name>),
   translating to English [OK]` for medium + a language other than English + translate (code withheld under the 21/10/2026
   neutrality rule), and for small.en + that language without translate the `language` line
-  fails with the English-only reason and the `cleanup` line reads "skipped: the text is not English … whitespace tidied
+  failed with the English-only reason and the `cleanup` line read "skipped: the text is not English … whitespace tidied
   only".
 - Rebased onto main 79bffb7 on 16/10/2026, after #1 (mouse hotkeys, snippets), #3 (cloud presets, one key per service),
   #5 (site) and #4 (the dictionary-term rule), for the product owner's decision 14 of the same day: merge now, with
@@ -2866,7 +2866,8 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
   so ignored build output cannot fail it. The one allowance is Whisper's own language table: the `("code", "Name")` entries
   inside the `Table` initializer of `src/Dictum.Core/Transcribe/WhisperLanguages.cs`, which list all 100 languages alike.
   Region words are in the list too. Text in the script of the sentence-end marks is allowed in test fixtures under `tests/`
-  (they test a script rule, not a language); everywhere else such examples are described by code point.
+  (they test a script rule, not a language); everywhere else such examples are described by code point, and the sweep
+  fails any file outside `tests/` that contains a character in U+0900 to U+097F.
 - **Limits:** commit messages and the merged history cannot be rewritten (no force-push), so earlier commits keep their
   wording. The pull-request descriptions were edited instead.
 
