@@ -142,7 +142,7 @@ Hold-to-talk stays one recording, and calibration takes are never cut.
   them: every settings reload builds a new one, so a cloud clean-up switched on mid-session is
   sent none of what was said before it was (whisper, on this PC, still hears them).
 - Boundary rule (`SegmentJoin`, before corrections, the profanity filter and snippets): when the
-  last part ended a sentence (. ! ? … । ॥ or a line break, read back past quotes and brackets: the
+  last part ended a sentence (. ! ? … U+0964 U+0965 or a line break, read back past quotes and brackets: the
   rule the corrections and the profanity filter use too), this part starts with its capital after
   a space; otherwise it carries on in lower case, unless its first word is "I", has another capital
   in it, or is a dictionary term spelt with a capital. Text that is not English (the plain
@@ -1037,9 +1037,9 @@ These amend earlier sections; where they conflict, this section wins.
 - **§16.3/§16.4 and §3 sentence start (amendment, 16/10/2026):** the corrections, the profanity
   filter and the hands-free boundary rule share one sentence-start rule (`SentenceStart`): the start
   of the text, or after a line break or a mark that ends a sentence, read back past spaces, quotes
-  and brackets. The marks are . ! ? … and the Devanagari danda । and double danda ॥ (Hindi
-  dictation); the profanity filter's remove mode uses the same marks for the one after a removed
-  word ("वह कमीना।" → "वह।", as "It's shit." → "It's.").
+  and brackets. The marks are . ! ? … and the end marks of scripts whose sentence marks differ from English
+  (for example U+0964, the sentence-end mark, and U+0965). The profanity filter's remove mode uses the same marks for the one after a removed
+  word (a removed word before U+0964 leaves no space before it, as "It's shit." → "It's.").
 - **§5 validator, dictionary terms (16/10/2026):** a reply is rejected ("reply adds a dictionary term the speaker did not say"; the log never names the term) when two conditions hold.
   - It has a term of the clean-up prompt's dictionary line, or a content word of a multi-word term, more often than the whole dictation, retracted clauses included.
   - It also has the term in some form more often than the dictation, counted the same way on both sides.
@@ -1068,14 +1068,13 @@ These amend earlier sections; where they conflict, this section wins.
 
 ## 23. Languages and translation (amendment, 16/10/2026)
 
-Asked for: offshore staff who speak Hindi or Cebuano should dictate in their own language
-and have English pasted, on device, with the models already in use; then "cover the most
-common Filipino and Indian languages".
+Purpose: staff who dictate in a language other than English should be able to dictate in their
+own language and have English pasted, on device, with the models already in use, across the
+languages Whisper supports.
 
 - **What Whisper can do** (openai/whisper `tokenizer.py` and README, read 16/10/2026):
-  100 languages, Hindi and Tagalog among them, and a speech-to-English translate task.
-  Cebuano, Ilocano, Hiligaynon and the other Philippine languages are absent, so they are
-  not possible; Tagalog is the Philippine language. The turbo model "is not trained for
+  100 languages and a speech-to-English translate task. Some languages are not in Whisper's
+  list, so they cannot be chosen. The turbo model "is not trained for
   translation tasks" and returns the original language even when asked to translate, so
   `large-v3-turbo` is refused for translation; OpenAI recommends medium or large.
 - **Settings:** `whisper.language` accepts any code in Whisper's table (lower-cased) or
@@ -1126,15 +1125,14 @@ common Filipino and Indian languages".
 - **Words and combining marks (amendment, 16/10/2026):** the whole-word matcher shared by corrections,
   snippets and the profanity list (`WholeWords`) counts combining marks as word characters (`\p{M}` in the
   `WholeWords.Pattern` boundaries, TextList.cs:72; `IsWordChar`, TextList.cs:82, which the profanity mask and the
-  Fix-last diff use, counts Unicode Mn and Mc), so a Devanagari vowel sign or virama no longer ends a word; English matching is
+  Fix-last diff use, counts Unicode Mn and Mc), so a vowel sign or virama no longer ends a word; English matching is
   unchanged.
-- **Picker order:** auto, English, Hindi, Tagalog, then Bengali, Telugu, Marathi, Tamil,
-  Urdu, Gujarati, Kannada, Malayalam, Punjabi, Assamese, Nepali, Sindhi, Sinhala, then the
-  rest by name, each labelled "Name (code)".
+- **Picker order (amendment, 21/10/2026):** auto, English, then every other language alphabetically by its
+  English name; no language is featured. Each is labelled "Name (code)".
 - **Not changed:** the clean-up prompt still asks for Australian English spelling (the
   text that reaches it is English whenever the cleaner runs at all).
-- Tests: the table (count, Hindi/Tagalog present, Cebuano absent, featured codes valid),
-  picker order, the guard matrix (names, paths, Cantonese, an unknown name trusted), the
+- Tests: the table (count, names, a code outside the list refused),
+  picker order (auto, English, then alphabetical), the guard matrix (names, paths, Cantonese, an unknown name trusted), the
   output-language rule, the Mode note on CPU and GPU, loader round trip and fallback, the
   decoder rebuilt with the new language without a second load, the plain cleaner against
   the English rules on Polish text, the six catalogue entries against the values read from
@@ -1144,7 +1142,7 @@ common Filipino and Indian languages".
 
 ## 24. Model folder and the bundled base.en (amendment, 17/10/2026: Decisions 15 and 16)
 
-Asked for: offshore staff on shared Azure virtual desktops (no GPU, little space on C:) need the models on another drive
+Purpose: staff on shared virtual desktops with little space on the system drive (no GPU) need the models on another drive
 or folder (Decision 15); base.en ships inside every package, no clean-up model is set up by default, and the entry level
 must run on small machines (Decision 16). These amend §9, §10, §17 and §20; where they conflict, this section wins.
 

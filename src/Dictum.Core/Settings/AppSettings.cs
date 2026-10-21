@@ -62,7 +62,7 @@ public sealed record WhisperSettings
     /// <summary>models.folder's earlier name (whisper.models_dir), still read when models.folder is not set (<see cref="AppPaths.ChosenModelsDir"/>).</summary>
     public string? ModelsDir { get; init; }
 
-    /// <summary>A Whisper language code ("en", "hi", "tl"…) or "auto" to detect it from the first seconds (needs a multilingual model).</summary>
+    /// <summary>A Whisper language code ("en", "es", "de"…) or "auto" to detect it from the first seconds (needs a multilingual model).</summary>
     public string Language { get; init; } = "en";
 
     /// <summary>Translate the speech to English instead of writing it down in its own language (multilingual model, not turbo).</summary>

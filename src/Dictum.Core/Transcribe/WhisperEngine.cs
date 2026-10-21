@@ -38,7 +38,7 @@ public sealed record DecodeOptions(string? Prompt, int BeamSize, string Language
 
     public string Describe() => BeamSize > 0 ? $"beam search ({BeamSize})" : "greedy";
 
-    /// <summary>"language hi (Hindi), translating to English" for the log and --selftest.</summary>
+    /// <summary>"language es (Spanish), translating to English" for the log and --selftest.</summary>
     public string DescribeLanguage() => $"language {WhisperLanguages.Describe(Language)}{(Translate ? ", translating to English" : "")}";
 
     /// <summary>
