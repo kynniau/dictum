@@ -75,29 +75,6 @@ public class DialogTests
     });
 
     [Fact]
-    public Task The_first_run_hotkey_check_keeps_the_key_pressed_or_the_current_one() => UiSession.Run(() =>
-    {
-        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
-        var (shell, platform, _) = scratch.Shell();
-        var window = new HotkeyCheckWindow(shell, "RightCtrl");
-        window.Show();
-        Assert.Contains(HotkeyCheckWindow.MacNote, string.Join("\n", All<TextBlock>(window).Select(t => t.Text)));
-        var monitor = platform.LastMonitor!; // listening from the start
-        monitor.Press(Dictum.Hotkey.Vk.RMenu, down: true);
-        monitor.Press(Dictum.Hotkey.Vk.RMenu, down: false);
-        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        Click(window, "Use this hotkey");
-        Assert.Equal("RightAlt", window.Result);
-        Assert.True(monitor.Disposed); // closing stops listening
-
-        var skipped = new HotkeyCheckWindow(shell, "RightCtrl");
-        skipped.Show();
-        Click(skipped, "Skip");
-        Assert.Equal("RightCtrl", skipped.Result);
-        shell.Dispose();
-    });
-
-    [Fact]
     public Task Add_word_writes_the_dictionary_and_refuses_a_comment() => UiSession.Run(() =>
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");

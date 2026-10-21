@@ -185,6 +185,23 @@ internal sealed class ScriptedPrompts : IModelPrompts
         return Busy;
     }
 
+    /// <summary>The words of every plain (Simple view) question, as the window would show them.</summary>
+    public List<string> PlainQuestions { get; } = [];
+
+    /// <summary>Records the plain question's words, then answers as the interface's default does (through <see cref="ConfirmDownload"/>).</summary>
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainConfirmText(plainName, sizeText, warning));
+        return ConfirmDownload(fileName, sizeText, warning is null ? ModelPromptText.PlainCheck : $"{ModelPromptText.PlainCheck}. {warning}");
+    }
+
+    /// <summary>Records the plain busy question's words, then answers as the interface's default does (through <see cref="ConfirmDownloadWhileBusy"/>).</summary>
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true)
+    {
+        PlainQuestions.Add(ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait));
+        return ConfirmDownloadWhileBusy(fileName, sizeText, warning is null ? ModelPromptText.PlainCheck : $"{ModelPromptText.PlainCheck}. {warning}", plainName, running, runningProgress, canWait);
+    }
+
     public string? ChooseFile(string initialDir, bool cleanupModel) => null;
 }
 

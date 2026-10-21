@@ -68,7 +68,8 @@ also see the key. Any single virtual key (`F9`, `CapsLock`, `RightAlt`, `Pause`�
 chord of modifiers plus one key (`Ctrl+Win`, `Ctrl+Shift+Space`) must be accepted. The
 Fn key is not reachable: on nearly all keyboards it is handled by firmware and never
 reaches Windows as a virtual key. Say so in the README and offer `RightCtrl`, `CapsLock`,
-`F-keys` and `Ctrl+Win` as alternatives.
+`F-keys` and `Ctrl+Win` as alternatives. At first run the hotkey is checked, and can be
+changed, in the "Your hotkey" step of the Welcome to Dictum window (§20, §27).
 
 Mouse buttons (amendment, 16/10/2026): `RightMouse`, `MiddleMouse`, `Mouse4` and `Mouse5`
 (VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2) are accepted as a single-key hotkey or
@@ -245,6 +246,19 @@ of", "kind of" when between commas or at clause starts), collapse immediate word
 ("the the"), apply "new line"/"new paragraph", capitalise sentence starts, tidy spaces
 before punctuation. Unit-tested with a table of cases; conservative by design.
 
+`off` provider = **no clean-up** (amendment, 21/10/2026, Dictum 1.2): the transcript is
+pasted as whisper wrote it, with whitespace normalised only (ends trimmed; runs of spaces,
+tabs, CR and LF become one space, and other whitespace inside the text, such as a no-break
+space, is kept; `TranscriptCleaner.Off`, the same step as the
+non-English plain clean-up of §23). No filler removal, no capitals, no full stop, and no
+spoken commands: "new line", "new paragraph", "scratch that", "comma" and the rest are typed
+as the words heard, and a hands-free part keeps whisper's case at the boundary. No model is
+loaded, no reply check runs, and nothing is sent, so `offline_only` has nothing to refuse and
+the privacy lines say nothing leaves the PC. Corrections, the profanity filter and snippets
+(§16) still run after it, as they do for every provider. `off` is not a fallback tier: the
+fallback for every model failure stays the deterministic cleanup above. `none` keeps its
+meaning.
+
 Optional cloud provider `anthropic` (opt-in; model `claude-haiku-5-5`, fast and cheap is
 the right tier for filler removal): non-streaming `messages.create` with the system
 prompt, user content = raw transcript. Thinking off (`thinking: {type: "disabled"}`) and
@@ -288,6 +302,7 @@ Providers (`llm.provider`):
 - `anthropic`: Anthropic SDK, key from `ANTHROPIC_API_KEY`.
 - `openai-compatible`: `POST {base_url}/chat/completions` with `model`, `messages` (system + user), `temperature: 0`. Which key goes to which server is in §22 ("§5 keys").
 - `none`: deterministic cleanup only.
+- `off` (1.2): no clean-up; whitespace normalised only (above).
 
 Secrets precedence (standard dotenv behaviour): a real process/machine environment
 variable wins; `.env` only fills in variables that are not already set. This lets a
@@ -363,6 +378,12 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   Cancel. The last choice of each kind (speech, clean-up) wins: a download that arrives
   after a newer choice does not switch to its model. Settings > Models shows the row being
   downloaded as "Downloading <n>%" with its button disabled. See DECISIONS, 19/10/2026.
+  Amended 21/10/2026 (1.2, §10.1): the tray panel's two pickers follow `ui.view`. Simple (the
+  default) lists the three speech tiers by their plain names (Standard, More accurate, Most
+  accurate) and, for clean-up, "Tidy my words" plus "Add AI clean-up" while the rule-based tidy
+  is in use and the text is English, then "Off" (no clean-up, §5); a model in use that is none of them is listed first as "Custom: <name>". The
+  "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
+  lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
 - About (version, runtime, no network statement).
 - Help (amendment, 21/10/2026): opens Settings → Help, the offline "How Dictum works" and questions and answers (§26).
 - Quit.
@@ -393,6 +414,7 @@ present; AppData wins). Models and logs in `%LOCALAPPDATA%\Dictate\models` and
   "offline_only": false,
   "insert": { "method": "paste", "restore_clipboard": false, "trailing_space": true, "paste_delay_ms": 150 },
   "pill": { "enabled": true },
+  "ui": { "view": "simple" },
   "log_level": "info",
   "log_transcripts": false
 }
@@ -405,6 +427,11 @@ Unknown keys and malformed values: log a warning, use the default, never crash.
 `models.folder` (amendment, 17/10/2026, §24): `null` (the per-user folder) or an absolute
 folder that is looked in first and downloaded to; a relative or invalid value falls back to
 `null` with a warning. `whisper.models_dir` is its earlier name, still read when it is not set.
+
+`ui.view` (amendment, 21/10/2026, §10.1): `"simple"` (the default, also when the key is absent)
+or `"advanced"`; any other value falls back to `"simple"` with a warning. The Simple | Advanced
+segments at the top of Settings > Models write it through the settings writer, and the reload
+redraws the page and the tray panel.
 
 `hands_free_max_seconds` (amendment, 16/10/2026): 30–3600, set from Settings > General (§20). A
 value from 5 to 29 left by an earlier version is raised to 30 at load with a log line, and the file
@@ -435,7 +462,12 @@ trade-off in one sentence. The choice is written to settings.json so it is visib
 editable; the tray submenu changes it later in one click. Amended 17/10/2026 (§24, Decision
 16): base.en ships inside every package; when it is found the first run asks no model
 question and writes base.en and the rule-based tidy (`llm.provider` = `none`), and the
-pickers run only without it.
+pickers run only without it. Amended 21/10/2026 (§27): the first-run speech choice is the speech
+step of the Welcome to Dictum window: with base.en, one line ("The Standard model is included and
+ready.") and no choice; without it, the Simple view's three tiers (§10.1) with the recommendation
+pre-selected, and "Show every model" for this whole list and a model file. The window asks no
+clean-up question: it writes the rule-based tidy, as with base.en. The clean-up picker remains for a
+seeded settings.json that names `whisper.model` but leaves the clean-up choice open, without base.en.
 Already downloaded on this machine to `%LOCALAPPDATA%\Dictate\models`:
 `ggml-small.en.bin` (487,614,201 bytes) and `ggml-medium.en.bin` (1,533,774,781 bytes),
 source `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<file>` (sizes verified
@@ -445,6 +477,70 @@ If the configured model file is missing at startup: do **not** download silently
 small dialog: "No speech model found. Download ggml-<name>.bin (<size>) from
 huggingface.co now?" with Download / Choose file… / Quit. Progress in the tray tooltip.
 Also ship `scripts/download-model.ps1 -Model medium.en`.
+
+### 10.1 Simple and Advanced views (amendment, 21/10/2026, Dictum 1.2)
+
+Product decision (Kyle, 21/10/2026): users do not understand base.en vs small.en vs q5_1 vs
+large-v3-turbo. Settings > Models and the tray panel's pickers default to a **Simple** view;
+today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
+
+- **Switch.** Segments "Simple | Advanced" head Settings > Models, with the line "Simple shows
+  what each choice means. Advanced shows every model and its details." Accessible names
+  "Models view: Simple" and "Models view: Advanced".
+- **Speech (Simple).** An explainer with a **Calibrate my voice** button (the existing
+  calibration window), then three rows: Standard, More accurate, Most accurate, each with its
+  line, its state (In use, Downloaded, its size when not on this PC, or nothing for the bundled
+  base.en, whose line says "Included."), and the catalogue row's Use / Download… / Downloading… /
+  Waiting… button. A row is a catalogue entry chosen through `ModelCoordinator.Select(name,
+  plainName)`; there is no download logic of its own. Given the tier's name, the download
+  question, the busy question and the "already downloading" balloon use it and plain words:
+  "Download <tier> (<size>)? It comes from the model makers' official download page and is
+  checked before use." (Advanced keeps the catalogue question). A model in use that is none of
+  the tiers is one more row, "Custom: <name>", "In use. Not one of the choices above."
+- **Tier mapping** (`SimpleView.Tiers`, reusing the catalogue's recommendation and the Mode
+  presets' models, keyed on `WhisperEngine.GpuMachine`):
+
+  | Tier | CPU only | GPU machine |
+  |---|---|---|
+  | Standard | base.en (bundled; Light) | base.en |
+  | More accurate | small.en (Full on CPU; "more accurate, a few seconds slower") | medium.en (the GPU recommendation) |
+  | Most accurate | medium.en (the catalogue's "high accuracy; wants a GPU or a fast desktop CPU") | large-v3-turbo (Full on GPU) |
+
+  When the text is not plain English speech (`whisper.language` is not `en`, or Translate is
+  on), the tiers are multilingual (lens on PR #23, 21/10/2026): Standard `small`, More accurate
+  `medium`, and on a GPU Most accurate `large-v3-turbo` (`large-v3` when translating); a CPU has
+  no multilingual Most accurate, as the catalogue has nothing above `medium` that does not need
+  a GPU. A tier whose model `WhisperLanguages.Problem` rules out is never offered: its row has
+  no button, only the existing problem sentence, and the tray leaves it out (an English-only
+  model is a tier only for plain English, so it never needs a line of its own; lens on 787b300,
+  21/10/2026). Lines on a CPU: "Bigger download. Takes
+  a few seconds longer on this PC." and "Slow without a graphics card: can take longer than you
+  spoke." (README "Measured speed"); on a GPU "Bigger download, a bit slower." and "Best results.
+  Needs a strong PC or patience."
+- **Clean-up (Simple).** One row, "Tidy my words (recommended)": in use while `llm.provider` is
+  `none` (the rule-based tidy) or `local` with the recommended model (state "In use, with AI
+  clean-up"). The existing **Add AI clean-up (<size> download)** button sits under it while the
+  rule-based tidy is in use and the text is English (no clean-up model runs on text in any other
+  language, so the Simple view does not offer the download then; Advanced still shows it; lens on
+  787b300, 21/10/2026). From a Custom clean-up, its **Use** button selects the recommended
+  model when it is on this PC, else the rule-based tidy. Anything else in use (another local
+  model, a .gguf file, a cloud provider chosen in Advanced) is a "Custom: <name>" row. Cloud
+  clean-up is never offered in the Simple view; the Advanced view keeps its pointer to Settings
+  > Clean-up. With text that is not English the line reads "Tidies spacing only for
+  <language>." (clean-up then tidies whitespace only). Under these rows (and under Add AI
+  clean-up), an **Off** row, "Paste what was heard. Only your own corrections, snippets and the profanity
+  filter (if on) still apply.", writes `llm.provider = off` (§5): "In use · " and the same line
+  while it is in use (wording amended 21/10/2026, final lens: "exactly" was untrue, as those
+  still run), otherwise a **Use** button named
+  "Use Off". Off is its own row, never "Custom", and has no language dependency, so it is
+  offered for every language. (Amended 21/10/2026 by the clean-up Off lane; the first build of
+  this view left the row out because no such mode existed.)
+- **Both views:** the language card, the model folder and the Storage link. **Advanced only:**
+  the catalogue lists, the decoding choice, the file choosers, "Rule-based tidy only", "Off
+  (paste what was heard)" and the cloud pointer. The tray panel's clean-up picker lists
+  "Off" in Simple and "Off (paste what was heard)" in Advanced.
+- The Mode presets (§16.1) are unchanged and remain in both views: they set speech and clean-up
+  together, which the tiers do not.
 
 ## 11. CLI modes (for verification without a microphone)
 
@@ -567,6 +663,8 @@ hardware, unit-tested:
 | Full | large-v3-turbo + qwen2.5-1.5b | small.en + qwen2.5-1.5b |
 
 Tray shows a tick on the matching preset. `--selftest` prints which preset is active.
+Light keeps the rule-based tidy (`none`), not `off` (§5, 21/10/2026): with clean-up off
+neither preset matches, so the panel shows Custom.
 
 ### 16.2 Personal dictionary
 
@@ -583,7 +681,8 @@ blanks, duplicates and an over-budget list.
 
 `%APPDATA%\Dictate\corrections.txt`: lines `heard => written`, literal phrases,
 whole-word, case-insensitive match, applied after clean-up and BEFORE the profanity filter (user intent first, so "ass => ask" works), before paste
-(and to raw text when the provider is `none`). The last pasted text is kept in memory
+(and to raw text when the provider is `none`, or to whisper's text with only its spaces tidied
+when it is `off`). The last pasted text is kept in memory
 only (never on disk in this batch). Tray → "Fix last dictation…" and an optional
 `fix_hotkey` (default unset; parsed with the existing hotkey parser) open a small
 always-on-top editor pre-filled with the last text. Buttons: "Copy", "Paste fix" (puts
@@ -826,7 +925,11 @@ user. Required:
 - First run: the same capture box after the model picker (amended 17/10/2026, §24: or, when
   base.en comes with Dictum, with no model question before it), defaulting to `RightCtrl`, with
   the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
-  Command (RightWin)".
+  Command (RightWin)". Amended 21/10/2026 (§27): the box, its words and its **Use this hotkey** /
+  **Skip** buttons are now the "Your hotkey" step of the Welcome to Dictum window, after the
+  model-folder and speech steps; the separate first-run window is gone. Its behaviour is unchanged:
+  it listens from the start, writes `hotkey` only when another key was chosen, and stops listening
+  when the step is left.
 - `--selftest` prints a 5-second "press your hotkey now" check and reports whether the
   configured key was seen.
 - Settings window, Hands-free (amendment, 16/10/2026): a "Hands-free" card on General with
@@ -1068,7 +1171,7 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
   `llm.model` gets the recommended clean-up model written, which is not downloaded (nothing downloads; the "not
-  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows. Without base.en the pickers run
+  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
   system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
@@ -1166,7 +1269,7 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
-  others, and what to do about it), then eleven questions and answers. All of it comes from
+  others, and what to do about it), then twelve questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
@@ -1189,3 +1292,78 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   - text wraps and fits the window at its default size, at 150 % on a 1280 × 720 screen and at its minimum size.
 - **Pins**: `HelpPageTests`. One pin checks that every control or message the help names still exists in the app. A
   rename elsewhere fails it until the copy follows, and that copy change needs the product owner's review.
+
+## 27. Onboarding: the Welcome to Dictum window (amendment, 21/10/2026, Dictum 1.2)
+
+Product decision (Kyle, 21/10/2026): the first run must explain how Dictum works, ask where to keep the model files (a
+virtual desktop short of space on C:; the models take 200 MB to 10 GB), test the microphone (a virtual desktop with no
+microphone redirection showed only "Recording"), and explain that accents and microphones differ, so a person whose words
+come out wrong tries a more accurate model or the calibration test. A 95-year-old must be able to complete it.
+
+One window, "Welcome to Dictum", replaces the chain of first-run dialogs (the speech picker, the clean-up picker, the
+hotkey check). It is shown exactly when the hotkey check was: settings.json is usable, names no `whisper.model`, and no
+`--model` or `DICTUM_MODEL_PATH` names the model (`AppRules.Onboards`). A step line and dots ("Step 2 of 6: Model files"),
+the step's heading and body (scrolling when it does not fit), **Back** on the left and the step's own buttons on the right;
+Enter presses the step's primary button. Steps:
+
+1. **Welcome / How it works**: one paragraph, then Next.
+2. **Where to keep the model files**: the suggested folder (the per-user default) pre-selected, with its drive's free space
+   ("C: has 41.0 GB free"; no line when it cannot be read), the network-folder note when it applies, and "Choose another
+   drive or folder…" (the system's folder chooser). The text calls base.en "the included one" only when it is on this PC,
+   else "the Standard model is about 150 MB to download". The folder is checked by Settings > Models' rule
+   (`ModelCoordinator.FolderRefusal`): the bundled folder or one inside it is refused with "That folder holds the models
+   that come with Dictum…", and a device path other than `\\?\X:\` or `\\?\UNC\` with a new sentence (the settings load
+   already ignored such a `models.folder`). `models.folder` is written only when it differs from what settings.json holds
+   ("Use the suggested folder" and Back can put it back to null). Not shown when settings.json names `models.folder` or
+   `whisper.models_dir` (`AppRules.AsksFolder`).
+3. **Speech model**: when base.en is in the lookup order (with the folder just chosen) and settings.json names English
+   without translate, one line, "The Standard model is included and ready.", and no choice. Otherwise the Simple view's
+   tiers (§10.1) for the language settings.json names (multilingual models when it is not plain English; a tier the
+   language rules out is left out), with their sub-lines and sizes, the recommendation pre-selected, and "Show every model"
+   for the full catalogue and "Choose model file…". With base.en on this PC and a language that is not English, the pick
+   wins over base.en; Esc there keeps base.en (as before 1.2: dictation works at once and the existing language warning
+   follows). Completing the step writes through the first run's own writer (`ModelCoordinator.AnswerFirstRun`, split out
+   of `FirstRun`): base.en and `llm.provider` = `none` with base.en and no pick; otherwise the pick, with a catalogue model
+   not on this PC downloaded at startup as the picker's was. No clean-up question: the rule-based tidy, unless a seeded
+   `llm.provider` is kept (§24).
+4. **Your hotkey**: the first-run hotkey check (§20), its box, words, buttons and behaviour unchanged. As in the old
+   window, nothing has keyboard focus when the step opens, so Space chosen as the hotkey does not also press a button;
+   Enter (never a hotkey) presses "Use this hotkey".
+5. **Microphone test**: Settings > Microphone's device list and labels (a list that cannot be read, the audio service
+   stopped, counts as no microphone); a capture opened for the test only, its `CurrentLevel` driving a five-bar meter
+   (polled every 50 ms; with reduced motion, `WindowFlags.ReducedMotion`, the meter is redrawn at most every 500 ms with the
+   loudest level since). "Say a few words." until about 3 s in all at or above settings.json's `silence_threshold` (0.01
+   by default, the level below which a dictation is discarded as silence: "Heard you."), or 5 s in a row of digital silence,
+   at or below 1e-5 RMS (the "No sound from mic" floor, PR #22: the advice, which a later sound can still turn into "Heard
+   you."). A level between the two (background hiss) is neither. With no microphone listed, the no-microphone sentence and
+   no capture. The capture is stopped about 5 s after "Heard you.", after 60 s in any case ("Test again" opens it again),
+   and on every way out of the step (Next, Skip, Back, Esc, closing the window). A test closed at 60 s with nothing decided (hiss only) says "Nothing heard."; a level counts towards "Heard you." only above the floor too (a `silence_threshold` of 0 never hears digital silence), and one late look at the level counts as at most two ticks. Choosing another microphone tests it at
+   once; Next writes `audio.device` only when it changed; Skip writes nothing.
+6. **Try it**: after steps 1-5 the window stays open while the shell loads the settings, installs the hotkey and starts
+   loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). Until the model is
+   ready the step says "Getting the speech model ready…"; then "Click in the box, hold <hotkey>, say a sentence, then let
+   go." over a multi-line box, which has the keyboard focus (a hotkey held without clicking first pastes there). A
+   dictation goes through the normal path (hotkey listener, controller, pipeline, paste into the focused box); the step
+   watches the shell's last dictation (`PersonalService.Last`) and after the first one shows the accent explainer
+   ("The Standard model works well…" when the model in use is the Standard choice for its language, else "The model you
+   chose works well…") and "Calibrate my voice" (which opens the calibration window and closes this one). With nothing 30 s
+   after the model is ready, or a speech model that failed to load, the try-later line (a polite live region); Finish always
+   works. No Back.
+
+Writes and interruption. Each step writes its own settings when completed, straight to settings.json (atomic writes, no
+reload: nothing is loaded yet). Esc or closing the window before the end is "skip the rest": the speech answer is written
+with today's defaults (base.en and the rule-based tidy; without base.en, the recommendation with nothing downloaded, so the
+missing-model question of §10 asks first), and the folder, hotkey and microphone stay as settings.json has them; Try it
+does not follow. A folder chosen in step 2 before any other write makes settings.json start with that key alone; the
+speech step adds its keys to it, as for a seeded file. A start after the speech step (a crash) opens no window, as no
+hotkey check was shown again before (`// simplification:` in `AppRules.Onboards`). `--selftest`, `--transcribe` and the
+other CLI modes never open it.
+
+Accessibility and size. Every control has an accessible name; everything is reached by Tab; the step line and the try-later
+line are polite live regions; the folder refusal is an assertive one. The client area is 640 × 420 DIP (resizable, minimum
+480 × 360); text is larger than in the other windows (body 17 px, buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512
+DIP; with the Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, and 420 plus a caption
+of about 32 DIP (recalled) fits. On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`,
+the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
+
+Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.

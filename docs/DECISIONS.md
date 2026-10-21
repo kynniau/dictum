@@ -3440,10 +3440,460 @@ opens Settings, where the shell shows `F24`, and checks both.) `The_header_keeps
 **Mutation.** `ReportProblem` put back to pass `Status.Models` (the hotkey back in the email line): **observed failing**: the Email support pin and
 ShellTests' Report a problem pin. Restored.
 
+## Simple and Advanced views for models (Dictum 1.2, 21/10/2026, branch feat/simple-view)
+
+**The product decision (Kyle, 21/10/2026, relayed in the lane brief):** users do not understand base.en vs small.en vs q5_1 vs large-v3-turbo. Settings > Models and the tray panel's pickers default to a Simple view that a 95-year-old can understand, with explainers; today's full detail stays as an Advanced view one click away.
+
+**What was built.**
+
+1. `ui.view` (`UiSettings` in `AppSettings.cs`, bound in `SettingsLoader.BindUi`, documented in the default file): `"simple"` (default, also when absent) or `"advanced"`; any other value warns and uses `"simple"`. The Simple | Advanced segments at the top of Settings > Models write it through `SettingsPage.Write` (the shell's settings writer), so the reload redraws the page and the tray panel and the next session opens in the same view.
+2. `SimpleView` (`src/Dictum.Core/Settings/SimpleView.cs`): the tiers, the clean-up rule and every PROPOSED string, in one place for both surfaces. No download logic: a tier is a catalogue entry, chosen through `ModelCoordinator.Select`; "Add AI clean-up" and the Tidy row go through `SelectCleanup` / `SelectRulesOnly`.
+3. Settings > Models (`ModelPages.cs`): the Simple view replaces the two catalogue lists with the tier rows and the Tidy row, built by the existing `CatalogueRow` / `ModelRow` primitives (so the 1.1.1 "Downloading <n>%" and "Waiting to download" states, the disabled button and its accessible name come with them). Only the shown view's rows are built; the compare-before-set key now includes the view and the machine class, so a progress tick still rebuilds nothing and keyboard focus stays on its button. Both views keep the Language card, the model folder and the Storage link; Advanced alone has the catalogue lists, decoding, the file choosers, "Rule-based tidy only" and the cloud pointer.
+4. Tray panel (`FlyoutWindow.cs`): in Simple, the speech picker lists the tier names and the clean-up picker "Tidy my words" (plus "Add AI clean-up" while the rule-based tidy is in use), each with the existing "(download)", "(downloading)" and "(waiting to download)" marks, and a "Custom: <name>" entry first for anything else in use. Advanced is unchanged. The pickers keep `SetItems`' compare-before-set.
+
+**Tier mapping (machine class = `WhisperEngine.GpuMachine`, as the catalogue's recommendation uses it).** Read from the code, not invented: Standard is `ModelCatalog.Bundled` (= `ModePresets.LightSpeech`); on a CPU, More accurate is `ModePresets.FullSpeechCpu`, which is also the model `ModelCatalog.Recommend(false)` offers as "more accurate, a few seconds slower"; on a GPU, More accurate is `ModelCatalog.Recommend(true)` and Most accurate is `ModePresets.FullSpeechGpu`. The CPU's Most accurate is medium.en, the largest English entry whose catalogue trade-off does not say "needs a GPU" ("high accuracy; wants a GPU or a fast desktop CPU").
+
+| Tier | CPU only | GPU machine |
+|---|---|---|
+| Standard | base.en | base.en |
+| More accurate | small.en | medium.en |
+| Most accurate | medium.en | large-v3-turbo |
+
+The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in the middle tier: the code already recommends medium.en to a GPU machine, so medium.en is used. The order follows the Full preset. One measurement supports it, weakly: the real-voice calibration result of 15/10/2026 (above; one voice, ten sentences, about a hundred words, so one error is about one point, and the word error rules of that build, since changed) had large-v3-turbo greedy at 4.7% against medium.en beam at 6.3% and greedy at 9.4%. (Corrected by the lens of 21/10/2026: this section first said no such measurement existed.)
+
+**Clean-up and the Mode presets.** The Mode presets (Light, Full) set speech and clean-up together; the tiers are speech only, so the Mode page and the tray's Mode segments do not express the same choice and Simple could not reuse them as its mechanism. Simple reuses their constants instead (above), and the Mode segments stay in both views unchanged. "Tidy my words" is in use while `llm.provider` is `none` or `local` with the recommended clean-up model (`CleanupCatalog.Recommend`); from anything else, its **Use** selects that model when it is on this PC, else the rule-based tidy. A cloud provider is never offered in Simple. One chosen in Advanced shows as a "Custom: <provider>" row with no button, because hiding a provider that sends text off the PC would be less honest than naming it.
+
+**Not built, and why: the "Off" clean-up row.** The brief asked for "Off" with the sub-line "Paste exactly what was heard." Dictum has no such mode: `llm.provider = none` is the rule-based tidy (filler removal, punctuation, capitals), and only a non-English dictation gets whitespace-only tidying (`TranscriptCleaner.Plain`). Shipping "Off" over `none` would make the sub-line untrue; making it true needs a new provider value through `TranscriptCleaner.Create`, `SettingsLoader`, the status lines and the docs, which is pipeline work outside this lane's files. Recommendation: a small follow-up lane adds `llm.provider = "off"` (whitespace-only, reusing `DeterministicCleaner.WhitespaceOnly`), then Simple gains the row.
+
+**Deviation from the brief's explainer.** The brief's text sends people to "Settings > Test my setup", which does not exist in this build (no such text on main or on any remote branch, checked 21/10/2026). The explainer names the existing calibration test instead, with a **Calibrate my voice** button under it that opens the same window as the tray panel's button. When a "Test my setup" page lands, the sentence and the button can point there.
+
+**Ceilings marked `// simplification:`.** First commit: `SimpleView` mapped only the English ladder. Retired by the lens fixes below (multilingual tiers and the guard).
+
+**File paths in the brief.** The brief named `src/Dictum.Core/Transcribe/ModelCatalog.cs` and `src/Dictum.Core/Llm/CleanupCatalog.cs`; both catalogues live in `src/Dictum.Core/Settings/`. Neither was changed: the plain names live in `SimpleView`, so the catalogues needed no display-name additions.
+
+**PROPOSED strings (21/10/2026), for the product owner's approval; none is approved:**
+
+- Segments: "Simple", "Advanced"; accessible names "Models view: Simple", "Models view: Advanced".
+- Help line under them: "Simple shows what each choice means. Advanced shows every model and its details."
+- Explainer: "Dictum turns your voice into text on this PC. The speech model does the listening. Standard works for most people. If words come out wrong, try a more accurate model, or press Calibrate my voice to see which hears you best." (the brief's wording, with "run the test in Settings > Test my setup" replaced as explained above). The button under it reuses the existing label "Calibrate my voice".
+- Tier names: "Standard", "More accurate", "Most accurate".
+- Tier lines: "Included. Works well for most people."; "Works well for most people." (Standard when its model did not come with this copy, so "Included" would be untrue); on a GPU machine "Bigger download, a bit slower." and "Best results. Needs a strong PC or patience."; on a CPU see the lens fixes below.
+- Tier state for a file not on this PC: its size alone (for example "487 MB"; first commit "487 MB download", changed by the lens fixes). The other states reuse the existing words: "In use", "Downloaded", "Downloading <n>%", "Waiting to download", and the buttons "Use", "Download…", "Downloading…", "Waiting…", "In use".
+- Tier buttons' accessible names: "Use <tier>", "Download <tier>" (for example "Download More accurate"); a busy one reuses the 1.1.1 pattern with the tier name: "More accurate is already downloading".
+- Custom row: "Custom: <name>", with the line "In use. Not one of the choices above." (first commit "In use · Chosen in Advanced view", changed by the lens fixes).
+- Clean-up row: "Tidy my words (recommended)", line "Fixes punctuation and removes ums and ahs. Runs on this PC."; state "In use, with AI clean-up" while the recommended model tidies; its button's accessible name "Use Tidy my words".
+- Tray clean-up picker (Simple): "Tidy my words"; "Add AI clean-up" reuses the existing label, with the existing marks.
+
+**Pins** (`tests/Dictum.Tests/SimpleViewTests.cs`, headless as `UiWindowTests`; no model is downloaded: an in-memory server holds the one download). Each was observed failing with its mutation applied and passing without it; the PR body has the table. Two existing UI tests that check Advanced catalogue rows now set `"ui": { "view": "advanced" }` (`NoSilentCancelUiTests.The_downloading_model_shows_as_downloading_with_a_disabled_button`, `ModelFolderTests.Settings_models_marks_the_bundled_model_as_included`); their assertions are unchanged. The test shell (`Scratch.Shell`) gained a `gpuMachine` option for the GPU mapping pin.
+
+**Not verified:** the views on a real desktop, at 150 % scaling, or in dark mode (headless only); screen-reader output (the accessible names are pinned, not heard); the GPU mapping on a real GPU machine (pinned with a stand-in machine class); a real download; tray mode, never run on the development PC.
+
+### Lens fixes (21/10/2026), first lens on 1316ea6
+
+The lens on PR #23 (head 1316ea6) returned Needs changes with three majors, six minors and one nit, and no blockers. All ten are fixed on the same branch, with the orchestrator's decisions where it gave one:
+
+1. **Major: a user whose language is not English could be switched to an English-only model, and the multilingual model in use vanished from Simple.** Orchestrator's decision: when the text is not plain English speech (`whisper.language` is not `en`, or Translate is on), the tiers map to multilingual models. Standard is `small` and More accurate is `medium`. On a GPU, Most accurate is `large-v3-turbo`, or `large-v3` when translating, because turbo cannot translate (OpenAI, as `WhisperLanguages` cites). On a CPU there is **no multilingual Most accurate**. The catalogue has nothing above `medium` whose trade-off line does not say "needs a GPU", and a second `medium` row would repeat More accurate, so the CPU shows two rows.
+
+   As a guard, every tier carries `WhisperLanguages.Problem` for its model with the language settings in force. A tier with a problem gets no button on the page, only its line, and is left out of the tray picker unless it is the model in use. For an English-only model the line is the PROPOSED "English only: switch to Advanced to choose a model for <language>." (or "…a model that detects the language." for Detect automatically); any other problem (Cantonese, which only the large-v3 models have) shows the existing `Problem` sentence. The `// simplification:` is retired.
+2. **Major: the CPU lines understated the measured slowness.** README "Measured speed" (15/10/2026, a 10.46 s clip, CPU forced) gives base.en 1.90 s, small.en 6.43 s and medium.en 20.1 s; calibration's ceiling is 2.5 s per 10 s. The lines now follow the machine class. CPU More accurate: "Bigger download. Takes a few seconds longer on this PC." CPU Most accurate, and the multilingual `medium` on a CPU: "Slow without a graphics card: can take longer than you spoke." The GPU keeps "Bigger download, a bit slower." and "Best results. Needs a strong PC or patience." The multilingual `medium` was not timed; the same line is used for it because it is the same size as medium.en (inferred, not measured).
+3. **Major: "Download More accurate" opened the catalogue question** ("Download ggml-small.en.bin (487 MB) from huggingface.co? …"). That text is not approved copy. A Simple choice now passes its tier name to `ModelCoordinator.Select(name, plainName)`, which asks through two new `IModelPrompts` members with default implementations (`ConfirmPlainDownload`, `ConfirmPlainDownloadWhileBusy`; the defaults ask the catalogue question, so other stand-ins are unchanged).
+
+   The question reads "Download <tier> (<size>)? It comes from the model makers' official download page and is checked before use.", followed by the existing low-space warning when there is one. The busy question names both models by their tier names where the Simple view started them. The "already downloading" balloon and the Stop balloon also use the tier name. Advanced keeps today's wording.
+
+   **Known Simple gaps, for a later lane** (deliberately not changed here):
+   - Calibration still speaks in catalogue terms (for example "large-v3-turbo-q5_0 · beam" and error counts).
+   - "Add AI clean-up" still asks the catalogue clean-up question (file name, host, licence line).
+4. **Minor: "In use · Chosen in Advanced view" was untrue** for a model applied by calibration, a Mode preset, the first run, `--model` or `DICTUM_MODEL_PATH`. The Custom line is now "In use. Not one of the choices above."
+5. **Minor: with text that is not English the clean-up is skipped** (`TranscriptCleaner.Plain`: whitespace only), so the Tidy line now reads "Tidies spacing only for <language>.", or "Tidies spacing only while the language is detected automatically." for Detect automatically. "In use, with AI clean-up" is not shown then, because no clean-up model runs.
+6. **Minor: the closed tray pickers cut long entries off** ("Custom: large-v3-turbo-q5_0"). Both model pickers now use an item template whose text ends in an ellipsis (`TextTrimming.CharacterEllipsis`).
+7. **Minor: choosing "Tidy my words" in the tray was unpinned.** It is now pinned.
+8. **Minor: `A_progress_refresh_leaves_the_tray_pickers_alone` ran only in Simple.** It is now a Theory over both views.
+9. **Minor: the claim that no measurement compared large-v3-turbo with medium.en was wrong.** It is corrected above, citing the real-voice calibration result with its caveats.
+10. **Nit: "1.5 GB download · Bigger download, …" repeated "download".** A tier not on this PC now shows its size alone ("1.5 GB · Bigger download, a bit slower.").
+
+**PROPOSED strings added or changed by these fixes** (none approved):
+- "Bigger download. Takes a few seconds longer on this PC."
+- "Slow without a graphics card: can take longer than you spoke."
+- "English only: switch to Advanced to choose a model for <language>."
+- "English only: switch to Advanced to choose a model that detects the language."
+- "Download <tier> (<size>)? It comes from the model makers' official download page and is checked before use." (plus the existing low-space warning)
+- Busy question, Simple: "<running> is downloading (<n>% done). Download <tier> (<size>) after it, or stop <running> and download <tier> now? Stopping deletes what <running> has downloaded so far." then a blank line and "It comes from the model makers' official download page and is checked before use."
+- Busy question, Simple, without room to wait: "<running> is downloading (<n>% done). There is not enough space to download it after <running>. Stop <running> and download <tier> (<size>) now? Stopping deletes what <running> has downloaded so far." then the same sentence.
+- The existing busy buttons and balloons, with the tier name in place of the model name: "Stop it and download <tier>", "<tier> is already downloading (<n>%).", "<tier> is already waiting to download.", "Download of <file> stopped: you chose <tier>."
+- "In use. Not one of the choices above." (replaces "In use · Chosen in Advanced view")
+- "Tidies spacing only for <language>."
+- "Tidies spacing only while the language is detected automatically."
+- The tier state for a file not on this PC is its size alone (replaces "<size> download").
+
+**Not verified (these fixes):** the plain question in the real question window (only its text is pinned, through the test dialogs); the ellipsis at 150 % scaling or with other fonts (headless only); the multilingual `small` and `medium` speed on a CPU.
+
+## Clean-up Off: paste exactly what was heard (Dictum 1.2, 21/10/2026, branch feat/cleanup-off)
+
+**Why.** The Simple view brief (above) asked for an "Off" clean-up row, "Paste exactly what was heard.", which was left out because `llm.provider = none` is the rule-based tidy and no off mode existed. This lane adds the mode, stacked on `feat/simple-view`.
+
+**What was built.**
+
+1. A fifth provider value, `llm.provider = "off"` (`LlmSettings.Off`, accepted by `SettingsLoader.BindLlm` in any case like the others, documented in the default settings file). `none` keeps its name and its behaviour.
+2. `TranscriptCleaner.Create` checks `off` first and returns `TranscriptCleaner.Off()`: no client, so no model load, no request and no reply check. It is checked before the prompt file is read and before the reply checks are built (`PersonalCleanup.Checks`), and before the not-English skip, so the status names what the user chose. `Off()` reuses the whitespace-only step that text in another language already gets (`DeterministicCleaner.WhitespaceOnly`, `plain: true`): ends trimmed, runs of spaces, tabs, CR and LF made one space (other whitespace inside the text, such as a no-break space, is kept). No second implementation was written. Because it is plain, `SegmentJoin` keeps whisper's case at a hands-free part's boundary (`keepCase: cleaner.IsPlain`), so no letter changes case anywhere. `IsPlain`'s comment now says it covers both cases; every reader of it was checked (the CLI's "whitespace-only tidy" line, the pipeline's keepCase, Settings > Clean-up's `OfflineOnlyIsWhyNothingIsSent`, which is false for off anyway because `OfflineRefusal` has nothing to refuse, and Settings > About's cleanup-error line, which reads `local` only).
+3. **Spoken commands.** Read from the code: "new line" and "new paragraph" are applied only by the rule-based tidy (`DeterministicCleaner.SpokenBreak`) and by a model following its prompt; `SegmentJoin.LeadingBreak` puts a break between hands-free parts only when the clean-up removed the opening command, which off never does. So with off, every spoken command ("new line", "new paragraph", "comma", "full stop", "scratch that"…) is typed as the words heard. Pinned in the pipeline, not only in the cleaner.
+4. Settings > Models: Simple gains an **Off** row under "Tidy my words (recommended)" and its Add AI clean-up button (a separate panel, so that button stays directly under the Tidy row); it is its own row, never "Custom". Advanced gains an "Off (paste exactly what was heard)" button beside "Rule-based tidy only", and its "In use:" line reads "In use: no clean-up (paste exactly what was heard)". `ModelCoordinator.SelectOff` writes the key through the same `SetValues` path as `SelectRulesOnly`; `CurrentCleanupName` names it "no clean-up" (lens on d6b4ea8: "off" in the tray line read as Dictum being off). The tray panel's clean-up picker gains "Off" in Simple and "Off (paste exactly what was heard)" in Advanced, so an off in use never shows as a "· cloud" entry.
+5. The pipeline's log line says "the whitespace-only tidy" for a plain clean-up instead of "the rule-based tidy" (it was already wrong for text in another language).
+
+**Privacy lines: reused, none new.** `NothingLeaves` is `!usesModel || …` (`CloudPolicy.NothingLeaves`), and the off cleaner has no client, so it is true: the tray panel shows "Nothing leaves this PC" with its lock, and Settings > Privacy shows the approved "Nothing leaves this PC: speech recognition and clean-up both run here." Settings > Clean-up shows the cleaner's status and none of the cloud "On" lines. **For the product owner:** with clean-up off, "clean-up both run here" is still true in the narrow sense (the whitespace step runs here), but a reader may find it odd. The approved line is not reworded; if a separate line is wanted for off, it needs the product owner's wording.
+
+**Open decision, not built: corrections, profanity filter and snippets.** They run after every clean-up (SPEC §22 order) and still run with off, because the user set each of them up and none is on by default except what the user adds (the profanity filter's default is `off`). If "exactly what was heard" should also skip them, that is a one-line change in the pipeline's finish step; recommendation: keep them, because a correction or snippet the user wrote is their own intent, not Dictum's tidying.
+
+**PROPOSED strings (21/10/2026), for the product owner's approval; none is approved:**
+
+- Simple row: "Off", line "Paste exactly what was heard."; in use: "In use · Paste exactly what was heard."; its button's accessible name "Use Off".
+- Advanced button and Advanced tray entry: "Off (paste exactly what was heard)".
+- Advanced "In use:" line: "In use: no clean-up (paste exactly what was heard)".
+- Tray Simple entry: "Off".
+- Tray panel models line and the icon's tooltip, in the clean-up place: "no clean-up" (for example "base.en · Vulkan · no clean-up · F9" and "Dictum · base.en · Vulkan · no clean-up · F9"), from `ModelCoordinator.CurrentCleanupName`.
+- Status (Settings > Clean-up's current line, About's "Clean-up:" line, the self-test and the log): "off: the text is pasted as whisper wrote it, whitespace tidied only (llm.provider = off)".
+- Log line (not shown in the UI): "Clean-up is off (llm.provider = off): the text is pasted as whisper wrote it, with whitespace tidied only."
+
+**Pins** (`tests/Dictum.Tests/CleanupOffTests.cs`; one existing assertion in `SimpleViewTests.The_simple_view_never_shows_cloud` now expects "Off" after "Add AI clean-up" in the tray list). Each was observed failing with its mutation applied and passing with it reverted:
+
+| Mutation | Pins that failed |
+|---|---|
+| M1: `"off"` removed from `SettingsLoader`'s provider list | `The_off_provider_round_trips`, `The_simple_rows_switch_between_tidy_and_off`, `The_advanced_list_offers_off`, `The_tray_pickers_offer_off`, `The_privacy_lines_say_nothing_leaves` (5 of 20) |
+| M2: `off` returns the rule-based tidy with the off status (exactly `return RulesOnly(OffStatus);`; `return RulesOnly("off");` also fails the privacy pin, M2b below) | all 10 rows of `Off_pastes_exactly_what_was_heard`, `Off_builds_no_validator_loads_no_model_and_sends_nothing`, `Off_wins_over_the_language_skip`, `The_simple_rows_switch_between_tidy_and_off` (13 of 20) |
+| M3: the `off` branch in `Create` removed (falls through to the default `anthropic` branch) | the same 13 plus `The_privacy_lines_say_nothing_leaves` (14 of 20) |
+| M5: the pipeline's `keepCase` forced to false | `A_hands_free_part_with_off_is_typed_as_heard` |
+| M6: the Simple Off row's Use writes the rule-based tidy | `The_simple_rows_switch_between_tidy_and_off` |
+| M7: the tray's Off entry writes the rule-based tidy | `The_tray_pickers_offer_off` |
+| M8: the Advanced Off button writes the rule-based tidy | `The_advanced_list_offers_off` |
+| M9 (`none` unchanged): `none` returns `Off()` | the existing `LanguageTests.Text_in_another_language_gets_whitespace_tidied_only_never_the_english_rules`, all 10 rows of `Off_pastes_exactly_what_was_heard` (their `none` column) and `The_simple_rows_switch_between_tidy_and_off` (12 of 72 in the cleanup, language, LLM, rules and Simple view tests) |
+| M11: off shown as a "Custom" row as well | `The_simple_rows_switch_between_tidy_and_off` |
+| M12: the tray's Simple picker selects Tidy while off is in use | `The_tray_pickers_offer_off` |
+
+**Not verified:** the rows on a real desktop, at 150 % scaling or in dark mode (headless only); a screen reader (the accessible name is pinned, not heard); a real dictation through whisper with off (the pipeline pin uses a fake transcriber); tray mode, never run on the development PC.
+
+### Merge of feat/simple-view 787b300 and lens fixes (21/10/2026), lens on d6b4ea8
+
+The lens on PR #27 (head d6b4ea8) returned Needs changes: no blockers or majors, three minors and one nit. All four are fixed in the same round as the merge of `origin/feat/simple-view` at 787b300 (lane A's lens fixes). The merge was a plain merge, not a rebase.
+
+**Merge.** The Off row sits with lane A's new rows and guards. It has no language dependency, because it never runs a clean-up, so it is offered for every language, unlike the tiers that the language rules out. That is pinned by `Off_is_offered_for_every_language`, run with French and with Detect automatically. The Custom clean-up row uses A's new line ("In use. Not one of the choices above.") and still never shows for off. The tray's Off entries use A's ellipsis item template, which applies to every entry of both pickers. That is pinned by `The_tray_line_says_no_clean_up_and_the_off_entry_is_trimmed`. A's new `Choosing_tidy_my_words_in_the_tray_switches_to_the_rule_based_tidy` now expects "Off" at the end of the Simple tray list. Its other assertions are unchanged.
+
+1. **Minor: the tray line read as Dictum being off.** `ModelCoordinator.CurrentCleanupName` returned "off", so the tray panel's models line and the icon's tooltip read "base.en · Vulkan · off · F9". It now returns "no clean-up" (PROPOSED). The Advanced "In use:" line becomes "In use: no clean-up (paste exactly what was heard)".
+2. **Minor: two comments said "plain" means "not English".** The `keepCase` comments in `SegmentJoin` and `DictationPipeline` now say "text that is not English (SPEC §23) or clean-up off (§5)". So does `SegmentJoin`'s summary.
+3. **Minor: the M2 row did not name its mutation.** The row now names it exactly (`return RulesOnly(OffStatus);`, 13 of 20 on d6b4ea8). M2b below confirms the lens's figure for `RulesOnly("off")`.
+4. **Nit: the whitespace wording was too broad.** README and SPEC now say "runs of spaces, tabs, CR and LF become one space". Other whitespace inside the text, such as a no-break space, is kept: `DeterministicCleaner.WhitespaceOnly` collapses `[ \t]+` after turning CR and LF into spaces, and trims the ends.
+
+**Mutations for these fixes.** Run on the merged tree with 23 pins in `CleanupOffTests`. Each mutation failed the pins listed and was restored byte for byte.
+
+| Mutation | Pins that failed |
+|---|---|
+| M2b: `off` returns `RulesOnly("off")` | 14 of 23: the 13 of M2 plus `The_privacy_lines_say_nothing_leaves` |
+| M13: the tray name back to "off" | `The_advanced_list_offers_off`, `The_tray_line_says_no_clean_up_and_the_off_entry_is_trimmed` |
+| M14: the Off row shown only for English text | both cases of `Off_is_offered_for_every_language` |
+
+**PROPOSED strings changed by these fixes** (none approved):
+- Tray panel models line and icon tooltip: "no clean-up".
+- Advanced "In use:" line: "In use: no clean-up (paste exactly what was heard)" (replaces "In use: off (paste exactly what was heard)").
+
+## Onboarding: the Welcome to Dictum window (Dictum 1.2, 21/10/2026, branch feat/onboarding, stacked on feat/simple-view)
+
+**The product decision (Kyle, 21/10/2026, relayed in the lane brief):** onboarding must explain how Dictum works, ask where to keep the model files (Kyle is low on C: on his VM; the models take 200 MB to 10 GB), test the microphone (a VM with no microphone passthrough showed only "Recording"), and explain that accents and microphones differ, so people try a more accurate model or the calibration test when words come out wrong. A 95-year-old must be able to complete it.
+
+**What was built** (SPEC §26, now §27).
+
+1. `OnboardingWindow` (`src/Dictum.UI/Views/Onboarding/`): one window, six steps (Welcome, Model files, Speech model, Your hotkey, Microphone, Try it), a step line and dots, Back and the step's own buttons, larger text than the other windows, 640 × 420 DIP client area (corrected by the lens on 6bacce9, below). It replaces the speech picker, the clean-up picker and `HotkeyCheckWindow` at first run.
+2. `OnboardingFlow`: the writes, apart from the window, so the shell and the tests drive the same code. Each step writes its own key when completed, only when it changed (`models.folder`, `whisper.model` with the clean-up answer, `hotkey`, `audio.device`). `SkipRest` (Esc, closing the window) writes the speech answer with today's defaults and nothing else.
+3. `ModelCoordinator.FirstRun` is split into `PlanFirstRun` (the GPU probe, the recommendations, whether base.en is on this PC) and `AnswerFirstRun` (the writes), with `FirstRun` unchanged in behaviour on top of them (its pins, in ModelFolderTests, FixBatchModelTests, NoVulkanCrashTests, ModelCoordinatorTests and ModelFolderSafetyTests, all pass). The window's speech step calls the two halves.
+4. `ModelCoordinator.SetModelsFolder` gains `reloadAfter` (false for the window: nothing is loaded yet, and a reload before `Start` loads the configuration would start a model load and a hotkey listener mid-wizard) and a shared `FolderRefusal` (the bundled folder, as before, and now a device path, below).
+5. `AppRules.Onboards` (the window shows exactly when the first-run hotkey check did: the speech choice is open and no model override) and `AppRules.AsksFolder` (no folder named), beside `FirstRunQuestions`, which is unchanged.
+6. `IShellDialogs.HotkeyCheck` is replaced by `IShellDialogs.Onboard(OnboardingFlow)`. `AppShell.Start` opens the window instead of `FirstRun` + `FirstRunHotkeyCheck` (removed), and calls `OnboardingFlow.BeginTryIt` at its end, once the hotkey listens.
+7. `HotkeyCheckWindow` is gone; its strings live in `HotkeyCheck` (Dialogs.cs) and are reused word for word by the hotkey step and by Settings > General (`HotkeyCheck.MacNote`, one reference changed in GeneralPages.cs).
+
+**Decisions made in this lane, and why.**
+
+- **No clean-up question in the window.** The brief's six steps have none, and "Skip everywhere leaves today's defaults". With base.en (every package) the first run already wrote the rule-based tidy without a question; without base.en the window now does the same, instead of the clean-up picker. The Simple view's "Tidy my words" and "Add AI clean-up" are where AI clean-up is chosen. The clean-up picker stays for a seeded settings.json that names `whisper.model` but leaves the clean-up choice open, without base.en (no window then).
+- **Interruption.** The brief: "a crash mid-way does not repeat finished steps; use the existing FirstRunQuestions mechanism and extend it minimally". The window shows while settings.json names no `whisper.model`; the folder step only while it names no folder. So a start after the folder step skips it, and a start after the speech step opens no window at all. simplification (`AppRules.Onboards`): the hotkey and microphone steps are not shown again after a crash that follows the speech step, exactly as the hotkey check was not before 1.2. Ceiling: a person whose PC stops between steps 3 and 6 does not see steps 4-6. Trigger to retire: a report of it; then record the steps finished (a settings.json key, which needs the loader to know it).
+- **A folder chosen first makes a sparse settings.json.** The folder step writes `models.folder` before the speech step, so with no settings.json yet the file starts with that key alone (no `_doc` comments); the speech step then adds its keys, as for a seeded file. The loader takes defaults for the rest. Ceiling: that file lacks the comment block. Trigger: a request for it; then write the full default file at the folder step without `whisper.model`.
+- **Device paths refused.** The brief: "refuse the bundled folder and device paths; show their existing messages". The bundled folder's sentence exists (`BundledFolderRefused`); a device path had none in the UI (the settings load ignores such a `models.folder` with a log warning), so `DevicePathRefused` is new and PROPOSED. `SetModelsFolder` uses the same rule, so Settings > Models' Browse… now refuses such a path too instead of writing one the load then ignores.
+- **Try it watches `PersonalService.Last`.** The paste goes through the normal path into the focused box; "a successful dictation" is the shell recording a pasted dictation, not text appearing in the box (which typing would also do). Any dictation counts, including one pasted into another program while the window is open.
+- **Waiting for the model.** Try it says "Getting the speech model ready…" until the model is ready, and only then starts the 30-second "nothing came through" clock ("a reasonable time" in the brief; 30 s is this lane's choice). A speech model that fails to load shows the try-later line at once.
+- **The microphone test's floor** (superseded for "Heard you." by the lens on 6bacce9, below: only "Nothing heard." uses it now) is 1e-5 RMS, PR #22's `CaptureBuffer.SoundFloor` ("No sound from mic"), so the test and the warning agree on what silence is. It is a constant here (`MicCheck.SoundFloor`) until main has PR #22; see "Merge with PR #22".
+- **The meter and reduced motion.** With `WindowFlags.ReducedMotion` (Windows' "Show animations" setting off) the meter is redrawn at most every 500 ms, showing the loudest level since, instead of every 50 ms.
+- **The capture runs while the step is on screen** (limited by the lens on 6bacce9, below: it closes about 5 s after "Heard you." or after a minute), not only until the first result, so a person who unmutes after "Nothing heard." sees it turn into "Heard you."; it is stopped on every way out of the step.
+- **Calibrate my voice closes the window** and opens the calibration window, so the two do not compete for the person's attention.
+- **Size at 150 %.** Superseded: the first version took 470 DIP as the whole window height and a 32 DIP taskbar; see the lens fixes below.
+
+**Merge with PR #22 (feat/silence-warning, not on main yet).** Three things are written to match it and must be joined when the orchestrator asks for `git merge origin/main`: `OnboardingText.NoMicrophone` becomes a reference to `NoSoundText.NoMicrophoneBalloon` (same words today); `MicCheck.SoundFloor` becomes `CaptureBuffer.SoundFloor`; `OnboardingText.NothingHeard` repeats the advice of `NoSoundText.SilentBalloon` after a different opening ("Nothing heard." is the brief's) and stays its own constant unless the product owner wants one sentence for both. The microphone step's note ("If Dictum hears nothing when you dictate, it will tell you.") is true only once PR #22 is on main: it is the "No sound from mic" warning. Merge PR #22 before this lane, or the note is untrue in a build of this branch alone.
+
+**PROPOSED strings (21/10/2026), for the product owner to approve; word for word.**
+
+| Where | String |
+|---|---|
+| Window title and header | Welcome to Dictum |
+| Buttons | Back · Next · Finish · Skip |
+| Step line | Step {n} of {total}: {name} (names: Welcome · Model files · Speech model · Your hotkey · Microphone · Try it) |
+| 1 heading | How Dictum works |
+| 1 text | Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. Everything happens on this PC. |
+| 1 text | The next few steps take a minute or two. Press Next to begin. |
+| 2 heading | Where to keep the model files |
+| 2 text | Dictum keeps its speech models on this PC. The included one is about 150 MB; adding more models can take several gigabytes more. |
+| 2 free space | {drive} has {size} free (for example "C: has 41.0 GB free") |
+| 2 buttons | Choose another drive or folder… · Use the suggested folder |
+| 2 field name (screen readers) | Folder for the model files |
+| 2 refusal (new) | Dictum cannot use a folder named that way. Choose a folder on a drive letter or a network share. |
+| 3 heading | Speech model |
+| 3 with base.en | The Standard model is included and ready. |
+| 3 without base.en | Choose how carefully Dictum listens. Bigger models are more accurate but slower. A model that is not on this PC yet is downloaded from huggingface.co when you reach the end of these steps. You can change this later in Settings > Models. |
+| 3 link | Show every model |
+| 5 heading | Test your microphone |
+| 5 lines | Say a few words. · Heard you. |
+| 5 silence | Nothing heard. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on. |
+| 5 no microphone (PR #22's words) | No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again. |
+| 5 note | You can skip this test. If Dictum hears nothing when you dictate, it will tell you. |
+| 5 meter name (screen readers) | Microphone level |
+| 6 heading | Try it |
+| 6 waiting | Getting the speech model ready… |
+| 6 instruction | Click in the box, hold {hotkey}, say a sentence, then let go. |
+| 6 box name (screen readers) | Practice box |
+| 6 explainer | Everyone's accent, voice and microphone are different. The Standard model works well for most people. If words come out wrong, choose More accurate in Settings > Models, or press Calibrate my voice to find which model hears you best. |
+| 6 nothing | Nothing came through. You can try again any time: Settings > Help explains how. |
+
+Reused, not new: the hotkey step's heading, text, Mac note and buttons (`HotkeyCheck`, unchanged since 15/10/2026); the tier names and sub-lines (`SimpleView`, PROPOSED in lane A); "Choose model file…" and "· recommended" (the first-run picker); "Microphone", "System default", "(default)", "(not connected)" and "The microphone could not be opened: {reason}" (Settings > Microphone); "Calibrate my voice" (`ModelsPage.CalibrateLabel`); `BundledFolderRefused` and the network-folder note (Settings > Models).
+
+**The product owner's answers (relayed by the orchestrator, 21/10/2026), applied in the merge round.**
+
+1. Step 1 drops "Nothing you say is sent anywhere." and keeps "Everything happens on this PC.", which is true whatever the cloud option says; cloud clean-up has its own consent step.
+2. Settings > Help will exist (lane C's PR #24, a Settings page titled "Help", merged before this one). Nothing re-runs this window, so the try-later line says where to read how: "Nothing came through. You can try again any time: Settings > Help explains how." (PROPOSED).
+3. Step 2 gives no exact total: "adding more models can take several gigabytes more" (PROPOSED). The basis, read from the catalogues on 21/10/2026 (inferred by summing their byte sizes, not measured on disk): every speech model together is 13.19 GB, every clean-up model 8.93 GB, and the largest of each (large-v3, 3.10 GB; gemma-3-4b, 3.16 GB) 6.25 GB together.
+
+**Merged with feat/simple-view at 787b300 (lane A's lens fixes).** No code conflict; DECISIONS kept both entries. Lane A's two new `IModelPrompts` members (`ConfirmPlainDownload`, `ConfirmPlainDownloadWhileBusy`) sit beside this lane's `FirstRunPlan`; the window asks neither (its speech pick downloads at startup, as the first-run picker's did). The speech step now uses lane A's language-aware tiers (`SimpleView.Tiers(gpu, language, translate)` with the language settings.json names): multilingual models when it is not plain English, and a tier whose model the language rules out is left out. `SimpleView.DownloadSize` is gone in lane A's fixes; a tier not on this PC shows its size in brackets after its line. Not changed: with base.en on this PC and a seeded language that is not English, the first run still writes base.en (as before 1.2, with the existing language warning after it) and the step says "The Standard model is included and ready."; a follow-up could ask the speech question in that case.
+
+**Pins and mutation checks** (`tests/Dictum.Tests/OnboardingTests.cs`, headless). Each pin was observed failing on the reverted behaviour: the mutation was applied alone, the test project rebuilt, the pin run, the file restored (26 mutations on 386fc76, and one more after the merge with 787b300, 21/10/2026).
+
+| Pin | Mutation (reverted behaviour) | Observed |
+|---|---|---|
+| Each_step_renders_and_advances_to_Try_it | leaving the microphone step does not end steps 1-5 (`FinishFirstSteps` removed) | failed: `Assert.True` (FirstStepsDone) |
+| Back_returns_to_the_step_before | Back does nothing | failed: `Assert.IsType` |
+| The_folder_step_writes_models_folder_only_when_changed | the "only when changed" guard removed | failed: `Assert.False` (settings.json written on an unchanged Next) |
+| The_folder_step_refuses_the_bundled_folder_and_a_device_path | `FolderRefusal` refuses nothing | failed: refusal text not found |
+| A_named_model_folder_skips_the_folder_step | the folder step always added | failed: `Assert.DoesNotContain` |
+| The_free_space_line_names_the_drive | the drive root shown untrimmed | failed: strings differ |
+| The_speech_step_asks_nothing_when_base_en_is_on_this_PC | the choice shown with base.en present | failed: "included and ready" not found |
+| Without_base_en_the_speech_step_offers_the_three_tiers | the full catalogue instead of the tiers | failed: collections differ |
+| The_hotkey_step_keeps_the_key_pressed_or_the_current_one (moved from DialogTests) | the hotkey never written | failed: strings differ |
+| A_seeded_language_that_is_not_English_gets_the_multilingual_tiers (after the merge) | the English tiers whatever the language | failed: collections differ |
+| The_microphone_test_hears_a_level_above_the_floor | sound only above 0.5 RMS | failed: strings differ |
+| The_microphone_test_gives_the_advice_after_five_seconds_of_silence | no silence result | failed: strings differ |
+| With_no_microphone_listed_the_test_says_so_and_opens_nothing | no early return for an empty list | failed: strings differ |
+| The_test_capture_is_stopped_on_leaving_the_step (Next, Skip, Back, close) | `Leave` does not stop the capture | failed: all 4 cases (microphone still open) |
+| The_microphone_chosen_is_tested_and_written_at_Next | audio.device never written | failed: strings differ |
+| The_meter_respects_reduced_motion | the reduced-motion rate removed | failed: the reduced case (40 redraws, not 4); the normal case passes, as it should |
+| A_microphone_that_cannot_be_opened_says_why | the reason replaced by "Say a few words." | failed: strings differ |
+| Try_it_after_the_first_dictation_shows_the_accent_explainer | (a) the explainer not shown; (b) a dictation never noticed | (a) failed: explainer not found; (b) failed: `Assert.True` (Succeeded) |
+| Try_it_says_nothing_came_through_after_thirty_seconds | the 30-second rule removed | failed: `Assert.True` (NothingShown) |
+| Try_it_waits_for_the_shell | the instruction shown before the shell is ready | failed: strings differ |
+| Esc_mid_way_leaves_the_defaults_and_a_valid_settings_file | closing the window does not skip the rest | failed: `Assert.True` (no usable settings.json) |
+| A_first_run_with_every_step_skipped_starts_on_the_defaults | `AppShell.Start` does not call `SkipRest` | failed: values differ (no base.en written) |
+| A_seeded_model_or_a_model_override_opens_no_window | `Onboards` ignores the model override | failed: values differ (the window opened) |
+| The_window_and_its_folder_step_follow_settings_json | `AsksFolder` ignores whisper.models_dir | failed: `Assert.False` |
+| Every_step_fits_at_150_percent_and_names_its_controls | (a) the window 600 DIP high; (b) the folder field's accessible name removed | (a) failed: `Assert.True` (size); (b) failed at the name check |
+
+The first-run pins in ModelFolderTests and ModelFolderSafetyTests (`(0, 0, 1)`: no model question, the hotkey step shown once) pass unchanged: `ScriptedDialogs.Onboard` counts as the hotkey step. The model-picker and question-window pins in DialogTests are unchanged.
+
+**Verified.** Full Release build (`--no-incremental`, no warning lines in its output) and the full suite on this branch before the docs-only DECISIONS edit: 1552 tests, 1529 passed, 23 skipped (gated), 0 failed, with the `Install_copies_models` filter.
+
+**Verified after the merge with 787b300.** Full Release build (`--no-incremental`, no warning lines) and the full suite: 1564 tests, 1541 passed, 23 skipped (gated), 0 failed.
+
+**Not verified.**
+- The window on a real desktop: the nested frame of `RunFirstSteps`, the system folder chooser, visible keyboard focus rendering, a real 150 % display, a screen reader reading the live regions. All pins are headless.
+- A real microphone or WASAPI capture in the microphone test (a fake capture stands in), and a real paste into the Try it box (the pin drives a dictation through the real controller and pipeline, with a fake clipboard and input sender, and watches `PersonalService.Last`).
+- A Dictum build launched in tray mode on this PC (not allowed by the lane brief), so no first run end to end.
+- The merge with PR #22 (above).
+
+### Lens fixes (21/10/2026), lens on 6bacce9
+
+The lens on PR #28 (head 6bacce9) returned Needs changes, no blockers: three majors and six minors. All fixed:
+
+1. **(Major) A seeded language that is not English got "The Standard model is included and ready." and base.en**, which is English only. The speech step now asks when settings.json names a language that is not English, or translate (`OnboardingFlow.AsksSpeech` = `Plan.AsksPickers || !Plan.Overridden && SimpleView.Multilingual(...)`), and `AnswerFirstRun` lets a speech pick win over base.en on this PC (`FirstRun` passes no pick when base.en is there, so it is unchanged). Esc in that case keeps base.en: dictation works at once and the existing language warning follows (SPEC §26, now §27).
+2. **(Major) "Heard you." fired on background hiss**: any level above 1e-5 counted, about 60 dB below `silence_threshold` (0.01 by default), under which a dictation is discarded as silence. "Heard you." now needs about 3 s in all at or above settings.json's `silence_threshold`; the 1e-5 floor is kept only for "Nothing heard." (five seconds in a row of digital silence, PR #22's rule). A level between the two is neither.
+3. **(Major) The window did not fit a 1366 × 768 screen at 150 %**: 470 DIP was the client height, so with the caption and taskbar Back, Next and Finish sat under the taskbar. The client height is now 420 DIP, and on opening the window is clamped to its screen's work area (`Screens.ScreenFromWindow(this).WorkingArea` over the scaling, less the frame's height; `OnboardingWindow.FitHeight`) and moved inside it, the body scrolling. The budget: 1366 × 768 at 150 % is 911 × 512 DIP; the Windows 11 taskbar is 48 DIP (recalled, not measured; the lens brief's 480 DIP budget took it as 32 DIP, the 48 physical pixels of 100 % scaling), leaving about 464 DIP, and a caption of about 32 DIP (recalled) with 420 fits. The first version's DECISIONS line ("640 × 470 so it fits with a 48 px taskbar (32 DIP)") was wrong on both counts.
+4. **(Minor) Try it focuses the practice box**, not Finish (a hotkey held without clicking first pasted into the button, and the step still counted it); the try-later line is a polite live region.
+5. **(Minor) The hotkey step gives focus to nothing**, as the old hotkey window did, so Space chosen as the hotkey does not also press "Use this hotkey"; Enter (never a hotkey) still presses it.
+6. **(Minor) The `// simplification:` comment** on `AppRules.Onboards` was missing; added, with the ceiling (a crash after the speech step means no window on the next start) and the trigger to retire it.
+7. **(Minor) The microphone test had no time limit.** It now closes the microphone about 5 s after "Heard you." (`MicrophoneStep.StopAfterHeardMs`) or after 60 s (`StopAfterMs`), keeps its result line, and shows "Test again".
+8. **(Minor) Copy.** "The included one is about 150 MB" only when base.en is on this PC, else "The Standard model is about 150 MB to download"; "downloaded … when you finish" is now "when you reach the end of these steps" (the download starts as Try it opens, before Finish); the accent explainer says "The Standard model works well…" only when the model in use is the Standard choice for its language, else "The model you chose works well…"; README "always left complete and valid" is now "always left valid". The PR body records the merge order: #28 merges only after #22 and #24 are on main.
+9. **(Minor) A microphone list that throws** (the Windows device list does with the audio service stopped) is caught and logged, and the step shows the no-microphone sentence.
+
+**Changed and new PROPOSED strings (21/10/2026).**
+
+| Where | String |
+|---|---|
+| 2 text without base.en (new) | Dictum keeps its speech models on this PC. The Standard model is about 150 MB to download; adding more models can take several gigabytes more. |
+| 3 without base.en (changed) | Choose how carefully Dictum listens. Bigger models are more accurate but slower. A model that is not on this PC yet is downloaded from huggingface.co when you reach the end of these steps. You can change this later in Settings > Models. |
+| 5 button (new) | Test again |
+| 6 explainer, another model in use (new) | Everyone's accent, voice and microphone are different. The model you chose works well for most people. If words come out wrong, choose a more accurate model in Settings > Models, or press Calibrate my voice to find which model hears you best. |
+
+**Pins and mutation checks (this round).** Each was observed failing on the reverted behaviour (applied alone, rebuilt, run, restored):
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| With_base_en_a_seeded_language_that_is_not_English_still_asks | (a) `AsksSpeech` back to `Plan.AsksPickers`; (b) base.en wins over a pick again | (a) failed: "included and ready" found; (b) failed: strings differ (base.en written) |
+| Hiss_under_the_silence_threshold_is_not_heard | "Heard you." counts any level above 1e-5 | failed: strings differ |
+| The_microphone_test_uses_the_settings_silence_threshold | the threshold fixed at 0.01 | failed: strings differ |
+| The_window_height_is_clamped_to_the_work_area | `FitHeight` returns the wanted height | failed: values differ |
+| Every_step_fits_at_150_percent_and_names_its_controls (budget corrected) | client height back to 470 | failed: "470 + 32 > 464" |
+| Try_it_focuses_the_practice_box | Try it focuses Finish | failed: not the same instance |
+| The_hotkey_step_focuses_nothing | the hotkey step focuses its primary button | failed: "focus is on Avalonia.Controls.Button" |
+| The_microphone_closes_after_hearing_you_and_can_test_again | no stop after "Heard you." | failed: `Assert.False` (microphone open) |
+| The_microphone_closes_after_a_minute | no one-minute stop | failed: `Assert.False` (microphone open) |
+| The_copy_follows_what_is_on_this_PC_and_what_was_chosen | (a) "the included one" always; (b) the Standard explainer always | (a) failed: sub-string not found; (b) failed: strings differ |
+| A_microphone_list_that_throws_says_no_microphone | the exception not caught | failed: COMException "The audio service is not running." |
+
+The existing microphone pins still use levels at or above 0.01 for "Heard you." (0.02, 0.05, 0.1), so they pass unchanged.
+
+**Verified after the lens fixes and the merge with c7d736d (head b097f03).** Full Release build (`--no-incremental`, no warning lines) and the full suite: 1597 tests, 1574 passed, 23 skipped (gated), 0 failed. The only change after that run is this line.
+
+**Merged with feat/simple-view at deda293 (main's PR #22 inside).** No conflicts. As planned in "Merge with PR #22": `OnboardingText.NoMicrophone` is gone and the step shows `NoSoundText.NoMicrophoneBalloon`, and `MicCheck.SoundFloor` is gone in favour of `CaptureBuffer.SoundFloor`; the words and the value are byte-identical to what this lane shipped, pinned by `The_no_microphone_sentence_and_the_floor_are_PR_22s_unchanged` (observed failing with the floor counted as sound, and with one character of the balloon changed). `OnboardingText.NothingHeard` stays its own constant (its opening, "Nothing heard.", is not the balloon's). The step-5 note ("If Dictum hears nothing when you dictate, it will tell you.") is now true in this tree.
+
+### Lens fixes (21/10/2026), lens on 36fa43e
+
+The lens on 36fa43e (and a854a41) verified the merge and the constant swaps and returned Needs changes on the microphone test and the window clamp. No new strings: every line below reuses existing copy.
+
+1. **(Major) Hiss for a minute ended on "Say a few words." beside a dead meter.** When the test closes at 60 s with nothing decided (hiss between the floor and `silence_threshold`), the line is now "Nothing heard. …" (existing copy).
+2. **(Major) `silence_threshold` 0 made digital silence "Heard you."** (the loader accepts 0 to 1, and level 0 is `>= 0`). A level now counts towards "Heard you." only when it is at or above the threshold and above `CaptureBuffer.SoundFloor`.
+3. **(Minor) The clamp had no pin on its wiring.** The placement is one pure function, `OnboardingWindow.Fit(height, frame, work, scaling, position) -> (height, position)`, pinned at 150 % on 1366 × 768 with a 48 DIP taskbar (recalled, not measured) and on second screens whose work area starts at a non-zero Y; the Opened handler counts its runs (`FitsOnOpen`, an internal property as the steps' other test seams are), and a pin checks it ran once on opening (the headless platform has a screen).
+4. **(Minor) One late tick could count as 3 s of speech.** The gap fed to `MicCheck` is capped at two ticks (`Math.Clamp(now - _last, 0, 2 * TickMs)`). Ceiling: if the timer always fires later than 100 ms, "about 3 s" takes longer.
+5. **(Minor)** The 48 DIP taskbar and 32 DIP caption are labelled recalled in the size pin's comment and in the PR's Not verified list; a check on a real 150 % desktop is still outstanding.
+
+**Pins and mutation checks (this round).** Each observed failing on the reverted behaviour (applied alone, rebuilt, run, restored):
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| The_microphone_closes_after_a_minute (extended: the line is "Nothing heard.") | the 60 s branch leaves the line alone | observed failing: strings differ |
+| A_threshold_of_zero_never_hears_digital_silence | the floor guard removed | observed failing: values are equal (Heard) |
+| Opening_the_window_fits_it_to_its_screen | the Opened hook removed | observed failing: values differ (0 runs) |
+| The_window_is_fitted_to_the_work_area_of_its_screen | `Fit` returns the position unchanged | observed failing: values differ |
+| One_late_tick_is_not_three_seconds_of_speech | the gap uncapped | observed failing: strings differ (Heard you.) |
+
+## Integration round on feat/simple-view (21/10/2026): merged main 8419f10; findings from the 787b300 and 86132af lenses
+
+**Merge.** `origin/main` at 8419f10 (PRs #30, #34, #32/#33, #22, #21) merged into the branch at ffb388a with a plain merge: no conflicts. DECISIONS keeps both tails, main's entries first. The public-copy sweep (`PublicCopyNeutralityTests`) passes on the merged tree; a grep for its word list found nothing to reword.
+
+**Simple view (lens on 787b300).**
+
+1. **(Major) Pins for the plain download question.** `A_plain_question_warns_when_little_space_would_be_left` checks the low-space warning reaches the plain question in its own words (and is absent with 2 GB to spare); `A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops` checks the `canWait = false` wording and its two buttons. The test prompts (`ScriptedPrompts`) now record the plain questions' words and then answer as the interface's defaults do.
+2. **(Minor) `GuardLine` is `WhisperLanguages.Problem`.** Its English-only branch could not be reached: `SimpleView.Tiers` offers an English-only model only for plain English without translate, which it can do. The two PROPOSED "English only: …" lines are removed.
+3. **(Minor) The busy question's name for the running download was remembered from when it started.** `ModelCoordinator` kept the tier name of each download it started from the Simple view; after a language change (English to es, say) it still called a running small.en "More accurate". The name is now read from the tiers in force when the question is asked (`PlainNameOf`), and nothing is remembered: a file that is no tier any more is named by its short name.
+4. **(Minor) "Add AI clean-up" is not offered in the Simple view, page or tray, while the text is not English.** No clean-up model runs on it (`TranscriptCleaner.Plain`), so the download would change nothing. English keeps it, and the Advanced view keeps it with every other detail.
+5. **Off.** `TranscriptCleaner.OffStatus` starts "no clean-up:", not "off:", as the tray name does ("Clean-up: off" read as Dictum being off). PROPOSED copy. Owner decision, not changed: for text that is not English, the Tidy row's line ("Tidies spacing only for <language>.") and Off do the same thing (whitespace only).
+
+**Onboarding (lens on 86132af).**
+
+1. **(Minor) The clamp's result had no pin.** `FitToWorkArea` now records `Fit`'s result (`LastFit`) and hands it to `Apply((double Height, PixelPoint Position))`, which holds the two assignments. `Opening_the_window_fits_it_to_its_screen` opens a window taller than the headless screen and below it, and checks the window's height and position equal `Fit`'s result; it then applies a 1366 × 768 at 175 % placement and checks it again.
+2. **(Minor) The 1 DIP floor in `Fit`** is kept, with a comment: it only keeps the height positive for a degenerate work area. 1366 × 768 at 175 % leaves about 359 DIP (inferred from the recalled 48 DIP taskbar and 32 DIP caption, not measured). The nav row's height is not a constant (it follows the 17 px text), so it was not used as the floor.
+3. **(Nit) `MicrophoneStep.Tick`'s clamp** carries a `// simplification:` naming its ceiling (a timer that always fires later than 100 ms makes "about 3 s" take longer) and its retire trigger (feed the check the capture's own sample time, or a report of the test running long).
+
+**Pins and mutation checks (this round).** Each was applied alone, the test project rebuilt, the pin run, the file restored:
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| A_plain_question_warns_when_little_space_would_be_left | the plain question is passed no warning | observed failing |
+| A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops | `PlainBusyText` ignores `canWait` | observed failing |
+| same | the coordinator passes `canWait: true` to the plain busy question | observed failing |
+| The_running_download_is_named_by_its_tier_in_force_when_asked | the name read with the English tiers whatever the language | observed failing |
+| same | `ModelCoordinator.cs` reverted to the branch's previous head (the remembered name) | observed failing |
+| Add_ai_clean_up_is_not_offered_in_simple_for_text_that_is_not_english | the page's language condition removed | observed failing |
+| same | the tray's language condition removed | observed failing |
+| CleanupOffTests.Off_wins_over_the_language_skip | `OffStatus` back to "off:" | observed failing |
+| Opening_the_window_fits_it_to_its_screen | `Apply`'s two assignments made no-ops (all 43 onboarding tests run) | observed failing (that pin only) |
+| same | the `Apply(fit)` call removed from `FitToWorkArea` | observed failing |
+
+## Final round on feat/simple-view (21/10/2026): merged main 500148a (PR #24, in-app Help); Help made true for the Simple view
+
+**Merge.** `origin/main` at 500148a merged with a plain merge (7d8d4be). Three conflicts:
+- This file's tail: both kept, main's entries first.
+- SPEC: both sides added "## 26." Main's In-app Help keeps §26. Onboarding is now **§27**, and its four references elsewhere in SPEC say §27. The two places above that cite "SPEC §26" for onboarding now read "SPEC §26, now §27".
+- `FlyoutWindow`'s class summary: this branch's tier wording and main's "six actions".
+
+**Help and the Simple view (all PROPOSED unless marked).** `HelpText` now holds for a user in the Simple view, which is the default:
+- "How Dictum works" gains a paragraph: "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. To paste exactly what was heard, with no tidying at all, choose Off there instead."
+- Its cloud sentence now also says what cloud clean-up sends, as "Where does my voice go?" does: "… and it is off unless you turn it on. If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here."
+- Accuracy: "For English, the speech model that comes with Dictum is a good place to start: it is Standard in Settings > Models. For other languages, Standard is a multilingual model, a download you choose." and "If words often come out wrong, open Settings > Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. To see every model by its name and size, choose Advanced at the top of that page." "Where it is listed" is there because a CPU with a language other than English has no Most accurate tier.
+- Model files: "Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words when the text is English) are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes)."
+- A twelfth question, "What does the name Dictum mean?" (PROPOSED), answered by the name line, **APPROVED verbatim by the owner 21/10/2026 22:21 AEDT** (`HelpText.NameLine`).
+- `FreeLine` and `FreeLaterNote` are unchanged (approved).
+
+`Every_label_the_help_names_exists_in_the_app` now runs in the Simple view with the rule-based tidy, the state the first run leaves with base.en. It also collects the tray pickers' entries, which the app shows. It checks Standard, More accurate, Most accurate, Advanced, Tidy my words, Off and Translate to English as exact labels, and "Add AI clean-up" as the start of a shown label, because the app appends its size or download mark.
+
+**Nits.**
+- `SimpleView.OffersAddCleanup(AppSettings)` is the one predicate for "Add AI clean-up", used by the page and the tray.
+- The busy question without room to wait now names the model asked for: "There is not enough space to download <tier> after <running>." in the Simple view, and "… download <model> after <running>." in the catalogue question (both PROPOSED; pins updated).
+
+**Mutation checks (this round).** Each was applied alone, the tests rebuilt and run, and the file restored:
+
+| Mutation | Pins | Observed |
+|---|---|---|
+| The name line's curly quotes made straight | The_name_question_carries_the_approved_line_verbatim | observed failing |
+| Accuracy reverted to "choose a bigger speech model in Settings > Models…" | Every_label_the_help_names_exists_in_the_app, The_help_names_the_simple_view_choices_as_the_app_does | observed failing (both) |
+| The app's tier renamed ("More accurate model") | the same two | observed failing (both) |
+| `OffersAddCleanup` ignores the language | The_help_names_the_simple_view_choices_as_the_app_does, SimpleViewTests.Add_ai_clean_up_is_not_offered_in_simple_for_text_that_is_not_english | observed failing (both) |
+| `OffersAddCleanup` always false | The_help_names_the_simple_view_choices_as_the_app_does | observed failing |
+| "Tidy my words" misnamed in the help | The_help_names_the_simple_view_choices_as_the_app_does | observed failing |
+| The cloud sentence's dictionary clause removed | Every_mention_of_turning_on_cloud_clean_up_says_what_it_sends | observed failing |
+| Simple busy text back to "download it after" | A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops | observed failing |
+| Catalogue busy text back to "download it after" | The_space_check_counts_the_download_already_running | observed failing |
+
+### Final-lens fixes (21/10/2026), lens on 4b5ee4f
+
+The lens returned Needs changes, with no blockers. Its findings and the fixes:
+
+1. **Off's line was untrue (orchestrator's decision: keep the behaviour, make the copy accurate).** Off skips the tidy only: the user's own corrections, snippets and the profanity filter (when on) still run after it (`DictationPipeline`). The lines now read (PROPOSED):
+   - Off's line: "Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply."
+   - The Advanced button and tray entry: "Off (paste what was heard)".
+   - The Advanced "In use:" suffix: " (paste what was heard; your corrections, snippets and the profanity filter still apply)".
+   - The Help's Off sentence: "To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply."
+   - README and SPEC follow.
+2. **The Help was true only in the Simple view.**
+   - Added (PROPOSED): "This help names the choices as the Simple view shows them; if you see model names instead, choose Simple at the top of that page."
+   - The model files answer now reads "(Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English)".
+   - The labels pin also opens the Advanced view and checks "Simple" is shown there.
+   - The onboarding's accent explainer now reads "choose More accurate in the Simple view of Settings > Models" (PROPOSED), so it holds when a seeded settings.json opens the Advanced view.
+3. **PR #21's safety was unpinned on the wizard path.**
+   - `Scratch.Shell` now takes a null `gpuMachine` (the app's own probe path) and a stand-in runtime probe. `ModelCoordinator.TestRuntimeProbe` is settable for that.
+   - `The_wizard_probes_the_runtime_with_the_seeded_gpu_setting` seeds `whisper.gpu = cpu` and checks the probe sees "cpu".
+4. **Two first-run rules were unpinned.**
+   - Without base.en and with no clean-up question, the wizard writes the rule-based tidy: an assertion was added to `Without_base_en_the_speech_step_offers_the_three_tiers`.
+   - The plan is looked up again after a folder is chosen: `The_plan_is_looked_up_again_after_a_folder_is_chosen` picks a folder already holding ggml-base.en.bin, and the speech step then says the Standard model is ready.
+5. **Shared builders, bytes unchanged.**
+   - `MicrophoneChoices.Build(devices, chosen)` serves the tray, Settings > Microphone and the onboarding test.
+   - `NoSoundText.SilentAdvice` is the tail of both "Nothing heard. …" and the "No sound from mic" balloon.
+   - Pins check the labels and both sentences byte for byte.
+6. **`OnboardingTests.cs` was 1,046 lines at 4b5ee4f (1,131 once this round's pins were added).** It is now one partial class in three files: `OnboardingTests.cs` (the steps and the first run), `OnboardingTests.Microphone.cs` and `OnboardingTests.Window.cs` (Try it, size, placement and focus). No test was renamed, and the class still runs 48 tests.
+
+**Mutation checks.** Each was applied alone, rebuilt, run and restored:
+
+| Mutation | Pin | Observed |
+|---|---|---|
+| The Help's "choose Simple" sentence removed | Every_label_the_help_names_exists_in_the_app, The_help_names_the_simple_view_choices_as_the_app_does | observed failing (both) |
+| The model files answer back to "when the text is English" | The_help_names_the_simple_view_choices_as_the_app_does | observed failing |
+| The Simple / Advanced switch hidden in the Advanced view | Every_label_the_help_names_exists_in_the_app | observed failing |
+| The accent explainer back to "in Settings > Models" | The_accent_explainer_says_where_More_accurate_is | observed failing |
+| `OnboardingFlow.Plan` calls `PlanFirstRun(null)` | The_wizard_probes_the_runtime_with_the_seeded_gpu_setting | observed failing |
+| The no-clean-up-pick branch in `AnswerFirstRun` made unreachable | Without_base_en_the_speech_step_offers_the_three_tiers | observed failing |
+| `_plan = null` removed from `CompleteFolder` | The_plan_is_looked_up_again_after_a_folder_is_chosen | observed failing |
+| Off's line back to "Paste exactly what was heard." | The_off_lines_say_what_still_applies | observed failing |
+| `SilentAdvice` reworded | The_nothing_heard_line_and_the_no_sound_balloon_share_their_advice | observed failing |
+| "(not connected)" changed in `MicrophoneChoices` | The_microphone_lists_are_built_in_one_place | observed failing |
+
+### Re-lens on 852f222 (21/10/2026): Off's status and the settings help
+
+The re-lens closed every finding of the final lens and raised one minor and one nit, both fixed:
+- **Minor:** the Off status now says what still applies (PROPOSED): "no clean-up: whitespace tidied only; your corrections, snippets and the profanity filter still apply (llm.provider = off)". It still starts with "no clean-up:".
+- **Nit:** the settings.json help text for `llm` (off) now reads "off (no clean-up: spaces tidied only; your corrections, snippets and the profanity filter still apply; spoken commands such as "new paragraph" are typed as words)".
+- **Pin:** `The_off_lines_say_what_still_applies` checks the status word for word. Mutation, with the old status put back: **observed failing**.
+
 ## Website help guide, landing infographic and the name line (21/10/2026, branch site/help-guide)
 
 1. **The guide lives at `/help`** (`site/help.html`; `vercel.json` has `cleanUrls`), the address of `HelpText.GuideUrl` on feat/in-app-help. Its copy is PROPOSED, for the owner to approve; it agrees with the in-app Help question for question and adds more.
-2. **The CSP gains `media-src 'self'`** so the guide's demo videos can play; under `default-src 'none'` they were blocked. Nothing else in the policy changes.
+2. **The CSP is unchanged.** An earlier commit on this branch added `media-src 'self'` for `<video>` demos. The demos are GIF-only on the site: the private-data guard refuses `.mp4`, and the GIFs and posters arrive through PR #36. So that change is reverted, and `site/vercel.json` matches main. The planned markup is a poster still with a Play `<details>` that shows the GIF. It needs no script and nothing beyond `img-src 'self'`.
 3. **Landing infographic** (owner, 21/10/2026): an inline SVG on `site/index.html` ("Dictum at a glance"), with all text as SVG `<text>`, colours from the site's tokens (light and dark), a wide version from 720 px and a tall one below, an `aria-label` and a visually hidden text equivalent. Its panel and badge copy is PROPOSED, except the free line, which is approved copy used verbatim. A shorter three-panel version sits in the guide's "Dictate" section.
 4. **The name line is approved copy** (owner, 21/10/2026, 22:21). It replaces the 22:00 version, which ended “something that has been said”, a phrase neither source below contains. It is used verbatim on the landing page (Why section) and in the guide's questions, with the Latin word in `<em>`: "The name: a dictum is a saying, something stated. From the Latin *dictum*, “something said”."
    - **Verified 21/10/2026**, Wiktionary, "dictum", https://en.wiktionary.org/wiki/dictum, Latin section, sense 1: "a word, saying, something said". Read as raw wikitext (`action=raw`). The same entry's Latin Etymology 1: "Neuter form of dictus (“said, spoken”), perfect passive participle of dīcō (“to say, to speak”)." Its English sense 1: "An authoritative statement; a dogmatic saying; a maxim, an apothegm."
@@ -3455,3 +3905,4 @@ ShellTests' Report a problem pin. Restored.
    - The empty `<video>` players are removed until the demo files exist. Their markup is kept in HTML comments.
    - Two roadmap items move to Done: languages, and long hands-free sessions.
    - The infographic's language badge reads "Works in 100 languages". **Verified 21/10/2026:** `git show origin/main:src/Dictum.Core/Transcribe/WhisperLanguages.cs | sed -n 27,46p | grep -o '("' | wc -l` prints 100. That is every entry of `WhisperLanguages.Table` on main at 8419f10, English included.
+7. **Aligned with the final in-app Help** (main cd46812, 22/10/2026). Every sentence of `HelpText.cs`' How Dictum works, Accuracy and Questions lists that the guide also says is now word for word the same in `site/help.html`. That makes 122 sentences, checked on the page's visible text. The exception is the in-app "Where is the full guide?" answer, whose site counterpart is "Is there help inside Dictum itself?". The guide's section 4 now has HelpText's heading, "Why Dictum hears some people better than others". Shared sentences use HelpText's straight apostrophes and quotes, while the rest of the site keeps curly ones.

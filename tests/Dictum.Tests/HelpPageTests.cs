@@ -71,7 +71,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Contains(text, shown);
 
-        Assert.Equal(11, HelpText.Questions.Count);
+        Assert.Equal(12, HelpText.Questions.Count);
         var blocks = All<Border>(page).Where(b => b.Focusable).Select(AutomationProperties.GetName).ToList();
         foreach (var entry in HelpText.Questions)
             Assert.Contains(entry.Question, blocks); // each question is its own tab stop, named after it
@@ -193,15 +193,19 @@ public class HelpPageTests
     [Fact]
     public Task Every_label_the_help_names_exists_in_the_app() => UiSession.Run(() =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        // The Simple view (ui.view's default) with the rule-based tidy and English, as the first run leaves a PC with base.en:
+        // the state the help describes, in which "Add AI clean-up" is offered (final round on the Simple view, 21/10/2026).
+        using var scratch = new Scratch("""{ "hotkey": "F24", "llm": { "provider": "none" } }""");
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: false);
+        Assert.True(shell.Settings.Ui.IsSimple);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         void Collect(ILogical root)
         {
             foreach (var b in All<Button>(root)) if (b.Content is string s) seen.Add(s);
             foreach (var t in All<TextBlock>(root)) if (t.Text is { } s) seen.Add(s);
             foreach (var c in All<Control>(root)) if (AutomationProperties.GetName(c) is { Length: > 0 } s) seen.Add(s);
+            foreach (var p in All<ComboBox>(root)) if (p.ItemsSource is IEnumerable<string> items) seen.UnionWith(items); // the tray pickers' entries
         }
 
         var flyout = new FlyoutWindow(shell);
@@ -234,14 +238,94 @@ public class HelpPageTests
             "General", "Models", "Storage", "Microphone", "Clean-up",
             "Press your hotkey", "Change…", "Use this hotkey", "Test microphone", "Model folder", "Browse…", "Remove Dictum completely…",
             "Try on the CPU", "Mic error", "No sound from mic", "Open the full guide", "Email support", "Help",
+            // The Simple view's names (final round, 21/10/2026).
+            "Standard", "More accurate", "Most accurate", "Advanced", "Tidy my words", "Off", "Translate to English",
         ];
         foreach (var label in named)
         {
             Assert.True(copy.Contains(label, StringComparison.Ordinal), $"the help does not name \"{label}\"");
             Assert.True(seen.Contains(label), $"the help names \"{label}\", which the app does not show");
         }
+        // "Add AI clean-up" shows with its download size or mark after it ("Add AI clean-up (1.1 GB download)"), so it is
+        // checked as the start of a label the app shows, on the page and in the tray.
+        Assert.True(copy.Contains(ModelsPage.AddCleanupLabel, StringComparison.Ordinal), "the help does not name Add AI clean-up");
+        Assert.Contains(seen, s => s.StartsWith(ModelsPage.AddCleanupLabel + " (", StringComparison.Ordinal));
+
+        // Final lens (M2): in the Advanced view the tier names are gone, and the help's way back, "Simple", is on the page.
+        shell.Write(("ui.view", System.Text.Json.Nodes.JsonValue.Create(Dictum.Settings.UiSettings.Advanced)));
+        Dispatcher.UIThread.RunJobs();
+        var advanced = new SettingsWindow(shell);
+        advanced.Show();
+        advanced.ShowPage("Models");
+        Dispatcher.UIThread.RunJobs();
+        var shownInAdvanced = All<Button>(advanced).Where(b => b.IsEffectivelyVisible).Select(b => b.Content as string).ToList();
+        Assert.Contains(Dictum.Settings.SimpleView.SimpleLabel, shownInAdvanced);
+        Assert.True(copy.Contains("choose Simple at the top of that page", StringComparison.Ordinal), "the help does not say how to get the Simple view");
+        advanced.Close();
         shell.Dispose();
     });
+
+    /// <summary>
+    /// Final round on the Simple view (21/10/2026), PROPOSED copy: the help names the speech and clean-up choices as the
+    /// Simple view (the default) shows them, says where Advanced is, and offers Add AI clean-up only where the app does.
+    /// </summary>
+    [Fact]
+    public void The_help_names_the_simple_view_choices_as_the_app_does()
+    {
+        var all = HelpText.AllText().ToList();
+        Assert.DoesNotContain(all, t => t.Contains("choose a bigger speech model", StringComparison.Ordinal)); // the Simple view has no such list
+        var accuracy = string.Join("\n", HelpText.Accuracy);
+        string[] tiers = [Dictum.Settings.SimpleView.StandardLabel, Dictum.Settings.SimpleView.MoreAccurateLabel, Dictum.Settings.SimpleView.MostAccurateLabel];
+        Assert.All(tiers, tier => Assert.Contains(tier, accuracy));
+        Assert.Equal(tiers, Dictum.Settings.SimpleView.Tiers(gpuMachine: true).Select(t => t.Label)); // the names the app offers
+        Assert.DoesNotContain(Dictum.Settings.SimpleView.MostAccurateLabel, Dictum.Settings.SimpleView.Tiers(false, "es").Select(t => t.Label)); // hence "where it is listed"
+        Assert.Contains("Most accurate where it is listed", accuracy);
+        Assert.Contains("choose " + Dictum.Settings.SimpleView.AdvancedLabel, accuracy, StringComparison.Ordinal);
+
+        var tidy = Assert.Single(HelpText.HowItWorks, p => p.StartsWith(Dictum.Settings.SimpleView.TidyLabel, StringComparison.Ordinal));
+        Assert.Contains("choose " + Dictum.Settings.SimpleView.OffLabel + " there", tidy);
+        Assert.Contains("only the spacing is tidied", tidy);
+
+        var files = HelpText.Questions.Single(q => q.Question.StartsWith("Where are the model files", StringComparison.Ordinal));
+        Assert.Contains(files.Answer, p => p.Contains("Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English", StringComparison.Ordinal));
+        // Final lens (M2): the help says it names the Simple view's choices, and how to get that view back.
+        Assert.Contains(HelpText.HowItWorks, p => p.Contains("if you see model names instead, choose " + Dictum.Settings.SimpleView.SimpleLabel + " at the top of that page", StringComparison.Ordinal));
+        // Off still runs the user's own corrections, snippets and the profanity filter, so the help does not say "exactly".
+        Assert.Contains("only your own corrections, snippets and the profanity filter (if on) still apply", tidy);
+        Assert.DoesNotContain(all, t => t.Contains("exactly what was heard", StringComparison.Ordinal));
+        var english = Dictum.Settings.SettingsLoader.Parse("""{ "llm": { "provider": "none" } }""").Settings;
+        var other = Dictum.Settings.SettingsLoader.Parse("""{ "llm": { "provider": "none" }, "whisper": { "language": "es" } }""").Settings;
+        Assert.True(Dictum.Settings.SimpleView.OffersAddCleanup(english));
+        Assert.False(Dictum.Settings.SimpleView.OffersAddCleanup(other)); // as the answer says
+    }
+
+    /// <summary>
+    /// Final round (21/10/2026), PROPOSED copy: every paragraph that tells the user how to turn on cloud clean-up also says
+    /// that the dictation's text and the dictionary go to the service (CleanupPrompt.Build sends both); the voice never does.
+    /// </summary>
+    [Fact]
+    public void Every_mention_of_turning_on_cloud_clean_up_says_what_it_sends()
+    {
+        var mentions = HelpText.AllText().Where(t => t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, mentions.Count); // "How Dictum works" and "Where does my voice go?"
+        Assert.All(mentions, t =>
+        {
+            Assert.Contains("the text of each dictation", t);
+            Assert.Contains("the words in your dictionary", t);
+            Assert.Contains("Your voice still stays here", t, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    /// <summary>The name line, APPROVED verbatim by the owner (21/10/2026 22:21 AEDT), is one question of the help.</summary>
+    [Fact]
+    public void The_name_question_carries_the_approved_line_verbatim()
+    {
+        Assert.Equal("The name: a dictum is a saying, something stated. From the Latin dictum, “something said”.", HelpText.NameLine);
+        var name = HelpText.Questions.Single(q => q.Question == "What does the name Dictum mean?");
+        Assert.Equal([HelpText.NameLine], name.Answer);
+        Assert.Equal(name, HelpText.Questions[^1]);
+        Assert.Contains(HelpText.NameLine, HelpText.AllText());
+    }
 
     /// <summary>
     /// Readable at 100 % and 150 %. Scaling shrinks the window's room in DIPs rather than changing the layout, so the page is

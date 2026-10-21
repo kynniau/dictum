@@ -33,7 +33,7 @@
 <main id="main" class="wrap doc guide">
   <h1>Help guide</h1>
   <p class="updated">Step by step, for Dictum 1.2 on Windows. Last updated <time datetime="2026-10-21">21/10/2026</time>.</p>
-  <p>Dictum types what you say. You hold down a key, speak, and let go. Your words appear wherever you were typing. This guide goes one step at a time. You do not need to know anything about computers to follow it.</p>
+  <p>Dictum types what you say into the program you are using. You hold down a key, speak, and let go. Your words appear wherever you were typing. This guide goes one step at a time. You do not need to know anything about computers to follow it.</p>
 
   <nav class="card toc" aria-labelledby="toc-title">
     <h2 id="toc-title">On this page</h2>
@@ -41,7 +41,7 @@
       <li><a href="#get">Get Dictum</a></li>
       <li><a href="#first-run">The first time you start Dictum</a></li>
       <li><a href="#dictate">Dictate: hold, speak, let go</a></li>
-      <li><a href="#accuracy">If Dictum gets your words wrong</a></li>
+      <li><a href="#accuracy">Why Dictum hears some people better than others</a></li>
       <li><a href="#views">Simple and Advanced</a></li>
       <li><a href="#models">Where the model files live</a></li>
       <li><a href="#privacy">Your privacy</a></li>
@@ -53,8 +53,8 @@
 
   <aside class="card" aria-labelledby="words-title">
     <h2 id="words-title">Two things to know first</h2>
-    <p><strong>The Dictum menu.</strong> Click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. The menu has Settings, Help and more.</p>
-    <p><strong>“Settings &gt; Models”</strong> means: open Settings from the Dictum menu, then choose Models on the left. This guide uses that shorthand for every page of Settings.</p>
+    <p><strong>The Dictum menu:</strong> click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. The menu has Settings, Help and more.</p>
+    <p>In this help, <strong>"Settings &gt; Models"</strong> means: open Settings from the Dictum menu, then choose Models on the left. This help names the choices as the Simple view shows them; if you see model names instead, choose Simple at the top of that page.</p>
   </aside>
 
   <section id="get" aria-labelledby="get-title">
@@ -83,11 +83,13 @@
       <li>Click <b>Finish</b>. Dictum starts.</li>
     </ol>
 
-    <!-- Demo video "install": restore this <video> once img/demos/install.mp4, .gif and -poster.png are committed.
-      <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/install-poster.png" aria-describedby="install-steps">
-        <source src="img/demos/install.mp4" type="video/mp4">
-        <img src="img/demos/install.gif" width="800" height="558" alt="Installing Dictum from the Downloads folder, one click at a time.">
-      </video>
+    <!-- Demo "install", planned (GIF only on the site; PR #36 adds img/demos/install.gif and install-poster.png).
+      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
+      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+      <details class="demo-play">
+        <summary><img src="img/demos/install-poster.png" width="800" height="558" alt="Installing Dictum from the Downloads folder, one click at a time."><span class="demo-play-label">Play</span></summary>
+        <img src="img/demos/install.gif" width="800" height="558" loading="lazy" alt="Installing Dictum from the Downloads folder, one click at a time.">
+      </details>
     -->
     <figure class="demo-video">
       <figcaption><span class="tag">Video coming</span> Installing Dictum. The steps above say the same in words.</figcaption>
@@ -158,16 +160,19 @@
           <li>Say a sentence.</li>
           <li>Let go. Your words appear in the box.</li>
         </ol>
-        <p>Dictum then explains that everyone’s accent, voice and microphone are different, and what to do if words come out wrong (see <a href="#accuracy">section 4</a>). Click <b>Finish</b>.</p>
+        <p>Dictum then says: “Everyone's accent, voice and microphone are different. The Standard model works well for most people. If words come out wrong, choose More accurate in the Simple view of Settings &gt; Models, or press Calibrate my voice to find which model hears you best.” (See <a href="#accuracy">section 4</a>.)</p>
+        <p>Click <b>Finish</b>.</p>
       </li>
     </ol>
     <p>If you close the window early, Dictum uses its usual settings for the steps you missed. You can change every one of them later in Settings.</p>
 
-    <!-- Demo video "first-run": restore this <video> once img/demos/first-run.mp4, .gif and -poster.png are committed.
-      <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/first-run-poster.png" aria-describedby="first-run-steps">
-        <source src="img/demos/first-run.mp4" type="video/mp4">
-        <img src="img/demos/first-run.gif" width="800" height="558" alt="Starting Dictum for the first time and going through the Welcome to Dictum window.">
-      </video>
+    <!-- Demo "first-run", planned (GIF only on the site; PR #36 adds img/demos/first-run.gif and first-run-poster.png).
+      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
+      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+      <details class="demo-play">
+        <summary><img src="img/demos/first-run-poster.png" width="800" height="558" alt="Starting Dictum for the first time and going through the Welcome to Dictum window."><span class="demo-play-label">Play</span></summary>
+        <img src="img/demos/first-run.gif" width="800" height="558" loading="lazy" alt="Starting Dictum for the first time and going through the Welcome to Dictum window.">
+      </details>
     -->
     <figure class="demo-video">
       <figcaption><span class="tag">Video coming</span> Starting Dictum for the first time. The steps above say the same in words.</figcaption>
@@ -181,11 +186,12 @@
     </figure>
     <ol id="dictate-steps">
       <li>Click where you want the words to go, for example in an email.</li>
-      <li>Hold down your hotkey. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard.</li>
-      <li>Speak in your normal voice. A small bar shows that Dictum is listening. It sits just above the taskbar, the strip along the bottom of the screen.</li>
+      <li>Hold down the Dictum key. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard. This key is called the hotkey.</li>
+      <li>Speak in your normal voice. A small bar above the taskbar shows that Dictum is listening. The taskbar is the strip along the bottom of the screen.</li>
       <li>Let go of the key. A moment later, your words appear where you clicked.</li>
     </ol>
-    <p>Dictum then tidies your words. This step is called clean-up. It puts in full stops, commas and capital letters, and takes out ums and ahs. You can turn clean-up off (see <a href="#faq-cleanup">the clean-up question</a>).</p>
+    <p>In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.</p>
+    <p>The tidying is called clean-up. You can turn it off (see <a href="#faq-cleanup">the clean-up question</a>).</p>
     <p>Say “new paragraph” to start a new paragraph.</p>
 
     <h3>Talking for a while? Use hands-free</h3>
@@ -203,11 +209,13 @@
     <h3>Turn Dictum off for a while</h3>
     <p>Open the Dictum menu. Use the on/off switch at the top right of the Dictum menu.</p>
 
-    <!-- Demo video "dictation-stills": restore this <video> once img/demos/dictation-stills.mp4, .gif and -poster.png are committed.
-      <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/dictation-stills-poster.png" aria-describedby="dictate-steps">
-        <source src="img/demos/dictation-stills.mp4" type="video/mp4">
-        <img src="img/demos/dictation-stills.gif" width="800" height="558" alt="Holding the hotkey, speaking, and letting go: the bar says Recording, then the words appear.">
-      </video>
+    <!-- Demo "dictation-stills", planned (GIF only on the site; PR #36 adds img/demos/dictation-stills.gif and dictation-stills-poster.png).
+      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
+      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+      <details class="demo-play">
+        <summary><img src="img/demos/dictation-stills-poster.png" width="800" height="558" alt="Holding the hotkey, speaking, and letting go: the bar says Recording, then the words appear."><span class="demo-play-label">Play</span></summary>
+        <img src="img/demos/dictation-stills.gif" width="800" height="558" loading="lazy" alt="Holding the hotkey, speaking, and letting go: the bar says Recording, then the words appear.">
+      </details>
     -->
     <figure class="demo-video">
       <figcaption><span class="tag">Video coming</span> A dictation from start to finish. The steps above say the same in words.</figcaption>
@@ -215,8 +223,10 @@
   </section>
 
   <section id="accuracy" aria-labelledby="accuracy-title">
-    <h2 id="accuracy-title">4. If Dictum gets your words wrong</h2>
-    <p>Everyone’s voice, accent and microphone are different, so a speech model hears some people better than others. The speech model that comes with Dictum is a good place to start. If words often come out wrong, try these, in order.</p>
+    <h2 id="accuracy-title">4. Why Dictum hears some people better than others</h2>
+    <p>Everyone's voice, accent and microphone are different, so a speech model hears some people better than others.</p>
+    <p>For English, the speech model that comes with Dictum is a good place to start: it is Standard in Settings &gt; Models. For other languages, Standard is a multilingual model, a download you choose.</p>
+    <p>If words often come out wrong, try these, in order.</p>
 
     <h3>Check your microphone</h3>
     <ol>
@@ -227,6 +237,7 @@
     </ol>
 
     <h3>Find the model that hears you best</h3>
+    <p>Not sure which one to choose? Open the Dictum menu and choose Calibrate my voice. You read ten short sentences aloud, and Dictum tells you which of the speech models on this PC hears you best.</p>
     <ol id="calibrate-steps">
       <li>Open the Dictum menu.</li>
       <li>Click <b>Calibrate my voice</b>.</li>
@@ -239,11 +250,13 @@
     </ol>
     <p>Calibrate my voice measures the models. It does not change them. The recordings it makes stay on this PC until you delete them.</p>
 
-    <!-- Demo video "test-setup": restore this <video> once img/demos/test-setup.mp4, .gif and -poster.png are committed.
-      <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/test-setup-poster.png" aria-describedby="calibrate-steps">
-        <source src="img/demos/test-setup.mp4" type="video/mp4">
-        <img src="img/demos/test-setup.gif" width="800" height="558" alt="Opening Calibrate my voice from the Dictum menu and recording the first sentence.">
-      </video>
+    <!-- Demo "test-setup", planned (GIF only on the site; PR #36 adds img/demos/test-setup.gif and test-setup-poster.png).
+      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
+      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+      <details class="demo-play">
+        <summary><img src="img/demos/test-setup-poster.png" width="800" height="558" alt="Opening Calibrate my voice from the Dictum menu and recording the first sentence."><span class="demo-play-label">Play</span></summary>
+        <img src="img/demos/test-setup.gif" width="800" height="558" loading="lazy" alt="Opening Calibrate my voice from the Dictum menu and recording the first sentence.">
+      </details>
     -->
     <figure class="demo-video">
       <figcaption><span class="tag">Video coming</span> Calibrate my voice. The steps above say the same in words.</figcaption>
@@ -256,7 +269,7 @@
       <li>Click <b>Download…</b> next to More accurate. If that model is already on this PC, the button says <b>Use</b> instead.</li>
       <li>When the download has finished, the button next to More accurate says <b>In use</b>.</li>
     </ol>
-    <p>Bigger models are more accurate, but slower. Each one is a download you choose.</p>
+    <p>If words often come out wrong, open Settings &gt; Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. To see every model by its name and size, choose Advanced at the top of that page.</p>
     <p><b>Most accurate</b> needs a strong PC, or patience. A graphics card helps a lot. A graphics card is the part of a computer that draws the screen; it is also called a GPU. On a PC without one, Most accurate can take longer than you spoke.</p>
 
     <h3>Teach Dictum a word</h3>
@@ -274,26 +287,28 @@
     <h3>What Simple shows</h3>
     <p>For the speech model, up to three choices:</p>
     <ul>
-      <li><b>Standard</b>. Included with Dictum. Works well for most people.</li>
-      <li><b>More accurate</b>. A bigger download, and a bit slower.</li>
-      <li><b>Most accurate</b>. Best results. Needs a strong PC, or patience.</li>
+      <li><b>Standard</b>: Included. Works well for most people.</li>
+      <li><b>More accurate</b>: Bigger download, a bit slower.</li>
+      <li><b>Most accurate</b>: Best results. Needs a strong PC or patience.</li>
     </ul>
     <p>What each line says depends on your PC. On a PC without a graphics card, Simple says so: the bigger choices take longer there.</p>
     <p>For clean-up (the step that tidies your words after they are heard), two choices:</p>
     <ul>
-      <li><b>Tidy my words</b> (recommended). Fixes punctuation and removes ums and ahs. Runs on this PC.</li>
-      <li><b>Off</b>. Pastes exactly what was heard.</li>
+      <li><b>Tidy my words (recommended)</b>: Fixes punctuation and removes ums and ahs. Runs on this PC.</li>
+      <li><b>Off</b>: Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.</li>
     </ul>
     <p>Each choice has a button on the right. <b>Use</b> switches to it. <b>Download…</b> fetches it first. <b>In use</b> means it is the one Dictum is using now.</p>
 
     <h3>What Advanced adds</h3>
     <p>Advanced lists every speech model and clean-up model, with its details. It also lets you choose a model file of your own. Most people never need it.</p>
 
-    <!-- Demo video "change-model": restore this <video> once img/demos/change-model.mp4, .gif and -poster.png are committed.
-      <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/change-model-poster.png" aria-describedby="views-title">
-        <source src="img/demos/change-model.mp4" type="video/mp4">
-        <img src="img/demos/change-model.gif" width="800" height="558" alt="Opening Settings, choosing Models, and clicking Use next to a speech model.">
-      </video>
+    <!-- Demo "change-model", planned (GIF only on the site; PR #36 adds img/demos/change-model.gif and change-model-poster.png).
+      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
+      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+      <details class="demo-play">
+        <summary><img src="img/demos/change-model-poster.png" width="800" height="558" alt="Opening Settings, choosing Models, and clicking Use next to a speech model."><span class="demo-play-label">Play</span></summary>
+        <img src="img/demos/change-model.gif" width="800" height="558" loading="lazy" alt="Opening Settings, choosing Models, and clicking Use next to a speech model.">
+      </details>
     -->
     <figure class="demo-video">
       <figcaption><span class="tag">Video coming</span> Changing the speech model. The steps under “Choose a more accurate model” say the same in words.</figcaption>
@@ -317,11 +332,13 @@
     <p>To free up space on the first drive, copy the models across yourself, or download them again. Then delete the old copies in Settings &gt; Storage, with <b>Delete…</b> next to each one.</p>
     <p>A folder on a network drive works, but models load slowly from it. A folder on this PC is faster. To go back to the usual folder, click <b>Use default</b>.</p>
 
-    <!-- Demo video "model-folder": restore this <video> once img/demos/model-folder.mp4, .gif and -poster.png are committed.
-      <video controls muted playsinline preload="none" width="1600" height="1116" poster="img/demos/model-folder-poster.png" aria-describedby="folder-steps">
-        <source src="img/demos/model-folder.mp4" type="video/mp4">
-        <img src="img/demos/model-folder.gif" width="800" height="558" alt="Choosing a model folder on drive D in Settings, Models.">
-      </video>
+    <!-- Demo "model-folder", planned (GIF only on the site; PR #36 adds img/demos/model-folder.gif and model-folder-poster.png).
+      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
+      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+      <details class="demo-play">
+        <summary><img src="img/demos/model-folder-poster.png" width="800" height="558" alt="Choosing a model folder on drive D in Settings, Models."><span class="demo-play-label">Play</span></summary>
+        <img src="img/demos/model-folder.gif" width="800" height="558" loading="lazy" alt="Choosing a model folder on drive D in Settings, Models.">
+      </details>
     -->
     <figure class="demo-video">
       <figcaption><span class="tag">Video coming</span> Keeping the models on another drive. The steps above say the same in words.</figcaption>
@@ -331,7 +348,7 @@
   <section id="privacy" aria-labelledby="privacy-title">
     <h2 id="privacy-title">7. Your privacy</h2>
     <p>Dictum turns your voice into text on this PC, then throws the recording away. Your voice never leaves this PC.</p>
-    <p>Cloud clean-up is off unless you turn it on. If you turn it on, the text of each dictation, and the words in your dictionary, are sent to the service you chose.</p>
+    <p>All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings &gt; Clean-up, and it is off unless you turn it on. If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here.</p>
     <p>In the words of our privacy policy:</p>
     <blockquote class="card">
       <p>We collect nothing. Dictum has no account, no analytics, no telemetry and no crash reporting. We never receive your audio or your text.</p>
@@ -343,7 +360,7 @@
     <h2 id="free-title">8. Free</h2>
     <p>Free: no subscription, no account, no ads, no analytics, no telemetry.</p>
     <p>The base product stays free to keep on your PC; optional paid extras may come later.</p>
-    <p>Dictum is open source, which means anyone can read the program’s code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
+    <p>There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
   </section>
 
   <section id="feedback" aria-labelledby="feedback-title">
@@ -392,23 +409,23 @@
           <p>Dictum can mishear words, just as people can. These things help:</p>
           <ul>
             <li>Keep the microphone close to your mouth, and speak at your normal speed.</li>
-            <li>If a name or word keeps coming out wrong, <a href="#faq-words">add it to the dictionary</a>.</li>
-            <li>To teach Dictum a fix, use <b>Fix last dictation</b> in the Dictum menu.</li>
-            <li>For better accuracy overall, see <a href="#accuracy">If Dictum gets your words wrong</a>.</li>
+            <li>If a name or word keeps coming out wrong, add it with Dictionary in the Dictum menu. (<a href="#faq-words">How to add a word</a>.)</li>
+            <li>To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.</li>
+            <li>For better accuracy overall, see <a href="#accuracy">"Why Dictum hears some people better than others"</a> above.</li>
           </ul>
         </div>
       </details>
 
       <details id="faq-no-sound">
-        <summary>It says “Mic error” or “No sound from mic”, or nothing happens when I talk. What do I check?</summary>
+        <summary>It says "Mic error" or "No sound from mic", or nothing happens when I talk. What do I check?</summary>
         <div class="answer">
-          <p>If Dictum shows “No sound from mic”, it says: Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.</p>
+          <p>If Dictum shows "No sound from mic", it says: Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.</p>
           <p>If Dictum cannot find a microphone at all, it says: No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.</p>
           <ul>
             <li>Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.</li>
             <li>Open Settings &gt; Microphone. Choose your microphone from the list, then choose <b>Test microphone</b> and speak. The bars move when Dictum hears you.</li>
-            <li>In Windows Settings, go to Privacy &amp; security &gt; Microphone. “Microphone access” and “Let desktop apps access your microphone” must both be on.</li>
-            <li>A remote or virtual desktop is a computer you use over the internet or your office network. Your own microphone has to be passed through to it. This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.</li>
+            <li>In Windows Settings, go to Privacy &amp; security &gt; Microphone. "Microphone access" and "Let desktop apps access your microphone" must both be on.</li>
+            <li>On a remote or virtual desktop (a computer you use over the internet or your office network), your own microphone has to be passed through to it. This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.</li>
           </ul>
         </div>
       </details>
@@ -438,8 +455,7 @@
         <div class="answer">
           <ol>
             <li>Open Settings &gt; General.</li>
-            <li>Under <b>Press your hotkey</b> (the hotkey is the key you hold), choose <b>Change…</b>.</li>
-            <li>Press the key you want.</li>
+            <li>Under Press your hotkey (the hotkey is the key you hold), choose Change…, then press the key you want.</li>
             <li>When Dictum shows its name, choose <b>Use this hotkey</b>.</li>
           </ol>
           <p>Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used, and neither can Enter or Space on their own.</p>
@@ -451,7 +467,7 @@
         <div class="answer">
           <p>Let go of the key. Dictum stops listening and types what you said.</p>
           <p>To cancel instead, press <kbd>Esc</kbd> before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc.</p>
-          <p>If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free. What is already typed stays; what you said since the last pause is dropped.</p>
+          <p>If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays. What you said since the last pause is dropped.</p>
           <p>To turn Dictum off for a while, use the on/off switch at the top right of the Dictum menu.</p>
         </div>
       </details>
@@ -480,10 +496,8 @@
       <details id="faq-closed">
         <summary>Dictum closed straight away when I opened it. What do I do?</summary>
         <div class="answer">
-          <p>On some PCs, Dictum 1.1.1 closed as soon as it started. The note for Dictum 1.1.2 says:</p>
-          <blockquote><p>Fixes Dictum closing straight away on PCs without a working graphics driver, such as virtual desktops.</p></blockquote>
-          <p>Install the latest version from the Microsoft Store, or from this website.</p>
-          <p>If the Dictum menu, or Settings &gt; About, shows a button called <b>Try on the CPU</b>, choose it. Dictum then runs the speech model on the computer’s main chip (the CPU) instead of the graphics card. This can be slower.</p>
+          <p>Dictum 1.1.2 fixes a start-up crash on PCs without a working Vulkan graphics driver (the app closed before its tray icon appeared; it now runs the speech model on the CPU there). If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.</p>
+          <p>If the Dictum menu, or Settings &gt; About, shows a button called <b>Try on the CPU</b>, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.</p>
           <p>If it still closes, email <a href="mailto:hello@kynni.com.au">hello@kynni.com.au</a> and tell us.</p>
         </div>
       </details>
@@ -550,10 +564,11 @@
         <summary>What does clean-up do? Can I turn it off?</summary>
         <div class="answer">
           <p>Clean-up tidies your words after Dictum hears them. You choose it in Settings &gt; Models, under <b>Clean-up model</b>.</p>
+          <p>Tidy my words, in Settings &gt; Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply.</p>
           <ul>
-            <li><b>Tidy my words</b> (recommended). Fixes punctuation and removes ums and ahs. Runs on this PC.</li>
-            <li><b>Add AI clean-up</b>. A bigger tidy-up model, about 1.1 GB to download, that also runs on this PC.</li>
-            <li><b>Off</b>. Pastes exactly what was heard.</li>
+            <li><b>Tidy my words (recommended)</b>: Fixes punctuation and removes ums and ahs. Runs on this PC.</li>
+            <li><b>Add AI clean-up</b>: a bigger tidy-up model, about 1.1 GB to download, that also runs on this PC.</li>
+            <li><b>Off</b>: Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.</li>
           </ul>
         </div>
       </details>
@@ -594,8 +609,8 @@
         <summary>Where are the model files, and how big are they?</summary>
         <div class="answer">
           <p>Settings &gt; Models shows the <b>Model folder</b>, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.</p>
-          <p>Bigger speech models and AI clean-up are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes).</p>
-          <p>To keep them on another drive, see <a href="#models">Where the model files live</a>. Settings &gt; Storage lists every model with its size, and you can delete the ones you do not need there.</p>
+          <p>Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English) are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes).</p>
+          <p>To keep them on another drive, choose Browse… beside Model folder in Settings &gt; Models. Settings &gt; Storage lists every model with its size, and you can delete the ones you do not need there. (Step by step: <a href="#models">Where the model files live</a>.)</p>
         </div>
       </details>
 
@@ -617,14 +632,11 @@
         <summary>How do I remove Dictum completely?</summary>
         <div class="answer">
           <ol>
-            <li>Open Settings &gt; Storage.</li>
-            <li>At the bottom, choose <b>Remove Dictum completely…</b></li>
-            <li>Dictum lists everything it will delete, with sizes. Read it.</li>
-            <li>Click <b>Continue</b>.</li>
-            <li>Type DELETE to confirm.</li>
-            <li>Click <b>Remove everything</b>.</li>
+            <li>Open Settings &gt; Storage. At the bottom, choose Remove Dictum completely…</li>
+            <li>Dictum first lists everything it will delete, with sizes. Read it, then click <b>Continue</b>.</li>
+            <li>Then it asks you to type DELETE to confirm. Type DELETE, then click <b>Remove everything</b>.</li>
           </ol>
-          <p>It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself. Otherwise Dictum removes the program too, unless its first warning says it cannot.</p>
+          <p>It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says it cannot.</p>
         </div>
       </details>
 
@@ -661,8 +673,9 @@
       <details id="faq-free">
         <summary>Is Dictum free?</summary>
         <div class="answer">
-          <p>Yes. There is no charge, no subscription and no word limit. See <a href="#free">Free</a>.</p>
-          <p>Dictum is open source, which means anyone can read the program’s code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
+          <p>Free: no subscription, no account, no ads, no analytics, no telemetry.</p>
+          <p>The base product stays free to keep on your PC; optional paid extras may come later.</p>
+          <p>There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
         </div>
       </details>
 

@@ -3,6 +3,7 @@ using Avalonia.Platform.Storage;
 using Dictum.App;
 using Dictum.Settings;
 using Dictum.UI.Views;
+using Dictum.UI.Views.Onboarding;
 
 namespace Dictum.UI.Shell;
 
@@ -28,11 +29,10 @@ public sealed class ShellDialogs : IShellDialogs
         return window.Confirmed;
     });
 
-    public string HotkeyCheck(AppShell shell, string current) => Modal.OnUi(() =>
+    public void Onboard(OnboardingFlow flow) => Modal.OnUi(() =>
     {
-        var window = new HotkeyCheckWindow(shell, current);
-        Modal.Run(window);
-        return window.Result;
+        new OnboardingWindow(flow).RunFirstSteps();
+        return true;
     });
 
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir)
@@ -88,6 +88,15 @@ public sealed class ShellDialogs : IShellDialogs
 
     public bool ConfirmDownload(string fileName, string sizeText, string note) =>
         Ask("Download a model", ModelPromptText.ConfirmText(fileName, sizeText, note), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
+
+    /// <summary>The Simple view's download question (1.2): the same window and buttons, in plain words.</summary>
+    public bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning) =>
+        Ask("Download a model", ModelPromptText.PlainConfirmText(plainName, sizeText, warning), new DialogChoice("Download", IsDefault: true), new DialogChoice("Cancel")) == 0;
+
+    /// <summary>The Simple view's busy question (1.2): the same window and answers as <see cref="ConfirmDownloadWhileBusy"/>, in plain words.</summary>
+    public BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true) =>
+        ModelPromptText.BusyAnswer(Ask("Download a model", ModelPromptText.PlainBusyText(plainName, sizeText, warning, running, runningProgress, canWait),
+            BusyDialogChoices(plainName, canWait)), canWait);
 
     /// <summary>
     /// The same question window with three answers: Download after it (Enter), Stop … and download … (it deletes progress),

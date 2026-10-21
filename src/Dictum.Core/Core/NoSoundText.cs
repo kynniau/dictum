@@ -10,9 +10,11 @@ public static class NoSoundText
     /// <summary>The pill, while recording goes on with no sound and when the recording ends that way.</summary>
     public const string Pill = "No sound from mic";
 
+    /// <summary>What to check when the microphone delivers only silence: the balloon's advice, and the onboarding microphone test's.</summary>
+    public const string SilentAdvice = "Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.";
+
     /// <summary>The balloon when the microphone delivers only silence.</summary>
-    public const string SilentBalloon =
-        "Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.";
+    public const string SilentBalloon = "Dictum is not hearing anything. " + SilentAdvice;
 
     /// <summary>The balloon when the system lists no microphone at all.</summary>
     public const string NoMicrophoneBalloon =
