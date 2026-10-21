@@ -3164,6 +3164,29 @@ reword without it.** Generated from `HelpText` (the constants are the source; th
 >
 > It opens in your web browser and needs the internet. Everything on this page works without the internet.
 
+### Help reconciled with main (21/10/2026, after PR #29 and the merge of origin/main 8419f10)
+
+All PROPOSED, awaiting the product owner's review; the three strings are constants in `HelpText.cs` and pinned by
+`The_crash_free_and_calibration_answers_carry_the_reconciled_copy` (observed failing on the reverted wording).
+
+- **Start-up crash.** The "Dictum closed straight away" answer now opens with the 1.1.2 note's sentence word for word
+  (`HelpText.CrashFixLine`, the same text as docs/STORE.md "CHANGED SINCE THE LAST SUBMISSION") and keeps its second
+  sentence about installing the latest version. The old "Dictum 1.1.1 closed..." and "The version you are using now has
+  the fix" sentences are gone. The microphone answer already reused `NoSoundText` (PR #29) and no literal in `HelpText.cs`
+  repeats a `NoSoundText` sentence.
+- **Is Dictum free?** The answer is two paragraphs: `HelpText.FreeLine` ("Free: no subscription, no account, no ads, no
+  analytics, no telemetry.") and `HelpText.FreeLaterNote` (new). The earlier answer (no charge, open source, MIT, Kynni Pty
+  Ltd) was replaced, not added to. **Source check:** `FreeLine` was supplied by the orchestrator as an approved Store
+  line, but on origin/main docs/STORE.md has "No account, no analytics, no telemetry" and no "Free:" line; the nearest
+  text is PR #25's unmerged, PROPOSED line "Free: no subscription, no account, no ads". So the string is not verified as
+  approved anywhere in the repository; it needs the owner's nod either way.
+- **Test exemption.** The old pin forbade the words telemetry and analytics anywhere in the Help. It now removes the one
+  `FreeLine` sentence before scanning, so any other use of those words still fails.
+- **Calibration.** The tray button on this branch is "Calibrate my voice" (FlyoutWindow.cs); the Help uses that name and
+  nothing else (pinned). A 1.2 rename to "Test your setup" is planned and not done: it must change the button and the Help
+  together (`Every_label_the_help_names_exists_in_the_app` fails until it does).
+- **Tier names.** Model names are untouched; reconcile after feat/simple-view merges.
+
 ## Feedback and feature requests through the user's mail program (21/10/2026, branch feat/feedback, lane F, stacked on feat/in-app-help)
 
 **The decision (Kyle, as relayed by the orchestrator, 21/10/2026).** Users need a way to say what they would like Dictum to do.
