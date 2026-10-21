@@ -393,13 +393,6 @@ h1 {
   margin-top: 28px;
 }
 
-.cta-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
-
 .note,
 .aside {
   max-width: 40em;
@@ -1322,10 +1315,6 @@ h1 {
 .guide-steps ol,
 .guide-steps ul {
   margin-top: 8px;
-}
-
-.callout {
-  border-left: 4px solid var(--accent);
 }
 
 .guide blockquote {
