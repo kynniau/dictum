@@ -100,10 +100,10 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 - **Mode**: **Light** | **Full** (see "Mode presets"); neither is selected when settings.json matches neither (Custom).
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
   (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;
-  choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy**.
+  choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy** and **Off (paste exactly what was heard)**.
   In the Simple view (the default, `ui.view`) the pickers show the plain choices instead: **Standard**, **More
   accurate** and **Most accurate** for speech, and **Tidy my words** (with **Add AI clean-up** while the rule-based
-  tidy is in use) for clean-up, with the same download marks; a model chosen in the Advanced view shows as
+  tidy is in use) and **Off** for clean-up, with the same download marks; a model chosen in the Advanced view shows as
   "Custom: <name>". The Advanced view shows the model names as above.
 - **Microphone** picker (System default, or a named device: `audio.device`) and a level meter that moves while you
   dictate.
@@ -128,7 +128,7 @@ an edit made in the file is picked up within a second and shows in the window.
 |---|---|
 | General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), **Hands-free stops after** (30 seconds to 60 minutes), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
 | Mode | Light or Full, with what each means on this PC. |
-| Models | A **Simple \| Advanced** switch at the top (`ui.view`; Simple is the default, see "Speech models"). Simple: an explainer with **Calibrate my voice**, the three plain speech choices and **Tidy my words**. Advanced: every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
+| Models | A **Simple \| Advanced** switch at the top (`ui.view`; Simple is the default, see "Speech models"). Simple: an explainer with **Calibrate my voice**, the three plain speech choices, **Tidy my words** and **Off**. Advanced: every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, **Rule-based tidy only** and **Off (paste exactly what was heard)**, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
 | Storage | Where everything is, the model folders in the order Dictum looks in them, free space, every model file with its folder, size and Delete (none for the models that come with Dictum), delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
@@ -374,8 +374,9 @@ The mapping reuses the existing recommendation (base.en, or medium.en on a GPU) 
 (small.en, or large-v3-turbo on a GPU, for Full). A model in use that is none of the three shows as "Custom: <name>".
 The plain choices are English-only models (and large-v3-turbo); for another language use the Advanced view (see
 "Other languages and translation"). Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
-recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model. Cloud clean-up is
-never offered in the Simple view.
+recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model, or **Off**, which
+pastes exactly what was heard with no clean-up at all (see "Cleanup"). Cloud clean-up is never offered in the Simple
+view.
 
 `base.en` comes with Dictum (see "First run"). The others are stored in the model folder
 (`%LOCALAPPDATA%\Dictum\models` unless you choose another: see "Model folder") as `ggml-<name>.bin`, downloaded from
@@ -692,7 +693,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `whisper.threads` | `0` | CPU threads; 0 = Whisper.net's default. |
 | `whisper.gpu` | `"auto"` | `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `auto`: the same when the Vulkan loader (`vulkan-1.dll`, installed with a GPU driver that supports Vulkan) loads on this PC; when it does not, Vulkan cannot load either, so `auto` starts straight on the CPU (the log says why). `cpu`: CPU, then CPU-without-AVX, including on the first start, when Dictum looks at the GPU to recommend a model. The runtime is chosen once per start, so a change needs a restart; a model loaded after a change to `cpu` already stays off the GPU. A model whose load or warm-up fails on the GPU is loaded once more on the CPU, and a start after the GPU ended Dictum while it loaded the model uses the CPU-only runtime for that run (Troubleshooting, "Dictum quits by itself"). |
 | `whisper.beam_size` | `0` | `0` = greedy decoding (fastest); `1`–`8` = beam search with that many beams (more accurate, slower). Calibration's **Use this** writes it. |
-| `llm.provider` | `"local"` when the key is absent; the first run writes `"none"` when base.en comes with Dictum (a seeded value is kept) | `local` (the cleanup model on this PC; Settings > Models > Add AI clean-up writes it), `none` (rule-based tidy only), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
+| `llm.provider` | `"local"` when the key is absent; the first run writes `"none"` when base.en comes with Dictum (a seeded value is kept) | `local` (the cleanup model on this PC; Settings > Models > Add AI clean-up writes it), `none` (rule-based tidy only), `off` (no clean-up: the text as whisper wrote it, spaces tidied only; see "Cleanup"), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
 | `llm.model` | your first-run pick (`qwen2.5-1.5b` if the file has no value) | For `local`: a cleanup catalogue name or an absolute path to a `.gguf`; the Clean-up picker and Settings > Models write this. Anything else (for example `claude-haiku-5-5` left by the first build) is treated as unset and the recommendation is used (logged). For `openai-compatible`: the server's model id. With `anthropic` a local name means `claude-haiku-5-5`. |
 | `llm.gpu` | `"auto"` | Cleanup model backend. `vulkan`: try Vulkan, then CPU. `auto`: the same, except that when every GPU Vulkan finds is integrated graphics the CPU build is used (faster there: on the development PC's Intel UHD P630 and 6-core Xeon, 2.1-2.2 s per clean-up against 4.2-4.3 s on Vulkan, qwen2.5-1.5b, 17/10/2026). Dictum learns the GPUs from the speech model's runtime, so `auto` keeps Vulkan on such a PC when that runtime is the CPU-only one (`whisper.gpu = cpu`, which **Try on the CPU** writes, or a start after the GPU ended Dictum on the speech model) or when no speech model load has been asked for (a missing speech model, say), and `--bench-cleanup` always times Vulkan there; set `llm.gpu` to `cpu` for the CPU build in those cases. `cpu`: CPU only. The backend is chosen once per start, so a change needs a restart; a model loaded after a change to `cpu` already stays off the GPU. A model whose load or warm-up fails on the GPU is loaded once more on the CPU, and a start after the GPU ended Dictum while it loaded the model uses the CPU build for that run. |
 | `llm.base_url` | `null` | Required for `openai-compatible`, e.g. `http://localhost:11434/v1`. For `anthropic` it is optional and replaces `https://api.anthropic.com` (e.g. a company gateway). The `ANTHROPIC_BASE_URL` environment variable is ignored. Because both providers share this key, a URL left over from `openai-compatible` would receive the Anthropic key and transcripts: Dictum logs a warning and shows a balloon "Anthropic requests will go to <host>" whenever `anthropic` is used with a `base_url`. |
@@ -758,6 +759,15 @@ Cleanup removes filler words and false starts, fixes punctuation and casing, app
 3. **The fallback, for every provider:** if the model is not loaded yet, runs past its deadline, or its reply fails
    the checks below, the rule-based tidy is pasted and the reason is logged (never the text). A cleanup failure never
    stops the paste.
+
+**`off`: no clean-up** (Settings > Models > **Off**, or **Off (paste exactly what was heard)** in the Advanced view
+and the tray panel). The text is pasted as whisper wrote it: only the spaces are tidied (the ends trimmed, and runs of
+spaces, tabs and line breaks made one space). Nothing else changes: no filler removal, no capitals, no full stop, and
+spoken commands are not applied, so saying "new paragraph", "new line", "comma" or "scratch that" types those words.
+No cleanup model is loaded and nothing is sent anywhere, so Settings > Privacy and the tray panel still say "Nothing
+leaves this PC". Your corrections, the profanity filter and snippets still run after it, as they do with every
+clean-up. Example: "um so the quick brown fox uh jumps" is pasted as "um so the quick brown fox uh jumps". `none` is
+still the rule-based tidy.
 
 **Deadline:** 10 s plus 0.1 s per dictated word, at least `llm.timeout_ms` (15 s by default) and at most 60 s. It is
 a hard limit: Dictum stops waiting then, and tells the model to stop, even if it has not stopped. Before calling the

@@ -210,7 +210,7 @@ public sealed class SimpleViewTests
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
         var cleanup = Labels(flyout, "Clean-up");
-        Assert.Equal([SimpleView.TidyLabel, $"{ModelsPage.AddCleanupLabel} (download)"], cleanup);
+        Assert.Equal([SimpleView.TidyLabel, $"{ModelsPage.AddCleanupLabel} (download)", SimpleView.OffLabel], cleanup);
         Assert.All(cloudWords, w => Assert.DoesNotContain(cleanup, l => l.Contains(w, StringComparison.Ordinal)));
         flyout.Close();
 

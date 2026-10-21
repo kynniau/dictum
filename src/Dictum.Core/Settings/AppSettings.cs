@@ -92,9 +92,16 @@ public sealed record LlmSettings
     public const string Anthropic = "anthropic";
     public const string OpenAiCompatible = "openai-compatible";
     public const string NoProvider = "none";
+
+    /// <summary>
+    /// No clean-up (1.2, 21/10/2026): the transcript is pasted as whisper wrote it, with whitespace tidied only: no model, no
+    /// rules, no spoken commands (<see cref="Llm.TranscriptCleaner.Off"/>). Not <see cref="NoProvider"/>, which stays the rule-based tidy.
+    /// </summary>
+    public const string Off = "off";
+
     public const string AnthropicDefaultModel = "claude-haiku-5-5";
 
-    /// <summary>local (default, llama.cpp in-process), anthropic, openai-compatible, or none (rule-based tidy only).</summary>
+    /// <summary>local (default, llama.cpp in-process), anthropic, openai-compatible, none (rule-based tidy only), or off (no clean-up, whitespace only).</summary>
     public string Provider { get; init; } = Local;
 
     /// <summary>local: a cleanup catalogue name or an absolute .gguf path; cloud providers: the model id.</summary>

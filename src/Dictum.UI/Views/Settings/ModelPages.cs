@@ -70,6 +70,7 @@ internal sealed class ModelsPage : SettingsPage
     private readonly Segments _view;
     private readonly StackPanel _simpleSpeech = new() { Spacing = 8 };
     private readonly StackPanel _simpleCleanup = new() { Spacing = 8 };
+    private readonly StackPanel _simpleOff = new() { Spacing = 8 }; // the Off row, under "Add AI clean-up" so that button stays under the Tidy row
     private readonly Control[] _simpleOnly;
     private readonly Control[] _advancedOnly;
     private string _drawn = "";
@@ -139,9 +140,10 @@ internal sealed class ModelsPage : SettingsPage
         var decoding = Ui.Line("Decoding", _decoding, "Beam search tries several readings of each phrase.");
         var cleanupButtons = Ui.Row(8,
             Ui.Button("Rule-based tidy only", "secondary", () => Run(Shell.Models.SelectRulesOnly)),
+            Ui.Button(SimpleView.OffAdvancedLabel, "secondary", () => Run(Shell.Models.SelectOff)),
             Ui.Button("Choose .gguf file…", "secondary", () => Run(Shell.Models.ChooseCleanupFile)));
         var cloudNote = Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption");
-        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup];
+        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff];
         _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote];
         Compose(
             Ui.Stack(6, _view, Ui.Text(SimpleView.SwitchHelp, "caption")),
@@ -154,7 +156,7 @@ internal sealed class ModelsPage : SettingsPage
                 Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
                 _languageNote), "Language"),
             // "Add AI clean-up" is one button in both views: under the Tidy row in Simple, above the catalogue in Advanced.
-            Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _simpleCleanup, _addCleanup, _cleanup,
+            Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _simpleCleanup, _addCleanup, _simpleOff, _cleanup,
                 cleanupButtons, cloudNote), "Clean-up model"),
             Ui.Card(Ui.Stack(8, folderRow, Ui.Text(FolderNote, "caption"), _folderWarning), FolderLabel),
             Ui.Button("Storage: model sizes, free space and Delete", "link", () => _window.ShowPage("Storage")));
@@ -233,6 +235,7 @@ internal sealed class ModelsPage : SettingsPage
         // Only the view shown is built: the other's rows are dropped, and built afresh when the view is switched.
         _simpleSpeech.Children.Clear();
         _simpleCleanup.Children.Clear();
+        _simpleOff.Children.Clear();
         _speech.Children.Clear();
         _cleanup.Children.Clear();
         if (s.Ui.IsSimple)
@@ -261,12 +264,15 @@ internal sealed class ModelsPage : SettingsPage
                 inUse, have, e.FileName, () => Run(() => Shell.Models.SelectCleanup(e.Name))));
         }
         if (current is null)
-            _cleanup.Children.Add(Ui.Text($"In use: {Shell.Models.CurrentCleanupName}{(s.Llm.Provider == LlmSettings.NoProvider ? " (rule-based tidy)" : "")}", "caption"));
+        {
+            var note = s.Llm.Provider switch { LlmSettings.NoProvider => " (rule-based tidy)", LlmSettings.Off => SimpleView.OffInUseNote, _ => "" };
+            _cleanup.Children.Add(Ui.Text($"In use: {Shell.Models.CurrentCleanupName}{note}", "caption"));
+        }
     }
 
     /// <summary>
     /// The Simple view (ui.view = simple): the three speech tiers of <see cref="SimpleView.Tiers"/> for this machine class, a
-    /// Custom row for a model in use that is none of them, and "Tidy my words". Each row is a catalogue row (the same states,
+    /// Custom row for a model in use that is none of them, "Tidy my words" and "Off". Each row is a catalogue row (the same states,
     /// Downloading 42% included, and the same Select path); no cloud provider is offered here.
     /// </summary>
     private void DrawSimple(AppSettings s, bool gpu)
@@ -292,9 +298,12 @@ internal sealed class ModelsPage : SettingsPage
         var tidyState = !tidy ? null : s.Llm.Provider == LlmSettings.Local ? SimpleView.TidyWithAiState : "In use";
         _simpleCleanup.Children.Add(ModelRow(SimpleView.TidyTitle, tidyState is null ? SimpleView.TidySubLine : $"{tidyState} · {SimpleView.TidySubLine}",
             tidy ? null : "Use", () => Run(() => UseTidy(Shell)), out _, name: tidy ? null : SimpleView.ActionName("Use", SimpleView.TidyLabel)));
-        if (!tidy)
+        var off = SimpleView.OffInUse(s.Llm);
+        if (!tidy && !off)
             _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), $"In use · {SimpleView.CustomNote}", null, () => { }));
-        // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use, sits under this row.
+        // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use, sits under this row; Off under it.
+        _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, off ? $"In use · {SimpleView.OffSubLine}" : SimpleView.OffSubLine,
+            off ? null : "Use", () => Run(Shell.Models.SelectOff), out _, name: off ? null : SimpleView.ActionName("Use", SimpleView.OffLabel)));
     }
 
     private static int IndexOfModel(string name)

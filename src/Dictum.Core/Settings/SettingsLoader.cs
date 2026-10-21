@@ -235,7 +235,7 @@ public static class SettingsLoader
         if (r is null) return d;
         var s = new LlmSettings
         {
-            Provider = r.String("provider", d.Provider, OneOf(LlmSettings.Local, LlmSettings.Anthropic, LlmSettings.OpenAiCompatible, LlmSettings.NoProvider)).ToLowerInvariant(),
+            Provider = r.String("provider", d.Provider, OneOf(LlmSettings.Local, LlmSettings.Anthropic, LlmSettings.OpenAiCompatible, LlmSettings.NoProvider, LlmSettings.Off)).ToLowerInvariant(),
             Model = r.String("model", d.Model, v => string.IsNullOrWhiteSpace(v) ? "expected a model id" : null),
             BaseUrl = r.NullableString("base_url", BaseUrlProblem),
             TimeoutMs = r.Int("timeout_ms", d.TimeoutMs, 1000, 120000),

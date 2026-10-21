@@ -87,7 +87,7 @@ public sealed class DictationPipeline
         // reload, such as cloud clean-up switched on mid-session) gets none: they were said before it was switched on.
         var cleaned = await cleaner.CleanAsync(raw, token, ReferenceEquals(part?.CarriedFrom, cleaner) ? carried : null).ConfigureAwait(false);
         var text = cleaned.Text;
-        _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : "the rule-based tidy")} in {sw.ElapsedMilliseconds} ms.");
+        _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : cleaner.IsPlain ? "the whitespace-only tidy" : "the rule-based tidy")} in {sw.ElapsedMilliseconds} ms.");
         if (settings.LogTranscripts) _log.Info($"Cleaned transcript: {text}");
         // The boundary rule decides the first letter before corrections, the profanity filter and snippets run, so a snippet
         // is still pasted exactly as written; the separator goes in front of the finished text. Text that is not English (the
