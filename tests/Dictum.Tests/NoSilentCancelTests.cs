@@ -418,6 +418,66 @@ public sealed class NoSilentCancelTests : IDisposable
         Assert.Contains("Warning: this leaves only", _prompts.LastNote, StringComparison.Ordinal);
     }
 
+    /// <summary>Lens on 787b300 (major i): the Simple view's plain question carries the low-space warning, in its own words.</summary>
+    [Fact]
+    public void A_plain_question_warns_when_little_space_would_be_left()
+    {
+        long @base = ModelCatalog.Find("base.en")!.Bytes;
+        var free = @base + Storage.DiskSpace.WarnBelowBytes - 1; // under 2 GB would be left, nothing else pending
+        var coordinator = Make(free: _ => free);
+        _prompts.Confirm = false;
+        coordinator.Select("base.en", "Standard");
+        var question = Assert.Single(_prompts.PlainQuestions);
+        Assert.StartsWith($"Download Standard ({ModelCatalog.Find("base.en")!.SizeText})? {ModelPromptText.PlainCheck}.\n\nWarning: this leaves only", question, StringComparison.Ordinal);
+        Assert.DoesNotContain(ModelCatalog.DownloadHost, question);
+
+        free += 2; // 2 GB would be left: no warning
+        coordinator.Select("base.en", "Standard");
+        Assert.Equal($"Download Standard ({ModelCatalog.Find("base.en")!.SizeText})? {ModelPromptText.PlainCheck}.", _prompts.PlainQuestions[^1]);
+        Assert.Equal(0, _server.InFlight); // both declined
+    }
+
+    /// <summary>
+    /// Lens on 787b300 (major ii): when the choice fits only if the running download stops (canWait false), the plain busy
+    /// question says so and offers only Stop and Cancel.
+    /// </summary>
+    [Fact]
+    public async Task A_plain_busy_question_says_when_it_fits_only_if_the_running_download_stops()
+    {
+        long tiny = Payload.Length, @base = ModelCatalog.Find("base.en")!.Bytes;
+        var free = tiny + @base + Storage.DiskSpace.SpareBytes - 1; // enough for base.en alone, not beside tiny.en
+        var coordinator = await TinyDownloading(_ => free);
+        _prompts.Busy = BusyDownloadChoice.Cancel;
+        coordinator.Select("base.en", "Standard");
+        var text = Assert.Single(_prompts.PlainQuestions);
+        Assert.StartsWith("tiny.en is downloading (", text, StringComparison.Ordinal);
+        Assert.Contains($"There is not enough space to download it after tiny.en. Stop tiny.en and download Standard ({ModelCatalog.Find("base.en")!.SizeText}) now?", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("after it, or stop", text, StringComparison.Ordinal);
+        Assert.Equal(["Stop it and download Standard", "Cancel"], _prompts.BusyQuestions[^1].Buttons);
+        Assert.Equal(DownloadState.None, coordinator.DownloadStateOf("ggml-base.en.bin")); // Cancel changed nothing
+        Assert.Equal(0, _server.Cancelled);
+    }
+
+    /// <summary>
+    /// Lens on 787b300 (stale tier name): the busy question names the running download by its tier in force when it is asked,
+    /// not the tier it had when it started; a language change that leaves it no tier names it by its file.
+    /// </summary>
+    [Fact]
+    public async Task The_running_download_is_named_by_its_tier_in_force_when_asked()
+    {
+        var coordinator = Make();
+        coordinator.Select("small.en", "More accurate"); // English on a CPU: More accurate is small.en
+        Assert.True(await Eventually(() => _server.InFlight == 1), "small.en never started downloading");
+        _prompts.Busy = BusyDownloadChoice.Cancel;
+        coordinator.Select("medium.en", "Most accurate");
+        Assert.StartsWith("More accurate is downloading (", _prompts.PlainQuestions[^1], StringComparison.Ordinal);
+
+        _settings = SettingsLoader.Parse("""{ "whisper": { "model": "base.en", "language": "es" } }""").Settings; // the tiers are now small and medium
+        coordinator.Select("small", "Standard");
+        Assert.StartsWith("small.en is downloading (", _prompts.PlainQuestions[^1], StringComparison.Ordinal);
+        Assert.Equal(0, _server.Cancelled);
+    }
+
     /// <summary>Second lens 1a: small.en downloading, Full pressed (small.en and qwen2.5-1.5b missing): small.en is downloaded once.</summary>
     [Fact]
     public async Task Full_pressed_while_its_speech_model_downloads_downloads_it_once()

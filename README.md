@@ -106,7 +106,7 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy** and **Off (paste exactly what was heard)**.
   In the Simple view (the default, `ui.view`) the pickers show the plain choices instead: **Standard**, **More
   accurate** and **Most accurate** for speech, and **Tidy my words** (with **Add AI clean-up** while the rule-based
-  tidy is in use) and **Off** for clean-up, with the same download marks; a model chosen in the Advanced view shows as
+  tidy is in use and the text is English) and **Off** for clean-up, with the same download marks; a model chosen in the Advanced view shows as
   "Custom: <name>". The Advanced view shows the model names as above.
 - **Microphone** picker (System default, or a named device: `audio.device`) and a level meter that moves while you
   dictate.
@@ -409,7 +409,8 @@ language is never offered. On a PC without a GPU the lines say how slow the bigg
 speed"). Choosing a model to download asks in plain words: "Download More accurate (487 MB)? It comes from the model
 makers' official download page and is checked before use." A model in use that is none of the choices shows as
 "Custom: <name>". Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
-recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model, or **Off**, which
+recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model (offered only while
+the text is English: no clean-up model runs on any other language), or **Off**, which
 pastes exactly what was heard with no clean-up at all, in any language (see "Cleanup"). Cloud clean-up is never
 offered in the Simple view.
 

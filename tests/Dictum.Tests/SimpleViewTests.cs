@@ -353,8 +353,10 @@ public sealed class SimpleViewTests
                 Assert.Null(Dictum.Transcribe.WhisperLanguages.Problem(t.Model, language, translate)); // every tier can do what the settings ask
             });
         }
-        Assert.Equal("English only: switch to Advanced to choose a model for Spanish.", SimpleView.GuardLine("base.en", "es", false));
-        Assert.Equal("English only: switch to Advanced to choose a model that detects the language.", SimpleView.GuardLine("small.en", "auto", false));
+        // An English-only model is a tier only for plain English, so its guard is the existing problem sentence (lens on 787b300).
+        Assert.Equal(Dictum.Transcribe.WhisperLanguages.Problem("base.en", "es", false), SimpleView.GuardLine("base.en", "es", false));
+        Assert.NotNull(SimpleView.GuardLine("small.en", "auto", false));
+        Assert.Null(SimpleView.GuardLine("base.en", "en", false));
         Assert.Null(SimpleView.GuardLine("small", "es", false));
         Assert.Equal(Dictum.Transcribe.WhisperLanguages.Problem("small", "yue", false), SimpleView.Tiers(false, "yue")[0].Guard); // Cantonese: large-v3 only
         Assert.Equal(SpeechTier.Standard, SimpleView.TierOf("small", false, "es")!.Tier);
@@ -499,6 +501,36 @@ public sealed class SimpleViewTests
         All<ComboBox>(flyout).Single(c => AutomationProperties.GetName(c) == "Clean-up").SelectedIndex = 1;
         Assert.Equal(LlmSettings.NoProvider, shell.Settings.Llm.Provider); // the recommended model is not on this PC: the rule-based tidy
         flyout.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Lens on 787b300: "Add AI clean-up" is not offered in the Simple view, page or tray, while the text is not English (no
+    /// clean-up model runs on it); English keeps it, and so does the Advanced view.
+    /// </summary>
+    [Fact]
+    public Task Add_ai_clean_up_is_not_offered_in_simple_for_text_that_is_not_english() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "small", "language": "es" }, "llm": { "provider": "none" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = ModelsWindow(shell);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        Button AddAi() => All<Button>(window).Single(b => b.Content is string c && c.StartsWith(ModelsPage.AddCleanupLabel, StringComparison.Ordinal));
+        Assert.False(AddAi().IsEffectivelyVisible);
+        Assert.Equal([SimpleView.TidyLabel, SimpleView.OffLabel], Labels(flyout, "Clean-up"));
+
+        shell.Write(("whisper.language", System.Text.Json.Nodes.JsonValue.Create("en")));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(AddAi().IsEffectivelyVisible);
+        Assert.Contains(Labels(flyout, "Clean-up"), l => l.StartsWith(ModelsPage.AddCleanupLabel, StringComparison.Ordinal));
+
+        shell.Write(("whisper.language", System.Text.Json.Nodes.JsonValue.Create("es")), ("ui.view", System.Text.Json.Nodes.JsonValue.Create(UiSettings.Advanced)));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(AddAi().IsEffectivelyVisible); // the Advanced view keeps it, with every other detail
+        flyout.Close();
+        window.Close();
         shell.Dispose();
     });
 }

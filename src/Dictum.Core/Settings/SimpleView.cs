@@ -112,17 +112,12 @@ public static class SimpleView
         : $"Tidies spacing only for {WhisperLanguages.Name(language)}.";
 
     /// <summary>
-    /// The line of a tier the Simple view cannot offer with these language settings, or null. An English-only model gets the
-    /// PROPOSED line below; any other problem (Cantonese on a model without it, say) shows <see cref="WhisperLanguages.Problem"/>.
+    /// The line of a tier the Simple view cannot offer with these language settings, or null: the existing
+    /// <see cref="WhisperLanguages.Problem"/> sentence (Cantonese on a model without it, say). An English-only model never needs
+    /// a line of its own: <see cref="Tiers"/> offers one only for plain English without translate, which it can do (lens on
+    /// 787b300, 21/10/2026, removed the unreachable "English only: …" lines).
     /// </summary>
-    public static string? GuardLine(string model, string language, bool translate)
-    {
-        if (WhisperLanguages.Problem(model, language, translate) is not { } problem) return null;
-        if (!WhisperLanguages.IsEnglishOnlyModel(model)) return problem;
-        return language == WhisperLanguages.Auto
-            ? "English only: switch to Advanced to choose a model that detects the language."
-            : $"English only: switch to Advanced to choose a model for {WhisperLanguages.Name(language)}.";
-    }
+    public static string? GuardLine(string model, string language, bool translate) => WhisperLanguages.Problem(model, language, translate);
 
     /// <summary>
     /// The CPU's most accurate English choice. The catalogue's own trade-off says "high accuracy; wants a GPU or a fast desktop

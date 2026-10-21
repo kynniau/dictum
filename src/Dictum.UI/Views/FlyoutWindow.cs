@@ -348,9 +348,9 @@ internal sealed class FlyoutWindow : Window
     }
 
     /// <summary>
-    /// ui.view = simple: "Tidy my words", "Add AI clean-up" (marked like a catalogue entry) while the rule-based tidy is in use,
-    /// "Off" (llm.provider = off), and a Custom entry for anything else in use. No cloud provider is offered here; one chosen in
-    /// Advanced shows as Custom.
+    /// ui.view = simple: "Tidy my words", "Add AI clean-up" (marked like a catalogue entry) while the rule-based tidy is in use
+    /// and the text is English (no clean-up model runs on any other: lens on 787b300), "Off" (llm.provider = off), and a Custom
+    /// entry for anything else in use. No cloud provider is offered here; one chosen in Advanced shows as Custom.
     /// </summary>
     private void FillSimpleCleanup(AppSettings s)
     {
@@ -358,7 +358,7 @@ internal sealed class FlyoutWindow : Window
         var ai = CleanupCatalog.Find(SimpleView.TidyModel(gpu))!;
         var names = new List<string> { TidyEntry };
         var labels = new List<string> { SimpleView.TidyLabel };
-        if (s.Llm.Provider == LlmSettings.NoProvider)
+        if (s.Llm.Provider == LlmSettings.NoProvider && Dictum.Transcribe.WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate))
         {
             names.Add(ai.Name);
             labels.Add(_shell.Models.IsCleanupDownloaded(ai) ? Settings.ModelsPage.AddCleanupLabel : $"{Settings.ModelsPage.AddCleanupLabel}{DownloadMark(ai.FileName)}");

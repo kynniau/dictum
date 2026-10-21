@@ -96,8 +96,11 @@ public sealed class TranscriptCleaner
     /// </summary>
     public static TranscriptCleaner Off() => new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, OffStatus, plain: true);
 
-    /// <summary>The off cleaner's <see cref="Status"/>, shown on Settings > Clean-up and About. PROPOSED copy (21/10/2026).</summary>
-    public const string OffStatus = "off: the text is pasted as whisper wrote it, whitespace tidied only (llm.provider = off)";
+    /// <summary>
+    /// The off cleaner's <see cref="Status"/>, shown on Settings > Clean-up and About. PROPOSED copy (21/10/2026). It starts "no clean-up",
+    /// not "off", as the tray name does (lens on 787b300): "Clean-up: off" read as Dictum being off.
+    /// </summary>
+    public const string OffStatus = "no clean-up: the text is pasted as whisper wrote it, whitespace tidied only (llm.provider = off)";
 
     /// <summary>
     /// True when only whitespace is tidied: the text is not English (<see cref="Plain"/>), or clean-up is off (<see cref="Off"/>).

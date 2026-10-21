@@ -99,10 +99,17 @@ public sealed class ModelCoordinator(
     }
 
     /// <summary>
-    /// The Simple view's names of the downloads it started (1.2), by destination, so a later busy question names the running
-    /// download as the user chose it ("More accurate"), not by its file.
+    /// The Simple view's name for the download running to <paramref name="destination"/> ("More accurate", 1.2), read from the
+    /// tiers in force when the question is asked, or its short name when it is none of them (a clean-up model, or a file the
+    /// language or the machine class no longer maps to a tier). Read each time, not remembered from when it started: a name
+    /// kept from then went stale when the language changed the tiers (lens on 787b300, 21/10/2026).
     /// </summary>
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _plainNames = new(StringComparer.OrdinalIgnoreCase);
+    private string PlainNameOf(string destination)
+    {
+        var s = settings();
+        var gpu = gpuMachine is not null ? gpuMachine() : WhisperEngine.GpuMachine;
+        return SimpleView.TierOf(ShortName(destination), gpu, s.Whisper.Language, s.Whisper.Translate)?.Label ?? ShortName(destination);
+    }
 
     /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
     public string ModelPath
@@ -508,7 +515,6 @@ public sealed class ModelCoordinator(
         void Start()
         {
             SetChoice(speech, token);
-            if (plainName is not null) _plainNames[token] = plainName;
             StartDownload(spec, destination, Apply); // behind a running download, it waits its turn (ModelDownloads.Start)
         }
         if (_downloads.CurrentDestination is not { } runningTo)
@@ -523,7 +529,7 @@ public sealed class ModelCoordinator(
         var answer = plainName is null
             ? prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), progress, canWait)
             : prompts.ConfirmPlainDownloadWhileBusy(spec.FileName, plainName, sizeText, SpaceWarning(spec.Bytes, exceptRunning: !canWait),
-                _plainNames.TryGetValue(Path.GetFullPath(runningTo), out var runningPlain) ? runningPlain : ShortName(runningTo), progress, canWait);
+                PlainNameOf(runningTo), progress, canWait);
         switch (answer)
         {
             case BusyDownloadChoice.DownloadAfter:

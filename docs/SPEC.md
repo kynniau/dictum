@@ -381,7 +381,7 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   Amended 21/10/2026 (1.2, §10.1): the tray panel's two pickers follow `ui.view`. Simple (the
   default) lists the three speech tiers by their plain names (Standard, More accurate, Most
   accurate) and, for clean-up, "Tidy my words" plus "Add AI clean-up" while the rule-based tidy
-  is in use, then "Off" (no clean-up, §5); a model in use that is none of them is listed first as "Custom: <name>". The
+  is in use and the text is English, then "Off" (no clean-up, §5); a model in use that is none of them is listed first as "Custom: <name>". The
   "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
   lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
 - About (version, runtime, no network statement).
@@ -510,15 +510,18 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   `medium`, and on a GPU Most accurate `large-v3-turbo` (`large-v3` when translating); a CPU has
   no multilingual Most accurate, as the catalogue has nothing above `medium` that does not need
   a GPU. A tier whose model `WhisperLanguages.Problem` rules out is never offered: its row has
-  no button, only "English only: switch to Advanced to choose a model for <language>." or the
-  existing problem sentence, and the tray leaves it out. Lines on a CPU: "Bigger download. Takes
+  no button, only the existing problem sentence, and the tray leaves it out (an English-only
+  model is a tier only for plain English, so it never needs a line of its own; lens on 787b300,
+  21/10/2026). Lines on a CPU: "Bigger download. Takes
   a few seconds longer on this PC." and "Slow without a graphics card: can take longer than you
   spoke." (README "Measured speed"); on a GPU "Bigger download, a bit slower." and "Best results.
   Needs a strong PC or patience."
 - **Clean-up (Simple).** One row, "Tidy my words (recommended)": in use while `llm.provider` is
   `none` (the rule-based tidy) or `local` with the recommended model (state "In use, with AI
   clean-up"). The existing **Add AI clean-up (<size> download)** button sits under it while the
-  rule-based tidy is in use. From a Custom clean-up, its **Use** button selects the recommended
+  rule-based tidy is in use and the text is English (no clean-up model runs on text in any other
+  language, so the Simple view does not offer the download then; Advanced still shows it; lens on
+  787b300, 21/10/2026). From a Custom clean-up, its **Use** button selects the recommended
   model when it is on this PC, else the rule-based tidy. Anything else in use (another local
   model, a .gguf file, a cloud provider chosen in Advanced) is a "Custom: <name>" row. Cloud
   clean-up is never offered in the Simple view; the Advanced view keeps its pointer to Settings

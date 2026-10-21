@@ -226,7 +226,9 @@ internal sealed class ModelsPage : SettingsPage
 
         var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(gpu).Model)!;
         _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
-        _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider;
+        // Not in the Simple view while the text is not English: no clean-up model runs on it (TranscriptCleaner.Plain), so the
+        // 1.1 GB download would change nothing (lens on 787b300, 21/10/2026). Advanced keeps it, with every other detail.
+        _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider && (!s.Ui.IsSimple || WhisperLanguages.OutputIsEnglish(s.Whisper.Language, s.Whisper.Translate));
         // While that model downloads or waits its turn, the button is disabled and named for why, as its row is (lens, 19/10/2026).
         var fetch = Shell.Models.DownloadStateOf(recommended.FileName);
         _addCleanup.IsEnabled = fetch == DownloadState.None;
@@ -312,7 +314,7 @@ internal sealed class ModelsPage : SettingsPage
         var off = SimpleView.OffInUse(s.Llm);
         if (!tidy && !off)
             _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), SimpleView.CustomNote, null, () => { }));
-        // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use, sits under this row; Off under it.
+        // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use on English text, sits under this row; Off under it.
         // Off has no language dependency (it never runs a clean-up), so unlike the tiers it is offered for every language.
         _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, off ? $"In use · {SimpleView.OffSubLine}" : SimpleView.OffSubLine,
             off ? null : "Use", () => Run(Shell.Models.SelectOff), out _, name: off ? null : SimpleView.ActionName("Use", SimpleView.OffLabel)));

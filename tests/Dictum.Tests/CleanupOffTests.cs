@@ -158,6 +158,7 @@ public sealed class CleanupOffTests
         var cleaner = TranscriptCleaner.Create(OffSettings, false, SecretStore.Empty, http, NullLog.Instance, englishText: false);
         Assert.True(cleaner.IsPlain);
         Assert.Equal(TranscriptCleaner.OffStatus, cleaner.Status);
+        Assert.StartsWith("no clean-up: ", cleaner.Status, StringComparison.Ordinal); // not "off:", which read as Dictum being off (lens on 787b300)
     }
 
     /// <summary>
