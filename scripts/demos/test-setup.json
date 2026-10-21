@@ -44,7 +44,7 @@
     },
     {
       "id": "record",
-      "caption": "Click Record, then read the sentence in your normal voice.",
+      "caption": "Click Record and read the sentence aloud.",
       "do": [ { "do": "click", "target": { "window": "calibrate my voice$", "type": "Button", "name": "Record sentence", "match": "prefix" } } ],
       "after": 4
     },

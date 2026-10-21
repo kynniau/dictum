@@ -93,11 +93,15 @@ function Copy-CaptionFont([string]$WorkDir) {
     Copy-Item -LiteralPath $font -Destination (Join-Path $WorkDir "caption.ttf")
 }
 
-# A GIF with a palette made for the video, made smaller (width, then frame rate) until it is under $MaxMB.
-function New-DemoGif([string]$Exe, [string]$Mp4, [string]$Gif, [int]$Width, [int]$Fps, [double]$MaxMB, [string]$WorkDir) {
+# A GIF with a palette made for the video, made smaller (width, then frame rate) until it is under $MaxMB. -FullPalette
+# builds a 256-colour palette from every pixel of every frame instead (stills: a small coloured mark on one slide, such as
+# the pill's green tick, is otherwise lost to a 128-colour palette built from what changes between frames).
+function New-DemoGif([string]$Exe, [string]$Mp4, [string]$Gif, [int]$Width, [int]$Fps, [double]$MaxMB, [string]$WorkDir, [switch]$FullPalette) {
+    $palette = if ($FullPalette) { "palettegen=stats_mode=full:max_colors=256[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" }
+               else { "palettegen=stats_mode=diff:max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" }
     foreach ($try in @(@($Width, $Fps), @([int]($Width * 0.8), $Fps), @([int]($Width * 0.8), [math]::Max(5, $Fps - 3)), @([int]($Width * 0.6), 5))) {
         Invoke-Ffmpeg $Exe @("-hide_banner", "-y", "-i", $Mp4, "-vf",
-            "fps=$($try[1]),scale=$($try[0]):-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff:max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle", $Gif) $WorkDir
+            "fps=$($try[1]),scale=$($try[0]):-1:flags=lanczos,split[a][b];[a]$palette", $Gif) $WorkDir
         if ((Get-Item -LiteralPath $Gif).Length -le $MaxMB * 1MB) { return }
     }
     Write-Warning "$Gif is still over $MaxMB MB at the smallest setting."

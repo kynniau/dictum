@@ -11,7 +11,7 @@
   "steps": [
     {
       "id": "open",
-      "caption": "Open your Downloads folder. Double-click Dictum-Setup.",
+      "caption": "Double-click Dictum-Setup in your Downloads folder.",
       "do": [
         { "do": "doubleClick", "target": { "window": "^Downloads", "type": "ListItem", "name": "Dictum-Setup", "match": "prefix" } },
         {

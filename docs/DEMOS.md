@@ -148,7 +148,8 @@ Inside, nothing on the host can appear in a video, and the host PC stays usable 
 
 `prepare` runs before recording starts; `steps` are recorded, one caption each. A step can carry `"optional": true`
 (skipped, and not shown, when its first target does not appear), `"skipIf": <target>` (skipped when that is already
-on screen), `"poster": true`, and its own `lead` and `after`. `environment.extraModels` names files in the host's model
+on screen), `"poster": true`, `"scrollFirst": true` (its first target is scrolled into view before the caption
+appears, for text further down a page), and its own `lead` and `after`. `environment.extraModels` names files in the host's model
 folder (`-ModelsDir`, default `%LOCALAPPDATA%\Dictum\models`). Only those files are copied, to a staging folder that is
 mapped read-only, and then copied in by `modelsFromHost`: the folder itself is never mapped and no model is ever
 downloaded.
@@ -245,15 +246,16 @@ videos are hosted is the product owner's decision.
 | 6. Find help | `help.json` | Settings > Help: Send feedback (shown, not pressed), How Dictum works, two of the questions and answers |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
 
-Each recorded demo's `prepare` goes through the welcome window with its defaults (Next, Next, Next, Use this hotkey,
-Next, Finish) before recording starts.
+change-model, test-setup, model-folder and help go through the welcome window with its defaults (Next, Next, Next,
+Use this hotkey, Next, Finish) before recording starts. install and first-run do not: install ends on the welcome
+window, and first-run records it.
 
 ## PROPOSED caption copy
 
 1. **Install Dictum** (`install.json`)
-   1. Open your Downloads folder. Double-click Dictum-Setup.
-   2. If Windows says it protected your PC, click More info. *(only when that dialog appears)*
-   3. Then click Run anyway. *(only when that dialog appears)*
+   1. Double-click Dictum-Setup in your Downloads folder.
+   2. If Windows says it protected your PC, click More info. *(online only: not seen in these recordings, so the video counts 7 steps)*
+   3. Then click Run anyway. *(online only: not seen in these recordings, so the video counts 7 steps)*
    4. If Windows says SmartScreen can't be reached, click Run. *(only when that dialog appears)*
    5. Setup opens. Click Next.
    6. Click Install.
@@ -270,7 +272,7 @@ Next, Finish) before recording starts.
    7. This is the key you hold while you speak. Right Ctrl is already chosen.
    8. Click Use this hotkey.
    9. Dictum tests your microphone. This test PC has none, so it says so.
-   10. With a microphone, say a few words first. Then click Next.
+   10. Click Next. With a microphone, you would say a few words first.
    11. Last, try it: click in the box, hold Right Ctrl, say a sentence, let go.
    12. Click Finish.
    13. Dictum now waits by the clock. Click the little up-arrow there. *(skipped when the icon is already on the taskbar)*
@@ -292,14 +294,14 @@ Next, Finish) before recording starts.
    2. Click the Dictum icon.
    3. Click Calibrate my voice.
    4. Dictum shows a sentence to read aloud.
-   5. Click Record, then read the sentence in your normal voice.
+   5. Click Record and read the sentence aloud.
    6. This test PC has no microphone, so Dictum says so here.
 5. **Keep the models on another drive** (`model-folder.json`)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
    3. Click Settings.
    4. Click Models, on the left.
-   5. Scroll down to Model folder. Click Browse.
+   5. Click Browse, under Model folder.
    6. Type the folder you want, for example D:\Dictum models.
    7. Click Select Folder.
    8. Done. Dictum now keeps new models on drive D.

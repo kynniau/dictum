@@ -60,7 +60,8 @@
       "do": [
         { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "The only recordings Dictum keeps", "match": "prefix" } }
       ],
-      "after": 3
+      "after": 3,
+      "scrollFirst": true
     },
     {
       "id": "wrong",
@@ -71,7 +72,8 @@
           "target": { "window": "^Dictum settings$", "type": "Text", "name": "Keep the microphone close to your mouth", "match": "contains" }
         }
       ],
-      "after": 3
+      "after": 3,
+      "scrollFirst": true
     }
   ]
 }

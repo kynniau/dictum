@@ -44,7 +44,7 @@
     },
     {
       "id": "browse",
-      "caption": "Scroll down to Model folder. Click Browse.",
+      "caption": "Click Browse, under Model folder.",
       "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Browse for a model folder" } } ]
     },
     {

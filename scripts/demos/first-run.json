@@ -75,7 +75,7 @@
     },
     {
       "id": "mic-next",
-      "caption": "With a microphone, say a few words first. Then click Next.",
+      "caption": "Click Next. With a microphone, you would say a few words first.",
       "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } } ]
     },
     {

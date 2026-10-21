@@ -324,13 +324,19 @@ try {
             $first = @($step.do | Where-Object { $_.PSObject.Properties["target"] -and $_.do -in "click", "doubleClick", "point" } | Select-Object -First 1)
             if ($first) {
                 $wait = [int]([double](Value $first[0].target "timeout" 30) * 1000)
-                if (-not (Find-Target $first[0].target $wait)) {
+                $found = Find-Target $first[0].target $wait
+                if (-not $found) {
                     if (Value $step "optional" $false) {
                         $entry.skipped = $true; $entry.ok = $true; $entry.actions += "optional, not shown: $(Describe $first[0].target)"
                         $log.steps += $entry
                         Note "step ${label}: optional target absent"
                         continue
                     }
+                } elseif (Value $step "scrollFirst" $false) {
+                    # "scrollFirst": scroll the target into view before the caption appears, so a caption about text further
+                    # down a page is never shown over the part above it.
+                    [void][DemoUi]::EnsureVisible($found, [int]($pace.glide * 1000))
+                    $entry.actions += "scrolled into view before the caption: $(Describe $first[0].target)"
                 }
             }
             $entry.start = Epoch
