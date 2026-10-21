@@ -33,6 +33,9 @@ public sealed class FixBatchModelTests : IDisposable
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    /// <summary>How long a test waits before it reports that a signal never came; order decides these tests, so it is generous.</summary>
+    private const int FailAfterMs = 30_000;
+
     private static async Task<bool> Eventually(Func<bool> condition, int timeoutMs = 5000)
     {
         var sw = Stopwatch.StartNew();
@@ -119,10 +122,12 @@ public sealed class FixBatchModelTests : IDisposable
         FakeSpeechEngine? engine = null;
         var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => engine = new FakeSpeechEngine(p, d, waitForCancel: true), gpuInUse: () => true);
         models.BeginLoad(Model("ggml-small.en.bin"), new WhisperSettings());
-        Assert.True(await Eventually(() => engine is not null));
-        await Task.Delay(100, Ct); // the warm-up is running
+        Assert.True(await Eventually(() => engine is not null, FailAfterMs), "the speech GPU load never began");
+        await engine!.TranscribeStarted.WaitAsync(TimeSpan.FromMilliseconds(FailAfterMs), Ct); // the warm-up is running
+        Assert.False(engine.TranscribeCancelled.IsCompleted); // nothing but quit can end it
         models.Dispose();
-        Assert.True(await Eventually(() => engine!.Disposed, 1500), "the warm-up ran on after quit and its engine was never released");
+        await engine.TranscribeCancelled.WaitAsync(TimeSpan.FromMilliseconds(FailAfterMs), Ct); // times out if quit never cancels it
+        Assert.True(await Eventually(() => engine.Disposed, FailAfterMs), "the warm-up ran on after quit and its engine was never released");
     }
 
     [Fact]
@@ -131,10 +136,12 @@ public sealed class FixBatchModelTests : IDisposable
         FakeLocalEngine? engine = null;
         var llm = new LocalLlmManager(NullLog.Instance, loader: (p, _) => engine = new FakeLocalEngine(p, waitForCancel: true));
         llm.BeginLoad(Model("qwen2.5-1.5b-instruct-q4_k_m.gguf"), "auto");
-        Assert.True(await Eventually(() => engine is not null));
-        await Task.Delay(100, Ct);
+        Assert.True(await Eventually(() => engine is not null, FailAfterMs), "the clean-up load never began");
+        await engine!.WarmUpStarted.WaitAsync(TimeSpan.FromMilliseconds(FailAfterMs), Ct); // the warm-up is running
+        Assert.False(engine.WarmUpCancelled.IsCompleted); // nothing but quit can end it
         llm.Dispose();
-        Assert.True(await Eventually(() => engine!.Disposed, 1500), "the warm-up ran on after quit and its engine was never released");
+        await engine.WarmUpCancelled.WaitAsync(TimeSpan.FromMilliseconds(FailAfterMs), Ct); // times out if quit never cancels it
+        Assert.True(await Eventually(() => engine.Disposed, FailAfterMs), "the warm-up ran on after quit and its engine was never released");
     }
 
     [Fact]
