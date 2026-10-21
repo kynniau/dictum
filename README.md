@@ -1152,10 +1152,11 @@ warns, and that file has no size or hash to be checked against. A value is never
   `type` there too.
 - **Wrong microphone.** Run `--selftest` to list devices and set `audio.device` to part of the name.
 - **"No sound from mic" (pill), "Dictum is not hearing anything" (balloon).** The microphone opened but gave no sound at
-  all for 2 seconds after the key was pressed: every 20 ms of audio was silent (digital silence or below about −91 dBFS),
-  or no audio arrived. Check that the microphone is plugged in, not muted (its own switch, and Windows Sound settings), is
-  the one Dictum uses (`--selftest`, `audio.device`), and that Windows allows desktop apps to use the microphone
-  (Settings > Privacy & security > Microphone). On a remote or virtual desktop (Remote Desktop, Azure Virtual Desktop) the
+  all for 2 seconds after the key was pressed: every 20 ms of audio was silent (digital silence, or white noise
+  at a 48 kHz microphone below about −91 dBFS in stereo or −94 dBFS in mono), or no audio arrived. Check that the
+  microphone is plugged in, not muted (its own switch, and Windows Sound settings), is the one Dictum uses
+  (`--selftest`, `audio.device`), and that Windows allows desktop apps to use the microphone (Settings > Privacy &
+  security > Microphone). On a remote or virtual desktop (Remote Desktop, Azure Virtual Desktop) the
   microphone must be redirected from your own PC: see "Remote Desktop microphone" under "Deploying to staff machines and
   Azure VMs". Once the microphone has been heard in a dictation, later pauses never bring the warning back. A microphone
   whose own noise suppression sends exact silence between words can show it until you start speaking (not seen; inferred

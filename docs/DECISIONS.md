@@ -2898,3 +2898,13 @@ The lens returned Needs changes, with no blockers. Its findings and what was don
 3. **Minor: the README's "No sound from mic" entry** now also says to check that Windows allows desktop apps to use the microphone (Settings > Privacy & security > Microphone). The balloon is unchanged. **Not verified:** whether a microphone privacy denial gives silence (the warning) or an open failure ("Mic error").
 4. **Nit, left as a known gap:** in hands-free, while the warning is up, the pill's "tap to stop · Esc stops and keeps what's typed" hint is hidden, because the hint shows only with the hands-free label.
 5. **Minor test race:** the second dictation in `The_controller_warns_once_for_a_silent_microphone…` reported its sound before the new session had started, so the sound could be counted against the old one. The test now waits for the new recording's pill first. It still proves its claim: a dictation that types text clears the heard-nothing line.
+
+### Lens fixes (21/10/2026), lens on 28d16b7
+
+The lens returned Needs changes with three minors and no change to src behaviour wanted. All three are fixed:
+
+1. **Test race.** `WarnNoSound` emits the pill before the balloon and log effects. So a test that waited for the "No sound from mic" pill could read the balloon list or the log before they were written. The effect order is unchanged. Instead, the two tests now wait for the balloon (`The_controller_warns_once_for_a_silent_microphone…`) and for the log line (`The_warning_log_line…`) themselves. To check the wait, I added a temporary `Thread.Sleep(50)` before the warning's log line and balloon in `DictationController`: all 17 tests in the class passed with it. It was then removed.
+2. **Pin gap.** `CaptureBuffer.PeakLevel` and `BlocksMeasured` now have their own pin. A fresh buffer reads 0 and 0. One block at RMS 0.3 followed by three at 0.01 reads a peak of 0.3 and 4 blocks.
+3. **README basis restored.** The entry now reads "digital silence, or white noise at a 48 kHz microphone below about −91 dBFS in stereo or −94 dBFS in mono". The −91 and −94 dBFS figures hold only for a 48 kHz device:
+   - A 16 kHz device skips the resampler (`MonoResampler` returns early when the input rate is the output rate), so its floor at the device is the raw 1e-5, which is −100 dBFS for a mono device. This is inferred from the code, not measured. A 16 kHz stereo device still goes through the downmix, which was not measured either.
+   - 44.1 kHz devices were not measured.

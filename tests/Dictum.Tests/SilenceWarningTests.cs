@@ -217,6 +217,19 @@ public class SilenceWarningTests
     }
 
     [Fact]
+    public void The_capture_buffer_reports_its_peak_block_level_and_block_count()
+    {
+        var buffer = new CaptureBuffer(SampleEncoding.Float32, 1, MonoResampler.WhisperRate);
+        Assert.Equal(0f, buffer.PeakLevel);
+        Assert.Equal(0, buffer.BlocksMeasured);
+
+        buffer.AppendResampled(Enumerable.Repeat(0.3f, CaptureBuffer.BlockSamples).ToArray()); // one block at RMS 0.3
+        buffer.AppendResampled(Enumerable.Repeat(0.01f, CaptureBuffer.BlockSamples * 3).ToArray()); // then three at 0.01
+        Assert.Equal(0.3f, buffer.PeakLevel, 0.0001f); // the loudest block, not the last one
+        Assert.Equal(4, buffer.BlocksMeasured);
+    }
+
+    [Fact]
     public void The_proposed_strings_are_the_ones_listed_for_approval()
     {
         Assert.Equal("No sound from mic", PillText.For(PillView.NoSound, TimeSpan.Zero));
@@ -301,6 +314,7 @@ public class SilenceWarningTests
         rig.Down();
         await WaitUntil(() => rig.Ui.Pills.Contains(PillView.NoSound), "the warning");
         Assert.True(sw.ElapsedMilliseconds >= Grace - 100, $"warned after {sw.ElapsedMilliseconds} ms");
+        await WaitUntil(() => !rig.Ui.NoSoundWarnings.IsEmpty, "the balloon"); // asked for just after the pill (one batch of effects)
         Assert.Equal([NoSoundCause.Silent], rig.Ui.NoSoundWarnings.ToArray());
         await Task.Delay(300, Ct);
         Assert.Equal(PillView.NoSound, rig.Ui.Pills.Last()); // it stays while recording goes on
@@ -335,6 +349,7 @@ public class SilenceWarningTests
         using var rig = Make(new QuietCapture { PeakLevel = 3.5e-6f, BlocksMeasured = 97 }, log: log);
         rig.Down();
         await WaitUntil(() => rig.Ui.Pills.Contains(PillView.NoSound), "the warning");
+        await WaitUntil(() => log.Lines.Any(l => l.Message.StartsWith("No sound from the microphone", StringComparison.Ordinal)), "the warning's log line");
         var line = Assert.Single(log.Lines, l => l.Message.StartsWith("No sound from the microphone", StringComparison.Ordinal)).Message;
         Assert.Contains("peak block RMS 3.50E-6 over 97 block(s) of 20 ms", line); // numbers only: nothing of what was said
         rig.Up();
