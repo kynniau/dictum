@@ -395,14 +395,7 @@ internal sealed class MicrophoneStep : OnboardingStep
     {
         var devices = Devices();
         _filling = true;
-        _ids = [null, .. devices.Select(d => (string?)d.Name)];
-        var labels = new List<string> { "System default" };
-        labels.AddRange(devices.Select(d => d.IsDefault ? $"{d.Name} (default)" : d.Name));
-        if (Flow.Device is { } chosen && !_ids.Contains(chosen))
-        {
-            _ids.Add(chosen);
-            labels.Add($"{chosen} (not connected)");
-        }
+        (_ids, var labels) = MicrophoneChoices.Build(devices, Flow.Device);
         _device.ItemsSource = labels;
         _device.SelectedIndex = Math.Max(0, _ids.IndexOf(Flow.Device));
         _filling = false;

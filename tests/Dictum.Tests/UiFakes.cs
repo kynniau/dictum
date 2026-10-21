@@ -323,12 +323,15 @@ internal sealed class Scratch : IDisposable
     /// <param name="gpuMachine">What the shell takes the machine for (WhisperEngine.GpuMachine): a CPU-only PC by default.</param>
     public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null,
         HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null, ILog? log = null, Dictum.Llm.LocalLlmManager? cleanupModels = null,
-        bool gpuMachine = false)
+        bool? gpuMachine = false, Func<string, ILog, string>? runtimeProbe = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
-        var shell = new AppShell(platform, Paths, log ?? NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs, gpuMachine: () => gpuMachine,
+        // gpuMachine null: the app's own path, which probes the whisper runtime (runtimeProbe stands in for it, so nothing native loads).
+        var shell = new AppShell(platform, Paths, log ?? NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs,
+            gpuMachine: gpuMachine is { } gpu ? () => gpu : null,
             speechModels: speechModels, downloadHandler: downloadHandler, updateHandler: updateHandler, cleanupModels: cleanupModels);
+        if (runtimeProbe is not null) shell.Models.TestRuntimeProbe = runtimeProbe;
         return (shell, platform, dialogs);
     }
 

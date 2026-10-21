@@ -328,7 +328,7 @@ public sealed class ModelCoordinator(
     internal static string FirstRunProbeGpu(AppSettings? seeded) => (seeded?.Whisper ?? new WhisperSettings()).Gpu;
 
     /// <summary>Tests only: stands in for <see cref="WhisperEngine.ProbeRuntime"/> (which loads the native runtime). Null in the app.</summary>
-    internal Func<string, ILog, string>? TestRuntimeProbe { get; init; }
+    internal Func<string, ILog, string>? TestRuntimeProbe { get; set; } // set, not init: a test shell's coordinator is built inside AppShell
 
     private bool ProbeGpuMachine(string gpu)
     {

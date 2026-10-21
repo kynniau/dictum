@@ -380,15 +380,7 @@ internal sealed class FlyoutWindow : Window
 
     private void FillMicrophones(AppSettings s)
     {
-        var devices = _shell.Platform.ListCaptureDevices();
-        _micIds = [null, .. devices.Select(d => (string?)d.Name)];
-        var labels = new List<string> { "System default" };
-        labels.AddRange(devices.Select(d => d.IsDefault ? $"{d.Name} (default)" : d.Name));
-        if (s.Audio.Device is { } chosen && !_micIds.Contains(chosen))
-        {
-            _micIds.Add(chosen);
-            labels.Add($"{chosen} (not connected)");
-        }
+        (_micIds, var labels) = MicrophoneChoices.Build(_shell.Platform.ListCaptureDevices(), s.Audio.Device);
         SetItems(_mic, labels, Math.Max(0, _micIds.IndexOf(s.Audio.Device))); // a progress tick leaves an open list alone (lens, 19/10/2026)
     }
 
