@@ -149,7 +149,7 @@ public sealed partial class OnboardingTests
         Assert.DoesNotContain(All<TextBlock>(tryIt), t => t.Text == OnboardingText.TryLoading && t != tryIt.StatusText);
         var holder = Assert.IsType<Grid>(tryIt.StatusText.Parent);
         Assert.Contains(tryIt.Box, holder.Children); // over the box, not a line above it
-        Assert.True(tryIt.StatusText.Classes.Contains("body"));
+        Assert.Contains("body", tryIt.StatusText.Classes);
         Assert.False(tryIt.StatusText.IsHitTestVisible); // a click goes to the box
         Dispatcher.UIThread.RunJobs();
         var boxTop = tryIt.Box.TranslatePoint(default, window)!.Value.Y;

@@ -382,7 +382,8 @@ public class PolishTests
         Assert.DoesNotContain(All<Button>(page), b => b.Content as string == ModelsPage.InUseLabel);
         var tags = All<Border>(page).Where(b => AutomationProperties.GetName(b) == ModelsPage.InUseLabel && b.IsEffectivelyVisible).ToList();
         Assert.NotEmpty(tags);
-        var link = (ISolidColorBrush)Application.Current!.FindResource(Application.Current.ActualThemeVariant, "LinkBrush")!;
+        var app = Application.Current!;
+        var link = (ISolidColorBrush)app.FindResource(app.ActualThemeVariant, "LinkBrush")!;
         foreach (var tag in tags)
         {
             Assert.False(tag.Focusable);
