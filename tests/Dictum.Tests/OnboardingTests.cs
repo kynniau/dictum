@@ -288,7 +288,7 @@ public sealed class OnboardingTests
         Assert.Equal(ModelCatalog.Recommend(false).Model, radios.Single(r => r.IsChecked == true).Tag);
         Assert.Contains(SimpleView.StandardSubLineNotIncluded, Visible(window));
         Assert.DoesNotContain(SimpleView.StandardSubLine, Visible(window)); // "Included" would be untrue here
-        Assert.Contains(SimpleView.DownloadSize(ModelCatalog.Find("small.en")!.SizeText), Visible(window));
+        Assert.Contains($"({ModelCatalog.Find("small.en")!.SizeText})", Visible(window)); // its size until it is on this PC
 
         Click(All<Button>(speech).Single(b => b.Content as string == OnboardingText.ShowEveryModel));
         Assert.Equal(ModelCatalog.Entries.Count, All<RadioButton>(speech).Count());
@@ -296,6 +296,28 @@ public sealed class OnboardingTests
         All<RadioButton>(speech).Single(r => (string?)r.Tag == "small.en").IsChecked = true;
         Next(window);
         Assert.Equal("small.en", SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Whisper.Model);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin (merge with lane A's lens fixes): a seeded language that is not English gets the multilingual tiers in the speech
+    /// step, with no English-only model offered, and the one chosen is written.
+    /// </summary>
+    [Fact]
+    public Task A_seeded_language_that_is_not_English_gets_the_multilingual_tiers() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "whisper": { "language": "es" } }""");
+        var (shell, _, _) = scratch.Shell(); // a CPU-only machine, no base.en
+        var (_, window) = Open(shell, scratch);
+        var speech = GoTo<SpeechStep>(window);
+        var tags = All<RadioButton>(speech).Select(r => (string?)r.Tag).ToList();
+        Assert.Equal(SimpleView.Tiers(false, "es").Where(t => t.Guard is null).Select(t => t.Model), tags);
+        Assert.DoesNotContain(tags, t => t!.EndsWith(".en", StringComparison.Ordinal));
+        Assert.Single(All<RadioButton>(speech), r => r.IsChecked == true);
+        All<RadioButton>(speech).Single(r => (string?)r.Tag == SimpleView.MultilingualMoreAccurate).IsChecked = true;
+        Next(window);
+        Assert.Equal(SimpleView.MultilingualMoreAccurate, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Whisper.Model);
         window.Close();
         shell.Dispose();
     });

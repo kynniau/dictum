@@ -25,12 +25,12 @@ internal static class OnboardingText
     public const string WelcomeHeading = "How Dictum works";
 
     /// <summary>
-    /// The brief asked for "everything happens on this PC; nothing is sent anywhere". True of every default; the one exception is
-    /// cloud clean-up, off by default and behind its own consent step (DECISIONS, 21/10/2026, asks whether to qualify it).
+    /// The orchestrator's decision (21/10/2026): "Everything happens on this PC." only. "Nothing you say is sent anywhere" was
+    /// dropped: cloud clean-up, off by default and behind its own consent step, sends text once switched on.
     /// </summary>
     public const string WelcomeText =
         "Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. " +
-        "Everything happens on this PC. Nothing you say is sent anywhere.";
+        "Everything happens on this PC.";
 
     public const string WelcomeNext = "The next few steps take a minute or two. Press Next to begin.";
 
@@ -38,9 +38,9 @@ internal static class OnboardingText
     public const string FolderName = "Model files";
     public const string FolderHeading = "Where to keep the model files";
 
-    /// <summary>The brief's own words (Kyle, 21/10/2026). "Up to 10 GB": see DECISIONS for the catalogue arithmetic.</summary>
+    /// <summary>No exact total in the UI (orchestrator, 21/10/2026); DECISIONS records the catalogue totals behind "several gigabytes".</summary>
     public const string FolderText =
-        "Dictum keeps its speech models on this PC. The included one is about 150 MB; adding the most accurate models can take up to 10 GB.";
+        "Dictum keeps its speech models on this PC. The included one is about 150 MB; adding more models can take several gigabytes more.";
 
     public const string FolderBoxName = "Folder for the model files";
     public const string ChooseOther = "Choose another drive or folder…";
@@ -100,6 +100,6 @@ internal static class OnboardingText
         "Everyone's accent, voice and microphone are different. The Standard model works well for most people. If words come out wrong, " +
         "choose More accurate in Settings > Models, or press Calibrate my voice to find which model hears you best.";
 
-    /// <summary>"Settings > Help" is the brief's wording; this build has Help as a card in Settings > About (see DECISIONS).</summary>
-    public const string NothingCame = "Nothing came through. You can try again later from Settings > Help.";
+    /// <summary>Settings > Help is lane C's page (PR #24, merged before this one); nothing re-runs this window, so the line says Help explains how.</summary>
+    public const string NothingCame = "Nothing came through. You can try again any time: Settings > Help explains how.";
 }

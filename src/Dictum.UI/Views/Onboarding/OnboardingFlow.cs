@@ -46,6 +46,11 @@ public sealed class OnboardingFlow
 
     public string Folder => ChosenFolder ?? SuggestedFolder;
 
+    /// <summary>whisper.language and whisper.translate in settings.json: the speech step offers the Simple view's tiers for them.</summary>
+    public string Language => _file.Settings.Whisper.Language;
+
+    public bool Translate => _file.Settings.Whisper.Translate;
+
     /// <summary>The hotkey in settings.json (the default when it names none); the hotkey step's answer once completed.</summary>
     public string Hotkey { get; private set; }
 

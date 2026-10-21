@@ -468,11 +468,14 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   "Models view: Simple" and "Models view: Advanced".
 - **Speech (Simple).** An explainer with a **Calibrate my voice** button (the existing
   calibration window), then three rows: Standard, More accurate, Most accurate, each with its
-  line, its state (In use, Downloaded, "<size> download", or nothing for the bundled base.en,
-  whose line says "Included."), and the catalogue row's Use / Download… / Downloading… /
-  Waiting… button. A row is a catalogue entry chosen through `ModelCoordinator.Select`; there
-  is no download logic of its own. A model in use that is none of the three is a fourth row,
-  "Custom: <name>", "In use · Chosen in Advanced view".
+  line, its state (In use, Downloaded, its size when not on this PC, or nothing for the bundled
+  base.en, whose line says "Included."), and the catalogue row's Use / Download… / Downloading… /
+  Waiting… button. A row is a catalogue entry chosen through `ModelCoordinator.Select(name,
+  plainName)`; there is no download logic of its own. Given the tier's name, the download
+  question, the busy question and the "already downloading" balloon use it and plain words:
+  "Download <tier> (<size>)? It comes from the model makers' official download page and is
+  checked before use." (Advanced keeps the catalogue question). A model in use that is none of
+  the tiers is one more row, "Custom: <name>", "In use. Not one of the choices above."
 - **Tier mapping** (`SimpleView.Tiers`, reusing the catalogue's recommendation and the Mode
   presets' models, keyed on `WhisperEngine.GpuMachine`):
 
@@ -482,9 +485,16 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   | More accurate | small.en (Full on CPU; "more accurate, a few seconds slower") | medium.en (the GPU recommendation) |
   | Most accurate | medium.en (the catalogue's "high accuracy; wants a GPU or a fast desktop CPU") | large-v3-turbo (Full on GPU) |
 
-  The tiers are English-only models (and large-v3-turbo); a non-English `whisper.language`
-  gets the existing language warning after an English-only tier is chosen (marked
-  `// simplification:` in `SimpleView`).
+  When the text is not plain English speech (`whisper.language` is not `en`, or Translate is
+  on), the tiers are multilingual (lens on PR #23, 21/10/2026): Standard `small`, More accurate
+  `medium`, and on a GPU Most accurate `large-v3-turbo` (`large-v3` when translating); a CPU has
+  no multilingual Most accurate, as the catalogue has nothing above `medium` that does not need
+  a GPU. A tier whose model `WhisperLanguages.Problem` rules out is never offered: its row has
+  no button, only "English only: switch to Advanced to choose a model for <language>." or the
+  existing problem sentence, and the tray leaves it out. Lines on a CPU: "Bigger download. Takes
+  a few seconds longer on this PC." and "Slow without a graphics card: can take longer than you
+  spoke." (README "Measured speed"); on a GPU "Bigger download, a bit slower." and "Best results.
+  Needs a strong PC or patience."
 - **Clean-up (Simple).** One row, "Tidy my words (recommended)": in use while `llm.provider` is
   `none` (the rule-based tidy) or `local` with the recommended model (state "In use, with AI
   clean-up"). The existing **Add AI clean-up (<size> download)** button sits under it while the
@@ -492,7 +502,8 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   model when it is on this PC, else the rule-based tidy. Anything else in use (another local
   model, a .gguf file, a cloud provider chosen in Advanced) is a "Custom: <name>" row. Cloud
   clean-up is never offered in the Simple view; the Advanced view keeps its pointer to Settings
-  > Clean-up. There is no "Off" row: Dictum has no clean-up mode that pastes exactly what was
+  > Clean-up. With text that is not English the line reads "Tidies spacing only for
+  <language>." (clean-up then tidies whitespace only). There is no "Off" row: Dictum has no clean-up mode that pastes exactly what was
   heard (`llm.provider = none` is the rule-based tidy), so the brief's "Off" was not built
   (DECISIONS, 21/10/2026).
 - **Both views:** the language card, the model folder and the Storage link. **Advanced only:**
@@ -1242,8 +1253,9 @@ Enter presses the step's primary button. Steps:
    ("Use the suggested folder" and Back can put it back to null). Not shown when settings.json names `models.folder` or
    `whisper.models_dir` (`AppRules.AsksFolder`).
 3. **Speech model**: when base.en is in the lookup order (with the folder just chosen), one line, "The Standard model is
-   included and ready.", and no choice; otherwise the Simple view's tiers (§10.1) with their sub-lines and download sizes,
-   the recommendation pre-selected, and "Show every model" for the full catalogue and "Choose model file…". Completing
+   included and ready.", and no choice; otherwise the Simple view's tiers (§10.1) for the language settings.json names (multilingual
+   models when it is not plain English; a tier the language rules out is left out), with their sub-lines and sizes, the
+   recommendation pre-selected, and "Show every model" for the full catalogue and "Choose model file…". Completing
    it writes through the first run's own writer (`ModelCoordinator.AnswerFirstRun`, split out of `FirstRun`): base.en and
    `llm.provider` = `none` with base.en; otherwise the pick, with a catalogue model not on this PC downloaded at startup as
    the picker's was. No clean-up question: the rule-based tidy, unless a seeded `llm.provider` is kept (§24).

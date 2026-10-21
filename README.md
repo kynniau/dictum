@@ -342,8 +342,8 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
       clean-up (1.1 GB download)** fetches the recommended cleanup model, `qwen2.5-1.5b`, after asking (see "Cleanup
       models"). A base.en in your own models folder, or in the one you chose in step 2, counts the same.
       **Without base.en** (a build without its `models` folder, or the file removed or failing its check) the step
-      offers the Simple view's three choices (Standard, More accurate, Most accurate), the recommendation for this PC
-      chosen, and **Show every model** for the whole catalogue and **Choose model file…**. A model that is not on disk yet
+      offers the Simple view's choices (Standard, More accurate, Most accurate; multilingual models when settings.json
+      names a language that is not English), the recommendation for this PC chosen, and **Show every model** for the whole catalogue and **Choose model file…**. A model that is not on disk yet
       is downloaded from huggingface.co when the window reaches Try it (progress in the tray panel and the icon's
       tooltip) and checked against the catalogue's size and SHA-256. The window asks no clean-up question: it writes the
       rule-based tidy, as with base.en. Nothing is downloaded without your choice.
@@ -394,9 +394,16 @@ Which model each plain choice is depends on whether Dictum found a discrete GPU:
 | Most accurate | medium.en | large-v3-turbo |
 
 The mapping reuses the existing recommendation (base.en, or medium.en on a GPU) and the Mode presets' models
-(small.en, or large-v3-turbo on a GPU, for Full). A model in use that is none of the three shows as "Custom: <name>".
-The plain choices are English-only models (and large-v3-turbo); for another language use the Advanced view (see
-"Other languages and translation"). Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
+(small.en, or large-v3-turbo on a GPU, for Full).
+
+When you speak another language, choose Detect automatically, or turn Translate on (see "Other languages and
+translation"), the choices are multilingual: Standard is small, More accurate is medium, and with a discrete GPU Most
+accurate is large-v3-turbo (large-v3 when translating, which turbo cannot do). Without a GPU there is no multilingual
+Most accurate, because every catalogue model above medium is marked as needing a GPU. A choice that cannot hear your
+language is never offered. On a PC without a GPU the lines say how slow the bigger models are there (see "Measured
+speed"). Choosing a model to download asks in plain words: "Download More accurate (487 MB)? It comes from the model
+makers' official download page and is checked before use." A model in use that is none of the choices shows as
+"Custom: <name>". Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
 recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model. Cloud clean-up is
 never offered in the Simple view.
 

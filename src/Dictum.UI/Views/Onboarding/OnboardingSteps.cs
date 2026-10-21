@@ -175,13 +175,17 @@ internal sealed class SpeechStep : OnboardingStep
         _choices.Children.Clear();
         if (!_everything)
         {
-            var tier = SimpleView.TierOf(current, plan.Gpu) ?? SimpleView.TierOf(plan.Speech, plan.Gpu);
-            foreach (var t in SimpleView.Tiers(plan.Gpu))
+            // The Simple view's tiers for the language settings.json names (lane A's mapping): multilingual models when it is
+            // not plain English; a tier the language rules out (an English-only model) is not offered here.
+            var tiers = SimpleView.Tiers(plan.Gpu, Flow.Language, Flow.Translate).Where(t => t.Guard is null).ToList();
+            var tier = tiers.FirstOrDefault(t => string.Equals(t.Model, current, StringComparison.OrdinalIgnoreCase))
+                       ?? tiers.FirstOrDefault(t => string.Equals(t.Model, plan.Speech, StringComparison.OrdinalIgnoreCase)) ?? tiers.FirstOrDefault();
+            foreach (var t in tiers)
             {
                 var info = ModelCatalog.Find(t.Model)!;
-                var sub = t.Tier == SpeechTier.Standard ? SimpleView.StandardSubLineNotIncluded : t.SubLine;
-                if (!OnThisPc(info)) sub = $"{sub} {SimpleView.DownloadSize(info.SizeText)}.";
-                _choices.Children.Add(Radio(t.Model, t.Label, sub, t.Tier == (tier?.Tier ?? SpeechTier.Standard)));
+                var sub = t.Tier == SpeechTier.Standard ? SimpleView.StandardSubLineNotIncluded : t.SubLine; // this step shows only without base.en
+                if (!OnThisPc(info)) sub = $"{sub} ({info.SizeText})";
+                _choices.Children.Add(Radio(t.Model, t.Label, sub, ReferenceEquals(t, tier)));
             }
         }
         else
