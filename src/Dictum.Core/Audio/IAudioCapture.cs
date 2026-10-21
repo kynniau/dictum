@@ -27,6 +27,28 @@ public interface IAudioCapture
 
     /// <summary>Raised from the capture thread if the device fails mid-recording.</summary>
     event Action<Exception>? Failed;
+
+    /// <summary>
+    /// This capture raises <see cref="SoundHeard"/>, so a recording with no sound gets the "No sound from mic" warning
+    /// (21/10/2026). A capture that cannot tell (this default) never gets it: its recordings behave as before.
+    /// </summary>
+    bool ReportsSound => false;
+
+    /// <summary>The loudest 20 ms block RMS so far this recording, after resampling (<see cref="CaptureBuffer.PeakLevel"/>); this default: 0.</summary>
+    float PeakLevel => 0f;
+
+    /// <summary>Whole 20 ms blocks measured so far this recording (<see cref="CaptureBuffer.BlocksMeasured"/>); this default: 0.</summary>
+    long BlocksMeasured => 0;
+
+    /// <summary>
+    /// Raised once per recording, from the capture thread, at the first 20 ms block louder than
+    /// <see cref="CaptureBuffer.SoundFloor"/>. Handlers must not block. This default never raises it.
+    /// </summary>
+    event Action? SoundHeard
+    {
+        add { }
+        remove { }
+    }
 }
 
 /// <summary>A microphone the system lists (Settings → Microphone, --selftest).</summary>
