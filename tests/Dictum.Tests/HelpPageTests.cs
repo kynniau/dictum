@@ -131,7 +131,7 @@ public class HelpPageTests
         var pages = File.ReadAllText(Path.Combine(root, "src", "Dictum.UI", "Views", "Settings", "OtherPages.cs"));
         var helpPage = pages[pages.IndexOf("internal sealed class HelpPage", StringComparison.Ordinal)..];
         foreach (var source in new[] { copy, helpPage })
-            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Download|CheckForUpdates|Shell\.Models|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute"), source); // Shell.ReportProblem and SendFeedback are allowed: they only build a mail link for the platform seam
+            Assert.DoesNotMatch(new Regex(@"Http|WebRequest|WebClient|Socket|Dns|Ping|NetworkInformation|Process\.Start|ShellExecute|Download|CheckForUpdates|Shell\.Models"), source); // Shell.ReportProblem and SendFeedback are allowed: they only build a mail link for the platform seam
         return true;
     });
 

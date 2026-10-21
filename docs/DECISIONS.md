@@ -2885,9 +2885,9 @@ is worded to be true at main 6dfede8 and after the other 1.2 lanes land.
    I talk.
 4. **"Settings > Models > Advanced > run on the CPU"** does not exist. What ships is the **Try on the CPU** button
    (tray panel and Settings > About, only after a model failed inside the GPU runtime) and `whisper.gpu = cpu` in
-   settings.json. The copy names Try on the CPU, and for a Dictum that still closes, Email support.
+   settings.json. The copy names Try on the CPU and where it appears, and for a Dictum that still closes, the support address.
 5. **"Updated in 1.1.2"**: there is no 1.1.2. `Directory.Build.props` says 1.1.1, and the launch-crash fix (19b09f6, PR
-   #21) merged after 1.1.1. The copy says "fixed in later versions", which holds for whatever number ships it.
+   #21) merged after 1.1.1. The copy says "The version you are using now has the fix", which holds for any build that carries this page (lens fix, below).
 6. **"Videos" in the full guide** are not promised in the app. The guide note says "step by step, with pictures",
    because the app cannot check the site and that lane had not shipped when this was written.
 
@@ -2956,11 +2956,54 @@ in Dictum.Core's internals does not rebuild its dependants. That run (the pill l
 - Screen-reader speech. Heading levels, names and help text are pinned as properties, not heard in Narrator or NVDA.
 - The page in a real Settings window on the desktop (tray mode is never run on the development PC).
 - https://dictum.kynni.au/help itself, which did not exist when this was written.
-- The tray panel's height with the extra row, on a small screen.
+- The tray panel on a small screen. Its height does not change: the lens on f69cf24 measured 748 DIP before and after, because Help takes the second column of the row Settings used to span.
 - Whether a person of 95 can follow it. Only a person can test that.
 
-**Full page text, PROPOSED (21/10/2026), awaiting the product owner's review: do not reword without it.** Generated from
-`HelpText` (the constants are the source; this copy is for review).
+### Lens fixes (21/10/2026), lens on f69cf24
+
+The lens on PR #24 returned **Block**, on the privacy sentence. That one is the product owner's call and is handled
+separately: `site/privacy.html` and `site/index.html` are not touched here.
+
+Finding 4 (the Email support button, and making the support address one value) went to lane F, which owns
+`feat/feedback`, stacked on this branch. `HelpText.SupportAddress` and the button are unchanged here.
+
+The other findings are fixed on this branch. The wording of each new string is the lens's, and every string is
+PROPOSED.
+
+| # | Finding | Fix |
+|---|---|---|
+| 2 | Major: the crash answer said "fixed in later versions", which is wrong in a build whose About page says 1.1.1 | "On some PCs, Dictum 1.1.1 closed as soon as it started. The version you are using now has the fix. If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au." |
+| 3 | Major: "choose Email support at the top of this page" cannot be followed when Dictum will not open | "If it still closes, email hello@kynni.com.au and tell us.", built from `SupportAddress` |
+| 5 | Minor: Esc also cancels after the key is let go, and the program typed into also receives it | "To cancel instead, press Esc before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc." |
+| 6 | Minor: the removal answer left out snippets, keys, the shortcut, the start-with-Windows entry and the program | see the note below the table |
+| 7 | Minor: the answer did not say where Try on the CPU is | "If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it." |
+| 8 | Minor: Enter or Space alone cannot be the hotkey either | "…, and neither can Enter or Space on their own." |
+| 9 | Minor: a DNS lookup added to the page passed all 11 tests | `Dns`, `Ping`, `NetworkInformation`, `Process.Start` and `ShellExecute` join the no-network pin's source scan |
+| 10 | Minor: the tray panel was said to grow by a row | "No height change" in DECISIONS and the PR. `FlyoutWindow.cs`'s summary says "six actions"; that is a comment-only edit |
+
+**Finding 6: the new wording.** The answer now reads:
+
+> It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu
+> shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings
+> then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says
+> it cannot.
+
+The last clause, "unless its first warning says it cannot", is mine and not the lens's. A copy with no `manifest.txt`
+is left in place, and the first warning says so (`AppShell.Actions.cs`, "The program itself is not removed: …"). That
+covers a build from source and one older than 16/10/2026. Without the clause the sentence would over-promise. Snippets
+are in the removal list (`PathRegistry`, "snippets").
+
+**Mutation check.** The DNS lookup (`System.Net.Dns.GetHostAddresses("localhost")` in the page's constructor) now fails
+`The_page_reaches_the_network_only_through_the_platform_seam` with "Assert.DoesNotMatch() Failure: Match found". That
+was observed failing on the reverted behaviour, in a `--no-incremental` build.
+
+**A shared-scratchpad mishap.** This lane's mutation script lived in the shared scratchpad, and another lane (onboarding)
+replaced it with its own script of the same name. One call here ran that script. With this lane's argument it matched
+none of its mutations, so it changed no file. It did build `.worktrees/onboarding` and print that worktree's status.
+This lane's scripts now live in their own folder.
+
+**Full page text, PROPOSED (21/10/2026; updated by the lens fixes above), awaiting the product owner's review: do not
+reword without it.** Generated from `HelpText` (the constants are the source; this copy is for review).
 
 > **Help** (page title)
 >
@@ -3038,23 +3081,23 @@ in Dictum.Core's internals does not rebuild its dependants. That run (the pill l
 >
 > **Dictum closed straight away when I opened it. What do I do?**
 >
-> On some PCs, Dictum version 1.1.1 closed as soon as it started. This is fixed in later versions. Get the latest version from the Microsoft Store or from dictum.kynni.au.
+> On some PCs, Dictum 1.1.1 closed as soon as it started. The version you are using now has the fix. If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.
 >
-> If Dictum still closes, choose Email support at the top of this page and tell us.
+> If it still closes, email hello@kynni.com.au and tell us.
 >
-> If Dictum opens but shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.
+> If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.
 >
 > **How do I change the key I hold?**
 >
 > Open Settings > General. Under Press your hotkey (the hotkey is the key you hold), choose Change…, then press the key you want. When Dictum shows its name, choose Use this hotkey.
 >
-> Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used.
+> Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used, and neither can Enter or Space on their own.
 >
 > **How do I stop it listening?**
 >
 > Let go of the key. Dictum stops listening and types what you said.
 >
-> To cancel instead, press Esc while you are still holding the key. Nothing is typed.
+> To cancel instead, press Esc before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc.
 >
 > If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.
 >
@@ -3080,7 +3123,7 @@ in Dictum.Core's internals does not rebuild its dependants. That run (the pill l
 >
 > Dictum first lists everything it will delete, with sizes. Then it asks you to type DELETE to confirm.
 >
-> It deletes its models, recordings, logs, settings, dictionary and corrections, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself.
+> It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says it cannot.
 >
 > **Is Dictum free?**
 >

@@ -96,19 +96,19 @@ public static class HelpText
         ]),
         new("Dictum closed straight away when I opened it. What do I do?",
         [
-            "On some PCs, Dictum version 1.1.1 closed as soon as it started. This is fixed in later versions. Get the latest version from the Microsoft Store or from dictum.kynni.au.",
-            "If Dictum still closes, choose Email support at the top of this page and tell us.",
-            "If Dictum opens but shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.",
+            "On some PCs, Dictum 1.1.1 closed as soon as it started. The version you are using now has the fix. If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.",
+            "If it still closes, email " + SupportMail.Address + " and tell us.",
+            "If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.",
         ]),
         new("How do I change the key I hold?",
         [
             "Open Settings > General. Under Press your hotkey (the hotkey is the key you hold), choose Change…, then press the key you want. When Dictum shows its name, choose Use this hotkey.",
-            "Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used.",
+            "Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used, and neither can Enter or Space on their own.",
         ]),
         new("How do I stop it listening?",
         [
             "Let go of the key. Dictum stops listening and types what you said.",
-            "To cancel instead, press Esc while you are still holding the key. Nothing is typed.",
+            "To cancel instead, press Esc before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc.",
             "If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.",
             "To turn Dictum off for a while, use the Dictation on switch in the Dictum menu.",
         ]),
@@ -127,7 +127,8 @@ public static class HelpText
         [
             "Open Settings > Storage. At the bottom, choose Remove Dictum completely…",
             "Dictum first lists everything it will delete, with sizes. Then it asks you to type DELETE to confirm.",
-            "It deletes its models, recordings, logs, settings, dictionary and corrections, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself.",
+            "It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. " +
+            "If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says it cannot.",
         ]),
         new("Is Dictum free?",
         [
