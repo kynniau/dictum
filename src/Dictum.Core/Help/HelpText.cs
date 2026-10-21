@@ -74,10 +74,10 @@ public static class HelpText
     /// <summary>PROPOSED (21/10/2026): the 1.1.2 note's sentence on the start-up crash, word for word (docs/STORE.md). The one place the Help describes it.</summary>
     public const string CrashFixLine = "Dictum 1.1.2 fixes a start-up crash on PCs without a working Vulkan graphics driver (the app closed before its tray icon appeared; it now runs the speech model on the CPU there).";
 
-    /// <summary>PROPOSED (21/10/2026): the Store-listing feature line as the product owner gave it; its reuse in the app needs the owner's nod. HelpPageTests exempts exactly this line from the "no telemetry or analytics word" pin.</summary>
+    /// <summary>APPROVED verbatim for Help, site and Store (owner, 21/10/2026 22:18 AEDT): do not reword. HelpPageTests exempts exactly this line from the "no telemetry or analytics word" pin.</summary>
     public const string FreeLine = "Free: no subscription, no account, no ads, no analytics, no telemetry.";
 
-    /// <summary>PROPOSED (21/10/2026): new copy.</summary>
+    /// <summary>APPROVED verbatim for Help, site and Store (owner, 21/10/2026 22:18 AEDT): do not reword.</summary>
     public const string FreeLaterNote = "The base product stays free to keep on your PC; optional paid extras may come later.";
 
     /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
@@ -147,11 +147,11 @@ public static class HelpText
         ]),
         new("Is Dictum free?",
         [
-            // PROPOSED (21/10/2026): FreeLine is the Store-listing feature line (owner's nod needed to reuse it here); FreeLaterNote is new.
+            // FreeLine and FreeLaterNote are APPROVED verbatim (owner, 21/10/2026 22:18 AEDT): do not reword. The third paragraph is PROPOSED (21/10/2026).
             FreeLine,
             FreeLaterNote,
-            // The earlier answer, kept word for word (it was already in the branch at 5252096): the facts the two new paragraphs do not carry.
-            "Yes. There is no charge, no subscription and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.",
+            // The earlier answer's facts, kept: its first sentence is reworded so it does not repeat the two paragraphs above (PROPOSED, 21/10/2026).
+            "There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.",
         ]),
         new("Where is the full guide?",
         [

@@ -151,7 +151,7 @@ public class HelpPageTests
 
     /// <summary>
     /// The reconciliation with main (21/10/2026), all PROPOSED copy: the crash answer carries the 1.1.2 note's sentence, the
-    /// free answer is the listing line plus one sentence, and the calibration feature goes by the name its button shows.
+    /// free answer is the two approved paragraphs plus the licence and no-limit facts, and the calibration feature goes by the name its button shows.
     /// </summary>
     [Fact]
     public void The_crash_free_and_calibration_answers_carry_the_reconciled_copy()
@@ -167,13 +167,12 @@ public class HelpPageTests
         var free = HelpText.Questions.Single(q => q.Question == "Is Dictum free?");
         Assert.Equal(["Free: no subscription, no account, no ads, no analytics, no telemetry.",
             "The base product stays free to keep on your PC; optional paid extras may come later.",
-            "Yes. There is no charge, no subscription and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence."], free.Answer);
+            "There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence."], free.Answer);
 
         // Calibration is "Calibrate my voice" in 1.1.x; the help uses that name and no other (a 1.2 rename must change both together).
         var calibration = new Regex(@"calibrat\w*", RegexOptions.IgnoreCase);
         foreach (var text in HelpText.AllText())
-            foreach (Match m in calibration.Matches(text))
-                Assert.Equal("Calibrate", m.Value); // only ever the verb of "Calibrate my voice"
+            Assert.Equal(calibration.Matches(text).Count, Regex.Matches(text, "Calibrate my voice").Count); // every "calibrat…" word sits inside "Calibrate my voice"
         Assert.Contains(HelpText.AllText(), t => t.Contains("Calibrate my voice", StringComparison.Ordinal));
     }
 
