@@ -122,11 +122,12 @@ public sealed class ModelCoordinator(
 
     public string CurrentName => ModelCatalog.DisplayName(CurrentPath);
 
-    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, or the cloud provider.</summary>
+    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, "no clean-up" for off (PROPOSED, 21/10/2026), or the cloud provider.</summary>
     public string CurrentCleanupName => settings().Llm.Provider switch
     {
         LlmSettings.Local => CleanupCatalog.DisplayName(llm.ModelPath ?? settings().Llm.Model),
         LlmSettings.NoProvider => "rules",
+        LlmSettings.Off => "no clean-up", // not "off": the tray line "base.en · Vulkan · off · F9" read as Dictum being off (lens on d6b4ea8)
         var cloud => cloud,
     };
 
@@ -528,6 +529,9 @@ public sealed class ModelCoordinator(
 
     /// <summary>Tray: "No AI cleanup (rule-based tidy)".</summary>
     public void SelectRulesOnly() => SetValues(("llm.provider", LlmSettings.NoProvider));
+
+    /// <summary>Settings > Models or the tray: no clean-up, the text pasted as whisper wrote it (llm.provider = off). Nothing is downloaded or loaded.</summary>
+    public void SelectOff() => SetValues(("llm.provider", LlmSettings.Off));
 
     /// <summary>Tray or startup prompt: pick any whisper ggml file.</summary>
     public void ChooseFile()

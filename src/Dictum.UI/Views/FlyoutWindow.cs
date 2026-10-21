@@ -331,10 +331,12 @@ internal sealed class FlyoutWindow : Window
         var labels = names.Select(n => CleanupCatalog.Find(n)! is var info && _shell.Models.IsCleanupDownloaded(info) ? $"{n} · local" : $"{n} · local{DownloadMark(info.FileName)}").ToList();
         names.Add(LlmSettings.NoProvider);
         labels.Add("Rule-based tidy");
+        names.Add(LlmSettings.Off);
+        labels.Add(SimpleView.OffAdvancedLabel);
         var current = s.Llm.Provider switch
         {
             LlmSettings.Local => CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model,
-            LlmSettings.NoProvider => LlmSettings.NoProvider,
+            LlmSettings.NoProvider or LlmSettings.Off => s.Llm.Provider,
             _ => s.Llm.Provider,
         };
         if (!names.Contains(current))
@@ -347,7 +349,8 @@ internal sealed class FlyoutWindow : Window
 
     /// <summary>
     /// ui.view = simple: "Tidy my words", "Add AI clean-up" (marked like a catalogue entry) while the rule-based tidy is in use,
-    /// and a Custom entry for anything else in use. No cloud provider is offered here; one chosen in Advanced shows as Custom.
+    /// "Off" (llm.provider = off), and a Custom entry for anything else in use. No cloud provider is offered here; one chosen in
+    /// Advanced shows as Custom.
     /// </summary>
     private void FillSimpleCleanup(AppSettings s)
     {
@@ -360,8 +363,14 @@ internal sealed class FlyoutWindow : Window
             names.Add(ai.Name);
             labels.Add(_shell.Models.IsCleanupDownloaded(ai) ? Settings.ModelsPage.AddCleanupLabel : $"{Settings.ModelsPage.AddCleanupLabel}{DownloadMark(ai.FileName)}");
         }
+        names.Add(LlmSettings.Off); // a provider value, not a catalogue name, so it cannot collide with one
+        labels.Add(SimpleView.OffLabel);
         var current = TidyEntry;
-        if (!SimpleView.TidyInUse(s.Llm, gpu))
+        if (SimpleView.OffInUse(s.Llm))
+        {
+            current = LlmSettings.Off;
+        }
+        else if (!SimpleView.TidyInUse(s.Llm, gpu))
         {
             current = s.Llm.Provider == LlmSettings.Local ? s.Llm.Model : s.Llm.Provider;
             names.Insert(0, current);
@@ -399,6 +408,7 @@ internal sealed class FlyoutWindow : Window
         var name = names[_cleanup.SelectedIndex];
         if (name == TidyEntry) Act(() => Settings.ModelsPage.UseTidy(_shell));
         else if (name == LlmSettings.NoProvider) Act(_shell.Models.SelectRulesOnly);
+        else if (name == LlmSettings.Off) Act(_shell.Models.SelectOff);
         else if (CleanupCatalog.Find(name) is not null) Act(() => _shell.Models.SelectCleanup(name));
     }
 

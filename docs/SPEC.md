@@ -242,6 +242,19 @@ of", "kind of" when between commas or at clause starts), collapse immediate word
 ("the the"), apply "new line"/"new paragraph", capitalise sentence starts, tidy spaces
 before punctuation. Unit-tested with a table of cases; conservative by design.
 
+`off` provider = **no clean-up** (amendment, 21/10/2026, Dictum 1.2): the transcript is
+pasted as whisper wrote it, with whitespace normalised only (ends trimmed; runs of spaces,
+tabs, CR and LF become one space, and other whitespace inside the text, such as a no-break
+space, is kept; `TranscriptCleaner.Off`, the same step as the
+non-English plain clean-up of §23). No filler removal, no capitals, no full stop, and no
+spoken commands: "new line", "new paragraph", "scratch that", "comma" and the rest are typed
+as the words heard, and a hands-free part keeps whisper's case at the boundary. No model is
+loaded, no reply check runs, and nothing is sent, so `offline_only` has nothing to refuse and
+the privacy lines say nothing leaves the PC. Corrections, the profanity filter and snippets
+(§16) still run after it, as they do for every provider. `off` is not a fallback tier: the
+fallback for every model failure stays the deterministic cleanup above. `none` keeps its
+meaning.
+
 Optional cloud provider `anthropic` (opt-in; model `claude-haiku-5-5`, fast and cheap is
 the right tier for filler removal): non-streaming `messages.create` with the system
 prompt, user content = raw transcript. Thinking off (`thinking: {type: "disabled"}`) and
@@ -285,6 +298,7 @@ Providers (`llm.provider`):
 - `anthropic`: Anthropic SDK, key from `ANTHROPIC_API_KEY`.
 - `openai-compatible`: `POST {base_url}/chat/completions` with `model`, `messages` (system + user), `temperature: 0`. Which key goes to which server is in §22 ("§5 keys").
 - `none`: deterministic cleanup only.
+- `off` (1.2): no clean-up; whitespace normalised only (above).
 
 Secrets precedence (standard dotenv behaviour): a real process/machine environment
 variable wins; `.env` only fills in variables that are not already set. This lets a
@@ -360,7 +374,7 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   Amended 21/10/2026 (1.2, §10.1): the tray panel's two pickers follow `ui.view`. Simple (the
   default) lists the three speech tiers by their plain names (Standard, More accurate, Most
   accurate) and, for clean-up, "Tidy my words" plus "Add AI clean-up" while the rule-based tidy
-  is in use; a model in use that is none of them is listed first as "Custom: <name>". The
+  is in use, then "Off" (no clean-up, §5); a model in use that is none of them is listed first as "Custom: <name>". The
   "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
   lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
 - About (version, runtime, no network statement).
@@ -497,12 +511,16 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   model, a .gguf file, a cloud provider chosen in Advanced) is a "Custom: <name>" row. Cloud
   clean-up is never offered in the Simple view; the Advanced view keeps its pointer to Settings
   > Clean-up. With text that is not English the line reads "Tidies spacing only for
-  <language>." (clean-up then tidies whitespace only). There is no "Off" row: Dictum has no clean-up mode that pastes exactly what was
-  heard (`llm.provider = none` is the rule-based tidy), so the brief's "Off" was not built
-  (DECISIONS, 21/10/2026).
+  <language>." (clean-up then tidies whitespace only). Under these rows (and under Add AI
+  clean-up), an **Off** row, "Paste exactly what was heard.", writes `llm.provider = off` (§5):
+  "In use · Paste exactly what was heard." while it is in use, otherwise a **Use** button named
+  "Use Off". Off is its own row, never "Custom", and has no language dependency, so it is
+  offered for every language. (Amended 21/10/2026 by the clean-up Off lane; the first build of
+  this view left the row out because no such mode existed.)
 - **Both views:** the language card, the model folder and the Storage link. **Advanced only:**
-  the catalogue lists, the decoding choice, the file choosers, "Rule-based tidy only" and the
-  cloud pointer.
+  the catalogue lists, the decoding choice, the file choosers, "Rule-based tidy only", "Off
+  (paste exactly what was heard)" and the cloud pointer. The tray panel's clean-up picker lists
+  "Off" in Simple and "Off (paste exactly what was heard)" in Advanced.
 - The Mode presets (§16.1) are unchanged and remain in both views: they set speech and clean-up
   together, which the tiers do not.
 
@@ -627,6 +645,8 @@ hardware, unit-tested:
 | Full | large-v3-turbo + qwen2.5-1.5b | small.en + qwen2.5-1.5b |
 
 Tray shows a tick on the matching preset. `--selftest` prints which preset is active.
+Light keeps the rule-based tidy (`none`), not `off` (§5, 21/10/2026): with clean-up off
+neither preset matches, so the panel shows Custom.
 
 ### 16.2 Personal dictionary
 
@@ -643,7 +663,8 @@ blanks, duplicates and an over-budget list.
 
 `%APPDATA%\Dictate\corrections.txt`: lines `heard => written`, literal phrases,
 whole-word, case-insensitive match, applied after clean-up and BEFORE the profanity filter (user intent first, so "ass => ask" works), before paste
-(and to raw text when the provider is `none`). The last pasted text is kept in memory
+(and to raw text when the provider is `none`, or to whisper's text with only its spaces tidied
+when it is `off`). The last pasted text is kept in memory
 only (never on disk in this batch). Tray → "Fix last dictation…" and an optional
 `fix_hotkey` (default unset; parsed with the existing hotkey parser) open a small
 always-on-top editor pre-filled with the last text. Buttons: "Copy", "Paste fix" (puts

@@ -2930,3 +2930,69 @@ The lens on PR #23 (head 1316ea6) returned Needs changes with three majors, six 
 - The tier state for a file not on this PC is its size alone (replaces "<size> download").
 
 **Not verified (these fixes):** the plain question in the real question window (only its text is pinned, through the test dialogs); the ellipsis at 150 % scaling or with other fonts (headless only); the multilingual `small` and `medium` speed on a CPU.
+
+## Clean-up Off: paste exactly what was heard (Dictum 1.2, 21/10/2026, branch feat/cleanup-off)
+
+**Why.** The Simple view brief (above) asked for an "Off" clean-up row, "Paste exactly what was heard.", which was left out because `llm.provider = none` is the rule-based tidy and no off mode existed. This lane adds the mode, stacked on `feat/simple-view`.
+
+**What was built.**
+
+1. A fifth provider value, `llm.provider = "off"` (`LlmSettings.Off`, accepted by `SettingsLoader.BindLlm` in any case like the others, documented in the default settings file). `none` keeps its name and its behaviour.
+2. `TranscriptCleaner.Create` checks `off` first and returns `TranscriptCleaner.Off()`: no client, so no model load, no request and no reply check. It is checked before the prompt file is read and before the reply checks are built (`PersonalCleanup.Checks`), and before the not-English skip, so the status names what the user chose. `Off()` reuses the whitespace-only step that text in another language already gets (`DeterministicCleaner.WhitespaceOnly`, `plain: true`): ends trimmed, runs of spaces, tabs, CR and LF made one space (other whitespace inside the text, such as a no-break space, is kept). No second implementation was written. Because it is plain, `SegmentJoin` keeps whisper's case at a hands-free part's boundary (`keepCase: cleaner.IsPlain`), so no letter changes case anywhere. `IsPlain`'s comment now says it covers both cases; every reader of it was checked (the CLI's "whitespace-only tidy" line, the pipeline's keepCase, Settings > Clean-up's `OfflineOnlyIsWhyNothingIsSent`, which is false for off anyway because `OfflineRefusal` has nothing to refuse, and Settings > About's cleanup-error line, which reads `local` only).
+3. **Spoken commands.** Read from the code: "new line" and "new paragraph" are applied only by the rule-based tidy (`DeterministicCleaner.SpokenBreak`) and by a model following its prompt; `SegmentJoin.LeadingBreak` puts a break between hands-free parts only when the clean-up removed the opening command, which off never does. So with off, every spoken command ("new line", "new paragraph", "comma", "full stop", "scratch that"…) is typed as the words heard. Pinned in the pipeline, not only in the cleaner.
+4. Settings > Models: Simple gains an **Off** row under "Tidy my words (recommended)" and its Add AI clean-up button (a separate panel, so that button stays directly under the Tidy row); it is its own row, never "Custom". Advanced gains an "Off (paste exactly what was heard)" button beside "Rule-based tidy only", and its "In use:" line reads "In use: no clean-up (paste exactly what was heard)". `ModelCoordinator.SelectOff` writes the key through the same `SetValues` path as `SelectRulesOnly`; `CurrentCleanupName` names it "no clean-up" (lens on d6b4ea8: "off" in the tray line read as Dictum being off). The tray panel's clean-up picker gains "Off" in Simple and "Off (paste exactly what was heard)" in Advanced, so an off in use never shows as a "· cloud" entry.
+5. The pipeline's log line says "the whitespace-only tidy" for a plain clean-up instead of "the rule-based tidy" (it was already wrong for text in another language).
+
+**Privacy lines: reused, none new.** `NothingLeaves` is `!usesModel || …` (`CloudPolicy.NothingLeaves`), and the off cleaner has no client, so it is true: the tray panel shows "Nothing leaves this PC" with its lock, and Settings > Privacy shows the approved "Nothing leaves this PC: speech recognition and clean-up both run here." Settings > Clean-up shows the cleaner's status and none of the cloud "On" lines. **For the product owner:** with clean-up off, "clean-up both run here" is still true in the narrow sense (the whitespace step runs here), but a reader may find it odd. The approved line is not reworded; if a separate line is wanted for off, it needs the product owner's wording.
+
+**Open decision, not built: corrections, profanity filter and snippets.** They run after every clean-up (SPEC §22 order) and still run with off, because the user set each of them up and none is on by default except what the user adds (the profanity filter's default is `off`). If "exactly what was heard" should also skip them, that is a one-line change in the pipeline's finish step; recommendation: keep them, because a correction or snippet the user wrote is their own intent, not Dictum's tidying.
+
+**PROPOSED strings (21/10/2026), for the product owner's approval; none is approved:**
+
+- Simple row: "Off", line "Paste exactly what was heard."; in use: "In use · Paste exactly what was heard."; its button's accessible name "Use Off".
+- Advanced button and Advanced tray entry: "Off (paste exactly what was heard)".
+- Advanced "In use:" line: "In use: no clean-up (paste exactly what was heard)".
+- Tray Simple entry: "Off".
+- Tray panel models line and the icon's tooltip, in the clean-up place: "no clean-up" (for example "base.en · Vulkan · no clean-up · F9" and "Dictum · base.en · Vulkan · no clean-up · F9"), from `ModelCoordinator.CurrentCleanupName`.
+- Status (Settings > Clean-up's current line, About's "Clean-up:" line, the self-test and the log): "off: the text is pasted as whisper wrote it, whitespace tidied only (llm.provider = off)".
+- Log line (not shown in the UI): "Clean-up is off (llm.provider = off): the text is pasted as whisper wrote it, with whitespace tidied only."
+
+**Pins** (`tests/Dictum.Tests/CleanupOffTests.cs`; one existing assertion in `SimpleViewTests.The_simple_view_never_shows_cloud` now expects "Off" after "Add AI clean-up" in the tray list). Each was observed failing with its mutation applied and passing with it reverted:
+
+| Mutation | Pins that failed |
+|---|---|
+| M1: `"off"` removed from `SettingsLoader`'s provider list | `The_off_provider_round_trips`, `The_simple_rows_switch_between_tidy_and_off`, `The_advanced_list_offers_off`, `The_tray_pickers_offer_off`, `The_privacy_lines_say_nothing_leaves` (5 of 20) |
+| M2: `off` returns the rule-based tidy with the off status (exactly `return RulesOnly(OffStatus);`; `return RulesOnly("off");` also fails the privacy pin, M2b below) | all 10 rows of `Off_pastes_exactly_what_was_heard`, `Off_builds_no_validator_loads_no_model_and_sends_nothing`, `Off_wins_over_the_language_skip`, `The_simple_rows_switch_between_tidy_and_off` (13 of 20) |
+| M3: the `off` branch in `Create` removed (falls through to the default `anthropic` branch) | the same 13 plus `The_privacy_lines_say_nothing_leaves` (14 of 20) |
+| M5: the pipeline's `keepCase` forced to false | `A_hands_free_part_with_off_is_typed_as_heard` |
+| M6: the Simple Off row's Use writes the rule-based tidy | `The_simple_rows_switch_between_tidy_and_off` |
+| M7: the tray's Off entry writes the rule-based tidy | `The_tray_pickers_offer_off` |
+| M8: the Advanced Off button writes the rule-based tidy | `The_advanced_list_offers_off` |
+| M9 (`none` unchanged): `none` returns `Off()` | the existing `LanguageTests.Text_in_another_language_gets_whitespace_tidied_only_never_the_english_rules`, all 10 rows of `Off_pastes_exactly_what_was_heard` (their `none` column) and `The_simple_rows_switch_between_tidy_and_off` (12 of 72 in the cleanup, language, LLM, rules and Simple view tests) |
+| M11: off shown as a "Custom" row as well | `The_simple_rows_switch_between_tidy_and_off` |
+| M12: the tray's Simple picker selects Tidy while off is in use | `The_tray_pickers_offer_off` |
+
+**Not verified:** the rows on a real desktop, at 150 % scaling or in dark mode (headless only); a screen reader (the accessible name is pinned, not heard); a real dictation through whisper with off (the pipeline pin uses a fake transcriber); tray mode, never run on the development PC.
+
+### Merge of feat/simple-view 787b300 and lens fixes (21/10/2026), lens on d6b4ea8
+
+The lens on PR #27 (head d6b4ea8) returned Needs changes: no blockers or majors, three minors and one nit. All four are fixed in the same round as the merge of `origin/feat/simple-view` at 787b300 (lane A's lens fixes). The merge was a plain merge, not a rebase.
+
+**Merge.** The Off row sits with lane A's new rows and guards. It has no language dependency, because it never runs a clean-up, so it is offered for every language, unlike the tiers that the language rules out. That is pinned by `Off_is_offered_for_every_language`, run with French and with Detect automatically. The Custom clean-up row uses A's new line ("In use. Not one of the choices above.") and still never shows for off. The tray's Off entries use A's ellipsis item template, which applies to every entry of both pickers. That is pinned by `The_tray_line_says_no_clean_up_and_the_off_entry_is_trimmed`. A's new `Choosing_tidy_my_words_in_the_tray_switches_to_the_rule_based_tidy` now expects "Off" at the end of the Simple tray list. Its other assertions are unchanged.
+
+1. **Minor: the tray line read as Dictum being off.** `ModelCoordinator.CurrentCleanupName` returned "off", so the tray panel's models line and the icon's tooltip read "base.en · Vulkan · off · F9". It now returns "no clean-up" (PROPOSED). The Advanced "In use:" line becomes "In use: no clean-up (paste exactly what was heard)".
+2. **Minor: two comments said "plain" means "not English".** The `keepCase` comments in `SegmentJoin` and `DictationPipeline` now say "text that is not English (SPEC §23) or clean-up off (§5)". So does `SegmentJoin`'s summary.
+3. **Minor: the M2 row did not name its mutation.** The row now names it exactly (`return RulesOnly(OffStatus);`, 13 of 20 on d6b4ea8). M2b below confirms the lens's figure for `RulesOnly("off")`.
+4. **Nit: the whitespace wording was too broad.** README and SPEC now say "runs of spaces, tabs, CR and LF become one space". Other whitespace inside the text, such as a no-break space, is kept: `DeterministicCleaner.WhitespaceOnly` collapses `[ \t]+` after turning CR and LF into spaces, and trims the ends.
+
+**Mutations for these fixes.** Run on the merged tree with 23 pins in `CleanupOffTests`. Each mutation failed the pins listed and was restored byte for byte.
+
+| Mutation | Pins that failed |
+|---|---|
+| M2b: `off` returns `RulesOnly("off")` | 14 of 23: the 13 of M2 plus `The_privacy_lines_say_nothing_leaves` |
+| M13: the tray name back to "off" | `The_advanced_list_offers_off`, `The_tray_line_says_no_clean_up_and_the_off_entry_is_trimmed` |
+| M14: the Off row shown only for English text | both cases of `Off_is_offered_for_every_language` |
+
+**PROPOSED strings changed by these fixes** (none approved):
+- Tray panel models line and icon tooltip: "no clean-up".
+- Advanced "In use:" line: "In use: no clean-up (paste exactly what was heard)" (replaces "In use: off (paste exactly what was heard)").

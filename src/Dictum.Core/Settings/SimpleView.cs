@@ -17,9 +17,9 @@ public sealed record TierChoice(SpeechTier Tier, string Label, string SubLine, s
 
 /// <summary>
 /// The Simple view of Settings > Models and of the tray panel's pickers (Dictum 1.2, product owner 21/10/2026): plain speech
-/// tiers mapped onto the catalogue, and "Tidy my words" for clean-up. It holds no models and no download logic of its own: a
-/// tier is one catalogue entry, chosen through the same Select path as the Advanced list. The mapping reuses the catalogue's
-/// recommendation and the Mode presets' models rather than a second rule (DECISIONS, 21/10/2026):
+/// tiers mapped onto the catalogue, and "Tidy my words" or "Off" for clean-up. It holds no models and no download logic of its
+/// own: a tier is one catalogue entry, chosen through the same Select path as the Advanced list. The mapping reuses the
+/// catalogue's recommendation and the Mode presets' models rather than a second rule (DECISIONS, 21/10/2026):
 /// <code>
 /// | whisper.language "en" (no translate) | CPU only  | GPU machine (WhisperEngine.GpuMachine) |
 /// | Standard                             | base.en   | base.en                                |
@@ -74,6 +74,21 @@ public static class SimpleView
 
     /// <summary>The Tidy row's state while the recommended clean-up model (not the rule-based tidy) does the tidying.</summary>
     public const string TidyWithAiState = "In use, with AI clean-up";
+
+    // PROPOSED copy (21/10/2026, the clean-up Off lane), for the product owner to approve before release (DECISIONS, 21/10/2026).
+    /// <summary>The Simple view's no-clean-up row (llm.provider = off), and the tray panel's Simple clean-up entry.</summary>
+    public const string OffLabel = "Off";
+
+    public const string OffSubLine = "Paste exactly what was heard.";
+
+    /// <summary>The same choice in the Advanced view: Settings > Models' clean-up buttons and the tray panel's Advanced clean-up picker.</summary>
+    public const string OffAdvancedLabel = "Off (paste exactly what was heard)";
+
+    /// <summary>The Advanced view's "In use:" line suffix while clean-up is off, after the tray name "no clean-up".</summary>
+    public const string OffInUseNote = " (paste exactly what was heard)";
+
+    /// <summary>"Off" is in use: no clean-up, the text pasted as whisper wrote it with whitespace tidied only.</summary>
+    public static bool OffInUse(LlmSettings llm) => llm.Provider == LlmSettings.Off;
 
     /// <summary>
     /// The line of a Custom row (lens on PR #23): the model in use is none of the choices above. It may have come from the
@@ -158,8 +173,9 @@ public static class SimpleView
     public static string TidyModel(bool gpuMachine) => CleanupCatalog.Recommend(gpuMachine).Model;
 
     /// <summary>
-    /// "Tidy my words" is in use: the rule-based tidy (llm.provider none), or the local recommended clean-up model. Anything
-    /// else (another local model, a .gguf file, a cloud provider chosen in the Advanced view) is a Custom row.
+    /// "Tidy my words" is in use: the rule-based tidy (llm.provider none), or the local recommended clean-up model. Off is its
+    /// own row (<see cref="OffInUse"/>). Anything else (another local model, a .gguf file, a cloud provider chosen in the
+    /// Advanced view) is a Custom row.
     /// </summary>
     public static bool TidyInUse(LlmSettings llm, bool gpuMachine) => llm.Provider switch
     {
