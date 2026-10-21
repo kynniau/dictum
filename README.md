@@ -130,7 +130,7 @@ an edit made in the file is picked up within a second and shows in the window.
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
 | About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
-| Help | **How Dictum works** and **Questions and answers** in plain words, readable with no internet; **Open the full guide** (https://dictum.kynni.au/help, in your browser) and **Email support** (a new email to hello@kynni.com.au in your own mail app). See "Help". |
+| Help | **How Dictum works** and **Questions and answers** in plain words, readable with no internet; **Open the full guide** (https://dictum.kynni.au/help, in your browser) and **Email support** and **Send feedback or suggest a feature** (each a new email to hello@kynni.com.au in your own mail app). See "Help" and "Feedback and feature requests". |
 
 The windows follow Windows' light or dark setting.
 
@@ -147,6 +147,20 @@ Help is in two places:
   page opens it in your browser; Dictum itself fetches nothing.
 
 The Help page's words are PROPOSED (docs/DECISIONS.md, 21/10/2026) and live in `src/Dictum.Core/Help/HelpText.cs`.
+
+### Feedback and feature requests
+
+Settings > Help has **Send feedback or suggest a feature**. It opens a new email to hello@kynni.com.au in your own mail
+app, with the subject "Dictum feedback" and a space to write in. Below that space are five lines about your setup,
+which you can delete: the Dictum version, your Windows version, the speech model and whether it runs on the GPU or the
+CPU, and the clean-up in use. Nothing else goes in: no folder or file path, no dictionary words, nothing you dictated,
+no microphone name and no PC or user name.
+
+Dictum sends nothing itself. It hands the email to your mail app, and you read it, change it and press Send, or close
+it and nothing is sent. Dictum makes no web request and uses no form for this. **Email support** works the same way and
+is the same email as **Report a problem** in Settings > About: the version and the models are filled in.
+
+The website's footer has a matching link, "Feedback and feature requests" (it opens the same email).
 
 ### Choosing a hotkey
 
@@ -1033,6 +1047,9 @@ send it on, and `offline_only` cannot see that.
 - **Report a problem** (Settings > About) opens an email to hello@kynni.com.au in your own mail app, with Dictum's
   version, the platform and the models filled in. Dictum sends nothing itself and never attaches what you dictated;
   GitHub issues (https://github.com/kynniau/dictum/issues) is the other way to reach us.
+- **Send feedback or suggest a feature** (Settings > Help) and **Email support** are emails in the same way: your mail
+  app opens a new message to hello@kynni.com.au; Dictum sends nothing, and no path, dictionary word or dictated text is
+  included (see "Feedback and feature requests").
 
 ### Storage and removing Dictum
 

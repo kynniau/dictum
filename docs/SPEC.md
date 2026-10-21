@@ -1164,8 +1164,18 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
   others, and what to do about it), then eleven questions and answers. All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
-- **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`, and
-  **Email support** passes `mailto:hello@kynni.com.au` to it. The browser or mail app does the rest; Dictum sends nothing.
+- **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
+  **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
+  the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
+  the rest; Dictum sends nothing: no HTTP, no form, no clipboard.
+- **Feedback** (amendment, 21/10/2026): **Send feedback or suggest a feature**, beside Email support. Subject
+  "Dictum feedback". The body is a space to write in, then five lines: the Dictum version, "Windows <version>", the speech
+  model and the runtime it loaded on (GPU or CPU), and the clean-up in use. The facts are the ones About shows and nothing
+  else: never a path, dictionary word, transcript, microphone name or machine or user name. Line breaks are CRLF
+  (`%0D%0A`), the text is percent-encoded as UTF-8, and the whole link is kept under 2,000 characters (past that the five
+  lines are left off). One builder (`SupportMail`, `src/Dictum.Core/Help/SupportMail.cs`) and one address constant serve
+  Report a problem, Email support and this. The About card that held Report a problem is titled **Support**, so that
+  "Help" names only this page.
 - **Accessibility**:
   - heading levels (page 1, cards 2, the accuracy part and each question 3);
   - each block of text is a tab stop named after its heading, scrolled into view when focused, with a ring only while

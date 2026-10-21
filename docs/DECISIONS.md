@@ -3093,3 +3093,118 @@ in Dictum.Core's internals does not rebuild its dependants. That run (the pill l
 > The full guide is on the Dictum website at dictum.kynni.au/help. Choose Open the full guide at the top of this page.
 >
 > It opens in your web browser and needs the internet. Everything on this page works without the internet.
+
+## Feedback and feature requests through the user's mail program (21/10/2026, branch feat/feedback, lane F, stacked on feat/in-app-help)
+
+**The decision (Kyle, as relayed by the orchestrator, 21/10/2026).** Users need a way to say what they would like Dictum to do.
+It must not break the privacy promise, so Dictum sends nothing: the feedback goes through the user's own mail program.
+
+**What this lane built.**
+
+- **Settings → Help → "Send feedback or suggest a feature"**, beside **Email support**. It builds a `mailto:` link and hands it to
+  `IPlatform.Open`, exactly as Report a problem does. The user's mail program opens a new message; the user reads it, edits it
+  and sends it, or closes it.
+- **No network statement.** Dictum makes no HTTP request, posts no form, and uses no clipboard for this. The only thing it does is
+  `IPlatform.Open(<mailto: link>)`. A source pin and a network pin (both clicked through the real page, with the model-download and
+  update-check clients counting requests) hold this.
+- **One mail builder.** `SupportMail.Uri(subject, body)` in `src/Dictum.Core/Help/SupportMail.cs` is the only place a support
+  `mailto:` link is made. `AppShell.ReportUri` (Report a problem) was changed to call it, with its output pinned identical to what it
+  produced before. Report a problem's body keeps its LF line breaks (unchanged on purpose); the feedback body uses CRLF.
+- **One address constant** (coordinator's addition, PR #24 lens finding 4). `SupportMail.Address` is the only copy of
+  `hello@kynni.com.au` in code. `AppShell.SupportEmail` is an alias of it, and `HelpText` names it directly (`HelpText.SupportAddress`
+  and `HelpText.SupportUri` were removed). A pin scans `src/**/*.cs` and fails on a second quoted copy.
+- **Email support now opens the Report a problem email** (the same builder and the same body: the version, the platform and the
+  models line), not a bare `mailto:`. Its note was reworded (PROPOSED, below). The models line is passed through
+  `SupportMail.Facts` first, which cuts any path down to its last part.
+- **About's card titled "Help" is now titled "Support"** (PROPOSED), so "Help" names only the Settings page.
+
+**Where the support address lives, so the switch to `dictum@kynni.com.au` is known (decision for later; not made here).**
+
+| Place | What to change |
+|---|---|
+| Code: `src/Dictum.Core/Help/SupportMail.cs`, `Address` | the one constant; the About text, Help page notes, Report a problem, Email support and feedback all follow it |
+| `site/index.html` | the footer's plain address link (`mailto:hello@kynni.com.au`, its text) and the feedback link (`mailto:hello@kynni.com.au?subject=Dictum%20feedback`) |
+| `site/privacy.html` | the privacy contact paragraph and the footer link (the site's own copy; **not touched by this lane**) |
+| `packaging/Dictum.iss` | `AppContact=` (the installer; not code that can read the constant) |
+| `.github/SECURITY.md` | the security contact |
+| `docs/STORE.md` | the Partner Center support contact and the listing's support line (approved copy: product owner's call) |
+| README.md, docs/SPEC.md, this file | prose mentions |
+
+A pin (`The_site_links_to_the_same_email_from_its_footer_and_has_no_form`) fails if the site's feedback link and the app's address or
+subject drift apart, so the site and the code cannot be switched half way unnoticed.
+
+**What the email says (PROPOSED copy, awaiting the product owner's review; do not reword).**
+
+- Button: `Send feedback or suggest a feature`
+- Note under Help (screen-reader help text on the button too): `Send feedback or suggest a feature opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum, your Windows version and the models in use filled in. You can read and change it before you send it. Dictum sends nothing by itself.`
+- Email support's note (reworded): `Email support opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.` (it was: `Email support opens a new email to hello@kynni.com.au in your own email program. Dictum sends nothing by itself.`)
+- Subject: `Dictum feedback`
+- Body (CRLF line breaks; `<…>` is filled in):
+
+```
+What I'd like to say:
+
+
+(You can delete the lines below. They help us understand your setup.)
+Dictum <version>
+Windows <version>
+Speech model: <name> on <GPU or CPU>
+Clean-up: <provider or rule-based tidy>
+```
+
+- About card title: `Support` (was `Help`).
+- Website footer link text: `Feedback and feature requests`, href `mailto:hello@kynni.com.au?subject=Dictum%20feedback`.
+
+**Where each fact comes from (`AppShell.FeedbackFacts`).** The version is `AppShell.AppVersion` (About's "Version"). "Windows
+<version>" is the platform name About shows ("On Windows…") plus `Environment.OSVersion.Version` to three parts: **About does not show the
+Windows version, so this one fact is new** (a version number only). The speech model is `Models.CurrentName` (a model's name, or a
+custom file's name without its folder). The runtime is the one About shows (`Vulkan`, `CPU`, `loading`, or `no runtime (model error)`).
+The clean-up is `rule-based tidy` (provider none, or a local model that failed to load), `<model> on this PC` (local), or the cloud
+provider's name alone (with a note when its key is missing): **not** About's full status line, because that names the server host, which
+for a company's own server could be private. Every fact is cleaned by `SupportMail.Fact`: control characters out, only the last part of
+anything path-like kept, 60 characters at most.
+
+**Length.** The whole link is kept at 2,000 characters or fewer (`SupportMail.MaxUriLength`, the common mailto limit as recalled, not
+verified against a specific mail program in this lane). If the five lines would take it over, they are left off and the writing space and
+note stay. A normal email is under 600 characters.
+
+**Pins (`tests/Dictum.Tests/FeedbackTests.cs`, and edits to `HelpPageTests.cs`), each observed failing on the reverted behaviour
+(21/10/2026, mutation run on c3c0339 and then on the follow-up commit).** Failing tests are the ones named; "also" lists others that failed.
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| The exact link for a sample setup | body line breaks changed from CRLF to LF (intro, then the join) | failed: exact-link pin, encoding pin, length pin, path pin, real-shell pin |
+| `&`, `é` and line breaks encoded (one `&` only, all breaks `%0D%0A`, no raw space or LF) | body left unencoded except spaces | failed: encoding pin, exact-link pin, length pin, and the Report a problem pin |
+| A path, folder or line break in a name never reaches the email | the cut at the last path separator removed | failed: path pin |
+| (same) | control-character removal removed | failed: path pin |
+| Link under 2,000 characters | the over-length fallback removed; the 60-character clip removed | failed: length pin (each) |
+| Button exists, named, Open called exactly once with a mailto | button removed | failed: button pin, the Help keyboard pin, the "every sentence renders" pin and the network pin |
+| (same) | `Open` called twice; `Open` given a GitHub URL instead | failed (each): button pin, real-shell pin and network pin |
+| Nothing private in a real shell's email (dictionary word, dictated text, app name, scratch folders, user and machine name) | the dictionary file's text appended to the clean-up fact | **the first mutation did not fail**: with the path cut in place the file's path is cut to `dictionary.txt`, which is correct behaviour. With the cut also removed (the real leak): failed real-shell, path and `Facts` pins. The same for the config folder's path |
+| Site link present with the exact href and text | link text changed; href's subject changed | failed: site pin (each) |
+| The site has no form | `<form>` added to the footer | failed: site pin |
+| One address constant in code | `AppShell.SupportEmail` given its own literal; `HelpText` given its own literal | failed: single-literal pin (each) |
+| Subject `Dictum feedback` | subject changed to `Feedback` | failed: exact-link, button, site and network pins |
+| Report a problem still builds the link it did before | `?subject=` broken in the shared builder | failed: Report pin, ShellTests' Report a problem, button, exact-link and network pins |
+| Email support opens the Report a problem email | the button opens a bare `mailto:hello@kynni.com.au` again | failed: Email support pin, single-literal pin, Help "full guide" pin, network pin |
+| About's card is titled Support | title put back to Help | failed: About card pin |
+| A models line is cleaned part by part | the split removed | failed: `Facts` pin |
+
+**Not killed (stated, not hidden).** Removing `SupportMail.Facts(...)` from `ReportProblem` fails no test (`nofacts` mutation): there
+is no input today that puts a path into the models line (a speech model shows its file name, and a clean-up model that is not in the
+catalogue or a full `.gguf` path is repaired away by the settings loader), so the call there is defence in depth; the `Facts` function
+itself is pinned.
+
+**Tests adapted from PR #24 (lane C)**, because this lane changes what they pin: the Help page's "network" pin now expects three `Open`
+calls (guide, the Report a problem email, the feedback email) and allows `Shell.ReportProblem` and `SendFeedback` in the page source while
+still forbidding direct network calls (the regex gained `Dns|Ping|NetworkInformation|Process\.Start|ShellExecute`, as the PR #24 lens asked);
+the keyboard pin starts Tab from the last button, which is now Send feedback; the Email support pin expects the prefilled email.
+
+**The Store certification notes (docs/STORE.md, "Notes for certification").** They describe Report a problem ("users can report a problem
+from Settings (Report a problem)…"), so one clause was added about Settings > Help. The live 1.1.1 package has no such button; the clause
+holds for the next submission (1.2) only. Update it if 1.2 does not ship with this feature.
+
+**Not verified.** No mail program was opened: the link was checked as a string, and `Open` is a fake in tests. How Outlook, Gmail's
+protocol handler or the Windows default mail app treat a `%0D%0A` body and a 600-character link was not tested here. The 2,000-character
+limit is the figure the brief gave, not one checked against a mail program. The Settings > Help page was not seen on screen (headless
+tests only), including the two buttons sitting side by side at 150 % scaling. The site change was not deployed or rendered.
