@@ -69,7 +69,7 @@ chord of modifiers plus one key (`Ctrl+Win`, `Ctrl+Shift+Space`) must be accepte
 Fn key is not reachable: on nearly all keyboards it is handled by firmware and never
 reaches Windows as a virtual key. Say so in the README and offer `RightCtrl`, `CapsLock`,
 `F-keys` and `Ctrl+Win` as alternatives. At first run the hotkey is checked, and can be
-changed, in the "Your hotkey" step of the Welcome to Dictum window (§20, §26).
+changed, in the "Your hotkey" step of the Welcome to Dictum window (§20, §27).
 
 Mouse buttons (amendment, 16/10/2026): `RightMouse`, `MiddleMouse`, `Mouse4` and `Mouse5`
 (VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2) are accepted as a single-key hotkey or
@@ -385,6 +385,7 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
   lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
 - About (version, runtime, no network statement).
+- Help (amendment, 21/10/2026): opens Settings → Help, the offline "How Dictum works" and questions and answers (§26).
 - Quit.
 
 Single instance via a named mutex; a second launch shows a balloon and exits.
@@ -461,7 +462,7 @@ trade-off in one sentence. The choice is written to settings.json so it is visib
 editable; the tray submenu changes it later in one click. Amended 17/10/2026 (§24, Decision
 16): base.en ships inside every package; when it is found the first run asks no model
 question and writes base.en and the rule-based tidy (`llm.provider` = `none`), and the
-pickers run only without it. Amended 21/10/2026 (§26): the first-run speech choice is the speech
+pickers run only without it. Amended 21/10/2026 (§27): the first-run speech choice is the speech
 step of the Welcome to Dictum window: with base.en, one line ("The Standard model is included and
 ready.") and no choice; without it, the Simple view's three tiers (§10.1) with the recommendation
 pre-selected, and "Show every model" for this whole list and a model file. The window asks no
@@ -922,7 +923,7 @@ user. Required:
 - First run: the same capture box after the model picker (amended 17/10/2026, §24: or, when
   base.en comes with Dictum, with no model question before it), defaulting to `RightCtrl`, with
   the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
-  Command (RightWin)". Amended 21/10/2026 (§26): the box, its words and its **Use this hotkey** /
+  Command (RightWin)". Amended 21/10/2026 (§27): the box, its words and its **Use this hotkey** /
   **Skip** buttons are now the "Your hotkey" step of the Welcome to Dictum window, after the
   model-folder and speech steps; the separate first-run window is gone. Its behaviour is unchanged:
   it listens from the start, writes `hotkey` only when another key was chosen, and stops listening
@@ -1168,7 +1169,7 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
   `llm.model` gets the recommended clean-up model written, which is not downloaded (nothing downloads; the "not
-  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §26: as a step of the Welcome to Dictum window). Without base.en the pickers run
+  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
   system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
@@ -1258,7 +1259,39 @@ resilience".
   dictations in a row that the estimate skipped, the next one runs the model and measures again; the allowance doubles
   (to 24 at most) while the model stays too slow, and a dictation the estimate lets through resets it.
 
-## 26. Onboarding: the Welcome to Dictum window (amendment, 21/10/2026, Dictum 1.2)
+## 26. In-app Help (amendment, 21/10/2026)
+
+Help lives in two places (decided 21/10/2026: "the thing we are missing is explaining how it works"). The full guide,
+with pictures, is on https://dictum.kynni.au/help, built outside the app. A short offline page is inside it:
+
+- **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
+- **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
+  tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
+  others, and what to do about it), then eleven questions and answers. All of it comes from
+  `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
+- **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
+  **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
+  the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
+  the rest; Dictum sends nothing: no HTTP, no form, no clipboard.
+- **Feedback** (amendment, 21/10/2026): **Send feedback or suggest a feature**, beside Email support. Subject
+  "Dictum feedback". The body is a space to write in, then four lines (five facts): the Dictum version, "Windows build <version>", the speech
+  model and the runtime it loaded on (GPU or CPU), and the clean-up in use. The facts are the ones About shows and nothing
+  else: never a path, dictionary word, transcript, microphone name or machine or user name. Line breaks are CRLF
+  (`%0D%0A`), the text is percent-encoded as UTF-8, and the whole link is kept under 2,000 characters (past that the four
+  setup lines are left off). One builder (`SupportMail`, `src/Dictum.Core/Help/SupportMail.cs`) and one address constant serve
+  Report a problem, Email support and this. The About card that held Report a problem is titled **Support**, so that
+  "Help" names only this page.
+- **Accessibility**:
+  - heading levels (page 1, cards 2, the accuracy part and each question 3);
+  - each block of text is a tab stop named after its heading, scrolled into view when focused, with a ring only while
+    the focus came from the keyboard;
+  - Page Down scrolls from there;
+  - both buttons carry their sentence as automation help text;
+  - text wraps and fits the window at its default size, at 150 % on a 1280 × 720 screen and at its minimum size.
+- **Pins**: `HelpPageTests`. One pin checks that every control or message the help names still exists in the app. A
+  rename elsewhere fails it until the copy follows, and that copy change needs the product owner's review.
+
+## 27. Onboarding: the Welcome to Dictum window (amendment, 21/10/2026, Dictum 1.2)
 
 Product decision (Kyle, 21/10/2026): the first run must explain how Dictum works, ask where to keep the model files (a
 virtual desktop short of space on C:; the models take 200 MB to 10 GB), test the microphone (a virtual desktop with no

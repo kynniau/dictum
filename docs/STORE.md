@@ -314,7 +314,7 @@ TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.js
 
 TO DICTATE: click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
-GENERATIVE AI: the clean-up step runs a local language model on the user's own dictated words only; it is instructed not to add or answer anything, its output is checked against the dictation, and users can report a problem from Settings (Report a problem) or by email.
+GENERATIVE AI: the clean-up step runs a local language model on the user's own dictated words only; it is instructed not to add or answer anything, its output is checked against the dictation, and users can report a problem from Settings (Report a problem), from 1.2, send feedback from Settings > Help (Send feedback or suggest a feature; both open an email in the user's own mail app, and Dictum sends nothing itself), or write by email.
 
 Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) is optional and off by default; it needs an in-app consent and, for a cloud provider, the user's own API key. It is not needed for testing.
 

@@ -3,13 +3,14 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
+using Dictum.Help;
 using Dictum.UI.Shell;
 using Dictum.UI.Views.Settings;
 
 namespace Dictum.UI.Views;
 
 /// <summary>
-/// Settings (SPEC §21): General, Mode, Models, Storage, Microphone, Clean-up, Privacy, About. Every control writes
+/// Settings (SPEC §21): General, Mode, Models, Storage, Microphone, Clean-up, Privacy, About, Help. Every control writes
 /// settings.json through the shell (the file stays the source of truth and hot-reloads); each page redraws when the
 /// settings or the models change. Opened on purpose, so it takes focus.
 /// </summary>
@@ -19,7 +20,7 @@ internal sealed class SettingsWindow : Window
     private readonly ListBox _nav = new() { Width = 180 };
     private readonly ContentControl _host = new();
     private readonly Dictionary<string, SettingsPage> _pages = [];
-    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", "Privacy", "About"];
+    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", "Privacy", "About", HelpText.PageTitle];
 
     public SettingsWindow(AppShell shell)
     {
@@ -82,6 +83,7 @@ internal sealed class SettingsWindow : Window
         "Clean-up" => new CleanupPage(_shell),
         "Privacy" => new PrivacyPage(_shell),
         "About" => new AboutPage(_shell),
+        HelpText.PageTitle => new HelpPage(_shell),
         _ => new GeneralPage(_shell),
     };
 
