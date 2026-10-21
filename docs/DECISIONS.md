@@ -2918,6 +2918,11 @@ is worded to be true at main 6dfede8 and after the other 1.2 lanes land.
   copy change, for review.
 - **A "No sound from mic" message**, if a lane adds it: question 3 should name it. The pin above checks only "Mic error".
 - **dictum.kynni.au/help** must be live, with pictures, before a release carries this page.
+- **The privacy policy and the landing page (approved copy, not changed here).** `site/privacy.html` ("This website:
+  dictum.kynni.au") and the landing page's dictum.kynni.au card both say the app reaches that host "Only when you open the
+  privacy policy from Settings, or click Check for updates". **Open the full guide** is a third case: the browser opens
+  dictum.kynni.au/help. Before a release carries this page, the product owner must approve an update to both. This lane
+  may not reword approved copy.
 - **The release that carries this page** must carry the launch-crash fix. Any build from main after 6dfede8 does.
 - **FlyoutWindow.cs (lane A).** The Help button is one hunk in its own commit, at the end of the branch.
 - **The Mac beta.** The copy is Windows copy: the clock, Windows Settings, the right Ctrl key and the Microsoft Store.
@@ -2935,7 +2940,7 @@ is worded to be true at main 6dfede8 and after the other 1.2 lanes land.
 | Every label the help names exists in the copy and in the app | the copy's "Test microphone" changed; the app's Test microphone button renamed; the pill's "Mic error" changed | failed all three |
 | No text or button runs past the visible width at 860 × 640, 853 × 480 (a 1280 × 720 screen at 150 %) and 640 × 420 (the smallest window), and text wraps | paragraphs set to no wrapping; a 700-DIP minimum width | failed in all three sizes both times |
 | Headings, keyboard order, focus ring, scroll into view, Page Down | blocks not focusable; ring removed; heading levels removed; ring left on after focus moved | failed all four |
-| The tray panel's Help button opens Settings → Help | the button removed | see the flyout commit's record below |
+| The tray panel's Help button opens Settings → Help, with Settings no longer spanning its row | the button removed; the button opening Settings with no page; the column span kept | failed all three (the label pin alone still passed with the button removed, because the Settings list also shows "Help") |
 
 Removing an explicit `BringIntoView` call **did not** fail the keyboard pin: Avalonia already scrolls a focused control
 into view. The call was deleted as redundant, so the scroll assertion now pins the framework's behaviour.

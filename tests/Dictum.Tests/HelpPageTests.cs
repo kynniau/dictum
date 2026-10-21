@@ -186,7 +186,7 @@ public class HelpPageTests
             "Calibrate my voice", "Dictionary", "Fix last dictation", "Save corrections", "Settings", "Dictation on",
             "General", "Models", "Storage", "Microphone", "Clean-up",
             "Press your hotkey", "Change…", "Use this hotkey", "Test microphone", "Model folder", "Browse…", "Remove Dictum completely…",
-            "Try on the CPU", "Mic error", "Open the full guide", "Email support",
+            "Try on the CPU", "Mic error", "Open the full guide", "Email support", "Help",
         ];
         foreach (var label in named)
         {
@@ -280,6 +280,28 @@ public class HelpPageTests
         blocks[0].RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.PageDown, Source = blocks[0] });
         Dispatcher.UIThread.RunJobs();
         Assert.True(scroll.Offset.Y > 0, "Page Down did not scroll");
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task The_tray_panel_Help_button_opens_Settings_Help() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        var help = All<Button>(flyout).Single(b => b.Content as string == "Help");
+        var settings = All<Button>(flyout).Single(b => b.Content as string == "Settings");
+        Assert.Equal(1, Grid.GetColumnSpan(settings)); // six buttons in three full rows: nothing overlaps
+        Assert.NotEqual((Grid.GetRow(settings), Grid.GetColumn(settings)), (Grid.GetRow(help), Grid.GetColumn(help)));
+
+        help.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        // The shell keeps the window it opened in a private field (no window list on the headless platform).
+        var window = Assert.IsType<SettingsWindow>(typeof(AppShell).GetField("_settingsWindow", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(shell));
+        Assert.IsType<HelpPage>(All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl));
         window.Close();
         shell.Dispose();
     });
