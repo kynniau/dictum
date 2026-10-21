@@ -91,7 +91,7 @@ public sealed class ProfanityFilter
             }
             else if (next >= text.Length || SentenceStart.IsEndMark(text[next]) || text[next] is ',' or ';' or ':' or '\n' or '\r')
             {
-                TrimEndSpaces(sb); // "It's shit." → "It's."; a removed word before the danda U+0964 leaves no space before it
+                TrimEndSpaces(sb); // "It's shit." → "It's."; a removed word before U+0964 leaves no space before it
             }
             if (start)
             {

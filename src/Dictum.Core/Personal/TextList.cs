@@ -96,8 +96,8 @@ public static class WholeWords
 public static class SentenceStart
 {
     /// <summary>
-    /// A mark that ends a sentence: . ! ? … and the danda U+0964 and double danda U+0965, which end a sentence in scripts whose
-    /// sentence marks differ from English (orchestrator, 16/10/2026: the languages lens found a space left before the danda
+    /// A mark that ends a sentence: . ! ? … and U+0964 (the sentence-end mark) and U+0965, which end a sentence in scripts whose
+    /// sentence marks differ from English (orchestrator, 16/10/2026: the languages lens found a space left before U+0964
     /// when the word before it was removed).
     /// </summary>
     public static bool IsEndMark(char c) => c is '.' or '!' or '?' or '…' or '\u0964' or '\u0965';

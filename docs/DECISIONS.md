@@ -1249,12 +1249,12 @@ floor and the carried-word count each sit under a `// simplification:` note with
   sentence end and pass over curly quotes and closing brackets; the boundary rule passes over opening ones. Not folded
   in: the tidy's own token-by-token capitalisation (`DeterministicCleaner.Capitalise`), a different shape and a pinned
   table of its own; and `CorrectionSuggestions.Edge`, the characters trimmed from a suggested correction's ends, which
-  is not a sentence rule and is left for its own follow-up (it lacks …, the dandas, « » and [ ]).
-- **The danda ends a sentence** (orchestrator, 16/10/2026, for scripts whose sentence marks differ from English, from the languages PR): the marks are
-  `SentenceStart.IsEndMark`: . ! ? … and the danda (U+0964) and double danda (U+0965). The profanity
-  filter's remove mode reads the same marks after a removed word, so a removed word before a danda leaves no space before the mark (the languages lens saw
-  a space left before the danda U+0964, while "It's shit." gave "It's.") and a word that was a sentence of its own takes
-  its danda with it. English pins unchanged; aligned with it, an ellipsis after a removed word now behaves like a full
+  is not a sentence rule and is left for its own follow-up (it lacks …, the sentence-end marks U+0964 and U+0965, « » and [ ]).
+- **U+0964 ends a sentence** (orchestrator, 16/10/2026, for scripts whose sentence marks differ from English, from the languages PR): the marks are
+  `SentenceStart.IsEndMark`: . ! ? … and U+0964 (the sentence-end mark) and U+0965 (its doubled form). The profanity
+  filter's remove mode reads the same marks after a removed word, so a removed word before U+0964 leaves no space before the mark (the languages lens saw
+  a space left before U+0964, while "It's shit." gave "It's.") and a word that was a sentence of its own takes
+  its sentence-end mark with it. English pins unchanged; aligned with it, an ellipsis after a removed word now behaves like a full
   stop ("It's shit… really." → "It's… really.", was "It's … really."; "Shit… I forgot." → "I forgot.", was "… I forgot.").
 - **Fix last dictation holds the last part typed** (finding 8, kept by decision): each part is remembered as it is
   pasted, with the window it went to. The editor shows that part, not the session.
@@ -1292,12 +1292,12 @@ part, so parts end at sentence ends more often, at the cost of later feedback.
 | 7 | Minor | SPEC was cited but not amended | SPEC §3, §7, §9, §20, §22; this section | — |
 | 7b | Minor | The rule-based tidy closes nearly every part | README corrected; options above | existing pin (`Parts_are_typed_in_order…`) |
 | 8 | Minor | Fix last holds the last part | Kept and documented | existing pin (`Remembered.Last()`) |
-| 9 | Minor | Three sentence-boundary checks | `SentenceStart`, with the dandas (orchestrator addition) | rows per caller, danda rows |
+| 9 | Minor | Three sentence-boundary checks | `SentenceStart`, with U+0964 and U+0965 (orchestrator addition) | rows per caller, U+0964 rows |
 | 10 | Minor | "Within 20 dB" | About 24 dB, recomputed | the 24 dB pin |
 | 11 | Minor | A dead `CaptureFailed` branch | Deleted | P5 |
 
 **Mutation checks of the fix lane**, each a `--no-incremental` build and the whole filtered suite on the finished code
-(1,091 tests before the danda addition; the sentence-start, danda and carried-word rows re-run on 1,101 after it), each
+(1,091 tests before the U+0964 addition; the sentence-start, U+0964 and carried-word rows re-run on 1,101 after it), each
 source restored byte-identical (SHA-256 compared). Failed per mutant:
 
 | Mutant | Failed |
@@ -1311,9 +1311,9 @@ source restored byte-identical (SHA-256 compared). Failed per mutant:
 | A lost microphone in hands-free sent down the drop path (the lens's M10) | 2: P5 (state machine and controller) |
 | `break` after a failed part (the lens's M11) | 1: P6 |
 | The number box reports each change at once (finding 6 reverted) / no Enter flush / no lost-focus flush | 3 / 2 / 1 |
-| The three old sentence checks back (finding 9 reverted) | 17: the 7 aligned rows, the 8 danda rows and the 2 ellipsis rows |
+| The three old sentence checks back (finding 9 reverted) | 17: the 7 aligned rows, the 8 U+0964 rows and the 2 ellipsis rows |
 | `SentenceStart` without … / without curly quotes / without brackets | 5 / 3 / 5 |
-| Without the dandas / Remove's lists back to the English literals / both files before the dandas | 8 / 5 / 10 |
+| Without U+0964 and U+0965 / Remove's lists back to the English literals / both files before U+0964 and U+0965 | 8 / 5 / 10 |
 | The level does not decay (`LevelDecay` 1.0) | 2: the 24 dB pin's −24.1 dB row and `A_cut_lands_on_a_quiet_block_when_the_look_back_has_one` |
 | The README's stay-in-the-window sentence removed | 1 |
 | `CarriedWords` 9 | 1 |

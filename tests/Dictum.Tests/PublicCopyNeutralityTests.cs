@@ -17,7 +17,7 @@ public class PublicCopyNeutralityTests
     [
         "hin" + "di", "taga" + "log", "ceb" + "uano", "ceb" + "u", "fili" + "pino", "philip" + "pin", "off" + "shore", "ilo" + "cano",
         "hili" + "gaynon", "deva" + "nagari", "hing" + "lish", "tag" + "lish",
-        "ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila",
+        "ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "dan" + "da",
     ];
 
     private static readonly string[] BinaryExtensions = [".png", ".ico", ".jpg", ".jpeg", ".gif", ".dll", ".exe", ".bin", ".zip", ".msix", ".pdb", ".woff", ".woff2", ".mp4"];
@@ -92,6 +92,7 @@ public class PublicCopyNeutralityTests
         foreach (var path in PublicPaths(root))
         {
             var file = Path.Combine(root, path);
+            foreach (var word in Words.Where(w => path.Contains(w, StringComparison.OrdinalIgnoreCase))) offences.Add($"{path}: {word} (in path)"); // a file's name is public too
             if (!File.Exists(file) || BinaryExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)) continue;
             var text = File.ReadAllText(file);
             if (text.Contains('\0')) continue; // a binary file under a text-looking name
@@ -146,6 +147,13 @@ public class PublicCopyNeutralityTests
             File.WriteAllText(Path.Combine(dir.FullName, "tests", "a.cs"), "// " + (char)0x0964 + " mark"); // a test fixture may use the script
             Git(dir.FullName, "add", "src/a.cs", "tests/a.cs");
             Assert.Equal(["src/a.cs: " + ScriptRule], Sweep(dir.FullName)); // anywhere else it is described by code point
+
+            Git(dir.FullName, "rm", "-q", "--cached", "src/a.cs");
+            File.Delete(Path.Combine(dir.FullName, "src", "a.cs"));
+            var named = "notes-" + Words[1] + ".md";
+            File.WriteAllText(Path.Combine(dir.FullName, named), "neutral contents");
+            Git(dir.FullName, "add", named);
+            Assert.Equal([named + ": " + Words[1] + " (in path)"], Sweep(dir.FullName)); // a tracked file whose NAME carries a word fails
         }
         finally
         {
@@ -158,11 +166,13 @@ public class PublicCopyNeutralityTests
     public void The_sweep_catches_every_word_and_forgives_only_the_language_table()
     {
         Assert.All(Words, word => Assert.NotEmpty(Offences("README.md", "a " + word.ToUpperInvariant() + " here")));
+        Assert.All(Words, w => Assert.NotEmpty(Offences("README.md", "x" + w + "s"))); // a word inside a longer one counts: no word boundary
+        Assert.Equal([ScriptRule], Offences("docs/SPEC.md", "x" + (char)0x0900)); // the lower edge of the script block
         Assert.Equal([ScriptRule], Offences("docs/SPEC.md", "end mark " + (char)0x0964)); // the script rule: any file outside tests/
         Assert.Equal([ScriptRule], Offences("src/Dictum.Core/X.cs", "'" + (char)0x097F + "'"));
         Assert.Empty(Offences("tests/Dictum.Tests/X.cs", "end mark " + (char)0x0964)); // a test fixture may use the script
         Assert.Empty(Offences("docs/SPEC.md", "next to the block: " + (char)0x08FF + (char)0x0980)); // only U+0900-U+097F
-        string[] regionWords = ["ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "ceb" + "u"];
+        string[] regionWords = ["ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "ceb" + "u", "dan" + "da"];
         Assert.All(regionWords, word => Assert.Contains(word, Words)); // the region words stay on the list
 
         var table = "private static readonly (string Code, string Name)[] Table =\n[\n    (\"es\", \"Spanish\"), (\"xx\", \"" + Capitalised(Words[0]) + "\"), (\"yy\", \"Haitian Creole\"),\n];\n";

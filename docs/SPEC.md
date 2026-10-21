@@ -940,8 +940,8 @@ These amend earlier sections; where they conflict, this section wins.
   filter and the hands-free boundary rule share one sentence-start rule (`SentenceStart`): the start
   of the text, or after a line break or a mark that ends a sentence, read back past spaces, quotes
   and brackets. The marks are . ! ? … and the end marks of scripts whose sentence marks differ from English
-  (for example the danda U+0964 and double danda U+0965). The profanity filter's remove mode uses the same marks for the one after a removed
-  word (a removed word before the danda leaves no space before it, as "It's shit." → "It's.").
+  (for example U+0964, the sentence-end mark, and U+0965). The profanity filter's remove mode uses the same marks for the one after a removed
+  word (a removed word before U+0964 leaves no space before it, as "It's shit." → "It's.").
 - **§5 validator, dictionary terms (16/10/2026):** a reply is rejected ("reply adds a dictionary term the speaker did not say"; the log never names the term) when two conditions hold.
   - It has a term of the clean-up prompt's dictionary line, or a content word of a multi-word term, more often than the whole dictation, retracted clauses included.
   - It also has the term in some form more often than the dictation, counted the same way on both sides.

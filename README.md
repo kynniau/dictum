@@ -37,7 +37,7 @@ hands-free each part goes through the same steps; whisper and the clean-up also 
 in the last part as context (taken before corrections, the profanity filter and snippets, so never their text), and
 those words are never typed again. A clean-up set up since that part was cleaned, such as cloud clean-up switched on
 mid-session, is given none of them. A part that carries on a sentence (the last one did not end with . ! ? …, a
-danda or a line break) starts with a small letter unless its first word is "I", has another capital in it,
+a sentence-end mark such as U+0964 or a line break) starts with a small letter unless its first word is "I", has another capital in it,
 or is a dictionary term spelt with a capital; with the rule-based tidy, which ends a part with a full stop whenever it
 ends with a letter or a digit, nearly every part is typed as its own sentence. Text in a language other than English is
 not cleaned up (see "Other languages and translation"), so no letter changes case where its parts join: each part is
