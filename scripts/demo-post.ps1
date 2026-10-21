@@ -117,7 +117,7 @@ try {
         $edge = 7
         $c = $h.Click
         $box = $c.rect -and $c.x -ge $c.rect.x - 1 -and $c.x -le $c.rect.x + $c.rect.w + 1 -and $c.y -ge $c.rect.y - 1 -and $c.y -le $c.rect.y + $c.rect.h + 1
-        # The ring sits 4 px outside the element; a small control (a 33 x 16 status label) gets 8 so the ring does not cut into its words or cover its dot.
+        # The ring sits 4 px outside the element; a small control (under 24 px tall) gets pad 8 so the ring does not cut into the words; on the panel's Ready label it covers the status dot beside it
         $pad = if ($box -and $c.rect.h -lt 24) { 8 } else { 4 }
         if ($box) {
             $w = [int]($c.rect.w * $scale) + 2 * ($pad + $edge); $hh = [int]($c.rect.h * $scale) + 2 * ($pad + $edge)
