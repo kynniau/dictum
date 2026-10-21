@@ -2843,3 +2843,13 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 - The first-run probe fix end to end in the tray (it is pinned through `FirstRun` with a stand-in probe).
 - The duplicate-folder mechanics inside Whisper.net.
 - CI's first run of the new step, including whether `--selftest` behaves on a runner without audio devices or a desktop.
+
+## Privacy sentence for dictum.kynni.au covers "Open the full guide" (PROPOSED, 21/10/2026, branch site/privacy-guide-sentence)
+
+**PROPOSED, pending the product owner's approval. Do not merge or deploy until approved.**
+
+- **Why.** The 1.2 in-app Help page (PR #24) adds "Open the full guide", which opens https://dictum.kynni.au/help in the browser. The current site sentence says the app reaches dictum.kynni.au only for the privacy policy or Check for updates, so it would no longer be complete.
+- **Old sentence** (privacy.html and index.html, pinned by `UpdateCheckTests.ProposedSiteSentence`): "Only when you open the privacy policy from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store."
+- **Proposed sentence:** "Only when you open the privacy policy or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store."
+- **Where.** `site/privacy.html` (paragraph under "This website: dictum.kynni.au") and `site/index.html` (the dictum.kynni.au card). The pin in `tests/Dictum.Tests/UpdateCheckTests.cs` is updated to match.
+- **On approval.** The policy's "Changes to this policy" section says "we will update this page and its date before that version is released". The date is the `Last updated` line in `site/privacy.html` (line 34, `<time datetime="2026-10-16">16/10/2026</time>`). It must be changed to the approval date, in both the `datetime` attribute and the text. This lane did not change it: no document in docs/ lets a lane set that date, so it stays with the owner's approval step.
