@@ -1,7 +1,11 @@
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using Dictum.Help;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.Transcribe;
@@ -258,7 +262,7 @@ internal sealed class AboutPage : SettingsPage
                 Ui.Row(8,
                     Ui.Button("Report a problem", "primary", () => Run(Shell.ReportProblem)),
                     Ui.Button("GitHub issues", "secondary", () => Run(() => Shell.Platform.Open(AppShell.IssuesUrl))),
-                    Ui.Button("Privacy policy", "secondary", () => Run(() => Shell.Platform.Open(AppShell.PrivacyUrl))))), "Help"),
+                    Ui.Button("Privacy policy", "secondary", () => Run(() => Shell.Platform.Open(AppShell.PrivacyUrl))))), "Support"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("settings.json is the source of truth: every change here is written to it, and an edit there is picked up within a second. " +
                         "Reload settings also re-installs the hotkey if Windows removed it."),
@@ -324,5 +328,89 @@ internal sealed class AboutPage : SettingsPage
         _downloadPage.IsVisible = result is { Status: UpdateStatus.NewerAvailable };
         _notes.Text = notes ?? "";
         _notes.IsVisible = notes is not null;
+    }
+}
+
+/// <summary>
+/// Settings → Help (docs/DECISIONS.md, "In-app Help", 21/10/2026): "How Dictum works" and "Questions and answers", all from
+/// <see cref="HelpText"/>, so it reads the same with no internet. The page makes no network request: its two buttons hand a
+/// fixed address to the system (<see cref="Dictum.Platform.IPlatform.Open"/>), whose browser or mail app does the rest.
+/// For the keyboard and screen readers, the headings carry heading levels, and each block of text (each question with its
+/// answer) is a tab stop named after its heading, scrolled into view when focused, with a ring while it has keyboard focus;
+/// with focus there, Page Up and Page Down scroll the page.
+/// </summary>
+internal sealed class HelpPage : SettingsPage
+{
+    public HelpPage(AppShell shell) : base(shell, HelpText.PageTitle)
+    {
+        var guide = Ui.Button(HelpText.GuideButton, "primary", () => Run(() => Shell.Platform.Open(HelpText.GuideUrl)));
+        var support = Ui.Button(HelpText.SupportButton, "secondary", () => Run(Shell.ReportProblem)); // the prefilled email About's Report a problem opens
+        var feedback = Ui.Button(HelpText.FeedbackButton, "secondary", () => Run(Shell.SendFeedback));
+        AutomationProperties.SetHelpText(guide, HelpText.GuideNote); // a screen reader says it with the button
+        AutomationProperties.SetHelpText(support, HelpText.SupportNote);
+        AutomationProperties.SetHelpText(feedback, HelpText.FeedbackNote);
+        Compose(
+            Section(HelpText.MoreHelpHeading, Paragraph(HelpText.GuideNote), Ui.Row(8, guide), Paragraph(HelpText.SupportNote), Paragraph(HelpText.FeedbackNote), Ui.Row(8, support, feedback)),
+            Section(HelpText.HowItWorksHeading,
+                Readable(HelpText.HowItWorksHeading, null, [.. HelpText.HowItWorks.Select(Paragraph)]),
+                Readable(HelpText.AccuracyHeading, Heading(HelpText.AccuracyHeading, 3, 15), [.. HelpText.Accuracy.Select(Paragraph)])),
+            Section(HelpText.QuestionsHeading, [.. HelpText.Questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)]))]));
+        if (Content is Panel { Children: [TextBlock title, ..] }) AutomationProperties.SetHeadingLevel(title, 1); // the page title Compose put first
+    }
+
+    /// <summary>Nothing on the page depends on the settings.</summary>
+    protected override void Redraw()
+    {
+    }
+
+    /// <summary>A card under a level-2 heading.</summary>
+    private static Border Section(string heading, params Control[] children) =>
+        Ui.Card(Ui.Stack(10, [Heading(heading, 2, 16), .. children]));
+
+    private static TextBlock Heading(string text, int level, double size)
+    {
+        var block = new TextBlock { Text = text, FontSize = size, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+        AutomationProperties.SetHeadingLevel(block, level);
+        return block;
+    }
+
+    /// <summary>Help text a step larger than the other pages' body text (14 against 13), for reading rather than glancing.</summary>
+    private static TextBlock Paragraph(string text)
+    {
+        var block = Ui.Text(text);
+        block.FontSize = 14;
+        block.LineHeight = 21;
+        return block;
+    }
+
+    /// <summary>
+    /// A block of text the keyboard can reach: a tab stop named <paramref name="name"/>, scrolled into view when focused,
+    /// that shows a ring (the link colour, light or dark) only while focus came from the keyboard.
+    /// </summary>
+    private static Border Readable(string name, TextBlock? heading, Control[] body)
+    {
+        var block = new Border
+        {
+            Focusable = true,
+            IsTabStop = true,
+            BorderThickness = new Thickness(2),
+            BorderBrush = Brushes.Transparent,
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8, 6),
+            Child = Ui.Stack(6, heading is null ? body : [heading, .. body]),
+        };
+        AutomationProperties.SetName(block, name);
+        block.GotFocus += (_, e) =>
+        {
+            // Avalonia scrolls a focused control into view itself (observed in HelpPageTests), so the ring is all this adds.
+            if (e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional)
+                block[!Border.BorderBrushProperty] = new DynamicResourceExtension("LinkBrush");
+        };
+        block.LostFocus += (_, _) =>
+        {
+            block.ClearValue(Border.BorderBrushProperty); // drops the resource binding the ring set
+            block.BorderBrush = Brushes.Transparent;
+        };
+        return block;
     }
 }

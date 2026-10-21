@@ -33,6 +33,14 @@ public sealed partial class AppShell
     private volatile bool _heardNothing; // the last dictation heard nothing (NoSoundText.HeardNothingLine), until one types text
     private string? _lastTooltip;
 
+    /// <summary>
+    /// The speech model, its runtime and the clean-up in use, as the header shows them but without the hotkey ("base.en · Vulkan · rules").
+    /// What the support emails carry (Report a problem, Email support): the hotkey is the user's own setting and is not part of "version and models".
+    /// </summary>
+    internal string ModelsLine => $"{Models.CurrentName} · {HeaderRuntime()} · {CleanupLabel()}";
+
+    private string HeaderRuntime() => _models.IsLoading ? "loading…" : _models.LastError is not null ? "model error" : SpeechRuntime();
+
     /// <summary>The header line and the tooltip, built from the models, their runtimes, the hotkey and any download.</summary>
     public ShellStatus Status
     {
@@ -40,9 +48,9 @@ public sealed partial class AppShell
         {
             var download = Models.DownloadStatus;
             var speech = Models.CurrentName;
-            var runtime = _models.IsLoading ? "loading…" : _models.LastError is not null ? "model error" : SpeechRuntime();
+            var runtime = HeaderRuntime();
             var hotkey = HotkeyParser.TryParse(_settings.Hotkey, out var spec, out _) ? spec.Display : _settings.Hotkey;
-            var models = $"{speech} · {runtime} · {CleanupLabel()} · {hotkey}";
+            var models = $"{ModelsLine} · {hotkey}";
             var (state, tone) = !_settings.Enabled ? ("Off", "off")
                 : _trayState switch
                 {

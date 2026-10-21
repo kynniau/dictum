@@ -109,7 +109,7 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 - **Big recording indicator** (Off | Orb | Edge | Both), **Profanity filter** (on = Mask; Remove is in Settings >
   Clean-up), **Grammar assist**, **Start and stop sounds** (`sounds.enabled`, off by default).
 - **Calibrate my voice**, **Dictionary** (add a word, open the dictionary or corrections file), **Snippets** (a phrase
-  you say and the text pasted in its place, see "Snippets"), **Fix last dictation**, **Settings**.
+  you say and the text pasted in its place, see "Snippets"), **Fix last dictation**, **Settings**, **Help** (opens Settings > Help).
 - The privacy line ("Nothing leaves this PC", or that clean-up uses a server on this PC or sends text off it) and **Quit**.
 
 The icon's tooltip reads `Dictum · <speech model> · <runtime> · <cleanup model> · <runtime> · <hotkey>`. Notices
@@ -133,8 +133,37 @@ an edit made in the file is picked up within a second and shows in the window.
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
 | About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
+| Help | **How Dictum works** and **Questions and answers** in plain words, readable with no internet; **Open the full guide** (https://dictum.kynni.au/help, in your browser) and **Email support** and **Send feedback or suggest a feature** (each a new email to hello@kynni.com.au in your own mail app). See "Help" and "Feedback and feature requests". |
 
 The windows follow Windows' light or dark setting.
+
+### Help
+
+Help is in two places:
+
+- **In the app**, with no internet needed: Settings > Help, or **Help** in the tray panel. It explains how Dictum works in
+  plain words (hold the key, speak, let go; your voice becomes text on this PC; the tidy; the paste; why some people are
+  heard better than others) and answers the common questions: where your voice goes, wrong words, "Mic error", a Dictum
+  that closes at start, changing the key, stopping, which programs it types into, model files and sizes, removing
+  Dictum, and the price.
+- **On the web**: the full guide, with pictures, at https://dictum.kynni.au/help. **Open the full guide** on the Help
+  page opens it in your browser; Dictum itself fetches nothing.
+
+The Help page's words are PROPOSED (docs/DECISIONS.md, 21/10/2026) and live in `src/Dictum.Core/Help/HelpText.cs`.
+
+### Feedback and feature requests
+
+Settings > Help has **Send feedback or suggest a feature**. It opens a new email to hello@kynni.com.au in your own mail
+app, with the subject "Dictum feedback" and a space to write in. Below that space are four lines about your setup
+(five facts), which you can delete: the Dictum version, your Windows build, the speech model and whether it runs on the GPU or the
+CPU, and the clean-up in use. Nothing else goes in: no folder or file path, no dictionary words, nothing you dictated,
+no microphone name and no PC or user name.
+
+Dictum sends nothing itself. It hands the email to your mail app, and you read it, change it and press Send, or close
+it and nothing is sent. Dictum makes no web request and uses no form for this. **Email support** works the same way and
+is the same email as **Report a problem** in Settings > About: the version and the models are filled in.
+
+The website's footer has a matching link, "Feedback and feature requests" (it opens the same email).
 
 ### Choosing a hotkey
 
@@ -1018,6 +1047,9 @@ send it on, and `offline_only` cannot see that.
 - **Report a problem** (Settings > About) opens an email to hello@kynni.com.au in your own mail app, with Dictum's
   version, the platform and the models filled in. Dictum sends nothing itself and never attaches what you dictated;
   GitHub issues (https://github.com/kynniau/dictum/issues) is the other way to reach us.
+- **Send feedback or suggest a feature** (Settings > Help) and **Email support** are emails in the same way: your mail
+  app opens a new message to hello@kynni.com.au; Dictum sends nothing, and no path, dictionary word or dictated text is
+  included (see "Feedback and feature requests").
 
 ### Storage and removing Dictum
 

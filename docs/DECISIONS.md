@@ -2871,6 +2871,477 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 - **Limits:** commit messages and the merged history cannot be rewritten (no force-push), so earlier commits keep their
   wording. The pull-request descriptions were edited instead.
 
+## In-app Help: How Dictum works, and questions and answers (21/10/2026, branch feat/in-app-help)
+
+**The decision (Kyle, 21/10/2026, as relayed by the orchestrator).** "The thing we are missing is explaining how it
+works": someone of 95 should be able to use Dictum with the help. Help lives in two places. A short "How Dictum works"
+and questions and answers sit inside the app, work with no internet and keep the privacy promise. A full illustrated
+guide lives on https://dictum.kynni.au/help (built by another lane), and the app links to it.
+
+**What this lane built.**
+
+- **Settings → Help**, the last entry in the Settings list (after About), and a **Help** button in the tray panel that
+  opens it (the lane's last commit, a single hunk in `FlyoutWindow.cs`, which lane A owns).
+- **The copy** is plain constants in `src/Dictum.Core/Help/HelpText.cs`, with no platform code, so tests pin it. The page,
+  `HelpPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, only lays it out.
+- **Network.** None from the page itself. **Open the full guide** hands https://dictum.kynni.au/help to `IPlatform.Open`
+  (the system browser), and **Email support** hands `mailto:hello@kynni.com.au` to it (the user's mail app). No other
+  address, no prefilled body, no request by Dictum.
+- **Reading it.**
+  - The page title is heading level 1, the three cards (More help, How Dictum works, Questions and answers) are level 2,
+    and the accuracy part and each question are level 3 (`AutomationProperties.HeadingLevel`).
+  - Each block of text (how it works, why it mishears, each question with its answer) is a tab stop named after its
+    heading. Tab walks through them in order, Avalonia scrolls the focused one into view, and Page Down scrolls the
+    page from there (both observed headless). A ring in the link colour (light or dark) shows only while the focus came
+    from the keyboard.
+  - Both buttons carry their sentence as automation help text.
+  - The help paragraphs are 14 px against 13 px body text elsewhere: they are read, not glanced at (my call).
+- **The More help card is first**, so the guide and support are the first thing a stuck reader sees. The answers point
+  to it as "at the top of this page".
+
+**Where the copy departs from the brief's wording, and why.** These are my calls, for the product owner to confirm. Each
+is worded to be true at main 6dfede8 and after the other 1.2 lanes land.
+
+1. **"More accurate", "Standard" and "Test my setup"** do not exist in the app at 6dfede8: a search of `src`, `docs`,
+   `site` and the README found none. The copy says "choose a bigger speech model in Settings > Models" and names the
+   shipped **Calibrate my voice**. Settings > Models itself says "Bigger is more accurate and slower."
+2. **"Standard works for most people"** is not measured anywhere in the repository (no test across speakers). The copy
+   says the model that comes with Dictum "is a good place to start".
+3. **"No sound from mic"** is not a message Dictum shows. The pill says "Mic error" (`PillText`), and a recording quieter
+   than `silence_threshold` is dropped with no message. The question reads: It says "Mic error", or nothing happens when
+   I talk.
+4. **"Settings > Models > Advanced > run on the CPU"** does not exist. What ships is the **Try on the CPU** button
+   (tray panel and Settings > About, only after a model failed inside the GPU runtime) and `whisper.gpu = cpu` in
+   settings.json. The copy names Try on the CPU and where it appears, and for a Dictum that still closes, the support address.
+5. **"Updated in 1.1.2"**: there is no 1.1.2. `Directory.Build.props` says 1.1.1, and the launch-crash fix (19b09f6, PR
+   #21) merged after 1.1.1. The copy says "The version you are using now has the fix", which holds for any build that carries this page (lens fix, below).
+6. **"Videos" in the full guide** are not promised in the app. The guide note says "step by step, with pictures",
+   because the app cannot check the site and that lane had not shipped when this was written.
+
+**Figures in the copy.**
+
+- "About 150 MB": base.en is 147,964,211 bytes, from the README's catalogue table, which the README says was verified by
+  HTTP HEAD on 15/10/2026.
+- "Several GB": large-v3 alone is 3,095,033,483 bytes, from the same table.
+- "Ten short sentences": the calibration window counts "Sentence 1 of 10" (`UiWindowTests`).
+
+**Recalled, not verified.**
+
+- The small up arrow beside the clock that shows hidden tray icons (Windows' own behaviour).
+- That many headsets have a mute button.
+
+**Dependencies on other lanes.**
+
+- **Renames.** `HelpPageTests.Every_label_the_help_names_exists_in_the_app` fails when the app drops a label the help
+  names: Calibrate my voice, Dictionary, Fix last dictation, Save corrections, Settings, Dictation on, General, Models,
+  Storage, Microphone, Clean-up, Press your hotkey, Change…, Use this hotkey, Test microphone, Model folder, Browse…,
+  Remove Dictum completely…, Try on the CPU, Mic error, Open the full guide, Email support and Help (the tray button).
+  Any lane renaming one of them, for example Calibrate my voice to Test my setup, must change `HelpText` with it, and
+  that copy change needs the product owner's review.
+- **Tier names (Simple and Advanced).** The copy names pages only ("Settings > Models"), never a tier, so it stays true.
+- **The onboarding folder step.** The copy says the Model folder is in Settings > Models, with Browse…; it stays true
+  unless that lane moves the control.
+- **A Settings > Models > Advanced run-on-the-CPU control**, if a lane adds it: question 4 could point there. That is a
+  copy change, for review.
+- **A "No sound from mic" message**, if a lane adds it: question 3 should name it. The pin above checks only "Mic error".
+- **dictum.kynni.au/help** must be live, with pictures, before a release carries this page.
+- **The privacy policy and the landing page (approved copy, not changed here).** `site/privacy.html` ("This website:
+  dictum.kynni.au") and the landing page's dictum.kynni.au card both say the app reaches that host "Only when you open the
+  privacy policy from Settings, or click Check for updates". **Open the full guide** is a third case: the browser opens
+  dictum.kynni.au/help. Before a release carries this page, the product owner must approve an update to both. This lane
+  may not reword approved copy.
+- **The release that carries this page** must carry the launch-crash fix. Any build from main after 6dfede8 does.
+- **FlyoutWindow.cs (lane A).** The Help button is one hunk in its own commit, at the end of the branch.
+- **The Mac beta.** The copy is Windows copy: the clock, Windows Settings, the right Ctrl key and the Microsoft Store.
+  A Mac build needs its own wording for those answers.
+
+**Pins (`tests/Dictum.Tests/HelpPageTests.cs`), each observed failing on the reverted behaviour (21/10/2026).**
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| Help is in the navigation (last) and opens from the list and by name | "Help" removed from the page list | failed: expected "Help", found "About" |
+| Every sentence and every question renders, each question a named tab stop | the first question left out | failed: item not found |
+| Open the full guide opens exactly https://dictum.kynni.au/help through the platform, and Email support exactly mailto:hello@kynni.com.au | the button opened the privacy address; the constant changed to the site root | failed both times: collections differ at index 0 |
+| No request reaches either HTTP client, `Open` gets only the two addresses, and the page and copy name no network API | `Shell.CheckForUpdatesAsync()` added to the page; an `HttpClient` named in the page source; Email support replaced by Report a problem | failed all three: 1 request against 0; the source scan matched; the mailto had a subject added |
+| The copy has no "always accurate", "100%", "perfect", "guarantee", telemetry, analytics or tracking word, and no US spelling | "always accurate", "no telemetry" and "100% accurate" added in turn | failed all three |
+| Every label the help names exists in the copy and in the app | the copy's "Test microphone" changed; the app's Test microphone button renamed; the pill's "Mic error" changed | failed all three |
+| No text or button runs past the visible width at 860 × 640, 853 × 480 (a 1280 × 720 screen at 150 %) and 640 × 420 (the smallest window), and text wraps | paragraphs set to no wrapping; a 700-DIP minimum width | failed in all three sizes both times |
+| Headings, keyboard order, focus ring, scroll into view, Page Down | blocks not focusable; ring removed; heading levels removed; ring left on after focus moved | failed all four |
+| The tray panel's Help button opens Settings → Help, with Settings no longer spanning its row | the button removed; the button opening Settings with no page; the column span kept | failed all three (the label pin alone still passed with the button removed, because the Settings list also shows "Help") |
+
+Removing an explicit `BringIntoView` call **did not** fail the keyboard pin: Avalonia already scrolls a focused control
+into view. The call was deleted as redundant, so the scroll assertion now pins the framework's behaviour.
+
+An early mutation run reused a stale `Dictum.UI.dll`. A restored file kept the backup's older timestamp, and a change
+in Dictum.Core's internals does not rebuild its dependants. That run (the pill label) was repeated with
+`--no-incremental` builds and a touch after each restore, and failed as expected.
+
+**Not verified.**
+
+- A real window at 150 % or 200 % scaling. The headless platform renders at scale 1, so the pin measures the DIP sizes
+  that scaling leaves.
+- Screen-reader speech. Heading levels, names and help text are pinned as properties, not heard in Narrator or NVDA.
+- The page in a real Settings window on the desktop (tray mode is never run on the development PC).
+- https://dictum.kynni.au/help itself, which did not exist when this was written.
+- The tray panel on a small screen. Its height does not change: the lens on f69cf24 measured 748 DIP before and after, because Help takes the second column of the row Settings used to span.
+- Whether a person of 95 can follow it. Only a person can test that.
+
+### Lens fixes (21/10/2026), lens on f69cf24
+
+The lens on PR #24 returned **Block**, on the privacy sentence. That one is the product owner's call and is handled
+separately: `site/privacy.html` and `site/index.html` are not touched here.
+
+Finding 4 (the Email support button, and making the support address one value) went to lane F, which owns
+`feat/feedback`, stacked on this branch. `HelpText.SupportAddress` and the button are unchanged here.
+
+The other findings are fixed on this branch. The wording of each new string is the lens's, and every string is
+PROPOSED.
+
+| # | Finding | Fix |
+|---|---|---|
+| 2 | Major: the crash answer said "fixed in later versions", which is wrong in a build whose About page says 1.1.1 | "On some PCs, Dictum 1.1.1 closed as soon as it started. The version you are using now has the fix. If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au." |
+| 3 | Major: "choose Email support at the top of this page" cannot be followed when Dictum will not open | "If it still closes, email hello@kynni.com.au and tell us.", built from `SupportAddress` |
+| 5 | Minor: Esc also cancels after the key is let go, and the program typed into also receives it | "To cancel instead, press Esc before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc." |
+| 6 | Minor: the removal answer left out snippets, keys, the shortcut, the start-with-Windows entry and the program | see the note below the table |
+| 7 | Minor: the answer did not say where Try on the CPU is | "If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it." |
+| 8 | Minor: Enter or Space alone cannot be the hotkey either | "…, and neither can Enter or Space on their own." |
+| 9 | Minor: a DNS lookup added to the page passed all 11 tests | `Dns`, `Ping`, `NetworkInformation`, `Process.Start` and `ShellExecute` join the no-network pin's source scan |
+| 10 | Minor: the tray panel was said to grow by a row | "No height change" in DECISIONS and the PR. `FlyoutWindow.cs`'s summary says "six actions"; that is a comment-only edit |
+
+**Finding 6: the new wording.** The answer now reads:
+
+> It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu
+> shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings
+> then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says
+> it cannot.
+
+The last clause, "unless its first warning says it cannot", is mine and not the lens's. A copy with no `manifest.txt`
+is left in place, and the first warning says so (`AppShell.Actions.cs`, "The program itself is not removed: …"). That
+covers a build from source and one older than 16/10/2026. Without the clause the sentence would over-promise. Snippets
+are in the removal list (`PathRegistry`, "snippets").
+
+**Mutation check.** The DNS lookup (`System.Net.Dns.GetHostAddresses("localhost")` in the page's constructor) now fails
+`The_page_reaches_the_network_only_through_the_platform_seam` with "Assert.DoesNotMatch() Failure: Match found". That
+was observed failing on the reverted behaviour, in a `--no-incremental` build.
+
+**A shared-scratchpad mishap.** This lane's mutation script lived in the shared scratchpad, and another lane (onboarding)
+replaced it with its own script of the same name. One call here ran that script. With this lane's argument it matched
+none of its mutations, so it changed no file. It did build `.worktrees/onboarding` and print that worktree's status.
+This lane's scripts now live in their own folder.
+
+**Full page text at 2d7e861 (supersedes the 4fe362c block).** Generated by printing `HelpText` at that commit (a throwaway
+test, not committed; every `HelpText.AllText()` entry is in it). `FreeLine` and `FreeLaterNote` are APPROVED verbatim
+(owner, 21/10/2026 22:18 AEDT); the rest is PROPOSED, awaiting the product owner's review: do not reword without it. The
+constants are the source; this copy is for review.
+
+> **Help** (page title)
+>
+> **More help** (section heading)
+>
+> The full guide on the Dictum website goes step by step, with pictures. It opens in your web browser and needs the internet.
+>
+> [Button: Open the full guide] opens https://dictum.kynni.au/help
+>
+> Email support opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.
+>
+> Send feedback or suggest a feature opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum, your Windows build and the models in use filled in. You can read and change it before you send it. Dictum sends nothing by itself.
+>
+> [Button: Email support] opens mailto:hello@kynni.com.au
+>
+> [Button: Send feedback or suggest a feature] opens mailto:hello@kynni.com.au
+>
+> **How Dictum works** (section heading)
+>
+> Dictum types what you say into the program you are using.
+>
+> 1. Click where you want the words to go, for example in an email.
+>
+> 2. Hold down the Dictum key. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard.
+>
+> 3. Speak in your normal voice. A small bar above the taskbar shows that Dictum is listening.
+>
+> 4. Let go of the key. A moment later, your words appear where you clicked.
+>
+> In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.
+>
+> All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on.
+>
+> The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. The menu has Settings, Help and more.
+>
+> In this help, "Settings > Models" means: open Settings from the Dictum menu, then choose Models on the left.
+>
+> **Why Dictum hears some people better than others**
+>
+> Everyone's voice, accent and microphone are different, so a speech model hears some people better than others.
+>
+> The speech model that comes with Dictum is a good place to start.
+>
+> If words often come out wrong, choose a bigger speech model in Settings > Models. Bigger models are more accurate, but slower, and each one is a download you choose.
+>
+> Not sure which one to choose? Open the Dictum menu and choose Calibrate my voice. You read ten short sentences aloud, and Dictum tells you which of the speech models on this PC hears you best.
+>
+> **Questions and answers** (section heading)
+>
+> **Where does my voice go?**
+>
+> Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.
+>
+> The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.
+>
+> If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here.
+>
+> **Why did it type the wrong words?**
+>
+> Dictum can mishear words, just as people can. These things help:
+>
+> • Keep the microphone close to your mouth, and speak at your normal speed.
+>
+> • If a name or word keeps coming out wrong, add it with Dictionary in the Dictum menu.
+>
+> • To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.
+>
+> • For better accuracy overall, see "Why Dictum hears some people better than others" above.
+>
+> **It says "Mic error" or "No sound from mic", or nothing happens when I talk. What do I check?**
+>
+> If Dictum shows "No sound from mic", it says: Dictum is not hearing anything. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.
+>
+> If Dictum cannot find a microphone at all, it says: No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.
+>
+> • Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.
+>
+> • Open Settings > Microphone. Choose your microphone from the list, then choose Test microphone and speak. The bars move when Dictum hears you.
+>
+> • In Windows Settings, go to Privacy & security > Microphone. "Microphone access" and "Let desktop apps access your microphone" must both be on.
+>
+> • On a remote or virtual desktop (a computer you use over the internet or your office network), your own microphone has to be passed through to it. This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.
+>
+> **Dictum closed straight away when I opened it. What do I do?**
+>
+> Dictum 1.1.2 fixes a start-up crash on PCs without a working Vulkan graphics driver (the app closed before its tray icon appeared; it now runs the speech model on the CPU there). If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.
+>
+> If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.
+>
+> If it still closes, email hello@kynni.com.au and tell us.
+>
+> **How do I change the key I hold?**
+>
+> Open Settings > General. Under Press your hotkey (the hotkey is the key you hold), choose Change…, then press the key you want. When Dictum shows its name, choose Use this hotkey.
+>
+> Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used, and neither can Enter or Space on their own.
+>
+> **How do I stop it listening?**
+>
+> Let go of the key. Dictum stops listening and types what you said.
+>
+> To cancel instead, press Esc before your words appear, while you are holding the key or just after you let go. Nothing is typed. The program you are typing in also receives the Esc.
+>
+> If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.
+>
+> To turn Dictum off for a while, use the on/off switch at the top right of the Dictum menu.
+>
+> **Can I use it in Word, Outlook, Teams or a web browser?**
+>
+> Yes. Dictum types into almost any program where you can type, including Word, Outlook, Teams and web browsers. Click where the words should go first.
+>
+> The exception is a program running as administrator (with extra permissions): Windows does not let Dictum type into it.
+>
+> **Where are the model files, and how big are they?**
+>
+> Settings > Models shows the Model folder, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.
+>
+> Bigger speech models and AI clean-up are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes).
+>
+> To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.
+>
+> **How do I remove Dictum completely?**
+>
+> Open Settings > Storage. At the bottom, choose Remove Dictum completely…
+>
+> Dictum first lists everything it will delete, with sizes. Then it asks you to type DELETE to confirm.
+>
+> It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says it cannot.
+>
+> **Is Dictum free?**
+>
+> Free: no subscription, no account, no ads, no analytics, no telemetry.
+>
+> The base product stays free to keep on your PC; optional paid extras may come later.
+>
+> There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.
+>
+> **Where is the full guide?**
+>
+> The full guide is on the Dictum website at dictum.kynni.au/help. Choose Open the full guide at the top of this page.
+>
+> It opens in your web browser and needs the internet. Everything on this page works without the internet.
+
+### Help reconciled with main (21/10/2026, after PR #29 and the merge of origin/main 8419f10)
+
+Only `CrashFixLine`, the reworded third paragraph of the free answer, the cloud sentence and the on/off switch sentence are PROPOSED, awaiting the product owner's review; `FreeLine` and `FreeLaterNote` are APPROVED (below). The strings are constants in `HelpText.cs`, pinned by
+`The_crash_free_and_calibration_answers_carry_the_reconciled_copy` (observed failing on the reverted wording).
+
+- **Start-up crash.** The "Dictum closed straight away" answer now opens with the 1.1.2 note's sentence word for word
+  (`HelpText.CrashFixLine`, the same text as docs/STORE.md "CHANGED SINCE THE LAST SUBMISSION") and keeps its second
+  sentence about installing the latest version. The old "Dictum 1.1.1 closed..." and "The version you are using now has
+  the fix" sentences are gone. The microphone answer already reused `NoSoundText` (PR #29) and no literal in `HelpText.cs`
+  repeats a `NoSoundText` sentence.
+- **Is Dictum free?** The answer is three paragraphs. `HelpText.FreeLine` ("Free: no subscription, no account, no ads, no
+  analytics, no telemetry.") and `HelpText.FreeLaterNote` ("The base product stays free to keep on your PC; optional paid
+  extras may come later.") are **APPROVED verbatim for Help, site and Store (owner, 21/10/2026 22:18 AEDT): do not
+  reword.** (Earlier in the day the "Free:" line was only the wording submitted in the Store listing, and it was not found
+  on origin/main; the owner's approval supersedes that note.) The third paragraph keeps the earlier answer's facts (no
+  charge, no word limit, open source, MIT licence, Kynni Pty Ltd). **PROPOSED reword (orchestrator, 21/10/2026):** its
+  opening "Yes." is gone, because two paragraphs have already answered, and "no subscription" is not repeated, so it now
+  begins "There is no charge and no word limit."
+- **Cloud clean-up sends the dictionary too (PROPOSED).** "Where does my voice go?" said only the text of each dictation is
+  sent. `CleanupPrompt.Build` also adds the personal dictionary's line to the prompt, and `site/privacy.html` already says
+  so. It now reads "…the text of each dictation, and the words in your dictionary, are sent to the service you chose."
+  `CloudPolicy` strings are untouched. Pinned: the answer must mention the dictionary (observed failing on the reverted
+  wording).
+- **The on/off switch (PROPOSED).** "Dictation on" is only the switch's screen-reader name (it shows no text), so the stop
+  answer now says "use the on/off switch at the top right of the Dictum menu." The labels-exist pin no longer lists
+  "Dictation on"; a pin forbids that name in the Help and requires the new phrase (observed failing on the reverted wording).
+- **Test exemption.** The old pin forbade the words telemetry and analytics anywhere in the Help. It now removes the one
+  `FreeLine` sentence before scanning, so any other use of those words still fails.
+- **Calibration.** The tray button on this branch is "Calibrate my voice" (FlyoutWindow.cs); the Help uses that name and
+  nothing else (pinned). A 1.2 rename to "Test your setup" is planned and not done: it must change the button and the Help
+  together (`Every_label_the_help_names_exists_in_the_app` fails until it does).
+- **Tier names.** Model names are untouched; reconcile after feat/simple-view merges.
+
+## Feedback and feature requests through the user's mail program (21/10/2026, branch feat/feedback, lane F, stacked on feat/in-app-help)
+
+**The decision (Kyle, as relayed by the orchestrator, 21/10/2026).** Users need a way to say what they would like Dictum to do.
+It must not break the privacy promise, so Dictum sends nothing: the feedback goes through the user's own mail program.
+
+**What this lane built.**
+
+- **Settings → Help → "Send feedback or suggest a feature"**, beside **Email support**. It builds a `mailto:` link and hands it to
+  `IPlatform.Open`, exactly as Report a problem does. The user's mail program opens a new message; the user reads it, edits it
+  and sends it, or closes it.
+- **No network statement.** Dictum makes no HTTP request, posts no form, and uses no clipboard for this. The only thing it does is
+  `IPlatform.Open(<mailto: link>)`. A source pin and a network pin (both clicked through the real page, with the model-download and
+  update-check clients counting requests) hold this.
+- **One mail builder.** `SupportMail.Uri(subject, body)` in `src/Dictum.Core/Help/SupportMail.cs` is the only place a support
+  `mailto:` link is made. `AppShell.ReportUri` (Report a problem) was changed to call it, with its output pinned identical to what it
+  produced before. Report a problem's body keeps its LF line breaks (unchanged on purpose); the feedback body uses CRLF.
+- **One address constant** (coordinator's addition, PR #24 lens finding 4). `SupportMail.Address` is the only copy of
+  `hello@kynni.com.au` in code. `AppShell.SupportEmail` is an alias of it, and `HelpText` names it directly (`HelpText.SupportAddress`
+  and `HelpText.SupportUri` were removed). A pin scans `src/**/*.cs` and fails on a second quoted copy.
+- **Email support now opens the Report a problem email** (the same builder and the same body: the version, the platform and the
+  models line), not a bare `mailto:`. Its note was reworded (PROPOSED, below). The models line is passed through
+  `SupportMail.Facts` first, which cuts any path down to its last part.
+- **About's card titled "Help" is now titled "Support"** (PROPOSED), so "Help" names only the Settings page.
+
+**Where the support address lives, so the switch to `dictum@kynni.com.au` is known (decision for later; not made here).**
+
+| Place | What to change |
+|---|---|
+| Code: `src/Dictum.Core/Help/SupportMail.cs`, `Address` | the one constant; the About text, Help page notes, Report a problem, Email support and feedback all follow it |
+| `site/index.html` | the footer's plain address link (`mailto:hello@kynni.com.au`, its text) and the feedback link (`mailto:hello@kynni.com.au?subject=Dictum%20feedback`) |
+| `site/privacy.html` | the privacy contact paragraph and the footer link (the site's own copy; **not touched by this lane**) |
+| `packaging/Dictum.iss` | `AppContact=` (the installer; not code that can read the constant) |
+| `.github/SECURITY.md` | the security contact |
+| `docs/STORE.md` | the Partner Center support contact and the listing's support line (approved copy: product owner's call) |
+| README.md, docs/SPEC.md, this file | prose mentions |
+
+A pin (`The_site_links_to_the_same_email_from_its_footer_and_has_no_form`) fails if the site's feedback link and the app's address or
+subject drift apart, so the site and the code cannot be switched half way unnoticed.
+
+**What the email says (PROPOSED copy, awaiting the product owner's review; do not reword).**
+
+- Button: `Send feedback or suggest a feature`
+- Note under Help (screen-reader help text on the button too): `Send feedback or suggest a feature opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum, your Windows build and the models in use filled in. You can read and change it before you send it. Dictum sends nothing by itself.`
+- Email support's note (reworded): `Email support opens a new email to hello@kynni.com.au in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.` (it was: `Email support opens a new email to hello@kynni.com.au in your own email program. Dictum sends nothing by itself.`)
+- Subject: `Dictum feedback`
+- Body (CRLF line breaks; `<…>` is filled in):
+
+```
+What I'd like to say:
+
+
+(You can delete the lines below. They help us understand your setup.)
+Dictum <version>
+Windows build <version>
+Speech model: <name> on <GPU or CPU>
+Clean-up: <provider or rule-based tidy>
+```
+
+- About card title: `Support` (was `Help`).
+- Website footer link text: `Feedback and feature requests`, href `mailto:hello@kynni.com.au?subject=Dictum%20feedback`.
+
+**Where each fact comes from (`AppShell.FeedbackFacts`).** The version is `AppShell.AppVersion` (About's "Version"). "Windows
+build <version>" is the platform name About shows ("On Windows…"), the word "build", and `Environment.OSVersion.Version` to three parts (for example 10.0.26100: Windows 11 reports 10.0, so the word "build" stops it reading as a version of Windows 10): **About does not show this, so it is the one new fact** (a number only). The speech model is `Models.CurrentName` (a model's name, or a
+custom file's name without its folder). The runtime is the one About shows (`Vulkan`, `CPU`, `loading`, or `no runtime (model error)`).
+The clean-up is `rule-based tidy` (provider none, or a local model that failed to load), `<model> on this PC` (local), or the cloud
+provider's name alone (with a note when its key is missing): **not** About's full status line, because that names the server host, which
+for a company's own server could be private. Every fact is cleaned by `SupportMail.Fact`: control characters out, only the last part of
+anything path-like kept, 60 characters at most.
+
+**Length.** The whole link is kept at 2,000 characters or fewer (`SupportMail.MaxUriLength`, the common mailto limit as recalled, not
+verified against a specific mail program in this lane). If the four setup lines (five facts) would take it over, they are left off and the writing space and
+note stay. A normal email is under 600 characters.
+
+**Pins (`tests/Dictum.Tests/FeedbackTests.cs`, and edits to `HelpPageTests.cs`), each observed failing on the reverted behaviour
+(21/10/2026, mutation run on c3c0339 and then on the follow-up commit).** Failing tests are the ones named; "also" lists others that failed.
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| The exact link for a sample setup | body line breaks changed from CRLF to LF (intro, then the join) | failed: exact-link pin, encoding pin, length pin, path pin, real-shell pin |
+| `&`, `é` and line breaks encoded (one `&` only, all breaks `%0D%0A`, no raw space or LF) | body left unencoded except spaces | failed: encoding pin, exact-link pin, length pin, and the Report a problem pin |
+| A path, folder or line break in a name never reaches the email | the cut at the last path separator removed | failed: path pin |
+| (same) | control-character removal removed | failed: path pin |
+| Link under 2,000 characters | the over-length fallback removed; the 60-character clip removed | failed: length pin (each) |
+| Button exists, named, Open called exactly once with a mailto | button removed | failed: button pin, the Help keyboard pin, the "every sentence renders" pin and the network pin |
+| (same) | `Open` called twice; `Open` given a GitHub URL instead | failed (each): button pin, real-shell pin and network pin |
+| Nothing private in a real shell's email (dictionary word, dictated text, app name, scratch folders, user and machine name) | the dictionary file's text appended to the clean-up fact | **the first mutation did not fail**: with the path cut in place the file's path is cut to `dictionary.txt`, which is correct behaviour. With the cut also removed (the real leak): failed real-shell, path and `Facts` pins. The same for the config folder's path |
+| Site link present with the exact href and text | link text changed; href's subject changed | failed: site pin (each) |
+| The site has no form | `<form>` added to the footer | failed: site pin |
+| One address constant in code | `AppShell.SupportEmail` given its own literal; `HelpText` given its own literal | failed: single-literal pin (each) |
+| Subject `Dictum feedback` | subject changed to `Feedback` | failed: exact-link, button, site and network pins |
+| Report a problem still builds the link it did before | `?subject=` broken in the shared builder | failed: Report pin, ShellTests' Report a problem, button, exact-link and network pins |
+| Email support opens the Report a problem email | the button opens a bare `mailto:hello@kynni.com.au` again | failed: Email support pin, single-literal pin, Help "full guide" pin, network pin |
+| About's card is titled Support | title put back to Help | failed: About card pin |
+| A models line is cleaned part by part | the split removed | failed: `Facts` pin |
+
+**Not killed (stated, not hidden).** Removing `SupportMail.Facts(...)` from `ReportProblem` fails no test (`nofacts` mutation): there
+is no input today that puts a path into the models line (a speech model shows its file name, and a clean-up model that is not in the
+catalogue or a full `.gguf` path is repaired away by the settings loader), so the call there is defence in depth; the `Facts` function
+itself is pinned.
+
+**Tests adapted from PR #24 (lane C)**, because this lane changes what they pin: the Help page's "network" pin now expects three `Open`
+calls (guide, the Report a problem email, the feedback email) and allows `Shell.ReportProblem` and `SendFeedback` in the page source while
+still forbidding direct network calls (the regex gained `Dns|Ping|NetworkInformation|Process\.Start|ShellExecute`, as the PR #24 lens asked);
+the keyboard pin starts Tab from the last button, which is now Send feedback; the Email support pin expects the prefilled email.
+
+**The Store certification notes (docs/STORE.md, "Notes for certification").** They describe Report a problem ("users can report a problem
+from Settings (Report a problem)…"), so one clause was added about Settings > Help. The live 1.1.1 package has no such button; the clause
+holds for the next submission (1.2) only. Update it if 1.2 does not ship with this feature.
+
+**Not verified.** No mail program was opened: the link was checked as a string, and `Open` is a fake in tests. How Outlook, Gmail's
+protocol handler or the Windows default mail app treat a `%0D%0A` body and a 600-character link was not tested here. The 2,000-character
+limit is the figure the brief gave, not one checked against a mail program. The Settings > Help page was not seen on screen (headless
+tests only), including the two buttons sitting side by side at 150 % scaling. The site change was not deployed or rendered.
+
+### Lens fixes (21/10/2026), lens on 45768fc (PRs #24 and #29: Needs changes, ten Minors, no new blocker)
+
+| # | Finding | Change | Pin, and the mutation observed failing |
+|---|---|---|---|
+| 1 | The no-network source scan did not read `SupportMail.cs` | the scan reads it too | an `HttpClient` field added to `SupportMail.cs` failed the network pin |
+| 2 | `SupportMail.Uri` was public and open | made private; `SupportMail.ReportUri` (public, moved from `AppShell.ReportUri`) is the only other way in, so no code outside the class can make a support email with other content. A source pin: `mailto:` appears in code only in `SupportMail.cs`. A sentinel (`context.txt` in the config folder, standing in for a future personal-context file) in the real-shell and Email support pins | a second `"mailto:" + "x"` constant failed the mailto pin; the sentinel text put in the models line (Email support) and in the speech-model fact (feedback) failed their pins. **Stated:** text appended after the clean-up fact did not fail the feedback pin, because `Fact` clips each fact to 60 characters and the sentinel sat past it; that is the clip working, not a gap in the pin |
+| 3 | The single-address scan needed a `"` on the same line | counts `hello@kynni.com.au` per `.cs` file over code lines only (lines starting `//` or `///` are skipped); exactly one in all code, in `SupportMail.cs` | a raw multi-line literal holding the address failed it |
+| 4 | Local provider with the clean-up model not downloaded: the email said "<model> on this PC", About says "rules until downloaded" | the fact follows the header's order: loaded or loading, else failed, else `rule-based tidy (clean-up model not downloaded)` | the old expression restored failed the pin (it also asserts the header still says "rules until downloaded") |
+| 5 | The Store note clause named a feature the live 1.1.1 lacks | clause now reads "from 1.2, send feedback from Settings > Help …" | none (copy) |
+| 6 | "five lines" | "four lines (five facts)" in SPEC, README, this file, the PR body | none (copy) |
+| 7 | `ReportUri` had no length cap | same `MaxUriLength` fallback: the models line is dropped. `ReportUri` now also cleans the models line itself (`Facts`), so no caller can skip it (this closes the earlier "not killed" `nofacts` case) | the fallback removed failed the report pin; the cleaning removed failed it too |
+| 8 | Help answer order | the Try on the CPU paragraph now comes before "If it still closes, email …" (PROPOSED order change; text unchanged) | none (order; no pin added) |
+| 9 | "Windows 10.0.26100" reads as Windows 10 on Windows 11 | the line is `Windows build 10.0.26100`; the Help note says "your Windows build" (PROPOSED) | the note back to "version" failed the note pin; the word "build" removed failed the real-shell pin; the sample link pin changed with the body |
+| 10 | Tab order of the three buttons unpinned | a pin walks `GetNext` from Open the full guide: guide, Email support, Send feedback | the row's buttons swapped failed it (and the older keyboard pin) |
+
+**PROPOSED copy changes in this round.** The feedback body's second setup line is `Windows build <version>` (was `Windows <version>`);
+the Help note for the feedback button ends "…the version of Dictum, your Windows build and the models in use filled in…"; the Try on the
+CPU paragraph moves one place up in the "Dictum closed straight away" answer.
+
 ## Privacy sentence for dictum.kynni.au covers "Open the full guide" (PROPOSED, 21/10/2026, branch site/privacy-guide-sentence)
 
 **PROPOSED, pending the product owner's approval. Do not merge or deploy until approved.**
@@ -2947,3 +3418,36 @@ The lens returned Needs changes with three minors and no change to src behaviour
 3. **README basis restored.** The entry now reads "digital silence, or white noise at a 48 kHz microphone below about −91 dBFS in stereo or −94 dBFS in mono". The −91 and −94 dBFS figures hold only for a 48 kHz device:
    - A 16 kHz device skips the resampler (`MonoResampler` returns early when the input rate is the output rate), so its floor at the device is the raw 1e-5, which is −100 dBFS for a mono device. This is inferred from the code, not measured. A 16 kHz stereo device still goes through the downmix, which was not measured either.
    - 44.1 kHz devices were not measured.
+
+### After merging main (21/10/2026, main at de944cc: PR #22's "No sound from mic" and release 1.1.2)
+
+- **Merge.** `git merge origin/main` into feat/feedback (no rebase). The only conflict was this file; both sides' sections are kept
+  (the warning section from PR #22 follows this one). `Directory.Build.props` came in with main's version change: this lane did not touch it.
+- **The Help question about the microphone** now reads `It says "Mic error" or "No sound from mic", or nothing happens when I talk. What do I check?`
+  (PROPOSED), and its answer starts with two paragraphs built from `NoSoundText` itself, so the help and the message cannot drift apart:
+  `If Dictum shows "No sound from mic", it says: <NoSoundText.SilentBalloon>` and
+  `If Dictum cannot find a microphone at all, it says: <NoSoundText.NoMicrophoneBalloon>`. The bullet checks that were there stay below them.
+  Pins: the "labels the help names exist in the app" pin now includes "No sound from mic" (the help copy and the pill constant), and
+  `The_mic_help_answer_quotes_the_no_sound_message_from_the_same_constants`.
+
+### Lens fixes (21/10/2026), re-lens on 4dc2ad7: the hotkey comes out of the support email
+
+**The finding (Major, privacy and disclosure).** Report a problem and Email support sent `Status.Models` as the "Models:" line, and
+`Status.Models` is the header line: `{speech} · {runtime} · {clean-up} · {hotkey}` (the raw `hotkey` text if it does not parse). The copy
+says only the version and the models go in (`HelpText.SupportNote`, this file's Report a problem entry, SPEC, README). **The email never
+carried the hotkey by design; main had sent it since Report a problem shipped; fixed 21/10/2026.** Decision: the hotkey comes out of the
+email and the copy stays as it is.
+
+**The fix, in one place.** `AppShell.ModelsLine` (speech · runtime · clean-up, no hotkey) is now what the header builds on
+(`Status.Models` = `ModelsLine` + ` · ` + the hotkey) and what `ReportProblem` passes to `SupportMail.ReportUri`. Callers of
+`Status.Models` checked first: the tray panel (`FlyoutWindow`) and About's runtime line keep the full header, hotkey included; only the email
+loses it. The runtime wording was lifted into one private helper (`HeaderRuntime`) used by both.
+
+**Pins.** `Email_support_opens_the_report_email_with_the_version_and_models_and_nothing_private` and ShellTests' Report a problem pin now
+refuse the hotkey: the test text "F24" and the key as the header actually shows it. (ShellTests' Report pin and the header pin use an unstarted
+shell, which shows its default `RightCtrl` rather than the file's `F24`, so they check the header's own last segment; the Email support pin
+opens Settings, where the shell shows `F24`, and checks both.) `The_header_keeps_the_hotkey_and_the_support_models_line_does_not` pins that the header still ends with the key and that
+`ModelsLine` is the header without it. The sample models line in the Report-link pin no longer has a hotkey.
+
+**Mutation.** `ReportProblem` put back to pass `Status.Models` (the hotkey back in the email line): **observed failing**: the Email support pin and
+ShellTests' Report a problem pin. Restored.
