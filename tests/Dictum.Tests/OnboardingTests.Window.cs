@@ -50,7 +50,8 @@ public sealed partial class OnboardingTests
             Assert.True(dialogs.LastOnboarding!.TryItLive);
             Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
             tryIt.Tick();
-            Assert.Equal(OnboardingText.TryInstruction("RightCtrl"), tryIt.Instruction);
+            Assert.Equal(OnboardingText.TryInstruction("Right Ctrl"), tryIt.Instruction); // the key by its display name (HotkeyNames)
+            Assert.Null(tryIt.Placeholder); // the model is ready: no status in the box
             Assert.False(window.SecondaryButton.IsVisible); // Calibrate my voice comes after the first dictation
 
             var listener = platform.LastListener!;
@@ -114,7 +115,7 @@ public sealed partial class OnboardingTests
         }
     });
 
-    /// <summary>Pin: before the shell has loaded (steps 1-5 just ended), Try it says the model is getting ready, not the instruction.</summary>
+    /// <summary>Pin: before the shell has loaded (steps 1-5 just ended), Try it says the model is getting ready, in the practice box.</summary>
     [Fact]
     public Task Try_it_waits_for_the_shell() => UiSession.Run(() =>
     {
@@ -124,7 +125,7 @@ public sealed partial class OnboardingTests
         var (flow, window) = Open(shell, scratch);
         var tryIt = GoTo<TryItStep>(window);
         Assert.False(flow.TryItLive);
-        Assert.Equal(OnboardingText.TryLoading, tryIt.Instruction);
+        Assert.Equal(OnboardingText.TryLoading, tryIt.Placeholder); // in the practice box since 1.2 polish (Try_it_shows_the_wait_inside_the_box)
         window.Close();
         shell.Dispose();
     });
@@ -135,7 +136,7 @@ public sealed partial class OnboardingTests
     private const double CaptionDip = 32;
 
     /// <summary>
-    /// Pin: every step fits a 1366 × 768 screen at 150 % (911 × 512 DIP, less a 48 px taskbar: 480 DIP), keeps its buttons inside
+    /// Pin: every step fits a 1366 × 768 screen at 150 % (911 × 512 DIP, less a 48 px taskbar: 480 DIP), cut to it by Fit since 1.2 polish, keeps its buttons inside
     /// the window (as the busy question's layout pin), names every control a keyboard reaches, and uses the larger text.
     /// </summary>
     [Fact]
@@ -147,12 +148,17 @@ public sealed partial class OnboardingTests
         // 1366 × 768 at 150 % is 911 × 512 DIP; less the Windows 11 taskbar (recalled: 48 DIP) the work area is 464 DIP, and
         // the whole window is the client plus a caption (recalled: about 32 DIP). Both figures are recalled, not measured; a check
         // on a real 150 % desktop is still outstanding.
-        Assert.True(OnboardingWindow.WindowWidth <= 911 && OnboardingWindow.WindowHeight + CaptionDip <= WorkAreaDip, $"{OnboardingWindow.WindowHeight} + {CaptionDip} > {WorkAreaDip}");
+        // Since 1.2 polish (22/10/2026) the default client (720 × 500) is taller than that work area: Fit cuts it to the work area
+        // less the caption, as opening the window on that screen does, and the body scrolls, the buttons staying in the window.
+        Assert.True(OnboardingWindow.WindowWidth <= 911, $"{OnboardingWindow.WindowWidth} > 911");
+        var laptop = OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, new PixelRect(0, 0, 1366, 768 - 72), 1.5, window.Position);
+        Assert.True(laptop.Height + CaptionDip <= WorkAreaDip, $"{laptop.Height} + {CaptionDip} > {WorkAreaDip}");
+        window.Apply(laptop);
         while (true)
         {
             var step = window.Current!;
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(OnboardingWindow.WindowHeight, window.ClientSize.Height);
+            Assert.Equal(laptop.Height, window.ClientSize.Height);
             foreach (var button in new[] { window.PrimaryButton, window.SecondaryButton, window.BackButton }.Where(b => b.IsEffectivelyVisible))
             {
                 var right = button.TranslatePoint(new Avalonia.Point(button.Bounds.Width, 0), window)!.Value.X;
@@ -180,7 +186,7 @@ public sealed partial class OnboardingTests
 
     /// <summary>
     /// Pin (lens 3, then lens on 36fa43e): the whole placement is one pure function. At 150 % on 1366 × 768 with a 48 DIP taskbar
-    /// (recalled, not measured: 72 px) the 420 DIP client and a 32 DIP caption (recalled) fit and the window is moved up into the
+    /// (recalled, not measured: 72 px) a 420 DIP client and a 32 DIP caption (recalled) fit and the window is moved up into the
     /// work area; a client too tall is cut to the work area less the frame; on a second screen whose work area starts at a
     /// non-zero Y (above or below the main one) the window is kept on it or moved into it.
     /// </summary>
@@ -188,16 +194,18 @@ public sealed partial class OnboardingTests
     public void The_window_is_fitted_to_the_work_area_of_its_screen()
     {
         var laptop = new PixelRect(0, 0, 1366, 768 - 72);
-        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(363, 9)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, laptop, 1.5, new PixelPoint(363, 400)));
+        const double fits = 420; // a client that fits the laptop: the default until 1.2 polish
+        Assert.Equal((432d, new PixelPoint(363, 0)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, laptop, 1.5, new PixelPoint(363, 400))); // the default since then: cut to the work area, the body scrolls
+        Assert.Equal((fits, new PixelPoint(363, 9)), OnboardingWindow.Fit(fits, CaptionDip, laptop, 1.5, new PixelPoint(363, 400)));
         Assert.Equal((432d, new PixelPoint(363, 0)), OnboardingWindow.Fit(470, CaptionDip, laptop, 1.5, new PixelPoint(363, 400)));
-        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(10, 20)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, new PixelRect(0, 0, 1920, 1032), 1, new PixelPoint(10, 20)));
+        Assert.Equal((fits, new PixelPoint(10, 20)), OnboardingWindow.Fit(fits, CaptionDip, new PixelRect(0, 0, 1920, 1032), 1, new PixelPoint(10, 20)));
 
         var above = new PixelRect(1920, -1080, 1920, 1032);
-        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(2000, -1000)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, above, 1, new PixelPoint(2000, -1000)));
-        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(2000, -790)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, above, 1, new PixelPoint(2000, 100)));
+        Assert.Equal((fits, new PixelPoint(2000, -1000)), OnboardingWindow.Fit(fits, CaptionDip, above, 1, new PixelPoint(2000, -1000)));
+        Assert.Equal((fits, new PixelPoint(2000, -790)), OnboardingWindow.Fit(fits, CaptionDip, above, 1, new PixelPoint(2000, 100)));
         var below = new PixelRect(0, 1080, 1920, 1032);
-        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(100, 1370)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, below, 1, new PixelPoint(100, 50)));
-        Assert.Equal(300, OnboardingWindow.Fit(OnboardingWindow.WindowHeight, 40, new PixelRect(0, 0, 800, 340), 1, default).Height); // under the minimum: fits all the same
+        Assert.Equal((fits, new PixelPoint(100, 1370)), OnboardingWindow.Fit(fits, CaptionDip, below, 1, new PixelPoint(100, 50)));
+        Assert.Equal(300, OnboardingWindow.Fit(fits, 40, new PixelRect(0, 0, 800, 340), 1, default).Height); // under the minimum: fits all the same
     }
 
     /// <summary>
@@ -227,19 +235,77 @@ public sealed partial class OnboardingTests
         shell.Dispose();
     });
 
-    /// <summary>Pin (lens 4): Try it puts the keyboard focus in the practice box, not on Finish.</summary>
+    /// <summary>
+    /// Pin (lens 4; 1.2 polish round 2, item 3): Try it puts the keyboard focus in the practice box, not on Finish, once the
+    /// model is ready. While "Getting the speech model ready…" shows in the box, nothing has focus, so no caret blinks in front
+    /// of it (first-run/11-loading.png).
+    /// </summary>
     [Fact]
-    public Task Try_it_focuses_the_practice_box() => UiSession.Run(() =>
+    public Task Try_it_focuses_the_practice_box_once_the_model_is_ready() => UiSession.Run(() =>
     {
         using var scratch = new Scratch();
         Bundle(scratch);
-        var (shell, _, _) = scratch.Shell();
-        var (_, window) = Open(shell, scratch);
-        var tryIt = GoTo<TryItStep>(window);
-        Dispatcher.UIThread.RunJobs();
-        Assert.Same(tryIt.Box, window.FocusManager!.GetFocusedElement());
-        window.Close();
-        shell.Dispose();
+        var (shell, _, dialogs) = scratch.Shell(FakeModels());
+        OnboardingWindow? window = null;
+        TryItStep? tryIt = null;
+        dialogs.Onboarding = flow =>
+        {
+            window = new OnboardingWindow(flow);
+            window.Show();
+            while (window.Current is not TryItStep) Next(window);
+            tryIt = (TryItStep)window.Current;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(OnboardingText.TryLoading, tryIt.Placeholder); // still loading
+            Assert.False(tryIt.Box.IsFocused, "the caret blinks in front of the loading line");
+            Assert.False(window.FocusManager!.GetFocusedElement() is Button, $"focus is on {window.FocusManager.GetFocusedElement()}");
+        };
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            tryIt!.Tick();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(tryIt.Placeholder);
+            Assert.Same(tryIt.Box, window!.FocusManager!.GetFocusedElement());
+        }
+        finally
+        {
+            if (window?.IsVisible == true) window.Close();
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>Pin (item 3): focus the person put elsewhere while the model loaded stays there when it is ready.</summary>
+    [Fact]
+    public Task Try_it_leaves_focus_the_person_moved() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, _, dialogs) = scratch.Shell(FakeModels());
+        OnboardingWindow? window = null;
+        dialogs.Onboarding = flow =>
+        {
+            window = new OnboardingWindow(flow);
+            window.Show();
+            while (window.Current is not TryItStep) Next(window);
+            Dispatcher.UIThread.RunJobs();
+            window.PrimaryButton.Focus(Avalonia.Input.NavigationMethod.Tab); // Tab to Finish while it loads
+        };
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            var tryIt = Assert.IsType<TryItStep>(window!.Current);
+            tryIt.Tick();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(tryIt.Placeholder);
+            Assert.Same(window.PrimaryButton, window.FocusManager!.GetFocusedElement());
+        }
+        finally
+        {
+            if (window?.IsVisible == true) window.Close();
+            shell.Dispose();
+        }
     });
 
     /// <summary>Pin (lens 5): the hotkey step gives focus to nothing, as the old hotkey window did, so Space cannot press a button.</summary>

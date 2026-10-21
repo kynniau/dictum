@@ -3890,6 +3890,208 @@ The re-lens closed every finding of the final lens and raised one minor and one 
 - **Nit:** the settings.json help text for `llm` (off) now reads "off (no clean-up: spaces tidied only; your corrections, snippets and the profanity filter still apply; spoken commands such as "new paragraph" are typed as words)".
 - **Pin:** `The_off_lines_say_what_still_applies` checks the status word for word. Mutation, with the old status put back: **observed failing**.
 
+## 1.2 polish (22/10/2026, branch fix/1.2-polish)
+
+**Why.** A demo lane drove the real 1.2 build (main at cd46812) in Windows Sandbox and recorded each screen. Its frames showed fourteen defects in the Welcome to Dictum window (§ Onboarding above), the tray panel, calibration, Settings > Models and Settings > Help (§ In-app Help above). This branch fixes them. The version is not bumped (the release lane does it).
+
+**What changed, per item.**
+
+1. **The last line of every wizard paragraph was clipped** ("gigabytes", "let go", "begin"). Cause: `OnboardingWindow.LargeText` set body text to 17 px but kept the theme's fixed 19 px line height (Theme/Controls.axaml, made for 13 px). The window's body style now sets both, the line height in the theme's proportion (`LineHeightFor`: 17 × 19 / 13, rounded up, 25 px).
+2. **The hotkey step's "Hold to test" and "Stop listening" were under the buttons.** The 640 × 420 client left the body 214 DIP; the hotkey step needs 264 and the speech choice 270 at 720 wide (measured headless, with this host's fonts). The client is now 720 × 500 DIP, so every step fits without scrolling. On opening, `Fit` still cuts it to the screen's work area. On 1366 × 768 at 150 % that is 432 DIP, and the body scrolls there. The scroll bar no longer auto-hides, so the scrolling is visible.
+3. **Try it showed "Getting the speech model ready…" above an empty box.** The status is now inside the empty box, in body text, over it as a placeholder; typing hides it. The theme's own watermark was tried first: its template draws it at half opacity (#66000000 at 0.5, measured headless), which a style cannot change, so it was too faint to read. The instruction, with the key, shows from the start.
+4. **The key showed as "RightCtrl" while Help says "the Ctrl key on the right-hand side".** There is one helper, `HotkeyNames.Display` (Core): "Right Ctrl", "Mouse 4", "Caps Lock", "Ctrl+Shift+Space". It is used by the tray panel header and tooltip, the hotkey box (its key and its "Windows received" line, which now drops "(right side)" because the name says it), calibration's "or hold …", Try it and Settings > General's messages. The token stays the settings value. The CLI, the logs and the settings loader's warnings also keep the token, because that is what goes into settings.json. `HotkeyParser.SideOf` had no caller left and was removed.
+5. **With no microphone the panel said "Ready" and the picker "System default".** `MicrophoneChoices.Build`, the one builder for the three lists, now labels the first entry "No microphone found" when the system lists none. The tray panel shows PR #22's `NoSoundText.NoMicrophoneBalloon` on its problem line, under any model problem. A list that throws counts as none, as in the wizard, and is logged once per panel. The state word stays "Ready" (Owner decisions).
+6. **The no-microphone wording differed between the wizard and calibration.** Calibration showed the Windows capture's own sentence. The Windows capture now throws `NoMicrophoneException` (Core), whose message is `NoMicrophoneBalloon`, the wizard's line, byte for byte. Calibration and the wizard's microphone test both show it.
+7. **Calibration's error was in small print under Run test.** A take that fails (Record, Skip, the hotkey) is now said under Record, in body text, in the sentence card. Run test, Delete recordings and Save failures stay under Run test.
+8. **Calibration's intro printed the recordings folder**, which names the Windows account. It now says where without the path, and has a button that opens the folder. The brief suggested "the folder you chose in Settings > Storage", but that would be untrue: the recordings folder is Dictum's own (`AppPaths.CalibrationDir`), not a chosen one. Settings > Storage lists it under "Models, logs, calibration recordings", so the line says that instead.
+10. **The panel led with model names in the Simple view.**
+    - In the Simple view the header is built from `SimpleView`'s one table: the tier, "loading…" or "model error" while that holds, then the clean-up ("Tidy my words", "AI clean-up", "Off", or "Custom: …"), then the key. There is no runtime in this view. Advanced and the support email keep `ModelsLine`.
+    - The Mode line under Light | Full uses the same names in Simple.
+    - The runtime: the header was already built from `WhisperEngine.LoadedRuntime`, the runtime that loaded, not the configured order. The demo run's own log (20261021-234550-first-run, `dictum-logs`) shows the Vulkan runtime loaded, one Vulkan device found (Intel UHD Graphics P630) and the model placed on Vulkan0. So "Vulkan" was true there, and the brief's premise that the virtual GPU was off does not match that log.
+    - One real gap was fixed: a Vulkan runtime that reports no device leaves ggml on the CPU (as `WhisperEngine.VulkanActive` already assumes), and the header now says "CPU" then (`AppShell.RuntimeLabel`).
+11. **The Simple view's Language card was jargon.** It now uses the orchestrator's wording. The Advanced card keeps its text, with the capital after its semicolon corrected.
+12. **"In use" was a greyed button.** It is now a tag (`Ui.Tag`): link-coloured text in an outlined pill, not focusable, with the accessible name "In use".
+13. **The model folder box cut the path off ("…\mod"), and Browse… opened in Documents.**
+    - The box is a `PathBox`: trimmed from the left (Avalonia's `LeadingCharacterEllipsis`), the whole path in its tooltip and its accessible name. It is a tab stop with a focus ring, and keyboard focus opens the tooltip.
+    - The chooser starts in the folder, or in the nearest folder above it that exists (`ShellDialogs.StartFolder`). The cause is inferred from the code and the demo log, not reproduced: the default model folder is made only by a download (`ModelDownloader`), the demo PC had downloaded nothing, and `WithStorage` passed no start folder for a folder that does not exist.
+14. **The Help was one long page.** It now opens with "Questions on this page", one link per question in `HelpText.Questions` (no copy of the questions). Each link is a tab stop with the theme's focus ring. Pressing one moves keyboard focus to its answer, which scrolls into view with its ring.
+
+Item 9 was not in the brief. Item 16: no version bump. Item 17 (the pill's "Recording · hold") is approved copy and is not this lane's: see Owner decisions.
+
+**PROPOSED strings (22/10/2026), for the product owner's approval; none is approved:**
+- "No microphone found" (the microphone pickers' first entry when none is listed)
+- "Nothing is uploaded: the recordings stay in Dictum's folder on this PC (Settings > Storage lists it), so the test can be re-run when you add a model." (calibration intro, after the unchanged `Framing`)
+- "Open the recordings folder"
+- "AI clean-up" (Simple header); "Full: <tier> and AI clean-up. Light: <tier> and Tidy my words." (Simple Mode line, for example "Full: More accurate and AI clean-up. Light: Standard and Tidy my words.")
+- "Dictum comes with an English-only model. For other languages it downloads a model that understands them; choose the language here." (Simple Language card)
+- The Advanced Language card with "; any of the languages…" (was "; Any…")
+- "Questions on this page"; the links' screen-reader hint "Moves to the answer, further down this page."
+- Keys by their display names: "On a Mac over Remote Desktop use the right Option key (Right Alt) or right Command (Right Win)." (was "(RightAlt)", "(RightWin)"); Settings > General's mouse note "(Mouse 4, Mouse 5)"; "Windows received: Right Alt down"; "The hotkey is now Right Ctrl." and the other messages that name a key.
+
+**Owner decisions (not changed here):**
+- Item 17: the pill's "Recording · hold" is an approved state line.
+- The panel's state word stays "Ready" with no microphone. The no-microphone sentence shows under it. A new state word would be new tray state copy.
+- The Mode (Light | Full) segments stay in the Simple view, as the Simple view's own decision recorded. Only their line now uses Simple names.
+- The Simple header names Off as "Off" (the brief's name), next to the switch and a state word that can also read "Off". "Clean-up off" would be clearer but is new copy.
+- The Simple Language card's "Translate to English" hint still names models ("OpenAI recommends medium or large-v3…"). It was not in the brief.
+
+**Pins** (`PolishTests.cs`, `OnboardingTests.Polish.cs`; headless). Each was observed failing with its mutation applied and passing without it (applied alone, rebuilt, run, restored):
+
+| Item | Mutation | Pin | Observed |
+|---|---|---|---|
+| 1 | the LineHeight setter removed from the body style | No_step_cuts_off_its_text (both forms), The_body_style_sets_size_and_line_height_together | observed failing |
+| 2 | WindowHeight back to 420 | Every_step_fits_the_default_window_without_scrolling (both forms) | observed failing |
+| 2 | the scroll bar auto-hiding again | Every_step_fits_the_default_window_without_scrolling | observed failing |
+| 3 | no status in the box | Try_it_shows_the_wait_inside_the_box, Try_it_waits_for_the_shell | observed failing |
+| 4 | `HotkeyNames.Display` returns the token | A_hotkey_is_shown_by_its_display_name (9 rows), The_panel_box_and_calibration_show_the_display_name, Try_it_after_the_first_dictation_shows_the_accent_explainer, Try_it_shows_the_wait_inside_the_box | observed failing |
+| 4 | calibration's hint back to `spec.Display` | No_window_shows_the_parser_token, The_panel_box_and_calibration_show_the_display_name | observed failing |
+| 5 | the panel's no-microphone line removed | With_no_microphone_the_panel_says_so, A_microphone_list_that_throws_is_none_in_the_panel | observed failing |
+| 5 | the picker's first entry back to "System default" | With_no_microphone_the_panel_says_so, The_microphone_lists_are_built_in_one_place | observed failing |
+| 6 | the Windows capture's own sentence put back | The_platform_says_no_microphone_with_the_one_sentence | observed failing |
+| 6 | calibration's failure text always "That did not work: …" | Calibration_says_no_microphone_next_to_Record, Other_failures_keep_their_words | observed failing |
+| 6 | the wizard's test ignores the no-microphone failure | A_capture_with_no_microphone_says_the_one_sentence | observed failing |
+| 7 | a take's failure written under Run test | Calibration_says_no_microphone_next_to_Record | observed failing |
+| 8 | the folder path appended to the intro | Calibration_shows_no_path_and_opens_the_folder | observed failing |
+| 10 | the header always `ModelsLine` | The_panel_header_follows_the_view(simple), The_header_keeps_the_hotkey_and_the_support_models_line_does_not | observed failing |
+| 10 | the Mode line always the model names | The_panel_header_follows_the_view(simple) | observed failing |
+| 10 | the Vulkan-with-no-device rule removed | The_runtime_is_where_the_model_runs (Vulkan, 0) | observed failing |
+| 11 | the Simple card shows the old jargon | The_language_card_speaks_plainly_in_the_simple_view(simple) | observed failing |
+| 12 | "In use" back to a disabled quiet button | In_use_is_a_tag_not_a_disabled_button (both views) | observed failing |
+| 13 | trimming at the end (`CharacterEllipsis`) | The_model_folder_shows_its_end | observed failing |
+| 13 | the chooser no longer looks above the folder | The_folder_chooser_starts_at_the_nearest_folder_that_exists | observed failing |
+| 14 | a link that does nothing | Help_lists_its_questions_and_each_jumps_to_its_answer | observed failing |
+| 14 | the question list left out | Help_lists_its_questions_and_each_jumps_to_its_answer, The_page_has_headings_and_reads_with_the_keyboard | observed failing |
+
+**Existing pins changed, and why:**
+- `Every_step_fits_at_150_percent_and_names_its_controls` now applies `Fit` for that screen first. The default no longer fits it by design, and the buttons stay in the window.
+- `The_window_is_fitted_to_the_work_area_of_its_screen` keeps its cases with a 420 DIP client, and adds the 500 DIP default being cut to 432.
+- `Try_it_waits_for_the_shell` reads the placeholder.
+- The received-line pins read "Right Alt down", "Mouse 5 down" and "Left Mouse up".
+- `The_microphone_lists_are_built_in_one_place` expects "No microphone found" for an empty list.
+- The Feedback and runtime-resilience header pins read the Advanced line, or name the view they check.
+- The model-folder pin reads the `PathBox`.
+- The Help headings pin starts with the list's heading.
+
+**Not verified:**
+- Any of this on a real desktop, at 150 % or with other fonts (headless on this host only; the layout heights were measured with this host's fonts).
+- The tooltip opening on keyboard focus on a desktop (pinned headless by the lens fixes below).
+- Dark mode contrast of the tag and the box's status (theme brushes chosen for it, not measured).
+- Screen-reader output (names and help texts are pinned, not heard).
+- The folder chooser's start folder on Windows (the helper is pinned; the dialog was not opened).
+- Tray mode (not run on this host).
+
+### Lens fixes (22/10/2026), lens on 4abba54
+
+The lens returned Needs changes, with no blocker. It re-ran 18 of the mutations above, all caught, and CI was green. Its findings, and the fixes on the same branch:
+
+1. **Major, privacy.** When the recordings folder could not be opened, calibration printed `OpenPath`'s reason, and that reason contains the full path (the Windows account name). The reason now goes to the log, and the window says "The recordings folder could not be opened." (PROPOSED). `OpenPath` and Settings > Storage are unchanged.
+2. **Major, item 10.** `SimpleView.ModeHint` ignored the language. With German, Detect automatically or translate it read "Full: Custom: small.en and AI clean-up…" and promised AI clean-up where none runs. It now returns the Simple line only while the text is English (`WhisperLanguages.OutputIsEnglish`) and both preset models are tiers; otherwise the panel keeps the model-name line.
+3. **Major, accessibility, item 13.** `PathBox` (a Border) was a tab stop with no automation peer, so a screen reader could not read it. It now has a peer: a read-only Edit, named "Model folder", whose value is the whole path, as the text box it replaced was. The entry above said the path was "part of the accessible name"; that is corrected: the name is "Model folder" and the path is the value. `Ui.Tag` set a name on its Border, which has no peer either; that line is dropped, and the tag's TextBlock, read by its own Text peer, says "In use".
+4. **Major, items 5 and 6.**
+   - There is now one guarded device lister, `MicrophoneChoices.List`, used by the tray panel, the welcome window's test and Settings > Microphone. Settings > Microphone threw COMException with the audio service stopped. Each caller logs a failure in its own words, once where it redraws often.
+   - The dictation controller now treats `NoMicrophoneException` as the no-microphone case, as the wizard and calibration do, even while the list still names a device.
+5. **Major, item 4.** The entry above claimed the logs keep the token. That was untrue at 4abba54: the "Tray tooltip:" log line carried "Right Ctrl". The tooltip is now built for the key it is given (`TooltipLine`): the display name on screen, the settings token (`RightCtrl`) in the log.
+6. **Minor.** Settings > General's fix-hotkey note now reads "F8 or Mouse 5 work well." (PROPOSED).
+7. **Minor.** SPEC is updated: the Simple header and its combinations, the Mode line's condition, the display names, the runtime rule, the no-microphone line, the "In use" tag, the model folder field and Browse…, the Help question list, calibration's intro and its open failure, and the Mac note.
+8. **Minor.** The PROPOSED list is completed below.
+9. **Nit.** The caret overdrew the "G" of the in-box status. The status now starts 16 px into the box (it was 12).
+
+The lens also asked for a pin that keyboard focus opens the `PathBox` tooltip, if cheap. It was cheap and is added; the tooltip opening is therefore no longer under Not verified, but only headless.
+
+**PROPOSED strings added by these fixes** (none approved):
+- "The recordings folder could not be opened."
+- "It must not share a key with the dictation hotkey; F8 or Mouse 5 work well." (was "Mouse5")
+- The model folder's accessible name "Model folder", with the path as its value. At 4abba54 it was the name "Model folder: <path>".
+- The Simple header's combinations:
+  - "<tier> · <clean-up> · <key>", for example "Standard · Tidy my words · Right Ctrl"
+  - "<tier> · loading… · <clean-up> · <key>"
+  - "<tier> · model error · <clean-up> · <key>"
+  - the clean-up as "Tidy my words", "AI clean-up", "AI clean-up · loading…", "AI clean-up · error", "Off" or "Custom: <name>"
+  - the tier as "Standard", "More accurate", "Most accurate" or "Custom: <model>"
+
+**Mutation checks** (each applied alone, rebuilt, run and restored):
+
+| Finding | Mutation | Pin | Observed |
+|---|---|---|---|
+| 1 | the open failure shows `OpenPath`'s reason | Calibration_says_an_open_failure_without_a_path | observed failing |
+| 2 | the Simple Mode line always, whatever the language | The_simple_mode_line_is_only_for_plain_English (7 rows), The_panel_keeps_model_names_in_the_mode_line_for_another_language | observed failing |
+| 3 | `PathBox` without its automation peer | The_model_folder_shows_its_end | observed failing |
+| 3 | keyboard focus not opening the tooltip | The_model_folder_shows_its_end | observed failing |
+| 4 | Settings > Microphone listing without the guard | Settings_microphone_survives_a_list_that_throws | observed failing |
+| 4 | the controller ignoring `NoMicrophoneException` | SilenceWarningTests.The_controller_warns_of_no_microphone_when_the_platform_says_so | observed failing |
+| 5 | the tooltip log line with the display name | The_tooltip_log_keeps_the_token | observed failing |
+| 9 | the in-box status back at 12 px | Try_it_shows_the_wait_inside_the_box | observed failing |
+
+## 1.2 polish round 2 (22/10/2026, branch fix/1.2-polish-2)
+
+**Why.** A second Windows Sandbox recording, of the round-1 build (main at 4ab800e, PR #38), showed six small defects, and the round-1 lens left two nits. This branch fixes them. The version is not bumped.
+
+**What changed, per item.**
+
+1. **The tray panel's header wrapped the key onto a second line** ("…Right" / "Ctrl", first-run-poster.png), **and the Mode line wrapped "Tidy my / words."**
+   - Cause: the models line shared a row with the state word and the switch, and wrapped (the caption style).
+   - The header now has two rows: the mark, "Dictum", the state and the switch, then the models line under the last three. The line never wraps; one longer than the panel ends in an ellipsis, whole in its tooltip.
+   - Measured headless at the panel's 380 px, with the longest state word ("Downloading"): every Simple line (each tier, each clean-up, "Right Ctrl" and "Mouse 5") and each preset's model-name line on a CPU and a GPU machine fit whole. With the old layout restored, 25 of the 26 lines broke, "Standard · Tidy my words · Right Ctrl" among them.
+   - The Mode line's rule: one sentence per line. `SimpleView.ModeHint` now returns its two sentences. The panel joins them with line breaks, after "Custom: your settings match neither preset." when that applies (`FlyoutWindow.ModeLine`). So a line breaks between presets, never inside a name. At the panel's width each sentence fits on its line, in both views, on both machine classes, with and without the Custom note. The words are unchanged; only the space between the sentences became a line break.
+2. **"Open log folder" stood under the no-microphone sentence.** The link now shows only while `ShellStatus.Problem` is set (a model problem, or "Last dictation heard nothing"), as before round 1 added the no-microphone line. The sentence alone has no link.
+3. **In Try it the caret blinked in front of "Getting the speech model ready…".** While the status shows, `TryItStep.InitialFocus` gives focus to nothing. When the status goes (the model is ready, or failed to load, or the person typed), the box takes the focus, unless the person has put it somewhere else meanwhile (Tab to Finish, say). Hiding the caret instead was considered and not chosen: the box would still have the focus, and nothing on screen would show it.
+4. **A Help index jump left the answer at the bottom edge with its last line cut off** (help/07, help/09). Focus alone scrolls only as far as needed. The link now scrolls the page so the answer's heading is 8 px below the top of the view (`HelpPage.JumpGap`). The answers near the end, which the page cannot scroll that far, show whole.
+   - The position is measured against the scrolled content, not the view. Focus has already moved the offset, and the view's coordinates follow only at the next layout pass.
+   - The first try measured against the view and overshot by the earlier offset. The pin caught it.
+5. **The Simple view said "In use" twice on a row** (the tag and the line, change-model/05-standard.png). Cause: round 1 added the tag to `ModelRow` while the lines still began with the state. A row with the tag now says it once, in both views and for every kind of row that can be in use:
+   - the catalogue row (`CatalogueRow` drops the state when the row is in use);
+   - a tier the language rules out;
+   - Tidy: "With AI clean-up · …" when the model does it, else the line alone;
+   - Off;
+   - the Custom rows ("Not one of the choices above.");
+   - the Advanced row for a model file from disk (its path).
+
+   The Advanced view had the same duplicate and is fixed with it, since it is the same cause.
+6. **Calibration's Record stayed active with no microphone** (test-setup/04-sentence.png).
+   - The window now looks for a microphone when it opens, when it is activated, before a take the hotkey starts (a disabled button does not stop the hotkey), and after a take fails for want of a microphone.
+   - With none listed, or a list that throws (the one guarded lister, `MicrophoneChoices.List`), Record is disabled. The no-microphone sentence stands under it, and the sentence to read stays. Once a microphone is listed, Record works again and the line goes. Stop is never disabled.
+   - A take that fails with `NoMicrophoneException` while the list still names a device leaves Record on, with the sentence. A first version disabled Record then too, so only the next activation turned it back on. The round-1 pin (Calibration_says_no_microphone_next_to_Record) caught that activation clearing the line. The list is what says a microphone is there.
+7. **Nits from the round-1 lens.**
+   - `PathBox.Path` had two summaries. The stale one is gone and the blank line is back.
+   - In SPEC §24 the Browse… amendment was spliced into the middle of the Settings window sentence. It now follows that sentence.
+
+**PROPOSED strings (22/10/2026)**, for the product owner's approval; none is approved:
+- "With AI clean-up" (`SimpleView.TidyWithAiState`, the Tidy row's line start; was "In use, with AI clean-up")
+- "Not one of the choices above." (`SimpleView.CustomNote`; was "In use. Not one of the choices above.")
+- Lines whose "In use · " prefix is dropped, the rest unchanged: the tiers' and the catalogue's lines, Tidy's, Off's, and a tier the language rules out.
+- The Mode line's sentences, one per line. The words are unchanged from round 1's PROPOSED line.
+
+No approved copy is touched. CloudPolicy, the consent dialog, the pill and tray state lines, the Store listing, the 1.1.2 note, FreeLine, FreeLaterNote and the name line are unchanged.
+
+**Pins** (`Polish2Tests.cs`, and `OnboardingTests.Window.cs` for Try it; headless). Each was observed failing with its mutation applied alone, rebuilt and run, and passing once restored:
+
+| Item | Mutation | Pin | Observed |
+|---|---|---|---|
+| 1 | the models line back beside the state and the switch, wrapping | The_panel_header_is_one_whole_line (26 lines) | observed failing (25 of 26; "Standard · Tidy my words · Right Ctrl" broke before "Right Ctrl") |
+| 1 | the models line wrapping, on its own row | The_panel_header_never_wraps | observed failing (3 lines, not 1) |
+| 1 | the Mode line joined with a space | The_mode_line_breaks_between_presets_only (8 rows) | observed failing (8 of 8) |
+| 2 | the log link for any line under the header | Open_log_folder_is_for_errors_not_the_microphone_line | observed failing |
+| 3 | Try it focusing the box while it loads | Try_it_focuses_the_practice_box_once_the_model_is_ready | observed failing |
+| 3 | no focus to the box when the model is ready | Try_it_focuses_the_practice_box_once_the_model_is_ready | observed failing |
+| 4 | the jump without the scroll to the top | A_help_jump_puts_the_answer_at_the_top | observed failing (the answer 439 px into a 640 px view) |
+| 5 | the catalogue row's line keeping "In use" | In_use_is_said_once_on_a_row; SimpleViewTests.The_default_view_is_simple, A_user_whose_language_is_not_english_is_never_switched_to_an_english_only_model | observed failing (6 tests) |
+| 5 | Off's line starting "In use · " again | In_use_is_said_once_on_a_row (Off); CleanupOffTests.The_simple_rows_switch_between_tidy_and_off | observed failing |
+| 6 | Record enabled whatever the list says | Calibration_record_waits_for_a_microphone, Calibration_with_a_list_that_throws_waits_for_a_microphone | observed failing |
+
+Not pinned:
+- the hotkey path's re-check (the hotkey is redirected through the shell's listener, which these headless tests do not drive);
+- item 7 (comments and docs).
+
+**Changed pins.** Round 1's pins that asserted the old text were updated to the new rule, not deleted:
+- PolishTests: the Mode line's text now has a line break between its sentences.
+- CleanupOffTests and SimpleViewTests: they checked the "In use · …" lines; they now check the tagged rows (`Polish2Tests.InUseRows`).
+- OnboardingTests: lens 4's Try_it_focuses_the_practice_box asserted the box had focus while the model loaded. It is now Try_it_focuses_the_practice_box_once_the_model_is_ready, and Try_it_leaves_focus_the_person_moved is added.
+
+**Not verified.**
+- Nothing here was run on a desktop or in Windows Sandbox.
+- The measurements use Avalonia's headless platform with Skia and this host's system fonts (Segoe UI Variable). A desktop at another scale, or a PC without that font, may set the lines differently.
+- A new Sandbox recording would confirm all six items on screen.
+
 ## Release 1.2.0 prepared (22/10/2026)
 
 Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOSED until the owner approves it. `site/version.json` is not touched (set at release time) and no tag is created.
@@ -3899,4 +4101,4 @@ Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOS
 3. `docs/STORE.md` listing (PROPOSED): a "What's new in this version (1.2.0)" note; the feature line "No account, no analytics, no telemetry" replaced by the approved line "Free: no subscription, no account, no ads, no analytics, no telemetry."; a FREE paragraph in the description with the two approved lines ("Free: no subscription, no account, no ads, no analytics, no telemetry." and "The base product stays free to keep on your PC; optional paid extras may come later.").
 4. `docs/STORE.md` version references (section 1 package-version row, section 6) say 1.2.0 / 1.2.0.0; the certification record gains "21/10/2026 1.1.2 submitted (Submission 2), marked mandatory, in certification" and "22/10/2026 Dictum 1.2.0 prepared".
 5. `README.md`: a bullet under the opening list carries the two approved lines verbatim, plus open source, MIT and Kynni Pty Ltd. No other fact was removed.
-6. Not changed, for the owner: section 9 row 17 of `docs/STORE.md` still says the first run shows "only the hotkey check"; with the 1.2 Welcome window it now also shows a model-folder choice and a microphone test.
+6. `docs/STORE.md` section 9 row 17 (PROPOSED): the first run opens the Welcome window with a hotkey check, a microphone test and a choice of where model files are kept, and Esc keeps the defaults.

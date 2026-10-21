@@ -394,7 +394,7 @@ public class HelpPageTests
 
         var headings = All<TextBlock>(page).Where(t => AutomationProperties.GetHeadingLevel(t) > 0).ToList();
         Assert.Equal([HelpText.PageTitle], headings.Where(t => AutomationProperties.GetHeadingLevel(t) == 1).Select(t => t.Text));
-        Assert.Equal([HelpText.MoreHelpHeading, HelpText.HowItWorksHeading, HelpText.QuestionsHeading],
+        Assert.Equal([HelpText.IndexHeading, HelpText.MoreHelpHeading, HelpText.HowItWorksHeading, HelpText.QuestionsHeading], // the question list first (1.2 polish)
             headings.Where(t => AutomationProperties.GetHeadingLevel(t) == 2).Select(t => t.Text));
         Assert.Equal([HelpText.AccuracyHeading, .. HelpText.Questions.Select(q => q.Question)],
             headings.Where(t => AutomationProperties.GetHeadingLevel(t) == 3).Select(t => t.Text));

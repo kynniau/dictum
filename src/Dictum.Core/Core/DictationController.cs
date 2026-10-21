@@ -265,9 +265,10 @@ public sealed class DictationController : IDisposable
         {
             _log.Error($"Microphone could not be opened: {ex.GetType().Name}: {ex.Message}");
             _ui.SetTrayState(TrayState.Error);
-            // No microphone listed at all: the no-microphone warning instead of "Mic error". Asked only now, so a press that opens
+            // No microphone (the platform says so: NoMicrophoneException, 1.2 polish; or none is listed): the no-microphone warning
+            // instead of "Mic error", as the welcome window's test and calibration say it. The list is asked only now, so a press that opens
             // the microphone pays nothing for the check.
-            Execute(MicrophoneListed() ? _machine.CaptureFailed(sessionId) : _machine.NoMicrophone(sessionId));
+            Execute(ex is not NoMicrophoneException && MicrophoneListed() ? _machine.CaptureFailed(sessionId) : _machine.NoMicrophone(sessionId));
             return false;
         }
     }

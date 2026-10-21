@@ -211,7 +211,7 @@ public class UiWindowTests
         var monitor = platform.LastMonitor!;
         monitor.Press(Vk.RMenu, down: true);
         Dispatcher.UIThread.RunJobs();
-        Assert.Contains("Windows received: RightAlt (right side) down", Texts(box));
+        Assert.Contains("Windows received: Right Alt down", Texts(box));
         Assert.Contains("Hold to test", Texts(box)); // F24 is the chosen key, and it is not held
         monitor.Press(Vk.RMenu, down: false);
         Dispatcher.UIThread.RunJobs();

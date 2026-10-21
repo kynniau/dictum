@@ -17,13 +17,15 @@ namespace Dictum.UI.Views.Onboarding;
 /// settings are first loaded (<see cref="RunFirstSteps"/> returns when they are done or the window closes); Try it follows once
 /// the shell has loaded them and the hotkey listens (<see cref="OnboardingFlow.BeginTryIt"/>). Esc or closing the window skips
 /// whatever is left with today's defaults (<see cref="OnboardingFlow.SkipRest"/>). The text is larger than Dictum's other
-/// windows (17 px body). Its client area is 420 DIP high, so with the caption it fits a 1366 × 768 screen at 150 % (911 × 512
-/// DIP, less the taskbar), and on opening it is clamped to the screen's work area, the body scrolling (<see cref="Fit"/>).
+/// windows (17 px body). Its client area (720 × 500 DIP since 1.2 polish, 22/10/2026, was 640 × 420) holds every step's body
+/// as built without scrolling (the hotkey step's "Hold to test" and "Stop listening" sat under the buttons at 420); on opening
+/// it is clamped to the screen's work area (<see cref="Fit"/>), and on a screen too small for it (1366 × 768 at 150 %) the body
+/// scrolls under a scroll bar that stays visible, with Back and the step's buttons always in view.
 /// </summary>
 internal sealed class OnboardingWindow : Window
 {
-    public const double WindowWidth = 640;
-    public const double WindowHeight = 420;
+    public const double WindowWidth = 720;
+    public const double WindowHeight = 500;
 
     private readonly OnboardingFlow _flow;
     private readonly List<OnboardingStep> _steps = [];
@@ -62,7 +64,8 @@ internal sealed class OnboardingWindow : Window
         _primary.IsDefault = true;
         AutomationProperties.SetLiveSetting(_stepLine, AutomationLiveSetting.Polite);
 
-        _scroll = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto };
+        // The bar stays visible whenever the body scrolls (only on a small screen): an auto-hiding one hid that there was more.
+        _scroll = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto, AllowAutoHide = false };
         var header = Ui.Row(12, new MarkIcon(30), Ui.Text(OnboardingText.Title, "title"));
         var progress = Ui.Row(12, _dots, _stepLine);
         var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
@@ -248,13 +251,28 @@ internal sealed class OnboardingWindow : Window
         _back.IsVisible = step.AllowsBack && _index > 0;
     }
 
+    /// <summary>This window's body text size (the theme's is <see cref="ThemeBodySize"/>).</summary>
+    internal const double BodySize = 17;
+
+    /// <summary>The theme's body text, Theme/Controls.axaml's TextBlock.body: 13 px on a 19 px line (a pin reads the theme against these).</summary>
+    internal const double ThemeBodySize = 13;
+    internal const double ThemeBodyLineHeight = 19;
+
+    /// <summary>The line height for body text of <paramref name="size"/>, in the theme's proportion, rounded up: 25 for 17 px.</summary>
+    internal static double LineHeightFor(double size) => Math.Ceiling(size * ThemeBodyLineHeight / ThemeBodySize);
+
     /// <summary>
     /// Larger text than the other windows: these styles, on this window, take precedence over the theme's (Theme/Controls.axaml).
     /// </summary>
     private void LargeText()
     {
         static Style Size(Func<Selector?, Selector> selector, double size) => new(selector) { Setters = { new Setter(TextBlock.FontSizeProperty, size) } };
-        Styles.Add(Size(s => s.OfType<TextBlock>().Class("body"), 17));
+        // The theme gives body text a fixed line height (19 px for 13 px text). Keeping it under 17 px text clipped the bottom of
+        // each paragraph's last line ("gigabytes", "let go"): the style sets both, the line height in the theme's proportion.
+        Styles.Add(new Style(s => s.OfType<TextBlock>().Class("body"))
+        {
+            Setters = { new Setter(TextBlock.FontSizeProperty, BodySize), new Setter(TextBlock.LineHeightProperty, LineHeightFor(BodySize)) },
+        });
         Styles.Add(Size(s => s.OfType<TextBlock>().Class("caption"), 15));
         Styles.Add(Size(s => s.OfType<TextBlock>().Class("hint"), 14));
         Styles.Add(Size(s => s.OfType<TextBlock>().Class("error"), 15));
