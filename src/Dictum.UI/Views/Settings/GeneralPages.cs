@@ -21,7 +21,7 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ToggleSwitch _login;
     private readonly TextBlock _loginHint = Ui.Text("", "hint");
     // The sentence pointing at hands_free_max_seconds in settings.json went with the Hands-free card below (16/10/2026).
-    public const string MouseNote = "A mouse button works too: hold the right or middle button or a side button (Mouse4, Mouse5), and double-tap it for " +
+    public const string MouseNote = "A mouse button works too: hold the right or middle button or a side button (Mouse 4, Mouse 5), and double-tap it for " +
                                     "hands-free. The left button cannot be used. " +
                                     "While Dictum is on and a speech model is ready, that button no longer reaches other apps at all (no right-click menu, no middle-click, " +
                                     "no Back); a side button you do not use is the best choice.";
@@ -166,12 +166,12 @@ internal sealed class GeneralPage : SettingsPage
         }
         if (Shell.Settings.FixHotkey is { } fix && HotkeyParser.TryParse(fix, out var fixSpec, out _) && spec.CanFireTogether(fixSpec))
         {
-            Say($"{spec.Display} shares keys with the fix-last hotkey ({fixSpec.Display}); one press would do both. Choose another key.");
+            Say($"{HotkeyNames.Display(spec)} shares keys with the fix-last hotkey ({HotkeyNames.Display(fixSpec)}); one press would do both. Choose another key.");
             return;
         }
         _capture.Stop();
         Write(("hotkey", Json(key)));
-        Say($"The hotkey is now {spec.Display}.");
+        Say($"The hotkey is now {HotkeyNames.Display(spec)}.");
     }
 
     private void SaveFixHotkey()
@@ -189,12 +189,12 @@ internal sealed class GeneralPage : SettingsPage
         }
         if (HotkeyParser.TryParse(Shell.Settings.Hotkey, out var main, out _) && spec.CanFireTogether(main))
         {
-            Say($"{spec.Display} shares keys with the dictation hotkey ({main.Display}); one press would do both. Choose another key.");
+            Say($"{HotkeyNames.Display(spec)} shares keys with the dictation hotkey ({HotkeyNames.Display(main)}); one press would do both. Choose another key.");
             return;
         }
         _fixCapture.Stop();
         Write(("fix_hotkey", Json(text)));
-        Say($"{spec.Display} now opens Fix last dictation.");
+        Say($"{HotkeyNames.Display(spec)} now opens Fix last dictation.");
     }
 
     private void ClearFixHotkey()

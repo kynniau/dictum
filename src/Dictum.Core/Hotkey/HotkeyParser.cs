@@ -144,14 +144,6 @@ public static class HotkeyParser
     /// </summary>
     public static string NameOf(int vk) => vk == Vk.LButton ? "LeftMouse" : Names.Value.TryGetValue(vk, out var name) ? name : $"0x{vk:X2}";
 
-    /// <summary>Which side of the keyboard a sided key is on ("right"), or null.</summary>
-    public static string? SideOf(int vk) => vk switch
-    {
-        Vk.LControl or Vk.LShift or Vk.LMenu or Vk.LWin => "left",
-        Vk.RControl or Vk.RShift or Vk.RMenu or Vk.RWin => "right",
-        _ => null,
-    };
-
     private static Dictionary<string, KeyGroup> BuildTable()
     {
         var t = new Dictionary<string, KeyGroup>(StringComparer.Ordinal);

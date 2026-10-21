@@ -3,6 +3,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
@@ -45,6 +46,20 @@ internal static class Ui
             }
         };
         return button;
+    }
+
+    /// <summary>
+    /// A state to read, not a control to press ("In use"): text in the link colour (the accent, legible in both themes) in an
+    /// outlined pill, button-sized text, never focusable, named for a screen reader.
+    /// </summary>
+    public static Border Tag(string text)
+    {
+        var label = new TextBlock { Text = text, FontSize = 13, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        label[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("LinkBrush");
+        var tag = new Border { Child = label, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 5), Focusable = false };
+        tag[!Border.BorderBrushProperty] = new DynamicResourceExtension("LinkBrush");
+        AutomationProperties.SetName(tag, text);
+        return tag;
     }
 
     public static StackPanel Stack(double spacing, params Control[] children)
@@ -130,6 +145,60 @@ internal static class Ui
     public const string MicIcon = "M9,6 A3,3 0 0 1 15,6 L15,11 A3,3 0 0 1 9,11 Z M5,11 A7,7 0 0 0 19,11 M12,18 L12,21";
     public const string LockIcon = "M6,10 L18,10 A2,2 0 0 1 20,12 L20,19 A2,2 0 0 1 18,21 L6,21 A2,2 0 0 1 4,19 L4,12 A2,2 0 0 1 6,10 Z M8,10 L8,7 A4,4 0 0 1 16,7 L16,10";
     public const string CloudIcon = "M7,18 A4,4 0 0 1 7,10 A5,5 0 0 1 17,9 A4.5,4.5 0 0 1 17,18 Z";
+}
+
+/// <summary>
+/// A read-only folder path in a box like a text box (1.2 polish, 22/10/2026: a read-only text box cut a long path off at its
+/// end, "…\mod"). The path is trimmed from the left, so its end, the folder's own name, stays in view; the whole path is the
+/// tooltip and part of the accessible name. It is a tab stop with a focus ring, and keyboard focus opens the tooltip, so the
+/// whole path is readable without a mouse, as the text box's was.
+/// </summary>
+internal sealed class PathBox : Border
+{
+    private readonly TextBlock _text = new() { TextTrimming = TextTrimming.LeadingCharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+    private readonly string _name;
+
+    /// <param name="name">What the path is ("Model folder"); the accessible name is "Model folder: C:\…".</param>
+    public PathBox(string name)
+    {
+        _name = name;
+        Child = _text;
+        MinHeight = 32;
+        Padding = new Thickness(10, 5);
+        CornerRadius = new CornerRadius(8);
+        BorderThickness = new Thickness(1);
+        Focusable = true;
+        IsTabStop = true;
+        this[!BackgroundProperty] = new DynamicResourceExtension("ControlBrush");
+        Ring(false);
+        GotFocus += (_, e) =>
+        {
+            var keyboard = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
+            Ring(keyboard);
+            if (keyboard) ToolTip.SetIsOpen(this, true);
+        };
+        LostFocus += (_, _) =>
+        {
+            Ring(false);
+            ToolTip.SetIsOpen(this, false);
+        };
+    }
+
+    /// <summary>The path shown; the tooltip and the accessible name follow it.</summary>
+    public string Path
+    {
+        get => _text.Text ?? "";
+        set
+        {
+            _text.Text = value;
+            ToolTip.SetTip(this, value);
+            AutomationProperties.SetName(this, $"{_name}: {value}");
+        }
+    }
+
+    internal TextBlock Text => _text;
+
+    private void Ring(bool on) => this[!BorderBrushProperty] = new DynamicResourceExtension(on ? "LinkBrush" : "ControlBorderBrush");
 }
 
 /// <summary>The segmented control (Light | Full, Off | Orb | Edge | Both): exactly one is checked, or none for "Custom".</summary>

@@ -1340,9 +1340,11 @@ Enter presses the step's primary button. Steps:
    and on every way out of the step (Next, Skip, Back, Esc, closing the window). A test closed at 60 s with nothing decided (hiss only) says "Nothing heard."; a level counts towards "Heard you." only above the floor too (a `silence_threshold` of 0 never hears digital silence), and one late look at the level counts as at most two ticks. Choosing another microphone tests it at
    once; Next writes `audio.device` only when it changed; Skip writes nothing.
 6. **Try it**: after steps 1-5 the window stays open while the shell loads the settings, installs the hotkey and starts
-   loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). Until the model is
-   ready the step says "Getting the speech model ready…"; then "Click in the box, hold <hotkey>, say a sentence, then let
-   go." over a multi-line box, which has the keyboard focus (a hotkey held without clicking first pastes there). A
+   loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). The step says "Click
+   in the box, hold <hotkey>, say a sentence, then let go." from the start (the key by its display name, "Right Ctrl",
+   `HotkeyNames`) over a multi-line box; until the model is ready "Getting the speech model ready…" sits inside the empty
+   box, in body text, as a placeholder (1.2 polish, 22/10/2026). The box has the keyboard focus
+   (a hotkey held without clicking first pastes there). A
    dictation goes through the normal path (hotkey listener, controller, pipeline, paste into the focused box); the step
    watches the shell's last dictation (`PersonalService.Last`) and after the first one shows the accent explainer
    ("The Standard model works well…" when the model in use is the Standard choice for its language, else "The model you
@@ -1360,10 +1362,13 @@ hotkey check was shown again before (`// simplification:` in `AppRules.Onboards`
 other CLI modes never open it.
 
 Accessibility and size. Every control has an accessible name; everything is reached by Tab; the step line and the try-later
-line are polite live regions; the folder refusal is an assertive one. The client area is 640 × 420 DIP (resizable, minimum
-480 × 360); text is larger than in the other windows (body 17 px, buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512
-DIP; with the Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, and 420 plus a caption
-of about 32 DIP (recalled) fits. On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`,
-the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
+line are polite live regions; the folder refusal is an assertive one. The client area is 720 × 500 DIP (resizable, minimum
+480 × 360; 640 × 420 until 1.2 polish, 22/10/2026, when the hotkey step's last row sat under the buttons): every step's body
+as built fits it without scrolling. Text is larger than in the other windows (body 17 px on a 25 px line, the theme's 13 on
+19 in proportion, so no last line is clipped; buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512 DIP; with the
+Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, less a caption of about 32 DIP
+(recalled). On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`, the frame's height
+counted) and moved inside it, so on that screen the body scrolls, under a scroll bar that stays visible, and Back and Next
+never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
 
 Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.

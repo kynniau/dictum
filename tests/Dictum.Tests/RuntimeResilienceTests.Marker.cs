@@ -494,7 +494,7 @@ public sealed partial class RuntimeResilienceTests
         File.WriteAllText(speech, "");
         File.WriteAllText(cleanup, "");
         File.WriteAllText(scratch.Paths.SettingsFile,
-            $$"""{ "hotkey": "F24", "whisper": { "model": {{JsonSerializer.Serialize(speech)}} }, "llm": { "provider": "local", "model": {{JsonSerializer.Serialize(cleanup)}} } }""");
+            $$"""{ "hotkey": "F24", "whisper": { "model": {{JsonSerializer.Serialize(speech)}} }, "llm": { "provider": "local", "model": {{JsonSerializer.Serialize(cleanup)}} }, "ui": { "view": "advanced" } }""");
         var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
         var llm = new LocalLlmManager(NullLog.Instance, loader: (p, gpu) =>
             gpu == "cpu" ? new FakeLocalEngine(p) : throw new InvalidOperationException("Failed to load model"), gpuInUse: () => true);

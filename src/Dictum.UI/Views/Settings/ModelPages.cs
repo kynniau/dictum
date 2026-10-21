@@ -45,6 +45,21 @@ internal sealed class ModelsPage : SettingsPage
     // PROPOSED copy (21/10/2026): the Simple | Advanced segments' accessible name ("Models view: Simple"); the rest is in SimpleView.
     internal const string ViewName = "Models view";
 
+    /// <summary>The Language card in the Simple view: no model names (PROPOSED, 1.2 polish, 22/10/2026, the orchestrator's wording).</summary>
+    internal const string LanguageIntroSimple =
+        "Dictum comes with an English-only model. For other languages it downloads a model that understands them; choose the language here.";
+
+    /// <summary>
+    /// The Language card in the Advanced view, as before but for the capital after its semicolon (1.2 polish: "…\".en\" one;
+    /// any of …"; PROPOSED as changed).
+    /// </summary>
+    internal const string LanguageIntroAdvanced =
+        "The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
+        "any of the languages Whisper supports can be chosen, in alphabetical order after English; some languages are not in Whisper's list, so they cannot be chosen.";
+
+    /// <summary>The state shown, as a tag and not a button, on the row of the model in use (1.2 polish: a greyed button read as broken).</summary>
+    internal const string InUseLabel = "In use";
+
     /// <summary>The calibration test's label, as on the tray panel's button that opens the same window.</summary>
     internal const string CalibrateLabel = "Calibrate my voice";
 
@@ -56,7 +71,7 @@ internal sealed class ModelsPage : SettingsPage
     private readonly SettingsWindow _window;
     private readonly StackPanel _speech = new() { Spacing = 8 };
     private readonly StackPanel _cleanup = new() { Spacing = 8 };
-    private readonly TextBox _folder = new() { IsReadOnly = true };
+    private readonly PathBox _folder = new(FolderLabel); // trimmed from the left: the folder's own name stays in view (1.2 polish)
     private readonly Button _useDefault;
     private readonly TextBlock _folderWarning = Ui.Text("", "caption");
     private readonly Button _addCleanup;
@@ -124,7 +139,6 @@ internal sealed class ModelsPage : SettingsPage
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // The recommended clean-up model, through the catalogue's own path (asked first, then downloaded and switched to).
         _addCleanup = Ui.Button("", "primary", () => Run(() => Shell.Models.SelectCleanup(CleanupCatalog.Recommend(Shell.GpuMachine).Model)));
-        AutomationProperties.SetName(_folder, FolderLabel);
         _useDefault = Ui.Button(UseDefaultLabel, "secondary", () => Run(() => Say(Shell.Models.SetModelsFolder(null) ?? "")), name: "Use the default model folder");
         var browse = Ui.Button(BrowseLabel, "secondary", () => Run(BrowseFolder), name: "Browse for a model folder");
         var folderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 8 };
@@ -143,15 +157,17 @@ internal sealed class ModelsPage : SettingsPage
             Ui.Button(SimpleView.OffAdvancedLabel, "secondary", () => Run(Shell.Models.SelectOff)),
             Ui.Button("Choose .gguf file…", "secondary", () => Run(Shell.Models.ChooseCleanupFile)));
         var cloudNote = Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption");
-        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff];
-        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote];
+        var languageSimple = Ui.Text(LanguageIntroSimple);
+        var languageAdvanced = Ui.Text(LanguageIntroAdvanced);
+        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff, languageSimple];
+        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
         Compose(
             Ui.Stack(6, _view, Ui.Text(SimpleView.SwitchHelp, "caption")),
             _download,
             Ui.Card(Ui.Stack(10, speechIntro, explainer, _simpleSpeech, _speech, chooseFile, decoding), "Speech model"),
             Ui.Card(Ui.Stack(10,
-                Ui.Text("The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
-                        "Any of the languages Whisper supports can be chosen, in alphabetical order after English; some languages are not in Whisper's list, so they cannot be chosen."),
+                languageSimple,
+                languageAdvanced,
                 Ui.Line("Spoken language", _language, "Detect automatically works it out from the first seconds of each dictation."),
                 Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
                 _languageNote), "Language"),
@@ -190,7 +206,7 @@ internal sealed class ModelsPage : SettingsPage
         _languageNote.Text = WhisperLanguages.Problem(Shell.Models.CurrentPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
         _languageNote.IsVisible = _languageNote.Text.Length > 0;
         var folder = Shell.ModelsDir;
-        _folder.Text = Shell.RealPath(folder);
+        _folder.Path = Shell.RealPath(folder);
         _useDefault.IsEnabled = Shell.Paths.ChosenModelsDir(s) is not null;
         _folderWarning.Text = FolderWarning(folder) ?? "";
         _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
@@ -375,11 +391,13 @@ internal sealed class ModelsPage : SettingsPage
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
         detailText = Ui.Text(detail, "hint");
         grid.Children.Add(Ui.Stack(2, Ui.Text(title, "body"), detailText));
-        var button = Ui.Button(action ?? "In use", action is null ? "quiet" : "secondary", click, name: name);
-        button.IsEnabled = enabled && action is not null;
-        button.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(button, 1);
-        grid.Children.Add(button);
+        // The model in use has nothing to press: a tag in the link colour (accent, legible in both themes), not a greyed
+        // button that looks broken (1.2 polish, 22/10/2026). It keeps the button's accessible name, "In use".
+        Control trailing = action is null ? Ui.Tag(InUseLabel) : Ui.Button(action, "secondary", click, name: name);
+        if (trailing is Button button) button.IsEnabled = enabled;
+        trailing.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(trailing, 1);
+        grid.Children.Add(trailing);
         return grid;
     }
 }

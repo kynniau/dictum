@@ -176,6 +176,33 @@ public static class SimpleView
     public static TierChoice? TierOf(string model, bool gpuMachine, string language = WhisperLanguages.English, bool translate = false) =>
         Tiers(gpuMachine, language, translate).FirstOrDefault(t => string.Equals(t.Model, model, StringComparison.OrdinalIgnoreCase));
 
+    // PROPOSED copy (1.2 polish, 22/10/2026), for the product owner to approve before release.
+    /// <summary>The tray panel header's clean-up name in the Simple view while the recommended clean-up model does the tidying.</summary>
+    public const string AiCleanupLabel = "AI clean-up";
+
+    /// <summary>A speech model by its Simple name: its tier's label with these settings, else "Custom: name" (the tray panel's header).</summary>
+    public static string SpeechName(string model, bool gpuMachine, string language = WhisperLanguages.English, bool translate = false) =>
+        TierOf(model, gpuMachine, language, translate)?.Label ?? Custom(model);
+
+    /// <summary>
+    /// The clean-up in use by its Simple name (the tray panel's header, 1.2 polish): "Off"; "AI clean-up" while the recommended
+    /// model is chosen and the text is English (no clean-up model runs on any other: TranscriptCleaner.Plain); "Tidy my words"
+    /// for the rest of the Tidy row; "Custom: name" for anything else (<paramref name="currentName"/>, the coordinator's name for it).
+    /// </summary>
+    public static string CleanupName(LlmSettings llm, bool gpuMachine, string language, bool translate, string currentName) =>
+        OffInUse(llm) ? OffLabel
+        : !TidyInUse(llm, gpuMachine) ? Custom(currentName)
+        : llm.Provider == LlmSettings.Local && WhisperLanguages.OutputIsEnglish(language, translate) ? AiCleanupLabel
+        : TidyLabel;
+
+    /// <summary>
+    /// The tray panel's line under Light | Full in the Simple view (PROPOSED, 1.2 polish): the presets by their Simple names,
+    /// "Full: More accurate and AI clean-up. Light: Standard and Tidy my words." The Advanced view keeps the model names.
+    /// </summary>
+    public static string ModeHint(bool gpuMachine, string language, bool translate) =>
+        $"Full: {SpeechName(ModePresets.For(ModePreset.Full, gpuMachine).SpeechModel, gpuMachine, language, translate)} and {AiCleanupLabel}. " +
+        $"Light: {SpeechName(ModePresets.LightSpeech, gpuMachine, language, translate)} and {TidyLabel}.";
+
     /// <summary>The clean-up model "Add AI clean-up" adds, and the Tidy row uses when it is on this PC.</summary>
     public static string TidyModel(bool gpuMachine) => CleanupCatalog.Recommend(gpuMachine).Model;
 

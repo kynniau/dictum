@@ -349,13 +349,33 @@ internal sealed class HelpPage : SettingsPage
         AutomationProperties.SetHelpText(guide, HelpText.GuideNote); // a screen reader says it with the button
         AutomationProperties.SetHelpText(support, HelpText.SupportNote);
         AutomationProperties.SetHelpText(feedback, HelpText.FeedbackNote);
+        var answers = HelpText.Questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)])).ToList();
+        // The questions first, each a link to its answer (1.2 polish, 22/10/2026: one long page with no list of what it answers).
+        var index = Section(HelpText.IndexHeading, [.. HelpText.Questions.Select((q, i) => JumpLink(q.Question, answers[i]))]);
         Compose(
+            index,
             Section(HelpText.MoreHelpHeading, Paragraph(HelpText.GuideNote), Ui.Row(8, guide), Paragraph(HelpText.SupportNote), Paragraph(HelpText.FeedbackNote), Ui.Row(8, support, feedback)),
             Section(HelpText.HowItWorksHeading,
                 Readable(HelpText.HowItWorksHeading, null, [.. HelpText.HowItWorks.Select(Paragraph)]),
                 Readable(HelpText.AccuracyHeading, Heading(HelpText.AccuracyHeading, 3, 15), [.. HelpText.Accuracy.Select(Paragraph)])),
-            Section(HelpText.QuestionsHeading, [.. HelpText.Questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)]))]));
+            Section(HelpText.QuestionsHeading, [.. answers]));
         if (Content is Panel { Children: [TextBlock title, ..] }) AutomationProperties.SetHeadingLevel(title, 1); // the page title Compose put first
+    }
+
+    /// <summary>
+    /// A question in the list at the top: a link button (a tab stop with the theme's focus ring) whose label wraps, so a long
+    /// question stays inside a narrow window. Pressing it moves keyboard focus to the answer, which scrolls it into view and,
+    /// as with Tab, shows its ring.
+    /// </summary>
+    private static Button JumpLink(string question, Border answer)
+    {
+        var link = Ui.Button("", "link", () => answer.Focus(NavigationMethod.Tab));
+        link.Content = new TextBlock { Text = question, TextWrapping = TextWrapping.Wrap, FontSize = 14 };
+        link.HorizontalContentAlignment = HorizontalAlignment.Left;
+        link.HorizontalAlignment = HorizontalAlignment.Left;
+        AutomationProperties.SetName(link, question);
+        AutomationProperties.SetHelpText(link, HelpText.IndexLinkHelp);
+        return link;
     }
 
     /// <summary>Nothing on the page depends on the settings.</summary>

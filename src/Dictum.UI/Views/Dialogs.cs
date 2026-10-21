@@ -157,7 +157,8 @@ internal static class HotkeyCheck
         "receives, and the light comes on while the key is held. Press a different key, or a mouse button other than the left " +
         "one, to choose it instead.";
 
-    public const string MacNote = "On a Mac over Remote Desktop use the right Option key (RightAlt) or right Command (RightWin).";
+    /// <summary>The keys by the names the box shows them (HotkeyNames: "Right Alt"; until 1.2 polish, 22/10/2026, the settings tokens). PROPOSED.</summary>
+    public const string MacNote = "On a Mac over Remote Desktop use the right Option key (Right Alt) or right Command (Right Win).";
 
     public const string UseLabel = "Use this hotkey";
 

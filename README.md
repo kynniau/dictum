@@ -86,7 +86,9 @@ rings and the spinner do not move and nothing fades.
 Click the Dictum icon in the notification area (or select it and press Enter): a panel opens beside it
 (docs/design/Flyout.dc.html). A click anywhere else, Esc, or another click on the icon closes it.
 
-- **Status**: the models in use with their runtimes and the hotkey, a coloured state (Ready, Recording, Working,
+- **Status**: the models in use with their runtimes and the hotkey (in the Simple view, the plain names instead: for
+  example "Standard · Tidy my words · Right Ctrl", with "AI clean-up" or "Off" for the clean-up; keys are shown by name,
+  "Right Ctrl", while settings.json keeps `RightCtrl`), a coloured state (Ready, Recording, Working,
   Loading, Downloading, No model, Error, Off) and the **Dictation on** switch (saved as `enabled`).
 - **A model problem**, under the status when there is one: why a model could not load (in plain words for a missing
   Visual C++ runtime, else the engine's own message), or that it runs on the CPU because the graphics driver could not
@@ -101,6 +103,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   time; cancelling deletes the partial file and drops any download waiting behind it. A dropped connection is resumed
   automatically (see "Model downloads and checks").
 - **Mode**: **Light** | **Full** (see "Mode presets"); neither is selected when settings.json matches neither (Custom).
+  The line under it names the presets' models; in the Simple view by their plain names ("Full: More accurate and AI
+  clean-up. Light: Standard and Tidy my words.").
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
   (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;
   choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy** and **Off (paste what was heard)**.
@@ -108,7 +112,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   accurate** and **Most accurate** for speech, and **Tidy my words** (with **Add AI clean-up** while the rule-based
   tidy is in use and the text is English) and **Off** for clean-up, with the same download marks; a model chosen in the Advanced view shows as
   "Custom: <name>". The Advanced view shows the model names as above.
-- **Microphone** picker (System default, or a named device: `audio.device`) and a level meter that moves while you
+- **Microphone** picker (System default, or a named device: `audio.device`; "No microphone found" when Windows lists
+  none, and then the no-microphone sentence shows under the status) and a level meter that moves while you
   dictate.
 - **Big recording indicator** (Off | Orb | Edge | Both), **Profanity filter** (on = Mask; Remove is in Settings >
   Clean-up), **Grammar assist**, **Start and stop sounds** (`sounds.enabled`, off by default).
@@ -145,7 +150,8 @@ The windows follow Windows' light or dark setting.
 
 Help is in two places:
 
-- **In the app**, with no internet needed: Settings > Help, or **Help** in the tray panel. It explains how Dictum works in
+- **In the app**, with no internet needed: Settings > Help, or **Help** in the tray panel. It opens with a list of its
+  questions; each is a link (Tab reaches it) that moves to its answer further down. It explains how Dictum works in
   plain words (hold the key, speak, let go; your voice becomes text on this PC; the tidy; the paste; why some people are
   heard better than others) and answers the common questions: where your voice goes, wrong words, "Mic error", a Dictum
   that closes at start, changing the key, stopping, which programs it types into, model files and sizes, removing
@@ -208,8 +214,8 @@ key, so the default `RightCtrl` never fires there. **On a Mac over Remote Deskto
 `CapsLock` and the F-keys. Fn never reaches Windows (above).
 
 To see what Windows actually receives, use the **Press your hotkey** box (Settings > General, and the Welcome to Dictum window at first run): press
-**Change…**, then the key or mouse button. The box names exactly what arrived, with its side ("RightAlt (right side)
-down", "Mouse5 down"), and its **Hold to test** light is on for as long as the chosen key is held; a key that never
+**Change…**, then the key or mouse button. The box names exactly what arrived, by the key's name, which says its side ("Right Alt
+down", "Mouse 5 down"), and its **Hold to test** light is on for as long as the chosen key is held; a key that never
 arrives is obvious in seconds. While the box listens, both hotkeys are paused, so testing does not start a dictation.
 Settings > General has a second box of the same kind for the **Fix last dictation** hotkey: press **Change…**, press the
 key or button, then **Use for Fix last dictation**; **Turn off** removes it. Only one box listens at a time. Tab, and
@@ -676,7 +682,9 @@ Dictum looks for a model, speech (`.bin`) or clean-up (`.gguf`), in three folder
 copy whose size matches the catalogue:
 
 1. **The folder you choose** (`models.folder`): Settings > Models > **Model folder** > **Browse…**, for example a
-   folder on another drive when C: is short of space. Downloads go here.
+   folder on another drive when C: is short of space. Downloads go here. The box shows the end of a long path (the
+   start is cut, "…\Dictum\models"); the whole path is its tooltip, which keyboard focus opens too. **Browse…** starts
+   in that folder, or the nearest folder above it that exists (the default one is made by the first download).
 2. **Your own folder**, `%LOCALAPPDATA%\Dictum\models`. Downloads go here while no folder is chosen (**Use default**).
 3. **The models that come with Dictum**: the `models` folder beside `Dictum.exe` (inside the package for the Store
    build), which holds `base.en`. Dictum never downloads into it, changes it or deletes anything in it, and it cannot be
@@ -990,7 +998,8 @@ entries. It does not train or change the model.* Nothing is uploaded and it work
    few names that come back in more than one sentence; shipped as `calibration-sentences.txt` beside `Dictum.exe`).
    Recordings are kept in `%LOCALAPPDATA%\Dictum\calibration` (with `takes.txt`, which notes the sentence each one was
    recorded for, so a reworded sentence after an upgrade asks to be recorded again) so you can re-run the test after
-   adding a model; **Delete recordings** removes them all, including any left by a save that failed. A take stops by
+   adding a model (the window does not print that path, which names your Windows account: **Open the recordings folder**
+   opens it); **Delete recordings** removes them all, including any left by a save that failed. A take stops by
    itself after 30 s and is discarded (each sentence takes about 5–10 s), and one whose microphone fails is discarded
    too; either way the row says to record it again.
 2. **Run test** (not while a take is being recorded): every installed speech model transcribes every recording twice,
