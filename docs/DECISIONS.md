@@ -4092,6 +4092,11 @@ Not pinned:
 - The measurements use Avalonia's headless platform with Skia and this host's system fonts (Segoe UI Variable). A desktop at another scale, or a PC without that font, may set the lines differently.
 - A new Sandbox recording would confirm all six items on screen.
 
+## Polish pins (22/10/2026, branch fix/polish-pins)
+
+- The transient models lines (a model still loading, a download pending, an error, with the longest runtime and key names) trim by design at the panel's 380 px: one line, an ellipsis, the whole line in its tooltip and its accessible name (lens finding 1 on PR #39). `Polish2Tests.A_transient_header_line_that_is_too_long_is_trimmed_whole_in_its_tooltip` pins five of them as expected-trimmed; the steady-state lines stay pinned as whole. No wording changed.
+- `CalibrationWindow.Toggle`'s `CheckMicrophone()` guard (the hotkey starts a take even though Record is disabled) is pinned: `Calibration_hotkey_with_no_microphone_starts_no_take`.
+
 ## Release 1.2.0 prepared (22/10/2026)
 
 Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOSED until the owner approves it. `site/version.json` is not touched (set at release time) and no tag is created.
