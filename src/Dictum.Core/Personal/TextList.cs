@@ -75,7 +75,7 @@ public static class WholeWords
 
     /// <summary>
     /// Part of a word, for the checks that walk a word one character at a time (the Fix-last diff, the profanity mask and
-    /// removal): a letter, a digit, or a combining mark such as a Devanagari vowel sign, virama or anusvara ("काम" is not
+    /// removal): a letter, a digit, or a combining mark such as a vowel sign, virama or anusvara ("काम" is not
     /// "कम"; "हैं" is not "है").
     /// </summary>
     public static bool IsWordChar(char c) =>
@@ -96,8 +96,8 @@ public static class WholeWords
 public static class SentenceStart
 {
     /// <summary>
-    /// A mark that ends a sentence: . ! ? … and the Devanagari danda । and double danda ॥, which end a sentence in Hindi
-    /// dictation (orchestrator, 16/10/2026: the languages lens found "वह कमीना।" filtered to "वह ।").
+    /// A mark that ends a sentence: . ! ? … and the danda । and double danda ॥, which end a sentence in scripts whose
+    /// sentence marks differ from English (orchestrator, 16/10/2026: the languages lens found "वह कमीना।" filtered to "वह ।").
     /// </summary>
     public static bool IsEndMark(char c) => c is '.' or '!' or '?' or '…' or '।' or '॥';
 

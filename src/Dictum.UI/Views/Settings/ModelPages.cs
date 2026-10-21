@@ -124,7 +124,7 @@ internal sealed class ModelsPage : SettingsPage
                 Ui.Line("Decoding", _decoding, "Beam search tries several readings of each phrase.")), "Speech model"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
-                        "Hindi, Tagalog and other languages are listed first. Whisper has no Cebuano or other Philippine language apart from Tagalog."),
+                        "Any of the languages Whisper supports can be chosen, in alphabetical order after English; some languages are not in Whisper's list, so they cannot be chosen."),
                 Ui.Line("Spoken language", _language, "Detect automatically works it out from the first seconds of each dictation."),
                 Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
                 _languageNote), "Language"),

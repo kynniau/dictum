@@ -184,7 +184,7 @@ public class ProfanityFilterTests
     }
 
     /// <summary>
-    /// The Devanagari danda and double danda end a sentence like a full stop (orchestrator, 16/10/2026: the languages lens
+    /// The danda and double danda end a sentence like a full stop (orchestrator, 16/10/2026: the languages lens
     /// found "वह कमीना।" filtered to "वह ।"). A one-word list, as an override profanity.txt would give.
     /// </summary>
     [Theory]

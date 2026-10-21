@@ -1074,8 +1074,7 @@ without the matcher, so the first pin drives the matcher and the state machine d
 - Built from main in its own worktree while `feature/mouse-hotkey-snippets` was under review in the main tree, so the two
   lanes never edited one file at the same time. Merge order is Kyle's call; both touch README.md, docs/SPEC.md and this
   file only in separate sections.
-- Facts, all fetched 16/10/2026 and recorded in SPEC §23: Whisper's 100-language table (Hindi and Tagalog in, Cebuano and
-  Filipino out), the README's words on the turbo model and translation, Whisper.net 1.9.1's `WithTranslate` and
+- Facts, all fetched 16/10/2026 and recorded in SPEC §23: Whisper's 100-language table (some languages are not in it, so they cannot be chosen), the README's words on the turbo model and translation, Whisper.net 1.9.1's `WithTranslate` and
   `WithLanguageDetection` (its XML docs in the NuGet cache), and the HF API tree at the pinned commit for the six
   multilingual files (controls: small.en, medium.en, large-v3-turbo and its q5_0 matched the catalogue byte for byte).
 - One guard function rather than scattered checks: `WhisperLanguages.Problem(model, language, translate)` is the only
@@ -1088,13 +1087,13 @@ without the matcher, so the first pin drives the matcher and the state machine d
   out that a reload of large-v3 (3.1 GB plus the warm-up) leaves `IsReady` false and the hotkey dead meanwhile, that the
   extra reload rule and the trailing optional `translate` parameter were a second mechanism for something the decoder
   rebuild already does, and that calibration inheriting the dictation language would score English sentences decoded
-  as Hindi. With the options in `DecodeOptions`, calibration's own `DecodeOptions(prompt, beam)` is English by
+  as another language. With the options in `DecodeOptions`, calibration's own `DecodeOptions(prompt, beam)` is English by
   construction, so the calibration notes were retired.
 - The clean-up is skipped (`TranscriptCleaner.Plain`, whitespace only) whenever the output is not English: the rules
-  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on Hindi or
+  capitalise a standalone "i" (Polish "and") and the prompt asks for Australian English, so running either on Spanish or
   Polish text would change it. Corrections and the profanity filter still run; they are whole-word matches the user
   wrote. Status "skipped: …" is visible in About and `--selftest`.
-- Combining marks are part of a word (lens, 16/10/2026). A Devanagari vowel sign, virama or anusvara is a combining mark
+- Combining marks are part of a word (lens, 16/10/2026). A vowel sign, virama or anusvara is a combining mark
   (`\p{M}`), not a letter, so the shared whole-word matcher (`WholeWords`: corrections, snippets, the profanity list)
   treated it as a word boundary: `राम => श्याम` turned "विराम" into "विश्याम", a snippet on "कम" fired inside "कमाओ", Fix
   last suggested nothing for "कम" to "काम" or "है" to "हैं", and mask wrote "क*ीना". The matcher's look-arounds now count
@@ -1114,7 +1113,7 @@ without the matcher, so the first pin drives the matcher and the state machine d
 - The Mode presets were left on English-only models (no multilingual twin of Light/Full), because choosing which
   multilingual model a preset should write needs measurements on the staff's actual machines that do not exist yet.
   The Mode page's note is computed per preset from the one guard (`WhisperLanguages.ModeNote`): on a GPU, Full writes
-  large-v3-turbo, which hears Hindi, so only Light is named unless translation is on.
+  large-v3-turbo, which hears every language, so only Light is named unless translation is on.
 - Every speech-model load passes through `ModelCoordinator.BeginSpeechLoad`, which shows a warning balloon (and still
   loads) when the model cannot do what the language settings ask: the Settings page refuses only its own two controls,
   and a model chosen from the tray picker, a Mode preset, Choose file, calibration's Use this or a hand edit used to
@@ -1125,16 +1124,16 @@ without the matcher, so the first pin drives the matcher and the state machine d
 - Observed with the first cut (the small.en runs below): an English-only model given `translate: true` or
   `language: auto` loads and transcribes English after the guard's warning, so whisper.cpp proceeds rather than fails;
   the combination is now refused in Settings and `--selftest`, and ballooned on every other path.
-- Recalled, not verified: whisper's handling of code-switched speech (Hinglish) under a fixed language (the README now
+- Recalled, not verified: whisper's handling of code-switched speech (two languages in one sentence) under a fixed language (the README now
   says "not tested here"); CPU timings for the multilingual `medium` (the README table has only the `.en` twins).
 - Not updated on this branch, for Kyle to settle before the Store submission: docs/STORE.md says "Dictum dictates in
   English" (and its Policy 10.1 row), and site/index.html says "English dictation." Both are outward-facing copy.
-- Not measured here: no Hindi or Tagalog audio was available in this session. Kyle will test with staff recordings;
+- Not measured here: no audio in the target languages was available in this session. The owner tests with real recordings;
   that result decides whether translation or accented English with a larger model reads better.
 - Observed 16/10/2026 with the published build from this worktree (`dist\Dictum\Dictum.exe`, scratch APPDATA,
   LOCALAPPDATA and `--config`):
-  - `--selftest` with `small.en` + `language: hi` prints `language hi (Hindi): small.en is an English-only model … [FAIL]`;
-    with `medium` + `hi` + `translate: true` it prints `language hi (Hindi), translating to English [OK]` (the model file
+  - `--selftest` with `small.en` + `language: es` prints `language es (Spanish): small.en is an English-only model … [FAIL]`;
+    with `medium` + `es` + `translate: true` it prints `language es (Spanish), translating to English [OK]` (the model file
     was absent in the scratch profile, so that line failed as expected).
   - `--transcribe` of a 6.37 s synthesised English clip on `ggml-small.en.bin` with `translate: true` and again with
     `language: auto`: both loaded (log "loaded … (language en (English), translating to English, greedy)" and "(language
@@ -1142,10 +1141,10 @@ without the matcher, so the first pin drives the matcher and the state machine d
     correctly; so `WithTranslate` and `WithLanguageDetection` on an English-only model warn rather than fail. 9.5 s and
     13.2 s per clip on Vulkan here, first use of the runtime in each fresh process (shader compilation, see the polish
     lane), not a figure for the feature.
-  - No Hindi or Tagalog audio was available: translation quality is unmeasured and is Kyle's test.
+  - No audio in the target languages was available: translation quality is unmeasured and is the owner's test.
 - After the lens round (16/10/2026, same day): build 0 warnings, 0 errors; 743 tests, 725 passed, 18 skipped, 0 failed
-  (the orchestrator's own run, not the lane's report). The re-published build's `--selftest` prints `language hi (Hindi),
-  translating to English [OK]` for medium + hi + translate, and for small.en + hi without translate the `language` line
+  (the orchestrator's own run, not the lane's report). The re-published build's `--selftest` prints `language es (Spanish),
+  translating to English [OK]` for medium + es + translate, and for small.en + es without translate the `language` line
   fails with the English-only reason and the `cleanup` line reads "skipped: the text is not English … whitespace tidied
   only".
 - Rebased onto main 79bffb7 on 16/10/2026, after #1 (mouse hotkeys, snippets), #3 (cloud presets, one key per service),
@@ -1159,7 +1158,7 @@ without the matcher, so the first pin drives the matcher and the state machine d
   after any other, so SPEC §23 and the README now name them beside corrections and the profanity filter. The README's
   settings row for `whisper.language` said a change reloads the model; it rebuilds the decoder, as the section above it
   says, and the row now says so.
-- A new test pins `--transcribe`'s language rule (`CliCommands.Cleaner`: plain for Hindi without translation, the model
+- A new test pins `--transcribe`'s language rule (`CliCommands.Cleaner`: plain for Spanish without translation, the model
   and the dictionary-term check with it). Observed failing with `englishText` removed from `CliCommands.Cleaner`; the two
   Models-page tests failed with it removed from `AppShell.Config`; the new test and the plain-text test failed with the
   constructor's `_plain = plain` removed. Full suite on the rebased head (this lane's run): build 0 warnings, 0 errors;
@@ -1247,8 +1246,8 @@ floor and the carried-word count each sit under a `// simplification:` note with
   in: the tidy's own token-by-token capitalisation (`DeterministicCleaner.Capitalise`), a different shape and a pinned
   table of its own; and `CorrectionSuggestions.Edge`, the characters trimmed from a suggested correction's ends, which
   is not a sentence rule and is left for its own follow-up (it lacks …, the dandas, « » and [ ]).
-- **The danda ends a sentence** (orchestrator, 16/10/2026, for Hindi dictation from the languages PR): the marks are
-  `SentenceStart.IsEndMark`: . ! ? … and the Devanagari danda । (U+0964) and double danda ॥ (U+0965). The profanity
+- **The danda ends a sentence** (orchestrator, 16/10/2026, for scripts whose sentence marks differ from English, from the languages PR): the marks are
+  `SentenceStart.IsEndMark`: . ! ? … and the danda । (U+0964) and double danda ॥ (U+0965). The profanity
   filter's remove mode reads the same marks after a removed word, so "वह कमीना।" becomes "वह।" (the languages lens saw
   "वह ।", a space left before the danda, while "It's shit." gave "It's.") and a word that was a sentence of its own takes
   its danda with it. English pins unchanged; aligned with it, an ellipsis after a removed word now behaves like a full
@@ -1289,7 +1288,7 @@ part, so parts end at sentence ends more often, at the cost of later feedback.
 | 7 | Minor | SPEC was cited but not amended | SPEC §3, §7, §9, §20, §22; this section | — |
 | 7b | Minor | The rule-based tidy closes nearly every part | README corrected; options above | existing pin (`Parts_are_typed_in_order…`) |
 | 8 | Minor | Fix last holds the last part | Kept and documented | existing pin (`Remembered.Last()`) |
-| 9 | Minor | Three sentence-boundary checks | `SentenceStart`, with the dandas (orchestrator addition) | rows per caller, Hindi rows |
+| 9 | Minor | Three sentence-boundary checks | `SentenceStart`, with the dandas (orchestrator addition) | rows per caller, danda rows |
 | 10 | Minor | "Within 20 dB" | About 24 dB, recomputed | the 24 dB pin |
 | 11 | Minor | A dead `CaptureFailed` branch | Deleted | P5 |
 
@@ -1342,12 +1341,12 @@ main's and this branch's together (main renamed one of the old ones, now `Every_
 Two changes after the rebase:
 
 - **Text that is not English keeps its case where parts join.** The plain clean-up leaves such text exactly as whisper
-  wrote it (SPEC §23), but the boundary rule re-cased each part's first letter: a Tagalog "Maynila" after a part with
-  no sentence end was typed "maynila", and a small letter after a sentence end was capitalised. `SegmentJoin.Join`
-  takes `keepCase` and the pipeline passes the cleaner's `IsPlain`; the separator rules are unchanged. A Devanagari
-  part, or a small letter after a part with no sentence end, comes out the same with or without the rule (Devanagari
-  has no case, and carrying on only lowers a capital), so the pins use a capital after no sentence end and a small
-  letter after one; the Devanagari rows document the behaviour.
+  wrote it (SPEC §23), but the boundary rule re-cased each part's first letter: a capitalised place name after a part with
+  no sentence end was typed in lower case, and a small letter after a sentence end was capitalised. `SegmentJoin.Join`
+  takes `keepCase` and the pipeline passes the cleaner's `IsPlain`; the separator rules are unchanged. A part
+  in a script without case, or a small letter after a part with no sentence end, comes out the same with or without the
+  rule (such a script has no case, and carrying on only lowers a capital), so the pins use a capital after no sentence
+  end and a small letter after one; the rows in that script document the behaviour.
 - **README, Privacy:** the cloud row and "Optional cloud polish" say that in hands-free the system prompt also carries
   up to 10 words of what the last part said (taken before corrections, the profanity filter and snippets). The consent
   dialog's copy is unchanged: it says every dictation's text is sent.
@@ -1860,8 +1859,8 @@ Not run: the installer, the Store package build, Windows Sandbox, a release buil
 
 ## Model folder and the bundled base.en (17/10/2026, branch feature/model-folder-bundled)
 
-Decisions 15 and 16 (product owner, 16-17/10/2026). Offshore staff use shared Azure virtual desktops with no GPU and little
-space on C:, and the Store resubmission should need no download to test.
+Decisions 15 and 16 (product owner, 16-17/10/2026). Staff on shared virtual desktops with no GPU have little
+space on the system drive, and the Store resubmission should need no download to test.
 
 - **Decision 15: a user can nominate another drive or folder for the models.** `models.folder` in settings.json, written by
   Settings > Models > Model folder (Browse…, Use default). An absolute folder or empty; a relative or invalid value falls
@@ -2843,3 +2842,23 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 - The first-run probe fix end to end in the tray (it is pinned through `FirstRun` with a stand-in probe).
 - The duplicate-folder mechanics inside Whisper.net.
 - CI's first run of the new step, including whether `--selftest` behaves on a runner without audio devices or a desktop.
+
+## Public copy is language-neutral (21/10/2026, branch fix/language-neutral)
+
+- **The rule (product owner, 21/10/2026):** Dictum is going out worldwide, and everything in this repository, the GitHub
+  pull-request descriptions and the Store listing is public. Public copy names no specific languages or regions tied to the
+  owner's team. It says "any of the languages Whisper supports" and points to the list in the app (Settings > Models >
+  Language); where an absence has to be mentioned it says "some languages are not in Whisper's list, so they cannot be
+  chosen" and never names the absent language. Technical examples use language codes that belong to nobody's team (`es`, `de`,
+  `ja`).
+- **Applied to:** the README language section, SPEC §16 and §23 to §24 (the "Asked for" sentences are now purpose
+  statements), the earlier entries of this file (their substance is kept, entries are not deleted), the site's roadmap card,
+  the Settings > Models > Language text, code comments and the tests' example languages.
+- **Language picker order (SPEC §23):** `auto`, English, then every other language alphabetically by its English name. No
+  language is featured any more, so `WhisperLanguages.Featured` is gone and the picker needs no list to maintain.
+- **Pins:** `LanguageTests.The_picker_lists_auto_then_english_then_every_other_language_alphabetically_by_name`, and
+  `PublicCopyNeutralityTests`, a sweep of every text file in the repository for the words (spelled in pieces in the test, so
+  the test does not contain them). The one allowance is Whisper's own language table in `WhisperLanguages.cs`, whose
+  `("code", "Name")` entries list all 100 languages alike.
+- **Limits:** commit messages and the merged history cannot be rewritten (no force-push), so earlier commits keep their
+  wording. The pull-request descriptions were edited instead.
