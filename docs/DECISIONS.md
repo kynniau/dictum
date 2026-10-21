@@ -3345,3 +3345,25 @@ The lens returned Needs changes with three minors and no change to src behaviour
   `If Dictum cannot find a microphone at all, it says: <NoSoundText.NoMicrophoneBalloon>`. The bullet checks that were there stay below them.
   Pins: the "labels the help names exist in the app" pin now includes "No sound from mic" (the help copy and the pill constant), and
   `The_mic_help_answer_quotes_the_no_sound_message_from_the_same_constants`.
+
+### Lens fixes (21/10/2026), re-lens on 4dc2ad7: the hotkey comes out of the support email
+
+**The finding (Major, privacy and disclosure).** Report a problem and Email support sent `Status.Models` as the "Models:" line, and
+`Status.Models` is the header line: `{speech} · {runtime} · {clean-up} · {hotkey}` (the raw `hotkey` text if it does not parse). The copy
+says only the version and the models go in (`HelpText.SupportNote`, this file's Report a problem entry, SPEC, README). **The email never
+carried the hotkey by design; main had sent it since Report a problem shipped; fixed 21/10/2026.** Decision: the hotkey comes out of the
+email and the copy stays as it is.
+
+**The fix, in one place.** `AppShell.ModelsLine` (speech · runtime · clean-up, no hotkey) is now what the header builds on
+(`Status.Models` = `ModelsLine` + ` · ` + the hotkey) and what `ReportProblem` passes to `SupportMail.ReportUri`. Callers of
+`Status.Models` checked first: the tray panel (`FlyoutWindow`) and About's runtime line keep the full header, hotkey included; only the email
+loses it. The runtime wording was lifted into one private helper (`HeaderRuntime`) used by both.
+
+**Pins.** `Email_support_opens_the_report_email_with_the_version_and_models_and_nothing_private` and ShellTests' Report a problem pin now
+refuse the hotkey: the test text "F24" and the key as the header actually shows it. (A scratch shell is not started, so it shows its default,
+`RightCtrl`, not the `F24` in its settings file: the pins use the header's own last segment, not just "F24", or they would pass without
+testing anything.) `The_header_keeps_the_hotkey_and_the_support_models_line_does_not` pins that the header still ends with the key and that
+`ModelsLine` is the header without it. The sample models line in the Report-link pin no longer has a hotkey.
+
+**Mutation.** `ReportProblem` put back to pass `Status.Models` (the hotkey back in the email line): **observed failing**: the Email support pin and
+ShellTests' Report a problem pin. Restored.

@@ -362,7 +362,7 @@ public sealed partial class AppShell
     /// SPEC §22 "Report a problem": a prefilled email to the support address (the user's own mail app sends it, or not).
     /// Nothing is sent by Dictum; no dictation text is included.
     /// </summary>
-    public void ReportProblem() => Platform.Open(Help.SupportMail.ReportUri(AppVersion, Platform.Name, Status.Models));
+    public void ReportProblem() => Platform.Open(Help.SupportMail.ReportUri(AppVersion, Platform.Name, ModelsLine));
 
     /// <summary>
     /// Settings → Help → "Send feedback or suggest a feature" (lane F): a new email to the support address in the user's own mail

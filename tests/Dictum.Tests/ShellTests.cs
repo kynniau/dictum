@@ -150,6 +150,7 @@ public class ShellTests
         Assert.Contains("problem%20report", uri);
         Assert.Contains("Test", Uri.UnescapeDataString(uri)); // the platform, so the report says where it happened
         Assert.DoesNotContain("secret", Uri.UnescapeDataString(uri));
+        Assert.DoesNotContain(shell.Status.Models.Split(" · ")[^1], Uri.UnescapeDataString(uri)); // the hotkey (as the header shows it) is not part of "version and models"
         shell.Dispose();
     });
 }

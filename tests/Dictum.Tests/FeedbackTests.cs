@@ -159,7 +159,8 @@ public class FeedbackTests
         Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20", uri);
         Assert.Contains("problem%20report", uri);
         Assert.Matches(@"Dictum \d+\.\d+\.\d+ on Test\nModels: [^\n]+", body); // the version and the models line, as Report a problem fills them
-        foreach (var private1 in new[] { ContextSentinel, "Acme", "Citizen", "Zorblaxquintet", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile })
+        var hotkey = shell.Status.Models.Split(" · ")[^1]; // the key as the header shows it: the email must not carry it
+        foreach (var private1 in new[] { "F24", hotkey, ContextSentinel, "Acme", "Citizen", "Zorblaxquintet", scratch.Root.Name, scratch.Paths.ConfigDir, scratch.Paths.DefaultModelsDir, scratch.Paths.DictionaryFile })
             Assert.DoesNotContain(private1, body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Dictum sends nothing by itself", HelpText.SupportNote);
         Assert.Contains("version of Dictum and the models", HelpText.SupportNote);
@@ -196,10 +197,10 @@ public class FeedbackTests
     [Fact]
     public void Report_a_problem_still_builds_the_link_it_built_before_the_builder_was_shared()
     {
-        var body = "What happened (and what you expected):\n\n\nDictum 1.2.0 on Windows\nModels: base.en · Vulkan · rules · F24\n\n" +
+        var body = "What happened (and what you expected):\n\n\nDictum 1.2.0 on Windows\nModels: base.en · Vulkan · rules\n\n" +
                    "To report text Dictum produced that should not have been there, describe it here; nothing is attached automatically.";
         Assert.Equal($"mailto:hello@kynni.com.au?subject={Uri.EscapeDataString("Dictum 1.2.0: problem report")}&body={Uri.EscapeDataString(body)}",
-            SupportMail.ReportUri("1.2.0", "Windows", "base.en · Vulkan · rules · F24"));
+            SupportMail.ReportUri("1.2.0", "Windows", "base.en · Vulkan · rules"));
     }
 
     [Fact]
@@ -255,6 +256,18 @@ public class FeedbackTests
         Assert.Contains(answer, p => p.Contains(Dictum.Core.NoSoundText.NoMicrophoneBalloon));
         Assert.Contains(Dictum.Core.NoSoundText.Pill, HelpText.Questions.Single(q => q.Question.Contains("Mic error")).Question);
     }
+
+    [Fact]
+    public Task The_header_keeps_the_hotkey_and_the_support_models_line_does_not() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var hotkey = shell.Status.Models.Split(" · ")[^1]; // the key as the header shows it (this unstarted shell has its default, not the file's F24)
+        Assert.False(string.IsNullOrWhiteSpace(hotkey));
+        Assert.Equal(shell.Status.Models, shell.ModelsLine + " · " + hotkey); // the header and the tray panel still show the key
+        Assert.DoesNotContain(hotkey, shell.ModelsLine);
+        shell.Dispose();
+    });
 
     [Fact]
     public void The_feedback_note_says_build_so_Windows_11_users_are_not_confused()
