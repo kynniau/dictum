@@ -1,7 +1,7 @@
 {
   "name": "install",
   "title": "Install Dictum",
-  "summary": "From the downloaded Setup file to Dictum's first window. The Setup copy is marked as downloaded from the internet (Zone.Identifier), as a browser leaves it.",
+  "summary": "From the downloaded Setup file to Dictum's welcome window (1.2: the six-step welcome replaces the first-run dialogs). The Setup copy is marked as downloaded from the internet (Zone.Identifier), as a browser leaves it.",
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "copyDownloaded", "from": "{setup}", "to": "%USERPROFILE%\\Downloads" },
@@ -14,7 +14,11 @@
       "caption": "Open your Downloads folder. Double-click Dictum-Setup.",
       "do": [
         { "do": "doubleClick", "target": { "window": "^Downloads", "type": "ListItem", "name": "Dictum-Setup", "match": "prefix" } },
-        { "do": "waitFor", "optional": true, "target": { "windowClass": "ApplicationFrameWindow", "type": "Button", "name": "^(More info|Run|Don't run)$", "match": "regex", "timeout": 12 } }
+        {
+          "do": "waitFor",
+          "optional": true,
+          "target": { "windowClass": "ApplicationFrameWindow", "type": "Button", "name": "^(More info|Run|Don't run)$", "match": "regex", "timeout": 12 }
+        }
       ]
     },
     {
@@ -57,9 +61,9 @@
     },
     {
       "id": "started",
-      "caption": "Dictum is installed and starts. First it asks about your hotkey.",
+      "caption": "Dictum starts and welcomes you. A few short steps set it up.",
+      "do": [ { "do": "point", "target": { "window": "^Welcome to Dictum$", "type": "Text", "name": "How Dictum works", "timeout": 90 } } ],
       "poster": true,
-      "do": [ { "do": "point", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 90 } } ],
       "after": 3
     }
   ]

@@ -1,7 +1,8 @@
 {
   "name": "first-run",
   "title": "Start Dictum for the first time",
-  "summary": "Open Dictum from Start, keep the suggested hotkey, and find Dictum's icon by the clock.",
+  "summary": "Open Dictum from Start and go through the six-step welcome (1.2): how it works, where the model files go, the speech model, the hotkey, the microphone test and Try it. The test PC has no microphone, so the microphone step shows what Dictum says when it finds none, and nothing can be dictated on the Try it step.",
+  "pace": { "lead": 2.5 },
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "installSilently" }
@@ -10,6 +11,7 @@
     {
       "id": "start",
       "caption": "Click the Start button.",
+      "lead": 2,
       "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "automationId": "StartButton" } } ]
     },
     {
@@ -21,42 +23,101 @@
     {
       "id": "enter",
       "caption": "Press Enter to open it.",
+      "lead": 2,
       "do": [ { "do": "key", "keys": "Enter" } ],
       "after": 2.5
     },
     {
+      "id": "welcome",
+      "caption": "Dictum explains how it works. Click Next.",
+      "lead": 3.5,
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } } ]
+    },
+    {
+      "id": "folder",
+      "caption": "Dictum suggests where to keep its files. Click Next to use that folder.",
+      "lead": 3,
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } } ]
+    },
+    {
+      "id": "speech",
+      "caption": "The speech model comes with Dictum and is ready. Click Next.",
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } } ]
+    },
+    {
       "id": "hotkey",
-      "caption": "Dictum asks which key you hold while you speak. Right Ctrl is already chosen.",
-      "do": [ { "do": "point", "target": { "window": "Check your hotkey$", "type": "Text", "name": "RightCtrl", "timeout": 120 } } ],
+      "caption": "This is the key you hold while you speak. Right Ctrl is already chosen.",
+      "do": [ { "do": "point", "target": { "window": "^Welcome to Dictum$", "type": "Text", "name": "RightCtrl", "timeout": 30 } } ],
+      "after": 2
+    },
+    {
+      "id": "use-hotkey",
+      "caption": "Click Use this hotkey.",
+      "lead": 2,
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Use this hotkey" } } ]
+    },
+    {
+      "id": "mic",
+      "caption": "Dictum tests your microphone. This test PC has none, so it says so.",
+      "do": [
+        {
+          "do": "point",
+          "target": {
+            "window": "^Welcome to Dictum$",
+            "type": "Text",
+            "name": "^(No microphone found|Nothing heard|The microphone could not be opened|Say a few words)",
+            "match": "regex",
+            "timeout": 30
+          }
+        }
+      ],
       "after": 2.5
     },
     {
-      "id": "use",
-      "caption": "Click Use this hotkey.",
-      "do": [ { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey" } } ],
-      "after": 4
+      "id": "mic-next",
+      "caption": "With a microphone, say a few words first. Then click Next.",
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } } ]
+    },
+    {
+      "id": "try",
+      "caption": "Last, try it: click in the box, hold Right Ctrl, say a sentence, let go.",
+      "lead": 3,
+      "do": [
+        { "do": "point", "target": { "window": "^Welcome to Dictum$", "type": "Text", "name": "Click in the box", "match": "prefix", "timeout": 90 } }
+      ],
+      "after": 2.5
+    },
+    {
+      "id": "finish",
+      "caption": "Click Finish.",
+      "lead": 2,
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Finish" } } ],
+      "after": 3
     },
     {
       "id": "arrow",
       "caption": "Dictum now waits by the clock. Click the little up-arrow there.",
       "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "lead": 2,
       "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
     },
     {
       "id": "tray",
       "caption": "Click the Dictum icon.",
+      "lead": 2,
       "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
     },
     {
       "id": "ready",
       "caption": "This is Dictum's panel. Ready means you can dictate.",
-      "poster": true,
       "do": [ { "do": "point", "target": { "window": "^Dictum$", "type": "Text", "name": "Ready", "timeout": 60 } } ],
+      "poster": true,
       "after": 3
     },
     {
       "id": "close",
       "caption": "Press Esc to close the panel.",
+      "lead": 2,
       "do": [ { "do": "key", "keys": "Escape" } ],
       "after": 2
     }
