@@ -854,15 +854,29 @@ public sealed class OnboardingTests
         Assert.Equal(300, OnboardingWindow.Fit(OnboardingWindow.WindowHeight, 40, new PixelRect(0, 0, 800, 340), 1, default).Height); // under the minimum: fits all the same
     }
 
-    /// <summary>Pin (lens on 36fa43e): opening the window runs the placement on its screen (the Opened hook is wired).</summary>
+    /// <summary>
+    /// Pin (lens on 36fa43e): opening the window runs the placement on its screen (the Opened hook is wired). Lens on 86132af:
+    /// the window then has the height and position <see cref="OnboardingWindow.Fit"/> worked out, not only worked them out.
+    /// </summary>
     [Fact]
     public Task Opening_the_window_fits_it_to_its_screen() => UiSession.Run(() =>
     {
         using var scratch = new Scratch();
         Bundle(scratch);
         var (shell, _, _) = scratch.Shell();
-        var (_, window) = Open(shell, scratch);
+        var flow = new OnboardingFlow(shell, SettingsLoader.LoadFile(scratch.Paths.SettingsFile), askCleanup: true);
+        var window = new OnboardingWindow(flow) { Height = 20_000, Position = new PixelPoint(0, 1_000_000) }; // taller than the screen, and below it
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
         Assert.Equal(1, window.FitsOnOpen);
+        var fit = Assert.NotNull(window.LastFit);
+        Assert.True(fit.Height < 20_000 && fit.Position.Y < 1_000_000, $"Fit changed nothing: {fit}");
+        Assert.Equal(fit, (window.Height, window.Position)); // applied on opening
+
+        var laptop = OnboardingWindow.Fit(window.Height, CaptionDip, new PixelRect(0, 0, 1366, 684), 1.75, new PixelPoint(100, 600)); // 1366 x 768 at 175 %
+        Assert.True(laptop.Height < window.Height && laptop.Position != window.Position, $"{laptop} against {(window.Height, window.Position)}");
+        window.Apply(laptop);
+        Assert.Equal(laptop, (window.Height, window.Position));
         window.Close();
         shell.Dispose();
     });

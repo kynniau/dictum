@@ -106,6 +106,10 @@ internal sealed class OnboardingWindow : Window
     internal static (double Height, PixelPoint Position) Fit(double height, double frame, PixelRect work, double scaling, PixelPoint position)
     {
         if (scaling <= 0) scaling = 1;
+        // The floor of 1 DIP only keeps the height positive for a degenerate work area (a test's, or a screen that reports
+        // none); no real screen comes near it. 1366 x 768 at 175 % leaves about 359 DIP (inferred from the recalled 48 DIP
+        // taskbar and 32 DIP caption, not measured): 768 px less 84 px of taskbar is 684 px, 391 DIP, less the caption. The nav
+        // row's height is not a constant (it follows the 17 px text and the theme), so it is not used as the floor (lens on 86132af).
         var fitted = Math.Max(1, Math.Min(height, work.Height / scaling - frame));
         var outer = (int)Math.Ceiling((fitted + frame) * scaling);
         var y = position.Y < work.Y || position.Y + outer > work.Bottom ? Math.Max(work.Y, work.Y + (work.Height - outer) / 2) : position.Y;
@@ -115,19 +119,32 @@ internal sealed class OnboardingWindow : Window
     /// <summary>How many times opening the window ran <see cref="Fit"/> on its screen (tests: the Opened hook is wired).</summary>
     internal int FitsOnOpen { get; private set; }
 
-    /// <summary>Clamps the window to the work area of its screen and moves it inside it (<see cref="Fit"/>).</summary>
+    /// <summary>What <see cref="Fit"/> said on opening, or null before it ran (tests compare the window with it).</summary>
+    internal (double Height, PixelPoint Position)? LastFit { get; private set; }
+
+    /// <summary>Clamps the window to the work area of its screen and moves it inside it (<see cref="Fit"/>, then <see cref="Apply"/>).</summary>
     private void FitToWorkArea()
     {
         if ((Screens.ScreenFromWindow(this) ?? Screens.Primary) is not { } screen) return;
         var frame = Math.Max(0, (FrameSize?.Height ?? ClientSize.Height) - ClientSize.Height);
-        var (height, position) = Fit(Height, frame, screen.WorkingArea, screen.Scaling, Position);
+        var fit = Fit(Height, frame, screen.WorkingArea, screen.Scaling, Position);
         FitsOnOpen++;
-        if (height < Height)
+        LastFit = fit;
+        Apply(fit);
+    }
+
+    /// <summary>
+    /// Puts the window where <see cref="Fit"/> said: a smaller height (the minimum lowered with it, so the clamp holds) and the
+    /// position. Its own member so a test sees the result applied, not only worked out (lens on 86132af).
+    /// </summary>
+    internal void Apply((double Height, PixelPoint Position) fit)
+    {
+        if (fit.Height < Height)
         {
-            MinHeight = Math.Min(MinHeight, height);
-            Height = height;
+            MinHeight = Math.Min(MinHeight, fit.Height);
+            Height = fit.Height;
         }
-        if (position != Position) Position = position;
+        if (fit.Position != Position) Position = fit.Position;
     }
 
     /// <summary>Raised once steps 1-5 are over: finished, or the window closed.</summary>

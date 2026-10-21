@@ -466,6 +466,9 @@ internal sealed class MicrophoneStep : OnboardingStep
         var now = Flow.Clock();
         var level = _capture.CurrentLevel;
         // One late tick (a busy UI thread, a suspended PC) counts as at most two ticks, never as seconds of speech.
+        // simplification: the clamp caps each tick at 2 x TickMs (100 ms), so on a PC whose timer always fires later than 100 ms
+        // "about 3 s" of speech takes longer to count than 3 s. Retire it when the check is fed the capture's own sample time (the
+        // frames it delivered) instead of the UI timer's gaps, or when a report shows the test taking noticeably longer than 3 s.
         var result = _check.Feed(level, Math.Clamp(now - _last, 0, 2 * TickMs));
         _last = now;
         _meterPeak = Math.Max(_meterPeak, level);
