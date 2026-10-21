@@ -2728,7 +2728,7 @@ Re-checked by this lane:
 - The duplicate folder and the free-then-retry in Whisper.net's loader were not re-read by this lane; the merge lens
   verified them from source on 21/10/2026: `NativeLibraryLoader.cs` at tag 1.9.1 frees already-loaded dependencies when
   one fails, and its search list has `AppDomain.BaseDirectory` (trailing separator) and
-  `GetDirectoryName(assemblyLocation)` (none) before an ordinal `Distinct`, so the Vulkan folder appears twice.
+  `GetSafeDirectoryName(assemblyLocation)` (a `Path.GetDirectoryName` wrapper; no trailing separator) before an ordinal `Distinct`, so the Vulkan folder appears twice.
 
 **Why the sandbox runs missed it.** `sandbox-check.wsb` turns the virtual GPU off (`VGpu Disable`), and its comments read
 as if that made a PC without a GPU. It does not:
