@@ -17,8 +17,12 @@
 
   Needs the Windows Sandbox feature, and no other sandbox open (one runs at a time). Its window opens on the desktop for
   a few minutes and closes itself. The sandbox sees the folders it is given read-only and writes only to -Out;
-  networking, the virtual GPU, the microphone, the camera, the clipboard and printers are off, so the microphone line of
-  every self-test fails and does not count.
+  networking, the microphone, the camera, the clipboard and printers are off, so the microphone line of every self-test
+  fails and does not count. The virtual GPU is turned off too (VGpu Disable), but that does NOT make the sandbox a PC
+  without a GPU: it keeps a Vulkan loader in System32, and Vulkan has found a device there (an Intel device, observed by
+  the investigation of 21/10/2026; Vulkan [OK] runs in docs\DECISIONS.md, 17/10/2026), so the whisper runtime loads its
+  Vulkan build. That is why these runs missed the launch crash of 21/10/2026 on PCs where the Vulkan runtime cannot load.
+  -NoVulkanLoader takes the loader away (below) to show that case.
 
 .PARAMETER Published
   Folders holding Dictum.exe, comma-separated. Default: dist\Dictum, unless -Package is given.
@@ -27,13 +31,21 @@
 .PARAMETER CleanupModel
   A catalogue .gguf (read only); its engine must load too.
 .PARAMETER Gpu
-  whisper.gpu and llm.gpu for each run, comma-separated: auto tries Vulkan first, cpu loads the CPU runtimes. Default:
-  auto,cpu.
+  whisper.gpu and llm.gpu for each run, comma-separated: auto tries Vulkan first when the Vulkan loader (vulkan-1.dll)
+  loads, vulkan tries Vulkan first always, cpu loads the CPU runtimes. Default: auto,cpu.
+.PARAMETER NoVulkanLoader
+  Inside the sandbox, before any run, renames System32\vulkan-1*.dll (taking ownership first: they belong to
+  TrustedInstaller), so it is a PC without a Vulkan loader, as on the PCs of the launch crash of 21/10/2026. Only the
+  disposable sandbox's own System32 is changed; environment.txt records what was renamed. Expect auto to load the CPU
+  runtime ([OK]), not abort. Use a layout that loads in a clean Windows at all (a publish.ps1 -VcRuntimeDir build, or
+  -Package with -Framework): without the Visual C++ runtime no whisper runtime loads, so no Vulkan load fails either.
 .PARAMETER Out
   Results folder. Default: packaging\out\sandbox\<date-time>.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts\sandbox-check.ps1 -Published dist\Dictum -CleanupModel "$env:LOCALAPPDATA\Dictum\models\qwen2.5-0.5b-instruct-q4_k_m.gguf"
+.EXAMPLE
+  powershell -ExecutionPolicy Bypass -File scripts\sandbox-check.ps1 -Published dist\Dictum -Gpu auto,cpu -NoVulkanLoader
 #>
 [CmdletBinding()]
 param(
@@ -44,6 +56,7 @@ param(
     [string]$Package,
     [string]$Framework,
     [string]$Out,
+    [switch]$NoVulkanLoader,
     [int]$TimeoutMinutes = 20
 )
 
@@ -83,7 +96,8 @@ foreach ($folder in $Published) {
     $inside = Add-Map $folder "published-$index"
     foreach ($g in $Gpu) { $runs += [ordered]@{ name = "$label-$g"; folder = $inside; gpu = $g; packaged = $false } }
 }
-$job = [ordered]@{ speechModel = (Add-Map $SpeechModel "models-speech" -File); cleanupModel = $null; package = $null; framework = $null }
+$job = [ordered]@{ speechModel = (Add-Map $SpeechModel "models-speech" -File); cleanupModel = $null; package = $null; framework = $null
+    noVulkanLoader = [bool]$NoVulkanLoader }
 if ($CleanupModel) { $job.cleanupModel = Add-Map $CleanupModel "models-cleanup" -File }
 if ($Package) {
     if (-not (Test-Path -LiteralPath (Join-Path $Package "AppxManifest.xml"))) { throw "$Package holds no AppxManifest.xml (an MSIX layout such as packaging\out\msix-store\layout)." }
@@ -120,6 +134,8 @@ while (-not (Test-Path -LiteralPath (Join-Path $Out "done.txt"))) {
 Write-Host ""
 Get-Content -LiteralPath (Join-Path $Out "environment.txt") | ForEach-Object { Write-Host "  $_" }
 if (Test-Path -LiteralPath (Join-Path $Out "package.txt")) { Get-Content -LiteralPath (Join-Path $Out "package.txt") | ForEach-Object { Write-Host "  $_" } }
+# Each run's exit code: -1073740791 (0xC0000409) is the abort of the launch crash of 21/10/2026.
+Get-Content -LiteralPath (Join-Path $Out "progress.txt") | Where-Object { $_ -match 'self-test .*: (exit|not run)' } | ForEach-Object { Write-Host "  $_" }
 $failed = 0
 foreach ($run in $runs) {
     $file = Join-Path $Out "selftest-$($run.name).txt"

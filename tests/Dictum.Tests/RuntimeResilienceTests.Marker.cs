@@ -378,7 +378,7 @@ public sealed partial class RuntimeResilienceTests
         using var llm = new LocalLlmManager(log, loader: (_, gpu) =>
             throw new InvalidOperationException(gpu == "cpu" ? "out of memory" : "Failed to load model"), gpuInUse: () => true);
         llm.BeginLoad("qwen2.5-1.5b-instruct-q4_k_m.gguf", "auto");
-        Assert.True(await Eventually(() => !llm.IsLoading));
+        Assert.True(await Eventually(() => !llm.IsLoading && llm.LastError is not null)); // the failure is recorded just after the load faults (LocalLlmManager.Finished)
         Assert.Equal("out of memory", llm.LastError);
         Assert.False(llm.CpuMightHelp);
         Assert.False(llm.RestartForCpu);

@@ -186,4 +186,14 @@ internal static class Native
     public static extern nint GetStdHandle(int nStdHandle);
 
     public static bool IsKeyDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
+    /// <summary>
+    /// Sets a variable in the C runtime's own copy of the environment (ucrtbase.dll, the Universal C Runtime that the
+    /// whisper.cpp DLLs import), which C getenv reads. Environment.SetEnvironmentVariable changes only the process
+    /// environment block, which the C runtime does not read again once it has made its copy (docs\DECISIONS.md, "Launch crash
+    /// without a working Vulkan driver"). Returns 0 on success, else an errno value. Not thread-safe: call it before any other
+    /// thread could read or change the C environment (<see cref="GgmlEnvironment.Apply"/>).
+    /// </summary>
+    [DllImport("ucrtbase.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    public static extern int _putenv_s(string name, string value);
 }

@@ -4,6 +4,7 @@ using Dictum.Cli;
 using Dictum.Platform;
 using Dictum.Settings;
 using Dictum.Storage;
+using Dictum.Transcribe;
 using Dictum.UI;
 using Dictum.UI.Shell;
 
@@ -26,6 +27,10 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // First, before arguments are read or any thread is started: every mode (tray, --selftest, transcribe, bench) loads
+        // whisper.cpp, and _putenv_s is not thread-safe (GgmlEnvironment).
+        var ggmlEnvironment = GgmlEnvironment.Apply();
+        WhisperEngine.VulkanLoaderPresent = GgmlEnvironment.VulkanLoaderLoads;
         var (options, error) = CliOptions.Parse(args);
         if (options is null || options.Mode != CliMode.Tray) WindowsPlatform.AttachConsoleIfNeeded();
         if (options is null)
@@ -46,6 +51,8 @@ public static class Program
         var redactor = new SecretRedactor();
         var initialLevel = LogExtensions.ParseLevel(SettingsLoader.LoadFile(paths.SettingsFile).Settings.LogLevel);
         using var log = new FileLog(paths.LogsDir, redactor, initialLevel, echoToStderr: options.Mode != CliMode.Tray);
+        if (ggmlEnvironment != 0)
+            log.Warn($"Could not set GGML_NO_BACKTRACE in the C runtime's environment (_putenv_s returned {ggmlEnvironment}); on a PC where the Vulkan runtime fails to load, Dictum may close at start.");
 
         // The command line cannot ask, so while the earlier build is running it stops here (SPEC §21, amended); the tray app
         // asks once it is up (below).

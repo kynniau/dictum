@@ -65,6 +65,14 @@ jobs:
         # and on a tag the installer and the test MSIX packed from the same dist\Dictum, carry it.
         run: ./scripts/publish.ps1
 
+      - name: Test the published build where the Vulkan runtime cannot load
+        # The launch crash of 21/10/2026 (docs/DECISIONS.md, "Launch crash without a working Vulkan driver"): a copy of
+        # dist\Dictum whose ggml-vulkan-whisper.dll cannot load runs --selftest (APPDATA and LOCALAPPDATA in a temporary
+        # folder) and must fall back to the CPU runtime instead of aborting with GGML_ASSERT (exit 0xC0000409).
+        env:
+          DICTUM_PUBLISHED_DIR: ${{ github.workspace }}\dist\Dictum
+        run: dotnet test --project tests/Dictum.Tests -c Release --no-build --filter "FullyQualifiedName~Dictum.Tests.PublishedVulkanFailureTests"
+
       - name: Upload the zip
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
