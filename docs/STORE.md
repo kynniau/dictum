@@ -149,7 +149,7 @@ Delete models, recordings and logs from Settings, or remove everything at once
 
 ### What's new in this version (1.2.0)
 
-PROPOSED (22/10/2026), for the owner to approve. Paste it in "What's new in this version" on the 1.2.0 submission.
+APPROVED by the owner 22/10/2026. Paste it in "What's new in this version" on the 1.2.0 submission.
 
 ```text
 Adds a Welcome window with a microphone test, a Simple view with plain model choices, a Help page in Settings, and feedback buttons. Also includes the 1.1.2 fix for PCs without a working graphics driver.
@@ -430,7 +430,9 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 20/10/2026 | Certification passed. Partner Center shows "In Microsoft Store" and https://apps.microsoft.com/detail/9N0DG1DHTR57 answers 200 with the Dictum listing (both checked 20/10/2026, 10:45 AEDT). The landing page's Store button went live the same day. |
 | 21/10/2026 | Dictum 1.1.2 prepared: launch crash without a working Vulkan driver fixed (PR #21), "No sound from mic" warning (PR #22). Published to GitHub and dictum.kynni.au first; the Store package is staged for the owner's upload. |
 | 21/10/2026 | 1.1.2 submitted (Submission 2), marked mandatory, in certification. |
+| 22/10/2026 | 1.1.2 (Submission 2) passed certification and is live in the Store (Partner Center overview: "Your product is now updated"; read 22/10/2026 03:54 AEDT). |
 | 22/10/2026 | Dictum 1.2.0 prepared (version bump, tester notes, listing text); all new wording is PROPOSED until the owner approves it. |
+| 22/10/2026 | 1.2.0 submitted (Submission 3, id 1152921505702194758) at about 09:00 AEDT; package Dictum-1.2.0-store.msix 240,077,036 bytes, SHA-256 7AF77EA8D5E695D4DA974E3CD4F0198BFB71575543F2702F96994B79B76A100F, v1.2.0.0 x64, validated with only the runFullTrust warning; 1.1.2 package removed on save; not marked mandatory; certification notes and What's new as in this file (owner approved 22/10/2026). |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
