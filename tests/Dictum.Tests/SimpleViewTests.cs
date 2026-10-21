@@ -211,7 +211,7 @@ public sealed class SimpleViewTests
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
         var cleanup = Labels(flyout, "Clean-up");
-        Assert.Equal([SimpleView.TidyLabel, $"{ModelsPage.AddCleanupLabel} (download)"], cleanup);
+        Assert.Equal([SimpleView.TidyLabel, $"{ModelsPage.AddCleanupLabel} (download)", SimpleView.OffLabel], cleanup);
         Assert.All(cloudWords, w => Assert.DoesNotContain(cleanup, l => l.Contains(w, StringComparison.Ordinal)));
         flyout.Close();
 
@@ -495,7 +495,7 @@ public sealed class SimpleViewTests
         shell.Reload(userRequested: false);
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
-        Assert.Equal([SimpleView.Custom("qwen2.5-0.5b"), SimpleView.TidyLabel], Labels(flyout, "Clean-up"));
+        Assert.Equal([SimpleView.Custom("qwen2.5-0.5b"), SimpleView.TidyLabel, SimpleView.OffLabel], Labels(flyout, "Clean-up"));
         All<ComboBox>(flyout).Single(c => AutomationProperties.GetName(c) == "Clean-up").SelectedIndex = 1;
         Assert.Equal(LlmSettings.NoProvider, shell.Settings.Llm.Provider); // the recommended model is not on this PC: the rule-based tidy
         flyout.Close();
