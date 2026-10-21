@@ -94,6 +94,50 @@ public class Polish2Tests
         shell.Dispose();
     });
 
+    /// <summary>
+    /// The transient header lines the 1.2 polish round 2 lens measured as trimmed at the panel's width (the models line is 308 px):
+    /// a model still loading, a download pending, an error. They trim by design (DECISIONS, "Polish pins (22/10/2026)"): an
+    /// ellipsis in the line, the whole line in its tooltip and in its accessible name. The third line is the lens's, with its elided
+    /// middle filled in from the line's format (AppShell.Status: speech, runtime, clean-up, clean-up state, key).
+    /// </summary>
+    public static TheoryData<string> TrimmedHeaderLines() => new()
+    {
+        "small.en · CPU · qwen2.5-1.5b · rules until downloaded · Right Ctrl",
+        "large-v3-turbo · Vulkan · qwen2.5-1.5b · rules until downloaded · Right Ctrl",
+        "large-v3-turbo-q5_0 · CPU (no AVX) · qwen2.5-1.5b · loading… · Right Ctrl",
+        "Most accurate · loading… · AI clean-up · loading… · Mouse 5",
+        "More accurate · model error · AI clean-up · error · Right Ctrl",
+    };
+
+    /// <summary>
+    /// Pin (lens finding 1): a transient line too long for the panel is one line (no wrap), ends in an ellipsis, and carries
+    /// the whole line in its tooltip and its accessible name, so nothing is lost to the trim.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(TrimmedHeaderLines))]
+    public Task A_transient_header_line_that_is_too_long_is_trimmed_whole_in_its_tooltip(string line) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "ui": { "view": "simple" }, "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var status = shell.Status;
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        Assert.Equal(FlyoutWindow.PanelWidth + 28, flyout.Width);
+        var models = All<TextBlock>(flyout).Single(t => t.Text == status.Models);
+        All<TextBlock>(flyout).Single(t => t.Text == status.State).Text = "Downloading"; // the longest state word
+        models.Text = line;
+        ToolTip.SetTip(models, line); // what the panel does with every line it shows (FlyoutWindow's refresh)
+        Layout(flyout);
+        var lines = models.TextLayout.TextLines;
+        Assert.True(lines.Count == 1, $"\"{line}\" took {lines.Count} lines: {string.Join(" | ", Lines(models))}");
+        Assert.True(lines[0].HasCollapsed, $"\"{line}\" was not trimmed at {models.Bounds.Width:0} px: the pin checked nothing");
+        Assert.Equal(line, ToolTip.GetTip(models));
+        Assert.Equal(line, Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(models).GetName());
+        flyout.Close();
+        shell.Dispose();
+    });
+
     /// <summary>Pin (item 1): the reported line, drawn by the panel itself, is one line; a line too long for the panel ends in an ellipsis, whole in its tooltip.</summary>
     [Fact]
     public Task The_panel_header_never_wraps() => UiSession.Run(() =>
@@ -357,6 +401,56 @@ public class Polish2Tests
         Dispatcher.UIThread.RunJobs();
         Assert.False(ButtonLabelled(window, "Record").IsEnabled);
         Assert.Contains(NoSoundText.NoMicrophoneBalloon, Texts(window));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>A microphone that counts how often it was opened.</summary>
+    private sealed class OpenCounter : IAudioCapture
+    {
+        public int Starts { get; private set; }
+        public float CurrentLevel => 0f;
+        public event Action<Exception>? Failed { add { } remove { } }
+        public void Start(string? deviceSetting, long keyDownTickMs) => Starts++;
+        public CapturedAudio Stop() => new(new float[32000], 0.2f);
+    }
+
+    /// <summary>
+    /// Pin: the hotkey is not stopped by a disabled Record, so <c>Toggle</c> checks for a microphone itself: with none listed,
+    /// holding the hotkey in the calibration window opens no capture and starts no take; the same hotkey with one listed does
+    /// (the control, so the pin cannot pass by the hotkey never arriving).
+    /// </summary>
+    [Fact]
+    public Task Calibration_hotkey_with_no_microphone_starts_no_take() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
+        var (shell, platform, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var mic = new OpenCounter();
+        platform.CaptureFactory = () => mic; // the calibration window's own capture
+        platform.Devices.Clear();
+        var window = new CalibrationWindow(shell);
+        window.Show();
+        window.Activate(); // the hotkey records here only while the window is active
+        Dispatcher.UIThread.RunJobs();
+        var listener = platform.LastListener!;
+        var t0 = Environment.TickCount64;
+
+        listener.Post(new HookEvent(HotkeySignal.Down, t0));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, mic.Starts); // no microphone: no take
+        Assert.Contains(NoSoundText.NoMicrophoneBalloon, Texts(window));
+        listener.Post(new HookEvent(HotkeySignal.Up, t0 + 500));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, mic.Starts);
+
+        platform.Devices.Add(new AudioDeviceInfo("id-1", "Test microphone", true));
+        listener.Post(new HookEvent(HotkeySignal.Down, t0 + 1_000));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, mic.Starts); // the control: the hotkey does reach the window
+        listener.Post(new HookEvent(HotkeySignal.Up, t0 + 1_500));
+        Dispatcher.UIThread.RunJobs();
         window.Close();
         shell.Dispose();
     });
