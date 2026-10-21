@@ -37,7 +37,7 @@ hands-free each part goes through the same steps; whisper and the clean-up also 
 in the last part as context (taken before corrections, the profanity filter and snippets, so never their text), and
 those words are never typed again. A clean-up set up since that part was cleaned, such as cloud clean-up switched on
 mid-session, is given none of them. A part that carries on a sentence (the last one did not end with . ! ? …, a
-Devanagari danda or a line break) starts with a small letter unless its first word is "I", has another capital in it,
+a sentence-end mark such as U+0964 or a line break) starts with a small letter unless its first word is "I", has another capital in it,
 or is a dictionary term spelt with a capital; with the rule-based tidy, which ends a part with a full stop whenever it
 ends with a letter or a digit, nearly every part is typed as its own sentence. Text in a language other than English is
 not cleaned up (see "Other languages and translation"), so no letter changes case where its parts join: each part is
@@ -186,16 +186,14 @@ them (a chord such as `Ctrl+Shift+Space` still counts).
 
 ### Other languages and translation
 
-Dictum can listen for any of Whisper's 100 languages and, if you want, write English whatever you speak: a Hindi
-speaker dictates in Hindi and English is pasted. Recognition and translation run on this PC; if cloud clean-up is on
-(Settings > Clean-up), the English text still goes to that provider, as every dictation does. Settings > Models >
-**Language**:
+Dictum can listen for any of the languages Whisper supports (100 of them) and, if you want, write English whatever you
+speak: a Spanish speaker dictates in Spanish and English is pasted. Recognition and translation run on this PC; if
+cloud clean-up is on (Settings > Clean-up), the English text still goes to that provider, as every dictation does.
+Settings > Models > **Language** shows the full list:
 
-- **Spoken language**: English, Hindi, Tagalog and other languages Whisper has (Bengali,
-  Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Malayalam, Punjabi, Assamese, Nepali, Sindhi, Sinhala) are listed
-  first, then the rest by name (Cantonese, `yue`, only with the large-v3 models), or **Detect automatically** (whisper
-  works it out from the first seconds of each dictation, useful for a mixed team). The code goes into
-  `whisper.language`.
+- **Spoken language**: English first, then every other language Whisper supports alphabetically by name (Cantonese,
+  `yue`, only with the large-v3 models), or **Detect automatically** (whisper works it out from the first seconds of each
+  dictation, useful for a mixed team). The code goes into `whisper.language`.
 - **Translate to English** (`whisper.translate`): the text is written in English whatever was spoken, and the clean-up,
   dictionary and corrections run on that English. With it off and a language other than English (or Detect
   automatically), the text is written in the language spoken and the clean-up is skipped, because its rules and prompt
@@ -211,13 +209,12 @@ speaker dictates in Hindi and English is pasted. Recognition and translation run
   translation. Medium needs a GPU or a fast desktop CPU (see the speed table below for its English twin). Choosing a
   model that cannot do what the language settings ask, from the tray picker, a Mode preset, Choose file, calibration's
   Use this or a hand edit, still loads it, with a warning balloon saying why it will not work.
-- **Not possible with Whisper:** Cebuano, Ilocano, Hiligaynon and the other Philippine languages apart from Tagalog
-  are not in Whisper's list (openai/whisper `tokenizer.py`, read 16/10/2026), so they cannot be transcribed or
-  translated; Tagalog is the Philippine language it has.
+- **Not possible with Whisper:** some languages are not in Whisper's list (openai/whisper `tokenizer.py`, read
+  16/10/2026), so they cannot be chosen, transcribed or translated.
 - **Calibrate my voice** always listens in English (it reads English sentences), whatever language dictation uses.
   The Light and Full presets in Mode write their own speech models (`base.en`; `small.en` on a CPU, `large-v3-turbo`
   on a GPU): the Mode page names any preset whose model cannot hear your language or translate.
-- Mixed speech ("Hinglish", Taglish) has not been tested here: try the language you set first, then Detect
+- Mixed speech (two languages in one sentence) has not been tested here: try the language you set first, then Detect
   automatically with translation on, and judge by ear. Translation can lose nuance that transcription keeps, so for
   staff who speak accented English a bigger multilingual model with the language left on English may read better;
   test both on real recordings.
@@ -666,7 +663,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `whisper.model` | `base.en` when it comes with Dictum, else your first-run pick (`medium.en` if the file has no value) | Short name → `ggml-<name>.bin`, looked up in the model folders (see "Model folder"), or an absolute path to a `.bin`. The tray panel's Speech model picker and Settings > Models write this. |
 | `whisper.models_dir` | `null` | The earlier name of `models.folder`, still read when that is not set (ignored, with a warning, when both are set and differ). Choosing a folder in Settings clears it. |
 | `models.folder` | `null` | `null` = `%LOCALAPPDATA%\Dictum\models`; else an absolute folder (another drive, or a `\\server\share`, from which models load slowly) that Dictum looks in first and downloads to. A relative or invalid value is ignored with a warning. Settings > Models > Model folder writes it; changing it moves no files. See "Model folder". |
-| `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`hi`, `tl`, `bn`, `ta`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change rebuilds the decoder and does not load the model again. |
+| `whisper.language` | `"en"` | The language you speak: a whisper code from openai/whisper's list (`es`, `de`, `ja`…) or `auto` to detect it from the first seconds of each dictation. Anything but `en` needs a multilingual model (`small`, `medium`, `large-v3`), not an `.en` one. Settings > Models > Language writes it; a change rebuilds the decoder and does not load the model again. |
 | `whisper.translate` | `false` | `true`: write English whatever language is spoken. Needs a multilingual model; `large-v3-turbo` cannot translate (OpenAI's README: the turbo model "is not trained for translation tasks"). |
 | `whisper.threads` | `0` | CPU threads; 0 = Whisper.net's default. |
 | `whisper.gpu` | `"auto"` | `vulkan`: try Vulkan, then CPU, then CPU-without-AVX. `auto`: the same when the Vulkan loader (`vulkan-1.dll`, installed with a GPU driver that supports Vulkan) loads on this PC; when it does not, Vulkan cannot load either, so `auto` starts straight on the CPU (the log says why). `cpu`: CPU, then CPU-without-AVX, including on the first start, when Dictum looks at the GPU to recommend a model. The runtime is chosen once per start, so a change needs a restart; a model loaded after a change to `cpu` already stays off the GPU. A model whose load or warm-up fails on the GPU is loaded once more on the CPU, and a start after the GPU ended Dictum while it loaded the model uses the CPU-only runtime for that run (Troubleshooting, "Dictum quits by itself"). |

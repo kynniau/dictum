@@ -434,7 +434,7 @@ public sealed partial class RuntimeResilienceTests
     [Fact]
     public Task About_keeps_the_plain_clean_ups_own_line_when_the_local_model_failed_for_text_that_is_not_English() => UiSession.Run(() =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "language": "hi" }, "llm": { "provider": "local", "model": "qwen2.5-0.5b" } }""");
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "language": "es" }, "llm": { "provider": "local", "model": "qwen2.5-0.5b" } }""");
         Directory.CreateDirectory(scratch.Paths.DefaultModelsDir);
         var file = CleanupCatalog.Find("qwen2.5-0.5b")!.FileName;
         File.WriteAllBytes(Path.Combine(scratch.Paths.DefaultModelsDir, file), [1, 2, 3, 4]); // fails its size check
