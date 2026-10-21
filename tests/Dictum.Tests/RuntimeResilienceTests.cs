@@ -454,7 +454,7 @@ public sealed partial class RuntimeResilienceTests
 
         using var cpu = new LocalLlmManager(NullLog.Instance, loader: (p, _) => new ScriptedLocalEngine(p, warmUpFails: true), gpuInUse: () => true);
         cpu.BeginLoad("qwen2.5-1.5b-instruct-q4_k_m.gguf", "cpu"); // llm.gpu = cpu inside the Vulkan build: nothing else to try now
-        Assert.True(await Eventually(() => !cpu.IsLoading));
+        Assert.True(await Eventually(() => !cpu.IsLoading && cpu.LastError is not null)); // the failure is recorded just after the load faults (LocalLlmManager.Finished)
         Assert.Equal("llama.cpp decode failed: Error", cpu.LastError);
         Assert.False(cpu.CpuMightHelp);
         Assert.True(cpu.RestartForCpu); // only a restart loads the CPU build

@@ -19,10 +19,9 @@ internal static class GgmlEnvironment
     /// ggml-base-whisper.dll is mapped a second time at the same address; its static initialiser then finds its own stale
     /// terminate handler as the previous one and GGML_ASSERT aborts the process (exit 0xC0000409) before the tray appears,
     /// on every PC where the Vulkan runtime cannot load. With the variable set the initialiser installs nothing and asserts
-    /// nothing. Environment.SetEnvironmentVariable alone is not enough to rely on: it changes the process environment block,
-    /// which the C runtime reads only when it first builds its own copy, so it is missed whenever that copy already exists
-    /// (the investigation of 21/10/2026 saw the crash remain with it; the development PC's patched-import check did not, see
-    /// docs\DECISIONS.md). _putenv_s writes the C runtime's copy itself. Must run first in Main: _putenv_s is not thread-safe.
+    /// nothing. Environment.SetEnvironmentVariable alone is not enough: in a .NET process the UCRT's environment copy already
+    /// exists before Main, so SetEnvironmentVariable alone is never seen by ggml's getenv; _putenv_s is required (merge lens,
+    /// 21/10/2026; docs\DECISIONS.md). Must run first in Main: _putenv_s is not thread-safe.
     /// </summary>
     /// <returns>0 when the C runtime took the value, else the errno _putenv_s returned (the caller logs it; never throws).</returns>
     // simplification: ggml's terminate chain (its handler that prints a backtrace, then calls the previous handler) is never

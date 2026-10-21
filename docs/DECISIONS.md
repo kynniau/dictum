@@ -2725,7 +2725,10 @@ Re-checked by this lane:
   string occurs exactly once in the file). `--selftest` with `whisper.gpu = auto`, APPDATA and LOCALAPPDATA in a
   temporary folder, exited -1073740791 (0xC0000409) with that `GGML_ASSERT` line on stderr.
 - In Windows Sandbox with `scripts\sandbox-check.ps1 -NoVulkanLoader` (below), the 1.1.1 build crashed the same way.
-- The duplicate folder and the free-then-retry in Whisper.net's loader were **not** re-read here.
+- The duplicate folder and the free-then-retry in Whisper.net's loader were not re-read by this lane; the merge lens
+  verified them from source on 21/10/2026: `NativeLibraryLoader.cs` at tag 1.9.1 frees already-loaded dependencies when
+  one fails, and its search list has `AppDomain.BaseDirectory` (trailing separator) and
+  `GetDirectoryName(assemblyLocation)` (none) before an ordinal `Distinct`, so the Vulkan folder appears twice.
 
 **Why the sandbox runs missed it.** `sandbox-check.wsb` turns the virtual GPU off (`VGpu Disable`), and its comments read
 as if that made a PC without a GPU. It does not:
@@ -2761,12 +2764,17 @@ as if that made a PC without a GPU. It does not:
      (the run's timestamps are in whole seconds). The investigation measured about 9.4 s of failing Vulkan tries per start.
    - A PC with a loader but a broken driver still tries Vulkan, and fix 1 is what keeps that start alive.
 
-**What this lane observed that differs from the investigation.** On the development PC, a published build whose
-`Apply()` used only `Environment.SetEnvironmentVariable` (mutation M2 below) did **not** crash in the patched-import
-check. The likely reason is inferred, not verified: the C runtime builds its copy of the environment lazily, so when
-nothing has read it before Main, the copy picks up the change. The investigation saw the crash remain with it, so it
-is not dependable either way. `_putenv_s` writes the C runtime's copy directly, and the unit pin shows the difference
-once that copy exists.
+**What the merge lens established about `SetEnvironmentVariable` (21/10/2026).** `Environment.SetEnvironmentVariable`
+alone does **not** stop the crash. The investigation observed this, and the merge lens reproduced it on 21/10/2026: a
+published build whose `Apply()` used only `SetEnvironmentVariable` (mutation M2 below) aborted 0xC0000409 in both gated
+(v) cases. Reason, from the lens's .NET 10 console experiment (framework-dependent and self-contained win-x64):
+`ucrtbase.dll` is already loaded at the first line of `Main` with `*__p__environ()` and `*__p__wenviron()` both
+non-null, and after `Environment.SetEnvironmentVariable("LENS_A","1")` ucrtbase `getenv("LENS_A")` returned null. In a
+.NET process the UCRT's environment copy therefore already exists before `Main`, so a change made through the OS
+environment block is never seen by `getenv`; ggml-base-whisper.dll imports `api-ms-win-crt-environment-l1-1-0.dll`, so
+ggml reads ucrtbase's copy. `_putenv_s` is required; `SetEnvironmentVariable` is kept only so .NET code reading the
+variable agrees. (An earlier version of this lane's record said the published M2 build did not crash and inferred that
+the UCRT builds its copy lazily; the lens disproved both, and this paragraph replaces them.)
 
 **Pins** (`tests/Dictum.Tests/NoVulkanCrashTests.cs`):
 
@@ -2797,7 +2805,7 @@ once that copy exists.
 **Mutation checks** (each run and read on 21/10/2026; the PR body has the table):
 
 - M1, `Apply()` doing nothing: (i) and both (v) cases failed, and the published build aborted 0xC0000409.
-- M2, `SetEnvironmentVariable` only: (i) failed; (v) passed (above).
+- M2 (SetEnvironmentVariable only): pin (i) and both (v) cases observed failing on the reverted behaviour (lens, 21/10/2026).
 - M3, `Apply()` moved after argument parsing: (ii) failed.
 - M4, `new WhisperSettings().Gpu` restored in `ProbeGpuMachine`: (iii) failed.
 - M5, the loader check ignored: (iv) failed.
