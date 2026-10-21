@@ -30,6 +30,13 @@ public sealed partial class RuntimeResilienceTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    /// <summary>
+    /// How long a test waits before it reports that a signal never came. Only for tests whose outcome is decided by order, not by
+    /// time (the event either happens or never does), so it is generous: a loaded CI runner (21/10/2026, run 39629537889) took
+    /// over 2 s to schedule a load that runs in milliseconds locally.
+    /// </summary>
+    private const int FailAfterMs = 30_000;
+
     private static async Task<bool> Eventually(Func<bool> condition, int timeoutMs = 5000)
     {
         var sw = Stopwatch.StartNew();
