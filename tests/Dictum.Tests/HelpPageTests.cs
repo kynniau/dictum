@@ -114,7 +114,9 @@ public class HelpPageTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(0, downloads.Requests);
         Assert.Equal(0, updates.Requests);
-        Assert.Equal([HelpText.GuideUrl, HelpText.SupportUri], platform.Opened); // the two buttons, nothing else
+        Assert.Equal(3, platform.Opened.Count); // the three buttons, one call each, nothing else
+        Assert.Equal([HelpText.GuideUrl, HelpText.SupportUri], platform.Opened.Take(2));
+        Assert.StartsWith("mailto:hello@kynni.com.au?subject=Dictum%20feedback&body=", platform.Opened[2]); // Send feedback: a mail link, handed to the system
         window.Close();
         shell.Dispose();
 
@@ -249,8 +251,8 @@ public class HelpPageTests
         Assert.Equal(2 + HelpText.Questions.Count, blocks.Count); // how it works, why it mishears, and each question
 
         // Tab reaches each block in order, from the last button, and the last block scrolls into view with its ring on.
-        var support = All<Button>(page).Single(b => b.Content as string == HelpText.SupportButton);
-        support.Focus(NavigationMethod.Tab);
+        var lastButton = All<Button>(page).Single(b => b.Content as string == HelpText.FeedbackButton); // after Email support, in the same row
+        lastButton.Focus(NavigationMethod.Tab);
         foreach (var expected in blocks)
         {
             var next = KeyboardNavigationHandler.GetNext(TopLevel.GetTopLevel(window)!.FocusManager!.GetFocusedElement()!, NavigationDirection.Next);

@@ -10,7 +10,7 @@ namespace Dictum.UI.Shell;
 
 public sealed partial class AppShell
 {
-    public const string SupportEmail = "hello@kynni.com.au";
+    public const string SupportEmail = Help.SupportMail.Address; // an alias: the one constant is in Core
     public const string IssuesUrl = "https://github.com/kynniau/dictum/issues";
     public const string PrivacyUrl = "https://dictum.kynni.au/privacy";
 
@@ -368,6 +368,30 @@ public sealed partial class AppShell
     {
         var body = $"What happened (and what you expected):\n\n\nDictum {version} on {platform}\nModels: {models}\n\n" +
                    "To report text Dictum produced that should not have been there, describe it here; nothing is attached automatically.";
-        return $"mailto:{SupportEmail}?subject={Uri.EscapeDataString($"Dictum {version}: problem report")}&body={Uri.EscapeDataString(body)}";
+        return Help.SupportMail.Uri($"Dictum {version}: problem report", body);
+    }
+
+    /// <summary>
+    /// Settings → Help → "Send feedback or suggest a feature" (lane F): a new email to the support address in the user's own mail
+    /// program, through the same platform seam and the same builder as <see cref="ReportProblem"/>. Dictum sends nothing itself.
+    /// </summary>
+    public void SendFeedback() => Platform.Open(Help.SupportMail.FeedbackUri(FeedbackFacts()));
+
+    /// <summary>
+    /// The five facts the feedback email carries, taken from what About shows: the version, the system and its version, the
+    /// speech model and the runtime it loaded on, and the clean-up in use. Never a path, a mic, a dictionary word, text
+    /// that was dictated, or a machine or user name.
+    /// </summary>
+    internal Help.FeedbackSetup FeedbackFacts()
+    {
+        var speechRuntime = _models.IsLoading ? "loading" : _models.LastError is not null ? "no runtime (model error)" : SpeechRuntime();
+        // The cloud provider's name alone: the status line also names the server, which on a company's own address could be private.
+        var cleanup = _settings.Llm.Provider switch
+        {
+            LlmSettings.NoProvider => "rule-based tidy",
+            LlmSettings.Local => CleanupError is not null && !CleanupLoading ? "rule-based tidy (the clean-up model could not be loaded)" : $"{Models.CurrentCleanupName} on this PC",
+            var cloud => cloud + (_cleaner.MissingKey is null ? "" : " (no key, so rule-based tidy)"),
+        };
+        return new Help.FeedbackSetup(AppVersion, $"{Platform.Name} {Environment.OSVersion.Version.ToString(3)}", Models.CurrentName, speechRuntime, cleanup);
     }
 }

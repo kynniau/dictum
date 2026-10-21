@@ -345,10 +345,12 @@ internal sealed class HelpPage : SettingsPage
     {
         var guide = Ui.Button(HelpText.GuideButton, "primary", () => Run(() => Shell.Platform.Open(HelpText.GuideUrl)));
         var support = Ui.Button(HelpText.SupportButton, "secondary", () => Run(() => Shell.Platform.Open(HelpText.SupportUri)));
+        var feedback = Ui.Button(HelpText.FeedbackButton, "secondary", () => Run(Shell.SendFeedback));
         AutomationProperties.SetHelpText(guide, HelpText.GuideNote); // a screen reader says it with the button
         AutomationProperties.SetHelpText(support, HelpText.SupportNote);
+        AutomationProperties.SetHelpText(feedback, HelpText.FeedbackNote);
         Compose(
-            Section(HelpText.MoreHelpHeading, Paragraph(HelpText.GuideNote), Ui.Row(8, guide), Paragraph(HelpText.SupportNote), Ui.Row(8, support)),
+            Section(HelpText.MoreHelpHeading, Paragraph(HelpText.GuideNote), Ui.Row(8, guide), Paragraph(HelpText.SupportNote), Paragraph(HelpText.FeedbackNote), Ui.Row(8, support, feedback)),
             Section(HelpText.HowItWorksHeading,
                 Readable(HelpText.HowItWorksHeading, null, [.. HelpText.HowItWorks.Select(Paragraph)]),
                 Readable(HelpText.AccuracyHeading, Heading(HelpText.AccuracyHeading, 3, 15), [.. HelpText.Accuracy.Select(Paragraph)])),

@@ -20,8 +20,8 @@ public static class HelpText
     /// <summary>The full illustrated guide (built and hosted outside the app). Opened by the system browser, never fetched by Dictum.</summary>
     public const string GuideUrl = "https://dictum.kynni.au/help";
 
-    /// <summary>The support address; the same as AppShell.SupportEmail (a test pins that they match).</summary>
-    public const string SupportAddress = "hello@kynni.com.au";
+    /// <summary>The support address: an alias of the one constant, <see cref="SupportMail.Address"/>.</summary>
+    public const string SupportAddress = SupportMail.Address;
 
     public const string SupportUri = "mailto:" + SupportAddress;
 
@@ -34,6 +34,13 @@ public static class HelpText
     public const string SupportButton = "Email support";
 
     public const string SupportNote = "Email support opens a new email to " + SupportAddress + " in your own email program. Dictum sends nothing by itself.";
+
+    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    public const string FeedbackButton = "Send feedback or suggest a feature";
+
+    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportAddress + " in your own email program, with the version of Dictum, your Windows version and the models in use filled in. " +
+        "You can read and change it before you send it. Dictum sends nothing by itself.";
 
     public const string HowItWorksHeading = "How Dictum works";
 
@@ -141,7 +148,7 @@ public static class HelpText
     /// <summary>Every sentence on the page, headings and button labels included: what the copy pins read.</summary>
     public static IEnumerable<string> AllText() =>
     [
-        PageTitle, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton,
+        PageTitle, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton, FeedbackNote, FeedbackButton,
         HowItWorksHeading, .. HowItWorks, AccuracyHeading, .. Accuracy,
         QuestionsHeading, .. Questions.SelectMany(q => (IEnumerable<string>)[q.Question, .. q.Answer]),
     ];
