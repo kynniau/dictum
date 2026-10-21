@@ -2843,3 +2843,248 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 - The first-run probe fix end to end in the tray (it is pinned through `FirstRun` with a stand-in probe).
 - The duplicate-folder mechanics inside Whisper.net.
 - CI's first run of the new step, including whether `--selftest` behaves on a runner without audio devices or a desktop.
+
+## In-app Help: How Dictum works, and questions and answers (21/10/2026, branch feat/in-app-help)
+
+**The decision (Kyle, 21/10/2026, as relayed by the orchestrator).** "The thing we are missing is explaining how it
+works": someone of 95 should be able to use Dictum with the help. Help lives in two places. A short "How Dictum works"
+and questions and answers sit inside the app, work with no internet and keep the privacy promise. A full illustrated
+guide lives on https://dictum.kynni.au/help (built by another lane), and the app links to it.
+
+**What this lane built.**
+
+- **Settings → Help**, the last entry in the Settings list (after About), and a **Help** button in the tray panel that
+  opens it (the lane's last commit, a single hunk in `FlyoutWindow.cs`, which lane A owns).
+- **The copy** is plain constants in `src/Dictum.Core/Help/HelpText.cs`, with no platform code, so tests pin it. The page,
+  `HelpPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, only lays it out.
+- **Network.** None from the page itself. **Open the full guide** hands https://dictum.kynni.au/help to `IPlatform.Open`
+  (the system browser), and **Email support** hands `mailto:hello@kynni.com.au` to it (the user's mail app). No other
+  address, no prefilled body, no request by Dictum.
+- **Reading it.**
+  - The page title is heading level 1, the three cards (More help, How Dictum works, Questions and answers) are level 2,
+    and the accuracy part and each question are level 3 (`AutomationProperties.HeadingLevel`).
+  - Each block of text (how it works, why it mishears, each question with its answer) is a tab stop named after its
+    heading. Tab walks through them in order, Avalonia scrolls the focused one into view, and Page Down scrolls the
+    page from there (both observed headless). A ring in the link colour (light or dark) shows only while the focus came
+    from the keyboard.
+  - Both buttons carry their sentence as automation help text.
+  - The help paragraphs are 14 px against 13 px body text elsewhere: they are read, not glanced at (my call).
+- **The More help card is first**, so the guide and support are the first thing a stuck reader sees. The answers point
+  to it as "at the top of this page".
+
+**Where the copy departs from the brief's wording, and why.** These are my calls, for the product owner to confirm. Each
+is worded to be true at main 6dfede8 and after the other 1.2 lanes land.
+
+1. **"More accurate", "Standard" and "Test my setup"** do not exist in the app at 6dfede8: a search of `src`, `docs`,
+   `site` and the README found none. The copy says "choose a bigger speech model in Settings > Models" and names the
+   shipped **Calibrate my voice**. Settings > Models itself says "Bigger is more accurate and slower."
+2. **"Standard works for most people"** is not measured anywhere in the repository (no test across speakers). The copy
+   says the model that comes with Dictum "is a good place to start".
+3. **"No sound from mic"** is not a message Dictum shows. The pill says "Mic error" (`PillText`), and a recording quieter
+   than `silence_threshold` is dropped with no message. The question reads: It says "Mic error", or nothing happens when
+   I talk.
+4. **"Settings > Models > Advanced > run on the CPU"** does not exist. What ships is the **Try on the CPU** button
+   (tray panel and Settings > About, only after a model failed inside the GPU runtime) and `whisper.gpu = cpu` in
+   settings.json. The copy names Try on the CPU, and for a Dictum that still closes, Email support.
+5. **"Updated in 1.1.2"**: there is no 1.1.2. `Directory.Build.props` says 1.1.1, and the launch-crash fix (19b09f6, PR
+   #21) merged after 1.1.1. The copy says "fixed in later versions", which holds for whatever number ships it.
+6. **"Videos" in the full guide** are not promised in the app. The guide note says "step by step, with pictures",
+   because the app cannot check the site and that lane had not shipped when this was written.
+
+**Figures in the copy.**
+
+- "About 150 MB": base.en is 147,964,211 bytes, from the README's catalogue table, which the README says was verified by
+  HTTP HEAD on 15/10/2026.
+- "Several GB": large-v3 alone is 3,095,033,483 bytes, from the same table.
+- "Ten short sentences": the calibration window counts "Sentence 1 of 10" (`UiWindowTests`).
+
+**Recalled, not verified.**
+
+- The small up arrow beside the clock that shows hidden tray icons (Windows' own behaviour).
+- That many headsets have a mute button.
+
+**Dependencies on other lanes.**
+
+- **Renames.** `HelpPageTests.Every_label_the_help_names_exists_in_the_app` fails when the app drops a label the help
+  names: Calibrate my voice, Dictionary, Fix last dictation, Save corrections, Settings, Dictation on, General, Models,
+  Storage, Microphone, Clean-up, Press your hotkey, Change…, Use this hotkey, Test microphone, Model folder, Browse…,
+  Remove Dictum completely…, Try on the CPU, Mic error, Open the full guide, Email support and Help (the tray button).
+  Any lane renaming one of them, for example Calibrate my voice to Test my setup, must change `HelpText` with it, and
+  that copy change needs the product owner's review.
+- **Tier names (Simple and Advanced).** The copy names pages only ("Settings > Models"), never a tier, so it stays true.
+- **The onboarding folder step.** The copy says the Model folder is in Settings > Models, with Browse…; it stays true
+  unless that lane moves the control.
+- **A Settings > Models > Advanced run-on-the-CPU control**, if a lane adds it: question 4 could point there. That is a
+  copy change, for review.
+- **A "No sound from mic" message**, if a lane adds it: question 3 should name it. The pin above checks only "Mic error".
+- **dictum.kynni.au/help** must be live, with pictures, before a release carries this page.
+- **The release that carries this page** must carry the launch-crash fix. Any build from main after 6dfede8 does.
+- **FlyoutWindow.cs (lane A).** The Help button is one hunk in its own commit, at the end of the branch.
+- **The Mac beta.** The copy is Windows copy: the clock, Windows Settings, the right Ctrl key and the Microsoft Store.
+  A Mac build needs its own wording for those answers.
+
+**Pins (`tests/Dictum.Tests/HelpPageTests.cs`), each observed failing on the reverted behaviour (21/10/2026).**
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| Help is in the navigation (last) and opens from the list and by name | "Help" removed from the page list | failed: expected "Help", found "About" |
+| Every sentence and every question renders, each question a named tab stop | the first question left out | failed: item not found |
+| Open the full guide opens exactly https://dictum.kynni.au/help through the platform, and Email support exactly mailto:hello@kynni.com.au | the button opened the privacy address; the constant changed to the site root | failed both times: collections differ at index 0 |
+| No request reaches either HTTP client, `Open` gets only the two addresses, and the page and copy name no network API | `Shell.CheckForUpdatesAsync()` added to the page; an `HttpClient` named in the page source; Email support replaced by Report a problem | failed all three: 1 request against 0; the source scan matched; the mailto had a subject added |
+| The copy has no "always accurate", "100%", "perfect", "guarantee", telemetry, analytics or tracking word, and no US spelling | "always accurate", "no telemetry" and "100% accurate" added in turn | failed all three |
+| Every label the help names exists in the copy and in the app | the copy's "Test microphone" changed; the app's Test microphone button renamed; the pill's "Mic error" changed | failed all three |
+| No text or button runs past the visible width at 860 × 640, 853 × 480 (a 1280 × 720 screen at 150 %) and 640 × 420 (the smallest window), and text wraps | paragraphs set to no wrapping; a 700-DIP minimum width | failed in all three sizes both times |
+| Headings, keyboard order, focus ring, scroll into view, Page Down | blocks not focusable; ring removed; heading levels removed; ring left on after focus moved | failed all four |
+| The tray panel's Help button opens Settings → Help | the button removed | see the flyout commit's record below |
+
+Removing an explicit `BringIntoView` call **did not** fail the keyboard pin: Avalonia already scrolls a focused control
+into view. The call was deleted as redundant, so the scroll assertion now pins the framework's behaviour.
+
+An early mutation run reused a stale `Dictum.UI.dll`. A restored file kept the backup's older timestamp, and a change
+in Dictum.Core's internals does not rebuild its dependants. That run (the pill label) was repeated with
+`--no-incremental` builds and a touch after each restore, and failed as expected.
+
+**Not verified.**
+
+- A real window at 150 % or 200 % scaling. The headless platform renders at scale 1, so the pin measures the DIP sizes
+  that scaling leaves.
+- Screen-reader speech. Heading levels, names and help text are pinned as properties, not heard in Narrator or NVDA.
+- The page in a real Settings window on the desktop (tray mode is never run on the development PC).
+- https://dictum.kynni.au/help itself, which did not exist when this was written.
+- The tray panel's height with the extra row, on a small screen.
+- Whether a person of 95 can follow it. Only a person can test that.
+
+**Full page text, PROPOSED (21/10/2026), awaiting the product owner's review: do not reword without it.** Generated from
+`HelpText` (the constants are the source; this copy is for review).
+
+> **Help** (page title)
+>
+> **More help** (section heading)
+>
+> The full guide on the Dictum website goes step by step, with pictures. It opens in your web browser and needs the internet.
+>
+> [Button: Open the full guide] opens https://dictum.kynni.au/help
+>
+> Email support opens a new email to hello@kynni.com.au in your own email program. Dictum sends nothing by itself.
+>
+> [Button: Email support] opens mailto:hello@kynni.com.au
+>
+> **How Dictum works** (section heading)
+>
+> Dictum types what you say into the program you are using.
+>
+> 1. Click where you want the words to go, for example in an email.
+>
+> 2. Hold down the Dictum key. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard.
+>
+> 3. Speak in your normal voice. A small bar above the taskbar shows that Dictum is listening.
+>
+> 4. Let go of the key. A moment later, your words appear where you clicked.
+>
+> In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.
+>
+> All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on.
+>
+> The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. The menu has Settings, Help and more.
+>
+> In this help, "Settings > Models" means: open Settings from the Dictum menu, then choose Models on the left.
+>
+> **Why Dictum hears some people better than others**
+>
+> Everyone's voice, accent and microphone are different, so a speech model hears some people better than others.
+>
+> The speech model that comes with Dictum is a good place to start.
+>
+> If words often come out wrong, choose a bigger speech model in Settings > Models. Bigger models are more accurate, but slower, and each one is a download you choose.
+>
+> Not sure which one to choose? Open the Dictum menu and choose Calibrate my voice. You read ten short sentences aloud, and Dictum tells you which of the speech models on this PC hears you best.
+>
+> **Questions and answers** (section heading)
+>
+> **Where does my voice go?**
+>
+> Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.
+>
+> The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.
+>
+> If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation is sent to the service you chose. Your voice still stays here.
+>
+> **Why did it type the wrong words?**
+>
+> Dictum can mishear words, just as people can. These things help:
+>
+> • Keep the microphone close to your mouth, and speak at your normal speed.
+>
+> • If a name or word keeps coming out wrong, add it with Dictionary in the Dictum menu.
+>
+> • To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.
+>
+> • For better accuracy overall, see "Why Dictum hears some people better than others" above.
+>
+> **It says "Mic error", or nothing happens when I talk. What do I check?**
+>
+> • Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.
+>
+> • Open Settings > Microphone. Choose your microphone from the list, then choose Test microphone and speak. The bars move when Dictum hears you.
+>
+> • In Windows Settings, go to Privacy & security > Microphone. "Microphone access" and "Let desktop apps access your microphone" must both be on.
+>
+> • On a remote or virtual desktop (a computer you use over the internet or your office network), your own microphone has to be passed through to it. This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.
+>
+> **Dictum closed straight away when I opened it. What do I do?**
+>
+> On some PCs, Dictum version 1.1.1 closed as soon as it started. This is fixed in later versions. Get the latest version from the Microsoft Store or from dictum.kynni.au.
+>
+> If Dictum still closes, choose Email support at the top of this page and tell us.
+>
+> If Dictum opens but shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.
+>
+> **How do I change the key I hold?**
+>
+> Open Settings > General. Under Press your hotkey (the hotkey is the key you hold), choose Change…, then press the key you want. When Dictum shows its name, choose Use this hotkey.
+>
+> Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used.
+>
+> **How do I stop it listening?**
+>
+> Let go of the key. Dictum stops listening and types what you said.
+>
+> To cancel instead, press Esc while you are still holding the key. Nothing is typed.
+>
+> If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.
+>
+> To turn Dictum off for a while, use the Dictation on switch in the Dictum menu.
+>
+> **Can I use it in Word, Outlook, Teams or a web browser?**
+>
+> Yes. Dictum types into almost any program where you can type, including Word, Outlook, Teams and web browsers. Click where the words should go first.
+>
+> The exception is a program running as administrator (with extra permissions): Windows does not let Dictum type into it.
+>
+> **Where are the model files, and how big are they?**
+>
+> Settings > Models shows the Model folder, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.
+>
+> Bigger speech models and AI clean-up are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes).
+>
+> To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.
+>
+> **How do I remove Dictum completely?**
+>
+> Open Settings > Storage. At the bottom, choose Remove Dictum completely…
+>
+> Dictum first lists everything it will delete, with sizes. Then it asks you to type DELETE to confirm.
+>
+> It deletes its models, recordings, logs, settings, dictionary and corrections, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself.
+>
+> **Is Dictum free?**
+>
+> Yes. There is no charge, no subscription and no word limit.
+>
+> Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.
+>
+> **Where is the full guide?**
+>
+> The full guide is on the Dictum website at dictum.kynni.au/help. Choose Open the full guide at the top of this page.
+>
+> It opens in your web browser and needs the internet. Everything on this page works without the internet.

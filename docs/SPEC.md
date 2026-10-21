@@ -358,6 +358,7 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   after a newer choice does not switch to its model. Settings > Models shows the row being
   downloaded as "Downloading <n>%" with its button disabled. See DECISIONS, 19/10/2026.
 - About (version, runtime, no network statement).
+- Help (amendment, 21/10/2026): opens Settings → Help, the offline "How Dictum works" and questions and answers (§26).
 - Quit.
 
 Single instance via a named mutex; a second launch shows a balloon and exits.
@@ -1152,3 +1153,25 @@ resilience".
 - **Speed estimate.** A model's first warm-up runs twice and only the second run's speed is kept. After three
   dictations in a row that the estimate skipped, the next one runs the model and measures again; the allowance doubles
   (to 24 at most) while the model stays too slow, and a dictation the estimate lets through resets it.
+
+## 26. In-app Help (amendment, 21/10/2026)
+
+Help lives in two places (decided 21/10/2026: "the thing we are missing is explaining how it works"). The full guide,
+with pictures, is on https://dictum.kynni.au/help, built outside the app. A short offline page is inside it:
+
+- **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
+- **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
+  tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
+  others, and what to do about it), then eleven questions and answers. All of it comes from
+  `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
+- **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`, and
+  **Email support** passes `mailto:hello@kynni.com.au` to it. The browser or mail app does the rest; Dictum sends nothing.
+- **Accessibility**:
+  - heading levels (page 1, cards 2, the accuracy part and each question 3);
+  - each block of text is a tab stop named after its heading, scrolled into view when focused, with a ring only while
+    the focus came from the keyboard;
+  - Page Down scrolls from there;
+  - both buttons carry their sentence as automation help text;
+  - text wraps and fits the window at its default size, at 150 % on a 1280 × 720 screen and at its minimum size.
+- **Pins**: `HelpPageTests`. One pin checks that every control or message the help names still exists in the app. A
+  rename elsewhere fails it until the copy follows, and that copy change needs the product owner's review.

@@ -1,0 +1,151 @@
+namespace Dictum.Help;
+
+/// <summary>
+/// The words on Settings → Help (SPEC §21; docs/DECISIONS.md, "In-app Help", 21/10/2026). PROPOSED copy, awaiting the
+/// product owner's review: do not reword without that review. Plain constants with no platform code, so tests can pin
+/// them and a Mac build can reuse the parts that hold there.
+/// <para>
+/// Written for someone who has never used a computer program like this: short sentences, a technical word explained in
+/// the same sentence, Australian English, no marketing. Every answer matches what Dictum does as built: the labels it
+/// names ("Calibrate my voice", "Try on the CPU", "Mic error"…) are pinned against the real windows by HelpPageTests, so
+/// renaming one in the app fails a test until this text follows it.
+/// </para>
+/// The page reaches the network only through the two buttons, which hand <see cref="GuideUrl"/> and
+/// <see cref="SupportUri"/> to the system (IPlatform.Open): the browser or mail app does the rest, not Dictum.
+/// </summary>
+public static class HelpText
+{
+    public const string PageTitle = "Help";
+
+    /// <summary>The full illustrated guide (built and hosted outside the app). Opened by the system browser, never fetched by Dictum.</summary>
+    public const string GuideUrl = "https://dictum.kynni.au/help";
+
+    /// <summary>The support address; the same as AppShell.SupportEmail (a test pins that they match).</summary>
+    public const string SupportAddress = "hello@kynni.com.au";
+
+    public const string SupportUri = "mailto:" + SupportAddress;
+
+    public const string MoreHelpHeading = "More help";
+
+    public const string GuideButton = "Open the full guide";
+
+    public const string GuideNote = "The full guide on the Dictum website goes step by step, with pictures. It opens in your web browser and needs the internet.";
+
+    public const string SupportButton = "Email support";
+
+    public const string SupportNote = "Email support opens a new email to " + SupportAddress + " in your own email program. Dictum sends nothing by itself.";
+
+    public const string HowItWorksHeading = "How Dictum works";
+
+    /// <summary>"How Dictum works": one entry per paragraph, in order.</summary>
+    public static readonly IReadOnlyList<string> HowItWorks =
+    [
+        "Dictum types what you say into the program you are using.",
+        "1. Click where you want the words to go, for example in an email.",
+        "2. Hold down the Dictum key. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard.",
+        "3. Speak in your normal voice. A small bar above the taskbar shows that Dictum is listening.",
+        "4. Let go of the key. A moment later, your words appear where you clicked.",
+        "In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. " +
+        "Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.",
+        "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on.",
+        "The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. " +
+        "The menu has Settings, Help and more.",
+        "In this help, \"Settings > Models\" means: open Settings from the Dictum menu, then choose Models on the left.",
+    ];
+
+    public const string AccuracyHeading = "Why Dictum hears some people better than others";
+
+    /// <summary>The part of "How Dictum works" on accuracy: one entry per paragraph.</summary>
+    public static readonly IReadOnlyList<string> Accuracy =
+    [
+        "Everyone's voice, accent and microphone are different, so a speech model hears some people better than others.",
+        "The speech model that comes with Dictum is a good place to start.",
+        "If words often come out wrong, choose a bigger speech model in Settings > Models. Bigger models are more accurate, but slower, and each one is a download you choose.",
+        "Not sure which one to choose? Open the Dictum menu and choose Calibrate my voice. You read ten short sentences aloud, and Dictum tells you which of the speech models on this PC hears you best.",
+    ];
+
+    public const string QuestionsHeading = "Questions and answers";
+
+    /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
+    public static readonly IReadOnlyList<HelpEntry> Questions =
+    [
+        new("Where does my voice go?",
+        [
+            "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.",
+            "The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.",
+            "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation is sent to the service you chose. Your voice still stays here.",
+        ]),
+        new("Why did it type the wrong words?",
+        [
+            "Dictum can mishear words, just as people can. These things help:",
+            "• Keep the microphone close to your mouth, and speak at your normal speed.",
+            "• If a name or word keeps coming out wrong, add it with Dictionary in the Dictum menu.",
+            "• To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.",
+            "• For better accuracy overall, see \"Why Dictum hears some people better than others\" above.",
+        ]),
+        new("It says \"Mic error\", or nothing happens when I talk. What do I check?",
+        [
+            "• Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.",
+            "• Open Settings > Microphone. Choose your microphone from the list, then choose Test microphone and speak. The bars move when Dictum hears you.",
+            "• In Windows Settings, go to Privacy & security > Microphone. \"Microphone access\" and \"Let desktop apps access your microphone\" must both be on.",
+            "• On a remote or virtual desktop (a computer you use over the internet or your office network), your own microphone has to be passed through to it. " +
+            "This is called microphone redirection, and it must be turned on. If you are not sure how, ask whoever looks after your computers.",
+        ]),
+        new("Dictum closed straight away when I opened it. What do I do?",
+        [
+            "On some PCs, Dictum version 1.1.1 closed as soon as it started. This is fixed in later versions. Get the latest version from the Microsoft Store or from dictum.kynni.au.",
+            "If Dictum still closes, choose Email support at the top of this page and tell us.",
+            "If Dictum opens but shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.",
+        ]),
+        new("How do I change the key I hold?",
+        [
+            "Open Settings > General. Under Press your hotkey (the hotkey is the key you hold), choose Change…, then press the key you want. When Dictum shows its name, choose Use this hotkey.",
+            "Most keys work, and so do the side buttons on a mouse. The Fn key, Esc and Tab cannot be used.",
+        ]),
+        new("How do I stop it listening?",
+        [
+            "Let go of the key. Dictum stops listening and types what you said.",
+            "To cancel instead, press Esc while you are still holding the key. Nothing is typed.",
+            "If you started hands-free (by tapping the key twice quickly), tap the key once more to stop. Esc also stops hands-free, and what is already typed stays.",
+            "To turn Dictum off for a while, use the Dictation on switch in the Dictum menu.",
+        ]),
+        new("Can I use it in Word, Outlook, Teams or a web browser?",
+        [
+            "Yes. Dictum types into almost any program where you can type, including Word, Outlook, Teams and web browsers. Click where the words should go first.",
+            "The exception is a program running as administrator (with extra permissions): Windows does not let Dictum type into it.",
+        ]),
+        new("Where are the model files, and how big are they?",
+        [
+            "Settings > Models shows the Model folder, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.",
+            "Bigger speech models and AI clean-up are downloads you choose. If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
+            "To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.",
+        ]),
+        new("How do I remove Dictum completely?",
+        [
+            "Open Settings > Storage. At the bottom, choose Remove Dictum completely…",
+            "Dictum first lists everything it will delete, with sizes. Then it asks you to type DELETE to confirm.",
+            "It deletes its models, recordings, logs, settings, dictionary and corrections, then closes. If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself.",
+        ]),
+        new("Is Dictum free?",
+        [
+            "Yes. There is no charge, no subscription and no word limit.",
+            "Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.",
+        ]),
+        new("Where is the full guide?",
+        [
+            "The full guide is on the Dictum website at dictum.kynni.au/help. Choose Open the full guide at the top of this page.",
+            "It opens in your web browser and needs the internet. Everything on this page works without the internet.",
+        ]),
+    ];
+
+    /// <summary>Every sentence on the page, headings and button labels included: what the copy pins read.</summary>
+    public static IEnumerable<string> AllText() =>
+    [
+        PageTitle, MoreHelpHeading, GuideNote, GuideButton, SupportNote, SupportButton,
+        HowItWorksHeading, .. HowItWorks, AccuracyHeading, .. Accuracy,
+        QuestionsHeading, .. Questions.SelectMany(q => (IEnumerable<string>)[q.Question, .. q.Answer]),
+    ];
+}
+
+/// <summary>One question on the Help page and its answer, one entry per paragraph.</summary>
+public sealed record HelpEntry(string Question, IReadOnlyList<string> Answer);
