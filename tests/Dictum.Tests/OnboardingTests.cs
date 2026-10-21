@@ -720,6 +720,9 @@ public sealed class OnboardingTests
 
     // ---- Accessibility and size ----
 
+    private const double WorkAreaDip = 512 - 48;
+    private const double CaptionDip = 32;
+
     /// <summary>
     /// Pin: every step fits a 1366 × 768 screen at 150 % (911 × 512 DIP, less a 48 px taskbar: 480 DIP), keeps its buttons inside
     /// the window (as the busy question's layout pin), names every control a keyboard reaches, and uses the larger text.
@@ -730,7 +733,9 @@ public sealed class OnboardingTests
         using var scratch = new Scratch();
         var (shell, _, _) = scratch.Shell(); // without base.en: the speech step's longest form
         var (_, window) = Open(shell, scratch);
-        Assert.True(OnboardingWindow.WindowWidth <= 911 && OnboardingWindow.WindowHeight <= 480);
+        // 1366 × 768 at 150 % is 911 × 512 DIP; less the Windows 11 taskbar (recalled: 48 DIP) the work area is 464 DIP, and
+        // the whole window is the client plus a caption (recalled: about 32 DIP).
+        Assert.True(OnboardingWindow.WindowWidth <= 911 && OnboardingWindow.WindowHeight + CaptionDip <= WorkAreaDip, $"{OnboardingWindow.WindowHeight} + {CaptionDip} > {WorkAreaDip}");
         while (true)
         {
             var step = window.Current!;
@@ -755,6 +760,197 @@ public sealed class OnboardingTests
             if (step is TryItStep) break;
             Next(window);
         }
+        window.Close();
+        shell.Dispose();
+    });
+
+    // ---- Lens fixes (21/10/2026), lens on 6bacce9 ----
+
+    /// <summary>
+    /// Pin (lens 1): base.en on this PC and a seeded language that is not English: the speech step offers the multilingual
+    /// tiers instead of "included and ready", and the pick is written over base.en; Esc there keeps base.en.
+    /// </summary>
+    [Fact]
+    public Task With_base_en_a_seeded_language_that_is_not_English_still_asks() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "whisper": { "language": "es" } }""");
+        Bundle(scratch);
+        var (shell, _, _) = scratch.Shell();
+        var (_, window) = Open(shell, scratch);
+        var speech = GoTo<SpeechStep>(window);
+        Assert.DoesNotContain(OnboardingText.SpeechIncluded, Visible(window));
+        var tags = All<RadioButton>(speech).Select(r => (string?)r.Tag).ToList();
+        Assert.Equal(SimpleView.Tiers(false, "es").Where(t => t.Guard is null).Select(t => t.Model), tags);
+        All<RadioButton>(speech).Single(r => (string?)r.Tag == SimpleView.MultilingualStandard).IsChecked = true;
+        Next(window);
+        Assert.Equal(SimpleView.MultilingualStandard, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Whisper.Model);
+        window.Close();
+        shell.Dispose();
+
+        using var skipped = new Scratch("""{ "whisper": { "language": "es" } }""");
+        Bundle(skipped);
+        var (shell2, _, _) = skipped.Shell();
+        var (_, window2) = Open(shell2, skipped);
+        GoTo<SpeechStep>(window2);
+        window2.Close(); // Esc: skip the rest
+        Assert.Equal("base.en", SettingsLoader.LoadFile(skipped.Paths.SettingsFile).Settings.Whisper.Model);
+        shell2.Dispose();
+    });
+
+    /// <summary>Pin (lens 2): background hiss (0.005, under silence_threshold 0.01) is not "Heard you." and not digital silence either.</summary>
+    [Fact]
+    public Task Hiss_under_the_silence_threshold_is_not_heard() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        var (step, window, mic, clock) = MicTest(scratch, shell, platform);
+        mic.Level = 0.005f;
+        Advance(step, clock, 6_000);
+        Assert.Equal(OnboardingText.SayWords, step.Result);
+        mic.Level = 0.02f;
+        Advance(step, clock, 3_050);
+        Assert.Equal(OnboardingText.HeardYou, step.Result);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens 2): the threshold is settings.json's silence_threshold, not a constant.</summary>
+    [Fact]
+    public Task The_microphone_test_uses_the_settings_silence_threshold() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "silence_threshold": 0.05 }""");
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        var (step, window, mic, clock) = MicTest(scratch, shell, platform);
+        mic.Level = 0.02f;
+        Advance(step, clock, 3_500);
+        Assert.Equal(OnboardingText.SayWords, step.Result);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens 3): the client height is clamped to the work area less the frame; a roomy screen keeps it.</summary>
+    [Fact]
+    public void The_window_height_is_clamped_to_the_work_area()
+    {
+        Assert.Equal(OnboardingWindow.WindowHeight, OnboardingWindow.FitHeight(OnboardingWindow.WindowHeight, CaptionDip, 1040));
+        Assert.Equal(400, OnboardingWindow.FitHeight(OnboardingWindow.WindowHeight, 40, 440));
+        Assert.Equal(300, OnboardingWindow.FitHeight(OnboardingWindow.WindowHeight, 40, 340)); // under the minimum: fits all the same
+    }
+
+    /// <summary>Pin (lens 4): Try it puts the keyboard focus in the practice box, not on Finish.</summary>
+    [Fact]
+    public Task Try_it_focuses_the_practice_box() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, _, _) = scratch.Shell();
+        var (_, window) = Open(shell, scratch);
+        var tryIt = GoTo<TryItStep>(window);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(tryIt.Box, window.FocusManager!.GetFocusedElement());
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens 5): the hotkey step gives focus to nothing, as the old hotkey window did, so Space cannot press a button.</summary>
+    [Fact]
+    public Task The_hotkey_step_focuses_nothing() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, _, _) = scratch.Shell();
+        var (_, window) = Open(shell, scratch);
+        GoTo<HotkeyStep>(window);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(window.FocusManager!.GetFocusedElement() is Button, $"focus is on {window.FocusManager.GetFocusedElement()}");
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens 7): the test closes the microphone about 5 s after "Heard you." and offers Test again, which opens it again.</summary>
+    [Fact]
+    public Task The_microphone_closes_after_hearing_you_and_can_test_again() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        var (step, window, mic, clock) = MicTest(scratch, shell, platform);
+        mic.Level = 0.05f;
+        Advance(step, clock, 3_000);
+        Assert.Equal(OnboardingText.HeardYou, step.Result);
+        Assert.True(mic.Open);
+        Advance(step, clock, (int)MicrophoneStep.StopAfterHeardMs);
+        Assert.False(mic.Open);
+        Assert.Null(step.Capture);
+        Assert.True(step.TestAgainShown);
+        Assert.Equal(OnboardingText.HeardYou, step.Result); // the result stays
+        Click(All<Button>(step).Single(b => b.Content as string == OnboardingText.TestAgain));
+        Assert.True(mic.Open);
+        Assert.False(step.TestAgainShown);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens 7): whatever it hears, the test closes the microphone after a minute.</summary>
+    [Fact]
+    public Task The_microphone_closes_after_a_minute() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        var (step, window, mic, clock) = MicTest(scratch, shell, platform);
+        mic.Level = 0.005f; // hiss: never heard, never digital silence
+        Advance(step, clock, (int)MicrophoneStep.StopAfterMs - 100);
+        Assert.True(mic.Open);
+        Advance(step, clock, 100);
+        Assert.False(mic.Open);
+        Assert.True(step.TestAgainShown);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens 8): "the included one" only with base.en on this PC; the accent explainer names the Standard model only when it is in use.</summary>
+    [Fact]
+    public Task The_copy_follows_what_is_on_this_PC_and_what_was_chosen() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        var (shell, _, _) = scratch.Shell(); // no base.en
+        var (_, window) = Open(shell, scratch);
+        GoTo<FolderStep>(window);
+        Assert.Contains(OnboardingText.FolderTextNotIncluded, Visible(window));
+        Assert.DoesNotContain(OnboardingText.FolderText, Visible(window));
+        var tryIt = (TryItStep)window.Steps.Last();
+        Assert.Equal(OnboardingText.AccentExplainer, tryIt.Explainer(new AppSettings { Whisper = new WhisperSettings { Model = "base.en" } }));
+        Assert.Equal(OnboardingText.AccentExplainerChosen, tryIt.Explainer(new AppSettings { Whisper = new WhisperSettings { Model = "small.en" } }));
+        Assert.Equal(OnboardingText.AccentExplainer, tryIt.Explainer(new AppSettings { Whisper = new WhisperSettings { Model = "small", Language = "es" } }));
+        window.Close();
+        shell.Dispose();
+
+        using var bundled = new Scratch();
+        Bundle(bundled);
+        var (shell2, _, _) = bundled.Shell();
+        var (_, window2) = Open(shell2, bundled);
+        GoTo<FolderStep>(window2);
+        Assert.Contains(OnboardingText.FolderText, Visible(window2));
+        window2.Close();
+        shell2.Dispose();
+    });
+
+    /// <summary>Pin (lens 9): a microphone list that throws (the audio service stopped) is the no-microphone sentence, and nothing is opened.</summary>
+    [Fact]
+    public Task A_microphone_list_that_throws_says_no_microphone() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        platform.ListDevicesThrows = true;
+        var captures = platform.Captures.Count;
+        var (step, window, mic, _) = MicTest(scratch, shell, platform);
+        Assert.Equal(OnboardingText.NoMicrophone, step.Result);
+        Assert.Equal(captures, platform.Captures.Count);
+        Assert.False(mic.Open);
         window.Close();
         shell.Dispose();
     });

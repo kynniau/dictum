@@ -17,12 +17,13 @@ namespace Dictum.UI.Views.Onboarding;
 /// settings are first loaded (<see cref="RunFirstSteps"/> returns when they are done or the window closes); Try it follows once
 /// the shell has loaded them and the hotkey listens (<see cref="OnboardingFlow.BeginTryIt"/>). Esc or closing the window skips
 /// whatever is left with today's defaults (<see cref="OnboardingFlow.SkipRest"/>). The text is larger than Dictum's other
-/// windows (17 px body), and the window fits a 1366 × 768 screen at 150 % (911 × 512 DIP, less the taskbar).
+/// windows (17 px body). Its client area is 420 DIP high, so with the caption it fits a 1366 × 768 screen at 150 % (911 × 512
+/// DIP, less the taskbar), and on opening it is clamped to the screen's work area, the body scrolling (<see cref="FitHeight"/>).
 /// </summary>
 internal sealed class OnboardingWindow : Window
 {
     public const double WindowWidth = 640;
-    public const double WindowHeight = 470;
+    public const double WindowHeight = 420;
 
     private readonly OnboardingFlow _flow;
     private readonly List<OnboardingStep> _steps = [];
@@ -91,7 +92,33 @@ internal sealed class OnboardingWindow : Window
             FirstStepsEnded?.Invoke();
         };
         flow.TryItReady += () => Dispatcher.UIThread.Post(() => (Current as TryItStep)?.Tick());
+        Opened += (_, _) => FitToWorkArea();
         Show(0);
+    }
+
+    /// <summary>
+    /// The client height that keeps the whole window (client plus <paramref name="frame"/>, the caption and borders) inside a
+    /// work area <paramref name="workArea"/> DIP high: <paramref name="wanted"/>, or less (the body scrolls; lens on 6bacce9: Back
+    /// and Next sat under the taskbar). MinHeight is lowered to match when the work area is smaller still.
+    /// </summary>
+    internal static double FitHeight(double wanted, double frame, double workArea) => Math.Max(1, Math.Min(wanted, workArea - frame));
+
+    /// <summary>Clamps the window to the work area of its screen (the taskbar excluded) and moves it inside it.</summary>
+    private void FitToWorkArea()
+    {
+        if ((Screens.ScreenFromWindow(this) ?? Screens.Primary) is not { } screen) return;
+        var scaling = screen.Scaling > 0 ? screen.Scaling : 1;
+        var work = screen.WorkingArea;
+        var frame = Math.Max(0, (FrameSize?.Height ?? ClientSize.Height) - ClientSize.Height);
+        var height = FitHeight(Height, frame, work.Height / scaling);
+        if (height < Height)
+        {
+            MinHeight = Math.Min(MinHeight, height);
+            Height = height;
+        }
+        var outer = (int)Math.Ceiling((height + frame) * scaling);
+        if (Position.Y < work.Y || Position.Y + outer > work.Bottom)
+            Position = new PixelPoint(Position.X, Math.Max(work.Y, work.Y + (work.Height - outer) / 2));
     }
 
     /// <summary>Raised once steps 1-5 are over: finished, or the window closed.</summary>
@@ -176,7 +203,14 @@ internal sealed class OnboardingWindow : Window
         step.Enter();
         ShowButtons();
         _scroll.Offset = default;
-        Dispatcher.UIThread.Post(() => _primary.Focus()); // Enter or Space moves on; Tab reaches everything else
+        // Enter or Space moves on from the primary button; Tab reaches everything else. Try it focuses its box, the hotkey step
+        // nothing (OnboardingStep.InitialFocus).
+        var focus = step.InitialFocus(_primary);
+        if (focus is null) FocusManager?.ClearFocus();
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Current == step && focus is not null) focus.Focus();
+        });
     }
 
     private void ShowButtons()

@@ -56,6 +56,9 @@ internal abstract class OnboardingStep : UserControl
     {
     }
 
+    /// <summary>What has keyboard focus when the step is shown: the primary button (Enter or Space moves on), unless a step says otherwise.</summary>
+    public virtual Control? InitialFocus(Button primary) => primary;
+
     /// <summary>The primary button: completes the step; false keeps it on screen (a refusal to read).</summary>
     public virtual bool Primary() => true;
 
@@ -85,6 +88,7 @@ internal sealed class FolderStep : OnboardingStep
     private readonly TextBlock _free = Ui.Text("", "caption");
     private readonly TextBlock _warning = Ui.Text("", "caption");
     private readonly TextBlock _refusal = Ui.Text("", "error");
+    private readonly TextBlock _intro = Ui.Text(OnboardingText.FolderText);
     private readonly Button _useSuggested;
 
     public FolderStep(OnboardingFlow flow) : base(flow, OnboardingText.FolderName, OnboardingText.FolderHeading)
@@ -93,9 +97,12 @@ internal sealed class FolderStep : OnboardingStep
         AutomationProperties.SetLiveSetting(_refusal, AutomationLiveSetting.Assertive);
         var choose = Ui.Button(OnboardingText.ChooseOther, "secondary", Choose);
         _useSuggested = Ui.Button(OnboardingText.UseSuggested, "secondary", () => Show(Flow.ChooseFolder(null)));
-        Content = Ui.Stack(12, Line(OnboardingText.FolderText), _folder, _free, _warning, new WrapPanel { ItemSpacing = 8, LineSpacing = 8, Children = { choose, _useSuggested } }, _refusal);
+        Content = Ui.Stack(12, _intro, _folder, _free, _warning, new WrapPanel { ItemSpacing = 8, LineSpacing = 8, Children = { choose, _useSuggested } }, _refusal);
         Show(null);
     }
+
+    /// <summary>"The included one" only when base.en is on this PC (looked up with the plan, as the speech step does).</summary>
+    public override void Enter() => _intro.Text = Flow.Plan.BundledPath is not null ? OnboardingText.FolderText : OnboardingText.FolderTextNotIncluded;
 
     private void Choose()
     {
@@ -183,7 +190,7 @@ internal sealed class SpeechStep : OnboardingStep
             foreach (var t in tiers)
             {
                 var info = ModelCatalog.Find(t.Model)!;
-                var sub = t.Tier == SpeechTier.Standard ? SimpleView.StandardSubLineNotIncluded : t.SubLine; // this step shows only without base.en
+                var sub = t.Tier == SpeechTier.Standard ? SimpleView.StandardSubLineNotIncluded : t.SubLine; // Standard here is small, or base.en without its bundled copy: never "Included"
                 if (!OnThisPc(info)) sub = $"{sub} ({info.SizeText})";
                 _choices.Children.Add(Radio(t.Model, t.Label, sub, ReferenceEquals(t, tier)));
             }
@@ -251,6 +258,12 @@ internal sealed class HotkeyStep : OnboardingStep
 
     internal HotkeyCaptureBox Box => _box;
 
+    /// <summary>
+    /// Nothing: a key pressed here is a hotkey being chosen, and Space on a focused button would choose it and press the button
+    /// in one go. The first-run hotkey window gave focus to nothing either; Enter still presses Use this hotkey (lens on 6bacce9).
+    /// </summary>
+    public override Control? InitialFocus(Button primary) => null;
+
     public override void Leave() => _box.Stop();
 
     public override bool Primary()
@@ -266,35 +279,30 @@ internal sealed class HotkeyStep : OnboardingStep
 internal enum MicResult { Listening, Heard, NothingHeard }
 
 /// <summary>
-/// The microphone test's rule, apart from the window: "Heard you." after about three seconds of sound in all, "Nothing heard."
-/// after five seconds of silence in a row (it can still become "Heard you." while the test listens). A level above
-/// <see cref="SoundFloor"/> is sound.
+/// The microphone test's rule, apart from the window (lens on 6bacce9, 21/10/2026). "Heard you." needs about three seconds in
+/// all at or above <c>silence_threshold</c> (settings.json, 0.01 by default: below it a dictation is discarded as silence), so a
+/// microphone that delivers only background hiss is not "heard". "Nothing heard." is digital silence: five seconds in a row at
+/// or below <see cref="SoundFloor"/>, the "No sound from mic" rule (PR #22); a level between the two is neither. "Nothing
+/// heard." can still become "Heard you." while the test listens.
 /// </summary>
-internal sealed class MicCheck
+internal sealed class MicCheck(double threshold)
 {
     public const long HeardAfterMs = 3000;
     public const long NothingAfterMs = 5000;
 
-    /// <summary>merge: PR #22's CaptureBuffer.SoundFloor (1e-5, -100 dBFS: below one 16-bit step), the same rule as "No sound from mic".</summary>
+    /// <summary>merge: PR #22's CaptureBuffer.SoundFloor (1e-5, -100 dBFS: below one 16-bit step), the "No sound from mic" floor.</summary>
     public const float SoundFloor = 1e-5f;
 
-    private long _soundMs;
+    private long _loudMs;
     private long _silentMs;
 
     public MicResult Result { get; private set; }
 
     public MicResult Feed(float level, long elapsedMs)
     {
-        if (level > SoundFloor)
-        {
-            _soundMs += elapsedMs;
-            _silentMs = 0;
-        }
-        else
-        {
-            _silentMs += elapsedMs;
-        }
-        if (_soundMs >= HeardAfterMs) Result = MicResult.Heard;
+        if (level >= threshold) _loudMs += elapsedMs;
+        _silentMs = level > SoundFloor ? 0 : _silentMs + elapsedMs;
+        if (_loudMs >= HeardAfterMs) Result = MicResult.Heard;
         else if (Result != MicResult.Heard && _silentMs >= NothingAfterMs) Result = MicResult.NothingHeard;
         return Result;
     }
@@ -302,22 +310,32 @@ internal sealed class MicCheck
 
 /// <summary>
 /// Step 5: the microphone test. The device list is Settings > Microphone's (same labels); a capture opened for this test only
-/// drives a live meter from its CurrentLevel and is closed when the step is left or the window closes, so the microphone is
-/// never left open. With reduced motion the meter moves at most twice a second.
+/// drives a live meter from its CurrentLevel and is closed when the step is left or the window closes, about five seconds
+/// after "Heard you.", or after a minute in any case (then "Test again" opens it again), so the microphone is never left
+/// open. With reduced motion the meter moves at most twice a second.
 /// </summary>
 internal sealed class MicrophoneStep : OnboardingStep
 {
     private const int TickMs = 50;
     internal const int ReducedMotionMeterMs = 500;
 
+    /// <summary>The test closes the microphone this long after "Heard you." (lens on 6bacce9).</summary>
+    internal const long StopAfterHeardMs = 5000;
+
+    /// <summary>The test closes the microphone after this long whatever it heard.</summary>
+    internal const long StopAfterMs = 60_000;
+
     private readonly ComboBox _device = new() { MinWidth = 300, HorizontalAlignment = HorizontalAlignment.Left };
     private readonly Meter _meter = new(28);
     private readonly TextBlock _result = Ui.Text(OnboardingText.SayWords);
+    private readonly Button _testAgain;
     private readonly DispatcherTimer _timer;
     private List<string?> _ids = [];
     private IAudioCapture? _capture;
-    private MicCheck _check = new();
+    private MicCheck _check = new(0.01);
     private long _last;
+    private long _startedAt;
+    private long? _heardAt;
     private long _meterShownAt;
     private float _meterPeak;
     private bool _filling;
@@ -332,10 +350,13 @@ internal sealed class MicrophoneStep : OnboardingStep
             if (_filling) return;
             StartTest(); // another microphone: test that one
         };
+        _testAgain = Ui.Button(OnboardingText.TestAgain, "secondary", StartTest);
+        _testAgain.IsVisible = false;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(TickMs), DispatcherPriority.Background, (_, _) => Tick());
         Content = Ui.Stack(14,
             Ui.Line("Microphone", _device),
             Ui.Row(14, _meter, _result),
+            _testAgain,
             Line(OnboardingText.MicSkipNote, "caption"));
         _result.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
         _result.MaxWidth = 460;
@@ -348,14 +369,33 @@ internal sealed class MicrophoneStep : OnboardingStep
 
     internal string Result => _result.Text ?? "";
 
+    internal bool TestAgainShown => _testAgain.IsVisible;
+
     /// <summary>The device id chosen (null: the system default).</summary>
     internal string? ChosenDevice => _device.SelectedIndex >= 0 && _device.SelectedIndex < _ids.Count ? _ids[_device.SelectedIndex] : Flow.Device;
 
     internal ComboBox DevicePicker => _device;
 
+    /// <summary>
+    /// The microphones the system lists, or none when it cannot say (the audio service stopped: the Windows device list throws
+    /// then; lens on 6bacce9). Logged, never fatal.
+    /// </summary>
+    private IReadOnlyList<AudioDeviceInfo> Devices()
+    {
+        try
+        {
+            return Flow.Shell.Platform.ListCaptureDevices();
+        }
+        catch (Exception ex)
+        {
+            Flow.Shell.Log.Warn($"Onboarding microphone test: the microphones could not be listed: {ex.GetType().Name}: {ex.Message}");
+            return [];
+        }
+    }
+
     public override void Enter()
     {
-        var devices = Flow.Shell.Platform.ListCaptureDevices();
+        var devices = Devices();
         _filling = true;
         _ids = [null, .. devices.Select(d => (string?)d.Name)];
         var labels = new List<string> { "System default" };
@@ -371,6 +411,7 @@ internal sealed class MicrophoneStep : OnboardingStep
         if (devices.Count == 0)
         {
             StopTest();
+            _testAgain.IsVisible = false;
             _result.Text = OnboardingText.NoMicrophone; // nothing to open
             return;
         }
@@ -380,7 +421,9 @@ internal sealed class MicrophoneStep : OnboardingStep
     private void StartTest()
     {
         StopTest();
-        _check = new MicCheck();
+        _testAgain.IsVisible = false;
+        _check = new MicCheck(Flow.SilenceThreshold);
+        _heardAt = null;
         _result.Text = OnboardingText.SayWords;
         var capture = Flow.Shell.Platform.CreateCapture(Flow.Shell.Log);
         try
@@ -390,11 +433,12 @@ internal sealed class MicrophoneStep : OnboardingStep
         catch (Exception ex)
         {
             (capture as IDisposable)?.Dispose();
-            _result.Text = Flow.Shell.Platform.ListCaptureDevices().Count == 0 ? OnboardingText.NoMicrophone : OnboardingText.CouldNotOpen(ex.Message);
+            _result.Text = Devices().Count == 0 ? OnboardingText.NoMicrophone : OnboardingText.CouldNotOpen(ex.Message);
+            _testAgain.IsVisible = true;
             return;
         }
         _capture = capture;
-        _last = _meterShownAt = Flow.Clock();
+        _last = _startedAt = _meterShownAt = Flow.Clock();
         _meterPeak = 0;
         _timer.Start();
     }
@@ -439,6 +483,12 @@ internal sealed class MicrophoneStep : OnboardingStep
             MicResult.NothingHeard => OnboardingText.NothingHeard,
             _ => OnboardingText.SayWords,
         };
+        if (result == MicResult.Heard) _heardAt ??= now;
+        if (_heardAt is long heard && now - heard >= StopAfterHeardMs || now - _startedAt >= StopAfterMs)
+        {
+            StopTest(); // the result line stays; Test again opens the microphone again
+            _testAgain.IsVisible = true;
+        }
     }
 
     /// <summary>How many times the meter was redrawn (tests: the reduced-motion rate).</summary>
@@ -476,6 +526,7 @@ internal sealed class TryItStep : OnboardingStep
         AutomationProperties.SetName(_box, OnboardingText.TryBoxName);
         AutomationProperties.SetLiveSetting(_instruction, AutomationLiveSetting.Polite);
         AutomationProperties.SetLiveSetting(_explainer, AutomationLiveSetting.Polite);
+        AutomationProperties.SetLiveSetting(_nothing, AutomationLiveSetting.Polite);
         _explainer.IsVisible = false;
         _nothing.IsVisible = false;
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
@@ -516,6 +567,7 @@ internal sealed class TryItStep : OnboardingStep
         if (!Succeeded && Flow.TryItLive && !ReferenceEquals(shell.Personal.Last, _before) && shell.Personal.Last is not null)
         {
             Succeeded = true;
+            _explainer.Text = Explainer(shell.Settings);
             _explainer.IsVisible = true;
             _nothing.IsVisible = false;
             RaiseButtonsChanged();
@@ -525,6 +577,15 @@ internal sealed class TryItStep : OnboardingStep
         var failedLoad = Flow.TryItLive && !shell.SpeechLoading && !shell.SpeechReady && shell.SpeechError is not null;
         if (failedLoad || _readyAt is long at && Flow.Clock() - at >= NothingAfterMs) _nothing.IsVisible = true;
     }
+
+    /// <summary>The Standard model's explainer only when the model in use is the Standard choice for its language; else "the model you chose".</summary>
+    internal string Explainer(AppSettings s) =>
+        SimpleView.TierOf(s.Whisper.Model, Flow.Shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate)?.Tier == SpeechTier.Standard
+            ? OnboardingText.AccentExplainer
+            : OnboardingText.AccentExplainerChosen;
+
+    /// <summary>The practice box: a hotkey held without clicking first pastes there, not into a button (lens on 6bacce9).</summary>
+    public override Control? InitialFocus(Button primary) => _box;
 
     private static string HotkeyName(string hotkey) => HotkeyParser.TryParse(hotkey, out var spec, out _) ? spec.Display : hotkey;
 

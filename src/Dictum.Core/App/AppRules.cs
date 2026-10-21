@@ -23,6 +23,11 @@ public static class AppRules
     /// Its speech step writes whisper.model, so a start after that step (a crash, say) does not show it again; the steps after
     /// it are not shown again either, as the hotkey check was not.
     /// </summary>
+    // simplification: the window is shown while settings.json names no whisper.model, and its speech step writes one, so the
+    // steps after it (hotkey, microphone, Try it) are not shown again after an interruption. Ceiling: a person whose PC stops
+    // or whose Dictum crashes between the speech step and the end gets no window on the next start and never sees those steps
+    // (as the first-run hotkey check was not shown again before 1.2). Trigger to retire: a report of that; then record the steps
+    // finished in settings.json (a key the loader must learn) and show the window until the last one is recorded.
     public static bool Onboards(SettingsLoadResult file, bool modelOverride) => FirstRunQuestions(file).AskSpeech && !modelOverride;
 
     /// <summary>

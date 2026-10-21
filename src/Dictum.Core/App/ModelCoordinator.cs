@@ -262,6 +262,8 @@ public sealed class ModelCoordinator(
     /// the size. A null speech pick (the onboarding skipped) writes the recommendation and downloads nothing: the startup
     /// missing-model question asks first (SPEC §10). A null clean-up pick (the onboarding asks no clean-up question) is the
     /// rule-based tidy, as with base.en, unless <paramref name="keepProvider"/>.
+    /// A speech pick wins over base.en on this PC: the onboarding asks for one when settings.json names a language that is not
+    /// English (lens on 6bacce9); FirstRun passes none when base.en is there, so it is unchanged.
     /// </summary>
     public void AnswerFirstRun(FirstRunPlan plan, bool askSpeech, bool askCleanup, bool keepProvider, ModelPick? speechPick = null, CleanupPick? cleanupPick = null)
     {
@@ -270,7 +272,7 @@ public sealed class ModelCoordinator(
         {
             log.Info("First run with a model override: pickers skipped.");
         }
-        else if (plan.BundledPath is { } bundled)
+        else if (plan.BundledPath is { } bundled && speechPick is null) // a pick (the onboarding's, for a language that is not English) wins over base.en
         {
             chosenSpeech = ModelCatalog.Bundled;
             if (!keepProvider) provider = LlmSettings.NoProvider; // the lens, 17/10/2026: a seeded "local" was turned to none without a question

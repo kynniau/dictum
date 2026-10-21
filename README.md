@@ -326,7 +326,7 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 1. **Welcome to Dictum (1.2).** With no `settings.json` yet (or a seeded one that names no `whisper.model`), Dictum opens
    one window that walks through the first run in large text, with a step line ("Step 2 of 6: Model files"), **Back**
    and **Next**. Every step is reachable by keyboard; **Esc** or closing the window skips the rest and keeps the
-   defaults below, and the settings file is always left complete and valid. Each step writes its own setting when you
+   defaults below, and the settings file is always left valid. Each step writes its own setting when you
    finish it, and only when you changed something:
    1. **How Dictum works**: hold your hotkey, speak, let go, and the words appear where you were typing; everything
       happens on this PC.
@@ -343,7 +343,10 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
       models"). A base.en in your own models folder, or in the one you chose in step 2, counts the same.
       **Without base.en** (a build without its `models` folder, or the file removed or failing its check) the step
       offers the Simple view's choices (Standard, More accurate, Most accurate; multilingual models when settings.json
-      names a language that is not English), the recommendation for this PC chosen, and **Show every model** for the whole catalogue and **Choose model file…**. A model that is not on disk yet
+      names a language that is not English), the recommendation for this PC chosen, and **Show every model** for the
+      whole catalogue and **Choose model file…**. A `settings.json` that names a language that is not English (or
+      translate) gets the same choice even with base.en, which is English only; **Esc** there keeps base.en, so dictation
+      works at once and the language warning follows. A model that is not on disk yet
       is downloaded from huggingface.co when the window reaches Try it (progress in the tray panel and the icon's
       tooltip) and checked against the catalogue's size and SHA-256. The window asks no clean-up question: it writes the
       rule-based tidy, as with base.en. Nothing is downloaded without your choice.
@@ -351,11 +354,13 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
       note for Mac keyboards over Remote Desktop, and **Use this hotkey** or **Skip** (see "Keyboards and Remote
       Desktop").
    5. **Test your microphone**: the microphone list from Settings > Microphone, a live level meter (it moves at most
-      twice a second when Windows' "Show animations" setting is off), and "Say a few words." After about three seconds of
-      sound it says "Heard you."; after five seconds of silence it explains what to check, including microphone
+      twice a second when Windows' "Show animations" setting is off), and "Say a few words." After about three seconds in all at
+      or above `silence_threshold` (the level below which a dictation counts as silence) it says "Heard you."; after five
+      seconds of digital silence it explains what to check, including microphone
       redirection on a remote or virtual desktop; with no microphone listed it says so. The microphone is open only
-      while this step is on screen. **Skip** is fine.
-   6. **Try it**: a box in the window. Click in it, hold your hotkey, say a sentence and let go: the real dictation path
+      while this step is on screen, and closes by itself about five seconds after "Heard you." or after a minute;
+      **Test again** opens it again. **Skip** is fine.
+   6. **Try it**: a box in the window, which has the keyboard focus. Click in it if you have moved away, hold your hotkey, say a sentence and let go: the real dictation path
       types into it. After your first dictation the window explains that accents, voices and microphones differ, with
       **Calibrate my voice** and **Finish**. If nothing arrives within 30 seconds of the model being ready, it says so,
       and **Finish** still works.

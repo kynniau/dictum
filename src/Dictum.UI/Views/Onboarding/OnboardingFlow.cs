@@ -51,6 +51,9 @@ public sealed class OnboardingFlow
 
     public bool Translate => _file.Settings.Whisper.Translate;
 
+    /// <summary>silence_threshold in settings.json: the microphone test hears you only at or above it, as dictation does.</summary>
+    public double SilenceThreshold => _file.Settings.SilenceThreshold;
+
     /// <summary>The hotkey in settings.json (the default when it names none); the hotkey step's answer once completed.</summary>
     public string Hotkey { get; private set; }
 
@@ -109,8 +112,12 @@ public sealed class OnboardingFlow
     /// <summary>The first-run recommendation and whether base.en is on this PC, looked up with the folder chosen (once).</summary>
     public FirstRunPlan Plan => _plan ??= _shell.Models.PlanFirstRun(SettingsLoader.LoadFile(_shell.Paths.SettingsFile) is { Usable: true } now ? now.Settings : _file.Settings);
 
-    /// <summary>The speech step shows a choice: base.en is not on this PC.</summary>
-    public bool AsksSpeech => Plan.AsksPickers;
+    /// <summary>
+    /// The speech step shows a choice: base.en is not on this PC, or settings.json names a language that is not English (or
+    /// translate), for which base.en, English only, is not one of the Simple view's choices (lens on 6bacce9). Esc there keeps
+    /// base.en, as before 1.2: dictation works at once and the existing language warning follows.
+    /// </summary>
+    public bool AsksSpeech => Plan.AsksPickers || !Plan.Overridden && SimpleView.Multilingual(Language, Translate);
 
     /// <summary>
     /// Completes the speech step: writes whisper.model (and the clean-up answer, the rule-based tidy as with base.en, unless

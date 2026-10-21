@@ -42,6 +42,10 @@ internal static class OnboardingText
     public const string FolderText =
         "Dictum keeps its speech models on this PC. The included one is about 150 MB; adding more models can take several gigabytes more.";
 
+    /// <summary>The same without base.en on this PC (a build without it): "included" would be untrue (lens on 6bacce9).</summary>
+    public const string FolderTextNotIncluded =
+        "Dictum keeps its speech models on this PC. The Standard model is about 150 MB to download; adding more models can take several gigabytes more.";
+
     public const string FolderBoxName = "Folder for the model files";
     public const string ChooseOther = "Choose another drive or folder…";
     public const string UseSuggested = "Use the suggested folder";
@@ -57,7 +61,7 @@ internal static class OnboardingText
     /// <summary>The speech choice when base.en is not on this PC (a build without it): the tiers, then every model on request.</summary>
     public static string SpeechChoice(string host) =>
         $"Choose how carefully Dictum listens. Bigger models are more accurate but slower. A model that is not on this PC yet is downloaded from {host} " +
-        "when you finish. You can change this later in Settings > Models.";
+        "when you reach the end of these steps. You can change this later in Settings > Models.";
 
     public const string ShowEveryModel = "Show every model";
 
@@ -96,9 +100,18 @@ internal static class OnboardingText
     public const string TryLoading = "Getting the speech model ready…";
     public const string TryBoxName = "Practice box";
 
+    /// <summary>After a first dictation on the Standard model (the Simple view's first choice for the language in use).</summary>
     public const string AccentExplainer =
         "Everyone's accent, voice and microphone are different. The Standard model works well for most people. If words come out wrong, " +
         "choose More accurate in Settings > Models, or press Calibrate my voice to find which model hears you best.";
+
+    /// <summary>After a first dictation on any other model: the one chosen in the speech step, or a seeded one (lens on 6bacce9).</summary>
+    public const string AccentExplainerChosen =
+        "Everyone's accent, voice and microphone are different. The model you chose works well for most people. If words come out wrong, " +
+        "choose a more accurate model in Settings > Models, or press Calibrate my voice to find which model hears you best.";
+
+    /// <summary>The microphone test closed the microphone (about 5 s after "Heard you.", or after a minute): this opens it again.</summary>
+    public const string TestAgain = "Test again";
 
     /// <summary>Settings > Help is lane C's page (PR #24, merged before this one); nothing re-runs this window, so the line says Help explains how.</summary>
     public const string NothingCame = "Nothing came through. You can try again any time: Settings > Help explains how.";

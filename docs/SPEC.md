@@ -1246,34 +1246,46 @@ Enter presses the step's primary button. Steps:
 1. **Welcome / How it works**: one paragraph, then Next.
 2. **Where to keep the model files**: the suggested folder (the per-user default) pre-selected, with its drive's free space
    ("C: has 41.0 GB free"; no line when it cannot be read), the network-folder note when it applies, and "Choose another
-   drive or folder…" (the system's folder chooser). The folder is checked by Settings > Models' rule
+   drive or folder…" (the system's folder chooser). The text calls base.en "the included one" only when it is on this PC,
+   else "the Standard model is about 150 MB to download". The folder is checked by Settings > Models' rule
    (`ModelCoordinator.FolderRefusal`): the bundled folder or one inside it is refused with "That folder holds the models
    that come with Dictum…", and a device path other than `\\?\X:\` or `\\?\UNC\` with a new sentence (the settings load
    already ignored such a `models.folder`). `models.folder` is written only when it differs from what settings.json holds
    ("Use the suggested folder" and Back can put it back to null). Not shown when settings.json names `models.folder` or
    `whisper.models_dir` (`AppRules.AsksFolder`).
-3. **Speech model**: when base.en is in the lookup order (with the folder just chosen), one line, "The Standard model is
-   included and ready.", and no choice; otherwise the Simple view's tiers (§10.1) for the language settings.json names (multilingual
-   models when it is not plain English; a tier the language rules out is left out), with their sub-lines and sizes, the
-   recommendation pre-selected, and "Show every model" for the full catalogue and "Choose model file…". Completing
-   it writes through the first run's own writer (`ModelCoordinator.AnswerFirstRun`, split out of `FirstRun`): base.en and
-   `llm.provider` = `none` with base.en; otherwise the pick, with a catalogue model not on this PC downloaded at startup as
-   the picker's was. No clean-up question: the rule-based tidy, unless a seeded `llm.provider` is kept (§24).
-4. **Your hotkey**: the first-run hotkey check (§20), its box, words, buttons and behaviour unchanged.
-5. **Microphone test**: Settings > Microphone's device list and labels; a capture opened for the test only, its
-   `CurrentLevel` driving a five-bar meter (polled every 50 ms; with reduced motion, `WindowFlags.ReducedMotion`, the meter is
-   redrawn at most every 500 ms with the loudest level since). "Say a few words." until about 3 s of sound in all ("Heard
-   you.") or 5 s of silence in a row (the advice, which a later sound can still turn into "Heard you."). A level above
-   1e-5 RMS is sound (the "No sound from mic" floor, PR #22). With no microphone listed, the no-microphone sentence and no
-   capture. The capture is stopped on every way out of the step (Next, Skip, Back, Esc, closing the window). Choosing
-   another microphone tests it at once; Next writes `audio.device` only when it changed; Skip writes nothing.
+3. **Speech model**: when base.en is in the lookup order (with the folder just chosen) and settings.json names English
+   without translate, one line, "The Standard model is included and ready.", and no choice. Otherwise the Simple view's
+   tiers (§10.1) for the language settings.json names (multilingual models when it is not plain English; a tier the
+   language rules out is left out), with their sub-lines and sizes, the recommendation pre-selected, and "Show every model"
+   for the full catalogue and "Choose model file…". With base.en on this PC and a language that is not English, the pick
+   wins over base.en; Esc there keeps base.en (as before 1.2: dictation works at once and the existing language warning
+   follows). Completing the step writes through the first run's own writer (`ModelCoordinator.AnswerFirstRun`, split out
+   of `FirstRun`): base.en and `llm.provider` = `none` with base.en and no pick; otherwise the pick, with a catalogue model
+   not on this PC downloaded at startup as the picker's was. No clean-up question: the rule-based tidy, unless a seeded
+   `llm.provider` is kept (§24).
+4. **Your hotkey**: the first-run hotkey check (§20), its box, words, buttons and behaviour unchanged. As in the old
+   window, nothing has keyboard focus when the step opens, so Space chosen as the hotkey does not also press a button;
+   Enter (never a hotkey) presses "Use this hotkey".
+5. **Microphone test**: Settings > Microphone's device list and labels (a list that cannot be read, the audio service
+   stopped, counts as no microphone); a capture opened for the test only, its `CurrentLevel` driving a five-bar meter
+   (polled every 50 ms; with reduced motion, `WindowFlags.ReducedMotion`, the meter is redrawn at most every 500 ms with the
+   loudest level since). "Say a few words." until about 3 s in all at or above settings.json's `silence_threshold` (0.01
+   by default, the level below which a dictation is discarded as silence: "Heard you."), or 5 s in a row of digital silence,
+   at or below 1e-5 RMS (the "No sound from mic" floor, PR #22: the advice, which a later sound can still turn into "Heard
+   you."). A level between the two (background hiss) is neither. With no microphone listed, the no-microphone sentence and
+   no capture. The capture is stopped about 5 s after "Heard you.", after 60 s in any case ("Test again" opens it again),
+   and on every way out of the step (Next, Skip, Back, Esc, closing the window). Choosing another microphone tests it at
+   once; Next writes `audio.device` only when it changed; Skip writes nothing.
 6. **Try it**: after steps 1-5 the window stays open while the shell loads the settings, installs the hotkey and starts
    loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). Until the model is
    ready the step says "Getting the speech model ready…"; then "Click in the box, hold <hotkey>, say a sentence, then let
-   go." over a multi-line box. A dictation goes through the normal path (hotkey listener, controller, pipeline, paste into
-   the focused box); the step watches the shell's last dictation (`PersonalService.Last`) and after the first one shows
-   the accent explainer and "Calibrate my voice" (which opens the calibration window and closes this one). With nothing
-   30 s after the model is ready, or a speech model that failed to load, the try-later line; Finish always works. No Back.
+   go." over a multi-line box, which has the keyboard focus (a hotkey held without clicking first pastes there). A
+   dictation goes through the normal path (hotkey listener, controller, pipeline, paste into the focused box); the step
+   watches the shell's last dictation (`PersonalService.Last`) and after the first one shows the accent explainer
+   ("The Standard model works well…" when the model in use is the Standard choice for its language, else "The model you
+   chose works well…") and "Calibrate my voice" (which opens the calibration window and closes this one). With nothing 30 s
+   after the model is ready, or a speech model that failed to load, the try-later line (a polite live region); Finish always
+   works. No Back.
 
 Writes and interruption. Each step writes its own settings when completed, straight to settings.json (atomic writes, no
 reload: nothing is loaded yet). Esc or closing the window before the end is "skip the rest": the speech answer is written
@@ -1281,10 +1293,14 @@ with today's defaults (base.en and the rule-based tidy; without base.en, the rec
 missing-model question of §10 asks first), and the folder, hotkey and microphone stay as settings.json has them; Try it
 does not follow. A folder chosen in step 2 before any other write makes settings.json start with that key alone; the
 speech step adds its keys to it, as for a seeded file. A start after the speech step (a crash) opens no window, as no
-hotkey check was shown again before. `--selftest`, `--transcribe` and the other CLI modes never open it.
+hotkey check was shown again before (`// simplification:` in `AppRules.Onboards`). `--selftest`, `--transcribe` and the
+other CLI modes never open it.
 
-Accessibility. Every control has an accessible name; everything is reached by Tab; the step line is a polite live region;
-the folder refusal is an assertive one. The window is 640 × 470 DIP (resizable, minimum 480 × 360), which fits a 1366 × 768
-screen at 150 % (911 × 512 DIP) with a taskbar; text is larger than in the other windows (body 17 px, buttons 16 px).
+Accessibility and size. Every control has an accessible name; everything is reached by Tab; the step line and the try-later
+line are polite live regions; the folder refusal is an assertive one. The client area is 640 × 420 DIP (resizable, minimum
+480 × 360); text is larger than in the other windows (body 17 px, buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512
+DIP; with the Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, and 420 plus a caption
+of about 32 DIP (recalled) fits. On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`,
+the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar.
 
 Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.

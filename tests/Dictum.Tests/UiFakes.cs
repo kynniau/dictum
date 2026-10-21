@@ -74,7 +74,9 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     }
     /// <summary>The microphones the system lists; one by default.</summary>
     public List<AudioDeviceInfo> Devices { get; } = [new("id-1", "Test microphone", true)];
-    public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => Devices;
+    /// <summary>Listing the microphones throws, as the Windows device list does with the audio service stopped.</summary>
+    public bool ListDevicesThrows { get; set; }
+    public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => ListDevicesThrows ? throw new System.Runtime.InteropServices.COMException("The audio service is not running.") : Devices;
     public IStartupRegistration Startup { get; } = new FakeStartup();
     public IInstanceLock AcquireSingleInstance(TimeSpan wait) => throw new NotSupportedException();
     public IWindowFlags WindowFlags => Flags;
