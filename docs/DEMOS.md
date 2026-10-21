@@ -205,7 +205,10 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   (`scripts\demos\dictation-stills.json`, kind `stills`). It is an illustration of the indicator, not a recording:
   no text is shown being typed. The headless frame has an opaque black background (no window transparency there),
   which the script keys out; the pill's shadow goes with it. The 1.2 stills were rendered by the 1.2 code (the script
-  run from a checkout of that build, `-Out` pointing here).
+  run from a checkout of that build, `-Out` pointing here). 1.2.1 changed the hold pill to "Recording · let go to
+  finish" (owner decision 3, 22/10/2026), so `dictation-stills` was re-rendered on branch `fix/1.2.1-copy`
+  (`scripts\demo-stills.ps1 -Out <folder>`, headless, no sandbox) and `site/img/demos/dictation-stills.gif` replaced;
+  the poster (the last slide, "Pasted 12 words") came out byte-identical and is unchanged. Whether a frame of any other demo shows the hold pill was not checked.
 - **No network.** SmartScreen cannot reach Microsoft, so the install demo shows "SmartScreen can't be reached right
   now" (Run / Don't run) where a real download shows "Windows protected your PC" (More info, then Run anyway). The data
   file has optional steps for both; only the offline one has been seen in the sandbox.

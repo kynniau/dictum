@@ -65,31 +65,31 @@ public static partial class UpdateCheck
     /// <summary>The most of an answer that is read. version.json was 76 bytes on 16/10/2026; a bigger answer is not it.</summary>
     public const int MaxBytes = 16 * 1024;
 
-    // The user-facing strings: proposed 16/10/2026, awaiting the product owner's approval; do not reword.
+    // The user-facing strings: APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.
     // UpdateCheckTests pins each one word for word.
 
-    /// <summary>The button on Settings → About (direct download only). Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>The button on Settings → About (direct download only). APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public const string ButtonLabel = "Check for updates";
 
-    /// <summary>Beside the button. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>Beside the button. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public const string PrivacyLine = "Checking reads one small file from dictum.kynni.au and sends nothing about you.";
 
-    /// <summary>This copy is the latest. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>This copy is the latest. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public static string LatestLine(string version) => $"You have the latest version ({version}).";
 
-    /// <summary>A newer version is out. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>A newer version is out. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public static string NewerLine(string version) => $"{version} is available.";
 
-    /// <summary>The button under <see cref="NewerLine"/>, above the release notes. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>The button under <see cref="NewerLine"/>, above the release notes. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public const string DownloadPageLabel = "Open the download page";
 
-    /// <summary>offline_only refused the check. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>offline_only refused the check. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public const string OfflineOnlyLine = "Offline only is on, so Dictum did not check.";
 
-    /// <summary>No network, an HTTP error or a bad file. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>No network, an HTTP error or a bad file. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public const string FailedLine = "Could not check right now. Try again later.";
 
-    /// <summary>The Store build, in place of the button. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.</summary>
+    /// <summary>The Store build, in place of the button. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.</summary>
     public const string StoreLine = "Updates come from the Microsoft Store.";
 
     /// <summary>

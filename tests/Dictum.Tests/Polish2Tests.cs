@@ -164,11 +164,13 @@ public class Polish2Tests
         shell.Dispose();
     });
 
-    /// <summary>The Mode lines the pin measures: Simple and model names, on a CPU and a GPU machine, with and without the Custom note.</summary>
-    public static TheoryData<bool, bool, bool> ModeLines() => new()
+    /// <summary>
+    /// The Mode lines the pin measures: the model names, on a CPU and a GPU machine, with and without the Custom note. Only the
+    /// Advanced view shows the line (owner decision 5, 22/10/2026), so the Simple names are no longer measured.
+    /// </summary>
+    public static TheoryData<bool, bool> ModeLines() => new()
     {
-        { true, false, false }, { true, true, false }, { true, false, true }, { true, true, true },
-        { false, false, false }, { false, true, false }, { false, false, true }, { false, true, true },
+        { false, false }, { true, false }, { false, true }, { true, true },
     };
 
     /// <summary>
@@ -177,15 +179,15 @@ public class Polish2Tests
     /// </summary>
     [Theory]
     [MemberData(nameof(ModeLines))]
-    public Task The_mode_line_breaks_between_presets_only(bool simple, bool gpu, bool custom) => UiSession.Run(() =>
+    public Task The_mode_line_breaks_between_presets_only(bool gpu, bool custom) => UiSession.Run(() =>
     {
-        using var scratch = new Scratch("""{ "ui": { "view": "simple" }, "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
+        using var scratch = new Scratch("""{ "ui": { "view": "advanced" }, "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: false);
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
         var hint = All<TextBlock>(flyout).Single(t => t.Classes.Contains("hint") && (t.Text ?? "").Contains("Light: ", StringComparison.Ordinal));
-        string[] presets = simple ? SimpleView.ModeHint(gpu, "en", translate: false)! : FlyoutWindow.ModelModeHint(gpu);
+        var presets = FlyoutWindow.ModelModeHint(gpu);
         hint.Text = FlyoutWindow.ModeLine(custom, presets);
         Layout(flyout);
         string[] sentences = custom ? [FlyoutWindow.CustomPresetNote, .. presets] : presets;
@@ -343,7 +345,7 @@ public class Polish2Tests
         shell.Dispose();
     });
 
-    /// <summary>Pin (item 5): the words the rows keep (PROPOSED, 1.2 polish round 2).</summary>
+    /// <summary>Pin (item 5): the words the rows keep (APPROVED 22/10/2026; proposed 1.2 polish round 2).</summary>
     [Fact]
     public void The_rows_keep_their_other_words()
     {

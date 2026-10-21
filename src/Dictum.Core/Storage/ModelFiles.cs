@@ -26,7 +26,7 @@ public static class ModelFiles
     /// <summary>The registry pattern for "catalogue model files and their partial downloads".</summary>
     public const string Pattern = "<catalogue model files>";
 
-    /// <summary>PROPOSED copy (17/10/2026), for the product owner to approve: why a model that came with Dictum is not deleted.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 17/10/2026): why a model that came with Dictum is not deleted.</summary>
     internal static string BundledNotDeleted(string fileName) => $"{fileName} came with Dictum, so Dictum does not delete it.";
 
     /// <summary>A catalogue model file name, or one of their partial downloads.</summary>

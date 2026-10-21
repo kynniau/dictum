@@ -4136,3 +4136,33 @@ Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOS
    - **Landing page wording.** The landing page's "No account, no cloud, no telemetry" and its meta and og descriptions now name opt-in cloud clean-up.
    - **FAQ styles.** These now apply only to the FAQ's own items, so the demo player inside an answer is not styled as one.
    - **Demo players.** Each is named "Demo: <title>", and the poster alt text says "a still from the demo".
+
+## Owner approvals (22/10/2026)
+
+Recorded on branch `fix/1.2.1-copy` for 1.2.1 (no version bump in this change). The earlier entries are left as written;
+this entry supersedes their "PROPOSED" and "awaiting the product owner" notes where it says so.
+
+1. **Decision 3, the hold pill.** "Recording · hold" becomes "Recording · let go to finish" (`PillText.RecordingHold`).
+   Hands-free's line is unchanged. The landing page's static pill and the two design files show the new words. The demo
+   GIF `site/img/demos/dictation-stills.gif` is re-rendered with the new pill (see docs/DEMOS.md).
+2. **Decision 4, no microphone.** With no microphone listed, the tray panel's state word is "No microphone"
+   (`NoSoundText.NoMicrophoneState`), and "Ready" again once one is listed (the panel reads the list on every refresh).
+   It replaces "Ready" only: Off, Recording, Working, Downloading, Loading, No model, Model error and Error are kept, as
+   each says more than the microphone does. The dot takes the error colour, as "No model" does (this lane's choice: the
+   decision names the word, not the colour). The no-microphone sentence under the header is unchanged.
+3. **Decision 5, Light | Full.** In the Simple view the tray panel hides "Mode", the Light | Full switch and the line
+   under it; the Advanced view keeps all three, with the presets' model names. `SimpleView.ModeHint` (the Simple names
+   for that line) had no caller left and is removed, with its two pins; the line's layout pin now measures the model-name
+   line only.
+4. **Decision 6, "No clean-up".** With clean-up off, the panel header's clean-up part reads "No clean-up" in both views
+   (`SimpleView.OffHeaderLabel`). The Advanced header shares its clean-up part with the icon's tooltip and the support
+   email's models line, so those say "No clean-up" too. The choice keeps its name: "Off" in the Simple view and the
+   Simple picker, "Off (paste what was heard)" in the Advanced view. Settings > Models' Advanced "In use:" line keeps
+   "no clean-up" (`ModelCoordinator.CurrentCleanupName`).
+5. **Block approval (item 8).** The owner approved every PROPOSED 1.2 string as a block. Every "PROPOSED" marker in
+   `src/` and `tests/` comments now reads "APPROVED 22/10/2026", keeping the date it was proposed, and the "awaiting the
+   product owner" and "for the product owner to approve" notes beside them are removed. That includes the lower-case
+   "Proposed 16/10/2026" markers in `UpdateCheck.cs`. Of the 92 lines with an upper-case marker, 45 were already in the v1.1.2 tag (each line's text looked
+   up in `git show v1.1.2:<file>`); they are flipped too, because the brief names `NoSoundText.cs` and `ModelPrompts.cs`, whose markers date from before v1.1.2. No
+   string's wording changed. docs/STORE.md and the README change only where a sentence now read wrong. The PROPOSED notes
+   in docs/SPEC.md, docs/DEMOS.md and docs/MAC-HANDOVER.md, and in earlier entries of this file, are left as written.

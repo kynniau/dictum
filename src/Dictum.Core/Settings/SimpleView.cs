@@ -34,7 +34,7 @@ public sealed record TierChoice(SpeechTier Tier, string Label, string SubLine, s
 /// </summary>
 public static class SimpleView
 {
-    // PROPOSED copy (21/10/2026), for the product owner to approve before release (DECISIONS, 21/10/2026). Never reword the
+    // APPROVED 22/10/2026 copy (proposed 21/10/2026) (DECISIONS, 21/10/2026). Never reword the
     // approved copy elsewhere to match it.
     public const string SimpleLabel = "Simple";
     public const string AdvancedLabel = "Advanced";
@@ -74,11 +74,11 @@ public static class SimpleView
 
     /// <summary>
     /// The Tidy row's state while the recommended clean-up model (not the rule-based tidy) does the tidying, after the row's
-    /// "In use" tag (PROPOSED, 1.2 polish round 2: it was "In use, with AI clean-up" beside the tag).
+    /// "In use" tag (APPROVED 22/10/2026; proposed 1.2 polish round 2: it was "In use, with AI clean-up" beside the tag).
     /// </summary>
     public const string TidyWithAiState = "With AI clean-up";
 
-    // PROPOSED copy (21/10/2026, the clean-up Off lane), for the product owner to approve before release (DECISIONS, 21/10/2026).
+    // APPROVED 22/10/2026 copy (proposed 21/10/2026, the clean-up Off lane) (DECISIONS, 21/10/2026).
     /// <summary>The Simple view's no-clean-up row (llm.provider = off), and the tray panel's Simple clean-up entry.</summary>
     public const string OffLabel = "Off";
 
@@ -95,6 +95,12 @@ public static class SimpleView
     public const string OffInUseNote = " (paste what was heard; your corrections, snippets and the profanity filter still apply)";
 
     /// <summary>
+    /// The tray panel header's clean-up part while clean-up is off, in both views, and the icon's tooltip with it. APPROVED
+    /// 22/10/2026 (owner decision 6): never reword it. The choice itself stays "Off" (<see cref="OffLabel"/>, <see cref="OffAdvancedLabel"/>).
+    /// </summary>
+    public const string OffHeaderLabel = "No clean-up";
+
+    /// <summary>
     /// "Add AI clean-up" is offered (Settings > Models and the tray panel): while the rule-based tidy is in use, and, in the
     /// Simple view, only while the text is English, since no clean-up model runs on any other (TranscriptCleaner.Plain; lens
     /// on 787b300). The Advanced view offers it whatever the language, with every other detail. One predicate for both places.
@@ -108,7 +114,7 @@ public static class SimpleView
     /// <summary>
     /// The line of a Custom row (lens on PR #23): the model in use is none of the choices above. It may have come from the
     /// Advanced view, calibration, a Mode preset, the first run, --model or DICTUM_MODEL_PATH, so the line does not say which.
-    /// The row's "In use" tag says it is in use (PROPOSED, 1.2 polish round 2: it was "In use. Not one of the choices above.").
+    /// The row's "In use" tag says it is in use (APPROVED 22/10/2026; proposed 1.2 polish round 2: it was "In use. Not one of the choices above.").
     /// </summary>
     public const string CustomNote = "Not one of the choices above.";
 
@@ -180,7 +186,7 @@ public static class SimpleView
     public static TierChoice? TierOf(string model, bool gpuMachine, string language = WhisperLanguages.English, bool translate = false) =>
         Tiers(gpuMachine, language, translate).FirstOrDefault(t => string.Equals(t.Model, model, StringComparison.OrdinalIgnoreCase));
 
-    // PROPOSED copy (1.2 polish, 22/10/2026), for the product owner to approve before release.
+    // APPROVED 22/10/2026 copy (proposed 1.2 polish, 22/10/2026).
     /// <summary>The tray panel header's clean-up name in the Simple view while the recommended clean-up model does the tidying.</summary>
     public const string AiCleanupLabel = "AI clean-up";
 
@@ -189,30 +195,15 @@ public static class SimpleView
         TierOf(model, gpuMachine, language, translate)?.Label ?? Custom(model);
 
     /// <summary>
-    /// The clean-up in use by its Simple name (the tray panel's header, 1.2 polish): "Off"; "AI clean-up" while the recommended
+    /// The clean-up in use by its Simple name (the tray panel's header, 1.2 polish): "No clean-up" (<see cref="OffHeaderLabel"/>); "AI clean-up" while the recommended
     /// model is chosen and the text is English (no clean-up model runs on any other: TranscriptCleaner.Plain); "Tidy my words"
     /// for the rest of the Tidy row; "Custom: name" for anything else (<paramref name="currentName"/>, the coordinator's name for it).
     /// </summary>
     public static string CleanupName(LlmSettings llm, bool gpuMachine, string language, bool translate, string currentName) =>
-        OffInUse(llm) ? OffLabel
+        OffInUse(llm) ? OffHeaderLabel
         : !TidyInUse(llm, gpuMachine) ? Custom(currentName)
         : llm.Provider == LlmSettings.Local && WhisperLanguages.OutputIsEnglish(language, translate) ? AiCleanupLabel
         : TidyLabel;
-
-    /// <summary>
-    /// The tray panel's line under Light | Full in the Simple view (PROPOSED, 1.2 polish): the presets by their Simple names,
-    /// one sentence each ("Full: More accurate and AI clean-up.", "Light: Standard and Tidy my words."; the panel puts each on
-    /// its own line, 1.2 polish round 2), or null when that would not be true, and the caller keeps the model-name line (lens
-    /// on 4abba54): the text is not plain English speech (another language, Detect automatically, or translate: no clean-up
-    /// model runs on it, and the presets' English models are no tier then), or a preset's model is no tier.
-    /// </summary>
-    public static string[]? ModeHint(bool gpuMachine, string language, bool translate)
-    {
-        if (!WhisperLanguages.OutputIsEnglish(language, translate)) return null;
-        var full = TierOf(ModePresets.For(ModePreset.Full, gpuMachine).SpeechModel, gpuMachine, language, translate);
-        var light = TierOf(ModePresets.LightSpeech, gpuMachine, language, translate);
-        return full is null || light is null ? null : [$"Full: {full.Label} and {AiCleanupLabel}.", $"Light: {light.Label} and {TidyLabel}."];
-    }
 
     /// <summary>The clean-up model "Add AI clean-up" adds, and the Tidy row uses when it is on this PC.</summary>
     public static string TidyModel(bool gpuMachine) => CleanupCatalog.Recommend(gpuMachine).Model;

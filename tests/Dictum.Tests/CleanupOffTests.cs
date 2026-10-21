@@ -349,7 +349,7 @@ public sealed class CleanupOffTests
     });
 
     /// <summary>
-    /// Pin (lens on d6b4ea8): the tray panel's models line and the icon's tooltip say "no clean-up", never "off", which read as
+    /// Pin (lens on d6b4ea8; owner decision 6, 22/10/2026): the tray panel's models line and the icon's tooltip say "No clean-up", never "off", which read as
     /// Dictum itself being off; and the closed Advanced clean-up picker shows the Off entry through the picker's ellipsis template.
     /// </summary>
     [Fact]
@@ -359,8 +359,8 @@ public sealed class CleanupOffTests
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: false);
         Assert.Equal("no clean-up", shell.Models.CurrentCleanupName);
-        Assert.Contains(" · no clean-up · ", shell.Status.Models, StringComparison.Ordinal);
-        Assert.Contains(" · no clean-up · ", shell.Status.Tooltip, StringComparison.Ordinal);
+        Assert.Contains(" · No clean-up · ", shell.Status.Models, StringComparison.Ordinal);
+        Assert.Contains(" · No clean-up · ", shell.Status.Tooltip, StringComparison.Ordinal);
         Assert.DoesNotContain(" · off · ", shell.Status.Models, StringComparison.Ordinal);
 
         var flyout = new FlyoutWindow(shell);

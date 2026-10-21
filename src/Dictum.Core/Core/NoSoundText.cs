@@ -2,8 +2,8 @@ namespace Dictum.Core;
 
 /// <summary>
 /// What Dictum says when the microphone gives no sound (21/10/2026): the pill label, the balloon for each cause, and the tray
-/// panel's line after a dictation that heard nothing. All PROPOSED 21/10/2026, awaiting the product owner's approval: do not
-/// reword without it.
+/// panel's line after a dictation that heard nothing. All APPROVED 22/10/2026 (proposed 21/10/2026): do not
+/// reword.
 /// </summary>
 public static class NoSoundText
 {
@@ -19,6 +19,12 @@ public static class NoSoundText
     /// <summary>The balloon when the system lists no microphone at all.</summary>
     public const string NoMicrophoneBalloon =
         "No microphone found. Plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.";
+
+    /// <summary>
+    /// The tray panel's state word, in place of "Ready", while the system lists no microphone; "Ready" again once one is listed.
+    /// APPROVED 22/10/2026 (owner decision 4): never reword it. <see cref="NoMicrophoneBalloon"/> stays the line under it.
+    /// </summary>
+    public const string NoMicrophoneState = "No microphone";
 
     /// <summary>The tray panel (and Settings &gt; About) after a dictation that heard nothing, until one types text.</summary>
     public const string HeardNothingLine = "Last dictation heard nothing: check the microphone";

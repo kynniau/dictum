@@ -19,7 +19,7 @@ namespace Dictum.UI.Views;
 /// <summary>
 /// The tray panel (docs/design/Flyout.dc.html), opened by a click on the tray icon and closed by another click, Esc, or
 /// focus moving elsewhere: status and the on/off switch, any model problem (with Try on the CPU and Open log folder),
-/// Light/Full, the two model pickers (plain tier names in the Simple view, ui.view; model names in Advanced), the microphone with its meter,
+/// Light/Full (Advanced view only), the two model pickers (plain tier names in the Simple view, ui.view; model names in Advanced), the microphone with its meter,
 /// the indicator and the three toggles, six actions, the privacy line and Quit. Opened on purpose, so it takes focus.
 /// </summary>
 internal sealed class FlyoutWindow : Window
@@ -42,6 +42,7 @@ internal sealed class FlyoutWindow : Window
     private readonly ToggleSwitch _enabled;
     private readonly Segments _mode;
     private readonly TextBlock _modeHint = Ui.Text("", "hint");
+    private readonly StackPanel _modeBox; // "Mode", Light | Full and the line under it: Advanced only (owner decision 5, 22/10/2026)
     private readonly ComboBox _speech = new();
     private readonly ComboBox _cleanup = new();
     private readonly ComboBox _mic = new() { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
@@ -77,6 +78,7 @@ internal sealed class FlyoutWindow : Window
         _enabled = Ui.Switch(shell.Settings.Enabled, shell.SetEnabled);
         AutomationProperties.SetName(_enabled, "Dictation on");
         _mode = new Segments(["Light", "Full"], -1, i => Act(() => shell.Personal.SelectPreset(i == 0 ? ModePreset.Light : ModePreset.Full)), "Mode");
+        _modeBox = Ui.Stack(6, Ui.Text("Mode", "caption"), _mode, _modeHint);
         _indicator = new Segments(IndicatorLabels, 0, i => Write("indicator.mode", IndicatorSettings.Modes[i]), "Big recording indicator");
         _profanity = Ui.Switch(false, on => Write("profanity.mode", on ? ProfanitySettings.Mask : ProfanitySettings.Off));
         _grammar = Ui.Switch(false, on => Write("llm.grammar_assist", on));
@@ -150,7 +152,7 @@ internal sealed class FlyoutWindow : Window
             header,
             _problemBox,
             _download,
-            Ui.Stack(6, Ui.Text("Mode", "caption"), _mode, _modeHint),
+            _modeBox,
             Ui.Columns(2, 10, Labelled("Speech model", _speech), Labelled("Clean-up", _cleanup)),
             micBox,
             Ui.Stack(2,
@@ -234,8 +236,9 @@ internal sealed class FlyoutWindow : Window
             // The log is for a problem the log explains (a model that failed, a dictation that heard nothing), not for the
             // no-microphone sentence alone, which says what to do (1.2 polish round 2).
             _openLogs.IsVisible = status.Problem is not null;
-            _state.Text = status.State;
-            _dot[!Shape.FillProperty] = new DynamicResourceExtension(status.Tone switch
+            var (stateWord, tone) = StateWithNoMicrophone(status.State, status.Tone, devices.Count == 0);
+            _state.Text = stateWord;
+            _dot[!Shape.FillProperty] = new DynamicResourceExtension(tone switch
             {
                 "ready" => "DoneBrush",
                 "recording" => "RecordingBrush",
@@ -249,11 +252,11 @@ internal sealed class FlyoutWindow : Window
             _progress.IsIndeterminate = status.DownloadFraction is null;
             _progress.Value = status.DownloadFraction ?? 0;
 
+            // The Simple view hides Mode, Light | Full and its line (owner decision 5, 22/10/2026); Advanced keeps all three.
+            _modeBox.IsVisible = !s.Ui.IsSimple;
             var preset = _shell.Personal.CurrentPreset;
             _mode.Select(preset switch { ModePreset.Light => 0, ModePreset.Full => 1, _ => -1 });
-            _modeHint.Text = ModeLine(preset == ModePreset.Custom,
-                (s.Ui.IsSimple ? SimpleView.ModeHint(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) : null) // the Simple names where true (1.2 polish)
-                ?? ModelModeHint(_shell.GpuMachine));
+            _modeHint.Text = ModeLine(preset == ModePreset.Custom, ModelModeHint(_shell.GpuMachine));
 
             FillSpeech(s);
             FillCleanup(s);
@@ -308,7 +311,7 @@ internal sealed class FlyoutWindow : Window
     /// <summary>The Simple clean-up picker's entry for "Tidy my words" (not a catalogue name, so it cannot collide with one).</summary>
     private const string TidyEntry = "tidy";
 
-    // PROPOSED copy (19/10/2026), for the product owner to approve: a picker entry whose file is on its way (Store 10.1.2.10).
+    // APPROVED 22/10/2026 copy (proposed 19/10/2026): a picker entry whose file is on its way (Store 10.1.2.10).
     internal const string DownloadingMark = " (downloading)";
     internal const string WaitingMark = " (waiting to download)";
 
@@ -423,7 +426,7 @@ internal sealed class FlyoutWindow : Window
     internal static string ModeLine(bool custom, IReadOnlyList<string> presets) =>
         string.Join("\n", custom ? [CustomPresetNote, .. presets] : presets);
 
-    /// <summary>The presets by their model names (the Advanced view, and the Simple view where its names would not be true).</summary>
+    /// <summary>The presets by their model names. Only the Advanced view shows the line (owner decision 5, 22/10/2026).</summary>
     internal static string[] ModelModeHint(bool gpuMachine)
     {
         var full = ModePresets.For(ModePreset.Full, gpuMachine);
@@ -436,6 +439,14 @@ internal sealed class FlyoutWindow : Window
     /// </summary>
     internal static string? WithNoMicrophone(string? problem, bool none) =>
         !none ? problem : problem is null ? Dictum.Core.NoSoundText.NoMicrophoneBalloon : $"{problem}\n{Dictum.Core.NoSoundText.NoMicrophoneBalloon}";
+
+    /// <summary>
+    /// The state word and its tone: "No microphone" (owner decision 4, 22/10/2026), with the error colour as "No model" has, in
+    /// place of "Ready" while the system lists no microphone, since nothing can be dictated then. Every other state (Off,
+    /// Recording, Downloading, Loading, a model error) says more than the microphone does and is kept.
+    /// </summary>
+    internal static (string State, string Tone) StateWithNoMicrophone(string state, string tone, bool none) =>
+        none && tone == "ready" ? (Dictum.Core.NoSoundText.NoMicrophoneState, "error") : (state, tone);
 
     private void OnSpeechPicked()
     {

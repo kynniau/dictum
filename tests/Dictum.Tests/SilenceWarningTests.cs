@@ -378,7 +378,7 @@ public class SilenceWarningTests
         await WaitUntil(() => !none.Ui.NoSoundWarnings.IsEmpty, "the no-microphone balloon", timeoutMs: 1500);
         await Task.Delay(200, Ct);
         Assert.Equal([NoSoundCause.NoMicrophone], none.Ui.NoSoundWarnings.ToArray());
-        Assert.Equal(PillView.NoSoundEnded, none.Ui.Pills.Last()); // not left on "Recording · hold"
+        Assert.Equal(PillView.NoSoundEnded, none.Ui.Pills.Last()); // not left on the hold pill ("Recording · let go to finish")
         Assert.DoesNotContain(PillView.MicError, none.Ui.Pills);
         Assert.True(none.Ui.HeardNothing);
         Assert.True(none.Controller.IsIdle);
@@ -407,7 +407,7 @@ public class SilenceWarningTests
         busy.Down();
         await WaitUntil(() => busy.Ui.Pills.Contains(PillView.MicError), "Mic error", timeoutMs: 1500);
         await Task.Delay(200, Ct);
-        Assert.Equal(PillView.MicError, busy.Ui.Pills.Last()); // the flash is not replaced by "Recording · hold"
+        Assert.Equal(PillView.MicError, busy.Ui.Pills.Last()); // the flash is not replaced by the hold pill ("Recording · let go to finish")
         Assert.Empty(busy.Ui.NoSoundWarnings);
         Assert.Null(busy.Ui.HeardNothing);
         Assert.True(busy.Controller.IsIdle);

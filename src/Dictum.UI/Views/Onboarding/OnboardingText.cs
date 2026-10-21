@@ -4,9 +4,8 @@ using Dictum.Settings;
 namespace Dictum.UI.Views.Onboarding;
 
 /// <summary>
-/// What the "Welcome to Dictum" window says (Dictum 1.2, product owner 21/10/2026). Every string here is PROPOSED copy
-/// (21/10/2026), listed word for word in DECISIONS for the product owner to approve before release; none may be reworded without
-/// that review. Strings the window reuses from elsewhere (the hotkey check, the Simple view's tier names, the microphone list's
+/// What the "Welcome to Dictum" window says (Dictum 1.2, product owner 21/10/2026). Every string here is APPROVED 22/10/2026 copy
+/// (proposed 21/10/2026, listed word for word in DECISIONS); none may be reworded. Strings the window reuses from elsewhere (the hotkey check, the Simple view's tier names, the microphone list's
 /// labels through MicrophoneChoices, the "No sound from mic" advice through NoSoundText.SilentAdvice, "Calibrate my voice")
 /// are referenced, never copied.
 /// </summary>

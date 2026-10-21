@@ -561,7 +561,7 @@ public sealed class NoSilentCancelTests : IDisposable
         Assert.True(await Eventually(() => !downloads.IsDownloading));
     }
 
-    /// <summary>Second lens 4: the two PROPOSED variants of the refusal and the warning, used only while downloads are pending.</summary>
+    /// <summary>Second lens 4: the two APPROVED 22/10/2026 variants of the refusal and the warning, used only while downloads are pending.</summary>
     [Fact]
     public void The_space_messages_count_pending_downloads()
     {

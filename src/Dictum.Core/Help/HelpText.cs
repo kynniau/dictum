@@ -3,8 +3,8 @@ using Dictum.Core;
 namespace Dictum.Help;
 
 /// <summary>
-/// The words on Settings → Help (SPEC §21; docs/DECISIONS.md, "In-app Help", 21/10/2026). PROPOSED copy, awaiting the
-/// product owner's review: do not reword without that review. Plain constants with no platform code, so tests can pin
+/// The words on Settings → Help (SPEC §21; docs/DECISIONS.md, "In-app Help", 21/10/2026). APPROVED 22/10/2026 copy (proposed 21/10/2026):
+/// do not reword. Plain constants with no platform code, so tests can pin
 /// them and a Mac build can reuse the parts that hold there.
 /// <para>
 /// Written for someone who has never used a computer program like this: short sentences, a technical word explained in
@@ -30,13 +30,13 @@ public static class HelpText
 
     public const string SupportButton = "Email support";
 
-    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword. Email support opens the same prefilled email as Report a problem.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): do not reword. Email support opens the same prefilled email as Report a problem.</summary>
     public const string SupportNote = "Email support opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum and the models in use filled in. Dictum sends nothing by itself.";
 
-    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): do not reword.</summary>
     public const string FeedbackButton = "Send feedback or suggest a feature";
 
-    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): do not reword.</summary>
     public const string FeedbackNote = FeedbackButton + " opens a new email to " + SupportMail.Address + " in your own email program, with the version of Dictum, your Windows build and the models in use filled in. " +
         "You can read and change it before you send it. Dictum sends nothing by itself.";
 
@@ -52,15 +52,15 @@ public static class HelpText
         "4. Let go of the key. A moment later, your words appear where you clicked.",
         "In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. " +
         "Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.",
-        // PROPOSED (21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
+        // APPROVED 22/10/2026 (proposed 21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
         "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. " +
         "To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply.",
-        // PROPOSED (21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does.
+        // APPROVED 22/10/2026 (proposed 21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does.
         "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. " +
         "If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here.",
         "The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. " +
         "The menu has Settings, Help and more.",
-        // PROPOSED (21/10/2026, final lens): the help names the Simple view's choices, so it says how to get that view.
+        // APPROVED 22/10/2026 (proposed 21/10/2026, final lens): the help names the Simple view's choices, so it says how to get that view.
         "In this help, \"Settings > Models\" means: open Settings from the Dictum menu, then choose Models on the left. " +
         "This help names the choices as the Simple view shows them; if you see model names instead, choose Simple at the top of that page.",
     ];
@@ -71,7 +71,7 @@ public static class HelpText
     public static readonly IReadOnlyList<string> Accuracy =
     [
         "Everyone's voice, accent and microphone are different, so a speech model hears some people better than others.",
-        // PROPOSED (21/10/2026, final round on the Simple view): the speech choices as the Simple view of Settings > Models names them.
+        // APPROVED 22/10/2026 (proposed 21/10/2026, final round on the Simple view): the speech choices as the Simple view of Settings > Models names them.
         "For English, the speech model that comes with Dictum is a good place to start: it is Standard in Settings > Models. For other languages, Standard is a multilingual model, a download you choose.",
         "If words often come out wrong, open Settings > Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. " +
         "To see every model by its name and size, choose Advanced at the top of that page.",
@@ -81,15 +81,15 @@ public static class HelpText
     public const string QuestionsHeading = "Questions and answers";
 
     /// <summary>
-    /// The list at the top of the page, each question a link to its answer (PROPOSED, 1.2 polish, 22/10/2026). The questions are
+    /// The list at the top of the page, each question a link to its answer (APPROVED 22/10/2026; proposed 1.2 polish, 22/10/2026). The questions are
     /// <see cref="Questions"/> themselves: the list holds no words of its own but this heading and the links' screen-reader hint.
     /// </summary>
     public const string IndexHeading = "Questions on this page";
 
-    /// <summary>What a screen reader says with each link in the list (PROPOSED, 1.2 polish).</summary>
+    /// <summary>What a screen reader says with each link in the list (APPROVED 22/10/2026; proposed 1.2 polish).</summary>
     public const string IndexLinkHelp = "Moves to the answer, further down this page.";
 
-    /// <summary>PROPOSED (21/10/2026): the 1.1.2 note's sentence on the start-up crash, word for word (docs/STORE.md). The one place the Help describes it.</summary>
+    /// <summary>APPROVED 22/10/2026 (proposed 21/10/2026): the 1.1.2 note's sentence on the start-up crash, word for word (docs/STORE.md). The one place the Help describes it.</summary>
     public const string CrashFixLine = "Dictum 1.1.2 fixes a start-up crash on PCs without a working Vulkan graphics driver (the app closed before its tray icon appeared; it now runs the speech model on the CPU there).";
 
     /// <summary>APPROVED verbatim for Help, site and Store (owner, 21/10/2026 22:18 AEDT): do not reword. HelpPageTests exempts exactly this line from the "no telemetry or analytics word" pin.</summary>
@@ -117,7 +117,7 @@ public static class HelpText
         ]),
         new("It says \"Mic error\" or \"" + NoSoundText.Pill + "\", or nothing happens when I talk. What do I check?",
         [
-            // PROPOSED (21/10/2026): the two paragraphs reuse NoSoundText's wording, so the help and the message cannot drift apart.
+            // APPROVED 22/10/2026 (proposed 21/10/2026): the two paragraphs reuse NoSoundText's wording, so the help and the message cannot drift apart.
             "If Dictum shows \"" + NoSoundText.Pill + "\", it says: " + NoSoundText.SilentBalloon,
             "If Dictum cannot find a microphone at all, it says: " + NoSoundText.NoMicrophoneBalloon,
             "• Check the microphone is plugged in, switched on and not muted. Many headsets have a mute button.",
@@ -128,7 +128,7 @@ public static class HelpText
         ]),
         new("Dictum closed straight away when I opened it. What do I do?",
         [
-            // PROPOSED (21/10/2026): the first sentence is the 1.1.2 note's wording (docs/STORE.md, "CHANGED SINCE THE LAST SUBMISSION"), word for word.
+            // APPROVED 22/10/2026 (proposed 21/10/2026): the first sentence is the 1.1.2 note's wording (docs/STORE.md, "CHANGED SINCE THE LAST SUBMISSION"), word for word.
             CrashFixLine + " If Dictum closes on another PC, install the latest version from the Microsoft Store or from dictum.kynni.au.",
             "If the Dictum menu, or Settings > About, shows a button called Try on the CPU, choose it. Dictum then runs the speech model on the computer's main chip (the CPU) instead of the graphics card. This can be slower.",
             "If it still closes, email " + SupportMail.Address + " and tell us.",
@@ -153,7 +153,7 @@ public static class HelpText
         new("Where are the model files, and how big are they?",
         [
             "Settings > Models shows the Model folder, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.",
-            // PROPOSED (21/10/2026, final round on the Simple view): names the choices as Settings > Models shows them.
+            // APPROVED 22/10/2026 (proposed 21/10/2026, final round on the Simple view): names the choices as Settings > Models shows them.
             "Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English) are downloads you choose. " +
             "If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
             "To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.",
@@ -167,10 +167,10 @@ public static class HelpText
         ]),
         new("Is Dictum free?",
         [
-            // FreeLine and FreeLaterNote are APPROVED verbatim (owner, 21/10/2026 22:18 AEDT): do not reword. The third paragraph is PROPOSED (21/10/2026).
+            // FreeLine and FreeLaterNote are APPROVED verbatim (owner, 21/10/2026 22:18 AEDT): do not reword. The third paragraph is APPROVED 22/10/2026 (proposed 21/10/2026).
             FreeLine,
             FreeLaterNote,
-            // The earlier answer's facts, kept: its first sentence is reworded so it does not repeat the two paragraphs above (PROPOSED, 21/10/2026).
+            // The earlier answer's facts, kept: its first sentence is reworded so it does not repeat the two paragraphs above (APPROVED 22/10/2026; proposed 21/10/2026).
             "There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.",
         ]),
         new("Where is the full guide?",
@@ -181,7 +181,7 @@ public static class HelpText
         new(NameQuestion, [NameLine]),
     ];
 
-    /// <summary>PROPOSED (21/10/2026): the question that carries the approved name line.</summary>
+    /// <summary>APPROVED 22/10/2026 (proposed 21/10/2026): the question that carries the approved name line.</summary>
     public const string NameQuestion = "What does the name Dictum mean?";
 
     /// <summary>APPROVED verbatim (owner, 21/10/2026 22:21 AEDT): do not reword.</summary>
