@@ -27,24 +27,40 @@ internal sealed class FakeSpeechEngine(string path, DecodeOptions decode, bool w
     public void Dispose() => Volatile.Write(ref _disposed, 1);
 }
 
-/// <summary>A loaded cleanup model stand-in that echoes the dictation, or gives a set reply; its warm-up can wait for its token (up to 5 s).</summary>
+/// <summary>
+/// A loaded cleanup model stand-in that echoes the dictation, or gives a set reply. With <c>waitForCancel</c> its warm-up never
+/// ends on its own, only when its token is cancelled, so a test proves a cancellation by the warm-up ending rather than by a clock.
+/// </summary>
 internal sealed class FakeLocalEngine(string path, bool waitForCancel = false, string? reply = null) : ILocalLlmEngine
 {
     private int _disposed;
+    private readonly TaskCompletionSource _warmUpStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _warmUpCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public string ModelPath { get; } = path;
     public bool Disposed => Volatile.Read(ref _disposed) == 1;
-    private volatile bool _warmingUp;
-    /// <summary>True once the warm-up is waiting on its token (set just before the delay).</summary>
-    public bool WarmingUp => _warmingUp;
+    /// <summary>True once the warm-up is waiting on its token.</summary>
+    public bool WarmingUp => _warmUpStarted.Task.IsCompleted;
+    /// <summary>Completes when the warm-up starts waiting on its token.</summary>
+    public Task WarmUpStarted => _warmUpStarted.Task;
+    /// <summary>Completes when the warm-up's token is cancelled, before the cancellation leaves <see cref="WarmUpAsync"/>.</summary>
+    public Task WarmUpCancelled => _warmUpCancelled.Task;
     public (double Prompt, double Generation) Rates => (0, 0);
 
     public async Task<TimeSpan> WarmUpAsync(string? systemPrompt = null, CancellationToken cancellationToken = default)
     {
         if (waitForCancel)
         {
-            _warmingUp = true;
-            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            _warmUpStarted.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _warmUpCancelled.TrySetResult();
+                throw;
+            }
         }
         return TimeSpan.Zero;
     }
