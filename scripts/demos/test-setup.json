@@ -1,0 +1,49 @@
+{
+  "name": "test-setup",
+  "title": "Test your setup",
+  "summary": "Today's build calls this Calibrate my voice (the 1.2 build is to rename it Test my setup). The sandbox has no microphone, so no sentence can be recorded there.",
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" },
+    { "do": "launch" },
+    { "do": "click", "target": { "window": "Check your hotkey$", "type": "Button", "name": "Use this hotkey", "timeout": 120 } },
+    { "do": "wait", "seconds": 10 }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "open",
+      "caption": "Click Calibrate my voice.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum$", "type": "Button", "name": "Calibrate my voice" } } ]
+    },
+    {
+      "id": "sentence",
+      "caption": "Dictum shows a sentence to read aloud.",
+      "do": [ { "do": "point", "target": { "window": "calibrate my voice$", "type": "Text", "name": "Sentence 1", "match": "prefix", "timeout": 30 } } ],
+      "after": 2.5
+    },
+    {
+      "id": "record",
+      "caption": "Click Record, then read the sentence in your normal voice.",
+      "do": [ { "do": "click", "target": { "window": "calibrate my voice$", "type": "Button", "name": "Record sentence", "match": "prefix" } } ],
+      "after": 4
+    },
+    {
+      "id": "result",
+      "caption": "This test PC has no microphone, so Dictum says so here.",
+      "poster": true,
+      "do": [ { "do": "point", "target": { "window": "calibrate my voice$", "type": "Text", "name": "That did not work", "match": "prefix", "timeout": 15 } } ],
+      "after": 3
+    }
+  ]
+}
