@@ -14,18 +14,20 @@ public sealed record CleanupResult(string Text, bool Cleaned, string? FallbackRe
 /// <param name="DictionaryLine">The personal dictionary's "Known names and terms" line (SPEC §16.2), or null.</param>
 /// <param name="MustKeepWords">Dictated words a reply may not drop (the profanity list unless profanity.mode = remove).</param>
 /// <param name="DictionaryTerms">The terms in that line: a reply may not add one the speaker did not say.</param>
-public sealed record PersonalCleanup(string? DictionaryLine, IReadOnlyCollection<string>? MustKeepWords, IReadOnlyCollection<string>? DictionaryTerms)
+/// <param name="AboutYou">The About you text from context.txt (SPEC §16.7): its line follows the dictionary line, and the checks keep it to spelling.</param>
+public sealed record PersonalCleanup(string? DictionaryLine, IReadOnlyCollection<string>? MustKeepWords, IReadOnlyCollection<string>? DictionaryTerms,
+    string? AboutYou = null)
 {
     public static readonly PersonalCleanup None = new(null, null, null);
 
     /// <summary>
-    /// The system prompt (llm.prompt_file or the built-in one, the grammar-assist sentence when on, the dictionary line) and
-    /// the checks every reply to it gets; the same for every provider and for --bench-cleanup.
+    /// The system prompt (llm.prompt_file or the built-in one, the grammar-assist sentence when on, the dictionary line, the
+    /// About you line) and the checks every reply to it gets; the same for every provider and for --bench-cleanup.
     /// </summary>
     public (string Prompt, ValidationContext Validation) Checks(LlmSettings settings, Action<string> warn)
     {
-        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, warn), settings.GrammarAssist, DictionaryLine);
-        return (prompt, new ValidationContext(prompt, MustKeepWords, DictionaryTerms));
+        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, warn), settings.GrammarAssist, DictionaryLine, CleanupPrompt.ContextLine(AboutYou));
+        return (prompt, new ValidationContext(prompt, MustKeepWords, DictionaryTerms, AboutYou: AboutYou));
     }
 }
 

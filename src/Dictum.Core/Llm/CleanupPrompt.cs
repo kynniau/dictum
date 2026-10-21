@@ -26,6 +26,15 @@ public static class CleanupPrompt
     /// <summary>SPEC §16.2: the start of the personal dictionary's line in the cleanup prompt.</summary>
     public const string DictionaryLinePrefix = "Known names and terms, keep their spelling: ";
 
+    /// <summary>
+    /// SPEC §16.7 (PROPOSED 21/10/2026, awaiting the product owner's approval): the start of the About you line, which follows
+    /// the dictionary line. Worded for spelling and term choice only, so the speaker's description is never read as content.
+    /// </summary>
+    public const string ContextLinePrefix = "Context about the speaker, for choosing spellings and terms only; never add, answer or change what was said: ";
+
+    /// <summary>The About you line for <paramref name="aboutYou"/>, or null when there is no text.</summary>
+    public static string? ContextLine(string? aboutYou) => string.IsNullOrWhiteSpace(aboutYou) ? null : ContextLinePrefix + aboutYou;
+
     /// <summary>SPEC §16.5 grammar assist (llm.grammar_assist), appended verbatim when the setting is on.</summary>
     public const string GrammarAssist =
         "The speaker may not be a native English speaker: also fix articles, tenses, prepositions and word order " +
@@ -46,14 +55,15 @@ public static class CleanupPrompt
 
     /// <summary>
     /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the grammar-assist sentence
-    /// when llm.grammar_assist is on, then the personal dictionary's "Known names and terms" line when it has terms.
-    /// Each addition is its own line, so a custom prompt file gets them too.
+    /// when llm.grammar_assist is on, then the personal dictionary's "Known names and terms" line when it has terms, then the
+    /// About you line (context.txt) when it has text. Each addition is its own line, so a custom prompt file gets them too.
     /// </summary>
-    public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine)
+    public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine, string? contextLine = null)
     {
         var prompt = basePrompt;
         if (grammarAssist) prompt += "\n" + GrammarAssist;
         if (!string.IsNullOrWhiteSpace(dictionaryLine)) prompt += "\n" + dictionaryLine;
+        if (!string.IsNullOrWhiteSpace(contextLine)) prompt += "\n" + contextLine;
         return prompt;
     }
 

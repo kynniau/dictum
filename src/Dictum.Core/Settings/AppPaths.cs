@@ -35,6 +35,9 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
     public string DictionaryFile => Path.Combine(ConfigDir, "dictionary.txt");
     public string CorrectionsFile => Path.Combine(ConfigDir, "corrections.txt");
     public string SnippetsFile => Path.Combine(ConfigDir, "snippets.txt");
+
+    /// <summary>About you (SPEC §16.7, 21/10/2026): a paragraph about the speaker for the clean-up prompt.</summary>
+    public string ContextFile => Path.Combine(ConfigDir, "context.txt");
     public string ProfanityOverrideFile => Path.Combine(ConfigDir, "profanity.txt");
 
     /// <summary>The word list shipped beside the executable.</summary>

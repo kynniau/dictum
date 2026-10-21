@@ -27,7 +27,7 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
 
     public LastDictation? Last => _last;
 
-    /// <summary>Re-reads the four text files (load, reload, file watcher). Logs counts only.</summary>
+    /// <summary>Re-reads the personal text files (load, reload, file watcher). Logs counts and lengths only.</summary>
     public PersonalText Load()
     {
         var text = PersonalText.Load(paths, log.Warn);
@@ -112,6 +112,23 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
     {
         if (!File.Exists(paths.SnippetsFile)) TextList.Append(paths.SnippetsFile, [], Corrections.SnippetsHeader);
         return paths.SnippetsFile;
+    }
+
+    /// <summary>About you as context.txt holds it, for Settings > Personal: the whole paragraph, even one over the cap, so it can be shortened.</summary>
+    public string ContextForEditing() => SpeakerContext.ReadForEditing(paths.ContextFile);
+
+    /// <summary>
+    /// Saves About you (SPEC §16.7): one paragraph, trimmed, at most <see cref="SpeakerContext.MaxChars"/> characters; empty
+    /// text deletes context.txt. Returns why it was not saved, or null. Logs the length only, never the text.
+    /// </summary>
+    public string? SaveContext(string text)
+    {
+        var paragraph = SpeakerContext.Normalise(text);
+        if (SpeakerContext.Check(paragraph) is { } problem) return problem;
+        SpeakerContext.Save(paths.ContextFile, paragraph);
+        log.Info(paragraph.Length == 0 ? "Cleared About you." : $"Saved About you ({paragraph.Length} characters).");
+        reload();
+        return null;
     }
 
     /// <summary>The preset these settings match on this hardware (tray panel and Settings → Mode).</summary>

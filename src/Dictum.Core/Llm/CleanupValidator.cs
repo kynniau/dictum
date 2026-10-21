@@ -15,8 +15,12 @@ namespace Dictum.Llm;
 /// dictation, so every rule, the dictionary-term rule included, measures the reply against the part's own words; the reply
 /// may not repeat them either.
 /// </param>
+/// <param name="AboutYou">
+/// The About you text in the prompt (context.txt, SPEC §16.7), or null. With it, a reply may not add a word of it the speaker
+/// did not say, nor swap a dictated word for another (<see cref="CleanupValidator.AboutYouRejection"/>).
+/// </param>
 public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection<string>? MustKeepWords = null,
-    IReadOnlyCollection<string>? DictionaryTerms = null, string? Carried = null);
+    IReadOnlyCollection<string>? DictionaryTerms = null, string? Carried = null, string? AboutYou = null);
 
 /// <summary>
 /// Decides whether a model's reply is the cleaned dictation (SPEC §5, applied to every provider). Rejected replies
@@ -28,7 +32,8 @@ public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection
 /// final line or bracket the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
 /// few shared words, a negation or a number dropped or changed, a kept word dropped (profanity), dropped content (overall
 /// and per sentence), "scratch that" handled both ways round: the correction must be in the reply and the retracted
-/// words must not, and, for a hands-free part, words repeated from the part typed before it.
+/// words must not, for a hands-free part, words repeated from the part typed before it, and, while About you is in the
+/// prompt, a word of it the speaker did not say or a dictated word swapped for another (CleanupValidator.AboutYou.cs).
 /// </summary>
 public static partial class CleanupValidator
 {
@@ -110,6 +115,7 @@ public static partial class CleanupValidator
         if (Unsaid(textLower, rawSet) is { } unsaid) return (null, unsaid);
         if (context?.DictionaryTerms is { Count: > 0 } terms && AddsTerm(raw, text, terms))
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
+        if (context?.AboutYou is { Length: > 0 } aboutYou && AboutYouRejection(raw, retracted, textLower, aboutYou) is { } changed) return (null, changed);
         if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
             return (null, "reply repeats words already typed before this part");
 

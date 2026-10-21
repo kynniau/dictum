@@ -9,7 +9,7 @@ using Dictum.UI.Views.Settings;
 namespace Dictum.UI.Views;
 
 /// <summary>
-/// Settings (SPEC §21): General, Mode, Models, Storage, Microphone, Clean-up, Privacy, About. Every control writes
+/// Settings (SPEC §21): General, Mode, Models, Storage, Microphone, Personal, Clean-up, Privacy, About. Every control writes
 /// settings.json through the shell (the file stays the source of truth and hot-reloads); each page redraws when the
 /// settings or the models change. Opened on purpose, so it takes focus.
 /// </summary>
@@ -19,7 +19,7 @@ internal sealed class SettingsWindow : Window
     private readonly ListBox _nav = new() { Width = 180 };
     private readonly ContentControl _host = new();
     private readonly Dictionary<string, SettingsPage> _pages = [];
-    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", "Privacy", "About"];
+    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Personal", "Clean-up", "Privacy", "About"];
 
     public SettingsWindow(AppShell shell)
     {
@@ -79,6 +79,7 @@ internal sealed class SettingsWindow : Window
         "Models" => new ModelsPage(_shell, this),
         "Storage" => new StoragePage(_shell),
         "Microphone" => new MicrophonePage(_shell),
+        "Personal" => new PersonalPage(_shell),
         "Clean-up" => new CleanupPage(_shell),
         "Privacy" => new PrivacyPage(_shell),
         "About" => new AboutPage(_shell),

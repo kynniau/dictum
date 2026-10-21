@@ -278,6 +278,15 @@ System prompt (ship as the default; overridable by `llm.prompt_file`):
 The user turn is the raw transcript only. Never put the API key or any settings in the
 prompt.
 
+Additions to the system prompt (amendment, 21/10/2026), each on its own line after the base
+prompt (built-in or `llm.prompt_file`), in this order: the grammar-assist sentence when
+`llm.grammar_assist` is on (§16.5); the personal dictionary's "Known names and terms" line,
+capped at 1,000 characters (§16.2); the About you line from `context.txt`, capped at 500
+characters of the user's text (§16.7). A hands-free part's context line follows them. The
+same assembly (`PersonalText.ForCleanup` → `PersonalCleanup.Checks` →
+`TranscriptCleaner.Create`) serves the tray app, `--transcribe` and `--bench-cleanup`, and
+every provider, so a cloud provider receives the About you text too.
+
 Providers (`llm.provider`):
 
 - `local` (default): llama.cpp in-process via LLamaSharp; `llm.model` is a cleanup
@@ -615,6 +624,35 @@ when `log_transcripts` is on. Tests: verbatim casing
 against the correction behaviour on the same line, `\n` round trip, the order relative to
 corrections and the filter, the bad-line warning naming the file, the dialog writing the
 file and the next `Finish` using it.
+
+### 16.7 About you (amendment, 21/10/2026)
+
+`%APPDATA%\Dictum\context.txt`: a sentence or two about who the speaker is and what they
+talk about, so the clean-up model picks the right spellings and terms (for example "I work
+for an Australian finance company dealing with Australian lenders, bank policy and
+terminology", or "I am a financial planner in the United Kingdom"). Free text; packs of
+ready-made context are a later option, not built.
+
+- **File.** One paragraph: `#` lines are comments, and every run of whitespace, line breaks
+  included, is read as one space. At most 500 characters after that; a longer file is left
+  out of the prompt whole (never cut) with a warning that gives its length only. A personal
+  file everywhere the others are: watched for reloads (deleting it switches About you off),
+  listed by the path registry for Storage, deleted by "Delete all app data" with settings
+  and by "Remove Dictum completely". The log records its length, never its text.
+- **Prompt.** One line after the dictionary line (PROPOSED wording, awaiting the product
+  owner's approval): `Context about the speaker, for choosing spellings and terms only;
+  never add, answer or change what was said: <text>`. Never in whisper's initial prompt
+  (DECISIONS, 21/10/2026: a deliberate ceiling).
+- **Validator.** While About you is in the prompt, a reply is also rejected when it adds a
+  word of the About you text the speaker did not say, or swaps a dictated word for another
+  (drops one and adds one, in no form the dictionary-term rule allows). Every other rule
+  runs unchanged. Measured on the About you bench (DECISIONS, 21/10/2026).
+- **Settings → Personal**, card "About you" (PROPOSED strings, DECISIONS 21/10/2026): help
+  text, a box with the example as its placeholder, a character count, Save (refuses more
+  than 500 characters, or a first character `#`, with the reason) and Clear (deletes the
+  file), and the sentence saying the text is sent with cloud clean-up.
+- **Cloud.** With cloud clean-up on, the About you text travels in the system prompt with
+  every dictation, like the dictionary terms.
 
 ### 16.5 Calibration (tray → "Calibrate my voice…")
 

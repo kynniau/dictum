@@ -19,6 +19,7 @@ public class StorageTests
         SettingsFile.SetValue(paths.SettingsFile, "hotkey", System.Text.Json.Nodes.JsonValue.Create("F24"));
         TextList.Append(paths.DictionaryFile, ["Kynni"], PersonalDictionary.FileHeader);
         TextList.Append(paths.CorrectionsFile, ["teh => the"], Corrections.FileHeader);
+        SpeakerContext.Save(paths.ContextFile, "I am a financial planner in the United Kingdom.");
         File.WriteAllText(paths.ProfanityOverrideFile, "bloody\n");
         File.WriteAllText(paths.EnvFile, "LLM_API_KEY=x\n");
         var models = paths.ModelsDir(settings);

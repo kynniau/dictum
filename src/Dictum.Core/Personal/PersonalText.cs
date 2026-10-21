@@ -9,7 +9,8 @@ namespace Dictum.Personal;
 /// list and the snippets. <see cref="Finish"/> is the last step before a paste: corrections, the profanity filter, then the
 /// snippets (SPEC §22, §16.6).
 /// </summary>
-public sealed class PersonalText(PersonalDictionary dictionary, Corrections corrections, ProfanityFilter profanity, Corrections? snippets = null)
+public sealed class PersonalText(PersonalDictionary dictionary, Corrections corrections, ProfanityFilter profanity, Corrections? snippets = null,
+    SpeakerContext? context = null)
 {
     public static readonly PersonalText Empty = new(PersonalDictionary.Empty, Corrections.Empty, ProfanityFilter.Empty);
 
@@ -20,11 +21,15 @@ public sealed class PersonalText(PersonalDictionary dictionary, Corrections corr
     /// <summary>snippets.txt: "what you say => what is pasted", pasted exactly as written (SPEC §16.6).</summary>
     public Corrections Snippets { get; } = snippets ?? Corrections.Empty;
 
+    /// <summary>context.txt, About you: who the speaker is, for the clean-up model's choice of spellings and terms (SPEC §16.7).</summary>
+    public SpeakerContext Context { get; } = context ?? SpeakerContext.Empty;
+
     public static PersonalText Load(AppPaths paths, Action<string> warn) => new(
         PersonalDictionary.Load(paths.DictionaryFile, warn),
         Corrections.Load(paths.CorrectionsFile, warn),
         ProfanityFilter.Load(paths.ProfanityOverrideFile, paths.ProfanityShippedFile, warn),
-        Corrections.LoadSnippets(paths.SnippetsFile, warn));
+        Corrections.LoadSnippets(paths.SnippetsFile, warn),
+        SpeakerContext.Load(paths.ContextFile, warn));
 
     /// <summary>
     /// After clean-up: the corrections, then the profanity filter, then the snippets, then the paste. Corrections first
@@ -45,13 +50,13 @@ public sealed class PersonalText(PersonalDictionary dictionary, Corrections corr
 
     /// <summary>
     /// What these files give every clean-up (SPEC §16): the dictionary line for the prompt, the dictated words a reply may
-    /// not drop, and the terms of that line a reply may not add. The tray app, --transcribe and --bench-cleanup take all
-    /// three from here, so none of them can leave one out.
+    /// not drop, the terms of that line a reply may not add, and the About you text. The tray app, --transcribe and
+    /// --bench-cleanup take all four from here, so none of them can leave one out.
     /// </summary>
     public PersonalCleanup ForCleanup(ProfanitySettings profanity) =>
-        new(Dictionary.CleanupLine, WordsTheCleanupMustKeep(profanity), Dictionary.CleanupTerms);
+        new(Dictionary.CleanupLine, WordsTheCleanupMustKeep(profanity), Dictionary.CleanupTerms, Context.Text);
 
-    /// <summary>Counts only, never the words themselves (they can be names, so they stay out of the log).</summary>
+    /// <summary>Counts only, never the words themselves (they can be names, so they stay out of the log); About you by its length.</summary>
     public string Summary(ProfanitySettings profanity) =>
-        $"dictionary {Dictionary.Terms.Count} term(s), corrections {Corrections.Rules.Count} rule(s), snippets {Snippets.Rules.Count}, profanity {profanity.Mode} ({Profanity.Words.Count} words, {Profanity.Source})";
+        $"dictionary {Dictionary.Terms.Count} term(s), corrections {Corrections.Rules.Count} rule(s), snippets {Snippets.Rules.Count}, profanity {profanity.Mode} ({Profanity.Words.Count} words, {Profanity.Source}), about you {Context.Text?.Length ?? 0} character(s)";
 }

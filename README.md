@@ -127,6 +127,7 @@ an edit made in the file is picked up within a second and shows in the window.
 | Models | Every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
 | Storage | Where everything is, the model folders in the order Dictum looks in them, free space, every model file with its folder, size and Delete (none for the models that come with Dictum), delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
+| Personal | **About you**: a sentence or two about who you are and what you talk about, for the clean-up model's choice of spellings and terms (see "Making it hear you better"). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
 | About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
@@ -831,9 +832,9 @@ active preset.
 
 ## Making it hear you better
 
-Four plain text files in `%APPDATA%\Dictum` (or your `--config` folder) personalise Dictum. Each is one entry per
-line, `#` starts a comment, and saving the file takes effect at once. Deleting `dictionary.txt`, `corrections.txt` or
-`snippets.txt` switches that feature off; deleting a `profanity.txt` override returns to the shipped list (set
+Five plain text files in `%APPDATA%\Dictum` (or your `--config` folder) personalise Dictum. Each is one entry per
+line (About you is one paragraph), `#` starts a comment, and saving the file takes effect at once. Deleting
+`dictionary.txt`, `corrections.txt`, `snippets.txt` or `context.txt` switches that feature off; deleting a `profanity.txt` override returns to the shipped list (set
 `profanity.mode` to `off` to stop filtering).
 
 **Personal dictionary (`dictionary.txt`).** Names, products and jargon you want spelt your way, one per line (tray panel >
@@ -870,6 +871,18 @@ address, and a correction can repair a misheard phrase first (`calendar lee => c
 reach the `my calendly` snippet). The clean-up model never sees the pasted text, only the phrase you said; if it tends to
 rewrite your phrase (for example "my e-mail"), add that form as a second line. Say the phrase as whole words with
 nothing attached, and keep it something you would not say by accident.
+
+**About you (`context.txt`).** A sentence or two about who you are and what you talk about, for example "I work for an
+Australian finance company: Australian lenders, bank names and mortgage terms." or "I am a financial planner in the
+United Kingdom." Settings > Personal > **About you** writes it, or edit the file. It is one paragraph (line breaks are
+read as spaces) of at most 500 characters; Save refuses more, and a longer file is left out until it is shortened.
+It goes into the clean-up prompt after the dictionary line, worded for spelling and term choice only, and never into
+whisper's prompt. While it is set, Dictum also rejects a clean-up reply that adds a word from it you did not say, or
+that swaps one of your words for another, and pastes the rule-based tidy instead. Measured 21/10/2026 on 18 synthetic
+sentences naming Australian lenders and United Kingdom insurers (DECISIONS): it changed little for the local models.
+qwen2.5-1.5b pasted 20 of 25 expected spellings without it, 20 with the Australian text and 19 with the United Kingdom
+one. The dictionary is still the way to make a name come out right every time. The log records its length only; with
+cloud clean-up on, it is sent with every dictation. Deleting `context.txt` switches it off.
 
 **Fix last dictation** (tray, or an optional `fix_hotkey`). Opens a small always-on-top editor with the last text
 Dictum pasted (kept in memory only, never written to disk); in hands-free, Fix last dictation holds the last part typed.
@@ -986,11 +999,11 @@ send it on, and `offline_only` cannot see that.
   to disk. The only audio Dictum stores is what you record on purpose in the calibration window: ten WAV files in
   `%LOCALAPPDATA%\Dictum\calibration`, kept until you press **Delete recordings** (calibration window, or Settings > Storage; or uninstall with `-RemoveData`),
   never uploaded, and used only by that window.
-- **Your own text files** in `%APPDATA%\Dictum`: `dictionary.txt`, `corrections.txt`, `snippets.txt` and an optional
-  `profanity.txt` override. Plain text you can read, edit and delete; nothing else reads them. Corrections, snippets
+- **Your own text files** in `%APPDATA%\Dictum`: `dictionary.txt`, `corrections.txt`, `snippets.txt`, `context.txt`
+  (About you) and an optional `profanity.txt` override. Plain text you can read, edit and delete; nothing else reads them. Corrections, snippets
   and the profanity list never leave the PC (a snippet's text, such as an address or a link, is added after the
   clean-up, so even a cloud clean-up never receives it). The dictionary goes into the cleanup prompt, so with `anthropic` or an `openai-compatible`
-  server its terms are sent with every dictation (to this PC's own server, or to the cloud).
+  server its terms are sent with every dictation (to this PC's own server, or to the cloud). So is your About you text.
 - **The last dictation** is kept in memory for "Fix last dictation" and is gone when Dictum quits. It is never written
   to disk or the log.
 - **Transcripts** are not stored. With `insert.method = "paste"` and `restore_clipboard = false` the last transcript
@@ -1038,7 +1051,7 @@ Every deletion says how much it frees and asks once; sizes are read from the dis
   corrections" is ticked). None of them touches `.env` or the program folder. A model folder you chose outside your
   user folder, which other users may share, is left alone by **Delete all app data**, and its question says so. Dictum
   keeps no dictation history, so there is nothing else to clear.
-- **Remove Dictum completely** deletes every model, recording, log, settings.json, `consent.json`, dictionary,
+- **Remove Dictum completely** deletes every model, recording, log, settings.json, `consent.json`, dictionary, About you,
   corrections, the `.env` files, whatever the migration left in Dictate's old folders (see "Moving from Dictate"; a
   Store copy never touches those), the Start menu shortcut, the launch-at-login entry and the program's own files,
   then quits. The first warning lists every file with its size and the total, the program's files included; the

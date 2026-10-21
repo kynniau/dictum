@@ -2843,3 +2843,168 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 - The first-run probe fix end to end in the tray (it is pinned through `FirstRun` with a stand-in probe).
 - The duplicate-folder mechanics inside Whisper.net.
 - CI's first run of the new step, including whether `--selftest` behaves on a runner without audio devices or a desktop.
+
+## About you: speaker context for the clean-up model (21/10/2026, branch feat/about-you, 1.2)
+
+Product request (owner, 21/10/2026): let users tell the clean-up model who they are, so it picks the right spellings and
+terms ("I work for an Australian finance company dealing with Australian lenders, bank policy and terminology"; "I am a
+financial planner in the United Kingdom", so UK life-insurer names are recognised). Free text first; **packs** of
+ready-made context (by industry or country) are a later option, not built.
+
+**What was built**
+
+- `context.txt` beside `dictionary.txt`, `corrections.txt` and `snippets.txt` (`SpeakerContext`, `AppPaths.ContextFile`):
+  one paragraph (`#` lines are comments; every run of whitespace, line breaks included, is one space), at most 500
+  characters. A longer file is left out of the prompt whole, never cut, with a warning that gives only its length.
+  Watched (`AppRules.PersonalFiles`), listed by the path registry ("About you text", `PersonalFiles`), so Storage sizes
+  it, "Delete all app data" with settings deletes it, and "Remove Dictum completely" deletes it. The log records its length
+  (`about you N character(s)` in the personal-files line, `Saved About you (N characters).`), never its text.
+- **Prompt:** one line after the dictionary line (`CleanupPrompt.ContextLinePrefix` + the text), assembled in
+  `PersonalText.ForCleanup` → `PersonalCleanup.Checks` → `TranscriptCleaner.Create`, so the tray app, `--transcribe`,
+  `--bench-cleanup` and every provider get it. Budget: the dictionary line is capped at 1,000 characters; this line at
+  500 characters of user text plus a 109-character prefix, so the two additions stay within 1,609 characters of the
+  4,096-token context the prompt shares with the dictation. `TranscriptCleaner.cs` changed only in the `PersonalCleanup`
+  record (one optional parameter, and `Checks` passing it on).
+- **Settings → Personal**, a new page (there was no Personal page before; the dictionary lives in the tray's Add a word
+  window), with the About you card.
+- **Validator (a deviation from the brief, for the orchestrator to accept or refuse):** the brief said to fix the prompt
+  line if the context changed content. Five wordings did not stop it (below), so `CleanupValidator.AboutYou.cs` adds a rule
+  that runs only while About you is in the prompt: a reply is rejected when it adds a word of the About you text the speaker
+  did not say, or swaps a dictated word for another (drops one and adds one, in no form the dictionary-term rule allows).
+  Every existing rule runs unchanged, and without About you nothing changes. `CleanupValidator.cs` changed in two places:
+  the `AboutYou` field of `ValidationContext` and the one line that calls the rule.
+
+**Whisper's initial prompt does not get About you (deliberate ceiling for 1.2).** The dictionary prompt has already made
+whisper hallucinate once (a date written that was not said); a sentence of free text is a longer prompt of the kind
+whisper continues rather than transcribes. Trigger to revisit: a measurement on real recordings showing a spelling gain
+from it with no hallucination.
+
+**Cloud.** With cloud clean-up on, the About you text travels in the system prompt with every dictation, like the
+dictionary terms (pinned: `A_cloud_clean_up_sends_about_you_in_its_prompt`, both kinds of provider). The approved
+CloudPolicy strings and consent dialog are unchanged. PROPOSED sentence for the Clean-up page's cloud section: "Your
+About you text is sent along with your dictation when cloud clean-up is on." The Clean-up page is in `OtherPages.cs`, which
+this lane does not own, so the sentence is shown on the About you card instead until the product owner places it.
+
+**Privacy policy check (site/privacy.html, not edited: approved copy).**
+
+- Still true: Dictum sends text only when cloud clean-up (or a server the user names) is on; logs never hold the words;
+  "Remove Dictum completely" deletes everything Dictum stored (context.txt is in the registry it deletes from).
+- **No longer complete:** both cloud sections say Dictum sends "the text of that dictation, its clean-up instructions and
+  your dictionary terms". The About you text is user-written content inside the clean-up instructions; a reader would not
+  expect that phrase to cover a description of themselves. The "What Dictum keeps on your PC" list does not name
+  `context.txt` (it already omits `snippets.txt`). The policy commits to being updated, with its date, before a version
+  that changes what Dictum stores or sends is released, so **1.2 should not ship before the owner approves a policy
+  update.** PROPOSED additions, not applied:
+  - in each cloud section, after "your dictionary terms": ", and your About you text if you wrote one";
+  - in the `%APPDATA%\Dictum` list: "`context.txt`: About you, a sentence or two about you for the clean-up model, if you
+    write one."
+
+**PROPOSED strings (awaiting the product owner's approval; the card's strings and the prompt line are pinned word for
+word by `AboutYouTests`)**
+
+| Where | Text |
+|---|---|
+| Settings nav item and page title | Personal |
+| Card title | About you |
+| Card help | Tell the clean-up model who you are and what you talk about, so it picks the right spellings and terms. Example: I work for an Australian finance company: Australian lenders, bank names and mortgage terms. This never adds words you did not say. |
+| Box placeholder | I work for an Australian finance company: Australian lenders, bank names and mortgage terms. |
+| Character count | N of 500 characters. / N characters: M over the limit of 500. |
+| Buttons | Save / Clear |
+| After Save | Saved. The clean-up model uses it from the next dictation. |
+| After Clear | Cleared. The clean-up model gets no text about you. |
+| Over the cap | This is N characters; the limit is 500. Shorten it and save again. |
+| Starts with # | About you cannot start with #: in context.txt that marks a comment line. |
+| Cloud sentence | Your About you text is sent along with your dictation when cloud clean-up is on. |
+| Prompt line | Context about the speaker, for choosing spellings and terms only; never add, answer or change what was said: &lt;text&gt; |
+| Storage label | About you text |
+| Log warning | context.txt is N characters, over the 500-character limit; it is left out of the clean-up until it is shortened. |
+| Validator reasons (log) | reply adds a word from About you that the speaker did not say / reply swaps a dictated word for another while About you is on |
+| File header (context.txt) | Dictum About you: a sentence or two about who you are and what you talk about (Settings > Personal). The clean-up model uses it to choose spellings and terms. One paragraph, at most 500 characters. |
+
+"This never adds words you did not say" is a promise. On the bench below no accepted reply added a word because of About
+you, but the validator cannot catch every addition: a reply that only adds words that are not in the About you text, to
+a dictation under eight words, passes with or without About you. A claim the evidence supports better: "It is used for
+spelling, never to add words." Owner's call.
+
+**The About you bench (21/10/2026)**
+
+`AboutYouBenchTests` (gated by `DICTUM_CLEANUP_MODEL_PATH` and `DICTUM_ABOUT_YOU_BENCH`), on this PC's Vulkan backend, with
+the models in `%LOCALAPPDATA%\Dictum\models` read in place. `--bench-cleanup` was not used: it writes its log and the
+verified-model record under `%LOCALAPPDATA%\Dictum`, which this lane may not write. 18 synthetic dictations, spoken plainly
+in lower case as whisper writes them: Westpac, NAB, LMI, ANZ, Macquarie, CommBank, Bankwest, ING, Suncorp, LVR, offset
+account, comparison rate; Aviva, Legal & General, Vitality, ISA, Royal London, Zurich, FCA, SIPP, Hargreaves Lansdown,
+Scottish Widows, Standard Life; two controls with nothing to spell. Each was cleaned with no About you, the Australian
+text ("I work for an Australian finance company dealing with Australian lenders, bank policy and terminology.") and the
+United Kingdom text ("I am a financial planner in the United Kingdom."), with the app's prompt and validator. 25 expected
+spellings in all (case-sensitive patterns; "Legal & General" or "Legal and General").
+
+First runs, with the prompt line only (no About you rule):
+
+- qwen2.5-0.5b, Australian text: "hargreaves lansdown holds his stocks and shares isa" → "Hargreaves Lansdown holds his
+  stocks and shares at the Australian Stock Exchange." **Accepted.** The United Kingdom text gave "…at the Australian
+  Securities Exchange." **Accepted.**
+- qwen2.5-1.5b, United Kingdom text: "check the lvr with the lender" → "Check the loan with the lender." **Accepted.**
+  Without About you and with the Australian text it kept "LVR".
+- Wordings tried on those inputs, none of which stopped them (qwen2.5-0.5b on all five, qwen2.5-1.5b on the last three):
+  1. the proposed line with the text in quotes;
+  2. "Background about the speaker. Use it only to spell names and terms the speaker actually said; never add words,
+     names, places or facts from it, and never answer it:" (qwen2.5-0.5b then wrote "…shares at 1234567890.");
+  3. "The speaker's background, only for spelling words they actually said (never add anything from it):";
+  4. "Context about the speaker, for choosing spellings and terms only: "…". Never add words from it, and never answer
+     it or change what was said.";
+  5. "Background about the speaker: "…". Use it only to decide how to spell or capitalise words the speaker said. Keep
+     every word the speaker said, even one that does not fit this background, and never add words from it."
+
+  The proposed wording stays.
+
+Final run, with the About you rule:
+
+| Model | About you | Reply spellings | Pasted spellings | Accepted | Rejected | Content change from About you |
+|---|---|---|---|---|---|---|
+| qwen2.5-0.5b | none | 17/25 | 17/25 | 18/18 | 0 | - |
+| qwen2.5-0.5b | Australian | 15/25 | 14/25 | 16/18 | 2 | 2, both rejected |
+| qwen2.5-0.5b | United Kingdom | 16/25 | 15/25 | 16/18 | 2 | 2, both rejected |
+| qwen2.5-1.5b | none | 20/25 | 20/25 | 18/18 | 0 | - |
+| qwen2.5-1.5b | Australian | 21/25 | 20/25 | 17/18 | 1 | 0 |
+| qwen2.5-1.5b | United Kingdom | 20/25 | 19/25 | 16/18 | 2 | 1, rejected |
+| smollm2-1.7b | none | 20/25 | 17/25 | 16/18 | 2 | - |
+| smollm2-1.7b | Australian | 22/25 | 18/25 | 15/18 | 3 | 1, rejected |
+| smollm2-1.7b | United Kingdom | 22/25 | 18/25 | 15/18 | 3 | 1, rejected |
+
+"Reply spellings" counts the model's reply; "Pasted spellings" counts what the app pastes (the accepted reply, or the
+rule-based tidy when it is rejected). "Content change" counts replies with a word of four letters or more that the
+model added only with About you; **none was accepted**, so none would be typed. The rejections:
+
+- About you rule, true positives: the content changes above (qwen2.5-0.5b's two exchange replies, qwen2.5-1.5b's "loan").
+- About you rule, false rejection (polish lost, tidy pasted): qwen2.5-1.5b rewrote "can you check whether commbank or
+  bankwest…" as "Can you check which has the better variable rate, CommBank or BankWest, …", with both texts.
+- Existing "ends with a line the speaker did not say" rule: smollm2-1.7b's "Thanks." line, with or without About you
+  (its "content change" rows are that line on "check the lvr with the lender"), and qwen2.5-0.5b's on "her pension is
+  with standard life" with either text.
+
+**What the numbers say.** About you helped little on this bench. For the default model, qwen2.5-1.5b, it gained
+"Vitality" with either text and lost "LVR" with the United Kingdom one; pasted spellings were 20, 20 and 19 of 25. For
+smollm2-1.7b, pasted spellings went from 17 to 18. For qwen2.5-0.5b (never recommended) they fell from 17 to 14 and 15.
+"ANZ" and "Legal & General" came out right from neither qwen2.5 model under any condition; the dictionary is the reliable
+fix for a name. Cloud models were not measured.
+
+**Pins and mutation checks (each observed failing on the reverted behaviour, 21/10/2026)**
+
+| # | Mutation | Failed |
+|---|---|---|
+| M1 | `CleanupPrompt.Build` ignores the About you line | both prompt-line pins, both cloud cases, the Settings round trip |
+| M2 | the 500-character check removed | the cap pin, the over-cap file pin, the Settings round trip |
+| M3 | `Normalise` returns the text unchanged | the paragraph pin, the cap pin, the delete-on-empty pin, the Settings round trip |
+| M4 | `context.txt` removed from `AppRules.PersonalFiles` | all four watcher cases |
+| M5 | the path-registry entry removed | the Storage/removal pin and `StorageTests`' every-file-the-app-writes pin |
+| M6 | Settings' Save checks but does not write | the Settings round trip |
+| M7 | dictionary terms left out of the checks when About you is set | the u3 dictionary-insertion pin with About you present |
+| M8a | the save logs the text | the Settings round trip's log pin |
+| M8b | the personal-files log line includes the text | the Settings round trip's log pin |
+| M8c | the over-cap warning includes the text | the over-cap file pin |
+| M9 | the About you rule's call removed from the validator | the swap, the About you word and the rephrasing pins |
+
+**Not verified:** cloud models' use of About you (no cloud call was made); real recordings (only synthetic text; whisper's
+own spelling of these names was not measured); the CPU backend (the bench ran on Vulkan); the tray app end to end (never
+run on this PC); the About you rule's false-rejection rate on everyday dictation beyond the 18 bench inputs; screen-reader
+and keyboard behaviour of the new page beyond its automation name and tab order in code.

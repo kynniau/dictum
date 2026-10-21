@@ -8,7 +8,7 @@ public enum DataCategory
     /// <summary>settings.json (and its write-in-progress .tmp).</summary>
     Settings,
 
-    /// <summary>The user's own text files: dictionary.txt, corrections.txt, snippets.txt, a profanity.txt override.</summary>
+    /// <summary>The user's own text files: dictionary.txt, corrections.txt, snippets.txt, context.txt, a profanity.txt override.</summary>
     PersonalFiles,
 
     /// <summary>.env files with API keys: only "Remove Dictum completely" deletes them.</summary>
@@ -73,6 +73,7 @@ public static class PathRegistry
             new(paths.DictionaryFile, DataCategory.PersonalFiles, "personal dictionary"),
             new(paths.CorrectionsFile, DataCategory.PersonalFiles, "corrections"),
             new(paths.SnippetsFile, DataCategory.PersonalFiles, "snippets"),
+            new(paths.ContextFile, DataCategory.PersonalFiles, "About you text"),
             new(paths.ProfanityOverrideFile, DataCategory.PersonalFiles, "your profanity word list"),
             new(paths.EnvFile, DataCategory.Secrets, "API keys (.env)"),
             new(paths.ExeEnvFile, DataCategory.Secrets, "API keys beside the program (.env)"),
