@@ -7,20 +7,41 @@ using Dictum.App;
 
 namespace Dictum.Tests;
 
-/// <summary>A loaded speech model stand-in: records decoder changes and disposal; a transcription can wait for its token (up to 5 s).</summary>
+/// <summary>
+/// A loaded speech model stand-in: records decoder changes and disposal. With <c>waitForCancel</c> a transcription never ends on
+/// its own, only when its token is cancelled, so a test proves a cancellation by the transcription ending rather than by a clock.
+/// </summary>
 internal sealed class FakeSpeechEngine(string path, DecodeOptions decode, bool waitForCancel = false) : ISpeechEngine
 {
     private int _disposed;
+    private readonly TaskCompletionSource _transcribeStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _transcribeCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public string ModelPath { get; } = path;
     public DecodeOptions Decode { get; private set; } = decode;
     public bool Disposed => Volatile.Read(ref _disposed) == 1;
+    /// <summary>Completes when a <c>waitForCancel</c> transcription starts waiting on its token.</summary>
+    public Task TranscribeStarted => _transcribeStarted.Task;
+    /// <summary>Completes when that transcription's token is cancelled, before the cancellation leaves <see cref="TranscribeAsync"/>.</summary>
+    public Task TranscribeCancelled => _transcribeCancelled.Task;
 
     public void Reconfigure(DecodeOptions options) => Decode = options;
 
     public async Task<string> TranscribeAsync(float[] samples, CancellationToken cancellationToken)
     {
-        if (waitForCancel) await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        if (waitForCancel)
+        {
+            _transcribeStarted.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _transcribeCancelled.TrySetResult();
+                throw;
+            }
+        }
         return Path.GetFileName(ModelPath);
     }
 
