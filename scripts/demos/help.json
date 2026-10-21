@@ -1,7 +1,7 @@
 {
   "name": "help",
   "title": "Find help in Dictum",
-  "summary": "Settings > Help (1.2): how Dictum works and plain answers to common questions, readable without the internet. Send feedback opens an email in the user's own mail program; it is shown, not clicked (the test PC has no mail program).",
+  "summary": "Settings > Help (1.2): a list of the questions it answers, each a link to its answer; how Dictum works; Send feedback opens an email in the user's own mail program (shown, not clicked: the test PC has no mail program).",
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "installSilently" },
@@ -42,38 +42,50 @@
       "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Help" } } ]
     },
     {
-      "id": "feedback",
-      "caption": "To tell us something, use Send feedback. It opens an email you can check, then send.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Send feedback or suggest a feature" } } ],
-      "after": 3,
-      "poster": true
-    },
-    {
-      "id": "how",
-      "caption": "Below, Help explains how Dictum works, in plain words.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "How Dictum works", "timeout": 30 } } ],
+      "id": "index",
+      "caption": "Help starts with a list of the questions it answers.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Questions on this page", "timeout": 30 } } ],
       "after": 2.5
     },
     {
       "id": "voice",
-      "caption": "It answers common questions, such as: where does my voice go?",
+      "caption": "Click a question, for example Where does my voice go?",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Where does my voice go?" } } ],
+      "after": 1
+    },
+    {
+      "id": "voice-answer",
+      "caption": "Help moves down to its answer.",
       "do": [
-        { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "The only recordings Dictum keeps", "match": "prefix" } }
+        { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Nowhere. Dictum turns your voice", "match": "prefix" } }
       ],
-      "after": 3,
-      "scrollFirst": true
+      "after": 3
     },
     {
       "id": "wrong",
-      "caption": "Why did it type the wrong words? Help lists what to try.",
+      "caption": "Click another question: Why did it type the wrong words?",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Why did it type the wrong words?" } } ],
+      "scrollFirst": true,
+      "after": 1
+    },
+    {
+      "id": "wrong-answer",
+      "caption": "Its answer lists what to try.",
       "do": [
         {
           "do": "point",
           "target": { "window": "^Dictum settings$", "type": "Text", "name": "Keep the microphone close to your mouth", "match": "contains" }
         }
       ],
+      "after": 3
+    },
+    {
+      "id": "feedback",
+      "caption": "To tell us something, use Send feedback. It opens an email you can check, then send.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Send feedback or suggest a feature" } } ],
+      "scrollFirst": true,
       "after": 3,
-      "scrollFirst": true
+      "poster": true
     }
   ]
 }

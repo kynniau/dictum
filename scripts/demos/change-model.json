@@ -46,7 +46,7 @@
     {
       "id": "standard",
       "caption": "Standard is in use. It works well for most people.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Button", "name": "In use", "sameRowAs": "Standard", "timeout": 30 } } ],
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "In use", "sameRowAs": "Standard", "timeout": 30 } } ],
       "after": 2
     },
     {
@@ -58,10 +58,7 @@
       "id": "in-use",
       "caption": "That's it. More accurate now says In use.",
       "do": [
-        {
-          "do": "point",
-          "target": { "window": "^Dictum settings$", "type": "Button", "name": "In use", "sameRowAs": "More accurate", "timeout": 60 }
-        }
+        { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "In use", "sameRowAs": "More accurate", "timeout": 60 } }
       ],
       "after": 2.5,
       "poster": true
@@ -74,7 +71,7 @@
     {
       "id": "names",
       "caption": "Advanced lists every model by name. small.en is in use.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Button", "name": "In use", "sameRowAs": "small.en ", "timeout": 30 } } ],
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "In use", "sameRowAs": "small.en ", "timeout": 30 } } ],
       "after": 3
     }
   ]

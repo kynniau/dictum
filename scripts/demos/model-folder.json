@@ -61,7 +61,7 @@
     {
       "id": "done",
       "caption": "Done. Dictum now keeps new models on drive D.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Edit", "name": "Model folder", "timeout": 30 } } ],
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "D:\\Dictum models", "timeout": 30 } } ],
       "after": 3,
       "poster": true
     }

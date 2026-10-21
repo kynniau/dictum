@@ -2,7 +2,7 @@
 
 Short captioned walkthrough videos of Dictum, recorded unattended on a clean Windows (Windows Sandbox) with no
 narration, for people who have never used it. Every caption names one thing to do. Pipeline written 21/10/2026 on
-main at 6dfede8; the demos were re-recorded on 21/10/2026 against the 1.2 build (PR #23 at 4b5ee4f), below.
+main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build with its polish (PR #38 at 4abba54), below.
 
 All caption copy below is **PROPOSED**, for the product owner to approve.
 
@@ -221,17 +221,20 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   that build's.
 - **Calibration keeps its name.** The 1.2 build still calls it "Calibrate my voice" (the tray panel, Settings > Models,
   the welcome's Try it step and Help all use that name), so the demo does too; its file stays `test-setup.json`. With
-  no microphone it shows "That did not work: No microphone found..." after Record.
+  no microphone it shows "No microphone found. Plug one in, ..." under Record (the same sentence as the welcome window
+  and the tray panel).
 - **The help demo does not press Send feedback**: it opens the user's own mail program, and the sandbox has none. The
   demo shows the button and says what it does.
-- **The Setup's version is 1.1.2.** The 1.2 build (PR #23 at 4b5ee4f) still carries version 1.1.2, so the Setup file,
+- **The Setup's version is 1.1.2.** The 1.2 build (PR #38 at 4abba54) still carries version 1.1.2, so the Setup file,
   the SmartScreen dialog and Setup's title say 1.1.2 in these recordings.
 
 ## What each demo shows (1.2 build, 21/10/2026)
 
-Recorded from PR #23's head 4b5ee4f (Simple/Advanced view, clean-up Off, the six-step welcome, Help). CI on a branch
+Recorded on 22/10/2026 from PR #38's head 4abba54 (the 1.2 build of PR #23 plus its polish: the welcome window at 720 x 500, key
+names such as "Right Ctrl", the no-microphone state, the Help index, "In use" as a tag). CI on a branch
 publishes only the zip (`.github/workflows/ci.yml` builds the Setup on tags), so the Setup exe was built locally from
-that commit with `scripts\build-installer.ps1` (Inno Setup 7.1.0). The web copies are in `site\img\demos\`:
+that commit with `scripts\build-installer.ps1` (Inno Setup 7.1.0): `Dictum-Setup-1.1.2.exe`, SHA-256
+`D12A9D96DCD5906DD70A7AADF023A87D91DAA0C62F794691883A4A2D9200DB20`, `Dictum.exe` version `1.1.2+4abba54`. The web copies are in `site\img\demos\`:
 `<name>.gif` and `<name>-poster.png` are committed; `<name>.mp4` is not, because the private-material guard
 (`.githooks/private-guard.sh`, and `.gitignore`) refuses every `.mp4` in the repository, with no exception. Where the
 videos are hosted is the product owner's decision.
@@ -239,11 +242,11 @@ videos are hosted is the product owner's decision.
 | Demo | File | Shows |
 |---|---|---|
 | 1. Install | `install.json` | Downloads folder, double-click Setup, SmartScreen (offline variant), Next, Install, Launch Dictum ticked, Finish, the "Welcome to Dictum" window |
-| 2. First run | `first-run.json` | Start, type Dictum, Enter, the six-step welcome (Welcome, Model files, Speech model, Your hotkey, Microphone with the no-microphone message, Try it), Finish, the tray icon, the panel showing Ready |
+| 2. First run | `first-run.json` | Start, type Dictum, Enter, the six-step welcome (Welcome, Model files, Speech model, Your hotkey, Microphone with the no-microphone message, Try it while the model gets ready), Finish, the tray icon, the panel showing Ready and the no-microphone sentence |
 | 3. Change the speech model | `change-model.json` | Settings > Models in the Simple view: Standard in use, Use next to More accurate (small.en, copied in from the host's model folder, read-only), In use, then Advanced showing every model by name |
-| 4. Calibrate my voice | `test-setup.json` | Tray icon, Calibrate my voice, the first sentence, Record, and the no-microphone message |
-| 5. Models on another drive | `model-folder.json` | Settings, Models, scroll to Model folder, Browse, type D:\Dictum models, Select Folder, the new folder shown |
-| 6. Find help | `help.json` | Settings > Help: Send feedback (shown, not pressed), How Dictum works, two of the questions and answers |
+| 4. Calibrate my voice | `test-setup.json` | Tray icon, Calibrate my voice, the first sentence, Record, and the no-microphone message under Record |
+| 5. Models on another drive | `model-folder.json` | Settings, Models, Browse, type D:\Dictum models, Select Folder, the new folder shown |
+| 6. Find help | `help.json` | Settings > Help: the "Questions on this page" list, two questions opened from it and their answers, Send feedback (shown, not pressed) |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
 
 change-model, test-setup, model-folder and help go through the welcome window with its defaults (Next, Next, Next,
@@ -273,12 +276,14 @@ window, and first-run records it.
    8. Click Use this hotkey.
    9. Dictum tests your microphone. This test PC has none, so it says so.
    10. Click Next. With a microphone, you would say a few words first.
-   11. Last, try it: click in the box, hold Right Ctrl, say a sentence, let go.
-   12. Click Finish.
-   13. Dictum now waits by the clock. Click the little up-arrow there. *(skipped when the icon is already on the taskbar)*
-   14. Click the Dictum icon.
-   15. This is Dictum's panel. Ready means you can dictate.
-   16. Press Esc to close the panel.
+   11. Dictum gets the speech model ready. This takes a moment.
+   12. Last, try it: click in the box, hold Right Ctrl, say a sentence, let go.
+   13. Click Finish.
+   14. Dictum now waits by the clock. Click the little up-arrow there. *(skipped when the icon is already on the taskbar)*
+   15. Click the Dictum icon.
+   16. This is Dictum's panel. Ready means it is waiting for you.
+   17. This test PC has no microphone, so the panel says so here.
+   18. Press Esc to close the panel.
 3. **Change the speech model** (`change-model.json`)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
@@ -295,7 +300,7 @@ window, and first-run records it.
    3. Click Calibrate my voice.
    4. Dictum shows a sentence to read aloud.
    5. Click Record and read the sentence aloud.
-   6. This test PC has no microphone, so Dictum says so here.
+   6. This test PC has no microphone, so Dictum says so under Record.
 5. **Keep the models on another drive** (`model-folder.json`)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
@@ -310,10 +315,12 @@ window, and first-run records it.
    2. Click the Dictum icon.
    3. Click Settings.
    4. Click Help, at the bottom of the list on the left.
-   5. To tell us something, use Send feedback. It opens an email you can check, then send.
-   6. Below, Help explains how Dictum works, in plain words.
-   7. It answers common questions, such as: where does my voice go?
-   8. Why did it type the wrong words? Help lists what to try.
+   5. Help starts with a list of the questions it answers.
+   6. Click a question, for example Where does my voice go?
+   7. Help moves down to its answer.
+   8. Click another question: Why did it type the wrong words?
+   9. Its answer lists what to try.
+   10. To tell us something, use Send feedback. It opens an email you can check, then send.
 - **Dictate: hold, speak, let go** (stills, `dictation-stills.json`)
   1. Hold Right Ctrl and speak. The bar at the bottom of the screen says Recording.
   2. Let go of the key when you have finished. Dictum turns your words into text.

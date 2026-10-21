@@ -50,11 +50,11 @@
     },
     {
       "id": "result",
-      "caption": "This test PC has no microphone, so Dictum says so here.",
+      "caption": "This test PC has no microphone, so Dictum says so under Record.",
       "do": [
         {
           "do": "point",
-          "target": { "window": "calibrate my voice$", "type": "Text", "name": "That did not work", "match": "prefix", "timeout": 15 }
+          "target": { "window": "calibrate my voice$", "type": "Text", "name": "^(No microphone found|That did not work)", "match": "regex", "timeout": 15 }
         }
       ],
       "after": 3,
