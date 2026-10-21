@@ -360,10 +360,11 @@ public sealed class ModelFolderTests : IDisposable
         var window = new SettingsWindow(shell);
         window.Show();
         window.ShowPage("Models");
-        var field = All<TextBox>(window).Single(t => AutomationProperties.GetName(t) == "Model folder");
+        var field = All<PathBox>(window).Single(); // the folder by its end, the whole path its tooltip (1.2 polish)
+        Assert.Equal("Model folder", AutomationProperties.GetName(field)); // its value is the path (PathBox's automation peer)
         var browse = ButtonNamed(window, "Browse…");
         var useDefault = ButtonNamed(window, "Use default");
-        Assert.Equal(scratch.Paths.DefaultModelsDir, field.Text);
+        Assert.Equal(scratch.Paths.DefaultModelsDir, field.Path);
         Assert.Equal("Browse for a model folder", AutomationProperties.GetName(browse)); // labelled for a screen reader
         Assert.True(browse.Focusable && browse.IsTabStop && field.IsTabStop); // and reached with Tab
         Assert.False(useDefault.IsEnabled); // nothing is chosen yet
@@ -375,14 +376,14 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Equal(chosen, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder); // written
         Assert.Equal(chosen, shell.Settings.Models.Folder); // and reloaded:
         Assert.Equal(inChosen, shell.Models.ModelPath); // the copy in the chosen folder is the one used now
-        Assert.Equal(chosen, field.Text);
+        Assert.Equal(chosen, field.Path);
         Assert.True(useDefault.IsEnabled);
         Assert.True(File.Exists(inChosen)); // nothing moved
 
         Click(useDefault);
         Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
         Assert.Null(shell.Settings.Models.Folder);
-        Assert.Equal(scratch.Paths.DefaultModelsDir, field.Text);
+        Assert.Equal(scratch.Paths.DefaultModelsDir, field.Path);
 
         dialogs.Folder = scratch.Paths.BundledModelsDir;
         Click(browse);

@@ -1347,12 +1347,26 @@ h1 {
   color: var(--text);
 }
 
-.demo-video {
+/* Demos (help.html): a still poster with a Play button; the GIF loads and plays only when the person opens it. No script.
+   The button sits at the top: the bottom of each poster is the demo's own caption band. */
+
+.demo-figure {
   margin-top: 20px;
 }
 
-.demo-video video,
-.demo-video img {
+.demo-play summary {
+  position: relative;
+  display: block;
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--radius-card);
+}
+
+.demo-play summary::-webkit-details-marker {
+  display: none;
+}
+
+.demo-play img {
   display: block;
   width: 100%;
   height: auto;
@@ -1360,13 +1374,64 @@ h1 {
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface-2);
+  color: var(--text-2);
 }
 
-.demo-video figcaption {
-  display: flex;
-  flex-wrap: wrap;
+.demo-play-label {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
   align-items: center;
-  gap: 6px 10px;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.demo-play-label::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 12px solid currentColor;
+}
+
+.demo-when-open {
+  display: none;
+}
+
+.demo-play[open] .demo-poster {
+  display: none;
+}
+
+.demo-play[open] .demo-play-label {
+  position: static;
+  margin-bottom: 10px;
+  box-shadow: none;
+}
+
+.demo-play[open] .demo-play-label::before {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  background: currentColor;
+}
+
+.demo-play[open] .demo-when-closed {
+  display: none;
+}
+
+.demo-play[open] .demo-when-open {
+  display: inline;
+}
+
+.demo-figure figcaption {
   margin-top: 10px;
   color: var(--text-2);
   font-size: 0.9375rem;

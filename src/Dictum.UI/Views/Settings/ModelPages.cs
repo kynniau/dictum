@@ -45,6 +45,21 @@ internal sealed class ModelsPage : SettingsPage
     // PROPOSED copy (21/10/2026): the Simple | Advanced segments' accessible name ("Models view: Simple"); the rest is in SimpleView.
     internal const string ViewName = "Models view";
 
+    /// <summary>The Language card in the Simple view: no model names (PROPOSED, 1.2 polish, 22/10/2026, the orchestrator's wording).</summary>
+    internal const string LanguageIntroSimple =
+        "Dictum comes with an English-only model. For other languages it downloads a model that understands them; choose the language here.";
+
+    /// <summary>
+    /// The Language card in the Advanced view, as before but for the capital after its semicolon (1.2 polish: "…\".en\" one;
+    /// any of …"; PROPOSED as changed).
+    /// </summary>
+    internal const string LanguageIntroAdvanced =
+        "The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
+        "any of the languages Whisper supports can be chosen, in alphabetical order after English; some languages are not in Whisper's list, so they cannot be chosen.";
+
+    /// <summary>The state shown, as a tag and not a button, on the row of the model in use (1.2 polish: a greyed button read as broken).</summary>
+    internal const string InUseLabel = "In use";
+
     /// <summary>The calibration test's label, as on the tray panel's button that opens the same window.</summary>
     internal const string CalibrateLabel = "Calibrate my voice";
 
@@ -56,7 +71,7 @@ internal sealed class ModelsPage : SettingsPage
     private readonly SettingsWindow _window;
     private readonly StackPanel _speech = new() { Spacing = 8 };
     private readonly StackPanel _cleanup = new() { Spacing = 8 };
-    private readonly TextBox _folder = new() { IsReadOnly = true };
+    private readonly PathBox _folder = new(FolderLabel); // trimmed from the left: the folder's own name stays in view (1.2 polish)
     private readonly Button _useDefault;
     private readonly TextBlock _folderWarning = Ui.Text("", "caption");
     private readonly Button _addCleanup;
@@ -124,7 +139,6 @@ internal sealed class ModelsPage : SettingsPage
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // The recommended clean-up model, through the catalogue's own path (asked first, then downloaded and switched to).
         _addCleanup = Ui.Button("", "primary", () => Run(() => Shell.Models.SelectCleanup(CleanupCatalog.Recommend(Shell.GpuMachine).Model)));
-        AutomationProperties.SetName(_folder, FolderLabel);
         _useDefault = Ui.Button(UseDefaultLabel, "secondary", () => Run(() => Say(Shell.Models.SetModelsFolder(null) ?? "")), name: "Use the default model folder");
         var browse = Ui.Button(BrowseLabel, "secondary", () => Run(BrowseFolder), name: "Browse for a model folder");
         var folderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 8 };
@@ -143,15 +157,17 @@ internal sealed class ModelsPage : SettingsPage
             Ui.Button(SimpleView.OffAdvancedLabel, "secondary", () => Run(Shell.Models.SelectOff)),
             Ui.Button("Choose .gguf file…", "secondary", () => Run(Shell.Models.ChooseCleanupFile)));
         var cloudNote = Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption");
-        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff];
-        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote];
+        var languageSimple = Ui.Text(LanguageIntroSimple);
+        var languageAdvanced = Ui.Text(LanguageIntroAdvanced);
+        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff, languageSimple];
+        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
         Compose(
             Ui.Stack(6, _view, Ui.Text(SimpleView.SwitchHelp, "caption")),
             _download,
             Ui.Card(Ui.Stack(10, speechIntro, explainer, _simpleSpeech, _speech, chooseFile, decoding), "Speech model"),
             Ui.Card(Ui.Stack(10,
-                Ui.Text("The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
-                        "Any of the languages Whisper supports can be chosen, in alphabetical order after English; some languages are not in Whisper's list, so they cannot be chosen."),
+                languageSimple,
+                languageAdvanced,
                 Ui.Line("Spoken language", _language, "Detect automatically works it out from the first seconds of each dictation."),
                 Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
                 _languageNote), "Language"),
@@ -190,7 +206,7 @@ internal sealed class ModelsPage : SettingsPage
         _languageNote.Text = WhisperLanguages.Problem(Shell.Models.CurrentPath, s.Whisper.Language, s.Whisper.Translate) ?? "";
         _languageNote.IsVisible = _languageNote.Text.Length > 0;
         var folder = Shell.ModelsDir;
-        _folder.Text = Shell.RealPath(folder);
+        _folder.Path = Shell.RealPath(folder);
         _useDefault.IsEnabled = Shell.Paths.ChosenModelsDir(s) is not null;
         _folderWarning.Text = FolderWarning(folder) ?? "";
         _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
@@ -253,7 +269,7 @@ internal sealed class ModelsPage : SettingsPage
             _speech.Children.Add(CatalogueRow(e.Name, $"{e.Name} · {e.SizeText}", state, e.TradeOff, inUse, have, e.FileName, () => Run(() => Shell.Models.Select(e.Name))));
         }
         if (ModelCatalog.Find(Shell.Models.CurrentName) is null)
-            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.CurrentPath}", null, () => { }));
+            _speech.Children.Add(ModelRow(Shell.Models.CurrentName, Shell.Models.CurrentPath, null, () => { })); // the tag says "In use"
 
         var current = s.Llm.Provider == LlmSettings.Local ? CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model : null;
         foreach (var e in CleanupCatalog.Entries)
@@ -287,7 +303,7 @@ internal sealed class ModelsPage : SettingsPage
             var inUse = e.Name == current;
             if (tier.Guard is { } guard) // never offered: choosing it would switch to a model that cannot hear this language
             {
-                _simpleSpeech.Children.Add(inUse ? ModelRow(tier.Label, $"In use · {guard}", null, () => { }) : TextRow(tier.Label, guard));
+                _simpleSpeech.Children.Add(inUse ? ModelRow(tier.Label, guard, null, () => { }) : TextRow(tier.Label, guard)); // the tag says "In use"
                 continue;
             }
             var source = _sources[i];
@@ -306,7 +322,8 @@ internal sealed class ModelsPage : SettingsPage
         var english = Dictum.Transcribe.WhisperLanguages.OutputIsEnglish(language, translate);
         var tidyLine = SimpleView.TidyLine(language, translate);
         // With text that is not English no clean-up model runs (whitespace only), so "with AI clean-up" would be untrue.
-        var tidyState = !tidy ? null : s.Llm.Provider == LlmSettings.Local && english ? SimpleView.TidyWithAiState : "In use";
+        // In use, the row has the "In use" tag, so its line does not say it again (1.2 polish round 2).
+        var tidyState = tidy && s.Llm.Provider == LlmSettings.Local && english ? SimpleView.TidyWithAiState : null;
         _simpleCleanup.Children.Add(ModelRow(SimpleView.TidyTitle, tidyState is null ? tidyLine : $"{tidyState} · {tidyLine}",
             tidy ? null : "Use", () => Run(() => UseTidy(Shell)), out _, name: tidy ? null : SimpleView.ActionName("Use", SimpleView.TidyLabel)));
         var off = SimpleView.OffInUse(s.Llm);
@@ -314,7 +331,7 @@ internal sealed class ModelsPage : SettingsPage
             _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), SimpleView.CustomNote, null, () => { }));
         // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use on English text, sits under this row; Off under it.
         // Off has no language dependency (it never runs a clean-up), so unlike the tiers it is offered for every language.
-        _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, off ? $"In use · {SimpleView.OffSubLine}" : SimpleView.OffSubLine,
+        _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, SimpleView.OffSubLine,
             off ? null : "Use", () => Run(Shell.Models.SelectOff), out _, name: off ? null : SimpleView.ActionName("Use", SimpleView.OffLabel)));
     }
 
@@ -350,7 +367,7 @@ internal sealed class ModelsPage : SettingsPage
     /// A catalogue row: In use (no action), Use, or Download…; a model whose file is downloading shows "Downloading 42%" (or
     /// "Waiting to download") with its button disabled and named for why, so it cannot be chosen again mid-download.
     /// </summary>
-    /// <param name="state">The row's state before its line ("In use", "Downloaded"), or null for none (the bundled Standard tier says "Included" in its line).</param>
+    /// <param name="state">The row's state before its line ("Downloaded"), or null for none (the bundled Standard tier says "Included" in its line). A row in use shows its tag instead, and its line drops the state.</param>
     /// <param name="simple">A Simple-view row: its Use or Download… button is named for its tier ("Use More accurate").</param>
     private Grid CatalogueRow(string name, string title, string? state, string tradeOff, bool inUse, bool have, string fileName, Action click, bool simple = false)
     {
@@ -358,7 +375,8 @@ internal sealed class ModelsPage : SettingsPage
         if (fetch == DownloadState.None)
         {
             var action = inUse ? null : have ? "Use" : "Download…";
-            return ModelRow(title, state is null ? tradeOff : $"{state} · {tradeOff}", action, click, out _,
+            // The model in use has the "In use" tag, so its line does not say it again (1.2 polish round 2: "In use" twice on a row).
+            return ModelRow(title, state is null || inUse ? tradeOff : $"{state} · {tradeOff}", action, click, out _,
                 name: simple && action is not null ? SimpleView.ActionName(action, name) : null);
         }
         var running = fetch == DownloadState.Running;
@@ -375,11 +393,13 @@ internal sealed class ModelsPage : SettingsPage
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
         detailText = Ui.Text(detail, "hint");
         grid.Children.Add(Ui.Stack(2, Ui.Text(title, "body"), detailText));
-        var button = Ui.Button(action ?? "In use", action is null ? "quiet" : "secondary", click, name: name);
-        button.IsEnabled = enabled && action is not null;
-        button.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(button, 1);
-        grid.Children.Add(button);
+        // The model in use has nothing to press: a tag in the link colour (accent, legible in both themes), not a greyed
+        // button that looks broken (1.2 polish, 22/10/2026). It keeps the button's accessible name, "In use".
+        Control trailing = action is null ? Ui.Tag(InUseLabel) : Ui.Button(action, "secondary", click, name: name);
+        if (trailing is Button button) button.IsEnabled = enabled;
+        trailing.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(trailing, 1);
+        grid.Children.Add(trailing);
         return grid;
     }
 }

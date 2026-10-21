@@ -243,7 +243,8 @@ public class FeedbackTests
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
         var (shell, _, _) = scratch.Shell();
-        Assert.Equal("rules until downloaded", Regex.Match(shell.Status.Models, "rules until downloaded").Value); // what the header says
+        Assert.Equal("rules until downloaded", Regex.Match(shell.ModelsLine, "rules until downloaded").Value); // what the Advanced header says (this unstarted shell is in the default Simple view, whose header says Tidy my words: 1.2 polish)
+        Assert.EndsWith($" · {Dictum.Settings.SimpleView.TidyLabel}", shell.SimpleModelsLine); // the rule-based tidy, as the Simple header names it
         Assert.Equal("rule-based tidy (clean-up model not downloaded)", shell.FeedbackFacts().Cleanup); // so the email does not claim a model is in use
         shell.Dispose();
     });
@@ -262,10 +263,15 @@ public class FeedbackTests
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
         var (shell, _, _) = scratch.Shell();
-        var hotkey = shell.Status.Models.Split(" · ")[^1]; // the key as the header shows it (this unstarted shell shows its default RightCtrl, not the file's F24; the Email support pin opens Settings, where the shell shows F24, and checks both)
+        var hotkey = shell.Status.Models.Split(" · ")[^1]; // the key as the header shows it (this unstarted shell shows its default Right Ctrl, not the file's F24; the Email support pin opens Settings, where the shell shows F24, and checks both)
         Assert.False(string.IsNullOrWhiteSpace(hotkey));
-        Assert.Equal(shell.Status.Models, shell.ModelsLine + " · " + hotkey); // the header and the tray panel still show the key
+        // The header in the view in use (the default Simple view here: its plain names since 1.2 polish), then the key; the support
+        // email's line is the Advanced one, without the key, whatever the view.
+        Assert.True(shell.Settings.Ui.IsSimple);
+        Assert.Equal(shell.Status.Models, shell.SimpleModelsLine + " · " + hotkey); // the header and the tray panel still show the key
         Assert.DoesNotContain(hotkey, shell.ModelsLine);
+        Assert.DoesNotContain(hotkey, shell.SimpleModelsLine);
+        Assert.NotEqual(shell.ModelsLine, shell.SimpleModelsLine);
         shell.Dispose();
     });
 

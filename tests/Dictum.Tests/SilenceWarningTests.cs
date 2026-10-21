@@ -384,6 +384,22 @@ public class SilenceWarningTests
         Assert.True(none.Controller.IsIdle);
     }
 
+    /// <summary>
+    /// Pin (1.2 polish, lens on 4abba54): the platform's own no-microphone failure is the no-microphone case even while the list
+    /// still names a device (a list that lags the device going away), as the welcome window's test and calibration treat it.
+    /// </summary>
+    [Fact]
+    public async Task The_controller_warns_of_no_microphone_when_the_platform_says_so()
+    {
+        using var none = Make(new QuietCapture { OpenFails = new NoMicrophoneException() }, microphoneListed: true);
+        none.Down();
+        await WaitUntil(() => !none.Ui.NoSoundWarnings.IsEmpty, "the no-microphone balloon", timeoutMs: 1500);
+        await Task.Delay(200, Ct);
+        Assert.Equal([NoSoundCause.NoMicrophone], none.Ui.NoSoundWarnings.ToArray());
+        Assert.DoesNotContain(PillView.MicError, none.Ui.Pills);
+        Assert.True(none.Controller.IsIdle);
+    }
+
     [Fact]
     public async Task The_controller_keeps_mic_error_when_a_listed_microphone_cannot_be_opened_and_the_flash_is_not_replaced_by_recording()
     {

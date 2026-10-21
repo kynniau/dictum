@@ -83,16 +83,15 @@
       <li>Click <b>Finish</b>. Dictum starts.</li>
     </ol>
 
-    <!-- Demo "install", planned (GIF only on the site; PR #36 adds img/demos/install.gif and install-poster.png).
-      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
-      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+    <figure class="demo-figure">
       <details class="demo-play">
-        <summary><img src="img/demos/install-poster.png" width="800" height="558" alt="Installing Dictum from the Downloads folder, one click at a time."><span class="demo-play-label">Play</span></summary>
-        <img src="img/demos/install.gif" width="800" height="558" loading="lazy" alt="Installing Dictum from the Downloads folder, one click at a time.">
+        <summary aria-label="Play the demo: Install Dictum">
+          <img class="demo-poster" src="img/demos/install-poster.png" width="1600" height="1116" loading="lazy" alt="Install Dictum: the first picture of the demo.">
+          <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/install.gif" width="800" height="558" loading="lazy" alt="Install Dictum, step by step, as a moving picture.">
       </details>
-    -->
-    <figure class="demo-video">
-      <figcaption><span class="tag">Video coming</span> Installing Dictum. The steps above say the same in words.</figcaption>
+      <figcaption>Install Dictum. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
     </figure>
 
     <div class="card callout" id="smartscreen">
@@ -138,7 +137,7 @@
         <h3>Your hotkey</h3>
         <p>The hotkey is the key you hold down while you speak. Unless you change it, it is the Ctrl key on the right-hand side of the keyboard (<kbd>Right Ctrl</kbd>).</p>
         <ol>
-          <li>Press the key now. The box shows its name, and a light comes on while you hold it.</li>
+          <li>Press the key now. The box shows its name, for example <b>Right Ctrl</b>, and a light comes on while you hold it.</li>
           <li>To choose a different key, press that key instead. A mouse button other than the left one works too.</li>
           <li>Click <b>Use this hotkey</b>.</li>
         </ol>
@@ -150,6 +149,7 @@
           <li>Say a few words.</li>
           <li>If it says “Heard you.”, your microphone works. Click <b>Next</b>.</li>
         </ol>
+        <p>If it says “No microphone found.”, plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.</p>
         <p>If it says “Nothing heard.”, check that the microphone is plugged in and not muted. Then click <b>Test again</b>. You can also click <b>Skip</b>. If Dictum hears nothing when you dictate, it will tell you.</p>
       </li>
       <li>
@@ -166,16 +166,15 @@
     </ol>
     <p>If you close the window early, Dictum uses its usual settings for the steps you missed. You can change every one of them later in Settings.</p>
 
-    <!-- Demo "first-run", planned (GIF only on the site; PR #36 adds img/demos/first-run.gif and first-run-poster.png).
-      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
-      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+    <figure class="demo-figure">
       <details class="demo-play">
-        <summary><img src="img/demos/first-run-poster.png" width="800" height="558" alt="Starting Dictum for the first time and going through the Welcome to Dictum window."><span class="demo-play-label">Play</span></summary>
-        <img src="img/demos/first-run.gif" width="800" height="558" loading="lazy" alt="Starting Dictum for the first time and going through the Welcome to Dictum window.">
+        <summary aria-label="Play the demo: Start Dictum for the first time">
+          <img class="demo-poster" src="img/demos/first-run-poster.png" width="1600" height="1116" loading="lazy" alt="Start Dictum for the first time: the first picture of the demo.">
+          <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/first-run.gif" width="800" height="558" loading="lazy" alt="Start Dictum for the first time, step by step, as a moving picture.">
       </details>
-    -->
-    <figure class="demo-video">
-      <figcaption><span class="tag">Video coming</span> Starting Dictum for the first time. The steps above say the same in words.</figcaption>
+      <figcaption>Start Dictum for the first time. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
     </figure>
   </section>
 
@@ -209,16 +208,15 @@
     <h3>Turn Dictum off for a while</h3>
     <p>Open the Dictum menu. Use the on/off switch at the top right of the Dictum menu.</p>
 
-    <!-- Demo "dictation-stills", planned (GIF only on the site; PR #36 adds img/demos/dictation-stills.gif and dictation-stills-poster.png).
-      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
-      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+    <figure class="demo-figure">
       <details class="demo-play">
-        <summary><img src="img/demos/dictation-stills-poster.png" width="800" height="558" alt="Holding the hotkey, speaking, and letting go: the bar says Recording, then the words appear."><span class="demo-play-label">Play</span></summary>
-        <img src="img/demos/dictation-stills.gif" width="800" height="558" loading="lazy" alt="Holding the hotkey, speaking, and letting go: the bar says Recording, then the words appear.">
+        <summary aria-label="Play the demo: Dictate: hold, speak, let go">
+          <img class="demo-poster" src="img/demos/dictation-stills-poster.png" width="1600" height="1116" loading="lazy" alt="Dictate: hold, speak, let go: the first picture of the demo.">
+          <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/dictation-stills.gif" width="800" height="558" loading="lazy" alt="Dictate: hold, speak, let go, step by step, as a moving picture.">
       </details>
-    -->
-    <figure class="demo-video">
-      <figcaption><span class="tag">Video coming</span> A dictation from start to finish. The steps above say the same in words.</figcaption>
+      <figcaption>Dictate: hold, speak, let go. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
     </figure>
   </section>
 
@@ -248,18 +246,17 @@
       <li>Click <b>Run test</b>.</li>
       <li>Dictum shows which of the speech models on this PC hears you best.</li>
     </ol>
-    <p>Calibrate my voice measures the models. It does not change them. The recordings it makes stay on this PC until you delete them.</p>
+    <p>Calibrate my voice measures the models. It does not change them. Nothing is uploaded: the recordings stay in Dictum's folder on this PC (Settings &gt; Storage lists it), so the test can be re-run when you add a model. To see them, click <b>Open the recordings folder</b>.</p>
 
-    <!-- Demo "test-setup", planned (GIF only on the site; PR #36 adds img/demos/test-setup.gif and test-setup-poster.png).
-      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
-      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+    <figure class="demo-figure">
       <details class="demo-play">
-        <summary><img src="img/demos/test-setup-poster.png" width="800" height="558" alt="Opening Calibrate my voice from the Dictum menu and recording the first sentence."><span class="demo-play-label">Play</span></summary>
-        <img src="img/demos/test-setup.gif" width="800" height="558" loading="lazy" alt="Opening Calibrate my voice from the Dictum menu and recording the first sentence.">
+        <summary aria-label="Play the demo: Calibrate my voice">
+          <img class="demo-poster" src="img/demos/test-setup-poster.png" width="1600" height="1116" loading="lazy" alt="Calibrate my voice: the first picture of the demo.">
+          <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/test-setup.gif" width="800" height="558" loading="lazy" alt="Calibrate my voice, step by step, as a moving picture.">
       </details>
-    -->
-    <figure class="demo-video">
-      <figcaption><span class="tag">Video coming</span> Calibrate my voice. The steps above say the same in words.</figcaption>
+      <figcaption>Calibrate my voice. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
     </figure>
 
     <h3>Choose a more accurate model</h3>
@@ -267,7 +264,7 @@
       <li>Open Settings &gt; Models.</li>
       <li>Find <b>More accurate</b>.</li>
       <li>Click <b>Download…</b> next to More accurate. If that model is already on this PC, the button says <b>Use</b> instead.</li>
-      <li>When the download has finished, the button next to More accurate says <b>In use</b>.</li>
+      <li>When the download has finished, More accurate shows <b>In use</b> instead of a button.</li>
     </ol>
     <p>If words often come out wrong, open Settings &gt; Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. To see every model by its name and size, choose Advanced at the top of that page.</p>
     <p><b>Most accurate</b> needs a strong PC, or patience. A graphics card helps a lot. A graphics card is the part of a computer that draws the screen; it is also called a GPU. On a PC without one, Most accurate can take longer than you spoke.</p>
@@ -297,21 +294,20 @@
       <li><b>Tidy my words (recommended)</b>: Fixes punctuation and removes ums and ahs. Runs on this PC.</li>
       <li><b>Off</b>: Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.</li>
     </ul>
-    <p>Each choice has a button on the right. <b>Use</b> switches to it. <b>Download…</b> fetches it first. <b>In use</b> means it is the one Dictum is using now.</p>
+    <p>Each choice has a button on the right. <b>Use</b> switches to it. <b>Download…</b> fetches it first. The choice Dictum is using now shows <b>In use</b> instead of a button.</p>
 
     <h3>What Advanced adds</h3>
     <p>Advanced lists every speech model and clean-up model, with its details. It also lets you choose a model file of your own. Most people never need it.</p>
 
-    <!-- Demo "change-model", planned (GIF only on the site; PR #36 adds img/demos/change-model.gif and change-model-poster.png).
-      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
-      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+    <figure class="demo-figure">
       <details class="demo-play">
-        <summary><img src="img/demos/change-model-poster.png" width="800" height="558" alt="Opening Settings, choosing Models, and clicking Use next to a speech model."><span class="demo-play-label">Play</span></summary>
-        <img src="img/demos/change-model.gif" width="800" height="558" loading="lazy" alt="Opening Settings, choosing Models, and clicking Use next to a speech model.">
+        <summary aria-label="Play the demo: Change the speech model">
+          <img class="demo-poster" src="img/demos/change-model-poster.png" width="1600" height="1116" loading="lazy" alt="Change the speech model: the first picture of the demo.">
+          <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/change-model.gif" width="800" height="558" loading="lazy" alt="Change the speech model, step by step, as a moving picture.">
       </details>
-    -->
-    <figure class="demo-video">
-      <figcaption><span class="tag">Video coming</span> Changing the speech model. The steps under “Choose a more accurate model” say the same in words.</figcaption>
+      <figcaption>Change the speech model. A moving picture with no sound: each step is written on it. The steps under “Choose a more accurate model” say the same in words.</figcaption>
     </figure>
   </section>
 
@@ -332,16 +328,15 @@
     <p>To free up space on the first drive, copy the models across yourself, or download them again. Then delete the old copies in Settings &gt; Storage, with <b>Delete…</b> next to each one.</p>
     <p>A folder on a network drive works, but models load slowly from it. A folder on this PC is faster. To go back to the usual folder, click <b>Use default</b>.</p>
 
-    <!-- Demo "model-folder", planned (GIF only on the site; PR #36 adds img/demos/model-folder.gif and model-folder-poster.png).
-      No script: the poster is the still, and Play opens the <details>, which shows the GIF and hides the poster
-      (CSS: .demo-play[open] summary img { display: none; }). The GIF loads only when opened (loading="lazy" inside a closed details; to be confirmed in the browsers we support).
+    <figure class="demo-figure">
       <details class="demo-play">
-        <summary><img src="img/demos/model-folder-poster.png" width="800" height="558" alt="Choosing a model folder on drive D in Settings, Models."><span class="demo-play-label">Play</span></summary>
-        <img src="img/demos/model-folder.gif" width="800" height="558" loading="lazy" alt="Choosing a model folder on drive D in Settings, Models.">
+        <summary aria-label="Play the demo: Keep the models on another drive">
+          <img class="demo-poster" src="img/demos/model-folder-poster.png" width="1600" height="1116" loading="lazy" alt="Keep the models on another drive: the first picture of the demo.">
+          <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/model-folder.gif" width="800" height="558" loading="lazy" alt="Keep the models on another drive, step by step, as a moving picture.">
       </details>
-    -->
-    <figure class="demo-video">
-      <figcaption><span class="tag">Video coming</span> Keeping the models on another drive. The steps above say the same in words.</figcaption>
+      <figcaption>Keep the models on another drive. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
     </figure>
   </section>
 
@@ -690,6 +685,17 @@
         <summary>Is there help inside Dictum itself?</summary>
         <div class="answer">
           <p>Yes. Open the Dictum menu and click <b>Help</b>. It answers the most common questions, and it works without the internet.</p>
+          <p>Help starts with a list of its questions, under <b>Questions on this page</b>. Click a question to move down to its answer.</p>
+          <figure class="demo-figure">
+            <details class="demo-play">
+              <summary aria-label="Play the demo: Find help in Dictum">
+                <img class="demo-poster" src="img/demos/help-poster.png" width="1600" height="1116" loading="lazy" alt="Find help in Dictum: the first picture of the demo.">
+                <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+              </summary>
+              <img class="demo-gif" src="img/demos/help.gif" width="800" height="558" loading="lazy" alt="Find help in Dictum, step by step, as a moving picture.">
+            </details>
+            <figcaption>Find help in Dictum. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
+          </figure>
           <p>Its <b>Open the full guide</b> button opens this page in your web browser.</p>
         </div>
       </details>

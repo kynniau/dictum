@@ -58,7 +58,7 @@ public sealed class SimpleViewTests
             Assert.Contains(label, shown.Split('\n'));
         Assert.DoesNotContain("tiny.en", shown); // no catalogue row
         Assert.DoesNotContain("Beam search", shown); // decoding is an Advanced detail
-        Assert.Contains($"In use · {SimpleView.StandardSubLineNotIncluded}", shown); // base.en did not come with this scratch copy: no "Included"
+        Assert.Contains((SimpleView.StandardLabel, SimpleView.StandardSubLineNotIncluded), Polish2Tests.InUseRows(window)); // base.en did not come with this scratch copy: no "Included"
         window.Close();
         shell.Dispose();
     });
@@ -181,8 +181,8 @@ public sealed class SimpleViewTests
         var lines = Visible(window).Split('\n');
         Assert.Contains(SimpleView.Custom("tiny.en"), lines);
         Assert.Contains(SimpleView.Custom("qwen2.5-0.5b"), lines);
-        Assert.Equal(2, lines.Count(l => l == "In use. Not one of the choices above.")); // not "Chosen in Advanced view": calibration, presets or --model may have chosen it
-        Assert.DoesNotContain($"In use · {SimpleView.TidySubLine}", lines); // the Tidy row is not in use
+        Assert.Equal(2, Polish2Tests.InUseRows(window).Count(r => r.Line == "Not one of the choices above.")); // not "Chosen in Advanced view": calibration, presets or --model may have chosen it
+        Assert.DoesNotContain(Polish2Tests.InUseRows(window), r => r.Title == SimpleView.TidyTitle); // the Tidy row is not in use
 
         Named(window, SimpleView.ActionName("Use", SimpleView.TidyLabel)).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(LlmSettings.NoProvider, shell.Settings.Llm.Provider); // the recommended model is not on this PC: the rule-based tidy
@@ -376,7 +376,7 @@ public sealed class SimpleViewTests
         foreach (var standard in All<Button>(window).Where(b => AutomationProperties.GetName(b) is "Use Standard" or "Download Standard").ToList()) Press(standard);
         Assert.Equal("small", shell.Settings.Whisper.Model);
         Assert.Empty(dialogs.DownloadQuestions);
-        Assert.Contains($"In use · {SimpleView.StandardSubLineNotIncluded}", Visible(window)); // Standard is small, the model in use
+        Assert.Contains((SimpleView.StandardLabel, SimpleView.StandardSubLineNotIncluded), Polish2Tests.InUseRows(window)); // Standard is small, the model in use
         Assert.DoesNotContain(SimpleView.Custom("small"), Visible(window));
         window.Close();
         shell.Dispose();
@@ -428,7 +428,7 @@ public sealed class SimpleViewTests
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: false);
         var window = ModelsWindow(shell);
-        Assert.Contains("In use · Tidies spacing only for Spanish.", Visible(window).Split('\n'));
+        Assert.Contains((SimpleView.TidyTitle, "Tidies spacing only for Spanish."), Polish2Tests.InUseRows(window));
         Assert.DoesNotContain(SimpleView.TidySubLine, Visible(window));
         window.Close();
         shell.Dispose();

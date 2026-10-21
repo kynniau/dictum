@@ -384,6 +384,24 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   is in use and the text is English, then "Off" (no clean-up, §5); a model in use that is none of them is listed first as "Custom: <name>". The
   "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
   lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
+  Amended 22/10/2026 (1.2 polish): in the Simple view the panel's header line is "<tier> · <clean-up> · <key>" from
+  `SimpleView`'s table (for example "Standard · Tidy my words · Right Ctrl"; "<tier> · loading…" or "<tier> · model
+  error" while that holds; the clean-up "Tidy my words", "AI clean-up" (with " · loading…" or " · error"), "Off" or
+  "Custom: <name>"), with no runtime; Advanced and the support email keep "<model> · <runtime> · <clean-up>". The line
+  under Light | Full names the presets by those names ("Full: More accurate and AI clean-up. Light: Standard and Tidy my
+  words.") only while the text is English and both preset models are tiers; otherwise the model names. Keys are shown by
+  their display names everywhere a person reads them (`HotkeyNames`: "Right Ctrl", "Mouse 4"); settings.json, the CLI and
+  the logs keep the token (`RightCtrl`). The runtime is the one that loaded; a Vulkan runtime that reports no device is
+  shown as CPU, where the model then runs. With no microphone listed (or a list that throws) the microphone picker's
+  first entry reads "No microphone found" and the problem line under the header shows the no-microphone sentence
+  (`NoSoundText.NoMicrophoneBalloon`); the state word is unchanged.
+  Amended 22/10/2026 (1.2 polish round 2): the header line has its own row under "Dictum", the state and the switch, and
+  is one line, never wrapped; a line longer than the panel (a custom model's file name) ends in an ellipsis, whole in its
+  tooltip. Every Simple line with "Right Ctrl" or "Mouse 5", and each preset's model-name line, fits whole at the panel's
+  380 px (measured headless). The line under Light | Full puts each sentence on its own line ("Full: …", "Light: …",
+  after "Custom: your settings match neither preset." when that applies), so it breaks between presets, never inside a
+  name. **Open log folder** shows only with a problem the log explains (a model problem, or the heard-nothing line), not
+  under the no-microphone sentence alone.
 - About (version, runtime, no network statement).
 - Help (amendment, 21/10/2026): opens Settings → Help, the offline "How Dictum works" and questions and answers (§26).
 - Quit.
@@ -491,12 +509,15 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   calibration window), then three rows: Standard, More accurate, Most accurate, each with its
   line, its state (In use, Downloaded, its size when not on this PC, or nothing for the bundled
   base.en, whose line says "Included."), and the catalogue row's Use / Download… / Downloading… /
-  Waiting… button. A row is a catalogue entry chosen through `ModelCoordinator.Select(name,
+  Waiting… button; the row in use has an "In use" tag instead (amended 22/10/2026: link-coloured text in an outlined
+  pill, not focusable, read by its text's own automation peer; in both views). A row is a catalogue entry chosen through `ModelCoordinator.Select(name,
   plainName)`; there is no download logic of its own. Given the tier's name, the download
   question, the busy question and the "already downloading" balloon use it and plain words:
   "Download <tier> (<size>)? It comes from the model makers' official download page and is
   checked before use." (Advanced keeps the catalogue question). A model in use that is none of
-  the tiers is one more row, "Custom: <name>", "In use. Not one of the choices above."
+  the tiers is one more row, "Custom: <name>", "Not one of the choices above." (amended 22/10/2026, 1.2 polish round 2:
+  a row with the "In use" tag does not say "In use" again in its line, in either view; this line was "In use. Not one of
+  the choices above.").
 - **Tier mapping** (`SimpleView.Tiers`, reusing the catalogue's recommendation and the Mode
   presets' models, keyed on `WhisperEngine.GpuMachine`):
 
@@ -518,8 +539,8 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   spoke." (README "Measured speed"); on a GPU "Bigger download, a bit slower." and "Best results.
   Needs a strong PC or patience."
 - **Clean-up (Simple).** One row, "Tidy my words (recommended)": in use while `llm.provider` is
-  `none` (the rule-based tidy) or `local` with the recommended model (state "In use, with AI
-  clean-up"). The existing **Add AI clean-up (<size> download)** button sits under it while the
+  `none` (the rule-based tidy) or `local` with the recommended model (its line then starts "With AI
+  clean-up", beside the "In use" tag; amended 22/10/2026, round 2: was "In use, with AI clean-up"). The existing **Add AI clean-up (<size> download)** button sits under it while the
   rule-based tidy is in use and the text is English (no clean-up model runs on text in any other
   language, so the Simple view does not offer the download then; Advanced still shows it; lens on
   787b300, 21/10/2026). From a Custom clean-up, its **Use** button selects the recommended
@@ -529,8 +550,8 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   > Clean-up. With text that is not English the line reads "Tidies spacing only for
   <language>." (clean-up then tidies whitespace only). Under these rows (and under Add AI
   clean-up), an **Off** row, "Paste what was heard. Only your own corrections, snippets and the profanity
-  filter (if on) still apply.", writes `llm.provider = off` (§5): "In use · " and the same line
-  while it is in use (wording amended 21/10/2026, final lens: "exactly" was untrue, as those
+  filter (if on) still apply.", writes `llm.provider = off` (§5): the "In use" tag beside the same line
+  while it is in use (amended 22/10/2026, round 2: the line no longer starts "In use · ") (wording amended 21/10/2026, final lens: "exactly" was untrue, as those
   still run), otherwise a **Use** button named
   "Use Off". Off is its own row, never "Custom", and has no language dependency, so it is
   offered for every language. (Amended 21/10/2026 by the clean-up Off lane; the first build of
@@ -735,6 +756,16 @@ Flow:
    Record/Stop button (the existing capture path). Recordings are kept in
    `%LOCALAPPDATA%\Dictate\calibration\` so the test can be re-run when a new model is
    installed; a "Delete recordings" button and a note in the README privacy section.
+   Amended 22/10/2026 (1.2 polish): the window prints no path (it names the Windows account): the intro says the
+   recordings stay in Dictum's folder on this PC (Settings > Storage lists it), and **Open the recordings folder**
+   opens it; a failure to open it is logged with its reason and shown as "The recordings folder could not be opened."
+   A take that fails (Record, Skip, the hotkey) is said under Record in body text; with no microphone, the words are
+   `NoSoundText.NoMicrophoneBalloon`, as in the welcome window's test.
+   Amended 22/10/2026 (1.2 polish round 2): with no microphone listed (or a list that throws), **Record** is disabled and
+   that sentence stands under it, with the sentence to read still shown. The list is checked again when the window is
+   activated, before a take the hotkey starts, and after a take fails for want of a microphone; once one is listed,
+   Record works again and the line goes. A take that fails for want of a microphone while the list still names one
+   leaves Record on.
 2. The app transcribes all ten clips with every installed speech model, each with greedy
    and with beam-search decoding (Whisper.net sampling strategy builder methods; verify
    names), and computes word error rate against the known text after normalisation
@@ -924,8 +955,8 @@ user. Required:
   a keyboard user reaches and presses its buttons. Tab is refused as a hotkey, as Esc is.)
 - First run: the same capture box after the model picker (amended 17/10/2026, §24: or, when
   base.en comes with Dictum, with no model question before it), defaulting to `RightCtrl`, with
-  the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
-  Command (RightWin)". Amended 21/10/2026 (§27): the box, its words and its **Use this hotkey** /
+  the note "On a Mac over Remote Desktop use the right Option key (Right Alt) or right
+  Command (Right Win)" (the keys by their display names since 22/10/2026). Amended 21/10/2026 (§27): the box, its words and its **Use this hotkey** /
   **Skip** buttons are now the "Your hotkey" step of the Welcome to Dictum window, after the
   model-folder and speech steps; the separate first-run window is gone. Its behaviour is unchanged:
   it listens from the start, writes `hotkey` only when another key was chosen, and stops listening
@@ -1179,7 +1210,9 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
   ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled
   folder. Storage (§17) lists the three folders in lookup order and the folder each model is in; bundled models have no
-  Delete. All new sentences are PROPOSED for the product owner.
+  Delete. All new sentences are PROPOSED for the product owner. Amended 22/10/2026: the field shows the end of a long
+  path, trimmed from the left, the whole path in its tooltip, which keyboard focus opens, and as its accessible value,
+  named "Model folder"; Browse… starts in the folder or the nearest folder above it that exists.
 - **Recommended layout for shared virtual desktops:** one local folder per VM shared by its users, on a persistent data
   disk, readable by every user and writable only by administrators, seeded as `models.folder` for every user and filled by
   an administrator with `install.ps1 -ModelsFrom`; a user who wants another model uses **Use default**. Dictum then looks
@@ -1271,6 +1304,10 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
   others, and what to do about it), then twelve questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
+  Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
+  themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
+  into view with its focus ring. Amended 22/10/2026 (round 2): the page scrolls so the answer's heading is 8 px below
+  the top of the view (`HelpPage.JumpGap`); an answer the page cannot scroll that far (the last ones) shows whole.
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
@@ -1340,9 +1377,13 @@ Enter presses the step's primary button. Steps:
    and on every way out of the step (Next, Skip, Back, Esc, closing the window). A test closed at 60 s with nothing decided (hiss only) says "Nothing heard."; a level counts towards "Heard you." only above the floor too (a `silence_threshold` of 0 never hears digital silence), and one late look at the level counts as at most two ticks. Choosing another microphone tests it at
    once; Next writes `audio.device` only when it changed; Skip writes nothing.
 6. **Try it**: after steps 1-5 the window stays open while the shell loads the settings, installs the hotkey and starts
-   loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). Until the model is
-   ready the step says "Getting the speech model ready…"; then "Click in the box, hold <hotkey>, say a sentence, then let
-   go." over a multi-line box, which has the keyboard focus (a hotkey held without clicking first pastes there). A
+   loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). The step says "Click
+   in the box, hold <hotkey>, say a sentence, then let go." from the start (the key by its display name, "Right Ctrl",
+   `HotkeyNames`) over a multi-line box; until the model is ready "Getting the speech model ready…" sits inside the empty
+   box, in body text, as a placeholder (1.2 polish, 22/10/2026). The box has the keyboard focus once the model is ready
+   (a hotkey held without clicking first pastes there). While the status shows, nothing has the focus, so no caret
+   blinks in front of it; the box takes the focus when the status goes, unless the person has moved it (1.2 polish
+   round 2, 22/10/2026). A
    dictation goes through the normal path (hotkey listener, controller, pipeline, paste into the focused box); the step
    watches the shell's last dictation (`PersonalService.Last`) and after the first one shows the accent explainer
    ("The Standard model works well…" when the model in use is the Standard choice for its language, else "The model you
@@ -1360,10 +1401,13 @@ hotkey check was shown again before (`// simplification:` in `AppRules.Onboards`
 other CLI modes never open it.
 
 Accessibility and size. Every control has an accessible name; everything is reached by Tab; the step line and the try-later
-line are polite live regions; the folder refusal is an assertive one. The client area is 640 × 420 DIP (resizable, minimum
-480 × 360); text is larger than in the other windows (body 17 px, buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512
-DIP; with the Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, and 420 plus a caption
-of about 32 DIP (recalled) fits. On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`,
-the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
+line are polite live regions; the folder refusal is an assertive one. The client area is 720 × 500 DIP (resizable, minimum
+480 × 360; 640 × 420 until 1.2 polish, 22/10/2026, when the hotkey step's last row sat under the buttons): every step's body
+as built fits it without scrolling. Text is larger than in the other windows (body 17 px on a 25 px line, the theme's 13 on
+19 in proportion, so no last line is clipped; buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512 DIP; with the
+Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, less a caption of about 32 DIP
+(recalled). On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`, the frame's height
+counted) and moved inside it, so on that screen the body scrolls, under a scroll bar that stays visible, and Back and Next
+never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
 
 Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.
