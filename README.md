@@ -103,7 +103,7 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 - **Mode**: **Light** | **Full** (see "Mode presets"); neither is selected when settings.json matches neither (Custom).
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
   (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;
-  choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy** and **Off (paste exactly what was heard)**.
+  choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy** and **Off (paste what was heard)**.
   In the Simple view (the default, `ui.view`) the pickers show the plain choices instead: **Standard**, **More
   accurate** and **Most accurate** for speech, and **Tidy my words** (with **Add AI clean-up** while the rule-based
   tidy is in use and the text is English) and **Off** for clean-up, with the same download marks; a model chosen in the Advanced view shows as
@@ -131,7 +131,7 @@ an edit made in the file is picked up within a second and shows in the window.
 |---|---|
 | General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), **Hands-free stops after** (30 seconds to 60 minutes), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
 | Mode | Light or Full, with what each means on this PC. |
-| Models | A **Simple \| Advanced** switch at the top (`ui.view`; Simple is the default, see "Speech models"). Simple: an explainer with **Calibrate my voice**, the three plain speech choices, **Tidy my words** and **Off**. Advanced: every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, **Rule-based tidy only** and **Off (paste exactly what was heard)**, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
+| Models | A **Simple \| Advanced** switch at the top (`ui.view`; Simple is the default, see "Speech models"). Simple: an explainer with **Calibrate my voice**, the three plain speech choices, **Tidy my words** and **Off**. Advanced: every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, **Rule-based tidy only** and **Off (paste what was heard)**, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
 | Storage | Where everything is, the model folders in the order Dictum looks in them, free space, every model file with its folder, size and Delete (none for the models that come with Dictum), delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
@@ -440,7 +440,7 @@ makers' official download page and is checked before use." A model in use that i
 "Custom: <name>". Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
 recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model (offered only while
 the text is English: no clean-up model runs on any other language), or **Off**, which
-pastes exactly what was heard with no clean-up at all, in any language (see "Cleanup"). Cloud clean-up is never
+pastes what was heard with no clean-up at all, in any language (your own corrections, snippets and the profanity filter still apply) (see "Cleanup"). Cloud clean-up is never
 offered in the Simple view.
 
 `base.en` comes with Dictum (see "First run"). The others are stored in the model folder
@@ -825,7 +825,7 @@ Cleanup removes filler words and false starts, fixes punctuation and casing, app
    the checks below, the rule-based tidy is pasted and the reason is logged (never the text). A cleanup failure never
    stops the paste.
 
-**`off`: no clean-up** (Settings > Models > **Off**, or **Off (paste exactly what was heard)** in the Advanced view
+**`off`: no clean-up** (Settings > Models > **Off**, or **Off (paste what was heard)** in the Advanced view
 and the tray panel). The text is pasted as whisper wrote it: only the spaces are tidied (the ends trimmed, and runs of
 spaces, tabs, CR and LF made one space; other whitespace inside the text, such as a no-break space, is kept). The tray
 panel's models line and the icon's tooltip say "no clean-up" where the clean-up model would be. Nothing else changes: no filler removal, no capitals, no full stop, and

@@ -79,13 +79,17 @@ public static class SimpleView
     /// <summary>The Simple view's no-clean-up row (llm.provider = off), and the tray panel's Simple clean-up entry.</summary>
     public const string OffLabel = "Off";
 
-    public const string OffSubLine = "Paste exactly what was heard.";
+    /// <summary>
+    /// Off's line. Off skips the tidy only: the user's own corrections, snippets and the profanity filter (when on) still run
+    /// after it, as with every clean-up, so the line says so rather than "exactly" (final lens, orchestrator's decision, 21/10/2026).
+    /// </summary>
+    public const string OffSubLine = "Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.";
 
     /// <summary>The same choice in the Advanced view: Settings > Models' clean-up buttons and the tray panel's Advanced clean-up picker.</summary>
-    public const string OffAdvancedLabel = "Off (paste exactly what was heard)";
+    public const string OffAdvancedLabel = "Off (paste what was heard)";
 
     /// <summary>The Advanced view's "In use:" line suffix while clean-up is off, after the tray name "no clean-up".</summary>
-    public const string OffInUseNote = " (paste exactly what was heard)";
+    public const string OffInUseNote = " (paste what was heard; your corrections, snippets and the profanity filter still apply)";
 
     /// <summary>
     /// "Add AI clean-up" is offered (Settings > Models and the tray panel): while the rule-based tidy is in use, and, in the

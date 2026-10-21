@@ -250,6 +250,18 @@ public class HelpPageTests
         // checked as the start of a label the app shows, on the page and in the tray.
         Assert.True(copy.Contains(ModelsPage.AddCleanupLabel, StringComparison.Ordinal), "the help does not name Add AI clean-up");
         Assert.Contains(seen, s => s.StartsWith(ModelsPage.AddCleanupLabel + " (", StringComparison.Ordinal));
+
+        // Final lens (M2): in the Advanced view the tier names are gone, and the help's way back, "Simple", is on the page.
+        shell.Write(("ui.view", System.Text.Json.Nodes.JsonValue.Create(Dictum.Settings.UiSettings.Advanced)));
+        Dispatcher.UIThread.RunJobs();
+        var advanced = new SettingsWindow(shell);
+        advanced.Show();
+        advanced.ShowPage("Models");
+        Dispatcher.UIThread.RunJobs();
+        var shownInAdvanced = All<Button>(advanced).Where(b => b.IsEffectivelyVisible).Select(b => b.Content as string).ToList();
+        Assert.Contains(Dictum.Settings.SimpleView.SimpleLabel, shownInAdvanced);
+        Assert.True(copy.Contains("choose Simple at the top of that page", StringComparison.Ordinal), "the help does not say how to get the Simple view");
+        advanced.Close();
         shell.Dispose();
     });
 
@@ -275,7 +287,12 @@ public class HelpPageTests
         Assert.Contains("only the spacing is tidied", tidy);
 
         var files = HelpText.Questions.Single(q => q.Question.StartsWith("Where are the model files", StringComparison.Ordinal));
-        Assert.Contains(files.Answer, p => p.Contains("Add AI clean-up, shown under Tidy my words when the text is English", StringComparison.Ordinal));
+        Assert.Contains(files.Answer, p => p.Contains("Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English", StringComparison.Ordinal));
+        // Final lens (M2): the help says it names the Simple view's choices, and how to get that view back.
+        Assert.Contains(HelpText.HowItWorks, p => p.Contains("if you see model names instead, choose " + Dictum.Settings.SimpleView.SimpleLabel + " at the top of that page", StringComparison.Ordinal));
+        // Off still runs the user's own corrections, snippets and the profanity filter, so the help does not say "exactly".
+        Assert.Contains("only your own corrections, snippets and the profanity filter (if on) still apply", tidy);
+        Assert.DoesNotContain(all, t => t.Contains("exactly what was heard", StringComparison.Ordinal));
         var english = Dictum.Settings.SettingsLoader.Parse("""{ "llm": { "provider": "none" } }""").Settings;
         var other = Dictum.Settings.SettingsLoader.Parse("""{ "llm": { "provider": "none" }, "whisper": { "language": "es" } }""").Settings;
         Assert.True(Dictum.Settings.SimpleView.OffersAddCleanup(english));

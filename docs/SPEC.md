@@ -528,15 +528,17 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
   clean-up is never offered in the Simple view; the Advanced view keeps its pointer to Settings
   > Clean-up. With text that is not English the line reads "Tidies spacing only for
   <language>." (clean-up then tidies whitespace only). Under these rows (and under Add AI
-  clean-up), an **Off** row, "Paste exactly what was heard.", writes `llm.provider = off` (§5):
-  "In use · Paste exactly what was heard." while it is in use, otherwise a **Use** button named
+  clean-up), an **Off** row, "Paste what was heard. Only your own corrections, snippets and the profanity
+  filter (if on) still apply.", writes `llm.provider = off` (§5): "In use · " and the same line
+  while it is in use (wording amended 21/10/2026, final lens: "exactly" was untrue, as those
+  still run), otherwise a **Use** button named
   "Use Off". Off is its own row, never "Custom", and has no language dependency, so it is
   offered for every language. (Amended 21/10/2026 by the clean-up Off lane; the first build of
   this view left the row out because no such mode existed.)
 - **Both views:** the language card, the model folder and the Storage link. **Advanced only:**
   the catalogue lists, the decoding choice, the file choosers, "Rule-based tidy only", "Off
-  (paste exactly what was heard)" and the cloud pointer. The tray panel's clean-up picker lists
-  "Off" in Simple and "Off (paste exactly what was heard)" in Advanced.
+  (paste what was heard)" and the cloud pointer. The tray panel's clean-up picker lists
+  "Off" in Simple and "Off (paste what was heard)" in Advanced.
 - The Mode presets (§16.1) are unchanged and remain in both views: they set speech and clean-up
   together, which the tiers do not.
 

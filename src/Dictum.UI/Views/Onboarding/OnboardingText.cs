@@ -1,3 +1,4 @@
+using Dictum.Core;
 using Dictum.Settings;
 
 namespace Dictum.UI.Views.Onboarding;
@@ -6,7 +7,8 @@ namespace Dictum.UI.Views.Onboarding;
 /// What the "Welcome to Dictum" window says (Dictum 1.2, product owner 21/10/2026). Every string here is PROPOSED copy
 /// (21/10/2026), listed word for word in DECISIONS for the product owner to approve before release; none may be reworded without
 /// that review. Strings the window reuses from elsewhere (the hotkey check, the Simple view's tier names, the microphone list's
-/// labels, "Calibrate my voice") are referenced, never copied.
+/// labels through MicrophoneChoices, the "No sound from mic" advice through NoSoundText.SilentAdvice, "Calibrate my voice")
+/// are referenced, never copied.
 /// </summary>
 internal static class OnboardingText
 {
@@ -74,9 +76,8 @@ internal static class OnboardingText
     public const string SayWords = "Say a few words.";
     public const string HeardYou = "Heard you.";
 
-    /// <summary>The tail repeats the "No sound from mic" balloon's advice (PR #22, NoSoundText.SilentBalloon); see DECISIONS for the merge.</summary>
-    public const string NothingHeard =
-        "Nothing heard. Check that the microphone is plugged in and not muted. On a remote or virtual desktop, microphone redirection must be on.";
+    /// <summary>The tail is the "No sound from mic" balloon's advice (PR #22), the same constant, so the two cannot drift apart.</summary>
+    public const string NothingHeard = "Nothing heard. " + NoSoundText.SilentAdvice;
 
     /// <summary>The words Settings > Microphone uses when the device cannot be opened (MicrophonePage).</summary>
     public static string CouldNotOpen(string reason) => $"The microphone could not be opened: {reason}";
@@ -93,10 +94,13 @@ internal static class OnboardingText
     public const string TryLoading = "Getting the speech model ready…";
     public const string TryBoxName = "Practice box";
 
-    /// <summary>After a first dictation on the Standard model (the Simple view's first choice for the language in use).</summary>
+    /// <summary>
+    /// After a first dictation on the Standard model (the Simple view's first choice for the language in use). "More accurate"
+    /// is a Simple view name, so the line says where it is: a seeded settings.json may open Settings > Models in Advanced (final lens, 21/10/2026).
+    /// </summary>
     public const string AccentExplainer =
         "Everyone's accent, voice and microphone are different. The Standard model works well for most people. If words come out wrong, " +
-        "choose More accurate in Settings > Models, or press Calibrate my voice to find which model hears you best.";
+        "choose More accurate in the Simple view of Settings > Models, or press Calibrate my voice to find which model hears you best.";
 
     /// <summary>After a first dictation on any other model: the one chosen in the speech step, or a seeded one (lens on 6bacce9).</summary>
     public const string AccentExplainerChosen =

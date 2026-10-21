@@ -150,6 +150,19 @@ public sealed class CleanupOffTests
         Assert.Null(TranscriptCleaner.OfflineRefusal(settings, offlineOnly: true)); // offline only has nothing to refuse
     }
 
+    /// <summary>
+    /// Pin (final lens, orchestrator's decision 21/10/2026): Off skips the tidy only; the user's own corrections, snippets and
+    /// the profanity filter still run after it (DictationPipeline), so no Off line says "exactly what was heard".
+    /// </summary>
+    [Fact]
+    public void The_off_lines_say_what_still_applies()
+    {
+        Assert.Equal("Paste what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.", SimpleView.OffSubLine);
+        foreach (var line in new[] { SimpleView.OffSubLine, SimpleView.OffAdvancedLabel, SimpleView.OffInUseNote })
+            Assert.DoesNotContain("exactly", line, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("corrections, snippets and the profanity filter", SimpleView.OffInUseNote);
+    }
+
     /// <summary>Pin: off is chosen over the not-English skip, so the status says what the user chose.</summary>
     [Fact]
     public void Off_wins_over_the_language_skip()

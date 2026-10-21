@@ -54,13 +54,15 @@ public static class HelpText
         "Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.",
         // PROPOSED (21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
         "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. " +
-        "To paste exactly what was heard, with no tidying at all, choose Off there instead.",
+        "To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply.",
         // PROPOSED (21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does.
         "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. " +
         "If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here.",
         "The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. " +
         "The menu has Settings, Help and more.",
-        "In this help, \"Settings > Models\" means: open Settings from the Dictum menu, then choose Models on the left.",
+        // PROPOSED (21/10/2026, final lens): the help names the Simple view's choices, so it says how to get that view.
+        "In this help, \"Settings > Models\" means: open Settings from the Dictum menu, then choose Models on the left. " +
+        "This help names the choices as the Simple view shows them; if you see model names instead, choose Simple at the top of that page.",
     ];
 
     public const string AccuracyHeading = "Why Dictum hears some people better than others";
@@ -143,7 +145,7 @@ public static class HelpText
         [
             "Settings > Models shows the Model folder, where Dictum keeps the models you download. The speech model that comes with Dictum is about 150 MB (megabytes) and is kept with the program itself.",
             // PROPOSED (21/10/2026, final round on the Simple view): names the choices as Settings > Models shows them.
-            "Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words when the text is English) are downloads you choose. " +
+            "Bigger speech models (More accurate and Most accurate) and AI clean-up (Add AI clean-up, shown under Tidy my words while the rule-based tidy is in use and the text is English) are downloads you choose. " +
             "If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
             "To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.",
         ]),
