@@ -63,8 +63,20 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     public IInputSender CreateInputSender(ILog log) => Desktop;
     public IClipboard Clipboard => Desktop;
     public FakeDesktop Desktop { get; } = new();
-    public IAudioCapture CreateCapture(ILog log) => new FakeCapture();
-    public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => [new("id-1", "Test microphone", true)];
+    /// <summary>Makes every capture created from now on (the shell's own is made when it is built): a test's level-reporting one, say.</summary>
+    public Func<IAudioCapture>? CaptureFactory { get; set; }
+    public List<IAudioCapture> Captures { get; } = [];
+    public IAudioCapture CreateCapture(ILog log)
+    {
+        var capture = CaptureFactory?.Invoke() ?? new FakeCapture();
+        Captures.Add(capture);
+        return capture;
+    }
+    /// <summary>The microphones the system lists; one by default.</summary>
+    public List<AudioDeviceInfo> Devices { get; } = [new("id-1", "Test microphone", true)];
+    /// <summary>Listing the microphones throws, as the Windows device list does with the audio service stopped.</summary>
+    public bool ListDevicesThrows { get; set; }
+    public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => ListDevicesThrows ? throw new System.Runtime.InteropServices.COMException("The audio service is not running.") : Devices;
     public IStartupRegistration Startup { get; } = new FakeStartup();
     public IInstanceLock AcquireSingleInstance(TimeSpan wait) => throw new NotSupportedException();
     public IWindowFlags WindowFlags => Flags;
@@ -211,11 +223,20 @@ internal sealed class ScriptedDialogs : IShellDialogs
     public string? Folder { get; set; }
     public List<string> FolderChooserOpenedIn { get; } = [];
 
-    public string HotkeyCheck(AppShell shell, string current)
+    /// <summary>
+    /// The Welcome to Dictum window: counted as the hotkey step (it holds the first-run hotkey check), then <see cref="Onboarding"/>
+    /// answers through the flow if a test set it; otherwise every step is skipped (the shell then writes today's defaults).
+    /// </summary>
+    public void Onboard(Dictum.UI.Views.Onboarding.OnboardingFlow flow)
     {
         FirstRunSteps = FirstRunSteps with { Hotkey = FirstRunSteps.Hotkey + 1 };
-        return current;
+        LastOnboarding = flow;
+        Onboarding?.Invoke(flow);
     }
+
+    public Action<Dictum.UI.Views.Onboarding.OnboardingFlow>? Onboarding { get; set; }
+
+    public Dictum.UI.Views.Onboarding.OnboardingFlow? LastOnboarding { get; private set; }
 
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir)
     {

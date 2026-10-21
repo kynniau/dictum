@@ -11,6 +11,7 @@ using Dictum.Storage;
 using Dictum.Transcribe;
 using Dictum.Hotkey;
 using Dictum.UI.Overlays;
+using Dictum.UI.Views.Onboarding;
 
 namespace Dictum.UI.Shell;
 
@@ -152,16 +153,20 @@ public sealed partial class AppShell : IDisposable
         _lifetime = lifetime;
         var file = SettingsLoader.LoadFile(Paths.SettingsFile);
         var (askSpeech, askCleanup) = AppRules.FirstRunQuestions(file);
-        if (askSpeech || askCleanup)
+        OnboardingFlow? onboarding = null;
+        if (AppRules.Onboards(file, modelOverride: _options.ModelOverride is not null || SettingsFile.ModelPathOverride(Environment.GetEnvironmentVariable) is not null))
         {
-            // With base.en on this PC (it comes with Dictum) no model question is asked; the hotkey check below stays.
-            if (!Models.FirstRun(askSpeech, askCleanup, file.Settings, keepProvider: file.NamesCleanupProvider))
-            {
-                _log.Info("First-run picker: user chose Quit.");
-                Quit();
-                return false;
-            }
-            if (askSpeech && _options.ModelOverride is null && SettingsFile.ModelPathOverride(Environment.GetEnvironmentVariable) is null) FirstRunHotkeyCheck();
+            // The Welcome to Dictum window (1.2): steps 1-5 write their answers as each is completed; anything left open when it
+            // closes keeps today's defaults, so the settings load below always finds the speech choice answered.
+            onboarding = new OnboardingFlow(this, file, askCleanup);
+            Dialogs.Onboard(onboarding);
+            onboarding.SkipRest();
+        }
+        else if ((askSpeech || askCleanup) && !Models.FirstRun(askSpeech, askCleanup, file.Settings, keepProvider: file.NamesCleanupProvider))
+        {
+            _log.Info("First-run picker: user chose Quit.");
+            Quit();
+            return false;
         }
         LoadConfiguration(isReload: false);
 
@@ -185,6 +190,7 @@ public sealed partial class AppShell : IDisposable
         StartupNotices();
         ScheduleDiagnosticExit();
         StatusChanged();
+        onboarding?.BeginTryIt(); // the hotkey listens and the model loads: the window's Try it step can use them
         return true;
     }
 

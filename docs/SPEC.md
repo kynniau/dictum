@@ -68,7 +68,8 @@ also see the key. Any single virtual key (`F9`, `CapsLock`, `RightAlt`, `Pause`�
 chord of modifiers plus one key (`Ctrl+Win`, `Ctrl+Shift+Space`) must be accepted. The
 Fn key is not reachable: on nearly all keyboards it is handled by firmware and never
 reaches Windows as a virtual key. Say so in the README and offer `RightCtrl`, `CapsLock`,
-`F-keys` and `Ctrl+Win` as alternatives.
+`F-keys` and `Ctrl+Win` as alternatives. At first run the hotkey is checked, and can be
+changed, in the "Your hotkey" step of the Welcome to Dictum window (§20, §26).
 
 Mouse buttons (amendment, 16/10/2026): `RightMouse`, `MiddleMouse`, `Mouse4` and `Mouse5`
 (VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2) are accepted as a single-key hotkey or
@@ -460,7 +461,12 @@ trade-off in one sentence. The choice is written to settings.json so it is visib
 editable; the tray submenu changes it later in one click. Amended 17/10/2026 (§24, Decision
 16): base.en ships inside every package; when it is found the first run asks no model
 question and writes base.en and the rule-based tidy (`llm.provider` = `none`), and the
-pickers run only without it.
+pickers run only without it. Amended 21/10/2026 (§26): the first-run speech choice is the speech
+step of the Welcome to Dictum window: with base.en, one line ("The Standard model is included and
+ready.") and no choice; without it, the Simple view's three tiers (§10.1) with the recommendation
+pre-selected, and "Show every model" for this whole list and a model file. The window asks no
+clean-up question: it writes the rule-based tidy, as with base.en. The clean-up picker remains for a
+seeded settings.json that names `whisper.model` but leaves the clean-up choice open, without base.en.
 Already downloaded on this machine to `%LOCALAPPDATA%\Dictate\models`:
 `ggml-small.en.bin` (487,614,201 bytes) and `ggml-medium.en.bin` (1,533,774,781 bytes),
 source `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<file>` (sizes verified
@@ -913,7 +919,11 @@ user. Required:
 - First run: the same capture box after the model picker (amended 17/10/2026, §24: or, when
   base.en comes with Dictum, with no model question before it), defaulting to `RightCtrl`, with
   the note "On a Mac over Remote Desktop use the right Option key (RightAlt) or right
-  Command (RightWin)".
+  Command (RightWin)". Amended 21/10/2026 (§26): the box, its words and its **Use this hotkey** /
+  **Skip** buttons are now the "Your hotkey" step of the Welcome to Dictum window, after the
+  model-folder and speech steps; the separate first-run window is gone. Its behaviour is unchanged:
+  it listens from the start, writes `hotkey` only when another key was chosen, and stops listening
+  when the step is left.
 - `--selftest` prints a 5-second "press your hotkey now" check and reports whether the
   configured key was seen.
 - Settings window, Hands-free (amendment, 16/10/2026): a "Hands-free" card on General with
@@ -1157,7 +1167,7 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
   `llm.model` gets the recommended clean-up model written, which is not downloaded (nothing downloads; the "not
-  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows. Without base.en the pickers run
+  downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §26: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
   system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
@@ -1246,3 +1256,78 @@ resilience".
 - **Speed estimate.** A model's first warm-up runs twice and only the second run's speed is kept. After three
   dictations in a row that the estimate skipped, the next one runs the model and measures again; the allowance doubles
   (to 24 at most) while the model stays too slow, and a dictation the estimate lets through resets it.
+
+## 26. Onboarding: the Welcome to Dictum window (amendment, 21/10/2026, Dictum 1.2)
+
+Product decision (Kyle, 21/10/2026): the first run must explain how Dictum works, ask where to keep the model files (a
+virtual desktop short of space on C:; the models take 200 MB to 10 GB), test the microphone (a virtual desktop with no
+microphone redirection showed only "Recording"), and explain that accents and microphones differ, so a person whose words
+come out wrong tries a more accurate model or the calibration test. A 95-year-old must be able to complete it.
+
+One window, "Welcome to Dictum", replaces the chain of first-run dialogs (the speech picker, the clean-up picker, the
+hotkey check). It is shown exactly when the hotkey check was: settings.json is usable, names no `whisper.model`, and no
+`--model` or `DICTUM_MODEL_PATH` names the model (`AppRules.Onboards`). A step line and dots ("Step 2 of 6: Model files"),
+the step's heading and body (scrolling when it does not fit), **Back** on the left and the step's own buttons on the right;
+Enter presses the step's primary button. Steps:
+
+1. **Welcome / How it works**: one paragraph, then Next.
+2. **Where to keep the model files**: the suggested folder (the per-user default) pre-selected, with its drive's free space
+   ("C: has 41.0 GB free"; no line when it cannot be read), the network-folder note when it applies, and "Choose another
+   drive or folder…" (the system's folder chooser). The text calls base.en "the included one" only when it is on this PC,
+   else "the Standard model is about 150 MB to download". The folder is checked by Settings > Models' rule
+   (`ModelCoordinator.FolderRefusal`): the bundled folder or one inside it is refused with "That folder holds the models
+   that come with Dictum…", and a device path other than `\\?\X:\` or `\\?\UNC\` with a new sentence (the settings load
+   already ignored such a `models.folder`). `models.folder` is written only when it differs from what settings.json holds
+   ("Use the suggested folder" and Back can put it back to null). Not shown when settings.json names `models.folder` or
+   `whisper.models_dir` (`AppRules.AsksFolder`).
+3. **Speech model**: when base.en is in the lookup order (with the folder just chosen) and settings.json names English
+   without translate, one line, "The Standard model is included and ready.", and no choice. Otherwise the Simple view's
+   tiers (§10.1) for the language settings.json names (multilingual models when it is not plain English; a tier the
+   language rules out is left out), with their sub-lines and sizes, the recommendation pre-selected, and "Show every model"
+   for the full catalogue and "Choose model file…". With base.en on this PC and a language that is not English, the pick
+   wins over base.en; Esc there keeps base.en (as before 1.2: dictation works at once and the existing language warning
+   follows). Completing the step writes through the first run's own writer (`ModelCoordinator.AnswerFirstRun`, split out
+   of `FirstRun`): base.en and `llm.provider` = `none` with base.en and no pick; otherwise the pick, with a catalogue model
+   not on this PC downloaded at startup as the picker's was. No clean-up question: the rule-based tidy, unless a seeded
+   `llm.provider` is kept (§24).
+4. **Your hotkey**: the first-run hotkey check (§20), its box, words, buttons and behaviour unchanged. As in the old
+   window, nothing has keyboard focus when the step opens, so Space chosen as the hotkey does not also press a button;
+   Enter (never a hotkey) presses "Use this hotkey".
+5. **Microphone test**: Settings > Microphone's device list and labels (a list that cannot be read, the audio service
+   stopped, counts as no microphone); a capture opened for the test only, its `CurrentLevel` driving a five-bar meter
+   (polled every 50 ms; with reduced motion, `WindowFlags.ReducedMotion`, the meter is redrawn at most every 500 ms with the
+   loudest level since). "Say a few words." until about 3 s in all at or above settings.json's `silence_threshold` (0.01
+   by default, the level below which a dictation is discarded as silence: "Heard you."), or 5 s in a row of digital silence,
+   at or below 1e-5 RMS (the "No sound from mic" floor, PR #22: the advice, which a later sound can still turn into "Heard
+   you."). A level between the two (background hiss) is neither. With no microphone listed, the no-microphone sentence and
+   no capture. The capture is stopped about 5 s after "Heard you.", after 60 s in any case ("Test again" opens it again),
+   and on every way out of the step (Next, Skip, Back, Esc, closing the window). A test closed at 60 s with nothing decided (hiss only) says "Nothing heard."; a level counts towards "Heard you." only above the floor too (a `silence_threshold` of 0 never hears digital silence), and one late look at the level counts as at most two ticks. Choosing another microphone tests it at
+   once; Next writes `audio.device` only when it changed; Skip writes nothing.
+6. **Try it**: after steps 1-5 the window stays open while the shell loads the settings, installs the hotkey and starts
+   loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). Until the model is
+   ready the step says "Getting the speech model ready…"; then "Click in the box, hold <hotkey>, say a sentence, then let
+   go." over a multi-line box, which has the keyboard focus (a hotkey held without clicking first pastes there). A
+   dictation goes through the normal path (hotkey listener, controller, pipeline, paste into the focused box); the step
+   watches the shell's last dictation (`PersonalService.Last`) and after the first one shows the accent explainer
+   ("The Standard model works well…" when the model in use is the Standard choice for its language, else "The model you
+   chose works well…") and "Calibrate my voice" (which opens the calibration window and closes this one). With nothing 30 s
+   after the model is ready, or a speech model that failed to load, the try-later line (a polite live region); Finish always
+   works. No Back.
+
+Writes and interruption. Each step writes its own settings when completed, straight to settings.json (atomic writes, no
+reload: nothing is loaded yet). Esc or closing the window before the end is "skip the rest": the speech answer is written
+with today's defaults (base.en and the rule-based tidy; without base.en, the recommendation with nothing downloaded, so the
+missing-model question of §10 asks first), and the folder, hotkey and microphone stay as settings.json has them; Try it
+does not follow. A folder chosen in step 2 before any other write makes settings.json start with that key alone; the
+speech step adds its keys to it, as for a seeded file. A start after the speech step (a crash) opens no window, as no
+hotkey check was shown again before (`// simplification:` in `AppRules.Onboards`). `--selftest`, `--transcribe` and the
+other CLI modes never open it.
+
+Accessibility and size. Every control has an accessible name; everything is reached by Tab; the step line and the try-later
+line are polite live regions; the folder refusal is an assertive one. The client area is 640 × 420 DIP (resizable, minimum
+480 × 360); text is larger than in the other windows (body 17 px, buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512
+DIP; with the Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, and 420 plus a caption
+of about 32 DIP (recalled) fits. On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`,
+the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
+
+Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.

@@ -95,7 +95,7 @@ internal sealed class GeneralPage : SettingsPage
                 _capture,
                 Ui.Row(8, _saveHotkey),
                 Ui.Text(MouseNote, "caption"),
-                Ui.Text(HotkeyCheckWindow.MacNote, "caption")), "Hotkey"),
+                Ui.Text(HotkeyCheck.MacNote, "caption")), "Hotkey"),
             Ui.Card(Ui.Stack(10,
                 Ui.Line(HandsFreeLabel, _handsFreeLimit.Value, HandsFreeHelp),
                 _handsFreeLimit.Slider,

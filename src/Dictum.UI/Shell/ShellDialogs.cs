@@ -3,6 +3,7 @@ using Avalonia.Platform.Storage;
 using Dictum.App;
 using Dictum.Settings;
 using Dictum.UI.Views;
+using Dictum.UI.Views.Onboarding;
 
 namespace Dictum.UI.Shell;
 
@@ -28,11 +29,10 @@ public sealed class ShellDialogs : IShellDialogs
         return window.Confirmed;
     });
 
-    public string HotkeyCheck(AppShell shell, string current) => Modal.OnUi(() =>
+    public void Onboard(OnboardingFlow flow) => Modal.OnUi(() =>
     {
-        var window = new HotkeyCheckWindow(shell, current);
-        Modal.Run(window);
-        return window.Result;
+        new OnboardingWindow(flow).RunFirstSteps();
+        return true;
     });
 
     public ModelPick FirstRunPicker(string recommended, string reason, Func<ModelInfo, bool> isDownloaded, string modelsDir)
