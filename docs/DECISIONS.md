@@ -3866,7 +3866,7 @@ The lens returned Needs changes, with no blockers. Its findings and the fixes:
    - `MicrophoneChoices.Build(devices, chosen)` serves the tray, Settings > Microphone and the onboarding test.
    - `NoSoundText.SilentAdvice` is the tail of both "Nothing heard. …" and the "No sound from mic" balloon.
    - Pins check the labels and both sentences byte for byte.
-6. **`OnboardingTests.cs` was 1,131 lines.** It is now one partial class in three files: `OnboardingTests.cs` (the steps and the first run), `OnboardingTests.Microphone.cs` and `OnboardingTests.Window.cs` (Try it, size, placement and focus). No test was renamed, and the class still runs 48 tests.
+6. **`OnboardingTests.cs` was 1,046 lines at 4b5ee4f (1,131 once this round's pins were added).** It is now one partial class in three files: `OnboardingTests.cs` (the steps and the first run), `OnboardingTests.Microphone.cs` and `OnboardingTests.Window.cs` (Try it, size, placement and focus). No test was renamed, and the class still runs 48 tests.
 
 **Mutation checks.** Each was applied alone, rebuilt, run and restored:
 
@@ -3882,3 +3882,10 @@ The lens returned Needs changes, with no blockers. Its findings and the fixes:
 | Off's line back to "Paste exactly what was heard." | The_off_lines_say_what_still_applies | observed failing |
 | `SilentAdvice` reworded | The_nothing_heard_line_and_the_no_sound_balloon_share_their_advice | observed failing |
 | "(not connected)" changed in `MicrophoneChoices` | The_microphone_lists_are_built_in_one_place | observed failing |
+
+### Re-lens on 852f222 (21/10/2026): Off's status and the settings help
+
+The re-lens closed every finding of the final lens and raised one minor and one nit, both fixed:
+- **Minor:** the Off status now says what still applies (PROPOSED): "no clean-up: whitespace tidied only; your corrections, snippets and the profanity filter still apply (llm.provider = off)". It still starts with "no clean-up:".
+- **Nit:** the settings.json help text for `llm` (off) now reads "off (no clean-up: spaces tidied only; your corrections, snippets and the profanity filter still apply; spoken commands such as "new paragraph" are typed as words)".
+- **Pin:** `The_off_lines_say_what_still_applies` checks the status word for word. Mutation, with the old status put back: **observed failing**.

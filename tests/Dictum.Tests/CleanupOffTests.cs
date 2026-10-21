@@ -161,6 +161,7 @@ public sealed class CleanupOffTests
         foreach (var line in new[] { SimpleView.OffSubLine, SimpleView.OffAdvancedLabel, SimpleView.OffInUseNote })
             Assert.DoesNotContain("exactly", line, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("corrections, snippets and the profanity filter", SimpleView.OffInUseNote);
+        Assert.Equal("no clean-up: whitespace tidied only; your corrections, snippets and the profanity filter still apply (llm.provider = off)", TranscriptCleaner.OffStatus);
     }
 
     /// <summary>Pin: off is chosen over the not-English skip, so the status says what the user chose.</summary>
