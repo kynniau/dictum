@@ -848,9 +848,18 @@ h1 {
   color: var(--text-3);
 }
 
+.status-done {
+  background: rgba(48, 164, 108, 0.18);
+  color: #1B6E46;
+}
+
 @media (prefers-color-scheme: dark) {
   .status-testing {
     color: #FFC96B;
+  }
+
+  .status-done {
+    color: #7EE0AE;
   }
 }
 
