@@ -35,9 +35,29 @@ try {
         "System32\{0} present: {1}" -f $name, (Test-Path -LiteralPath (Join-Path $env:SystemRoot "System32\$name"))
     }
     $vcLibs = @(Get-AppxPackage -AllUsers -Name "Microsoft.VCLibs*" | ForEach-Object { "$($_.Name) $($_.Version)" })
+
+    # The Vulkan loader. VGpu Disable does not remove it (and Vulkan has still found a device here), so -NoVulkanLoader
+    # renames it in this disposable System32: the PC of the launch crash of 21/10/2026, where the Vulkan runtime cannot load.
+    $system32 = Join-Path $env:SystemRoot "System32"
+    $loaders = @(Get-ChildItem -LiteralPath $system32 -Filter "vulkan-1*.dll" -File -ErrorAction SilentlyContinue)
+    $vulkan = @("Vulkan loader in System32: $(if ($loaders) { ($loaders.Name) -join ', ' } else { 'none' })")
+    if ($job.noVulkanLoader) {
+        foreach ($loader in $loaders) {
+            & takeown.exe /f $loader.FullName /a | Out-Null
+            & icacls.exe $loader.FullName /grant "*S-1-5-32-544:F" | Out-Null # the Administrators group, by SID (any language)
+            try {
+                Rename-Item -LiteralPath $loader.FullName -NewName "$($loader.Name).disabled" -ErrorAction Stop
+                $vulkan += "-NoVulkanLoader: renamed $($loader.Name) to $($loader.Name).disabled"
+            } catch {
+                $vulkan += "-NoVulkanLoader: could not rename $($loader.Name): $($_.Exception.Message)"
+            }
+        }
+        $left = @(Get-ChildItem -LiteralPath $system32 -Filter "vulkan-1*.dll" -File -ErrorAction SilentlyContinue)
+        $vulkan += "Vulkan loader in System32 for the runs: $(if ($left) { ($left.Name) -join ', ' } else { 'none' })"
+    }
     Write-Utf8 "$out\environment.txt" (@("OS: $([Environment]::OSVersion.VersionString)") + $vc +
         @("Visual C++ Redistributable registry key present: $(Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64')",
-          "VCLibs packages before the check: $(if ($vcLibs) { $vcLibs -join ', ' } else { 'none' })"))
+          "VCLibs packages before the check: $(if ($vcLibs) { $vcLibs -join ', ' } else { 'none' })") + $vulkan)
 
     # Unpackaged builds first, before any package is registered.
     foreach ($run in @($job.runs | Where-Object { -not $_.packaged })) { Invoke-SelfTest $run $job }

@@ -35,7 +35,12 @@ Non-negotiables:
   Runtime order: Vulkan → Cpu → CpuNoAvx (include `Whisper.net.Runtime.NoAvx` so old or
   virtual CPUs still work), with automatic fallback and the chosen runtime logged and
   shown in the tray tooltip. Machines without any GPU (most Azure VMs) must land on Cpu
-  cleanly with no error dialog.
+  cleanly with no error dialog. *Amended 21/10/2026 (DECISIONS.md, "Launch crash without a
+  working Vulkan driver"):* `whisper.gpu = auto` uses Cpu → CpuNoAvx when the Vulkan loader
+  (`vulkan-1.dll`) does not load, and says why in the log; `vulkan` always tries Vulkan
+  first; `cpu` is Cpu → CpuNoAvx, the first run's GPU probe included. A failed Vulkan load
+  must fall back, never end the process: `GGML_NO_BACKTRACE=1` is set in the C runtime's
+  environment as the first statement of `Main`, before whisper.cpp can load.
 - Audio: NAudio (WASAPI capture), resampled to 16 kHz mono float32 for whisper.
 - Global keys: a `WH_KEYBOARD_LL` low-level hook via P/Invoke on a **dedicated thread
   with its own message loop** (not the WPF UI thread). The callback does only vk matching

@@ -144,8 +144,33 @@ public sealed partial class WhisperEngine : ISpeechEngine
     };
 
     /// <summary>
-    /// Sets the runtime order for this process. Must run before the first factory is created; later calls are
-    /// no-ops because Whisper.net keeps the first native library it loads.
+    /// Whether the Vulkan loader (vulkan-1.dll) loads on this PC: set once by the platform at the start of Main, before any
+    /// runtime order is set (Dictum.Windows: GgmlEnvironment.VulkanLoaderLoads). Null (tests, a platform without the check)
+    /// keeps the Vulkan-first order for whisper.gpu = auto.
+    /// </summary>
+    public static Func<bool>? VulkanLoaderPresent { get; set; }
+
+    /// <summary>The CPU runtimes, best first (SPEC §2).</summary>
+    private static readonly RuntimeLibrary[] CpuOrder = [RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx];
+
+    /// <summary>
+    /// The runtime order for a whisper.gpu value, and why it is the CPU order when auto was asked for (null otherwise). Only
+    /// the runtimes this app ships (SPEC §2); no Cuda: those packages need an installed CUDA Toolkit. cpu: the CPU runtimes.
+    /// auto: Vulkan first, unless <paramref name="vulkanLoaderPresent"/> says the Vulkan loader does not load, when the Vulkan
+    /// runtime cannot load either and trying it only delays every start (docs\DECISIONS.md, 21/10/2026). vulkan: Vulkan first
+    /// always, as the user asked for it (a failed Vulkan load then falls back to the CPU as before).
+    /// </summary>
+    internal static (RuntimeLibrary[] Order, string? Why) RuntimeOrder(string gpuSetting, Func<bool>? vulkanLoaderPresent)
+    {
+        if (gpuSetting == "cpu") return (CpuOrder, null);
+        if (gpuSetting == "auto" && vulkanLoaderPresent is not null && !vulkanLoaderPresent())
+            return (CpuOrder, "the Vulkan loader, vulkan-1.dll, does not load on this PC, so the Vulkan runtime is not tried");
+        return ([RuntimeLibrary.Vulkan, .. CpuOrder], null);
+    }
+
+    /// <summary>
+    /// Sets the runtime order for this process (<see cref="RuntimeOrder"/>). Must run before the first factory is created;
+    /// later calls are no-ops because Whisper.net keeps the first native library it loads.
     /// </summary>
     public static void ConfigureRuntime(string gpuSetting, ILog log)
     {
@@ -154,11 +179,9 @@ public sealed partial class WhisperEngine : ISpeechEngine
             if (_runtimeConfigured) return;
             _runtimeConfigured = true;
             Volatile.Write(ref _configuredGpu, gpuSetting);
-            // Only the runtimes this app ships (SPEC §2). No Cuda: those packages need an installed CUDA Toolkit.
-            RuntimeOptions.RuntimeLibraryOrder = gpuSetting == "cpu"
-                ? [RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx]
-                : [RuntimeLibrary.Vulkan, RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx];
-            log.Info($"Whisper runtime order: {string.Join(" -> ", RuntimeOptions.RuntimeLibraryOrder)} (whisper.gpu = {gpuSetting}).");
+            var (order, why) = RuntimeOrder(gpuSetting, VulkanLoaderPresent);
+            RuntimeOptions.RuntimeLibraryOrder = [.. order];
+            log.Info($"Whisper runtime order: {string.Join(" -> ", RuntimeOptions.RuntimeLibraryOrder)} (whisper.gpu = {gpuSetting}{(why is null ? "" : $"; {why}")}).");
             _nativeLogSubscription = LogProvider.AddLogger((level, message) => ForwardNativeLog(log, level, message));
         }
     }

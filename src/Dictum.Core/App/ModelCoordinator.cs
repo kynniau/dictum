@@ -205,7 +205,7 @@ public sealed class ModelCoordinator(
     /// <param name="keepProvider">settings.json names llm.provider (<see cref="SettingsLoadResult.NamesCleanupProvider"/>).</param>
     public bool FirstRun(bool askSpeech = true, bool askCleanup = true, AppSettings? seeded = null, bool keepProvider = false)
     {
-        var gpu = gpuMachine is not null ? gpuMachine() : ProbeGpuMachine();
+        var gpu = gpuMachine is not null ? gpuMachine() : ProbeGpuMachine(FirstRunProbeGpu(seeded ?? settings()));
         var (speech, speechWhy) = ModelCatalog.Recommend(gpu);
         var (cleanup, cleanupWhy) = CleanupCatalog.Recommend(gpu);
         log.Info($"First run: runtime {WhisperEngine.LoadedRuntime}, Vulkan devices {WhisperEngine.DeviceSummary}: recommending {speech} ({speechWhy}) and {cleanup} ({cleanupWhy}).");
@@ -256,9 +256,19 @@ public sealed class ModelCoordinator(
         return true;
     }
 
-    private bool ProbeGpuMachine()
+    /// <summary>
+    /// The whisper.gpu the first-run probe loads the runtime with: the one settings.json names (a seeded or hand-written
+    /// whisper.gpu = cpu is the documented escape from a GPU driver that fails, so it holds on the first run too, 21/10/2026),
+    /// else the default (auto).
+    /// </summary>
+    internal static string FirstRunProbeGpu(AppSettings? seeded) => (seeded?.Whisper ?? new WhisperSettings()).Gpu;
+
+    /// <summary>Tests only: stands in for <see cref="WhisperEngine.ProbeRuntime"/> (which loads the native runtime). Null in the app.</summary>
+    internal Func<string, ILog, string>? TestRuntimeProbe { get; init; }
+
+    private bool ProbeGpuMachine(string gpu)
     {
-        WhisperEngine.ProbeRuntime(new WhisperSettings().Gpu, log);
+        (TestRuntimeProbe ?? WhisperEngine.ProbeRuntime)(gpu, log);
         return WhisperEngine.GpuMachine;
     }
 
