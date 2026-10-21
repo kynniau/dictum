@@ -4096,3 +4096,14 @@ Not pinned:
 
 - The transient models lines (a model still loading, a download pending, an error, with the longest runtime and key names) trim by design at the panel's 380 px: one line, an ellipsis, the whole line in its tooltip and its accessible name (lens finding 1 on PR #39). `Polish2Tests.A_transient_header_line_that_is_too_long_is_trimmed_whole_in_its_tooltip` pins five of them as expected-trimmed; the steady-state lines stay pinned as whole. No wording changed.
 - `CalibrationWindow.Toggle`'s `CheckMicrophone()` guard (the hotkey starts a take even though Record is disabled) is pinned: `Calibration_hotkey_with_no_microphone_starts_no_take`.
+
+## Release 1.2.0 prepared (22/10/2026)
+
+Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOSED until the owner approves it. `site/version.json` is not touched (set at release time) and no tag is created.
+
+1. `Directory.Build.props`: `<Version>` 1.1.2 to 1.2.0 (package 1.2.0.0).
+2. `docs/STORE.md` certification notes (PROPOSED): header "Notes written 22/10/2026 for Dictum 1.2.0." and a new CHANGED SINCE THE LAST SUBMISSION paragraph (the Welcome window, the Simple and Advanced views, clean-up Off, the Help page, the Send feedback and Email support buttons). Every other paragraph of the block is unchanged, except one sentence added to TO DICTATE (PROPOSED): "on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then" before "click into any text field". The block had no first-run hotkey dialog sentence to replace.
+3. `docs/STORE.md` listing (PROPOSED): a "What's new in this version (1.2.0)" note; the feature line "No account, no analytics, no telemetry" replaced by the approved line "Free: no subscription, no account, no ads, no analytics, no telemetry."; a FREE paragraph in the description with the two approved lines ("Free: no subscription, no account, no ads, no analytics, no telemetry." and "The base product stays free to keep on your PC; optional paid extras may come later.").
+4. `docs/STORE.md` version references (section 1 package-version row, section 6) say 1.2.0 / 1.2.0.0; the certification record gains "21/10/2026 1.1.2 submitted (Submission 2), marked mandatory, in certification" and "22/10/2026 Dictum 1.2.0 prepared".
+5. `README.md`: a bullet under the opening list carries the two approved lines verbatim, plus open source, MIT and Kynni Pty Ltd. No other fact was removed.
+6. `docs/STORE.md` section 9 row 17 (PROPOSED): the first run opens the Welcome window with a hotkey check, a microphone test and a choice of where model files are kept, and Esc keeps the defaults.

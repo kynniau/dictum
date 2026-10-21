@@ -7,6 +7,7 @@ that also runs **on this PC** with llama.cpp, once you add it), and pasted at th
 - **Nothing leaves the machine by default.** No accounts, telemetry, analytics, crash reporting or automatic update
   checks: the direct download checks only when you click Check for updates. Nothing is downloaded to get started: a
   small English speech model (base.en) comes with Dictum, and bigger models and AI clean-up are downloads you choose.
+- Free: no subscription, no account, no ads, no analytics, no telemetry. The base product stays free to keep on your PC; optional paid extras may come later. Open source under the MIT licence, by Kynni Pty Ltd.
 - Works fully offline; with `offline_only: true` Dictum itself connects to no other machine. A cleanup server on
   this PC is still allowed; what such a server does with the text is up to it (see "Privacy").
 - If the cleanup model is missing, slow or gives a bad answer, a rule-based tidy is pasted instead: never a failure.
