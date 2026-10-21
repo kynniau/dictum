@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
@@ -52,6 +53,7 @@ internal sealed class FlyoutWindow : Window
     private readonly Control _lock = Ui.Icon(Ui.LockIcon, 14);
     private readonly DispatcherTimer _meterTimer;
     private List<string?> _micIds = [];
+    private Dictionary<string, string>? _speechPlain; // Simple view: each listed model's tier name; null in Advanced
     private bool _refreshing;
 
     public FlyoutWindow(AppShell shell)
@@ -79,6 +81,10 @@ internal sealed class FlyoutWindow : Window
         _mic.SelectionChanged += (_, _) => OnMicPicked();
         AutomationProperties.SetName(_speech, "Speech model");
         AutomationProperties.SetName(_cleanup, "Clean-up");
+        // The two pickers share one row, so a closed one is narrow: a long entry ("Custom: large-v3-turbo-q5_0") ends in an
+        // ellipsis instead of being cut off mid-letter (lens on PR #23, 21/10/2026). The open list shows the same words.
+        foreach (var picker in new[] { _speech, _cleanup })
+            picker.ItemTemplate = new FuncDataTemplate<string>((text, _) => new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis });
         AutomationProperties.SetName(_mic, "Microphone");
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // Why a model could not load or runs on the CPU, under the header, with what to do about it (Store investigation, 16/10/2026).
@@ -255,14 +261,18 @@ internal sealed class FlyoutWindow : Window
     private void FillSpeech(AppSettings s)
     {
         var current = _shell.Models.CurrentName;
+        _speechPlain = null;
         if (s.Ui.IsSimple)
         {
-            // ui.view = simple: the three tiers by their plain names, each still marked while its file is on its way, and a
-            // Custom entry for a model in use that is none of them (SimpleView).
-            var tiers = SimpleView.Tiers(_shell.GpuMachine);
+            // ui.view = simple: the tiers by their plain names for these language settings, each still marked while its file is on
+            // its way, and a Custom entry for a model in use that is none of them (SimpleView). A tier the language rules out is
+            // not offered (it stays listed only while it is the model in use).
+            var tiers = SimpleView.Tiers(_shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate)
+                .Where(t => t.Guard is null || string.Equals(t.Model, current, StringComparison.OrdinalIgnoreCase)).ToList();
             var models = tiers.Select(t => t.Model).ToList();
             var labels = tiers.Select(t => Marked(t.Label, ModelCatalog.Find(t.Model))).ToList();
-            if (SimpleView.TierOf(current, _shell.GpuMachine) is null)
+            _speechPlain = tiers.ToDictionary(t => t.Model, t => t.Label, StringComparer.OrdinalIgnoreCase);
+            if (SimpleView.TierOf(current, _shell.GpuMachine, s.Whisper.Language, s.Whisper.Translate) is null)
             {
                 models.Insert(0, current);
                 labels.Insert(0, SimpleView.Custom(current));
@@ -387,7 +397,9 @@ internal sealed class FlyoutWindow : Window
     {
         if (_refreshing || _speech.Tag is not List<string> names || _speech.SelectedIndex < 0) return;
         var name = names[_speech.SelectedIndex];
-        if (name != _shell.Models.CurrentName && ModelCatalog.Find(name) is not null) Act(() => _shell.Models.Select(name));
+        // In the Simple view the question and balloons use the tier's name ("More accurate"), as the page does.
+        var plain = _speechPlain is { } tiers && tiers.TryGetValue(name, out var label) ? label : null;
+        if (name != _shell.Models.CurrentName && ModelCatalog.Find(name) is not null) Act(() => _shell.Models.Select(name, plain));
     }
 
     private void OnCleanupPicked()

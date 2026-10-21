@@ -4,6 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.UI.Views;
@@ -140,8 +141,8 @@ public sealed class SimpleViewTests
         shell.Reload(userRequested: false);
         var window = ModelsWindow(shell);
         var shown = Visible(window);
-        Assert.Contains($"{SimpleView.DownloadSize(ModelCatalog.Find("large-v3-turbo")!.SizeText)} · {SimpleView.MostAccurateSubLine}", shown);
-        Assert.Contains($"{SimpleView.DownloadSize(ModelCatalog.Find("medium.en")!.SizeText)} · {SimpleView.MoreAccurateSubLine}", shown);
+        Assert.Contains($"{ModelCatalog.Find("large-v3-turbo")!.SizeText} · {SimpleView.MostAccurateSubLine}", shown); // the size alone: the line may say "download"
+        Assert.Contains($"{ModelCatalog.Find("medium.en")!.SizeText} · {SimpleView.MoreAccurateSubLine}", shown);
         Named(window, SimpleView.ActionName("Download…", SimpleView.MostAccurateLabel)).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(["ggml-large-v3-turbo.bin"], dialogs.DownloadQuestions); // the catalogue's own question, for the GPU tier
         Assert.Equal(0, server.Requests); // declined: nothing fetched, nothing changed
@@ -180,7 +181,7 @@ public sealed class SimpleViewTests
         var lines = Visible(window).Split('\n');
         Assert.Contains(SimpleView.Custom("tiny.en"), lines);
         Assert.Contains(SimpleView.Custom("qwen2.5-0.5b"), lines);
-        Assert.Equal(2, lines.Count(l => l == $"In use · {SimpleView.CustomNote}"));
+        Assert.Equal(2, lines.Count(l => l == "In use. Not one of the choices above.")); // not "Chosen in Advanced view": calibration, presets or --model may have chosen it
         Assert.DoesNotContain($"In use · {SimpleView.TidySubLine}", lines); // the Tidy row is not in use
 
         Named(window, SimpleView.ActionName("Use", SimpleView.TidyLabel)).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
@@ -264,7 +265,7 @@ public sealed class SimpleViewTests
         var busy = All<Button>(window).Single(b => b.Content as string == ModelsPage.DownloadingButton);
         Assert.False(busy.IsEnabled);
         Assert.Equal($"{SimpleView.MoreAccurateLabel} is already downloading", AutomationProperties.GetName(busy));
-        Assert.Contains($"Downloading 0% · {SimpleView.MoreAccurateSubLine}", Visible(window));
+        Assert.Contains($"Downloading 0% · {SimpleView.CpuMoreAccurateSubLine}", Visible(window));
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
         Assert.Contains(SimpleView.MoreAccurateLabel + FlyoutWindow.DownloadingMark, Labels(flyout, "Speech model"));
@@ -317,6 +318,187 @@ public sealed class SimpleViewTests
         Assert.Same(more, Named(window, SimpleView.ActionName("Download…", SimpleView.MoreAccurateLabel))); // not rebuilt
         Assert.True(more.IsFocused);
         window.Close();
+        shell.Dispose();
+    });
+
+    // ---- Lens fixes (21/10/2026), first lens on 1316ea6 ----
+
+    private static void Press(Button button) => button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+    /// <summary>Lens 2: the tier lines follow the machine class; on a CPU they say what the measured times say.</summary>
+    [Fact]
+    public void The_tier_lines_follow_the_machine_class()
+    {
+        Assert.Equal([SimpleView.StandardSubLine, "Bigger download. Takes a few seconds longer on this PC.", "Slow without a graphics card: can take longer than you spoke."],
+            SimpleView.Tiers(gpuMachine: false).Select(t => t.SubLine));
+        Assert.Equal([SimpleView.StandardSubLine, "Bigger download, a bit slower.", "Best results. Needs a strong PC or patience."],
+            SimpleView.Tiers(gpuMachine: true).Select(t => t.SubLine));
+        Assert.Equal(SimpleView.CpuMostAccurateSubLine, SimpleView.Tiers(gpuMachine: false, "es")[1].SubLine); // medium on a CPU is the slow one
+    }
+
+    /// <summary>Lens 1: a language other than English maps the tiers to multilingual models; a tier the language rules out carries a guard.</summary>
+    [Fact]
+    public void A_language_other_than_english_maps_the_tiers_to_multilingual_models()
+    {
+        Assert.Equal(["small", "medium"], SimpleView.Tiers(false, "es").Select(t => t.Model)); // nothing above medium on a CPU
+        Assert.Equal(["small", "medium", "large-v3-turbo"], SimpleView.Tiers(true, "de").Select(t => t.Model));
+        Assert.Equal(["small", "medium", "large-v3"], SimpleView.Tiers(true, "es", translate: true).Select(t => t.Model)); // turbo cannot translate
+        Assert.Equal(["small", "medium"], SimpleView.Tiers(false, "en", translate: true).Select(t => t.Model));
+        Assert.Equal(["small", "medium", "large-v3-turbo"], SimpleView.Tiers(true, "auto").Select(t => t.Model));
+        foreach (var (gpu, language, translate) in new[] { (false, "es", false), (true, "de", false), (true, "es", true), (false, "en", true), (true, "auto", false), (false, "en", false), (true, "en", false) })
+        {
+            Assert.All(SimpleView.Tiers(gpu, language, translate), t =>
+            {
+                Assert.Null(t.Guard);
+                Assert.Null(Dictum.Transcribe.WhisperLanguages.Problem(t.Model, language, translate)); // every tier can do what the settings ask
+            });
+        }
+        Assert.Equal("English only: switch to Advanced to choose a model for Spanish.", SimpleView.GuardLine("base.en", "es", false));
+        Assert.Equal("English only: switch to Advanced to choose a model that detects the language.", SimpleView.GuardLine("small.en", "auto", false));
+        Assert.Null(SimpleView.GuardLine("small", "es", false));
+        Assert.Equal(Dictum.Transcribe.WhisperLanguages.Problem("small", "yue", false), SimpleView.Tiers(false, "yue")[0].Guard); // Cantonese: large-v3 only
+        Assert.Equal(SpeechTier.Standard, SimpleView.TierOf("small", false, "es")!.Tier);
+        Assert.Null(SimpleView.TierOf("base.en", false, "es"));
+    }
+
+    /// <summary>Lens 1: with Spanish and the multilingual small in use, nothing on the page switches to an English-only model.</summary>
+    [Fact]
+    public Task A_user_whose_language_is_not_english_is_never_switched_to_an_english_only_model() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "small", "language": "es" }, "llm": { "provider": "none" } }""");
+        Directory.CreateDirectory(scratch.Paths.DefaultModelsDir); // base.en on this PC: the English Standard would be one press away
+        using (var file = new FileStream(Path.Combine(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin"), FileMode.Create, FileAccess.Write)) file.SetLength(ModelCatalog.Find("base.en")!.Bytes);
+        var (shell, _, dialogs) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = ModelsWindow(shell);
+        foreach (var standard in All<Button>(window).Where(b => AutomationProperties.GetName(b) is "Use Standard" or "Download Standard").ToList()) Press(standard);
+        Assert.Equal("small", shell.Settings.Whisper.Model);
+        Assert.Empty(dialogs.DownloadQuestions);
+        Assert.Contains($"In use · {SimpleView.StandardSubLineNotIncluded}", Visible(window)); // Standard is small, the model in use
+        Assert.DoesNotContain(SimpleView.Custom("small"), Visible(window));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Lens 1: the tray lists the same multilingual tiers, and choosing one asks in plain words.</summary>
+    [Fact]
+    public Task The_tray_lists_the_multilingual_tiers() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "small", "language": "es" }, "llm": { "provider": "none" } }""");
+        var (shell, _, dialogs) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        Assert.Equal([$"{SimpleView.StandardLabel} (download)", $"{SimpleView.MoreAccurateLabel} (download)"], Labels(flyout, "Speech model"));
+        All<ComboBox>(flyout).Single(c => AutomationProperties.GetName(c) == "Speech model").SelectedIndex = 1;
+        Assert.Equal(["ggml-medium.bin"], dialogs.DownloadQuestions);
+        Assert.Equal($"Download {SimpleView.MoreAccurateLabel} ({ModelCatalog.Find("medium")!.SizeText})? {ModelPromptText.PlainCheck}.", dialogs.PlainQuestions.Single().Split("\n\n")[0]);
+        flyout.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Lens 1: a tier the language rules out (Cantonese on small and medium) has no button on the page and is not offered in the tray.</summary>
+    [Fact]
+    public Task A_tier_the_language_rules_out_is_never_offered() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en", "language": "yue" }, "llm": { "provider": "none" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = ModelsWindow(shell);
+        var lines = Visible(window).Split('\n');
+        Assert.Contains(Dictum.Transcribe.WhisperLanguages.Problem("small", "yue", false)!, lines);
+        Assert.Contains(Dictum.Transcribe.WhisperLanguages.Problem("medium", "yue", false)!, lines);
+        Assert.DoesNotContain(All<Button>(window), b => AutomationProperties.GetName(b) is { } n && (n.EndsWith(SimpleView.StandardLabel, StringComparison.Ordinal) || n.EndsWith(SimpleView.MoreAccurateLabel, StringComparison.Ordinal)));
+        Assert.Contains(SimpleView.Custom("base.en"), lines);
+        window.Close();
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        Assert.Equal([SimpleView.Custom("base.en")], Labels(flyout, "Speech model"));
+        flyout.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Lens 5: with text that is not English the clean-up tidies spacing only, and the Tidy line says so.</summary>
+    [Fact]
+    public Task The_tidy_line_says_spacing_only_for_a_language_other_than_english() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "small", "language": "es" }, "llm": { "provider": "none" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = ModelsWindow(shell);
+        Assert.Contains("In use · Tidies spacing only for Spanish.", Visible(window).Split('\n'));
+        Assert.DoesNotContain(SimpleView.TidySubLine, Visible(window));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Lens 3: a Simple choice asks in plain words (and names the running download by its tier), Advanced keeps the catalogue question.</summary>
+    [Fact]
+    public Task A_simple_choice_asks_in_plain_words() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
+        var server = new GateHandler([1, 2, 3, 4]);
+        var (shell, _, dialogs) = scratch.Shell(downloadHandler: server);
+        shell.Reload(userRequested: false);
+        var window = ModelsWindow(shell);
+        var more = Named(window, SimpleView.ActionName("Download…", SimpleView.MoreAccurateLabel));
+        Press(more); // declined
+        var question = Assert.Single(dialogs.PlainQuestions);
+        Assert.StartsWith($"Download More accurate ({ModelCatalog.Find("small.en")!.SizeText})? It comes from the model makers' official download page and is checked before use.", question);
+        Assert.DoesNotContain("ggml-", question);
+        Assert.DoesNotContain(ModelCatalog.DownloadHost, question);
+
+        dialogs.ConfirmDownloads = true;
+        Press(more);
+        for (var waited = 0; server.InFlight != 1 && waited < 5000; waited += 10) await Task.Delay(10, TestContext.Current.CancellationToken);
+        Assert.True(server.InFlight == 1, "small.en never started downloading");
+        Press(Named(window, SimpleView.ActionName("Download…", SimpleView.MostAccurateLabel))); // the busy question, answered Cancel
+        Assert.StartsWith($"More accurate is downloading (", dialogs.PlainQuestions[^1]);
+        Assert.Contains($"Download Most accurate ({ModelCatalog.Find("medium.en")!.SizeText}) after it", dialogs.PlainQuestions[^1]);
+
+        var asked = dialogs.PlainQuestions.Count;
+        shell.Write(("ui.view", System.Text.Json.Nodes.JsonValue.Create(UiSettings.Advanced)));
+        Dispatcher.UIThread.RunJobs();
+        Press(All<Button>(window).First(b => b.Content as string == "Download…")); // tiny.en, the first catalogue row
+        Assert.Equal("ggml-tiny.en.bin", dialogs.DownloadQuestions[^1]); // the catalogue question
+        Assert.Equal(asked, dialogs.PlainQuestions.Count);
+        Assert.Equal(0, server.Cancelled);
+        window.Close();
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>Lens 6: a long entry in a closed tray picker ends in an ellipsis instead of being cut off.</summary>
+    [Fact]
+    public Task A_long_tray_entry_is_trimmed_with_an_ellipsis() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "large-v3-turbo-q5_0" }, "llm": { "provider": "none" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        flyout.UpdateLayout();
+        var speech = All<ComboBox>(flyout).Single(c => AutomationProperties.GetName(c) == "Speech model");
+        var shown = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(speech).OfType<TextBlock>().Single(t => t.Text == SimpleView.Custom("large-v3-turbo-q5_0"));
+        Assert.Equal(Avalonia.Media.TextTrimming.CharacterEllipsis, shown.TextTrimming);
+        Assert.True(shown.Bounds.Width <= speech.Bounds.Width, $"{shown.Bounds.Width:0} of {speech.Bounds.Width:0}");
+        flyout.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Lens 7: choosing "Tidy my words" in the tray's Simple clean-up picker switches a Custom clean-up to the rule-based tidy.</summary>
+    [Fact]
+    public Task Choosing_tidy_my_words_in_the_tray_switches_to_the_rule_based_tidy() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "local", "model": "qwen2.5-0.5b" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        Assert.Equal([SimpleView.Custom("qwen2.5-0.5b"), SimpleView.TidyLabel, SimpleView.OffLabel], Labels(flyout, "Clean-up"));
+        All<ComboBox>(flyout).Single(c => AutomationProperties.GetName(c) == "Clean-up").SelectedIndex = 1;
+        Assert.Equal(LlmSettings.NoProvider, shell.Settings.Llm.Provider); // the recommended model is not on this PC: the rule-based tidy
+        flyout.Close();
         shell.Dispose();
     });
 }

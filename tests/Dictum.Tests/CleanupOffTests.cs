@@ -244,6 +244,30 @@ public sealed class CleanupOffTests
         shell.Dispose();
     });
 
+    /// <summary>Pin: Off has no language dependency: with text that is not English (or Detect automatically) the row and its button are still offered.</summary>
+    [Theory]
+    [InlineData("""{ "hotkey": "F24", "whisper": { "model": "small", "language": "fr" }, "llm": { "provider": "none" } }""")]
+    [InlineData("""{ "hotkey": "F24", "whisper": { "model": "small", "language": "auto" }, "llm": { "provider": "none" } }""")]
+    public Task Off_is_offered_for_every_language(string settings) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(settings);
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = Page(shell, "Models");
+        Assert.Contains(SimpleView.OffSubLine, Lines(window));
+        var use = Named(window, SimpleView.ActionName("Use", SimpleView.OffLabel));
+        Assert.True(use.IsEffectivelyVisible && use.IsEnabled);
+        Click(use);
+        Assert.Equal(LlmSettings.Off, FileProvider(scratch));
+        window.Close();
+
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        Assert.Contains(SimpleView.OffLabel, Labels(Picker(flyout, "Clean-up")));
+        flyout.Close();
+        shell.Dispose();
+    });
+
     /// <summary>Pin: the Advanced clean-up buttons offer Off and say so in the In use line.</summary>
     [Fact]
     public Task The_advanced_list_offers_off() => UiSession.Run(() =>
@@ -255,7 +279,7 @@ public sealed class CleanupOffTests
         Assert.Contains("In use: rules (rule-based tidy)", Lines(window)); // none unchanged
         Click(All<Button>(window).Single(b => b.Content as string == SimpleView.OffAdvancedLabel));
         Assert.Equal(LlmSettings.Off, FileProvider(scratch));
-        Assert.Contains($"In use: off{SimpleView.OffInUseNote}", Lines(window));
+        Assert.Contains($"In use: no clean-up{SimpleView.OffInUseNote}", Lines(window));
         Click(All<Button>(window).Single(b => b.Content as string == "Rule-based tidy only"));
         Assert.Equal(LlmSettings.NoProvider, FileProvider(scratch));
         window.Close();
@@ -304,6 +328,32 @@ public sealed class CleanupOffTests
         cleanup.SelectedIndex = Labels(cleanup).IndexOf(SimpleView.OffAdvancedLabel);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(LlmSettings.Off, FileProvider(scratch));
+        flyout.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin (lens on d6b4ea8): the tray panel's models line and the icon's tooltip say "no clean-up", never "off", which read as
+    /// Dictum itself being off; and the closed Advanced clean-up picker shows the Off entry through the picker's ellipsis template.
+    /// </summary>
+    [Fact]
+    public Task The_tray_line_says_no_clean_up_and_the_off_entry_is_trimmed() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "off" }, "ui": { "view": "advanced" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Assert.Equal("no clean-up", shell.Models.CurrentCleanupName);
+        Assert.Contains(" · no clean-up · ", shell.Status.Models, StringComparison.Ordinal);
+        Assert.Contains(" · no clean-up · ", shell.Status.Tooltip, StringComparison.Ordinal);
+        Assert.DoesNotContain(" · off · ", shell.Status.Models, StringComparison.Ordinal);
+
+        var flyout = new FlyoutWindow(shell);
+        flyout.ShowNear(null);
+        flyout.UpdateLayout();
+        var cleanup = Picker(flyout, "Clean-up");
+        var shown = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(cleanup).OfType<TextBlock>().Single(t => t.Text == SimpleView.OffAdvancedLabel);
+        Assert.Equal(Avalonia.Media.TextTrimming.CharacterEllipsis, shown.TextTrimming);
+        Assert.True(shown.Bounds.Width <= cleanup.Bounds.Width, $"{shown.Bounds.Width:0} of {cleanup.Bounds.Width:0}");
         flyout.Close();
         shell.Dispose();
     });

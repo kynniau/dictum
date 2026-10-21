@@ -371,12 +371,19 @@ Which model each plain choice is depends on whether Dictum found a discrete GPU:
 | Most accurate | medium.en | large-v3-turbo |
 
 The mapping reuses the existing recommendation (base.en, or medium.en on a GPU) and the Mode presets' models
-(small.en, or large-v3-turbo on a GPU, for Full). A model in use that is none of the three shows as "Custom: <name>".
-The plain choices are English-only models (and large-v3-turbo); for another language use the Advanced view (see
-"Other languages and translation"). Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
+(small.en, or large-v3-turbo on a GPU, for Full).
+
+When you speak another language, choose Detect automatically, or turn Translate on (see "Other languages and
+translation"), the choices are multilingual: Standard is small, More accurate is medium, and with a discrete GPU Most
+accurate is large-v3-turbo (large-v3 when translating, which turbo cannot do). Without a GPU there is no multilingual
+Most accurate, because every catalogue model above medium is marked as needing a GPU. A choice that cannot hear your
+language is never offered. On a PC without a GPU the lines say how slow the bigger models are there (see "Measured
+speed"). Choosing a model to download asks in plain words: "Download More accurate (487 MB)? It comes from the model
+makers' official download page and is checked before use." A model in use that is none of the choices shows as
+"Custom: <name>". Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
 recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model, or **Off**, which
-pastes exactly what was heard with no clean-up at all (see "Cleanup"). Cloud clean-up is never offered in the Simple
-view.
+pastes exactly what was heard with no clean-up at all, in any language (see "Cleanup"). Cloud clean-up is never
+offered in the Simple view.
 
 `base.en` comes with Dictum (see "First run"). The others are stored in the model folder
 (`%LOCALAPPDATA%\Dictum\models` unless you choose another: see "Model folder") as `ggml-<name>.bin`, downloaded from
@@ -762,7 +769,8 @@ Cleanup removes filler words and false starts, fixes punctuation and casing, app
 
 **`off`: no clean-up** (Settings > Models > **Off**, or **Off (paste exactly what was heard)** in the Advanced view
 and the tray panel). The text is pasted as whisper wrote it: only the spaces are tidied (the ends trimmed, and runs of
-spaces, tabs and line breaks made one space). Nothing else changes: no filler removal, no capitals, no full stop, and
+spaces, tabs, CR and LF made one space; other whitespace inside the text, such as a no-break space, is kept). The tray
+panel's models line and the icon's tooltip say "no clean-up" where the clean-up model would be. Nothing else changes: no filler removal, no capitals, no full stop, and
 spoken commands are not applied, so saying "new paragraph", "new line", "comma" or "scratch that" types those words.
 No cleanup model is loaded and nothing is sent anywhere, so Settings > Privacy and the tray panel still say "Nothing
 leaves this PC". Your corrections, the profanity filter and snippets still run after it, as they do with every

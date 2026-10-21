@@ -92,6 +92,17 @@ public sealed class NoSilentCancelTests : IDisposable
 
     private bool AnyCancelBalloon => _balloons.Any(b => b.Contains("cancelled", StringComparison.Ordinal) || b.Contains("stopped", StringComparison.Ordinal));
 
+    /// <summary>Lens on PR #23 (3): a choice made in the Simple view names the model by its tier in the "already downloading" balloon.</summary>
+    [Fact]
+    public async Task A_simple_choice_of_the_downloading_model_is_named_by_its_tier()
+    {
+        var coordinator = await TinyDownloading();
+        coordinator.Select("tiny.en", "Standard");
+        Assert.Contains("Standard is already downloading (0%).", _balloons);
+        Assert.DoesNotContain(_balloons, b => b.StartsWith("tiny.en is already", StringComparison.Ordinal));
+        Assert.Equal(0, _server.Cancelled);
+    }
+
     /// <summary>Pin (rule 1): choosing the model being downloaded again cancels nothing and says it is already downloading; queued, waiting.</summary>
     [Fact]
     public async Task Choosing_the_downloading_model_again_does_not_cancel_it_and_says_it_is_already_downloading()
@@ -718,12 +729,15 @@ public sealed class NoSilentCancelUiTests
     });
 
     /// <summary>Lens 8: a progress refresh leaves the tray panel's pickers alone: same list, drop-down still open (speech, clean-up, microphone).</summary>
-    [Fact]
-    public Task A_progress_refresh_leaves_the_tray_pickers_alone() => UiSession.RunAsync(async () =>
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("advanced")]
+    public Task A_progress_refresh_leaves_the_tray_pickers_alone(string view) => UiSession.RunAsync(async () =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        using var scratch = new Scratch($$"""{ "hotkey": "F24", "ui": { "view": "{{view}}" } }"""); // both views (lens on PR #23)
         var server = new GateHandler([1, 2, 3, 4]);
         var (shell, _) = await TinyDownloading(scratch, server);
+        Assert.Equal(view, shell.Settings.Ui.View);
         var flyout = new FlyoutWindow(shell);
         flyout.ShowNear(null);
         foreach (var name in new[] { "Speech model", "Clean-up", "Microphone" })

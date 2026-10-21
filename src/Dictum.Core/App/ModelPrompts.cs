@@ -39,6 +39,19 @@ public interface IModelPrompts
     BusyDownloadChoice ConfirmDownloadWhileBusy(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true);
 
     string? ChooseFile(string initialDir, bool cleanupModel);
+
+    /// <summary>
+    /// The download question in plain words, for a choice made in the Simple view (1.2): <paramref name="plainName"/> ("More
+    /// accurate") instead of the file name, and no catalogue detail (<see cref="ModelPromptText.PlainConfirmText"/>).
+    /// <paramref name="warning"/> is the low-space warning, if any. The default asks the catalogue question, so a stand-in that
+    /// implements only <see cref="ConfirmDownload"/> still answers it.
+    /// </summary>
+    bool ConfirmPlainDownload(string fileName, string plainName, string sizeText, string? warning) =>
+        ConfirmDownload(fileName, sizeText, warning is null ? ModelPromptText.PlainCheck : $"{ModelPromptText.PlainCheck}. {warning}");
+
+    /// <summary>The busy question in plain words (<see cref="ModelPromptText.PlainBusyText"/>); the default asks the catalogue one.</summary>
+    BusyDownloadChoice ConfirmPlainDownloadWhileBusy(string fileName, string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true) =>
+        ConfirmDownloadWhileBusy(fileName, sizeText, warning is null ? ModelPromptText.PlainCheck : $"{ModelPromptText.PlainCheck}. {warning}", plainName, running, runningProgress, canWait);
 }
 
 public static class ModelPromptText
@@ -49,6 +62,25 @@ public static class ModelPromptText
     /// </summary>
     public static string ConfirmText(string fileName, string sizeText, string note) =>
         $"Download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost}?\n\n{note}. Its size and SHA-256 are checked before use; progress shows in the tray panel and the tray icon's tooltip.";
+
+    /// <summary>
+    /// PROPOSED copy (21/10/2026, lens on PR #23): what the Simple view's download question says about where the file comes
+    /// from and the size and SHA-256 check, without naming the host or the hash.
+    /// </summary>
+    public const string PlainCheck = "It comes from the model makers' official download page and is checked before use";
+
+    /// <summary>PROPOSED copy (21/10/2026): "Download More accurate (487 MB)? It comes from … checked before use." plus any low-space warning.</summary>
+    public static string PlainConfirmText(string plainName, string sizeText, string? warning) =>
+        $"Download {plainName} ({sizeText})? {PlainCheck}." + (warning is null ? "" : $"\n\n{warning}.");
+
+    /// <summary>PROPOSED copy (21/10/2026): <see cref="BusyText"/> in plain words, naming the models by their Simple names where they have one.</summary>
+    public static string PlainBusyText(string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true) =>
+        (canWait
+            ? $"{running} is downloading ({runningProgress} done). Download {plainName} ({sizeText}) after it, " +
+              $"or stop {running} and download {plainName} now? Stopping deletes what {running} has downloaded so far.\n\n"
+            : $"{running} is downloading ({runningProgress} done). There is not enough space to download it after {running}. " +
+              $"Stop {running} and download {plainName} ({sizeText}) now? Stopping deletes what {running} has downloaded so far.\n\n") +
+        $"{PlainCheck}." + (warning is null ? "" : $" {warning}.");
 
     /// <summary>
     /// PROPOSED copy (19/10/2026), for the product owner to approve: the download question while another download runs. It

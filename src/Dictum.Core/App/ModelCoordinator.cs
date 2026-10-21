@@ -88,11 +88,21 @@ public sealed class ModelCoordinator(
 
     /// <summary>The download question's note, with the low-space warning when the download would leave under 2 GB (SPEC §17).</summary>
     /// <param name="exceptRunning">Count the downloads waiting but not the running one: the question offers only to stop it.</param>
-    private string WithSpaceWarning(string note, long? bytes, bool exceptRunning = false)
+    private string WithSpaceWarning(string note, long? bytes, bool exceptRunning = false) =>
+        SpaceWarning(bytes, exceptRunning) is { } warning ? $"{note}. {warning}" : note;
+
+    /// <summary>The low-space warning alone (SPEC §17), or null: the Simple view's plain question adds it to its own words.</summary>
+    private string? SpaceWarning(long? bytes, bool exceptRunning = false)
     {
         var folder = paths.ModelsDir(settings());
-        return bytes is long b && Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder, exceptRunning)) is { } warning ? $"{note}. {warning}" : note;
+        return bytes is long b ? Storage.DiskSpace.DownloadWarning(folder, b, _freeBytes, _downloads.PendingBytes(folder, exceptRunning)) : null;
     }
+
+    /// <summary>
+    /// The Simple view's names of the downloads it started (1.2), by destination, so a later busy question names the running
+    /// download as the user chose it ("More accurate"), not by its file.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _plainNames = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The speech model file the settings mean now, looked up in the model folders (<see cref="Lookups"/> counts each time).</summary>
     public string ModelPath
@@ -112,12 +122,12 @@ public sealed class ModelCoordinator(
 
     public string CurrentName => ModelCatalog.DisplayName(CurrentPath);
 
-    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, "off" for no clean-up, or the cloud provider.</summary>
+    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, "no clean-up" for off (PROPOSED, 21/10/2026), or the cloud provider.</summary>
     public string CurrentCleanupName => settings().Llm.Provider switch
     {
         LlmSettings.Local => CleanupCatalog.DisplayName(llm.ModelPath ?? settings().Llm.Model),
         LlmSettings.NoProvider => "rules",
-        LlmSettings.Off => "off",
+        LlmSettings.Off => "no clean-up", // not "off": the tray line "base.en · Vulkan · off · F9" read as Dictum being off (lens on d6b4ea8)
         var cloud => cloud,
     };
 
@@ -393,7 +403,11 @@ public sealed class ModelCoordinator(
     /// that is not goes through <see cref="ChooseDownload"/>. Neither cancels a download already running (Store 10.1.2.10,
     /// 19/10/2026): only the Stop answer to the question asked first does.
     /// </summary>
-    public void Select(string name)
+    /// <param name="plainName">
+    /// The Simple view's name for the choice ("More accurate", 1.2): the question, the busy question and the "already
+    /// downloading" balloon then use it and plain words instead of the file name and the catalogue's trade-off line.
+    /// </param>
+    public void Select(string name, string? plainName = null)
     {
         if (ModelCatalog.Find(name) is not { } info) return;
         _launchOverride = null; // a tray choice replaces a --model launch override
@@ -401,7 +415,7 @@ public sealed class ModelCoordinator(
         (string, string)[] values = [("whisper.model", info.Name)];
         if (IsDownloaded(info)) SetValues(values); // a download running meanwhile carries on; its own switch then defers to this choice
         else ChooseDownload(info.Name, info.Download, ModelCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), info.SizeText,
-            $"{info.TradeOff}. {SwitchNote}", values, speech: true);
+            $"{info.TradeOff}. {SwitchNote}", values, speech: true, plainName);
     }
 
     /// <summary>A cleanup catalogue entry was chosen (tray panel or Settings): as <see cref="Select"/>, after the login check.</summary>
@@ -427,7 +441,8 @@ public sealed class ModelCoordinator(
     /// </list>
     /// When the file arrives its values are written, unless a later choice of the same kind was made meanwhile (last choice wins).
     /// </summary>
-    private void ChooseDownload(string name, DownloadSpec spec, string destination, string sizeText, string note, (string, string)[] values, bool speech)
+    private void ChooseDownload(string name, DownloadSpec spec, string destination, string sizeText, string note, (string, string)[] values, bool speech,
+        string? plainName = null)
     {
         var token = Path.GetFullPath(destination);
         void Apply() => ApplyIfLatest(speech, token, name, values);
@@ -436,7 +451,7 @@ public sealed class ModelCoordinator(
         {
             SetChoice(speech, token);
             _downloads.AlsoOnArrival(destination, $"choice {token}", Apply); // a calibration or first-run download of it switches too; a repeat pick adds nothing
-            balloon(OnItsWay(name, state), false);
+            balloon(OnItsWay(plainName ?? name, state), false);
             return;
         }
         // Refused before asking only when it would not fit even with the running download stopped; when it fits only that
@@ -447,21 +462,30 @@ public sealed class ModelCoordinator(
         void Start()
         {
             SetChoice(speech, token);
+            if (plainName is not null) _plainNames[token] = plainName;
             StartDownload(spec, destination, Apply); // behind a running download, it waits its turn (ModelDownloads.Start)
         }
         if (_downloads.CurrentDestination is not { } runningTo)
         {
-            if (prompts.ConfirmDownload(spec.FileName, sizeText, question)) Start();
+            var yes = plainName is null
+                ? prompts.ConfirmDownload(spec.FileName, sizeText, question)
+                : prompts.ConfirmPlainDownload(spec.FileName, plainName, sizeText, SpaceWarning(spec.Bytes, exceptRunning: !canWait));
+            if (yes) Start();
             return;
         }
-        switch (prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), _downloads.Progress ?? "0%", canWait))
+        var progress = _downloads.Progress ?? "0%";
+        var answer = plainName is null
+            ? prompts.ConfirmDownloadWhileBusy(spec.FileName, sizeText, question, name, ShortName(runningTo), progress, canWait)
+            : prompts.ConfirmPlainDownloadWhileBusy(spec.FileName, plainName, sizeText, SpaceWarning(spec.Bytes, exceptRunning: !canWait),
+                _plainNames.TryGetValue(Path.GetFullPath(runningTo), out var runningPlain) ? runningPlain : ShortName(runningTo), progress, canWait);
+        switch (answer)
         {
             case BusyDownloadChoice.DownloadAfter:
                 Start();
                 break;
             case BusyDownloadChoice.StopAndDownload:
                 // Stop cancels the download the question named; one that started while it was open is left alone (lens, 19/10/2026).
-                if (_downloads.CurrentDestination is { } now && SamePath(now, runningTo)) _ = CancelThenAsync(name, Start);
+                if (_downloads.CurrentDestination is { } now && SamePath(now, runningTo)) _ = CancelThenAsync(plainName ?? name, Start);
                 else
                 {
                     log.Info($"{ShortName(runningTo)} is no longer downloading, so nothing is stopped; {name} waits its turn.");
