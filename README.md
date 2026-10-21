@@ -101,6 +101,10 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
   (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;
   choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy**.
+  In the Simple view (the default, `ui.view`) the pickers show the plain choices instead: **Standard**, **More
+  accurate** and **Most accurate** for speech, and **Tidy my words** (with **Add AI clean-up** while the rule-based
+  tidy is in use) for clean-up, with the same download marks; a model chosen in the Advanced view shows as
+  "Custom: <name>". The Advanced view shows the model names as above.
 - **Microphone** picker (System default, or a named device: `audio.device`) and a level meter that moves while you
   dictate.
 - **Big recording indicator** (Off | Orb | Edge | Both), **Profanity filter** (on = Mask; Remove is in Settings >
@@ -124,7 +128,7 @@ an edit made in the file is picked up within a second and shows in the window.
 |---|---|
 | General | Dictation on, Launch at login (the Run key, or the startup task when installed from the Store), the **Press your hotkey** box (see "Keyboards and Remote Desktop"), **Hands-free stops after** (30 seconds to 60 minutes), the Fix last dictation hotkey, the pill, the big indicator and orb corner, start and stop sounds, paste or type, trailing space, restore clipboard. |
 | Mode | Light or Full, with what each means on this PC. |
-| Models | Every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
+| Models | A **Simple \| Advanced** switch at the top (`ui.view`; Simple is the default, see "Speech models"). Simple: an explainer with **Calibrate my voice**, the three plain speech choices and **Tidy my words**. Advanced: every speech and cleanup catalogue model with size, state (Included for the base.en that comes with Dictum) and Use / Download, a file chooser for each, greedy or beam-search decoding, **Add AI clean-up** while the rule-based tidy is in use, and the **Model folder** with **Browse…** and **Use default** (see "Model folder"). |
 | Storage | Where everything is, the model folders in the order Dictum looks in them, free space, every model file with its folder, size and Delete (none for the models that come with Dictum), delete recordings / logs / all app data, and **Remove Dictum completely** (see "Storage and removing Dictum"). |
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
@@ -352,6 +356,26 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 4. Optional, off by default: cloud polish with Anthropic, OpenAI, Google Gemini or your own server (see "Optional cloud polish").
 
 ### Speech models
+
+**Simple and Advanced views (1.2).** Settings > Models opens in the Simple view: three plain choices instead of
+model names, each with a line that says what it means, its download size until it is on this PC, and the same In use,
+Downloaded, Download… and Downloading states as the full list. Choosing one is the same as choosing its model in the
+full list. The **Advanced** segment at the top of the page (or `"ui": { "view": "advanced" }`) shows every model and
+its details, the decoding choice and the file choosers; the choice is saved and the tray panel's pickers follow it.
+Which model each plain choice is depends on whether Dictum found a discrete GPU:
+
+| Choice | No discrete GPU | Discrete GPU |
+|---|---|---|
+| Standard | base.en | base.en |
+| More accurate | small.en | medium.en |
+| Most accurate | medium.en | large-v3-turbo |
+
+The mapping reuses the existing recommendation (base.en, or medium.en on a GPU) and the Mode presets' models
+(small.en, or large-v3-turbo on a GPU, for Full). A model in use that is none of the three shows as "Custom: <name>".
+The plain choices are English-only models (and large-v3-turbo); for another language use the Advanced view (see
+"Other languages and translation"). Clean-up in the Simple view is **Tidy my words**: the rule-based tidy, or the
+recommended clean-up model once it is on this PC, with **Add AI clean-up** to download that model. Cloud clean-up is
+never offered in the Simple view.
 
 `base.en` comes with Dictum (see "First run"). The others are stored in the model folder
 (`%LOCALAPPDATA%\Dictum\models` unless you choose another: see "Model folder") as `ggml-<name>.bin`, downloaded from
@@ -686,6 +710,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `indicator.orb_corner` | `"bottom-right"` | Where the orb sits: `bottom-right`, `bottom-left`, `top-right` or `top-left`. |
 | `sounds.enabled` | `false` | A short sound when recording starts and stops. |
 | `profanity.mode` | `"off"` | `off`, `mask` or `remove` (see "Profanity filter"). Settings > Clean-up; the tray panel's switch turns Mask on and off. |
+| `ui.view` | `"simple"` | How Settings > Models and the tray panel's pickers list the models: `simple` (three plain speech choices and Tidy my words) or `advanced` (every model and its details). The **Simple \| Advanced** switch at the top of Settings > Models writes it (see "Speech models"). |
 | `fix_hotkey` | `null` | A second hotkey, same format as `hotkey`, that opens Fix last dictation. Ignored (with a warning) if one press could complete both hotkeys: the same key, a chord containing the other (`Ctrl+Space` and `Ctrl+Shift+Space`), or a key group containing the other's key (`Ctrl+Shift+F` with the default `RightCtrl`, when pressed with the right-hand Ctrl). Use keys the hotkey does not use, for example `LeftCtrl+Shift+F`. Follows `enabled`. |
 | `log_level` | `"info"` | `debug`, `info`, `warning`, `error`. |
 | `log_transcripts` | `false` | `true` writes transcript text to the log. Off by default. |

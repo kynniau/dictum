@@ -11,7 +11,9 @@ namespace Dictum.UI.Views.Settings;
 
 /// <summary>
 /// Settings → Models: the speech and clean-up catalogues with their state, a file chooser for each, decoding, the language,
-/// "Add AI clean-up" while the rule-based tidy is in use, and the model folder (Decision 15).
+/// "Add AI clean-up" while the rule-based tidy is in use, and the model folder (Decision 15). Since 1.2 (21/10/2026) a
+/// Simple | Advanced switch (ui.view) heads it: Simple, the default, lists the three plain tiers of <see cref="SimpleView"/>
+/// and "Tidy my words"; Advanced is the full catalogue, decoding and the file choosers, as before.
 /// </summary>
 internal sealed class ModelsPage : SettingsPage
 {
@@ -40,6 +42,12 @@ internal sealed class ModelsPage : SettingsPage
     /// <summary>PROPOSED: "Add AI clean-up (1.1 GB download)", the size read from the catalogue; without the download part once the model is on this PC.</summary>
     internal static string AddCleanupText(CleanupModelInfo model, bool onThisPc) => onThisPc ? AddCleanupLabel : $"{AddCleanupLabel} ({model.SizeText} download)";
 
+    // PROPOSED copy (21/10/2026): the Simple | Advanced segments' accessible name ("Models view: Simple"); the rest is in SimpleView.
+    internal const string ViewName = "Models view";
+
+    /// <summary>The calibration test's label, as on the tray panel's button that opens the same window.</summary>
+    internal const string CalibrateLabel = "Calibrate my voice";
+
     /// <summary>The line under the folder when models would load from the network (a UNC path or a mapped network drive), else null.</summary>
     internal static string? FolderWarning(string folder) => DiskSpace.IsNetwork(folder) ? NetworkWarning : null;
 
@@ -59,6 +67,11 @@ internal sealed class ModelsPage : SettingsPage
     private readonly TextBlock _downloadText = Ui.Text("", "caption");
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, Height = 4 };
     private readonly StackPanel _download;
+    private readonly Segments _view;
+    private readonly StackPanel _simpleSpeech = new() { Spacing = 8 };
+    private readonly StackPanel _simpleCleanup = new() { Spacing = 8 };
+    private readonly Control[] _simpleOnly;
+    private readonly Control[] _advancedOnly;
     private string _drawn = "";
     private (int, int)? _lookedUpAt; // the shell's ModelFilesVersion when the lookups below were made; null: look up at the next redraw
     private List<ModelFolderKind?> _sources = []; // the folder each speech catalogue entry is used from, in catalogue order
@@ -117,22 +130,32 @@ internal sealed class ModelsPage : SettingsPage
         Grid.SetColumn(browse, 1);
         Grid.SetColumn(_useDefault, 2);
         folderRow.Children.AddRange([_folder, browse, _useDefault]);
+        // ui.view (1.2): Simple | Advanced, written through the settings writer like every other key; the reload redraws the page.
+        _view = new Segments([SimpleView.SimpleLabel, SimpleView.AdvancedLabel], -1, i => Write(("ui.view", Json(UiSettings.Views[i]))), ViewName);
+        // The Simple view's own controls, and the Advanced ones it hides; the language, the folder and Storage are in both.
+        var speechIntro = Ui.Text("Turns your voice into words, on this PC. Bigger is more accurate and slower.");
+        var explainer = Ui.Stack(8, Ui.Text(SimpleView.Explainer), Ui.Row(8, Ui.Button(CalibrateLabel, "secondary", () => Run(Shell.OpenCalibration))));
+        var chooseFile = Ui.Row(8, Ui.Button("Choose model file…", "secondary", () => Run(Shell.Models.ChooseFile)));
+        var decoding = Ui.Line("Decoding", _decoding, "Beam search tries several readings of each phrase.");
+        var cleanupButtons = Ui.Row(8,
+            Ui.Button("Rule-based tidy only", "secondary", () => Run(Shell.Models.SelectRulesOnly)),
+            Ui.Button("Choose .gguf file…", "secondary", () => Run(Shell.Models.ChooseCleanupFile)));
+        var cloudNote = Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption");
+        _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup];
+        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote];
         Compose(
+            Ui.Stack(6, _view, Ui.Text(SimpleView.SwitchHelp, "caption")),
             _download,
-            Ui.Card(Ui.Stack(10, Ui.Text("Turns your voice into words, on this PC. Bigger is more accurate and slower."), _speech,
-                Ui.Row(8, Ui.Button("Choose model file…", "secondary", () => Run(Shell.Models.ChooseFile))),
-                Ui.Line("Decoding", _decoding, "Beam search tries several readings of each phrase.")), "Speech model"),
+            Ui.Card(Ui.Stack(10, speechIntro, explainer, _simpleSpeech, _speech, chooseFile, decoding), "Speech model"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
                         "Hindi, Tagalog and other languages are listed first. Whisper has no Cebuano or other Philippine language apart from Tagalog."),
                 Ui.Line("Spoken language", _language, "Detect automatically works it out from the first seconds of each dictation."),
                 Ui.Line("Translate to English", _translate, "Writes English whatever you speak. OpenAI recommends medium or large-v3 for translation; large-v3-turbo cannot translate."),
                 _languageNote), "Language"),
-            Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _addCleanup, _cleanup,
-                Ui.Row(8,
-                    Ui.Button("Rule-based tidy only", "secondary", () => Run(Shell.Models.SelectRulesOnly)),
-                    Ui.Button("Choose .gguf file…", "secondary", () => Run(Shell.Models.ChooseCleanupFile))),
-                Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption")), "Clean-up model"),
+            // "Add AI clean-up" is one button in both views: under the Tidy row in Simple, above the catalogue in Advanced.
+            Ui.Card(Ui.Stack(10, Ui.Text("Tidies the words: filler, punctuation, capitals. A different job from the speech model."), _simpleCleanup, _addCleanup, _cleanup,
+                cleanupButtons, cloudNote), "Clean-up model"),
             Ui.Card(Ui.Stack(8, folderRow, Ui.Text(FolderNote, "caption"), _folderWarning), FolderLabel),
             Ui.Button("Storage: model sizes, free space and Delete", "link", () => _window.ShowPage("Storage")));
     }
@@ -152,6 +175,10 @@ internal sealed class ModelsPage : SettingsPage
         _progress.IsIndeterminate = status.DownloadFraction is null;
         _progress.Value = status.DownloadFraction ?? 0;
         var s = Shell.Settings;
+        var simple = s.Ui.IsSimple;
+        _view.Select(simple ? 0 : 1); // quiet, and a no-op when it already shows: the segment keeps keyboard focus
+        foreach (var control in _simpleOnly) control.IsVisible = simple;
+        foreach (var control in _advancedOnly) control.IsVisible = !simple;
         _decoding.SelectedIndex = s.Whisper.BeamSize > 0 ? 1 : 0;
         var languageIndex = -1;
         for (var i = 0; i < Languages.Count && languageIndex < 0; i++) if (Languages[i].Code == s.Whisper.Language) languageIndex = i;
@@ -181,20 +208,21 @@ internal sealed class ModelsPage : SettingsPage
         var downloaded = string.Join(",", _sources) + "|" + string.Join(",", _cleanupOnPc);
         var fetching = string.Join(",", ModelCatalog.Entries.Select(e => Shell.Models.DownloadStateOf(e.FileName)))
                        + "|" + string.Join(",", CleanupCatalog.Entries.Select(e => Shell.Models.DownloadStateOf(e.FileName)));
-        var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}|{fetching}";
+        var gpu = Shell.GpuMachine;
+        var key = $"{Shell.Models.CurrentName}|{s.Llm.Provider}|{s.Llm.Model}|{downloaded}|{status.Download is null}|{fetching}|{s.Ui.View}|{gpu}";
         if (key != _drawn)
         {
             _drawn = key;
-            DrawLists(s);
+            DrawLists(s, gpu);
         }
         if (_downloadingRow is var (detail, tradeOff)) detail.Text = $"{DownloadingState(Shell.Models.DownloadProgress)} · {tradeOff}";
     }
 
-    private void DrawLists(AppSettings s)
+    private void DrawLists(AppSettings s, bool gpu)
     {
         _downloadingRow = null;
 
-        var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(Shell.GpuMachine).Model)!;
+        var recommended = CleanupCatalog.Find(CleanupCatalog.Recommend(gpu).Model)!;
         _addCleanup.Content = AddCleanupText(recommended, _cleanupOnPc.Contains(recommended.Name));
         _addCleanup.IsVisible = s.Llm.Provider == LlmSettings.NoProvider;
         // While that model downloads or waits its turn, the button is disabled and named for why, as its row is (lens, 19/10/2026).
@@ -202,7 +230,17 @@ internal sealed class ModelsPage : SettingsPage
         _addCleanup.IsEnabled = fetch == DownloadState.None;
         AutomationProperties.SetName(_addCleanup, fetch == DownloadState.None ? null : BusyButtonName(recommended.Name, fetch));
 
+        // Only the view shown is built: the other's rows are dropped, and built afresh when the view is switched.
+        _simpleSpeech.Children.Clear();
+        _simpleCleanup.Children.Clear();
         _speech.Children.Clear();
+        _cleanup.Children.Clear();
+        if (s.Ui.IsSimple)
+        {
+            DrawSimple(s, gpu);
+            return;
+        }
+
         for (var i = 0; i < ModelCatalog.Entries.Count; i++)
         {
             var e = ModelCatalog.Entries[i];
@@ -214,7 +252,6 @@ internal sealed class ModelsPage : SettingsPage
         if (ModelCatalog.Find(Shell.Models.CurrentName) is null)
             _speech.Children.Add(ModelRow(Shell.Models.CurrentName, $"In use · {Shell.Models.CurrentPath}", null, () => { }));
 
-        _cleanup.Children.Clear();
         var current = s.Llm.Provider == LlmSettings.Local ? CleanupCatalog.FindByFile(s.Llm.Model)?.Name ?? s.Llm.Model : null;
         foreach (var e in CleanupCatalog.Entries)
         {
@@ -225,6 +262,57 @@ internal sealed class ModelsPage : SettingsPage
         }
         if (current is null)
             _cleanup.Children.Add(Ui.Text($"In use: {Shell.Models.CurrentCleanupName}{(s.Llm.Provider == LlmSettings.NoProvider ? " (rule-based tidy)" : "")}", "caption"));
+    }
+
+    /// <summary>
+    /// The Simple view (ui.view = simple): the three speech tiers of <see cref="SimpleView.Tiers"/> for this machine class, a
+    /// Custom row for a model in use that is none of them, and "Tidy my words". Each row is a catalogue row (the same states,
+    /// Downloading 42% included, and the same Select path); no cloud provider is offered here.
+    /// </summary>
+    private void DrawSimple(AppSettings s, bool gpu)
+    {
+        var current = Shell.Models.CurrentName;
+        foreach (var tier in SimpleView.Tiers(gpu))
+        {
+            var i = IndexOfModel(tier.Model);
+            var e = ModelCatalog.Entries[i];
+            var inUse = e.Name == current;
+            var source = _sources[i];
+            var bundled = source == ModelFolderKind.Bundled;
+            // "Included" only when it is: a build without the bundled base.en says what Standard means without it.
+            var subLine = tier.Tier == SpeechTier.Standard && !bundled ? SimpleView.StandardSubLineNotIncluded : tier.SubLine;
+            string? state = inUse ? "In use" : bundled ? null : source is not null ? "Downloaded" : SimpleView.DownloadSize(e.SizeText);
+            _simpleSpeech.Children.Add(CatalogueRow(tier.Label, tier.Label, state, subLine, inUse, source is not null, e.FileName,
+                () => Run(() => Shell.Models.Select(e.Name)), simple: true));
+        }
+        if (SimpleView.TierOf(current, gpu) is null)
+            _simpleSpeech.Children.Add(ModelRow(SimpleView.Custom(current), $"In use · {SimpleView.CustomNote}", null, () => { }));
+
+        var tidy = SimpleView.TidyInUse(s.Llm, gpu);
+        var tidyState = !tidy ? null : s.Llm.Provider == LlmSettings.Local ? SimpleView.TidyWithAiState : "In use";
+        _simpleCleanup.Children.Add(ModelRow(SimpleView.TidyTitle, tidyState is null ? SimpleView.TidySubLine : $"{tidyState} · {SimpleView.TidySubLine}",
+            tidy ? null : "Use", () => Run(() => UseTidy(Shell)), out _, name: tidy ? null : SimpleView.ActionName("Use", SimpleView.TidyLabel)));
+        if (!tidy)
+            _simpleCleanup.Children.Add(ModelRow(SimpleView.Custom(Shell.Models.CurrentCleanupName), $"In use · {SimpleView.CustomNote}", null, () => { }));
+        // "Add AI clean-up", drawn by the caller and shown while the rule-based tidy is in use, sits under this row.
+    }
+
+    private static int IndexOfModel(string name)
+    {
+        for (var i = 0; i < ModelCatalog.Entries.Count; i++)
+            if (string.Equals(ModelCatalog.Entries[i].Name, name, StringComparison.OrdinalIgnoreCase)) return i;
+        throw new InvalidOperationException($"{name} is not in the speech catalogue."); // pinned: every tier model is (SimpleViewTests)
+    }
+
+    /// <summary>
+    /// "Tidy my words" chosen (Settings or the tray panel in the Simple view): the recommended clean-up model when it is on this
+    /// PC, else the rule-based tidy. Both go through the catalogue's own paths, so nothing is downloaded from here.
+    /// </summary>
+    internal static void UseTidy(AppShell shell)
+    {
+        var model = CleanupCatalog.Find(SimpleView.TidyModel(shell.GpuMachine))!;
+        if (shell.Models.IsCleanupDownloaded(model)) shell.Models.SelectCleanup(model.Name);
+        else shell.Models.SelectRulesOnly();
     }
 
     /// <summary>Shown again later, the page looks every model up afresh (a file copied in meanwhile is seen).</summary>
@@ -238,10 +326,17 @@ internal sealed class ModelsPage : SettingsPage
     /// A catalogue row: In use (no action), Use, or Download…; a model whose file is downloading shows "Downloading 42%" (or
     /// "Waiting to download") with its button disabled and named for why, so it cannot be chosen again mid-download.
     /// </summary>
-    private Grid CatalogueRow(string name, string title, string state, string tradeOff, bool inUse, bool have, string fileName, Action click)
+    /// <param name="state">The row's state before its line ("In use", "Downloaded"), or null for none (the bundled Standard tier says "Included" in its line).</param>
+    /// <param name="simple">A Simple-view row: its Use or Download… button is named for its tier ("Use More accurate").</param>
+    private Grid CatalogueRow(string name, string title, string? state, string tradeOff, bool inUse, bool have, string fileName, Action click, bool simple = false)
     {
         var fetch = inUse || have ? DownloadState.None : Shell.Models.DownloadStateOf(fileName);
-        if (fetch == DownloadState.None) return ModelRow(title, $"{state} · {tradeOff}", inUse ? null : have ? "Use" : "Download…", click);
+        if (fetch == DownloadState.None)
+        {
+            var action = inUse ? null : have ? "Use" : "Download…";
+            return ModelRow(title, state is null ? tradeOff : $"{state} · {tradeOff}", action, click, out _,
+                name: simple && action is not null ? SimpleView.ActionName(action, name) : null);
+        }
         var running = fetch == DownloadState.Running;
         var row = ModelRow(title, running ? $"{DownloadingState(Shell.Models.DownloadProgress)} · {tradeOff}" : $"{WaitingState} · {tradeOff}",
             running ? DownloadingButton : WaitingButton, click, out var detail, enabled: false, name: BusyButtonName(name, fetch));

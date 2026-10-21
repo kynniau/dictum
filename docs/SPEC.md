@@ -357,6 +357,12 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   Cancel. The last choice of each kind (speech, clean-up) wins: a download that arrives
   after a newer choice does not switch to its model. Settings > Models shows the row being
   downloaded as "Downloading <n>%" with its button disabled. See DECISIONS, 19/10/2026.
+  Amended 21/10/2026 (1.2, §10.1): the tray panel's two pickers follow `ui.view`. Simple (the
+  default) lists the three speech tiers by their plain names (Standard, More accurate, Most
+  accurate) and, for clean-up, "Tidy my words" plus "Add AI clean-up" while the rule-based tidy
+  is in use; a model in use that is none of them is listed first as "Custom: <name>". The
+  "(download)", "(downloading)" and "(waiting to download)" marks work in both views. Advanced
+  lists the catalogue names as before. No cloud provider is offered in the Simple pickers.
 - About (version, runtime, no network statement).
 - Quit.
 
@@ -386,6 +392,7 @@ present; AppData wins). Models and logs in `%LOCALAPPDATA%\Dictate\models` and
   "offline_only": false,
   "insert": { "method": "paste", "restore_clipboard": false, "trailing_space": true, "paste_delay_ms": 150 },
   "pill": { "enabled": true },
+  "ui": { "view": "simple" },
   "log_level": "info",
   "log_transcripts": false
 }
@@ -398,6 +405,11 @@ Unknown keys and malformed values: log a warning, use the default, never crash.
 `models.folder` (amendment, 17/10/2026, §24): `null` (the per-user folder) or an absolute
 folder that is looked in first and downloaded to; a relative or invalid value falls back to
 `null` with a warning. `whisper.models_dir` is its earlier name, still read when it is not set.
+
+`ui.view` (amendment, 21/10/2026, §10.1): `"simple"` (the default, also when the key is absent)
+or `"advanced"`; any other value falls back to `"simple"` with a warning. The Simple | Advanced
+segments at the top of Settings > Models write it through the settings writer, and the reload
+redraws the page and the tray panel.
 
 `hands_free_max_seconds` (amendment, 16/10/2026): 30–3600, set from Settings > General (§20). A
 value from 5 to 29 left by an earlier version is raised to 30 at load with a log line, and the file
@@ -438,6 +450,50 @@ If the configured model file is missing at startup: do **not** download silently
 small dialog: "No speech model found. Download ggml-<name>.bin (<size>) from
 huggingface.co now?" with Download / Choose file… / Quit. Progress in the tray tooltip.
 Also ship `scripts/download-model.ps1 -Model medium.en`.
+
+### 10.1 Simple and Advanced views (amendment, 21/10/2026, Dictum 1.2)
+
+Product decision (Kyle, 21/10/2026): users do not understand base.en vs small.en vs q5_1 vs
+large-v3-turbo. Settings > Models and the tray panel's pickers default to a **Simple** view;
+today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
+
+- **Switch.** Segments "Simple | Advanced" head Settings > Models, with the line "Simple shows
+  what each choice means. Advanced shows every model and its details." Accessible names
+  "Models view: Simple" and "Models view: Advanced".
+- **Speech (Simple).** An explainer with a **Calibrate my voice** button (the existing
+  calibration window), then three rows: Standard, More accurate, Most accurate, each with its
+  line, its state (In use, Downloaded, "<size> download", or nothing for the bundled base.en,
+  whose line says "Included."), and the catalogue row's Use / Download… / Downloading… /
+  Waiting… button. A row is a catalogue entry chosen through `ModelCoordinator.Select`; there
+  is no download logic of its own. A model in use that is none of the three is a fourth row,
+  "Custom: <name>", "In use · Chosen in Advanced view".
+- **Tier mapping** (`SimpleView.Tiers`, reusing the catalogue's recommendation and the Mode
+  presets' models, keyed on `WhisperEngine.GpuMachine`):
+
+  | Tier | CPU only | GPU machine |
+  |---|---|---|
+  | Standard | base.en (bundled; Light) | base.en |
+  | More accurate | small.en (Full on CPU; "more accurate, a few seconds slower") | medium.en (the GPU recommendation) |
+  | Most accurate | medium.en (the catalogue's "high accuracy; wants a GPU or a fast desktop CPU") | large-v3-turbo (Full on GPU) |
+
+  The tiers are English-only models (and large-v3-turbo); a non-English `whisper.language`
+  gets the existing language warning after an English-only tier is chosen (marked
+  `// simplification:` in `SimpleView`).
+- **Clean-up (Simple).** One row, "Tidy my words (recommended)": in use while `llm.provider` is
+  `none` (the rule-based tidy) or `local` with the recommended model (state "In use, with AI
+  clean-up"). The existing **Add AI clean-up (<size> download)** button sits under it while the
+  rule-based tidy is in use. From a Custom clean-up, its **Use** button selects the recommended
+  model when it is on this PC, else the rule-based tidy. Anything else in use (another local
+  model, a .gguf file, a cloud provider chosen in Advanced) is a "Custom: <name>" row. Cloud
+  clean-up is never offered in the Simple view; the Advanced view keeps its pointer to Settings
+  > Clean-up. There is no "Off" row: Dictum has no clean-up mode that pastes exactly what was
+  heard (`llm.provider = none` is the rule-based tidy), so the brief's "Off" was not built
+  (DECISIONS, 21/10/2026).
+- **Both views:** the language card, the model folder and the Storage link. **Advanced only:**
+  the catalogue lists, the decoding choice, the file choosers, "Rule-based tidy only" and the
+  cloud pointer.
+- The Mode presets (§16.1) are unchanged and remain in both views: they set speech and clean-up
+  together, which the tiers do not.
 
 ## 11. CLI modes (for verification without a microphone)
 

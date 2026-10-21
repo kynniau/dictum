@@ -18,7 +18,7 @@ namespace Dictum.UI.Views;
 /// <summary>
 /// The tray panel (docs/design/Flyout.dc.html), opened by a click on the tray icon and closed by another click, Esc, or
 /// focus moving elsewhere: status and the on/off switch, any model problem (with Try on the CPU and Open log folder),
-/// Light/Full, the two model pickers, the microphone with its meter,
+/// Light/Full, the two model pickers (plain tier names in the Simple view, ui.view; model names in Advanced), the microphone with its meter,
 /// the indicator and the three toggles, four actions, the privacy line and Quit. Opened on purpose, so it takes focus.
 /// </summary>
 internal sealed class FlyoutWindow : Window
@@ -232,7 +232,7 @@ internal sealed class FlyoutWindow : Window
             _modeHint.Text = (preset == ModePreset.Custom ? "Custom: your settings match neither preset. " : "") +
                              $"Full: {full.SpeechModel} and {full.CleanupModel}. Light: {ModePresets.LightSpeech} and the rule-based tidy.";
 
-            FillSpeech();
+            FillSpeech(s);
             FillCleanup(s);
             FillMicrophones(s);
             _indicator.Select(Math.Max(0, Array.IndexOf(IndicatorSettings.Modes, s.Indicator.Mode)));
@@ -252,13 +252,34 @@ internal sealed class FlyoutWindow : Window
         }
     }
 
-    private void FillSpeech()
+    private void FillSpeech(AppSettings s)
     {
         var current = _shell.Models.CurrentName;
+        if (s.Ui.IsSimple)
+        {
+            // ui.view = simple: the three tiers by their plain names, each still marked while its file is on its way, and a
+            // Custom entry for a model in use that is none of them (SimpleView).
+            var tiers = SimpleView.Tiers(_shell.GpuMachine);
+            var models = tiers.Select(t => t.Model).ToList();
+            var labels = tiers.Select(t => Marked(t.Label, ModelCatalog.Find(t.Model))).ToList();
+            if (SimpleView.TierOf(current, _shell.GpuMachine) is null)
+            {
+                models.Insert(0, current);
+                labels.Insert(0, SimpleView.Custom(current));
+            }
+            Fill(_speech, models, labels, current);
+            return;
+        }
         var names = ModelCatalog.Entries.Select(e => e.Name).ToList();
         if (!names.Contains(current)) names.Insert(0, current); // a model file chosen from disk
-        Fill(_speech, names, [.. names.Select(n => ModelCatalog.Find(n) is { } info && !_shell.Models.IsDownloaded(info) ? $"{n}{DownloadMark(info.FileName)}" : n)], current);
+        Fill(_speech, names, [.. names.Select(n => Marked(n, ModelCatalog.Find(n)))], current);
     }
+
+    /// <summary>A speech entry's label, with its download mark while the catalogue file is not on this PC.</summary>
+    private string Marked(string label, ModelInfo? info) => info is not null && !_shell.Models.IsDownloaded(info) ? $"{label}{DownloadMark(info.FileName)}" : label;
+
+    /// <summary>The Simple clean-up picker's entry for "Tidy my words" (not a catalogue name, so it cannot collide with one).</summary>
+    private const string TidyEntry = "tidy";
 
     // PROPOSED copy (19/10/2026), for the product owner to approve: a picker entry whose file is on its way (Store 10.1.2.10).
     internal const string DownloadingMark = " (downloading)";
@@ -291,6 +312,11 @@ internal sealed class FlyoutWindow : Window
 
     private void FillCleanup(AppSettings s)
     {
+        if (s.Ui.IsSimple)
+        {
+            FillSimpleCleanup(s);
+            return;
+        }
         var names = CleanupCatalog.Entries.Select(e => e.Name).ToList();
         var labels = names.Select(n => CleanupCatalog.Find(n)! is var info && _shell.Models.IsCleanupDownloaded(info) ? $"{n} · local" : $"{n} · local{DownloadMark(info.FileName)}").ToList();
         names.Add(LlmSettings.NoProvider);
@@ -305,6 +331,31 @@ internal sealed class FlyoutWindow : Window
         {
             names.Insert(0, current);
             labels.Insert(0, s.Llm.Provider == LlmSettings.Local ? $"{System.IO.Path.GetFileName(current)} · local" : $"{_shell.Models.CurrentCleanupName} · cloud");
+        }
+        Fill(_cleanup, names, labels, current);
+    }
+
+    /// <summary>
+    /// ui.view = simple: "Tidy my words", "Add AI clean-up" (marked like a catalogue entry) while the rule-based tidy is in use,
+    /// and a Custom entry for anything else in use. No cloud provider is offered here; one chosen in Advanced shows as Custom.
+    /// </summary>
+    private void FillSimpleCleanup(AppSettings s)
+    {
+        var gpu = _shell.GpuMachine;
+        var ai = CleanupCatalog.Find(SimpleView.TidyModel(gpu))!;
+        var names = new List<string> { TidyEntry };
+        var labels = new List<string> { SimpleView.TidyLabel };
+        if (s.Llm.Provider == LlmSettings.NoProvider)
+        {
+            names.Add(ai.Name);
+            labels.Add(_shell.Models.IsCleanupDownloaded(ai) ? Settings.ModelsPage.AddCleanupLabel : $"{Settings.ModelsPage.AddCleanupLabel}{DownloadMark(ai.FileName)}");
+        }
+        var current = TidyEntry;
+        if (!SimpleView.TidyInUse(s.Llm, gpu))
+        {
+            current = s.Llm.Provider == LlmSettings.Local ? s.Llm.Model : s.Llm.Provider;
+            names.Insert(0, current);
+            labels.Insert(0, SimpleView.Custom(_shell.Models.CurrentCleanupName));
         }
         Fill(_cleanup, names, labels, current);
     }
@@ -334,7 +385,8 @@ internal sealed class FlyoutWindow : Window
     {
         if (_refreshing || _cleanup.Tag is not List<string> names || _cleanup.SelectedIndex < 0) return;
         var name = names[_cleanup.SelectedIndex];
-        if (name == LlmSettings.NoProvider) Act(_shell.Models.SelectRulesOnly);
+        if (name == TidyEntry) Act(() => Settings.ModelsPage.UseTidy(_shell));
+        else if (name == LlmSettings.NoProvider) Act(_shell.Models.SelectRulesOnly);
         else if (CleanupCatalog.Find(name) is not null) Act(() => _shell.Models.SelectCleanup(name));
     }
 

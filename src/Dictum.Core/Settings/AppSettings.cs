@@ -34,6 +34,7 @@ public sealed record AppSettings
     public IndicatorSettings Indicator { get; init; } = new();
     public SoundSettings Sounds { get; init; } = new();
     public ProfanitySettings Profanity { get; init; } = new();
+    public UiSettings Ui { get; init; } = new();
 
     /// <summary>Optional second hotkey that opens "Fix last dictation" (SPEC §16.3). Null = unset (the default).</summary>
     public string? FixHotkey { get; init; }
@@ -152,6 +153,22 @@ public sealed record IndicatorSettings
 
     public bool ShowsOrb => Mode is Orb or Both;
     public bool ShowsEdge => Mode is Edge or Both;
+}
+
+/// <summary>
+/// ui.view (Dictum 1.2, product owner 21/10/2026): how Settings > Models and the tray panel's pickers list the models.
+/// "simple" (the default) shows three plain speech tiers and "Tidy my words" (<see cref="SimpleView"/>); "advanced" shows
+/// every catalogue model with its details, as before 1.2.
+/// </summary>
+public sealed record UiSettings
+{
+    public const string Simple = "simple";
+    public const string Advanced = "advanced";
+    public static readonly string[] Views = [Simple, Advanced];
+
+    public string View { get; init; } = Simple;
+
+    public bool IsSimple => View == Simple;
 }
 
 /// <summary>A short sound when recording starts and stops.</summary>

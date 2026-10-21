@@ -656,7 +656,7 @@ public sealed class NoSilentCancelUiTests
     [Fact]
     public Task The_downloading_model_shows_as_downloading_with_a_disabled_button() => UiSession.RunAsync(async () =>
     {
-        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        using var scratch = new Scratch("""{ "hotkey": "F24", "ui": { "view": "advanced" } }"""); // the catalogue rows (1.2: the Simple view has its own pin, SimpleViewTests)
         var server = new GateHandler([1, 2, 3, 4]);
         var (shell, dialogs) = await TinyDownloading(scratch, server);
         dialogs.BusyDownload = BusyDownloadChoice.DownloadAfter;

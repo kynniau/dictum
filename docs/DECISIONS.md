@@ -2843,3 +2843,51 @@ the UCRT builds its copy lazily; the lens disproved both, and this paragraph rep
 - The first-run probe fix end to end in the tray (it is pinned through `FirstRun` with a stand-in probe).
 - The duplicate-folder mechanics inside Whisper.net.
 - CI's first run of the new step, including whether `--selftest` behaves on a runner without audio devices or a desktop.
+
+## Simple and Advanced views for models (Dictum 1.2, 21/10/2026, branch feat/simple-view)
+
+**The product decision (Kyle, 21/10/2026, relayed in the lane brief):** users do not understand base.en vs small.en vs q5_1 vs large-v3-turbo. Settings > Models and the tray panel's pickers default to a Simple view that a 95-year-old can understand, with explainers; today's full detail stays as an Advanced view one click away.
+
+**What was built.**
+
+1. `ui.view` (`UiSettings` in `AppSettings.cs`, bound in `SettingsLoader.BindUi`, documented in the default file): `"simple"` (default, also when absent) or `"advanced"`; any other value warns and uses `"simple"`. The Simple | Advanced segments at the top of Settings > Models write it through `SettingsPage.Write` (the shell's settings writer), so the reload redraws the page and the tray panel and the next session opens in the same view.
+2. `SimpleView` (`src/Dictum.Core/Settings/SimpleView.cs`): the tiers, the clean-up rule and every PROPOSED string, in one place for both surfaces. No download logic: a tier is a catalogue entry, chosen through `ModelCoordinator.Select`; "Add AI clean-up" and the Tidy row go through `SelectCleanup` / `SelectRulesOnly`.
+3. Settings > Models (`ModelPages.cs`): the Simple view replaces the two catalogue lists with the tier rows and the Tidy row, built by the existing `CatalogueRow` / `ModelRow` primitives (so the 1.1.1 "Downloading <n>%" and "Waiting to download" states, the disabled button and its accessible name come with them). Only the shown view's rows are built; the compare-before-set key now includes the view and the machine class, so a progress tick still rebuilds nothing and keyboard focus stays on its button. Both views keep the Language card, the model folder and the Storage link; Advanced alone has the catalogue lists, decoding, the file choosers, "Rule-based tidy only" and the cloud pointer.
+4. Tray panel (`FlyoutWindow.cs`): in Simple, the speech picker lists the tier names and the clean-up picker "Tidy my words" (plus "Add AI clean-up" while the rule-based tidy is in use), each with the existing "(download)", "(downloading)" and "(waiting to download)" marks, and a "Custom: <name>" entry first for anything else in use. Advanced is unchanged. The pickers keep `SetItems`' compare-before-set.
+
+**Tier mapping (machine class = `WhisperEngine.GpuMachine`, as the catalogue's recommendation uses it).** Read from the code, not invented: Standard is `ModelCatalog.Bundled` (= `ModePresets.LightSpeech`); on a CPU, More accurate is `ModePresets.FullSpeechCpu`, which is also the model `ModelCatalog.Recommend(false)` offers as "more accurate, a few seconds slower"; on a GPU, More accurate is `ModelCatalog.Recommend(true)` and Most accurate is `ModePresets.FullSpeechGpu`. The CPU's Most accurate is medium.en, the largest English entry whose catalogue trade-off does not say "needs a GPU" ("high accuracy; wants a GPU or a fast desktop CPU").
+
+| Tier | CPU only | GPU machine |
+|---|---|---|
+| Standard | base.en | base.en |
+| More accurate | small.en | medium.en |
+| Most accurate | medium.en | large-v3-turbo |
+
+The brief's example for a GPU (base.en / small.en / large-v3-turbo) differs in the middle tier: the code already recommends medium.en to a GPU machine, so medium.en is used. No measurement in this repository compares large-v3-turbo with medium.en for English accuracy; the order follows the Full preset, not a measurement.
+
+**Clean-up and the Mode presets.** The Mode presets (Light, Full) set speech and clean-up together; the tiers are speech only, so the Mode page and the tray's Mode segments do not express the same choice and Simple could not reuse them as its mechanism. Simple reuses their constants instead (above), and the Mode segments stay in both views unchanged. "Tidy my words" is in use while `llm.provider` is `none` or `local` with the recommended clean-up model (`CleanupCatalog.Recommend`); from anything else, its **Use** selects that model when it is on this PC, else the rule-based tidy. A cloud provider is never offered in Simple. One chosen in Advanced shows as a "Custom: <provider>" row with no button, because hiding a provider that sends text off the PC would be less honest than naming it.
+
+**Not built, and why: the "Off" clean-up row.** The brief asked for "Off" with the sub-line "Paste exactly what was heard." Dictum has no such mode: `llm.provider = none` is the rule-based tidy (filler removal, punctuation, capitals), and only a non-English dictation gets whitespace-only tidying (`TranscriptCleaner.Plain`). Shipping "Off" over `none` would make the sub-line untrue; making it true needs a new provider value through `TranscriptCleaner.Create`, `SettingsLoader`, the status lines and the docs, which is pipeline work outside this lane's files. Recommendation: a small follow-up lane adds `llm.provider = "off"` (whitespace-only, reusing `DeterministicCleaner.WhitespaceOnly`), then Simple gains the row.
+
+**Deviation from the brief's explainer.** The brief's text sends people to "Settings > Test my setup", which does not exist in this build (no such text on main or on any remote branch, checked 21/10/2026). The explainer names the existing calibration test instead, with a **Calibrate my voice** button under it that opens the same window as the tray panel's button. When a "Test my setup" page lands, the sentence and the button can point there.
+
+**Ceilings marked `// simplification:`.** `SimpleView`: the tiers are the English ladder; a user whose `whisper.language` is not English gets the existing language warning after choosing an English-only tier. Retire it when Simple-view users dictate in another language: map the tiers to the multilingual entries when the language is not `en`.
+
+**File paths in the brief.** The brief named `src/Dictum.Core/Transcribe/ModelCatalog.cs` and `src/Dictum.Core/Llm/CleanupCatalog.cs`; both catalogues live in `src/Dictum.Core/Settings/`. Neither was changed: the plain names live in `SimpleView`, so the catalogues needed no display-name additions.
+
+**PROPOSED strings (21/10/2026), for the product owner's approval; none is approved:**
+
+- Segments: "Simple", "Advanced"; accessible names "Models view: Simple", "Models view: Advanced".
+- Help line under them: "Simple shows what each choice means. Advanced shows every model and its details."
+- Explainer: "Dictum turns your voice into text on this PC. The speech model does the listening. Standard works for most people. If words come out wrong, try a more accurate model, or press Calibrate my voice to see which hears you best." (the brief's wording, with "run the test in Settings > Test my setup" replaced as explained above). The button under it reuses the existing label "Calibrate my voice".
+- Tier names: "Standard", "More accurate", "Most accurate".
+- Tier lines: "Included. Works well for most people."; "Works well for most people." (Standard when base.en did not come with this copy, so "Included" would be untrue); "Bigger download, a bit slower."; "Best results. Needs a strong PC or patience."
+- Tier state for a file not on this PC: "<size> download" (for example "487 MB download"). The other states reuse the existing words: "In use", "Downloaded", "Downloading <n>%", "Waiting to download", and the buttons "Use", "Download…", "Downloading…", "Waiting…", "In use".
+- Tier buttons' accessible names: "Use <tier>", "Download <tier>" (for example "Download More accurate"); a busy one reuses the 1.1.1 pattern with the tier name: "More accurate is already downloading".
+- Custom row: "Custom: <name>", with the line "In use · Chosen in Advanced view".
+- Clean-up row: "Tidy my words (recommended)", line "Fixes punctuation and removes ums and ahs. Runs on this PC."; state "In use, with AI clean-up" while the recommended model tidies; its button's accessible name "Use Tidy my words".
+- Tray clean-up picker (Simple): "Tidy my words"; "Add AI clean-up" reuses the existing label, with the existing marks.
+
+**Pins** (`tests/Dictum.Tests/SimpleViewTests.cs`, headless as `UiWindowTests`; no model is downloaded: an in-memory server holds the one download). Each was observed failing with its mutation applied and passing without it; the PR body has the table. Two existing UI tests that check Advanced catalogue rows now set `"ui": { "view": "advanced" }` (`NoSilentCancelUiTests.The_downloading_model_shows_as_downloading_with_a_disabled_button`, `ModelFolderTests.Settings_models_marks_the_bundled_model_as_included`); their assertions are unchanged. The test shell (`Scratch.Shell`) gained a `gpuMachine` option for the GPU mapping pin.
+
+**Not verified:** the views on a real desktop, at 150 % scaling, or in dark mode (headless only); screen-reader output (the accessible names are pinned, not heard); the GPU mapping on a real GPU machine (pinned with a stand-in machine class); a real download; tray mode, never run on the development PC.
