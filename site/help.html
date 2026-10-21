@@ -32,7 +32,7 @@
 
 <main id="main" class="wrap doc guide">
   <h1>Help guide</h1>
-  <p class="updated">Step by step, for Dictum 1.2 on Windows. Last updated <time datetime="2026-10-21">21/10/2026</time>.</p>
+  <p class="updated">Step by step, for Dictum 1.2 on Windows. Last updated <time datetime="2026-10-22">22/10/2026</time>.</p>
   <p>Dictum types what you say into the program you are using. You hold down a key, speak, and let go. Your words appear wherever you were typing. This guide goes one step at a time. You do not need to know anything about computers to follow it.</p>
 
   <nav class="card toc" aria-labelledby="toc-title">
@@ -74,6 +74,7 @@
       <li>Click the file whose name starts with <b>Dictum-Setup</b>. It downloads to your PC.</li>
       <li>Open your Downloads folder. Double-click <b>Dictum-Setup</b>.</li>
       <li>If Windows says “Windows protected your PC”, see <a href="#smartscreen">the box below</a>.</li>
+      <li>If Windows says SmartScreen can't be reached (this can happen without the internet), click <b>Run</b>.</li>
       <li>Setup may say your PC needs the Microsoft Visual C++ Redistributable. This is a free part from Microsoft that Dictum needs to work. If you see that message, click <b>Yes</b>.</li>
       <li>Your web browser downloads a file called <b>vc_redist.x64.exe</b>. Open it and install it. This needs an administrator account.</li>
       <li>Go back to Dictum’s Setup.</li>
@@ -85,25 +86,32 @@
 
     <figure class="demo-figure">
       <details class="demo-play">
-        <summary aria-label="Play the demo: Install Dictum">
-          <img class="demo-poster" src="img/demos/install-poster.png" width="1600" height="1116" loading="lazy" alt="Install Dictum: the first picture of the demo.">
+        <summary aria-label="Demo: Install Dictum">
+          <img class="demo-poster" src="img/demos/install-poster.png" width="1600" height="1116" loading="lazy" alt="Install Dictum: a still from the demo.">
           <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
         </summary>
         <img class="demo-gif" src="img/demos/install.gif" width="800" height="558" loading="lazy" alt="Install Dictum, step by step, as a moving picture.">
       </details>
-      <figcaption>Install Dictum. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
+      <figcaption>Install Dictum. A moving picture with no sound: each step is written on it. The demo shows the main steps; the written steps are complete.</figcaption>
     </figure>
 
     <div class="card callout" id="smartscreen">
       <h3>“Windows protected your PC”: is this safe?</h3>
-      <p>For the direct download, this message is expected. Windows shows it for programs that are not code-signed yet. Code-signed means the file carries a digital signature: a seal that says who made it. Dictum’s installer does not have one yet, so Windows SmartScreen (the part of Windows that checks downloads) does not recognise it.</p>
+      <p>This is expected. Click <b>More info</b>, then <b>Run anyway</b>.</p>
+      <p>For the direct download, Windows shows this message for programs that are not code-signed yet. Code-signed means the file carries a digital signature: a seal that says who made it. Dictum’s installer does not have one yet, so Windows SmartScreen (the part of Windows that checks downloads) does not recognise it.</p>
       <p>The Microsoft Store version does not show this message, because Microsoft signs Store apps.</p>
       <p>Only carry on if you downloaded the file from <a href="https://github.com/kynniau/dictum/releases/latest">github.com/kynniau/dictum</a>.</p>
       <ol>
         <li>Click <b>More info</b>.</li>
         <li>Click <b>Run anyway</b>.</li>
       </ol>
-      <p>If Microsoft Edge held the download back: select <b>…</b> (More actions) next to the file, then <b>Keep</b>, then <b>Show more</b>, then <b>Keep anyway</b>.</p>
+      <p>If Microsoft Edge held the download back:</p>
+      <ol>
+        <li>Select <b>…</b> (More actions) next to the file.</li>
+        <li>Select <b>Keep</b>.</li>
+        <li>Select <b>Show more</b>.</li>
+        <li>Select <b>Keep anyway</b>.</li>
+      </ol>
       <p>On a work PC, your IT team may have turned these options off. Ask them, or <a href="https://apps.microsoft.com/detail/9N0DG1DHTR57">get Dictum from the Microsoft Store</a> instead.</p>
     </div>
   </section>
@@ -149,8 +157,8 @@
           <li>Say a few words.</li>
           <li>If it says “Heard you.”, your microphone works. Click <b>Next</b>.</li>
         </ol>
-        <p>If it says “No microphone found.”, plug one in, or on a remote or virtual desktop turn on microphone redirection, then try again.</p>
-        <p>If it says “Nothing heard.”, check that the microphone is plugged in and not muted. Then click <b>Test again</b>. You can also click <b>Skip</b>. If Dictum hears nothing when you dictate, it will tell you.</p>
+        <p>If it says “No microphone found.”, plug one in, or on a remote or virtual desktop turn on microphone redirection. Then click <b>Back</b>, then <b>Next</b>.</p>
+        <p>If it says “Nothing heard.”, check that the microphone is plugged in and not muted. Speak again; when <b>Test again</b> appears, click it. You can also click <b>Skip</b>. If Dictum hears nothing when you dictate, it will tell you.</p>
       </li>
       <li>
         <h3>Try it</h3>
@@ -168,8 +176,8 @@
 
     <figure class="demo-figure">
       <details class="demo-play">
-        <summary aria-label="Play the demo: Start Dictum for the first time">
-          <img class="demo-poster" src="img/demos/first-run-poster.png" width="1600" height="1116" loading="lazy" alt="Start Dictum for the first time: the first picture of the demo.">
+        <summary aria-label="Demo: Start Dictum for the first time">
+          <img class="demo-poster" src="img/demos/first-run-poster.png" width="1600" height="1116" loading="lazy" alt="Start Dictum for the first time: a still from the demo.">
           <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
         </summary>
         <img class="demo-gif" src="img/demos/first-run.gif" width="800" height="558" loading="lazy" alt="Start Dictum for the first time, step by step, as a moving picture.">
@@ -181,7 +189,7 @@
   <section id="dictate" aria-labelledby="dictate-title">
     <h2 id="dictate-title">3. Dictate: hold, speak, let go</h2>
     <figure class="infographic infographic-steps">
-      <svg class="ig ig-steps" viewBox="0 0 360 530" width="360" height="530" role="img" aria-label="Hold a key, speak, and your words appear in any program, where your cursor is." focusable="false"><g><rect class="ig-panel" x="1" y="1" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="36" r="17"/><text class="ig-num" x="36" y="42" text-anchor="middle">1</text><text class="ig-title" x="64" y="44">Hold a key</text><rect class="ig-key" x="110" y="62" width="140" height="52" rx="10"/><text class="ig-keytext" x="180" y="95" text-anchor="middle">Right Ctrl</text><text class="ig-sub" x="180" y="136" text-anchor="middle">Hold it while you talk</text></g><g><rect class="ig-panel" x="1" y="191" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="226" r="17"/><text class="ig-num" x="36" y="232" text-anchor="middle">2</text><text class="ig-title" x="64" y="234">Speak</text><rect class="ig-accent" x="166" y="252" width="28" height="38" rx="14"/><path class="ig-line" d="M160 274 a20 20 0 0 0 40 0 M180 294 v8 M170 302 h20"/><rect class="ig-bar" x="124" y="264" width="6" height="16" rx="3"/><rect class="ig-bar" x="136" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="148" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="206" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="218" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="230" y="264" width="6" height="16" rx="3"/><text class="ig-sub" x="180" y="326" text-anchor="middle">In your normal voice</text></g><g><rect class="ig-panel" x="1" y="381" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="416" r="17"/><text class="ig-num" x="36" y="422" text-anchor="middle">3</text><text class="ig-title" x="64" y="424">Your words appear</text><rect class="ig-doc" x="60" y="442" width="240" height="52" rx="10"/><text class="ig-typed" x="76" y="475">See you at ten.</text><rect class="ig-accent" x="214" y="455" width="2.5" height="26"/><text class="ig-sub" x="180" y="516" text-anchor="middle">in any program, where your cursor is</text></g><path class="ig-line" d="M180 156 v26 M170 172 l10 10 l10 -10"/><path class="ig-line" d="M180 346 v26 M170 362 l10 10 l10 -10"/></svg>
+      <svg class="ig ig-steps" viewBox="0 0 360 530" width="360" height="530" role="img" aria-label="Hold a key, speak, and your words appear at your cursor, in almost any program." focusable="false"><g><rect class="ig-panel" x="1" y="1" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="36" r="17"/><text class="ig-num" x="36" y="42" text-anchor="middle">1</text><text class="ig-title" x="64" y="44">Hold a key</text><rect class="ig-key" x="110" y="62" width="140" height="52" rx="10"/><text class="ig-keytext" x="180" y="95" text-anchor="middle">Right Ctrl</text><text class="ig-sub" x="180" y="136" text-anchor="middle">Hold it while you talk</text></g><g><rect class="ig-panel" x="1" y="191" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="226" r="17"/><text class="ig-num" x="36" y="232" text-anchor="middle">2</text><text class="ig-title" x="64" y="234">Speak</text><rect class="ig-accent" x="166" y="252" width="28" height="38" rx="14"/><path class="ig-line" d="M160 274 a20 20 0 0 0 40 0 M180 294 v8 M170 302 h20"/><rect class="ig-bar" x="124" y="264" width="6" height="16" rx="3"/><rect class="ig-bar" x="136" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="148" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="206" y="268" width="6" height="8" rx="3"/><rect class="ig-bar" x="218" y="256" width="6" height="32" rx="3"/><rect class="ig-bar" x="230" y="264" width="6" height="16" rx="3"/><text class="ig-sub" x="180" y="326" text-anchor="middle">In your normal voice</text></g><g><rect class="ig-panel" x="1" y="381" width="358" height="148" rx="16"/><circle class="ig-accent" cx="36" cy="416" r="17"/><text class="ig-num" x="36" y="422" text-anchor="middle">3</text><text class="ig-title" x="64" y="424">Your words appear</text><rect class="ig-doc" x="60" y="442" width="240" height="52" rx="10"/><text class="ig-typed" x="76" y="475">See you at ten.</text><rect class="ig-accent" x="214" y="455" width="2.5" height="26"/><text class="ig-sub" x="180" y="516" text-anchor="middle">at your cursor, in almost any program</text></g><path class="ig-line" d="M180 156 v26 M170 172 l10 10 l10 -10"/><path class="ig-line" d="M180 346 v26 M170 362 l10 10 l10 -10"/></svg>
     </figure>
     <ol id="dictate-steps">
       <li>Click where you want the words to go, for example in an email.</li>
@@ -191,7 +199,7 @@
     </ol>
     <p>In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.</p>
     <p>The tidying is called clean-up. You can turn it off (see <a href="#faq-cleanup">the clean-up question</a>).</p>
-    <p>Say “new paragraph” to start a new paragraph.</p>
+    <p>Say “new paragraph” to start a new paragraph (with Tidy my words, in English).</p>
 
     <h3>Talking for a while? Use hands-free</h3>
     <ol>
@@ -210,8 +218,8 @@
 
     <figure class="demo-figure">
       <details class="demo-play">
-        <summary aria-label="Play the demo: Dictate: hold, speak, let go">
-          <img class="demo-poster" src="img/demos/dictation-stills-poster.png" width="1600" height="1116" loading="lazy" alt="Dictate: hold, speak, let go: the first picture of the demo.">
+        <summary aria-label="Demo: Dictate: hold, speak, let go">
+          <img class="demo-poster" src="img/demos/dictation-stills-poster.png" width="1600" height="1116" loading="lazy" alt="Dictate: hold, speak, let go: a still from the demo.">
           <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
         </summary>
         <img class="demo-gif" src="img/demos/dictation-stills.gif" width="800" height="558" loading="lazy" alt="Dictate: hold, speak, let go, step by step, as a moving picture.">
@@ -250,13 +258,13 @@
 
     <figure class="demo-figure">
       <details class="demo-play">
-        <summary aria-label="Play the demo: Calibrate my voice">
-          <img class="demo-poster" src="img/demos/test-setup-poster.png" width="1600" height="1116" loading="lazy" alt="Calibrate my voice: the first picture of the demo.">
+        <summary aria-label="Demo: Calibrate my voice">
+          <img class="demo-poster" src="img/demos/test-setup-poster.png" width="1600" height="1116" loading="lazy" alt="Calibrate my voice: a still from the demo.">
           <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
         </summary>
         <img class="demo-gif" src="img/demos/test-setup.gif" width="800" height="558" loading="lazy" alt="Calibrate my voice, step by step, as a moving picture.">
       </details>
-      <figcaption>Calibrate my voice. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
+      <figcaption>Calibrate my voice. A moving picture with no sound: each step is written on it. The demo shows the main steps; the written steps are complete.</figcaption>
     </figure>
 
     <h3>Choose a more accurate model</h3>
@@ -264,6 +272,7 @@
       <li>Open Settings &gt; Models.</li>
       <li>Find <b>More accurate</b>.</li>
       <li>Click <b>Download…</b> next to More accurate. If that model is already on this PC, the button says <b>Use</b> instead.</li>
+      <li>A window asks to download it. Click <b>Download</b>.</li>
       <li>When the download has finished, More accurate shows <b>In use</b> instead of a button.</li>
     </ol>
     <p>If words often come out wrong, open Settings &gt; Models and choose More accurate, or Most accurate where it is listed. These are bigger speech models: more accurate, but slower, and each one is a download you choose. To see every model by its name and size, choose Advanced at the top of that page.</p>
@@ -301,8 +310,8 @@
 
     <figure class="demo-figure">
       <details class="demo-play">
-        <summary aria-label="Play the demo: Change the speech model">
-          <img class="demo-poster" src="img/demos/change-model-poster.png" width="1600" height="1116" loading="lazy" alt="Change the speech model: the first picture of the demo.">
+        <summary aria-label="Demo: Change the speech model">
+          <img class="demo-poster" src="img/demos/change-model-poster.png" width="1600" height="1116" loading="lazy" alt="Change the speech model: a still from the demo.">
           <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
         </summary>
         <img class="demo-gif" src="img/demos/change-model.gif" width="800" height="558" loading="lazy" alt="Change the speech model, step by step, as a moving picture.">
@@ -324,14 +333,18 @@
       <li>Choose a folder on the other drive, for example <code>D:\Dictum models</code>.</li>
       <li>Click <b>Select Folder</b>.</li>
     </ol>
-    <p>New downloads now go to that folder. Changing the folder does not move any files. Models you already downloaded stay where they are, and Dictum still finds them there.</p>
-    <p>To free up space on the first drive, copy the models across yourself, or download them again. Then delete the old copies in Settings &gt; Storage, with <b>Delete…</b> next to each one.</p>
+    <p>New downloads now go to that folder. Changing the folder does not move any files.</p>
+    <ul>
+      <li>Models in Dictum's usual folder are still found.</li>
+      <li>Models in a folder you chose earlier are not found any more. Copy them into the new folder first, or download them again.</li>
+    </ul>
+    <p>To free up space on the first drive when you move from Dictum's usual folder, copy the models across, then delete the old copies in Settings &gt; Storage, with <b>Delete…</b> next to each one.</p>
     <p>A folder on a network drive works, but models load slowly from it. A folder on this PC is faster. To go back to the usual folder, click <b>Use default</b>.</p>
 
     <figure class="demo-figure">
       <details class="demo-play">
-        <summary aria-label="Play the demo: Keep the models on another drive">
-          <img class="demo-poster" src="img/demos/model-folder-poster.png" width="1600" height="1116" loading="lazy" alt="Keep the models on another drive: the first picture of the demo.">
+        <summary aria-label="Demo: Keep the models on another drive">
+          <img class="demo-poster" src="img/demos/model-folder-poster.png" width="1600" height="1116" loading="lazy" alt="Keep the models on another drive: a still from the demo.">
           <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
         </summary>
         <img class="demo-gif" src="img/demos/model-folder.gif" width="800" height="558" loading="lazy" alt="Keep the models on another drive, step by step, as a moving picture.">
@@ -441,7 +454,7 @@
         <summary>My keyboard has no Ctrl key on the right. What do I do?</summary>
         <div class="answer">
           <p>Choose another key. See <a href="#faq-change-key">How do I change the key I hold?</a></p>
-          <p>If you use a Mac to reach a Windows PC, hold the Option or Command key on the right.</p>
+          <p>If you use a Mac to reach a Windows PC, choose the right Option or Command key as your hotkey.</p>
         </div>
       </details>
 
@@ -530,7 +543,7 @@
             <li>Open the <b>Spoken language</b> list. It shows every language you can choose.</li>
             <li>Choose yours.</li>
           </ol>
-          <p>Anything but English needs a model that understands more than one language. In the Simple view, the choices change to suit the language you picked. <b>Translate to English</b>, in the same place, writes English whatever language you speak.</p>
+          <p>Speak another language? Pick it here and Settings &gt; Models shows the right choices. <b>Translate to English</b>, in the same place, writes English whatever language you speak.</p>
         </div>
       </details>
 
@@ -641,7 +654,7 @@
           <p><b>Microsoft Store version:</b> Windows deletes Dictum’s data when you uninstall it.</p>
           <p><b>Direct download:</b> uninstalling from Windows Settings &gt; Apps asks whether to delete your models, settings and recordings too. If you say no, they stay on this PC.</p>
           <p>To uninstall by hand, search Start for “Add or remove programs”, find Dictum and choose <b>Uninstall</b>. For the direct download, then delete the folders <code>%APPDATA%\Dictum</code> and <code>%LOCALAPPDATA%\Dictum</code> if they are still there.</p>
-          <p>A model folder you chose on another drive is not touched by Windows’ uninstall of the direct download. See <a href="#faq-other-drive">the next question</a>.</p>
+          <p>A model folder you chose yourself stays after either kind of uninstall, from the Microsoft Store or the direct download. See <a href="#faq-other-drive">the next question</a>.</p>
         </div>
       </details>
 
@@ -649,7 +662,7 @@
         <summary>I keep my models on another drive. What happens to them when I remove Dictum?</summary>
         <div class="answer">
           <p><b>Remove Dictum completely</b> deletes Dictum’s own model files in that folder. The folder itself stays, and so does anything else you keep in it.</p>
-          <p>Uninstalling the direct download from Windows Settings &gt; Apps leaves that folder alone. Its question says: “Folders you chose yourself in Settings are not touched.”</p>
+          <p>Uninstalling Dictum from Windows Settings &gt; Apps leaves that folder alone, for the Microsoft Store version and the direct download. The direct download's uninstall question says: “Folders you chose yourself in Settings are not touched.”</p>
         </div>
       </details>
 
@@ -668,9 +681,7 @@
       <details id="faq-free">
         <summary>Is Dictum free?</summary>
         <div class="answer">
-          <p>Free: no subscription, no account, no ads, no analytics, no telemetry.</p>
-          <p>The base product stays free to keep on your PC; optional paid extras may come later.</p>
-          <p>There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
+          <p>Yes. See <a href="#free">Free</a>, above.</p>
         </div>
       </details>
 
@@ -688,13 +699,13 @@
           <p>Help starts with a list of its questions, under <b>Questions on this page</b>. Click a question to move down to its answer.</p>
           <figure class="demo-figure">
             <details class="demo-play">
-              <summary aria-label="Play the demo: Find help in Dictum">
-                <img class="demo-poster" src="img/demos/help-poster.png" width="1600" height="1116" loading="lazy" alt="Find help in Dictum: the first picture of the demo.">
+              <summary aria-label="Demo: Find help in Dictum">
+                <img class="demo-poster" src="img/demos/help-poster.png" width="1600" height="1116" loading="lazy" alt="Find help in Dictum: a still from the demo.">
                 <span class="demo-play-label" aria-hidden="true"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
               </summary>
               <img class="demo-gif" src="img/demos/help.gif" width="800" height="558" loading="lazy" alt="Find help in Dictum, step by step, as a moving picture.">
             </details>
-            <figcaption>Find help in Dictum. A moving picture with no sound: each step is written on it. The steps above say the same in words.</figcaption>
+            <figcaption>Find help in Dictum. A moving picture with no sound: each step is written on it. The demo shows the main steps; the written steps are complete.</figcaption>
           </figure>
           <p>Its <b>Open the full guide</b> button opens this page in your web browser.</p>
         </div>

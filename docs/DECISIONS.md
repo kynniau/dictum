@@ -4092,6 +4092,11 @@ Not pinned:
 - The measurements use Avalonia's headless platform with Skia and this host's system fonts (Segoe UI Variable). A desktop at another scale, or a PC without that font, may set the lines differently.
 - A new Sandbox recording would confirm all six items on screen.
 
+## Polish pins (22/10/2026, branch fix/polish-pins)
+
+- The transient models lines (a model still loading, a download pending, an error, with the longest runtime and key names) trim by design at the panel's 380 px: one line, an ellipsis, the whole line in its tooltip and its accessible name (lens finding 1 on PR #39). `Polish2Tests.A_transient_header_line_that_is_too_long_is_trimmed_whole_in_its_tooltip` pins five of them as expected-trimmed; the steady-state lines stay pinned as whole. No wording changed.
+- `CalibrationWindow.Toggle`'s `CheckMicrophone()` guard (the hotkey starts a take even though Record is disabled) is pinned: `Calibration_hotkey_with_no_microphone_starts_no_take`.
+
 ## Website help guide, landing infographic and the name line (21/10/2026, branch site/help-guide)
 
 1. **The guide lives at `/help`** (`site/help.html`; `vercel.json` has `cleanUrls`), the address of `HelpText.GuideUrl` on feat/in-app-help. Its copy is PROPOSED, for the owner to approve; it agrees with the in-app Help question for question and adds more.
@@ -4114,3 +4119,9 @@ Not pinned:
    - **Missing files:** with the files absent, each poster box keeps its 1600:1116 shape, shows its alt text and the Play button, and the page does not scroll sideways at 375 px.
    - **Layout:** the Play button sits at the top of the poster, because the bottom of each poster is the demo's own caption band.
    - **Polish-round screens:** the guide's steps now say "Right Ctrl" for the key name, "In use" is shown in place of a button, there is an "Open the recordings folder" button, Help has a "Questions on this page" list, and the welcome window's microphone step can show "No microphone found".
+9. **Final lens on ad8ae40** (22/10/2026). The lens returned Block only because main had moved; everything else passed. The findings are fixed:
+   - **Model folder (finding 2).** The guide now says that models in Dictum's usual folder are still found, and models in a folder chosen earlier are not. `ModelFolders.LookupOrder` searches the current chosen folder, `%LOCALAPPDATA%\Dictum\models` and the bundled folder, and nothing else. Product candidate: remember previously chosen folders, or offer to move the models.
+   - **Roadmap.** Three items move to Done. Their merge commits are each contained in v1.1.0, v1.1.1 and v1.1.2 (`git tag --contains`, 22/10/2026): mouse-button hotkeys and snippets (PR #1, b5363bb); the check that clean-up never inserts unsaid dictionary names (PR #4, 79bffb7); the cloud presets with their warning (PR #3, 13ba7e5). The language item (PR #2, a88e492) and segmented hands-free (PR #8, 23acf35) are in the same three tags.
+   - **Landing page wording.** The landing page's "No account, no cloud, no telemetry" and its meta and og descriptions now name opt-in cloud clean-up.
+   - **FAQ styles.** These now apply only to the FAQ's own items, so the demo player inside an answer is not styled as one.
+   - **Demo players.** Each is named "Demo: <title>", and the poster alt text says "a still from the demo".
