@@ -18,7 +18,7 @@ namespace Dictum.UI.Views.Onboarding;
 /// the shell has loaded them and the hotkey listens (<see cref="OnboardingFlow.BeginTryIt"/>). Esc or closing the window skips
 /// whatever is left with today's defaults (<see cref="OnboardingFlow.SkipRest"/>). The text is larger than Dictum's other
 /// windows (17 px body). Its client area is 420 DIP high, so with the caption it fits a 1366 × 768 screen at 150 % (911 × 512
-/// DIP, less the taskbar), and on opening it is clamped to the screen's work area, the body scrolling (<see cref="FitHeight"/>).
+/// DIP, less the taskbar), and on opening it is clamped to the screen's work area, the body scrolling (<see cref="Fit"/>).
 /// </summary>
 internal sealed class OnboardingWindow : Window
 {
@@ -97,28 +97,37 @@ internal sealed class OnboardingWindow : Window
     }
 
     /// <summary>
-    /// The client height that keeps the whole window (client plus <paramref name="frame"/>, the caption and borders) inside a
-    /// work area <paramref name="workArea"/> DIP high: <paramref name="wanted"/>, or less (the body scrolls; lens on 6bacce9: Back
-    /// and Next sat under the taskbar). MinHeight is lowered to match when the work area is smaller still.
+    /// Where the window goes on a screen whose work area (the taskbar excluded) is <paramref name="work"/>, in physical pixels at
+    /// <paramref name="scaling"/>: the client <paramref name="height"/> in DIP, or less so that it and the <paramref name="frame"/>
+    /// (caption and borders, DIP) fit (the body scrolls; lens on 6bacce9: Back and Next sat under the taskbar), and the position,
+    /// moved down or up into the work area when the window would start above it or end below it. Pure, so it is pinned headless
+    /// (lens on 36fa43e).
     /// </summary>
-    internal static double FitHeight(double wanted, double frame, double workArea) => Math.Max(1, Math.Min(wanted, workArea - frame));
+    internal static (double Height, PixelPoint Position) Fit(double height, double frame, PixelRect work, double scaling, PixelPoint position)
+    {
+        if (scaling <= 0) scaling = 1;
+        var fitted = Math.Max(1, Math.Min(height, work.Height / scaling - frame));
+        var outer = (int)Math.Ceiling((fitted + frame) * scaling);
+        var y = position.Y < work.Y || position.Y + outer > work.Bottom ? Math.Max(work.Y, work.Y + (work.Height - outer) / 2) : position.Y;
+        return (fitted, new PixelPoint(position.X, y));
+    }
 
-    /// <summary>Clamps the window to the work area of its screen (the taskbar excluded) and moves it inside it.</summary>
+    /// <summary>How many times opening the window ran <see cref="Fit"/> on its screen (tests: the Opened hook is wired).</summary>
+    internal int FitsOnOpen { get; private set; }
+
+    /// <summary>Clamps the window to the work area of its screen and moves it inside it (<see cref="Fit"/>).</summary>
     private void FitToWorkArea()
     {
         if ((Screens.ScreenFromWindow(this) ?? Screens.Primary) is not { } screen) return;
-        var scaling = screen.Scaling > 0 ? screen.Scaling : 1;
-        var work = screen.WorkingArea;
         var frame = Math.Max(0, (FrameSize?.Height ?? ClientSize.Height) - ClientSize.Height);
-        var height = FitHeight(Height, frame, work.Height / scaling);
+        var (height, position) = Fit(Height, frame, screen.WorkingArea, screen.Scaling, Position);
+        FitsOnOpen++;
         if (height < Height)
         {
             MinHeight = Math.Min(MinHeight, height);
             Height = height;
         }
-        var outer = (int)Math.Ceiling((height + frame) * scaling);
-        if (Position.Y < work.Y || Position.Y + outer > work.Bottom)
-            Position = new PixelPoint(Position.X, Math.Max(work.Y, work.Y + (work.Height - outer) / 2));
+        if (position != Position) Position = position;
     }
 
     /// <summary>Raised once steps 1-5 are over: finished, or the window closed.</summary>

@@ -1301,7 +1301,7 @@ Enter presses the step's primary button. Steps:
    at or below 1e-5 RMS (the "No sound from mic" floor, PR #22: the advice, which a later sound can still turn into "Heard
    you."). A level between the two (background hiss) is neither. With no microphone listed, the no-microphone sentence and
    no capture. The capture is stopped about 5 s after "Heard you.", after 60 s in any case ("Test again" opens it again),
-   and on every way out of the step (Next, Skip, Back, Esc, closing the window). Choosing another microphone tests it at
+   and on every way out of the step (Next, Skip, Back, Esc, closing the window). A test closed at 60 s with nothing decided (hiss only) says "Nothing heard."; a level counts towards "Heard you." only above the floor too (a `silence_threshold` of 0 never hears digital silence), and one late look at the level counts as at most two ticks. Choosing another microphone tests it at
    once; Next writes `audio.device` only when it changed; Skip writes nothing.
 6. **Try it**: after steps 1-5 the window stays open while the shell loads the settings, installs the hotkey and starts
    loading the speech model (`OnboardingFlow.BeginTryIt` is called at the end of `AppShell.Start`). Until the model is
@@ -1328,6 +1328,6 @@ line are polite live regions; the folder refusal is an assertive one. The client
 480 × 360); text is larger than in the other windows (body 17 px, buttons 16 px). A 1366 × 768 screen at 150 % is 911 × 512
 DIP; with the Windows 11 taskbar (recalled, not measured: 48 DIP) its work area is about 464 DIP, and 420 plus a caption
 of about 32 DIP (recalled) fits. On opening, the window is clamped to its screen's work area (`Screens.ScreenFromWindow`,
-the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar.
+the frame's height counted) and moved inside it, the body scrolling, so Back and Next never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
 
 Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.

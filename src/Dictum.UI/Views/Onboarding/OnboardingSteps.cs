@@ -298,7 +298,7 @@ internal sealed class MicCheck(double threshold)
 
     public MicResult Feed(float level, long elapsedMs)
     {
-        if (level >= threshold) _loudMs += elapsedMs;
+        if (level >= threshold && level > CaptureBuffer.SoundFloor) _loudMs += elapsedMs; // a threshold of 0 never makes digital silence "heard"
         _silentMs = level > CaptureBuffer.SoundFloor ? 0 : _silentMs + elapsedMs;
         if (_loudMs >= HeardAfterMs) Result = MicResult.Heard;
         else if (Result != MicResult.Heard && _silentMs >= NothingAfterMs) Result = MicResult.NothingHeard;
@@ -465,7 +465,8 @@ internal sealed class MicrophoneStep : OnboardingStep
         if (_capture is null) return;
         var now = Flow.Clock();
         var level = _capture.CurrentLevel;
-        var result = _check.Feed(level, Math.Max(0, now - _last));
+        // One late tick (a busy UI thread, a suspended PC) counts as at most two ticks, never as seconds of speech.
+        var result = _check.Feed(level, Math.Clamp(now - _last, 0, 2 * TickMs));
         _last = now;
         _meterPeak = Math.Max(_meterPeak, level);
         if (!Flow.Shell.Platform.WindowFlags.ReducedMotion || now - _meterShownAt >= ReducedMotionMeterMs)
@@ -485,6 +486,7 @@ internal sealed class MicrophoneStep : OnboardingStep
         if (_heardAt is long heard && now - heard >= StopAfterHeardMs || now - _startedAt >= StopAfterMs)
         {
             StopTest(); // the result line stays; Test again opens the microphone again
+            if (result == MicResult.Listening) _result.Text = OnboardingText.NothingHeard; // only hiss for a minute: not a dead "Say a few words."
             _testAgain.IsVisible = true;
         }
     }

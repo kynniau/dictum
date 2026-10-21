@@ -3221,3 +3221,23 @@ The existing microphone pins still use levels at or above 0.01 for "Heard you." 
 **Verified after the lens fixes and the merge with c7d736d (head b097f03).** Full Release build (`--no-incremental`, no warning lines) and the full suite: 1597 tests, 1574 passed, 23 skipped (gated), 0 failed. The only change after that run is this line.
 
 **Merged with feat/simple-view at deda293 (main's PR #22 inside).** No conflicts. As planned in "Merge with PR #22": `OnboardingText.NoMicrophone` is gone and the step shows `NoSoundText.NoMicrophoneBalloon`, and `MicCheck.SoundFloor` is gone in favour of `CaptureBuffer.SoundFloor`; the words and the value are byte-identical to what this lane shipped, pinned by `The_no_microphone_sentence_and_the_floor_are_PR_22s_unchanged` (observed failing with the floor counted as sound, and with one character of the balloon changed). `OnboardingText.NothingHeard` stays its own constant (its opening, "Nothing heard.", is not the balloon's). The step-5 note ("If Dictum hears nothing when you dictate, it will tell you.") is now true in this tree.
+
+### Lens fixes (21/10/2026), lens on 36fa43e
+
+The lens on 36fa43e (and a854a41) verified the merge and the constant swaps and returned Needs changes on the microphone test and the window clamp. No new strings: every line below reuses existing copy.
+
+1. **(Major) Hiss for a minute ended on "Say a few words." beside a dead meter.** When the test closes at 60 s with nothing decided (hiss between the floor and `silence_threshold`), the line is now "Nothing heard. …" (existing copy).
+2. **(Major) `silence_threshold` 0 made digital silence "Heard you."** (the loader accepts 0 to 1, and level 0 is `>= 0`). A level now counts towards "Heard you." only when it is at or above the threshold and above `CaptureBuffer.SoundFloor`.
+3. **(Minor) The clamp had no pin on its wiring.** The placement is one pure function, `OnboardingWindow.Fit(height, frame, work, scaling, position) -> (height, position)`, pinned at 150 % on 1366 × 768 with a 48 DIP taskbar (recalled, not measured) and on second screens whose work area starts at a non-zero Y; the Opened handler counts its runs (`FitsOnOpen`, an internal property as the steps' other test seams are), and a pin checks it ran once on opening (the headless platform has a screen).
+4. **(Minor) One late tick could count as 3 s of speech.** The gap fed to `MicCheck` is capped at two ticks (`Math.Clamp(now - _last, 0, 2 * TickMs)`). Ceiling: if the timer always fires later than 100 ms, "about 3 s" takes longer.
+5. **(Minor)** The 48 DIP taskbar and 32 DIP caption are labelled recalled in the size pin's comment and in the PR's Not verified list; a check on a real 150 % desktop is still outstanding.
+
+**Pins and mutation checks (this round).** Each observed failing on the reverted behaviour (applied alone, rebuilt, run, restored):
+
+| Pin | Mutation | Observed |
+|---|---|---|
+| The_microphone_closes_after_a_minute (extended: the line is "Nothing heard.") | the 60 s branch leaves the line alone | observed failing: strings differ |
+| A_threshold_of_zero_never_hears_digital_silence | the floor guard removed | observed failing: values are equal (Heard) |
+| Opening_the_window_fits_it_to_its_screen | the Opened hook removed | observed failing: values differ (0 runs) |
+| The_window_is_fitted_to_the_work_area_of_its_screen | `Fit` returns the position unchanged | observed failing: values differ |
+| One_late_tick_is_not_three_seconds_of_speech | the gap uncapped | observed failing: strings differ (Heard you.) |

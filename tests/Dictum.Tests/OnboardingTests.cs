@@ -735,7 +735,8 @@ public sealed class OnboardingTests
         var (shell, _, _) = scratch.Shell(); // without base.en: the speech step's longest form
         var (_, window) = Open(shell, scratch);
         // 1366 × 768 at 150 % is 911 × 512 DIP; less the Windows 11 taskbar (recalled: 48 DIP) the work area is 464 DIP, and
-        // the whole window is the client plus a caption (recalled: about 32 DIP).
+        // the whole window is the client plus a caption (recalled: about 32 DIP). Both figures are recalled, not measured; a check
+        // on a real 150 % desktop is still outstanding.
         Assert.True(OnboardingWindow.WindowWidth <= 911 && OnboardingWindow.WindowHeight + CaptionDip <= WorkAreaDip, $"{OnboardingWindow.WindowHeight} + {CaptionDip} > {WorkAreaDip}");
         while (true)
         {
@@ -831,14 +832,40 @@ public sealed class OnboardingTests
         shell.Dispose();
     });
 
-    /// <summary>Pin (lens 3): the client height is clamped to the work area less the frame; a roomy screen keeps it.</summary>
+    /// <summary>
+    /// Pin (lens 3, then lens on 36fa43e): the whole placement is one pure function. At 150 % on 1366 × 768 with a 48 DIP taskbar
+    /// (recalled, not measured: 72 px) the 420 DIP client and a 32 DIP caption (recalled) fit and the window is moved up into the
+    /// work area; a client too tall is cut to the work area less the frame; on a second screen whose work area starts at a
+    /// non-zero Y (above or below the main one) the window is kept on it or moved into it.
+    /// </summary>
     [Fact]
-    public void The_window_height_is_clamped_to_the_work_area()
+    public void The_window_is_fitted_to_the_work_area_of_its_screen()
     {
-        Assert.Equal(OnboardingWindow.WindowHeight, OnboardingWindow.FitHeight(OnboardingWindow.WindowHeight, CaptionDip, 1040));
-        Assert.Equal(400, OnboardingWindow.FitHeight(OnboardingWindow.WindowHeight, 40, 440));
-        Assert.Equal(300, OnboardingWindow.FitHeight(OnboardingWindow.WindowHeight, 40, 340)); // under the minimum: fits all the same
+        var laptop = new PixelRect(0, 0, 1366, 768 - 72);
+        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(363, 9)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, laptop, 1.5, new PixelPoint(363, 400)));
+        Assert.Equal((432d, new PixelPoint(363, 0)), OnboardingWindow.Fit(470, CaptionDip, laptop, 1.5, new PixelPoint(363, 400)));
+        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(10, 20)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, new PixelRect(0, 0, 1920, 1032), 1, new PixelPoint(10, 20)));
+
+        var above = new PixelRect(1920, -1080, 1920, 1032);
+        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(2000, -1000)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, above, 1, new PixelPoint(2000, -1000)));
+        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(2000, -790)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, above, 1, new PixelPoint(2000, 100)));
+        var below = new PixelRect(0, 1080, 1920, 1032);
+        Assert.Equal((OnboardingWindow.WindowHeight, new PixelPoint(100, 1370)), OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, below, 1, new PixelPoint(100, 50)));
+        Assert.Equal(300, OnboardingWindow.Fit(OnboardingWindow.WindowHeight, 40, new PixelRect(0, 0, 800, 340), 1, default).Height); // under the minimum: fits all the same
     }
+
+    /// <summary>Pin (lens on 36fa43e): opening the window runs the placement on its screen (the Opened hook is wired).</summary>
+    [Fact]
+    public Task Opening_the_window_fits_it_to_its_screen() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, _, _) = scratch.Shell();
+        var (_, window) = Open(shell, scratch);
+        Assert.Equal(1, window.FitsOnOpen);
+        window.Close();
+        shell.Dispose();
+    });
 
     /// <summary>Pin (lens 4): Try it puts the keyboard focus in the practice box, not on Finish.</summary>
     [Fact]
@@ -908,6 +935,7 @@ public sealed class OnboardingTests
         Advance(step, clock, 100);
         Assert.False(mic.Open);
         Assert.True(step.TestAgainShown);
+        Assert.Equal(OnboardingText.NothingHeard, step.Result); // only hiss for a minute: the advice, not a dead "Say a few words." (lens on 36fa43e)
         window.Close();
         shell.Dispose();
     });
@@ -971,4 +999,34 @@ public sealed class OnboardingTests
         sound.Feed(CaptureBuffer.SoundFloor * 2, MicCheck.NothingAfterMs); // above the floor: not silence (and not heard)
         Assert.Equal(MicResult.Listening, sound.Result);
     }
+
+    // ---- Lens fixes (21/10/2026), lens on 36fa43e ----
+
+    /// <summary>Pin (M2): with silence_threshold 0 (the loader accepts it), digital silence is never "Heard you."</summary>
+    [Fact]
+    public void A_threshold_of_zero_never_hears_digital_silence()
+    {
+        var check = new MicCheck(0);
+        for (var t = 0; t < 4_000; t += 50) check.Feed(0f, 50);
+        Assert.NotEqual(MicResult.Heard, check.Result);
+        var floor = new MicCheck(0);
+        for (var t = 0; t < 4_000; t += 50) floor.Feed(CaptureBuffer.SoundFloor, 50);
+        Assert.NotEqual(MicResult.Heard, floor.Result);
+    }
+
+    /// <summary>Pin (M4): one late tick counts as at most two ticks, so three seconds without a look cannot be three seconds of speech.</summary>
+    [Fact]
+    public Task One_late_tick_is_not_three_seconds_of_speech() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        Bundle(scratch);
+        var (shell, platform, _) = scratch.Shell();
+        var (step, window, mic, clock) = MicTest(scratch, shell, platform);
+        mic.Level = 0.02f;
+        clock[0] += 3_000;
+        step.Tick();
+        Assert.Equal(OnboardingText.SayWords, step.Result);
+        window.Close();
+        shell.Dispose();
+    });
 }
