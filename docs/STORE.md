@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 and updated 22/10/2026 for 1.2.1 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 23/10/2026 for 1.3.0 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.2.1, so the package is 1.2.1.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026 and to 1.2.1 on 22/10/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.3.0, so the package is 1.3.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 and to 1.3.0 on 23/10/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -274,7 +274,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.2.1 (set 22/10/2026; 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.3.0 (set 23/10/2026; 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -470,8 +470,9 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 22/10/2026 | The owner approved every PROPOSED 1.2 string as a block (DECISIONS, "Owner approvals (22/10/2026)"). 1.2.1 (not yet built or submitted) changes the hold pill to "Recording · let go to finish"; screenshot 1 needs retaking with it. |
 | 22/10/2026 | Dictum 1.2.1 prepared (version bump, tester notes, listing text); wording PROPOSED until the owner approves it; Store screenshot 1 to be retaken with the new hold pill. |
 | 22/10/2026 | The owner approved the 1.2.1 "What's new" paragraph and the 1.2.1 certification-notes lines ("Notes written" and CHANGED) as written, at 14:33 AEDT (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)"). Store screenshot 1 is still to be retaken with the new hold pill. |
+| 23/10/2026 | Dictum 1.3.0 prepared (version bump; listing text and What's new approved 22/10/2026; tester notes PROPOSED). Contents: cloud speech (optional, consent), own clean-up instructions, Create the key file, "What is clean-up?" Help, Dictum in plain words, public copy for cloud speech; storage move-on-change (PR #61) pending at the time of writing. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
-for 1.1.0, 1.1.1, 1.1.2, 1.2.0 or 1.2.1 (no packaged run on a clean PC yet).
+for 1.1.0, 1.1.1, 1.1.2, 1.2.0, 1.2.1 or 1.3.0 (no packaged run on a clean PC yet).
