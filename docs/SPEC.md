@@ -303,9 +303,17 @@ prompt in their own section, after the base prompt and before the grammar-assist
 the built-in one, or `llm.prompt_file` when that is set: **if both are set, the file replaces the built-in prompt and the
 instructions are still added after it.** They go to the local model and to cloud clean-up alike (for cloud clean-up they are
 part of the text sent, under the clean-up consent already given); never to `none` (the rule-based tidy) or `off`. The
-validator and its rules are unchanged and check every reply whatever the instructions say: a reply that adds a line or a
-bracketed remark, summarises, translates or answers is rejected and the rule-based tidy is typed. Its known ceiling: a short
-sentence added on the same line as the dictation is accepted (probed 22/10/2026; see the pin in `OwnInstructionsTests`).
+validator checks every reply whatever the instructions say: a reply that adds a line, a bracketed remark or a closing
+sentence, summarises, translates or answers is rejected and the rule-based tidy is typed.
+
+Final-sentence rule (owner decision, 22/10/2026 20:55 AEDT; reason text PROPOSED): a short sentence added at the end on
+the same line as the dictation ("… before lunch. Thanks for reading.") had passed every rule. `CleanupValidator` now rejects
+it as "reply ends with a sentence the speaker did not say": in a reply of two sentences or more, the last sentence's words
+of three letters or more that are not function words, fillers or spoken commands (`ValidatorText.IsCorrectionWord`) must be
+at least half said, as spelt or sounding alike (`ValidatorText.SoundsLike`), the share the final-line rule uses. It runs
+after the dictionary-term and hands-free repeat rules, so their reasons stand. Ceiling: a last sentence made of words said
+earlier in another order passes, and a short last sentence a grammar fix rewrites into other words is rejected (a false
+rejection costs polish only).
 Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
 feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
 first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is

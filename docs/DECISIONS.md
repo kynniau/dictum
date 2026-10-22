@@ -4812,12 +4812,10 @@ Two owner requests for Settings > Clean-up, built from main 04287d6. Every new s
      `SettingsFile.PrivateKeys`. The loader's generic warning quotes up to 57 characters of a bad value, so the key has its own
      reader (`ObjectReader.PrivateText`), whose warnings give a length only. The clean-up's load line gives the length. The
      feedback email, the state lines and See how it works carry no prompt text (pinned).
-   - *Validator ceiling (found by this lane, not fixed: the brief keeps the validator unchanged).* A short sentence added on
-     the same line as the dictation passes every rule. Probed 22/10/2026 with "um so i think we should uh move the meeting to
-     thursday and tell the whole team before lunch": "… before lunch. Thanks for reading.", "… before lunch. Kind regards."
-     and "… before lunch. Please call me if you have any questions." were all accepted. A line of its own, a bracketed remark,
-     a translation and a summary are rejected (pinned). So instructions that ask for an added sentence can get one through,
-     as a model could without them. Trigger to retire: a validator rule for a final sentence the speaker did not say.
+   - *Validator gap, found by this lane, then closed on the owner's decision (22/10/2026 20:55 AEDT): see item 4.* A short
+     sentence added on the same line as the dictation passed every rule. Probed 22/10/2026 with "um so i think we should uh
+     move the meeting to thursday and tell the whole team before lunch": "… before lunch. Thanks for reading.", "… before
+     lunch. Kind regards." and "… before lunch. Please call me if you have any questions." were all accepted.
    - *Page placement pending.* The Clean-up page is `CleanupPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, a file
      another lane owns. The box is `OwnInstructionsCard` and the button `KeyFileButton` (both in `CleanupOwnInstructions.cs`).
      Wiring them in takes five small edits in `CleanupPage`, listed in the PR body. They are not made here.
@@ -4855,6 +4853,7 @@ PROPOSED strings, verbatim:
 - Log (written value): "Set from the app: llm.instructions = ({N} characters, not logged)."
 - Log (clean-up loaded): "Clean-up instructions: Dictum's, with your own added ({N} characters; their text is not logged)."
 - Log (key file): "Key file created with a placeholder line for {VARIABLE} (no key written)." / "Key file already exists: opened as it is, not changed."
+- Validator reason (item 4): "reply ends with a sentence the speaker did not say"
 - Load warnings: "Setting \"llm.instructions\" is {N} characters long; only the first 2000 are used." / "Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used."
 - settings.json `_doc` llm note, added sentence: "instructions: your own clean-up instructions (at most 2,000 characters; Settings > Clean-up in the Advanced view writes them), added after the prompt, built-in or prompt_file, for the local model and cloud clean-up, never for none or off; every reply is still checked against what you said."
 
@@ -4867,6 +4866,19 @@ text when focus leaves it, and shows the limit and cloud-host lines; the key fil
 an existing file stays the same byte for byte; the file is opened at its path; both status lines; the placeholder counts as
 not set and sends nothing.
 
+4. **Final-sentence rule (owner decision 22/10/2026 20:55 AEDT).** `CleanupValidator.AddedFinalSentence`: in a reply of two
+   sentences or more, the last sentence's words that the "scratch that" checks count (`IsCorrectionWord`: three letters or
+   more, no function word, filler or spoken command) must be at least half said, as spelt or sounding alike (`SoundsLike`),
+   the share the final-line rule uses. It runs after the dictionary-term and hands-free repeat rules: placed inside the
+   final-line checks it first took the reason of `DictionaryInsertionValidatorTests` ("Push it to GitHub. GitHub.", still
+   rejected, but with the new reason), so it moved and every existing reason stands. PROPOSED reason: "reply ends with a
+   sentence the speaker did not say". Ceiling (`// simplification:` at the rule): a last sentence of words said earlier in
+   another order passes; a short last sentence a grammar fix rewrites into other words is rejected (polish lost only).
+   Pins: the three probed replies are rejected with that reason; the four earlier cases are still rejected with their own
+   reasons; three replies ending with the speaker's own last sentence, tidied (fillers out, "their" fixed to "there",
+   "scratch that" and "new line" followed), are used. The validator, cleaner, rules, dictionary, hands-free, LLM, calibration
+   and See how it works test classes all pass (421 total, 0 failed, 2 skipped). README's rule list and SPEC §5 updated.
+
 Mutations (each observed failing, 22/10/2026, then restored):
 - Validator pin: `CleanAsync` used the model's reply without `CleanupValidator.Validate`. All four cases of
   `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing.
@@ -4876,5 +4888,8 @@ Mutations (each observed failing, 22/10/2026, then restored):
   `An_existing_file_is_left_byte_for_byte_and_opened` observed failing on the byte comparison.
 - Placeholder: `Merge` without `v != Placeholder`. `The_placeholder_counts_as_not_set_so_nothing_is_sent_with_it` observed
   failing ("your-key-here" returned as the key).
+- Final-sentence rule: the rule's call disabled (`false &&`). The three same-line cases of
+  `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing; the other four still passed.
 
 Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnInstructionsTests, KeyFileTests, CloudWarningAndPresetsTests, CleanupOffTests, FixBatchSettingsTests, PublicCopyNeutralityTests and HelpPageTests: 166 total, 0 failed, 0 skipped. Full suite, first run: 1951 total, 1 failed (`HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`, the placeholder stand-in, fixed as above), 23 skipped. Full suite after the fix: 1951 total, 1928 passed, 0 failed, 23 skipped.
+Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incremental`, 0 warnings, 0 errors; the named classes plus HelpPageTests and OwnerApprovalsTests 192 total, 0 failed; full suite 1957 total, 1934 passed, 0 failed, 23 skipped. Gates with the final-sentence rule (item 4): Release build with `--no-incremental`, 0 warnings, 0 errors; the same classes 198 total, 0 failed, 0 skipped; full suite 1963 total, 1940 passed, 0 failed, 23 skipped.

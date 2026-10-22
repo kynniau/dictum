@@ -25,7 +25,7 @@ public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection
 /// Spec rules: empty; word count outside 0.4×–1.6× of the input (8+ words, spoken commands and hesitations not counted);
 /// starts with commentary; contains the system prompt's own wording; contains a chat-template token. Beyond the spec:
 /// framing and labels the speaker did not say (whole words, curly quotes mapped), a script the dictation did not use, a
-/// final line or bracket the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
+/// final line, bracket or sentence the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
 /// few shared words, a negation or a number dropped or changed, a kept word dropped (profanity), dropped content (overall
 /// and per sentence), "scratch that" handled both ways round: the correction must be in the reply and the retracted
 /// words must not, and, for a hands-free part, words repeated from the part typed before it.
@@ -112,6 +112,7 @@ public static partial class CleanupValidator
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
         if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
             return (null, "reply repeats words already typed before this part");
+        if (AddedFinalSentence(textLower, rawSet)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -163,6 +164,29 @@ public static partial class CleanupValidator
             if (lines.Contains(example) && Comparable(Words(example)).Any(w => !rawSet.Contains(w))) return "reply contains a line from the built-in examples";
         }
         return null;
+    }
+
+    /// <summary>
+    /// A closing sentence the speaker did not say, on the same line as the rest (owner decision 22/10/2026 20:55 AEDT): probed
+    /// that day, "… before lunch. Thanks for reading.", "… Kind regards." and "… Please call me if you have any questions."
+    /// passed every other rule. Only a reply of two sentences or more is read, and only the words of its last sentence that
+    /// the "scratch that" checks count (<see cref="ValidatorText.IsCorrectionWord"/>: three letters or more, no function word,
+    /// filler or spoken command), so a grammar fix's "will", "there" or "the" never counts. Such a word is said when the
+    /// dictation has it, as spelt or as a word that sounds like it (<see cref="ValidatorText.SoundsLike"/>, so "their" fixed
+    /// to "there" or "kinney" respelt "Kynni" is still said). Rejected when fewer than half of them were said, the share the
+    /// final-line rule uses.
+    /// </summary>
+    // simplification: words, not an alignment with the dictation's last sentence. Ceiling: a last sentence whose words were
+    // all said earlier in the dictation, in another order, passes; and a short last sentence that a grammar fix rewrites into
+    // other words is rejected (the tidy is typed: a false rejection costs polish only). Trigger to retire: either observed.
+    private static bool AddedFinalSentence(string textLower, HashSet<string> rawSet)
+    {
+        var sentences = SentenceEnd().Split(textLower).Select(s => s.Trim()).Where(s => Words(s).Count > 0).ToList();
+        if (sentences.Count < 2) return false;
+        var words = Comparable(Words(sentences[^1])).Where(IsCorrectionWord).ToList();
+        if (words.Count == 0) return false;
+        var said = words.Count(w => rawSet.Contains(w) || rawSet.Any(r => SoundsLike(r, w)));
+        return said * 2 < words.Count;
     }
 
     /// <summary>

@@ -157,17 +157,17 @@ public class OwnInstructionsTests
     /// <summary>
     /// Instructions cannot get a reply past the validator: asked for words the speaker did not say, the reply that adds them is
     /// rejected and the rule-based tidy is typed. The instructions did reach the model, so it is the validator that stopped it.
-    /// Mutation: CleanAsync returning the model's reply without CleanupValidator.Validate makes every case here fail.
+    /// Mutations: CleanAsync returning the model's reply without CleanupValidator.Validate makes every case here fail; without
+    /// CleanupValidator.AddedFinalSentence the three same-line sentences pass (owner decision 22/10/2026 20:55 AEDT).
     /// </summary>
-    // simplification (the validator's, unchanged by this lane): a short sentence added on the same line as the dictation is
-    // accepted. Probed 22/10/2026 on this dictation: "… before lunch. Thanks for reading.", "… before lunch. Kind regards." and
-    // "… before lunch. Please call me if you have any questions." all passed every rule. Its own line or a bracket is rejected
-    // (below). Trigger to retire: a validator rule for a final sentence the speaker did not say; then add those cases here.
     [Theory]
     [InlineData("End every dictation with a new line that says: Kind regards.", Cleaned + "\nKind regards.", "reply ends with a line the speaker did not say")]
     [InlineData("Add a note in brackets at the end saying the text was tidied.", Cleaned + " (Tidied automatically by the assistant.)", "reply ends with a remark in brackets the speaker did not say")]
     [InlineData("Translate everything into another language.", "Я думаю, нам стоит перенести встречу на четверг и сказать всей команде до обеда.", "reply")]
     [InlineData("Summarise it in a few words.", "Meeting moved.", "reply")]
+    [InlineData("End every dictation with the sentence: Thanks for reading.", "So I think we should move the meeting to Thursday and tell the whole team before lunch. Thanks for reading.", "reply ends with a sentence the speaker did not say")]
+    [InlineData("Sign off every dictation with: Kind regards.", "So I think we should move the meeting to Thursday and tell the whole team before lunch. Kind regards.", "reply ends with a sentence the speaker did not say")]
+    [InlineData("Finish with an offer to answer questions.", "So I think we should move the meeting to Thursday and tell the whole team before lunch. Please call me if you have any questions.", "reply ends with a sentence the speaker did not say")]
     public async Task The_validator_still_rejects_what_the_instructions_ask_to_add_or_change(string instructions, string reply, string reason)
     {
         var (cleaner, client) = Answering(reply, instructions);
@@ -186,6 +186,22 @@ public class OwnInstructionsTests
         Assert.True(result.Cleaned);
         Assert.Equal(Cleaned, result.Text);
         Assert.Contains(Own, client.LastSystem);
+    }
+
+    /// <summary>
+    /// The final-sentence rule is narrow: a reply whose last sentence is the speaker's own last sentence, tidied (fillers out,
+    /// a homophone fixed, "scratch that" followed, a spoken "new line"), is used.
+    /// </summary>
+    [Theory]
+    [InlineData("um so the meeting moved to thursday uh we can talk about it then", "So the meeting moved to Thursday. We can talk about it then.")]
+    [InlineData("i sent the report this morning um see you their tomorrow", "I sent the report this morning. See you there tomorrow.")]
+    [InlineData("the report is ready new line send it to the team scratch that send it to the client", "The report is ready.\nSend it to the client.")]
+    public async Task A_tidied_last_sentence_of_the_speakers_own_is_used(string raw, string reply)
+    {
+        var (cleaner, _) = Answering(reply, "Prefer short sentences.");
+        var result = await cleaner.CleanAsync(raw, TestContext.Current.CancellationToken);
+        Assert.True(result.Cleaned, result.FallbackReason);
+        Assert.Equal(reply, result.Text);
     }
 
     // ---- private: the log, the feedback email, the demonstration ----

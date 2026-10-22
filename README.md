@@ -882,7 +882,7 @@ text:") or contains framing such as "I'm sorry" or "let me know" that you did no
 included); repeats five or more words of the system prompt actually sent (a custom `llm.prompt_file` included);
 contains a chat-template token (`<|im_end|>`, `<end_of_turn>`…); drops a "?" you dictated; shares fewer than half its
 words with the dictation (replies of 6+ words); is in a script the dictation did not use (for example Chinese for
-an English dictation); ends with a line or a bracketed remark you did not say, or contains one of the built-in example
+an English dictation); ends with a line, a bracketed remark or (in a reply of two sentences or more) a sentence you did not say, or contains one of the built-in example
 sentences; drops a "not", "no", "never" or a contraction such as "can't" that you said; drops or changes a number you
 said; drops a word on the profanity list (unless `profanity.mode` is `remove`, which removes them afterwards anyway);
 keeps most of a clause you retracted with "scratch that", or loses the words that replaced it; keeps fewer than 60%
