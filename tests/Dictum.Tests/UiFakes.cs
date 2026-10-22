@@ -160,6 +160,8 @@ internal sealed class FakeRemoval : IRemovalSteps
         return [];
     }
 
+    public string StartupItemsPhrase => "the fake shortcut and the fake launch-at-login entry";
+
     public bool ScheduleProgramFolderRemoval(string folder, out string? reason)
     {
         Steps.Add($"program folder {folder}");

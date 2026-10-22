@@ -419,6 +419,76 @@ public sealed class ModelFolderTests : IDisposable
     });
 
     /// <summary>
+    /// First beta finding (23/10/2026), the owner's decision through the lens on PR #71: while no model folder is chosen, the folder
+    /// map's row for Dictum's own data folder keeps its words, since downloads land in that folder's models subfolder.
+    /// </summary>
+    [Fact]
+    public Task Storage_names_the_models_in_its_own_folder_row_while_no_model_folder_is_chosen() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "models_dir": null } }""");
+        var (shell, _, _) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false));
+        shell.Reload(userRequested: false);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        Assert.Null(shell.Settings.Models.Folder);
+        Assert.Equal("Models, logs, calibration recordings", StoragePage.DataFolderRow(modelFolderChosen: false));
+        Assert.Contains("Models, logs, calibration recordings", Texts(window));
+        Assert.Single(All<Button>(window), b => AutomationProperties.GetName(b) == "Open the folder for Models, logs, calibration recordings");
+        window.Close();
+        return Task.CompletedTask;
+    });
+
+    /// <summary>
+    /// First beta finding (23/10/2026), the owner's decision through the lens on PR #71: once a model folder is chosen, the models
+    /// leave that row (the Models card lists every model folder in lookup order), and the Open button's name follows the row.
+    /// </summary>
+    [Fact]
+    public Task Storage_drops_the_models_from_its_own_folder_row_once_a_model_folder_is_chosen() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "models_dir": null } }""");
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        Directory.CreateDirectory(chosen);
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false));
+        shell.Reload(userRequested: false);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        dialogs.Folder = chosen;
+        Click(ButtonNamed(window, StoragePage.ChangeLabel));
+        Assert.Equal(chosen, shell.Settings.Models.Folder);
+        Assert.Equal("Logs, calibration recordings", StoragePage.DataFolderRow(modelFolderChosen: true)); // PROPOSED 23/10/2026
+        Assert.Contains("Logs, calibration recordings", Texts(window));
+        Assert.DoesNotContain("Models, logs", Texts(window));
+        Assert.Single(All<Button>(window), b => AutomationProperties.GetName(b) == "Open the folder for Logs, calibration recordings");
+        window.Close();
+        return Task.CompletedTask;
+    });
+
+    /// <summary>
+    /// Re-lens on PR #71 (23/10/2026): choosing the default folder's own path writes models.folder, but LookupOrder drops a chosen
+    /// folder equal to the default, so the models are still in Dictum's own data folder and the row keeps them.
+    /// </summary>
+    [Fact]
+    public Task Storage_keeps_the_models_in_its_own_folder_row_when_the_chosen_folder_is_the_default_one() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "models_dir": null } }""");
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false));
+        shell.Reload(userRequested: false);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        dialogs.Folder = scratch.Paths.DefaultModelsDir;
+        Click(ButtonNamed(window, StoragePage.ChangeLabel));
+        Assert.Equal(scratch.Paths.DefaultModelsDir, shell.Settings.Models.Folder); // the setting names the default folder's own path
+        Assert.Equal(ModelFolderKind.Default, ModelFolders.LookupOrder(scratch.Paths, shell.Settings)[0].Kind); // which the lookup order drops
+        Assert.Contains("Models, logs, calibration recordings", Texts(window));
+        Assert.Single(All<Button>(window), b => AutomationProperties.GetName(b) == "Open the folder for Models, logs, calibration recordings");
+        window.Close();
+        return Task.CompletedTask;
+    });
+
+    /// <summary>
     /// Pin (22/10/2026, owner report "no option to change this location"): Settings > Storage shows Change… and Use default beside
     /// the model folder, which run the same handlers as Models' Browse… and Use default (the same chooser seam, the same
     /// models.folder write); the note, the drive-speed sentence and the accessible names are there; the folders that cannot be
@@ -448,6 +518,9 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Contains($"Downloads go to: {scratch.Paths.DefaultModelsDir}", Texts(window));
         Assert.False(useDefault.IsEnabled); // nothing is chosen yet, as on Models
         Assert.True(change.Focusable && change.IsTabStop); // reached with Tab
+        // First beta finding (23/10/2026): "Remove everything" names the platform's own startup items, not the Start menu.
+        Assert.Contains("keys, the fake shortcut and the fake launch-at-login entry, then the program itself.", Texts(window));
+        Assert.DoesNotContain("Start menu", Texts(window));
 
         dialogs.Folder = chosen;
         Click(change);

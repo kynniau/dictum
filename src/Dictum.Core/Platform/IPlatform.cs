@@ -233,6 +233,12 @@ public interface IRemovalSteps
     IReadOnlyList<string> RemoveShortcutAndStartup();
 
     /// <summary>
+    /// What <see cref="RemoveShortcutAndStartup"/> removes, as the Storage page's "Remove everything" sentence names it, lower
+    /// case and without a full stop: "the Start menu shortcut and the launch-at-login entry" on Windows, "the login item" on macOS.
+    /// </summary>
+    string StartupItemsPhrase { get; }
+
+    /// <summary>
     /// Starts a detached step that, after this process exits, deletes the files <paramref name="folder"/>'s manifest.txt
     /// lists (same name and size), the folders that leaves empty, and the folder itself only if it is then empty (SPEC §17,
     /// amended). False (with the reason) when it is not done.

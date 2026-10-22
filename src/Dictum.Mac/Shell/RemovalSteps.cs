@@ -28,6 +28,9 @@ internal sealed class RemovalSteps(ILog log, AppBundle? bundle, string exeDir, F
     internal const string LoginItemPath = "System Settings > General > Login Items > Dictum";
     internal const string BundleDescription = "Dictum.app, moved to the Trash after Dictum closes";
 
+    // PROPOSED 23/10/2026 (first beta finding): the Storage page's "Remove everything" sentence named the Start menu on a Mac.
+    public string StartupItemsPhrase => "the login item";
+
     // PROPOSED 23/10/2026: why the program is left in place.
     internal const string NotInstalledCopy = "This copy is not the installed Dictum.app, so it stays where it is. Move it to the Trash yourself.";
     internal const string Translocated = "macOS is running this copy from a temporary read-only location, so it cannot be moved. Drag Dictum.app to the Trash yourself.";

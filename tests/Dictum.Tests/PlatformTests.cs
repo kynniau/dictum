@@ -110,6 +110,11 @@ public class PackagingTests
         File.Delete(Path.Combine(scratch.Root.FullName, "Dictum.sln"));
         var steps = new RemovalSteps(new FakeRunKey(), install, Path.Combine(install, "Dictum.exe"), false, scratch.Root.FullName, scratch.Root.FullName, NullLog.Instance,
             waitForProcessId: 1234);
+        Assert.Equal("the Start menu shortcut and the launch-at-login entry", steps.StartupItemsPhrase);
+        // The Storage page's "Remove everything" sentence on Windows, byte for byte as before IRemovalSteps.StartupItemsPhrase existed.
+        Assert.Equal("Deletes every model, recording, log, setting, your dictionary, corrections and .env keys, the Start menu shortcut and the " +
+            "launch-at-login entry, then the program itself. Two warnings come first; the second needs DELETE typed.",
+            Dictum.UI.Views.Settings.StoragePage.RemoveEverythingText(steps.StartupItemsPhrase));
         var start = steps.RemovalStart(install);
         Assert.Equal(install, start.Environment[RemovalSteps.FolderVariable]); // the folder travels outside the script text
         Assert.Equal("1234", start.Environment[RemovalSteps.WaitVariable]);

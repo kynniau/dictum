@@ -29,7 +29,8 @@ internal sealed partial class CalibrationWindow : Window
 
     /// <summary>
     /// Where the recordings are, without the path (APPROVED 22/10/2026; proposed 1.2 polish, 22/10/2026). The folder is Dictum's own
-    /// (AppPaths.CalibrationDir), not one the user chose, and Settings > Storage lists it under "Models, logs, calibration recordings".
+    /// (AppPaths.CalibrationDir), not one the user chose, and Settings > Storage lists it under "Models, logs, calibration recordings"
+    /// ("Logs, calibration recordings" once a model folder is chosen).
     /// </summary>
     public const string RecordingsNote = "Nothing is uploaded: the recordings stay in Dictum's folder on this PC (Settings > Storage lists it), so the test can be re-run when you add a model.";
 
