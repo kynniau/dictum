@@ -152,6 +152,17 @@ public sealed record LlmSettings
     /// <summary>true: the cleanup prompt also asks for article, tense, preposition and word-order fixes (SPEC §16.5).</summary>
     public bool GrammarAssist { get; init; }
 
+    /// <summary>The longest <see cref="Instructions"/> Dictum uses, in UTF-16 characters (the box on Settings > Clean-up stops there too).</summary>
+    public const int InstructionsMaxLength = 2000;
+
+    /// <summary>
+    /// llm.instructions (1.3): the user's own clean-up instructions, added to the system prompt in their own section for the local
+    /// model and cloud clean-up alike (<see cref="Llm.CleanupPrompt.Build"/>); never for the rule-based tidy or off. Null when empty.
+    /// At most <see cref="InstructionsMaxLength"/> characters (the loader keeps the first ones). Private text: the log gets its
+    /// length only, and no email, page or state line shows it; every reply is still checked by the validator.
+    /// </summary>
+    public string? Instructions { get; init; }
+
     /// <summary>
     /// The host the user agreed, in Dictum's consent dialog, to send dictations to for cloud clean-up (SPEC §22): a cloud
     /// provider runs only while this names the host it would send to. Null = no consent given. Filled at load from

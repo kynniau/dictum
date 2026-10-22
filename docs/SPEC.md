@@ -295,6 +295,22 @@ System prompt (ship as the default; overridable by `llm.prompt_file`):
 The user turn is the raw transcript only. Never put the API key or any settings in the
 prompt.
 
+Your own instructions (amendment, 22/10/2026, release 1.3; strings PROPOSED): `llm.instructions` (string or null, default
+null; multi-line allowed; at most 2,000 characters, `LlmSettings.InstructionsMaxLength`) holds the user's own clean-up
+instructions, typed in a box on Settings → Clean-up in the Advanced view. When it is set they are added to the system
+prompt in their own section, after the base prompt and before the grammar-assist sentence and the dictionary line: the line
+`CleanupPrompt.OwnInstructionsStart`, the text as typed, then `CleanupPrompt.OwnInstructionsEnd`, once. The base prompt is
+the built-in one, or `llm.prompt_file` when that is set: **if both are set, the file replaces the built-in prompt and the
+instructions are still added after it.** They go to the local model and to cloud clean-up alike (for cloud clean-up they are
+part of the text sent, under the clean-up consent already given); never to `none` (the rule-based tidy) or `off`. The
+validator and its rules are unchanged and check every reply whatever the instructions say: a reply that adds a line or a
+bracketed remark, summarises, translates or answers is rejected and the rule-based tidy is typed. Its known ceiling: a short
+sentence added on the same line as the dictation is accepted (probed 22/10/2026; see the pin in `OwnInstructionsTests`).
+Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
+feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
+first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is
+`OwnInstructionsCard`; placing it in `CleanupPage` (OtherPages.cs, another lane's file) is pending: DECISIONS, 22/10/2026.
+
 Providers (`llm.provider`):
 
 - `local` (default): llama.cpp in-process via LLamaSharp; `llm.model` is a cleanup
@@ -308,6 +324,17 @@ Secrets precedence (standard dotenv behaviour): a real process/machine environme
 variable wins; `.env` only fills in variables that are not already set. This lets a
 staff machine or Azure VM be configured with a machine-level `ANTHROPIC_API_KEY` and no
 `.env` file at all.
+
+Create the key file (amendment, 22/10/2026, release 1.3; strings PROPOSED): a "Create the key file…" button beside "Open
+the settings folder" on the Cloud clean-up card writes the config folder's `.env` (`AppPaths.EnvFile`, %APPDATA%\Dictum\.env
+on Windows) with a two-line header in `.env.example`'s comment style and one line, `<VARIABLE>=your-key-here`, for the
+variable the card's key line names for the service and address chosen (Anthropic's own entry: `ANTHROPIC_API_KEY`; a
+preset or custom address: `CloudPresets.ForAddress`). It then opens the file with `IPlatform.Open`, as the folder button
+does (at the real path in a packaged build). A `.env` that already exists is never changed (the create fails rather than
+overwrite) and is opened as it is. A service that takes no key (Ollama on this PC) gets no file, only the card's own "needs
+no key" line. The placeholder `your-key-here` (`SecretStore.Placeholder`) counts as not set, as a blank value does, so no
+dictation is sent with it and the pages keep their waiting-for-key line until a real key is saved over it. The button is
+`KeyFileButton`; placing it in `CleanupPage` (OtherPages.cs) is pending: DECISIONS, 22/10/2026.
 
 ## 6. Text insertion
 
@@ -1312,7 +1339,7 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
-  others, and what to do about it), then twelve questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
+  others, and what to do about it), then thirteen questions and answers (counted in `HelpText.Questions` on 22/10/2026 at main 04287d6; the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
   Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
   themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls

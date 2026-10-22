@@ -4777,3 +4777,84 @@ copy are the C-Copy lane's, gated on owner approval.
        22/10/2026): "fallback." changed to "fallback!". The Simple case of the Models-page pin observed failing; then restored.
     - Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnerApprovalsTests, CloudWarningAndPresetsTests, ShellTests,
       CloudSpeechModelsPageTests, CloudSpeechUiTests and SimpleViewTests: 138 total, 0 failed. Full suite: 1920 total, 0 failed, 23 skipped.
+
+## Clean-up: your own instructions and Create the key file (22/10/2026, branch feat/own-instructions, release 1.3)
+
+Two owner requests for Settings > Clean-up, built from main 04287d6. Every new string is PROPOSED; none is approved yet.
+
+1. **Your own instructions.** New key `llm.instructions` (string or null, default null, multi-line, at most 2,000 characters:
+   `LlmSettings.InstructionsMaxLength`). `CleanupPrompt.Build` adds them after the base prompt (built-in or `llm.prompt_file`)
+   and before the grammar-assist sentence and the dictionary line, once, between `OwnInstructionsStart` and `OwnInstructionsEnd`.
+   With `llm.prompt_file` set too, the file replaces the built-in prompt and the instructions are still added. The local model
+   and cloud clean-up get them; `none` and `off` never do. The validator is unchanged and checks every reply.
+   - *Private text.* `ModelCoordinator.TryWrite` logged every written value as JSON, so the box would have put the text in the
+     log ("Set from the app: llm.instructions = …"). It now logs `SettingsFile.LogValue`, which gives the length for a key in
+     `SettingsFile.PrivateKeys`. The loader's generic warning quotes up to 57 characters of a bad value, so the key has its own
+     reader (`ObjectReader.PrivateText`), whose warnings give a length only. The clean-up's load line gives the length. The
+     feedback email, the state lines and See how it works carry no prompt text (pinned).
+   - *Validator ceiling (found by this lane, not fixed: the brief keeps the validator unchanged).* A short sentence added on
+     the same line as the dictation passes every rule. Probed 22/10/2026 with "um so i think we should uh move the meeting to
+     thursday and tell the whole team before lunch": "… before lunch. Thanks for reading.", "… before lunch. Kind regards."
+     and "… before lunch. Please call me if you have any questions." were all accepted. A line of its own, a bracketed remark,
+     a translation and a summary are rejected (pinned). So instructions that ask for an added sentence can get one through,
+     as a model could without them. Trigger to retire: a validator rule for a final sentence the speaker did not say.
+   - *Page placement pending.* The Clean-up page is `CleanupPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, a file
+     another lane owns. The box is `OwnInstructionsCard` and the button `KeyFileButton` (both in `CleanupOwnInstructions.cs`).
+     Wiring them in takes five small edits in `CleanupPage`, listed in the PR body. They are not made here.
+2. **Create the key file.** `KeyFile.CreateIfMissing` writes `AppPaths.EnvFile` with `KeyFile.Header` and
+   `<VARIABLE>=your-key-here` (the variable must be one of `SecretStore.KeyNames`). It opens with `FileMode.CreateNew` after an
+   exists check, so an existing `.env` is never changed. `AppShell.CreateKeyFile` then opens the file through `OpenPath` at
+   its real path. `KeyFileButton.VariableFor` picks the variable the card's key line names (Anthropic's entry:
+   `ANTHROPIC_API_KEY`; otherwise `CloudPresets.ForAddress`). A service with no key (Ollama on this PC) writes nothing.
+   - *Placeholder is not a key (lane decision).* Before this change `SecretStore` read `your-key-here` as a key. Dictum would then
+     send each dictation to the service with a key that cannot work, and the page would say clean-up was on. `SecretStore.Merge`
+     now treats `SecretStore.Placeholder` as not set, as it treats a blank value. The waiting-for-key line stays until a real key is saved.
+     The first full run caught one consequence: `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built` used the
+     placeholder as its stand-in key. Its walk-through now first saves the placeholder and checks the card still waits, then
+     saves a stand-in key ("k-standin-not-real") and checks the card says On, and that the stand-in is never shown.
+   - *Wiring checked, not committed.* The five `CleanupPage` edits from the PR body were applied in this worktree only. A
+     throwaway headless test then passed: Advanced view, typed text saved on leaving the page and shown again, the button
+     made the Anthropic file and showed the created line, and Simple hid the box. The edits and the test were then removed.
+     (Without a layout pass the page switch did not save, because the box was never attached; a real window lays out.)
+3. **Docs.** SPEC §5 has both amendments. SPEC §26 said "twelve questions and answers". `HelpText.Questions` at 04287d6 has
+   thirteen, counted in its initializer, so it now says thirteen. (The brief said the SPEC read "thirteen" and main had
+   fifteen; at this branch's base neither was so.) README has the `llm.instructions` row.
+
+PROPOSED strings, verbatim:
+- Card label and the box's accessible name: "Your own instructions"
+- Hint: "Added to Dictum's clean-up instructions for the AI and cloud clean-up. Dictum still checks every reply against what you said."
+- At the cap: "That is the limit: Dictum uses up to 2,000 characters of your own instructions."
+- Cloud clean-up on: "With cloud clean-up on, these instructions go to {host} with each dictation."
+- Prompt section start (to the model): "The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply."
+- Prompt section end (to the model): "End of the user's instructions."
+- Button: "Create the key file…"
+- Created: "Your key file has been created and opened: put your key in place of your-key-here after {VARIABLE}=, then save it."
+- Exists: "Your key file already exists; it has been opened."
+- Key file header, line 1: "# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself."
+- Key file header, line 2: "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log."
+- Log (written value): "Set from the app: llm.instructions = ({N} characters, not logged)."
+- Log (clean-up loaded): "Clean-up instructions: Dictum's, with your own added ({N} characters; their text is not logged)."
+- Log (key file): "Key file created with a placeholder line for {VARIABLE} (no key written)." / "Key file already exists: opened as it is, not changed."
+- Load warnings: "Setting \"llm.instructions\" is {N} characters long; only the first 2000 are used." / "Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used."
+- settings.json `_doc` llm note, added sentence: "instructions: your own clean-up instructions (at most 2,000 characters; Settings > Clean-up in the Advanced view writes them), added after the prompt, built-in or prompt_file, for the local model and cloud clean-up, never for none or off; every reply is still checked against what you said."
+
+Pins (`OwnInstructionsTests`, `KeyFileTests`): round trip through settings.json, multi-line kept and blank read as none;
+added once, in order, also after a prompt file; sent once to a cloud service; never used by `none` or `off`; the validator
+still rejects a sign-off line, a bracketed remark, a translation and a summary that the instructions ask for; the cap (with
+a surrogate pair at the cut) and warnings without the text; the log never has the text (the app's write, the reload, a value
+over the cap); the feedback email never has it; See how it works never shows it; the box is Advanced-only, saves trimmed
+text when focus leaves it, and shows the limit and cloud-host lines; the key file has the right variable for each service;
+an existing file stays the same byte for byte; the file is opened at its path; both status lines; the placeholder counts as
+not set and sends nothing.
+
+Mutations (each observed failing, 22/10/2026, then restored):
+- Validator pin: `CleanAsync` used the model's reply without `CleanupValidator.Validate`. All four cases of
+  `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing.
+- Log pin: `TryWrite` logged `v.Value?.ToJsonString()` again. `The_log_gets_their_length_and_never_their_text` observed
+  failing on `DoesNotContain(Marker)` ("zebracorn-7316" found).
+- No-overwrite pin: `KeyFile.CreateIfMissing` without its exists check and with `FileMode.Create`.
+  `An_existing_file_is_left_byte_for_byte_and_opened` observed failing on the byte comparison.
+- Placeholder: `Merge` without `v != Placeholder`. `The_placeholder_counts_as_not_set_so_nothing_is_sent_with_it` observed
+  failing ("your-key-here" returned as the key).
+
+Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnInstructionsTests, KeyFileTests, CloudWarningAndPresetsTests, CleanupOffTests, FixBatchSettingsTests, PublicCopyNeutralityTests and HelpPageTests: 166 total, 0 failed, 0 skipped. Full suite, first run: 1951 total, 1 failed (`HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`, the placeholder stand-in, fixed as above), 23 skipped. Full suite after the fix: 1951 total, 1928 passed, 0 failed, 23 skipped.

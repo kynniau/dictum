@@ -44,14 +44,26 @@ public static class CleanupPrompt
     /// <summary>The system prompt with a hands-free part's context line after it (the cloud providers', and the checks', reading).</summary>
     public static string WithCarried(string systemPrompt, string carried) => systemPrompt + "\n" + CarriedLine(carried);
 
+    /// <summary>PROPOSED 22/10/2026 (1.3): the line before the user's own instructions (llm.instructions) in the system prompt.</summary>
+    public const string OwnInstructionsStart =
+        "The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply.";
+
+    /// <summary>PROPOSED 22/10/2026 (1.3): the line after them.</summary>
+    public const string OwnInstructionsEnd = "End of the user's instructions.";
+
+    /// <summary>The user's own instructions as their section of the prompt: the start line, the text as typed, the end line.</summary>
+    public static string OwnInstructions(string instructions) => OwnInstructionsStart + "\n" + instructions.Trim() + "\n" + OwnInstructionsEnd;
+
     /// <summary>
-    /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the grammar-assist sentence
+    /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the user's own instructions in
+    /// their delimited section when llm.instructions has any (<see cref="OwnInstructions"/>), then the grammar-assist sentence
     /// when llm.grammar_assist is on, then the personal dictionary's "Known names and terms" line when it has terms.
-    /// Each addition is its own line, so a custom prompt file gets them too.
+    /// Each addition is its own line, so a custom prompt file gets them too. The validator checks every reply whatever is here.
     /// </summary>
-    public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine)
+    public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine, string? instructions = null)
     {
         var prompt = basePrompt;
+        if (!string.IsNullOrWhiteSpace(instructions)) prompt += "\n" + OwnInstructions(instructions);
         if (grammarAssist) prompt += "\n" + GrammarAssist;
         if (!string.IsNullOrWhiteSpace(dictionaryLine)) prompt += "\n" + dictionaryLine;
         return prompt;
