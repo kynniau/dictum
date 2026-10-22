@@ -19,12 +19,12 @@ public sealed record PersonalCleanup(string? DictionaryLine, IReadOnlyCollection
     public static readonly PersonalCleanup None = new(null, null, null);
 
     /// <summary>
-    /// The system prompt (llm.prompt_file or the built-in one, the grammar-assist sentence when on, the dictionary line) and
-    /// the checks every reply to it gets; the same for every provider and for --bench-cleanup.
+    /// The system prompt (llm.prompt_file or the built-in one, the user's own instructions, the grammar-assist sentence when on,
+    /// the dictionary line) and the checks every reply to it gets; the same for every provider and for --bench-cleanup.
     /// </summary>
     public (string Prompt, ValidationContext Validation) Checks(LlmSettings settings, Action<string> warn)
     {
-        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, warn), settings.GrammarAssist, DictionaryLine);
+        var prompt = CleanupPrompt.Build(CleanupPrompt.Load(settings.PromptFile, warn), settings.GrammarAssist, DictionaryLine, settings.Instructions);
         return (prompt, new ValidationContext(prompt, MustKeepWords, DictionaryTerms));
     }
 }
@@ -257,6 +257,18 @@ public sealed class TranscriptCleaner
         };
     }
 
+    /// <summary>
+    /// A model clean-up built with the user's own instructions (llm.instructions) says so in the log by their length alone: the
+    /// text is private and never logged. Only the model arms call it, so rules-only and off never claim instructions they do not use.
+    /// </summary>
+    private static TranscriptCleaner Noted(TranscriptCleaner cleaner, LlmSettings settings, ILog log)
+    {
+        if (settings.Instructions is { Length: > 0 } own && cleaner.SystemPrompt.Contains(CleanupPrompt.OwnInstructionsStart, StringComparison.Ordinal))
+            // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the log line below.
+            log.Info($"Clean-up instructions: Dictum's, with your own added ({own.Length} characters; their text is not logged).");
+        return cleaner;
+    }
+
     /// <summary>Builds the configured provider. A provider that cannot run becomes rules-only, with the reason.</summary>
     /// <param name="local">The loaded local model, if any (null until it has loaded).</param>
     /// <param name="personal">The dictionary line, kept words and dictionary terms (PersonalText.ForCleanup), or none.</param>
@@ -301,7 +313,7 @@ public sealed class TranscriptCleaner
             case LlmSettings.Local:
                 var name = CleanupCatalog.DisplayName(settings.Model);
                 var client = new LocalLlmClient(local ?? (() => null), name);
-                return new TranscriptCleaner(client, prompt, timeout, log, $"local/{name} on this PC (nothing leaves it)", validation: validation);
+                return Noted(new TranscriptCleaner(client, prompt, timeout, log, $"local/{name} on this PC (nothing leaves it)", validation: validation), settings, log);
 
             case LlmSettings.OpenAiCompatible:
                 if (settings.BaseUrl is null) return RulesOnly("rule-based tidy only: llm.base_url is required for openai-compatible");
@@ -315,7 +327,7 @@ public sealed class TranscriptCleaner
                 }
                 var oai = new OpenAiCompatibleLlmClient(http, settings.BaseUrl, settings.Model, key);
                 var keyState = service.KeyVariable is null ? "no key sent" : $"{service.KeyVariable} {(key is null ? "absent" : "present")}";
-                return new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})", validation: validation);
+                return Noted(new TranscriptCleaner(oai, prompt, timeout, log, $"{oai.Name} ({keyState})", validation: validation), settings, log);
 
             default:
                 if (AnthropicRedirectWarning(settings) is { } redirect) log.Warn(redirect);
@@ -324,7 +336,7 @@ public sealed class TranscriptCleaner
                 // llm.model defaults to a local cleanup model; that is not an Anthropic model id.
                 var model = CleanupCatalog.IsValidSetting(settings.Model) ? LlmSettings.AnthropicDefaultModel : settings.Model;
                 var anthropic = new AnthropicLlmClient(apiKey, model, timeout, settings.BaseUrl, http); // the shared, offline-guarded client
-                return new TranscriptCleaner(anthropic, prompt, timeout, log, $"{anthropic.Name} (ANTHROPIC_API_KEY present)", validation: validation);
+                return Noted(new TranscriptCleaner(anthropic, prompt, timeout, log, $"{anthropic.Name} (ANTHROPIC_API_KEY present)", validation: validation), settings, log);
         }
     }
 }

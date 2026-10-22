@@ -153,7 +153,7 @@ Delete models, recordings and logs from Settings, or remove everything at once
 
 ### What's new in this version (1.3.0)
 
-APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Paste it in "What's new in this version" on the 1.3.0 submission, and keep only the sentences whose feature is in the build: the sentences on cloud speech depend on the cloud speech UI (merged); the sentences on your own instructions and the key file depend on the own-instructions lane (PR #60, wired into Settings > Clean-up at 5e9c227, not merged when this was written); and "Settings > Storage offers to move your model files" depends on PR #61 (f5ec71c, not merged when this was written), which offers the move from Change…, Browse… and Use default (owner, 22/10/2026 21:45 AEDT).
+APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Paste it in "What's new in this version" on the 1.3.0 submission, and keep only the sentences whose feature is in the build: the sentences on cloud speech depend on the cloud speech UI (merged); the sentences on your own instructions and the key file depend on the own-instructions lane (PR #60, merged at 672f85b into main 4a4072a); and "Settings > Storage offers to move your model files" depends on PR #61 (f5ec71c, not merged when this was written), which offers the move from Change…, Browse… and Use default (owner, 22/10/2026 21:45 AEDT).
 
 ```text
 Adds optional cloud speech: an advanced setting, off by default, that sends each recording to OpenAI, Azure OpenAI or Groq with your own API key, after a consent step of its own. The speech model on this PC is still used by default and when a request fails. Settings > Clean-up has a box for your own clean-up instructions and a Create the key file button. Settings > Storage offers to move your model files when you change their folder. Help explains what clean-up is, and Settings > About has a new "In plain words" statement, also on the Dictum website.
@@ -359,7 +359,7 @@ Support: hello@kynni.com.au
 
 ### Notes for certification: PROPOSED for 1.3.0
 
-PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner). Not yet in the block above, which stays the approved 1.2.1 notes until the release lane runs. For 1.3.0, replace its "Notes written" line, its CHANGED paragraph and its cloud paragraph with these. The CHANGED paragraph names features that must be in the build: the cloud speech UI is merged; the own-instructions box and the Create the key file button are PR #60 (wired into Settings > Clean-up at 5e9c227, not merged when this was written); "Settings > Storage offers to move model files" is PR #61 (f5ec71c, not merged when this was written; it offers the move from Change…, Browse… and Use default). Delete any sentence whose feature is not in the build.
+PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner). Not yet in the block above, which stays the approved 1.2.1 notes until the release lane runs. For 1.3.0, replace its "Notes written" line, its CHANGED paragraph and its cloud paragraph with these. The CHANGED paragraph names features that must be in the build: the cloud speech UI is merged; the own-instructions box and the Create the key file button are PR #60 (merged at 672f85b into main 4a4072a); "Settings > Storage offers to move model files" is PR #61 (f5ec71c, not merged when this was written; it offers the move from Change…, Browse… and Use default). Delete any sentence whose feature is not in the build.
 
 ```text
 Notes written DD/MM/2026 for Dictum 1.3.0.

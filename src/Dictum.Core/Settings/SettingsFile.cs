@@ -69,7 +69,7 @@ public static class SettingsFile
                 // The speech note (cloud speech): APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
                 ["speech"] = "Absent = local. provider: local (the speech model in whisper, on this PC: nothing leaves it) | openai-compatible (each recording, or each hands-free part, is sent as audio to the service at base_url, which Dictum appends /audio/transcriptions to; your dictionary terms go with it as a hint). base_url and model are required for openai-compatible (for Azure OpenAI, model is your deployment name; https:// only, also for a server on this PC). timeout_ms: the deadline for one request (1000-120000). Cloud speech runs only after its own consent step, which records it in consent.json; settings.json cannot switch it on, and offline_only refuses it. The language hint is whisper.language (none for auto); with whisper.translate on, cloud speech is not used. Any failure (no key, an HTTP error, the deadline) uses the speech model on this PC for that recording.",
                 ["models"] = "folder: null = Dictum's own folder, %LOCALAPPDATA%\\Dictum\\models; or an absolute folder on another drive or a network share (models load slowly from a share), where Dictum looks first and downloads go. It then looks in its own folder, then in the models that come with it (base.en, beside Dictum.exe, never changed). Changing it moves no files. Settings > Models > Model folder writes it.",
-                ["llm"] = $"provider: local (a small model on this PC, nothing leaves it; used when this key is absent) | anthropic | openai-compatible | none (rule-based tidy only; the first run writes it when base.en comes with Dictum, and Settings > Models > Add AI clean-up switches to local) | off (no clean-up: spaces tidied only; your corrections, snippets and the profanity filter still apply; spoken commands such as \"new paragraph\" are typed as words). model: for local a cleanup model name ({string.Join(", ", CleanupCatalog.Entries.Select(e => e.Name))}) or an absolute .gguf path; for cloud providers the model id. gpu (local): auto | vulkan | cpu, needs a restart. base_url is required for openai-compatible (e.g. http://localhost:11434/v1 for Ollama; plain http:// only for a server on this PC); for anthropic it is optional and replaces https://api.anthropic.com (the ANTHROPIC_BASE_URL environment variable is ignored). A cloud provider runs only after Settings > Clean-up's consent step, which records it in consent.json; settings.json cannot switch it on. prompt_file: absolute path to a custom system prompt. grammar_assist: true also fixes articles, tenses, prepositions and word order (for speakers whose first language is not English).",
+                ["llm"] = $"provider: local (a small model on this PC, nothing leaves it; used when this key is absent) | anthropic | openai-compatible | none (rule-based tidy only; the first run writes it when base.en comes with Dictum, and Settings > Models > Add AI clean-up switches to local) | off (no clean-up: spaces tidied only; your corrections, snippets and the profanity filter still apply; spoken commands such as \"new paragraph\" are typed as words). model: for local a cleanup model name ({string.Join(", ", CleanupCatalog.Entries.Select(e => e.Name))}) or an absolute .gguf path; for cloud providers the model id. gpu (local): auto | vulkan | cpu, needs a restart. base_url is required for openai-compatible (e.g. http://localhost:11434/v1 for Ollama; plain http:// only for a server on this PC); for anthropic it is optional and replaces https://api.anthropic.com (the ANTHROPIC_BASE_URL environment variable is ignored). A cloud provider runs only after Settings > Clean-up's consent step, which records it in consent.json; settings.json cannot switch it on. prompt_file: absolute path to a custom system prompt. instructions: your own clean-up instructions (at most 2,000 characters; Settings > Clean-up in the Advanced view writes them), added after the prompt, built-in or prompt_file, for the local model and cloud clean-up, never for none or off; every reply is still checked against what you said. grammar_assist: true also fixes articles, tenses, prepositions and word order (for speakers whose first language is not English).",
                 ["insert"] = "method: paste (clipboard + Ctrl+V) or type (simulated typing for apps that block paste). restore_clipboard restores text formats only. clipboard_history false keeps transcripts out of Win+V history and cloud clipboard.",
                 ["indicator"] = "mode: off | orb | edge | both. The orb is a large badge in a corner (orb_corner: bottom-right | bottom-left | top-right | top-left); edge is a red glow round every screen while recording. Both are click-through and never take focus.",
                 ["sounds"] = "enabled: true plays a short sound when recording starts and stops.",
@@ -107,6 +107,7 @@ public static class SettingsFile
                 ["prompt_file"] = null,
                 ["gpu"] = d.Llm.Gpu,
                 ["grammar_assist"] = d.Llm.GrammarAssist,
+                ["instructions"] = null,
             },
             ["insert"] = new JsonObject
             {
@@ -137,6 +138,16 @@ public static class SettingsFile
         WriteAtomic(path, DefaultJson(model, cleanupProvider, cleanupModel));
         return true;
     }
+
+    /// <summary>Keys whose value is the user's own text (llm.instructions): the log names them with a length, never the value.</summary>
+    public static readonly IReadOnlySet<string> PrivateKeys = new HashSet<string>(StringComparer.Ordinal) { "llm.instructions" };
+
+    /// <summary>A written value as the log may show it: as JSON, or for a <see cref="PrivateKeys"/> key its length alone.</summary>
+    public static string LogValue(string dottedKey, JsonNode? value) =>
+        value is null ? "null"
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the length line below.
+        : PrivateKeys.Contains(dottedKey) ? $"({(value is JsonValue v && v.TryGetValue<string>(out var text) ? text.Length : 0)} characters, not logged)"
+        : value.ToJsonString();
 
     /// <summary>
     /// Sets one key (dotted path, e.g. "whisper.model") in the existing file, keeping every other key. Returns false and

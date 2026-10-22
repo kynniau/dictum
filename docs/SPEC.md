@@ -295,6 +295,44 @@ System prompt (ship as the default; overridable by `llm.prompt_file`):
 The user turn is the raw transcript only. Never put the API key or any settings in the
 prompt.
 
+Your own instructions (amendment, 22/10/2026, release 1.3; strings APPROVED 22/10/2026 22:52 AEDT): `llm.instructions` (string or null, default
+null; multi-line allowed; at most 2,000 characters, `LlmSettings.InstructionsMaxLength`) holds the user's own clean-up
+instructions, typed in a box on Settings → Clean-up in the Advanced view. When it is set they are added to the system
+prompt in their own section, after the base prompt and before the grammar-assist sentence and the dictionary line: the line
+`CleanupPrompt.OwnInstructionsStart`, the text as typed, then `CleanupPrompt.OwnInstructionsEnd`, once. The base prompt is
+the built-in one, or `llm.prompt_file` when that is set: **if both are set, the file replaces the built-in prompt and the
+instructions are still added after it.** They go to the local model and to cloud clean-up alike (for cloud clean-up they are
+part of the text sent, under the clean-up consent already given); never to `none` (the rule-based tidy) or `off`. The
+validator checks every reply whatever the instructions say: a reply that adds a line, a bracketed remark or a closing
+sentence, summarises, translates or answers is rejected and the rule-based tidy is typed.
+
+Final-sentence rule (owner decision, 22/10/2026 20:55 AEDT; reworked after the lens on 5e9c227 and the re-lens on c796dc8;
+reason text APPROVED 22/10/2026 22:52 AEDT): a short sentence added at the end on the same line as the dictation ("… before lunch. Thanks for
+reading.") had passed every rule. `CleanupValidator` now rejects it as "reply ends with a sentence the speaker did not say":
+in a reply of two sentences or more, the last sentence's words of three letters or more that are not function words,
+fillers or spoken commands (`ValidatorText.IsCorrectionWord`), leaving out words with a digit (the number rule's), must be
+at least half said, the share the final-line rule uses. A word is said when the dictation has it: as spelt; by its stem
+("won't" → "will", "can't" → "can", "shan't" → "shall", any other "-n't" without it, else the part before the apostrophe,
+"I'd" → "i"); with accents folded ("café", "résumé", "Zoë"); within one edit of a dictated counted word when both have
+five letters or more ("cancelled", "Catherine"); the same against two or three dictated words joined, or four single
+letters ("email", "alright", "tomorrow" from "to morrow", "ATO", "ASIC"); or, for a word of a dictionary term only,
+sounding like a dictated counted word (`ValidatorText.SoundsLike`: "kinney" → "Kynni", "zero" → "Xero", "dictim" →
+"Dictum"). Sound keys are used for nothing else: short keys collide ("bye" with "be", "good" with "go"), and the re-lens
+found 14 of 50 sign-offs passing that way. It runs after the dictionary-term and hands-free repeat rules, so their reasons
+stand. Ceiling: a last sentence made of words said in that dictation passes ("Done." after "the report is done"), so does
+one with no counted word ("Ta."), and a short last sentence a grammar fix rewrites into other words is rejected ("i asked
+him he go" → "I asked him. He went.", pinned; a false rejection costs polish only). `FinalSentenceRuleTests` pins the
+re-lens's whole corpus (84 honest tidies, 50 sign-offs on five dictations, the first lens's 27 closing sentences) with the
+result each gets. The echo rule reads the prompt without the user's own text inside their section
+(`CleanupPrompt.WithoutOwnText`), so a reply may repeat words of the instructions that the dictation has too; every copy
+of either marker line in the typed text (any case, curly apostrophes read as straight, nested copies included) is taken
+out before the text is wrapped. In the Simple view, which hides the box, the Clean-up page says "Your own clean-up
+instructions are in use (Advanced view)." while `llm.instructions` is set (APPROVED 22/10/2026 22:52 AEDT).
+Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
+feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
+first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is
+`OwnInstructionsCard`, placed in `CleanupPage` between the Grammar and Cloud clean-up cards; it is saved when focus leaves it and when the page is left or the window closes (`CleanupPage.Leave`).
+
 Providers (`llm.provider`):
 
 - `local` (default): llama.cpp in-process via LLamaSharp; `llm.model` is a cleanup
@@ -308,6 +346,17 @@ Secrets precedence (standard dotenv behaviour): a real process/machine environme
 variable wins; `.env` only fills in variables that are not already set. This lets a
 staff machine or Azure VM be configured with a machine-level `ANTHROPIC_API_KEY` and no
 `.env` file at all.
+
+Create the key file (amendment, 22/10/2026, release 1.3; strings APPROVED 22/10/2026 22:52 AEDT): a "Create the key file…" button beside "Open
+the settings folder" on the Cloud clean-up card writes the config folder's `.env` (`AppPaths.EnvFile`, %APPDATA%\Dictum\.env
+on Windows) with a two-line header in `.env.example`'s comment style and one line, `<VARIABLE>=your-key-here`, for the
+variable the card's key line names for the service and address chosen (Anthropic's own entry: `ANTHROPIC_API_KEY`; a
+preset or custom address: `CloudPresets.ForAddress`). It then opens the file with `IPlatform.Open`, as the folder button
+does (at the real path in a packaged build). A `.env` that already exists is never changed (the create fails rather than
+overwrite) and is opened as it is. A service that takes no key (Ollama on this PC) gets no file, only the card's own "needs
+no key" line. The placeholder `your-key-here` (`SecretStore.Placeholder`) counts as not set, as a blank value does, so no
+dictation is sent with it and the pages keep their waiting-for-key line until a real key is saved over it. The button is
+`KeyFileButton`, beside "Open the settings folder" on the Cloud clean-up card.
 
 ## 6. Text insertion
 
@@ -1312,7 +1361,7 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
   tidy; the paste; nothing is sent unless cloud clean-up or cloud speech is turned on; why a speech model hears some people better than
-  others, and what to do about it), then thirteen questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
+  others, and what to do about it), then sixteen questions and answers (counted in `HelpText.Questions` on 22/10/2026 at main 4a4072a with this PR's one new question; the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
   Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
   themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
@@ -1584,5 +1633,5 @@ cloud speech and the 1.3 features".
   certify how the service handles the voice; This website; Offline only, which now refuses cloud speech to a service that is not on the PC; What any connection reveals); If you install from the
   Microsoft Store; This website; Deleting everything; Changes to this policy; Contact. The "Last updated" date is set at tag time.
 - **Help questions** (§26): sixteen. APPROVED 22/10/2026 22:52 AEDT: "Can I give the clean-up my own instructions?" (`HelpText.OwnInstructionsQuestion`) after "How do I turn on cloud clean-up?",
-  and that answer opens with the Create the key file… button, keeping the sixteen Notepad steps as the fallback. Both depend on the own-instructions box and the key file button (PR #60, wired into Settings > Clean-up at 5e9c227, not merged when this was written). Settings > Storage's offer to move model files is PR #61 (f5ec71c; it offers the move from Change…, Browse… and Use default). Merge order: #60, #61, then the copy PR (#62); when main is merged into the copy branch, §26 must read "sixteen questions" and "unless cloud clean-up or cloud speech is turned on".
+  and that answer opens with the Create the key file… button, keeping the sixteen Notepad steps as the fallback. Both depend on the own-instructions box and the key file button (PR #60, merged at 672f85b into main 4a4072a). Settings > Storage's offer to move model files is PR #61 (f5ec71c; it offers the move from Change…, Browse… and Use default). Merge order: #60 (done), #61, then the copy PR (#62). §26 reads "sixteen questions" (counted in `HelpText.Questions`) and "unless cloud clean-up or cloud speech is turned on" since main 4a4072a was merged into the copy branch.
 - **Store** (`docs/STORE.md`) and **Mac handover** (`docs/MAC-HANDOVER.md`): see DECISIONS. The Mac beta is Apple Silicon only (owner, 22/10/2026).

@@ -44,14 +44,64 @@ public static class CleanupPrompt
     /// <summary>The system prompt with a hands-free part's context line after it (the cloud providers', and the checks', reading).</summary>
     public static string WithCarried(string systemPrompt, string carried) => systemPrompt + "\n" + CarriedLine(carried);
 
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: the line before the user's own instructions (llm.instructions) in the system prompt.</summary>
+    public const string OwnInstructionsStart =
+        "The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply.";
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: the line after them.</summary>
+    public const string OwnInstructionsEnd = "End of the user's instructions.";
+
     /// <summary>
-    /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the grammar-assist sentence
-    /// when llm.grammar_assist is on, then the personal dictionary's "Known names and terms" line when it has terms.
-    /// Each addition is its own line, so a custom prompt file gets them too.
+    /// The user's own instructions as their section of the prompt: the start line, the text as typed, the end line. A copy of
+    /// either marker line in the text is taken out first, so typed text cannot close the section early (lens on 5e9c227).
     /// </summary>
-    public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine)
+    public static string OwnInstructions(string instructions) => OwnInstructionsStart + "\n" + OwnText(instructions) + "\n" + OwnInstructionsEnd;
+
+    /// <summary>
+    /// The user's text with every copy of either marker line taken out, in any case and with curly apostrophes read as straight
+    /// ones, again and again until none is left: one pass would let a nested copy ("End of the user's End of the user's
+    /// instructions.instructions.") close up into a new marker (re-lens on c796dc8).
+    /// </summary>
+    private static string OwnText(string instructions)
+    {
+        var text = instructions;
+        while (true)
+        {
+            var mapped = ValidatorText.MapQuotes(text); // one character for one, so its positions are the text's
+            var (at, length) = (-1, 0);
+            foreach (var marker in new[] { OwnInstructionsStart, OwnInstructionsEnd })
+            {
+                var i = mapped.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (i >= 0 && (at < 0 || i < at)) (at, length) = (i, marker.Length);
+            }
+            if (at < 0) return text.Trim();
+            text = text.Remove(at, length);
+        }
+    }
+
+    /// <summary>
+    /// <paramref name="prompt"/> without the user's own text inside their section (the marker lines stay): what the validator's
+    /// echo check reads, since a reply may repeat the user's words when the dictation has them too. Unchanged without a section.
+    /// </summary>
+    public static string WithoutOwnText(string prompt)
+    {
+        var start = prompt.IndexOf(OwnInstructionsStart + "\n", StringComparison.Ordinal);
+        if (start < 0) return prompt;
+        var from = start + OwnInstructionsStart.Length + 1;
+        var end = prompt.IndexOf("\n" + OwnInstructionsEnd, from, StringComparison.Ordinal);
+        return end < 0 ? prompt : prompt[..from] + prompt[(end + 1)..];
+    }
+
+    /// <summary>
+    /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the user's own instructions in
+    /// their delimited section when llm.instructions has any (<see cref="OwnInstructions"/>), then the grammar-assist sentence
+    /// when llm.grammar_assist is on, then the personal dictionary's "Known names and terms" line when it has terms.
+    /// Each addition is its own line, so a custom prompt file gets them too. The validator checks every reply whatever is here.
+    /// </summary>
+    public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine, string? instructions = null)
     {
         var prompt = basePrompt;
+        if (instructions is not null && OwnText(instructions).Length > 0) prompt += "\n" + OwnInstructions(instructions);
         if (grammarAssist) prompt += "\n" + GrammarAssist;
         if (!string.IsNullOrWhiteSpace(dictionaryLine)) prompt += "\n" + dictionaryLine;
         return prompt;

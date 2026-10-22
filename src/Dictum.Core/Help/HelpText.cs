@@ -123,7 +123,7 @@ public static class HelpText
         "To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.",
         // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the first paragraph is the own-instructions lane's Help sentence for the
         // Create the key file… button (PR #60), verbatim; the second keeps the Notepad steps below as the fallback and is this lane's. True only
-        // once the button is on Settings > Clean-up (PR #60, wired at 5e9c227, not merged when this was written).
+        // once the button is on Settings > Clean-up (PR #60, merged at 672f85b into main 4a4072a).
         "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
         "If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.",
         "1. Open Settings > Clean-up. Under Cloud clean-up, choose your service in the Service list: Anthropic (Claude), OpenAI, Google Gemini, Ollama on this PC, or Custom server (OpenAI-compatible) for your own server. " +
@@ -162,7 +162,7 @@ public static class HelpText
     /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the first paragraph is the own-instructions lane's Help text (PR #60), verbatim except
     /// its last words ("as part of Dictum's clean-up instructions.": the instructions go in the system prompt, not the dictation text; lens fix). The
     /// second paragraph is the lens's wording: the check is usually right, not always, and the paragraph says so. True only once the box is on
-    /// Settings > Clean-up (PR #60, wired at 5e9c227, not merged when this was written). The site's help page carries the same two paragraphs word for word (pinned).
+    /// Settings > Clean-up (PR #60, merged at 672f85b into main 4a4072a). The site's help page carries the same two paragraphs word for word (pinned).
     /// </summary>
     public static readonly IReadOnlyList<string> OwnInstructionsAnswer =
     [

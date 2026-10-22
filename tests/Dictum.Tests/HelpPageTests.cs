@@ -665,7 +665,14 @@ public class HelpPageTests
 
             // Steps 4 and 5: the line the help gives, saved as .env in that folder (as Notepad saves it: UTF-8, no line end). Dictum
             // reloads on a saved .env (AppRules.ReloadsOn); the shell here is not started, so the reload is called as the watcher would.
+            // The placeholder itself, left in, is not a key (SecretStore.Placeholder): still waiting, and nothing is sent.
             File.WriteAllText(scratch.Paths.EnvFile, SecretStore.AnthropicKey + "=your-key-here");
+            shell.Reload(userRequested: false);
+            Assert.Equal(SecretStore.AnthropicKey, shell.CleanupWaitingForKey);
+            Assert.True(shell.NothingLeaves);
+            // With the user's own key in its place (a stand-in here, never a real one).
+            const string standIn = "k-standin-not-real";
+            File.WriteAllText(scratch.Paths.EnvFile, SecretStore.AnthropicKey + "=" + standIn);
             shell.Reload(userRequested: false);
             Assert.Null(shell.CleanupWaitingForKey);
             Assert.False(shell.NothingLeaves);
@@ -678,8 +685,8 @@ public class HelpPageTests
             Assert.Contains(ApprovedTrayLine, tray);
 
             // The key is never in settings.json, the page or the tray panel.
-            Assert.DoesNotContain("your-key-here", File.ReadAllText(scratch.Paths.SettingsFile));
-            Assert.DoesNotContain(on.Concat(tray), l => l.Contains("your-key-here", StringComparison.Ordinal));
+            Assert.DoesNotContain(standIn, File.ReadAllText(scratch.Paths.SettingsFile));
+            Assert.DoesNotContain(on.Concat(tray), l => l.Contains(standIn, StringComparison.Ordinal));
 
             // Turning it off: the tidying runs on this PC again, and the tray panel no longer says text leaves it.
             Click(window, "Switch cloud clean-up off");

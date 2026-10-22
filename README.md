@@ -792,6 +792,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `llm.base_url` | `null` | Required for `openai-compatible`, e.g. `http://localhost:11434/v1`. For `anthropic` it is optional and replaces `https://api.anthropic.com` (e.g. a company gateway). The `ANTHROPIC_BASE_URL` environment variable is ignored. Because both providers share this key, a URL left over from `openai-compatible` would receive the Anthropic key and transcripts: Dictum logs a warning and shows a balloon "Anthropic requests will go to <host>" whenever `anthropic` is used with a `base_url`. |
 | `llm.timeout_ms` | `15000` | The shortest cleanup deadline (1000–120000). The deadline is 10 s + 0.1 s per dictated word, at least this and at most 60 s (or this, if longer); past it the rule-based tidy is pasted. |
 | `llm.prompt_file` | `null` | Absolute path to a custom system prompt; the built-in prompt otherwise. The grammar-assist sentence and the dictionary line are added to it too. |
+| `llm.instructions` | `null` | Your own clean-up instructions (Settings > Clean-up, Advanced view; at most 2,000 characters, a longer value is cut with a warning). Added in their own section after the prompt (built-in or `llm.prompt_file`) for the local model and cloud clean-up, never for `none` or `off`; for cloud clean-up they are part of the text sent. Every reply is still checked by the validator. The log gets their length, never their text. |
 | `llm.grammar_assist` | `false` | `true` adds the grammar-assist sentence to the cleanup prompt (see "Calibration"). Tray panel > Grammar assist. |
 | `llm.cloud_consent` | — | Ignored, with a warning in the log: consent to cloud clean-up is not a setting. It is recorded in `consent.json` in the settings folder (provider, host, time, app version), written only by Settings > Clean-up's consent step (SPEC §22). |
 | `insert.method` | `"paste"` | `paste` (clipboard + Ctrl+V) or `type` (simulated typing, for apps that block paste). |
@@ -822,6 +823,11 @@ Standard dotenv behaviour: a real environment variable (process, user or machine
 keys that are not set. Dictum reads `%APPDATA%\Dictum\.env` and the `.env` beside `Dictum.exe` (the AppData file
 wins between the two). So a staff machine or Azure VM can carry a machine-level `ANTHROPIC_API_KEY` and no `.env`
 at all. See `.env.example`.
+
+Settings > Clean-up has **Create the key file…** beside Open the settings folder: it writes `%APPDATA%\Dictum\.env` with
+a short header and the line for the service chosen, such as `ANTHROPIC_API_KEY=your-key-here`, and opens it. A `.env`
+that already exists is opened as it is, never changed. The placeholder `your-key-here` counts as not set, as an empty
+value does, so nothing is sent until a real key is saved in its place.
 
 | Key | Used by |
 |---|---|
@@ -882,7 +888,7 @@ text:") or contains framing such as "I'm sorry" or "let me know" that you did no
 included); repeats five or more words of the system prompt actually sent (a custom `llm.prompt_file` included);
 contains a chat-template token (`<|im_end|>`, `<end_of_turn>`…); drops a "?" you dictated; shares fewer than half its
 words with the dictation (replies of 6+ words); is in a script the dictation did not use (for example Chinese for
-an English dictation); ends with a line or a bracketed remark you did not say, or contains one of the built-in example
+an English dictation); ends with a line, a bracketed remark or (in a reply of two sentences or more) a sentence you did not say, or contains one of the built-in example
 sentences; drops a "not", "no", "never" or a contraction such as "can't" that you said; drops or changes a number you
 said; drops a word on the profanity list (unless `profanity.mode` is `remove`, which removes them afterwards anyway);
 keeps most of a clause you retracted with "scratch that", or loses the words that replaced it; keeps fewer than 60%

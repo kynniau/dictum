@@ -443,4 +443,64 @@ public class OwnerApprovalsTests
         ], HelpText.OwnInstructionsAnswer);
         Assert.Contains(HelpText.Questions, q => q.Question == "Can I give the clean-up my own instructions?" && ReferenceEquals(q.Answer, HelpText.OwnInstructionsAnswer));
     }
+
+    // ---- 1.3, your own instructions and Create the key file: APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026), as a block ----
+    // Sections A and B of .demo-preview/approve-1.3-block.md. Pinned word for word, independently of the app's constants.
+    // Reworded only on the owner's written replacement, and then these literals change with the strings in the same commit.
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the card, its lines and the Simple-view line.</summary>
+    [Fact]
+    public void The_own_instructions_card_words_are_pinned()
+    {
+        Assert.Equal("Your own instructions", OwnInstructionsCard.Label);
+        Assert.Equal("Added to Dictum's clean-up instructions for the AI and cloud clean-up. Dictum still checks every reply against what you said.", OwnInstructionsCard.Hint);
+        Assert.Equal("That is the limit: Dictum uses up to 2,000 characters of your own instructions.", OwnInstructionsCard.LimitLine);
+        Assert.Equal("With cloud clean-up on, these instructions go to llm.example.net with each dictation.", OwnInstructionsCard.CloudLine("llm.example.net"));
+        Assert.Equal("Your own clean-up instructions are in use (Advanced view).", OwnInstructionsCard.SimpleLine);
+    }
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the two marker lines around the user's text in the prompt, and the validator reason.</summary>
+    [Fact]
+    public void The_own_instructions_prompt_lines_and_the_validator_reason_are_pinned()
+    {
+        Assert.Equal("The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply.",
+            Dictum.Llm.CleanupPrompt.OwnInstructionsStart);
+        Assert.Equal("End of the user's instructions.", Dictum.Llm.CleanupPrompt.OwnInstructionsEnd);
+        Assert.Equal("reply ends with a sentence the speaker did not say",
+            Dictum.Llm.CleanupValidator.Validate("move the meeting to thursday and tell the team", "Move the meeting to Thursday and tell the team. Kind regards.").Rejection);
+    }
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the log lines that give a length, never the text, and the settings-file warnings.</summary>
+    [Fact]
+    public void The_own_instructions_log_lines_and_warnings_are_pinned()
+    {
+        Assert.Equal("(3 characters, not logged)", SettingsFile.LogValue("llm.instructions", System.Text.Json.Nodes.JsonValue.Create("abc")));
+        var log = new RecordingLog();
+        Dictum.Llm.TranscriptCleaner.Create(new LlmSettings { Provider = LlmSettings.Local, Instructions = "abc" }, offlineOnly: false, SecretStore.Empty, new HttpClient(new CountingHandler()), log);
+        Assert.Contains("Clean-up instructions: Dictum's, with your own added (3 characters; their text is not logged).", log.All);
+        Assert.Equal("Setting \"llm.instructions\" is 2001 characters long; only the first 2000 are used.",
+            Assert.Single(SettingsLoader.Parse(JsonSerializer.Serialize(new { llm = new { instructions = new string('a', 2001) } })).Warnings));
+        Assert.Equal("Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used.",
+            Assert.Single(SettingsLoader.Parse("""{ "llm": { "instructions": 5 } }""").Warnings));
+    }
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the button, its two status lines, the key file's header and its log lines.</summary>
+    [Fact]
+    public Task The_key_file_words_are_pinned() => UiSession.Run(() =>
+    {
+        Assert.Equal("Create the key file…", KeyFileButton.Label);
+        Assert.Equal("Your key file already exists; it has been opened.", AppShell.KeyFileExists);
+        Assert.Equal("Your key file has been created and opened: put your key in place of your-key-here after GEMINI_API_KEY=, then save it.", AppShell.KeyFileCreated("GEMINI_API_KEY"));
+        Assert.Equal("# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself.\n" +
+                     "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log.\n", KeyFile.Header);
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" } }""");
+        var log = new RecordingLog();
+        var (shell, _, _) = scratch.Shell(log: log);
+        shell.CreateKeyFile("GEMINI_API_KEY");
+        shell.CreateKeyFile("GEMINI_API_KEY");
+        Assert.Contains("Key file created with a placeholder line for GEMINI_API_KEY (no key written).", log.All);
+        Assert.Contains("Key file already exists: opened as it is, not changed.", log.All);
+        shell.Dispose();
+    });
+
 }
