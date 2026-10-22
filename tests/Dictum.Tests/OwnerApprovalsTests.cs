@@ -5,10 +5,13 @@ using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Dictum.Audio;
 using Dictum.Core;
+using Dictum.Help;
 using Dictum.Settings;
+using Dictum.Storage;
 using Dictum.Transcribe;
 using Dictum.UI.Shell;
 using Dictum.UI.Views;
+using Dictum.UI.Views.Settings;
 
 namespace Dictum.Tests;
 
@@ -150,4 +153,74 @@ public class OwnerApprovalsTests
         Assert.Equal("no clean-up", shell.Models.CurrentCleanupName);
         shell.Dispose();
     });
+
+    // ---- The 1.2.1 block (22/10/2026, 14:25 AEDT): sections 1 to 3 of the owner's list, markers only ----
+    // Pinned word for word, independently of the app's constants. The cloud speech engine lines (SpeechPolicy, CloudSpeech*) are
+    // not in this block and stay PROPOSED, so nothing here claims them.
+
+    /// <summary>Pin (1.2.1 block, section 1): the Help question for turning on cloud clean-up is in the list, under its approved words.</summary>
+    [Fact]
+    public void The_help_question_for_cloud_clean_up_is_pinned()
+    {
+        Assert.Equal("How do I turn on cloud clean-up?", HelpText.CloudQuestion);
+        Assert.Contains(HelpText.Questions, q => q.Question == "How do I turn on cloud clean-up?" && ReferenceEquals(q.Answer, HelpText.CloudAnswer));
+        Assert.Equal("Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.",
+            HelpText.CloudAnswer[0]);
+        Assert.Contains("To turn it off, open Settings > Clean-up and click Switch cloud clean-up off. Your dictations are tidied on this PC again.", HelpText.CloudAnswer);
+    }
+
+    /// <summary>Pin (1.2.1 block, section 2): Settings > Storage's Change… button, its accessible name, the drive-speed sentence, and consent.json's label.</summary>
+    [Fact]
+    public void The_storage_page_strings_are_pinned()
+    {
+        Assert.Equal("Change…", StoragePage.ChangeLabel);
+        Assert.Equal("Change the model folder", StoragePage.ChangeName);
+        Assert.Equal("A slower drive makes the speech model slower to load and to switch.", StoragePage.SlowerDriveNote);
+        using var scratch = new Scratch();
+        var consent = PathRegistry.Locations(scratch.Paths, new AppSettings()).Single(l => l.Path == scratch.Paths.ConsentFile && !l.Path.EndsWith(".tmp", StringComparison.Ordinal));
+        Assert.Equal("consent to cloud clean-up and cloud speech", consent.Description);
+    }
+
+    /// <summary>Pin (1.2.1 block, section 3): the words of Settings > See how it works, including the two cloud speech variants and the no-model line.</summary>
+    [Fact]
+    public void The_see_how_it_works_page_words_are_pinned()
+    {
+        Assert.Equal("See how it works", HowItWorksText.PageTitle);
+        Assert.Equal("Record one short dictation and watch what Dictum does with it, step by step. It uses your current settings: the same speech model and clean-up as the hotkey.", HowItWorksText.Intro);
+        Assert.Equal("This page pastes nothing. The recording is kept in memory only, never saved to disk, and the sound never leaves this PC.", HowItWorksText.MemoryNote);
+        Assert.Equal("This page pastes nothing. The recording is kept in memory only and never saved to disk. With cloud speech on, the sound is sent to HOST to be turned into text.", HowItWorksText.CloudSpeechNote("HOST"));
+        Assert.Equal("With cloud speech on, HOST turns the sound into words (the speech model on this PC, if that fails). This is the raw text.", HowItWorksText.HeardByCloud("HOST"));
+        Assert.Equal("Your clean-up sends text to another program (STATUS), so this recording's words go there too, as a dictation's would.", HowItWorksText.SendsText("STATUS"));
+        Assert.Equal(("Record", "Stop", "Record one dictation", "Stop recording and show the steps", "or hold F24"),
+            (HowItWorksText.RecordLabel, HowItWorksText.StopLabel, HowItWorksText.RecordName, HowItWorksText.StopName, HowItWorksText.HoldHint("F24")));
+        Assert.Equal("Recording: say a sentence or two, then press Stop.", HowItWorksText.Recording);
+        Assert.Equal("Stopped at 30 s, the longest this page records.", HowItWorksText.LimitReached);
+        Assert.Equal("A dictation is in progress: try again when it has finished.", HowItWorksText.Busy);
+        Assert.Equal("Cancelled: nothing was kept.", HowItWorksText.Cancelled);
+        Assert.Equal("Done. Record again to try another sentence.", HowItWorksText.Done);
+        Assert.Equal("That did not work: MESSAGE", HowItWorksText.Failed("MESSAGE"));
+        Assert.Equal("No speech model is ready yet, so Record is off. Settings > Models shows the model's state.", HowItWorksText.NoSpeechModel);
+        Assert.Equal(
+        [
+            ("1. What Dictum hears", "Sound, not words: the bars show how loud your microphone is."),
+            ("2. What the speech model heard", "The speech model on this PC turns the sound into words. This is its raw text."),
+            ("3. Rule-based tidy", "Fixed rules remove hesitations such as \"um\", add capitals and a full stop, and follow spoken commands such as \"new line\"."),
+            ("4. AI clean-up", "A language model polishes the words, then Dictum checks its reply and uses it only if it passes every check."),
+            ("5. What would be pasted", "After your corrections, the profanity filter and snippets. A dictation pastes this; this page does not."),
+        ], HowItWorksText.Stages);
+        Assert.Equal(["Waiting", "Working…", "Done", "Not used", "Not reached"],
+            [HowItWorksText.Waiting, HowItWorksText.Working, HowItWorksText.StageDone, HowItWorksText.NotUsed, HowItWorksText.NotReached]);
+        Assert.Equal("Took 12 ms", HowItWorksText.Took(12));
+        Assert.Equal("Dictum stops here (REASON), as it would for a dictation.", HowItWorksText.StoppedHere("REASON"));
+        Assert.Equal("The rule-based tidy did not run: only spaces were tidied.", HowItWorksText.TidyPlain);
+        Assert.Equal("No AI clean-up is in use, so this is the clean-up.", HowItWorksText.TidyIsAll);
+        Assert.Equal("Used, because the AI reply was not (step 4).", HowItWorksText.TidyUsed);
+        Assert.Equal("Not needed this time: the AI reply passed. Dictum uses this text when a reply does not.", HowItWorksText.TidyNotNeeded);
+        Assert.Equal("Not in use. Clean-up in use: STATUS.", HowItWorksText.NotInUse("STATUS"));
+        Assert.Equal("Accepted: the reply passed every check, so Dictum used it.", HowItWorksText.Accepted);
+        Assert.Equal("Not used: REASON. Dictum used the rule-based tidy (step 3) instead.", HowItWorksText.Rejected("REASON"));
+        Assert.Equal("Not asked: REASON. Dictum used the rule-based tidy (step 3) instead.", HowItWorksText.NotAsked("REASON"));
+        Assert.Equal("A dictation would paste this. This page pasted nothing.", HowItWorksText.WouldPaste);
+        Assert.Equal("Your corrections, the profanity filter or snippets changed the text.", HowItWorksText.Changed);
+    }
 }

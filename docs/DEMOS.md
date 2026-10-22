@@ -5,6 +5,7 @@ narration, for people who have never used it. Every caption names one thing to d
 main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build on main at d47e7f9 (both polish rounds), below.
 
 All caption copy below is **PROPOSED**, for the product owner to approve.
+Owner approval, 22/10/2026 14:25 AEDT: the captions of demo 7, **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`), are **APPROVED** (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)"). The marker on the other demos' captions is unchanged by that entry.
 
 ## What it makes
 

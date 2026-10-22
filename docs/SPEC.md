@@ -831,7 +831,7 @@ Users must be able to remove what the app has put on disk, from inside the app.
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
   model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
   also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
-  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and PROPOSED: "A slower
+  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
   drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
   and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
@@ -1481,7 +1481,7 @@ Owner intent (22/10/2026): "a new live demonstration screen in settings, which s
 talk, the first section shows exactly what Dictum hears, then how we process those words (the speech model), then the
 clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the compare mode in the design brief is a later lane.
 
-- **Where**: Settings → **See how it works** (PROPOSED title), the entry before Help in the Settings list
+- **Where**: Settings → **See how it works** (APPROVED title, 22/10/2026), the entry before Help in the Settings list
   (`SettingsWindow`'s page list). The arrow keys reach it in the list like every other page.
 - **Recording**: **Record** / **Stop**, or hold the dictation hotkey while the page is shown in the window in front (as
   calibration: `AppShell.RedirectHotkey`, released when the window loses focus or another page is shown; Esc drops the
@@ -1530,4 +1530,4 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
 - **Not in this lane**: a link from Settings → Help (Help's page and copy belong to other lanes); compare mode.
 - **Pins**: `HowItWorksTests` (pipeline and stages), `HowItWorksPageTests` (the page, headless).
 
-Every new user-facing string is PROPOSED (DECISIONS, 22/10/2026), awaiting the product owner's approval.
+Every new user-facing string is APPROVED 22/10/2026 (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)").
