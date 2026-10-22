@@ -49,8 +49,8 @@ Build and run from source: `dotnet build Dictum.sln -c Release` then `dotnet run
 Tests: `tests/Dictum.Tests/Mac*Tests.cs` (pure parts everywhere; the ones that need the Mac, Accessibility or the microphone
 skip with a reason unless `DICTUM_UI_TESTS=1` / `DICTUM_AUDIO_TESTS=1`).
 
-Installing a build (the words below are PROPOSED for the public README and release notes, kept here until the owner approves
-them; the public README says nothing about the Mac until the beta ships): the beta is for Apple Silicon Macs on macOS 15 or
+Installing a build (the words below were approved by the owner on 23/10/2026 for the release notes and, once the beta ships,
+the public README, which says nothing about the Mac until then): the beta is for Apple Silicon Macs on macOS 15 or
 later. Download `Dictum-<version>-osx-arm64.zip`, check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it
 and move `Dictum.app` to Applications. A build signed with the owner's Developer ID certificate and notarised opens normally;
 an ad-hoc build is refused by Gatekeeper until allowed in System Settings > Privacy & Security. The app lives in the menu bar

@@ -34,7 +34,7 @@ public sealed class MacPackagingTests
         Assert.Equal("true", plist["NSHighResolutionCapable"].Name.LocalName);
         Assert.Equal("15.0", plist["LSMinimumSystemVersion"].Value); // .NET 10 supports macOS 15 and later
         Assert.Equal("public.app-category.productivity", plist["LSApplicationCategoryType"].Value);
-        // PROPOSED (docs/MAC-HANDOVER.md §0, public-copy lane 22/10/2026): true with cloud speech (1.3) on as well.
+        // APPROVED by the owner 23/10/2026 (DECISIONS): true with cloud speech (1.3) on as well.
         Assert.Equal("Dictum uses the microphone only while it is recording (from your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud speech.", plist["NSMicrophoneUsageDescription"].Value);
         Assert.Equal("© 2026 Kynni Pty Ltd", plist["NSHumanReadableCopyright"].Value);
         // The script fills both version keys from Directory.Build.props.
@@ -79,9 +79,10 @@ public sealed class MacPackagingTests
         Assert.Contains("--prerelease", yaml);
         Assert.Contains("--notes-file packaging/release-notes-mac.md", yaml);
         var macNotes = File.ReadAllText(Repo("packaging", "release-notes-mac.md"));
-        // The Mac notes carry the PROPOSED label until the owner approves the copy; this pin is flipped to DoesNotContain on
-        // that approval (DECISIONS). Nothing else is in the file: the pre-release shows it as it is.
-        Assert.StartsWith("**PROPOSED", macNotes, StringComparison.Ordinal);
+        // The owner approved the Mac copy on 23/10/2026 (DECISIONS); the label is gone and must not come back. Nothing else is
+        // in the file: the pre-release shows it as it is.
+        Assert.DoesNotContain("PROPOSED", macNotes);
+        Assert.StartsWith("**Dictum for macOS (beta).**", macNotes, StringComparison.Ordinal);
         Assert.Equal(1, macNotes.TrimEnd().Split('\n').Length); // one paragraph, no internal notes (those live in ci.yml)
         Assert.Contains("mac-v", yaml); // the version check runs on the Mac tag too
         Assert.Contains("startsWith(github.ref, 'refs/tags/mac-v') && (env.HAS_MAC_SIGNING != 'true' || env.HAS_MAC_NOTARY != 'true')", yaml); // never an ad-hoc pre-release

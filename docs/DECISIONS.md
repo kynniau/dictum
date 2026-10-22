@@ -5518,3 +5518,38 @@ unless marked:
   attribute is gone with it).
 - m1, this file no longer names the owner's volume path; m2, `.DS_Store` untracked (and, since the follow-up PR after the merge, listed in .gitignore; the lens found it was not); m3, the
   network-audit pin compares repo-relative paths; m4, the handover's two "Input Monitoring" lines now follow decision c.
+
+**Notarisation (23/10/2026, after PR #68 merged at 03:57 AEDT; main 8d43a08), each Verified on this Mac:**
+
+- The first submission (00:26 AEDT, the pre-merge 1.2.1 bundle with the five-key entitlements) sat "In Progress" for
+  about five and a half hours and came back Accepted at 06:00 AEDT; stapled; `spctl -a -vv -t exec` "accepted,
+  source=Notarized Developer ID". That bundle is not the beta.
+- A rebuild from main 8d43a08 by the agent session at 06:01 signed and verified, then `notarytool` stopped with "No
+  Keychain password item found for profile: dictum-notary": the owner's keychain profile is not reachable from the agent's
+  shells (it was at 00:26). The agent did not inspect the keychain (owner's credentials). The owner ran
+  `scripts/publish-mac.sh` with both variables in their own terminal at 06:08: submission d405b5d5-f883-45f5-b864-c4490b046ff6
+  was Accepted within minutes, stapled at 06:10, zipped at 06:13. `dist/Dictum-1.3.0-osx-arm64.zip`, SHA-256
+  5d8ac4bc9ef79979619d1f6ae81d010ce62939c1429a0bc99a08f42bbf86703f; `stapler validate` and `spctl` both pass; the bundle's
+  entitlements are the three keys of M3, so Apple accepts that set.
+- Consequence for the release path: notarisation runs from the owner's terminal or from CI with the five `MAC_*` secrets,
+  never from an agent session. The hands-on checklist (Welcome window, Microphone, Accessibility, hotkey, Cmd-V, login item,
+  removal, Gatekeeper on the quarantined zip) is next and is the owner's; no `mac-v` tag before the owner approves the
+  Mac copy.
+- Owner's first dictation (23/10/2026, reported by the owner at about 06:20 AEDT, in a line dictated with Dictum into the
+  agent session's terminal): the notarised 1.3.0 bundle launched, was granted Microphone and Accessibility, recorded on the
+  hotkey, transcribed, and pasted the text into another app. That covers the launch, the two permission dialogs, the event
+  tap, the hotkey and Cmd-V paste end to end. Not yet exercised by the owner: the login item, removal, the owned dialogs,
+  and whether the launch was from the quarantined zip copy (the Gatekeeper first-open dialog) or from dist/Dictum.app.
+- Mac copy APPROVED by the owner (23/10/2026 06:2x AEDT, "approved both"): the release-notes paragraph in
+  packaging/release-notes-mac.md and the install paragraph in src/Dictum.Mac/README.md. The PROPOSED label is gone from
+  both and the packaging test now pins it absent (observed failing against the labelled file before the file changed).
+  Still PROPOSED, not covered by that approval: the `NSMicrophoneUsageDescription` sentence (M2 above) and the Right Option
+  default hotkey (decision d). The public README stays silent about the Mac until the beta ships.
+- `NSMicrophoneUsageDescription` APPROVED by the owner (23/10/2026, "yes" to the sentence as written in M2). The handover
+  and the packaging test's comment say so. The Right Option default hotkey (decision d) is the one Mac string still
+  PROPOSED.
+- Right Option as the Mac default hotkey APPROVED by the owner (23/10/2026), with this rider from the owner: the default is
+  exactly why users must test and assign their key at install and first use. The Welcome flow already does that on both
+  platforms: step 4 "Your hotkey" (`HotkeyStep`, the capture box listening from the moment the step appears, "Use this
+  hotkey" / skip) and step 6, a first dictation into a box in the window through the real path. No Mac string is PROPOSED
+  any more.
