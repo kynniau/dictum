@@ -616,7 +616,7 @@ public class HandsFreeSettingsTests
     [Fact]
     public void The_proposed_hands_free_wording_is_pinned_word_for_word()
     {
-        // PROPOSED 16/10/2026, awaiting the product owner's approval: every word as proposed.
+        // APPROVED 22/10/2026 (proposed 16/10/2026): every word as approved.
         Assert.Equal("Hands-free stops after", GeneralPage.HandsFreeLabel);
         Assert.Equal("Hands-free dictation types each sentence as you pause, so a long session reads back as you go. It stops by itself after this long.",
             GeneralPage.HandsFreeHelp);

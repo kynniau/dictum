@@ -39,7 +39,7 @@ public sealed class ModelCoordinator(
     public const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
 
     /// <summary>
-    /// PROPOSED copy (17/10/2026), for the product owner to approve: Settings > Models > Model folder > Browse… when the folder
+    /// APPROVED 22/10/2026 copy (proposed 17/10/2026): Settings > Models > Model folder > Browse… when the folder
     /// picked is the one holding the models that come with Dictum (or inside it), which is never written (Decision 16).
     /// </summary>
     public const string BundledFolderRefused = "That folder holds the models that come with Dictum, which Dictum never changes. Choose another folder.";
@@ -129,7 +129,10 @@ public sealed class ModelCoordinator(
 
     public string CurrentName => ModelCatalog.DisplayName(CurrentPath);
 
-    /// <summary>Cleanup shown in the tray: the local model's name, "rules" for none, "no clean-up" for off (PROPOSED, 21/10/2026), or the cloud provider.</summary>
+    /// <summary>
+    /// The clean-up's name: the local model's name, "rules" for none, "no clean-up" for off (APPROVED 22/10/2026; Settings > Models'
+    /// "In use:" line), or the cloud provider. The tray header and tooltip say off as SimpleView.OffHeaderLabel (owner decision 6).
+    /// </summary>
     public string CurrentCleanupName => settings().Llm.Provider switch
     {
         LlmSettings.Local => CleanupCatalog.DisplayName(llm.ModelPath ?? settings().Llm.Model),
@@ -550,7 +553,7 @@ public sealed class ModelCoordinator(
         }
     }
 
-    /// <summary>The balloon for a model on its way: downloading now (how far), or waiting its turn. PROPOSED copy, 19/10/2026.</summary>
+    /// <summary>The balloon for a model on its way: downloading now (how far), or waiting its turn. APPROVED 22/10/2026 copy (proposed 19/10/2026).</summary>
     private string OnItsWay(string name, DownloadState state) => state == DownloadState.Running
         ? $"{name} is already downloading ({_downloads.Progress})."
         : $"{name} is already waiting to download.";
@@ -690,7 +693,7 @@ public sealed class ModelCoordinator(
     }
 
     /// <summary>
-    /// PROPOSED copy (21/10/2026), for the product owner to approve: a folder named by a device path other than \\?\X:\ or
+    /// APPROVED 22/10/2026 copy (proposed 21/10/2026): a folder named by a device path other than \\?\X:\ or
     /// \\?\UNC\ (a \\?\Volume{GUID}\ path, say), which the settings load refuses for models.folder (SettingsLoader), so it would
     /// be written and then ignored.
     /// </summary>

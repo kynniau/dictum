@@ -146,7 +146,7 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
             _cancelBalloon = reason switch
             {
                 DownloadCancelReason.CancelLink => $"Download of {file} cancelled.",
-                DownloadCancelReason.Choice => $"Download of {file} stopped: you chose {chosen}.", // PROPOSED copy, 19/10/2026
+                DownloadCancelReason.Choice => $"Download of {file} stopped: you chose {chosen}.", // APPROVED 22/10/2026 copy (proposed 19/10/2026)
                 _ => null,
             };
             cts.Cancel();

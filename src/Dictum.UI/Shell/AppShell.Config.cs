@@ -241,8 +241,8 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, fifth draft; this sentence is unchanged since the fourth), not yet approved: the product
-    /// owner reviews it before release. Pinned word for word in CloudOffTakesEffectTests; do not reword it until that review.
+    /// APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft; this sentence is unchanged since the fourth).
+    /// Pinned word for word in CloudOffTakesEffectTests; do not reword it.
     /// Shown while offline only is on for this session and settings.json does not have it on. No "Nothing is sent": offline
     /// only still allows a server on this PC. The last clause names the start with a settings.json that still cannot be read
     /// (not valid JSON, say), which runs offline with the defaults (ConfigLoader.BrokenAtStartup).

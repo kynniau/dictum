@@ -26,10 +26,10 @@ internal sealed class GeneralPage : SettingsPage
                                     "While Dictum is on and a speech model is ready, that button no longer reaches other apps at all (no right-click menu, no middle-click, " +
                                     "no Back); a side button you do not use is the best choice.";
 
-    /// <summary>The hands-free auto-stop field's label. PROPOSED 16/10/2026, awaiting the product owner's approval.</summary>
+    /// <summary>The hands-free auto-stop field's label. APPROVED 22/10/2026 (proposed 16/10/2026).</summary>
     public const string HandsFreeLabel = "Hands-free stops after";
 
-    /// <summary>The field's help text. PROPOSED 16/10/2026, awaiting the product owner's approval.</summary>
+    /// <summary>The field's help text. APPROVED 22/10/2026 (proposed 16/10/2026).</summary>
     public const string HandsFreeHelp = "Hands-free dictation types each sentence as you pause, so a long session reads back as you go. It stops by itself after this long.";
 
     private readonly HandsFreeLimit _handsFreeLimit;
@@ -220,7 +220,7 @@ internal sealed class GeneralPage : SettingsPage
 internal sealed class HandsFreeLimit
 {
     // The quick-pick labels, the unit names and the card's "Hands-free" title are this change's own wording (16/10/2026),
-    // listed for the product owner beside the proposed strings.
+    // listed for the product owner beside the proposed strings; APPROVED 22/10/2026 with them.
     public static readonly int[] PresetMinutes = [1, 2, 5, 10, 30, 60];
     public static readonly string[] Units = ["minutes", "seconds"];
 
