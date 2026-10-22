@@ -321,7 +321,7 @@
   <section id="cloud" aria-labelledby="cloud-title">
     <h2 id="cloud-title">8. Optional: turn on cloud clean-up</h2>
     <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.</p>
-    <p>Before it switches on, Dictum shows a warning. For Anthropic, it says:</p>
+    <p>Before Dictum sends text to a service off this PC, it shows a warning. For Anthropic, it says:</p>
     <blockquote class="card">
       <p>WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on api.anthropic.com's servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.</p>
     </blockquote>
@@ -332,14 +332,24 @@
 
     <h3>Save the key, then switch it on</h3>
     <ol id="cloud-steps">
-      <li>Open Settings &gt; Clean-up. Under <b>Cloud clean-up</b>, choose your service in the <b>Service</b> list: <b>Anthropic (Claude)</b>, <b>OpenAI</b>, <b>Google Gemini</b>, or <b>Custom server (OpenAI-compatible)</b> for your own server. The line under <b>Model</b> says which name its key needs.</li>
-      <li>Click <b>Open the settings folder</b>. File Explorer opens Dictum's settings folder. Press Ctrl+L: the folder's address shows, highlighted, at the top of that window. Press Ctrl+C to copy it.</li>
+      <li>Open Settings &gt; Clean-up. Under <b>Cloud clean-up</b>, choose your service in the <b>Service</b> list: <b>Anthropic (Claude)</b>, <b>OpenAI</b>, <b>Google Gemini</b>, <b>Ollama on this PC</b>, or <b>Custom server (OpenAI-compatible)</b> for your own server. For your own server, also type its address in <b>Server address</b> and its model name in <b>Model</b>. The line under <b>Model</b> says which name its key needs.</li>
+      <li>Click <b>Open the settings folder</b>. File Explorer opens Dictum's settings folder.</li>
+      <li>Press Ctrl+L. The folder's address shows, highlighted, at the top of that window.</li>
+      <li>Press Ctrl+C to copy the folder's address.</li>
       <li>Open Notepad: click the Start button, type Notepad, then press Enter.</li>
       <li>Type one line: <code>ANTHROPIC_API_KEY=your-key-here</code>, with your own key in place of <code>your-key-here</code> and no spaces. For OpenAI, the line starts <code>OPENAI_API_KEY=</code>; for Google Gemini, <code>GEMINI_API_KEY=</code>; for your own server, if it needs a key, <code>LLM_API_KEY=</code>. If you use more than one service, put each on its own line.</li>
-      <li>In Notepad, choose <b>File</b>, then <b>Save as</b>. Set <b>Save as type</b> to <b>All files</b>. Click in <b>File name</b> and press Ctrl+A to select what is there, then press Ctrl+V to paste the folder's address in its place. Type <code>\.env</code> straight after it, then click <b>Save</b>.
-        <p>The file must be called .env exactly: a dot, then env, with nothing after it. A file called .env.txt is not read.</p>
+      <li>In Notepad, click <b>File</b>.</li>
+      <li>Click <b>Save as</b>.</li>
+      <li>Open the <b>Save as type</b> list.</li>
+      <li>Choose <b>All files</b>.</li>
+      <li>Click in <b>File name</b>.</li>
+      <li>Press Ctrl+A to select what is there.</li>
+      <li>Press Ctrl+V to paste the folder's address.</li>
+      <li>Type <code>\.env</code> straight after it.</li>
+      <li>Click <b>Save</b>.
+        <p>The file must be called .env exactly: a dot, then env, with nothing after it. A file called .env.txt is not read. In the folder, the Type column beside .env says ENV File, not Text Document.</p>
       </li>
-      <li>Go back to Settings &gt; Clean-up and click <b>Use cloud clean-up…</b> to switch it on. Dictum says what it will send and to whom, with the warning above. Read it. Click <b>Allow cloud clean-up</b> only if you agree. Nothing is sent until you do.</li>
+      <li>Go back to Settings &gt; Clean-up and click <b>Use cloud clean-up…</b> to switch it on. For a service off this PC, Dictum then says what it will send and to whom, with the warning above. Read it. Click <b>Allow cloud clean-up</b> only if you agree. Nothing is sent until you do.</li>
     </ol>
 
     <figure class="demo-figure">
@@ -354,8 +364,8 @@
     </figure>
 
     <h3>Is it working?</h3>
-    <p>When it is working, the Cloud clean-up card on that page starts with "On: the text of each dictation is sent to" and names the service, and the Dictum menu says "Cloud clean-up on · text leaves this PC".</p>
-    <p>If the card does not start with "On:", Dictum cannot find your key. For OpenAI, for example, it says "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add it to .env." Check the file's name, and the line in it.</p>
+    <p>When Dictum has found your key, the Cloud clean-up card on that page starts with "On: the text of each dictation is sent to" and names the service, and the Dictum menu says "Cloud clean-up on · text leaves this PC". Dictum cannot check that the key itself is right: if your dictations come back only lightly tidied, check the key.</p>
+    <p>If the card says "On, but waiting for your …", Dictum cannot find your key. For OpenAI, for example, it says "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add it to .env." Check the file's name, and the line in it.</p>
 
     <h3>Turn it off</h3>
     <p>To turn it off, open Settings &gt; Clean-up and click <b>Switch cloud clean-up off</b>. Your dictations are tidied on this PC again.</p>

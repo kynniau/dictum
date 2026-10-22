@@ -270,7 +270,7 @@ internal sealed class FlyoutWindow : Window
             _lock.IsVisible = nothingLeaves; // the lock stands only beside "Nothing leaves this PC"
             _privacy.Text = nothingLeaves ? "Nothing leaves this PC"
                 : Dictum.Llm.CloudPolicy.LocalServerHost(s.Llm) is not null ? "Clean-up via a server on this PC"
-                : "Cloud clean-up on · text leaves this PC";
+                : Dictum.Llm.CloudPolicy.TrayLine;
         }
         finally
         {

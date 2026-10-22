@@ -89,6 +89,12 @@ public static class CloudPolicy
     public const string StateLineWarning = "Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.";
 
     /// <summary>
+    /// The tray panel's privacy line (FlyoutWindow) while cloud clean-up sends text to a host off this PC; Help quotes it.
+    /// Approved by the product owner on 16/10/2026 as written: never reword it.
+    /// </summary>
+    public const string TrayLine = "Cloud clean-up on · text leaves this PC";
+
+    /// <summary>
     /// The Settings > Clean-up state line and the Settings > Privacy summary while cloud clean-up is on for a service that
     /// needs its own key and the clean-up in use found none (<see cref="TranscriptCleaner.MissingKey"/>), so nothing is sent.
     /// Approved by the product owner on 16/10/2026 as written: never reword it.

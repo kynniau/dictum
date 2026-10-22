@@ -346,7 +346,7 @@ public class HelpPageTests
         Assert.Contains("\"" + ApprovedWarning("api.anthropic.com") + "\"", answer);
         Assert.Contains("\"" + ApprovedWaitingLine + "\"", answer);
         Assert.Contains("\"" + ApprovedTrayLine + "\"", answer);
-        Assert.Equal(ApprovedTrayLine, HelpText.CloudTrayLine);
+        Assert.Equal(ApprovedTrayLine, CloudPolicy.TrayLine); // one constant, used by the tray panel and quoted by the help
 
         // The four services, and how to get a key, in the words the brief allows.
         foreach (var service in new[] { "Anthropic", "OpenAI", "Google Gemini", "your own server" })
@@ -354,11 +354,15 @@ public class HelpPageTests
         Assert.Contains("sign in to the service's website and create an API key", answer);
         Assert.Contains("The key is like a password", answer);
 
-        // Every key .env.example lists is named, each as the start of its own line (KEY=), and the only value shown is the placeholder.
+        // Every clean-up key is in .env.example as the start of its own line (KEY=), and the help names each one the same way. Other
+        // keys may join that file (cloud speech, say): only the clean-up ones are the help's business, so the list is not pinned whole.
         var example = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), ".env.example"));
         var variables = Regex.Matches(example, @"^([A-Z_]+)=", RegexOptions.Multiline).Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal([SecretStore.AnthropicKey, SecretStore.OpenAiKey, SecretStore.GeminiKey, SecretStore.LlmKey], variables);
-        Assert.All(variables, v => Assert.Contains(v + "=", answer));
+        foreach (var key in new[] { SecretStore.AnthropicKey, SecretStore.OpenAiKey, SecretStore.GeminiKey, SecretStore.LlmKey })
+        {
+            Assert.Contains(key, variables);
+            Assert.Contains(key + "=", answer);
+        }
         Assert.Contains(SecretStore.AnthropicKey + "=your-key-here", answer);
         Assert.Contains("your own key in place of your-key-here", answer);
         foreach (var text in HelpText.AllText())
@@ -407,7 +411,8 @@ public class HelpPageTests
     /// <summary>
     /// The cloud answer, walked through as it says on a scratch profile: every label it names is on Settings > Clean-up, the tray
     /// panel or the consent dialog; Open the settings folder opens the folder Dictum reads .env from; a .env.txt there is not read
-    /// (the waiting line shows); the line the help gives, saved as .env, is read; the consent dialog carries the warning the help
+    /// (for Anthropic today the card stays in its off state, since EffectiveSettings uses the local model without a key; the lane
+    /// fix/anthropic-missing-key-line makes it show the waiting line and owns that assertion); the line the help gives, saved as .env, is read; the consent dialog carries the warning the help
     /// quotes; after Allow the card and the tray panel say what the help says; Switch cloud clean-up off puts the tidying back on
     /// this PC; and the key never reaches settings.json or the screen. Nothing reaches the network: no dictation is made.
     /// </summary>
@@ -452,8 +457,8 @@ public class HelpPageTests
             // Step 1: the page, the card (its overline is in capitals on screen), the Service list and its entries, the Model field
             // and the key line under it.
             var page = CleanUpPage();
-            string[] named = ["Clean-up", "Service", "Anthropic (Claude)", "OpenAI", "Google Gemini", "Custom server (OpenAI-compatible)", "Model",
-                "Open the settings folder", "Use cloud clean-up…"];
+            string[] named = ["Clean-up", "Service", "Anthropic (Claude)", "OpenAI", "Google Gemini", "Ollama on this PC", "Custom server (OpenAI-compatible)",
+                "Server address", "Model", "Open the settings folder", "Use cloud clean-up…"];
             foreach (var label in named)
             {
                 Assert.True(answer.Contains(label, StringComparison.Ordinal), $"the cloud answer does not name \"{label}\"");
@@ -488,7 +493,7 @@ public class HelpPageTests
             Assert.DoesNotContain(withoutKey, l => l.StartsWith("On:", StringComparison.Ordinal));
             Assert.Contains("Use cloud clean-up…", withoutKey);
             Assert.True(shell.NothingLeaves);
-            Assert.Contains("If the card does not start with \"On:\", Dictum cannot find your key.", answer);
+            Assert.Contains("If the card says \"On, but waiting for your …\", Dictum cannot find your key.", answer);
 
             // Steps 4 and 5: the line the help gives, saved as .env in that folder (as Notepad saves it: UTF-8, no line end). Dictum
             // reloads on a saved .env (AppRules.ReloadsOn); the shell here is not started, so the reload is called as the watcher would.
