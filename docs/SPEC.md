@@ -1490,7 +1490,7 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
     PC." gives way to "Turns your voice into words; with cloud speech on, {host} does this and the model here is the fallback.",
     and the Simple view's "Dictum turns your voice into text on this PC." to "Dictum sends your voice to {host} to be turned into
     text while cloud speech is on." Permanent changes (18:41): Help's "Nothing you say is sent anywhere unless you turn on
-    cloud clean-up" now adds "or cloud speech" (app and site), and the cloud clean-up consent (SPEC §22) says "every dictation's
+    cloud clean-up" now reads "…unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech (Settings > Models)" (app and site; paths named 19:10), and the cloud clean-up consent (SPEC §22) says "every dictation's
     text (the audio only if you also turn on cloud speech)" where it said "(never the audio)", with a new paragraph after its
     warning (16:35): "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent
     there." Both consent changes were made on the owner's instruction; counsel review is pending.

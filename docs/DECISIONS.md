@@ -4737,3 +4737,10 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
       - The three 18:46 strings, each changed by one character ("encrypted" to "encrypted!", "Speech: " to "Speech - ",
         "offline." to "offline!"): the log-and-loader pin, the About fallback pin and the off-not-saved pin observed failing.
 24. **Gates after items 22 and 23** (origin/main d838326 merged): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1920 total, 0 failed, 23 skipped, 0 errors. A first full run printed no summary line (cause not found); the rerun, whose whole output was kept, is the one recorded.
+25. **Help, "How Dictum works", paths named (owner, 22/10/2026 19:10 AEDT).** The sentence item 23.3 flagged now reads, app
+    and site: "Nothing you say is sent anywhere unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech
+    (Settings > Models), and it is off unless you turn it on." The rest of the answer is unchanged. Marker "APPROVED 22/10/2026
+    19:10 AEDT (paths named; qualifier 18:41; proposed 21/10/2026)". The Help qualifier pin now checks the sentence byte for
+    byte in the app and on the site, and that neither still says "or cloud speech in Settings". This resolves item 23.3's note.
+    Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; HelpPageTests, OwnerApprovalsTests,
+    PublicCopyNeutralityTests and SiteStoreFirstTests, 62 total, 0 failed, 0 skipped (the full suite was not rerun for this edit).

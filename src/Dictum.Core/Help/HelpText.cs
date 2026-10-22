@@ -57,9 +57,9 @@ public static class HelpText
         // APPROVED 22/10/2026 (proposed 21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
         "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. " +
         "To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply.",
-        // APPROVED 22/10/2026 18:41 AEDT (qualifier added; proposed 21/10/2026): "or cloud speech" in the first sentence; the second
+        // APPROVED 22/10/2026 19:10 AEDT (paths named; qualifier 18:41; proposed 21/10/2026): the first sentence; the second
         // sentence's qualifier APPROVED 22/10/2026 17:22 AEDT (qualifier added; proposed 21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does; the qualifier "unless you also turn on cloud speech" is the owner's.
-        "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up or cloud speech in Settings > Clean-up, and it is off unless you turn it on. " +
+        "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech (Settings > Models), and it is off unless you turn it on. " +
         "If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here unless you also turn on cloud speech.",
         "The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. " +
         "The menu has Settings, Help and more.",

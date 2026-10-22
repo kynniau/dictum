@@ -346,11 +346,13 @@ public class HelpPageTests
         Assert.Contains($"<p>{first}</p>", html);
         Assert.DoesNotContain("never sends it anywhere.", html);
 
-        // Owner, 22/10/2026 18:41 AEDT: "How Dictum works" names cloud speech beside cloud clean-up, in the app and on the site.
-        const string nothing = "Nothing you say is sent anywhere unless you turn on cloud clean-up or cloud speech in Settings";
-        Assert.Contains(nothing, HelpText.HowItWorks.Single(t => t.Contains("Nothing you say is sent anywhere", StringComparison.Ordinal)));
-        Assert.Contains(nothing, html);
+        // Owner, 22/10/2026 18:41 AEDT (qualifier) and 19:10 AEDT (paths named): "How Dictum works" names cloud speech beside cloud
+        // clean-up, each with its own Settings page, in the app and on the site, byte for byte.
+        const string nothing = "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech (Settings > Models), and it is off unless you turn it on. ";
+        Assert.StartsWith(nothing, HelpText.HowItWorks.Single(t => t.Contains("Nothing you say is sent anywhere", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.Contains(nothing.Replace(">", "&gt;", StringComparison.Ordinal), html);
         Assert.DoesNotContain("unless you turn on cloud clean-up in Settings", html);
+        Assert.DoesNotContain("or cloud speech in Settings", html);
     }
 
     // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy
