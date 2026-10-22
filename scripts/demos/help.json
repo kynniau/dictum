@@ -57,7 +57,7 @@
       "id": "voice-answer",
       "caption": "Help moves down to its answer.",
       "do": [
-        { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Nowhere. Dictum turns your voice", "match": "prefix" } }
+        { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Nowhere, by default. Dictum turns your voice", "match": "prefix" } }
       ],
       "after": 3
     },

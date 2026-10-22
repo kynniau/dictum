@@ -357,12 +357,12 @@ The package contains profanity.txt, a word list used only by the optional profan
 Support: hello@kynni.com.au
 ```
 
-### Notes for certification: PROPOSED for 1.3.0
+### Notes for certification: APPROVED for 1.3.0
 
-PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner). Not yet in the block above, which stays the approved 1.2.1 notes until the release lane runs. For 1.3.0, replace its "Notes written" line, its CHANGED paragraph and its cloud paragraph with these. The CHANGED paragraph names features that must be in the build: the cloud speech UI is merged; the own-instructions box and the Create the key file button are PR #60 (merged at 672f85b into main 4a4072a); "Settings > Storage offers to move model files" is PR #61 (head 1730818 when this was written, open; it offers the move from Change…, Browse… and Use default). Delete any sentence whose feature is not in the build.
+APPROVED by the owner 23/10/2026 06:13 AEDT (proposed 22/10/2026): the "Notes written" line and the CHANGED paragraph below are the 1.3.0 certification notes; paste them in place of the 1.2.1 block when submitting.
 
 ```text
-Notes written DD/MM/2026 for Dictum 1.3.0.
+Notes written 23/10/2026 for Dictum 1.3.0.
 
 CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.0 adds optional cloud speech. In Settings > Models, in the Advanced view, a new Cloud speech card lets the user send each recording to OpenAI, Azure OpenAI, Groq or a server of their own instead of using the speech model on this PC. It is off by default. It asks for express consent in its own dialog, which names the host and says the recording leaves the PC; it needs the user's own API key; offline only mode refuses it for any service that is not on the PC; and if a request fails, the speech model on this PC hears the dictation. Settings > Clean-up, in the Advanced view, has a new box for the user's own clean-up instructions and a Create the key file button that makes the .env file for a cloud clean-up key. Settings > Storage offers to move model files when the model folder changes. Settings > Help has new questions ("What is clean-up?", "How can I see what Dictum does with my words?" and "Can I give the clean-up my own instructions?"), and Settings > About and the Welcome window show a short "In plain words" statement. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads.
 

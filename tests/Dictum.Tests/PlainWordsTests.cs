@@ -220,9 +220,9 @@ public sealed class PlainWordsTests
         Assert.Contains("**Nothing leaves the machine by default.**", readme); // the approved heading line is unchanged
     }
 
-    /// <summary>Store: the listing text, the age-rating answer, the privacy-policy hosts note, row 13, and the 1.3.0 What's new block (APPROVED 22/10/2026 22:52 AEDT) and the 1.3.0 tester notes (still PROPOSED: they go with the Store submission), above/after the approved 1.2.1 ones.</summary>
+    /// <summary>Store: the listing text, the age-rating answer, the privacy-policy hosts note, row 13, and the 1.3.0 What's new block (APPROVED 22/10/2026 22:52 AEDT) and the 1.3.0 tester notes (APPROVED 23/10/2026 06:13 AEDT: they go with the Store submission), above/after the approved 1.2.1 ones.</summary>
     [Fact]
-    public void The_store_text_names_cloud_speech_and_the_1_3_0_blocks_are_proposed()
+    public void The_store_text_names_cloud_speech_and_the_1_3_0_blocks_are_approved()
     {
         var store = Repo("docs", "STORE.md");
         var flat = Flat(store);
@@ -247,9 +247,12 @@ public sealed class PlainWordsTests
         Assert.Contains("\"In plain words\"", block);
         Assert.DoesNotContain("http", block); // the Store says no URLs in plain text
 
-        var notes = store.IndexOf("### Notes for certification: PROPOSED for 1.3.0", StringComparison.Ordinal);
+        var notes = store.IndexOf("### Notes for certification: APPROVED for 1.3.0", StringComparison.Ordinal);
         Assert.True(notes > store.IndexOf("Notes written 22/10/2026 for Dictum 1.2.1.", StringComparison.Ordinal), "the 1.3.0 notes come after the approved 1.2.1 notes");
         var changed = Flat(store[notes..store.IndexOf("## 8. What to expect from certification", notes, StringComparison.Ordinal)]);
+        Assert.Contains("APPROVED by the owner 23/10/2026 06:13 AEDT (proposed 22/10/2026): the \"Notes written\" line and the CHANGED paragraph below are the 1.3.0 certification notes", changed);
+        Assert.Contains("Notes written 23/10/2026 for Dictum 1.3.0.", changed);
+        Assert.DoesNotContain("PROPOSED", store[notes..store.IndexOf("```text", notes, StringComparison.Ordinal)]); // the tester notes are no longer proposed
         Assert.Contains("CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.0 adds optional cloud speech.", changed);
         Assert.Contains("It is off by default. It asks for express consent in its own dialog", changed);
         Assert.Contains("Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default", changed);

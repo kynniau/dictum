@@ -109,6 +109,13 @@ function Invoke-Pointer($Spec, [string]$Kind, [string]$Label) {
     $epoch = Epoch
     switch ($Kind) {
         "click" { [DemoUi]::Click() }
+        "invokeClick" {
+            # The pointer glides and rests as for a click, then the element is invoked through UI Automation: a mouse click on a second
+            # Dictum window (the consent dialogs) did not reach it in the sandbox (21 to 23/10/2026: the dialog went behind Settings and
+            # nothing was chosen), while a key press did. Always listed under fallbacks.
+            if (-not $element -or -not [DemoUi]::Invoke($element)) { throw "invokeClick: no Invoke, SelectionItem or Toggle pattern: $(Describe $Spec)" }
+            $script:log.fallbacks += [ordered]@{ step = $Label; fallback = "invoke after the pointer rested on it: a mouse click does not reach this dialog in the sandbox: $(Describe $Spec)" }
+        }
         "doubleClick" { [DemoUi]::DoubleClick() }
         "point" { }
     }
@@ -192,6 +199,20 @@ function Invoke-Action($Action, [string]$Label) {
             foreach ($m in @($job.extraModels)) { if ($m) { Copy-Item -LiteralPath $m -Destination $to -Force } }
             return "copied $(@($job.extraModels).Count) model file(s) from the host (read-only) to $to"
         }
+        "openWith" {
+            # Makes `extension` (for example ".env") open in `path` for this sandbox's user, as a PC whose editor is set for that file
+            # type would: a clean Windows has no handler for .env, so a button that opens such a file would show "How do you want to
+            # open this file?", and the sandbox has no Notepad of its own (see environment.notepad). Per-user keys under
+            # HKCU\Software\Classes only; nothing outside the disposable sandbox changes.
+            $ext = [string]$Action.extension
+            $exe = Expand $Action.path
+            $progId = "Dictum.Demo" + $ext.TrimStart('.')
+            New-Item -Path "HKCU:\Software\Classes\$ext" -Force | Out-Null
+            Set-ItemProperty -Path "HKCU:\Software\Classes\$ext" -Name "(default)" -Value $progId
+            New-Item -Path "HKCU:\Software\Classes\$progId\shell\open\command" -Force | Out-Null
+            Set-ItemProperty -Path "HKCU:\Software\Classes\$progId\shell\open\command" -Name "(default)" -Value "`"$exe`" `"%1`""
+            return "$ext files open in $exe"
+        }
         "plainDesktop" { return [DemoUi]::PlainDesktop(31, 58, 96, [bool](Value $Action "hideIcons" $true)) }
         "secondDrive" { return New-SecondDrive (Value $Action "letter" "D") (Value $Action "label" "Data") (Value $Action "folder" $null) }
         "openFolder" {
@@ -200,6 +221,7 @@ function Invoke-Action($Action, [string]$Label) {
             return "opened $path in File Explorer"
         }
         "click" { return Invoke-Pointer $Action.target "click" $Label }
+        "invokeClick" { return Invoke-Pointer $Action.target "invokeClick" $Label }
         "doubleClick" { return Invoke-Pointer $Action.target "doubleClick" $Label }
         "point" { return Invoke-Pointer $Action.target "point" $Label }
         "type" {
@@ -322,7 +344,7 @@ try {
             }
             # The first pointer target is found before the caption appears, so a caption never names something not yet shown.
             $found = $null
-            $first = @($step.do | Where-Object { $_.PSObject.Properties["target"] -and $_.do -in "click", "doubleClick", "point" } | Select-Object -First 1)
+            $first = @($step.do | Where-Object { $_.PSObject.Properties["target"] -and $_.do -in "click", "invokeClick", "doubleClick", "point" } | Select-Object -First 1)
             if ($first) {
                 $wait = [int]([double](Value $first[0].target "timeout" 30) * 1000)
                 $found = Find-Target $first[0].target $wait
@@ -358,6 +380,8 @@ try {
         } catch {
             $entry.error = $_.Exception.Message
             Note "step $label failed: $($_.Exception.Message)"
+            # Whether Dictum itself is stuck (a hung window looks like a missing target): its state, for the run's log.
+            try { Note ("Dictum at the failure: " + ((Get-Process -Name Dictum -ErrorAction SilentlyContinue | ForEach-Object { "pid $($_.Id) responding=$($_.Responding) threads=$($_.Threads.Count) cpu=$([math]::Round($_.CPU, 1)) s" }) -join "; ")) } catch { }
         }
         $entry.end = Epoch
         $log.steps += $entry
@@ -374,6 +398,12 @@ try {
     $log.endEpoch = Epoch
     try { Stop-InsideCapture $ffmpeg } catch { Note "stopping ffmpeg: $($_.Exception.Message)" }
     Copy-Item -LiteralPath (Join-Path $env:LOCALAPPDATA "Dictum\logs") -Destination "$out\dictum-logs" -Recurse -ErrorAction SilentlyContinue
+    # The settings folder's files (names, sizes, and the two JSON files; .env is listed, never copied), for the run's record of what the demo changed.
+    try {
+        $cfg = Join-Path $env:APPDATA "Dictum"
+        Get-ChildItem -LiteralPath $cfg -Force -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Name)`t$($_.Length)" } | Set-Content -LiteralPath "$out\config-listing.txt" -Encoding UTF8
+        foreach ($f in "settings.json", "consent.json") { if (Test-Path -LiteralPath (Join-Path $cfg $f)) { Copy-Item -LiteralPath (Join-Path $cfg $f) -Destination "$out\config-$f" -Force } }
+    } catch { }
     Write-Utf8 "$out\steps.json" ($log | ConvertTo-Json -Depth 8)
     Note "done: $($log.result)"
     Write-Utf8 "$out\done.txt" $log.result
