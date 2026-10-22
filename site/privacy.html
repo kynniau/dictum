@@ -32,15 +32,15 @@
 
 <main id="main" class="wrap doc">
   <h1>Privacy policy</h1>
-  <p class="updated">Dictum by Kynni. Last updated <time datetime="2026-10-22">22/10/2026</time>.</p>
+  <p class="updated">Dictum by Kynni. Last updated <time datetime="2026-10-23">23/10/2026</time>.</p>
   <p>This policy covers the Dictum desktop app for Windows PCs, whether you install it from the Microsoft Store or as the direct download, and this website, dictum.kynni.au. A Mac version is coming soon and will be covered by this policy when it is released. Dictum is made by Kynni Pty Ltd (“we”).</p>
 
   <section aria-labelledby="short">
     <h2 id="short">The short version</h2>
     <ul>
       <li><strong>We collect nothing.</strong> Dictum has no account, no analytics, no telemetry and no crash reporting. We never receive your audio or your text.</li>
-      <li><strong>Your speech is turned into text on your PC</strong>, and the text is tidied on your PC.</li>
-      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, to check for updates in the direct-download version, or, if you switch it on, to send text to a cloud clean-up service or a server you choose.</li>
+      <li><strong>Your speech is turned into text on your PC, unless you turn on cloud speech</strong>, and the text is tidied on your PC.</li>
+      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, to check for updates in the direct-download version, or, if you switch it on, to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose.</li>
     </ul>
   </section>
 
@@ -53,7 +53,7 @@
     <h2 id="uses">What Dictum uses on your PC</h2>
 
     <h3>Microphone</h3>
-    <p>Dictum opens the microphone only while you are dictating (holding the hotkey, or in hands-free mode) or recording a calibration sentence, and closes it afterwards, so the Windows microphone indicator is off the rest of the time. The audio is kept in memory while it is turned into text, then discarded. It is never written to disk, except the calibration recordings you make on purpose (below).</p>
+    <p>Dictum opens the microphone only while you are dictating (holding the hotkey, or in hands-free mode) or recording a calibration sentence, and closes it afterwards, so the Windows microphone indicator is off the rest of the time. The audio is kept in memory while it is turned into text, then discarded. It is never written to disk, except the calibration recordings you make on purpose (below). With cloud speech on, the recording is sent to the service you chose and then discarded here.</p>
 
     <h3>Your words</h3>
     <p>Transcripts are not stored. The last dictation is kept in memory so you can use Fix last dictation, and is gone when Dictum quits. Logs never contain what you said unless you turn on the <code>log_transcripts</code> setting.</p>
@@ -76,7 +76,7 @@
         <li><code>settings.json</code>: your settings.</li>
         <li><code>dictionary.txt</code> and <code>corrections.txt</code>: your names, terms and fixes, if you add any.</li>
         <li><code>profanity.txt</code>: only if you add your own word list.</li>
-        <li><code>.env</code>: an API key, only if you add one for cloud clean-up. (The direct download also reads a <code>.env</code> you place beside <code>Dictum.exe</code>.)</li>
+        <li><code>.env</code>: an API key, only if you add one for cloud clean-up or cloud speech. (The direct download also reads a <code>.env</code> you place beside <code>Dictum.exe</code>.)</li>
       </ul>
     </div>
     <div class="card">
@@ -106,15 +106,20 @@
     <h3>OpenAI-compatible service (off by default)</h3>
     <p>Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it. This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.</p>
 
+    <!-- APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (cloud speech section) -->
+    <h3>Cloud speech (off by default)</h3>
+    <!-- PROPOSED 23/10/2026: shipped text differs from the owner-approved summary by the sentences quoted in DECISIONS; owner confirmation pending -->
+    <p>Only if you switch on cloud speech in Settings &gt; Models, agree to the service in its own consent step and, for OpenAI, Azure OpenAI or Groq, add your own API key (a server you name may need none). After each dictation (each part, in hands-free) Dictum then sends that dictation’s recording, as a WAV file, to the service you chose, together with the words in your personal dictionary as a hint and, in hands-free, the closing words of the part before. The service is OpenAI (<code>api.openai.com</code>), Azure OpenAI (<code>{resource}.openai.azure.com</code>, your own resource), Groq (<code>api.groq.com</code>) or a custom <code>https://</code> address you enter. That service handles your voice under its own terms. This is an advanced option: Dictum cannot validate or certify how that service stores, protects or uses your voice. Check its terms before dictating anything sensitive.</p>
+
     <h3>This website: <code>dictum.kynni.au</code></h3>
     <!-- APPROVED 22/10/2026 20:47 AEDT (plain-words route added) -->
     <p>Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.</p>
 
     <h3>Offline only</h3>
-    <p>With the <code>offline_only</code> setting turned on, Dictum never connects to anything outside your PC: downloads, cloud clean-up and servers that aren’t on your PC are all refused. A clean-up server running on your own PC still works. You can copy model files in instead of downloading them.</p>
+    <p>With the <code>offline_only</code> setting turned on, Dictum never connects to anything outside your PC: downloads, cloud clean-up, cloud speech and servers that aren’t on your PC are all refused. A clean-up or speech server running on your own PC still works. You can copy model files in instead of downloading them.</p>
 
     <h3>What any connection reveals</h3>
-    <p>Like any internet connection, each of these reveals your IP address to the host you connect to. Hugging Face, Anthropic, OpenAI, Google Gemini and any server you name handle that under their own policies. Model downloads and requests to Anthropic, OpenAI and Google Gemini use HTTPS. A server you name yourself uses the address you give it, so use an <code>https://</code> address for anything that isn’t on your own PC.</p>
+    <p>Like any internet connection, each of these reveals your IP address to the host you connect to. Hugging Face, Anthropic, OpenAI, Azure OpenAI, Groq, Google Gemini and any server you name handle that under their own policies. Model downloads and requests to Anthropic, OpenAI, Azure OpenAI, Groq and Google Gemini use HTTPS. A server you name yourself uses the address you give it, so use an <code>https://</code> address for anything that isn’t on your own PC.</p>
   </section>
 
   <section aria-labelledby="store">

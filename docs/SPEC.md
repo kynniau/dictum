@@ -1360,8 +1360,8 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
-  tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
-  others, and what to do about it), then fifteen questions and answers (counted in `HelpText.Questions` on 22/10/2026 at main cc3c0ba; the last, added 21/10/2026, carries the approved name line). All of it comes from
+  tidy; the paste; nothing is sent unless cloud clean-up or cloud speech is turned on; why a speech model hears some people better than
+  others, and what to do about it), then sixteen questions and answers (counted in `HelpText.Questions` on 23/10/2026 at a1546e3 (main 4a4072a plus PR #62's question); the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
   Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
   themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
@@ -1369,7 +1369,8 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   the top of the view (`HelpPage.JumpGap`); an answer the page cannot scroll that far (the last ones) shows whole.
   APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): two more questions after "Why did it type the wrong words?", "What is
   clean-up?" and "How can I see what Dictum does with my words?" (`HelpText.CleanupQuestion`, `SeeHowQuestion`), which make fifteen;
-  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers").
+  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers"). APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: a sixteenth
+  question, "Can I give the clean-up my own instructions?", after "How do I turn on cloud clean-up?", and a Create the key file… paragraph at the head of that answer (§31).
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
@@ -1614,3 +1615,23 @@ Every new user-facing string is APPROVED 22/10/2026 (DECISIONS, "Owner approvals
 - **Store listing**: one added sentence at the end of PRIVATE BY DESIGN (`docs/STORE.md`).
 - **Landing page**: "Free for life" became "Free to keep on your PC" (APPROVED 22/10/2026 17:42 AEDT).
 - **Pins**: `PlainWordsTests`, `OwnerApprovalsTests.The_plain_words_short_version_is_pinned`, `SiteStoreFirstTests` (anchors and the GitHub line on the new page).
+
+
+## 31. Cloud speech: public copy (amendment, 22/10/2026, APPROVED 22/10/2026 22:52 AEDT)
+
+Cloud speech (§28) sends the recording of each dictation to a service the user chooses, so every public surface that says where the
+voice goes says "unless you turn on cloud speech" (or "by default"). Wording and the old sentences: docs/DECISIONS.md, "Public copy for
+cloud speech and the 1.3 features".
+
+- **Release gate.** No page of the site (`index.html`, `help.html`, `privacy.html`, `plain-words.html`) says the voice "never leaves" the PC
+  without an "unless" in the same sentence, or that it "stays" on or here without "unless" or "by default"
+  (`SiteStoreFirstTests.No_page_says_the_voice_never_leaves_the_PC_without_an_unless`).
+- **Privacy policy sections** (`site/privacy.html`), in order: The short version; What we collect; What Dictum uses on your PC (Microphone, Your words,
+  Keyboard, Clipboard, Calibration recordings); What Dictum keeps on your PC, and where; When Dictum connects to the internet (Model downloads; Cloud clean-up:
+  api.anthropic.com; OpenAI-compatible service; **Cloud speech (off by default)**, new: api.openai.com, {resource}.openai.azure.com, api.groq.com and a custom
+  https:// address, what is sent (the recording as a WAV file, the personal dictionary words as a hint, in hands-free the closing words of the part before) and that Dictum cannot validate or
+  certify how the service handles the voice; This website; Offline only, which now refuses cloud speech to a service that is not on the PC; What any connection reveals); If you install from the
+  Microsoft Store; This website; Deleting everything; Changes to this policy; Contact. The "Last updated" date is set at tag time.
+- **Help questions** (§26): sixteen. APPROVED 22/10/2026 22:52 AEDT: "Can I give the clean-up my own instructions?" (`HelpText.OwnInstructionsQuestion`) after "How do I turn on cloud clean-up?",
+  and that answer opens with the Create the key file… button, keeping the sixteen Notepad steps as the fallback. Both depend on the own-instructions box and the key file button (PR #60, merged at 672f85b into main 4a4072a). Settings > Storage's offer to move model files is PR #61 (head 1730818 when this was written, open; it offers the move from Change…, Browse… and Use default). Merge order: #60 (done), #61, then the copy PR (#62). §26 reads "sixteen questions" (counted in `HelpText.Questions`) and "unless cloud clean-up or cloud speech is turned on" since main 4a4072a was merged into the copy branch.
+- **Store** (`docs/STORE.md`) and **Mac handover** (`docs/MAC-HANDOVER.md`): see DECISIONS. The Mac beta is Apple Silicon only (owner, 22/10/2026).
