@@ -1450,3 +1450,60 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
   model hears the same samples; the log names the reason (status and host, never audio, text or key); the status says the
   last request failed until the next success. Esc pastes nothing. A settings reload cancels a request under way. So does
   quitting.
+
+## 29. See how it works: live stages in Settings (amendment, 22/10/2026)
+
+Owner intent (22/10/2026): "a new live demonstration screen in settings, which shows a few boxes: first we get the user to
+talk, the first section shows exactly what Dictum hears, then how we process those words (the speech model), then the
+clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the compare mode in the design brief is a later lane.
+
+- **Where**: Settings → **See how it works** (PROPOSED title), the entry before Help in the Settings list
+  (`SettingsWindow`'s page list). The arrow keys reach it in the list like every other page.
+- **Recording**: **Record** / **Stop**, or hold the dictation hotkey while the page is shown in the window in front (as
+  calibration: `AppShell.RedirectHotkey`, released when the window loses focus or another page is shown; Esc drops the
+  take). A dictation already under way when the page takes the hotkey (held, hands-free or toggle, started elsewhere) keeps
+  it: the hotkey is decided once per press, so a press whose key-down went to a dictation goes to the controller whole (its
+  key-up and Esc too, even after that dictation has gone idle; `AppShell.ForwardHotkey`), and Record says "A dictation is
+  in progress". Esc is the page's only while its own take is open. Record is off until a speech model is ready (the welcome window's "Getting the
+  speech model ready…" while one loads, else `HowItWorksText.NoSpeechModel`). A take is dropped, with the reason, when the
+  microphone fails (`IAudioCapture.Failed`) or the window goes behind another. One take at a time, stopped at calibration's 30 s take limit (`CalibrationSession.TakeLimit`). The capture is
+  opened for this page only and its audio stays a `CapturedAudio` in memory: nothing is written to disk.
+- **The run**: the take goes through the shell's own `DictationPipeline` (`AppShell.Pipeline`, the controller's) via
+  `DictationPipeline.DemonstrateAsync`: the same gate, speech model, clean-up (local, rules, off or a consented cloud
+  service, whichever is in use) and finishing step (corrections, profanity filter, snippets) as a dictation. It reports
+  each step as a `PipelineProgress` as it finishes. Nothing is pasted and "Fix last dictation" is not told. The log gets
+  what a dictation's gets (timings and lengths; the text only with `log_transcripts` on) plus "See how it works: nothing
+  pasted (N chars would have been)". When the clean-up in use sends text to another program (`TranscriptCleaner.SendsText`),
+  the page says so above Record.
+- **The five stages** (labels from `HowItWorksText.Stages`, the one source):
+  1. *What Dictum hears*: sound, not words. The live level meter (`Meter`, the welcome window's microphone test; at most
+     twice a second with reduced motion, `MicrophoneStep.ReducedMotionMeterMs`), then the take's length. A silent take
+     stops here with `NoSoundText.SilentBalloon`; a too-short one with the gate's reason.
+  2. *What the speech model heard*: the raw transcript and the transcription time the pipeline logs. No words: it stops
+     here ("no speech recognised").
+  3. *Rule-based tidy*: with no model, the tidy's text and the clean-up time (it is the whole clean-up); with clean-up
+     off or text not English, "only spaces were tidied"; after a reply that was not used, the tidy's text, untimed (its
+     time is inside step 4's); after an accepted reply, `DeterministicCleaner.Clean` of the raw text, untimed, marked
+     "Not used" as what a rejected reply would have got.
+  4. *AI clean-up*: no model: "Not in use" with the clean-up's status line. Otherwise the clean-up time the pipeline logs
+     and the verdict: accepted, with the reply's text, or "Not used: <reason>" in the validator's or provider's own words
+     (for example "reply drops a negation" or "timed out after … ms"); a skipped dictation says "Not asked". While it runs,
+     the pill's own "Polishing…" (the `showPill` event).
+  5. *What would be pasted*: the finished text, with a line when corrections, the profanity filter or snippets changed it.
+     Not timed: the pipeline does not time this step, so no time is shown.
+- **Speech step** (after §28, cloud speech Core): the pipeline's transcriber is the shell's speech step
+  (`token => _speech.GetAsync(token)`), the same for the controller and the page. While the model on this PC is the speech
+  step, the in-memory line says the sound never leaves this PC; with cloud speech on (`CloudSpeech.SendsAudio`) it says the
+  sound is sent to its host (`HowItWorksText.CloudSpeechNote`), and step 2's description names that host
+  (`HowItWorksText.HeardByCloud`). Record still gates on the local model being ready (`AppShell.SpeechReady`), as the hotkey
+  does (`hotkeyBlocked: !_models.IsReady`): the local model stays loaded as cloud speech's fallback.
+- **Timings**: only the pipeline's two stopwatch readings (transcription; clean-up), the same values its log lines carry.
+  No other clock is added.
+- **Accessibility**: every control named; each stage is a tab stop named with all it shows, with a ring only for keyboard
+  focus; the status line under Record and each stage's text and verdict are polite live regions; Stop from the keyboard
+  (Record focused by Tab or the arrows) moves focus to step 2, as Record is off while the steps run; after a click it is left
+  where it was; the page title is heading level 1, each stage title level 2.
+- **Not in this lane**: a link from Settings → Help (Help's page and copy belong to other lanes); compare mode.
+- **Pins**: `HowItWorksTests` (pipeline and stages), `HowItWorksPageTests` (the page, headless).
+
+Every new user-facing string is PROPOSED (DECISIONS, 22/10/2026), awaiting the product owner's approval.

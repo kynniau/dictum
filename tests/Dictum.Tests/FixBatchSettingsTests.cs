@@ -146,11 +146,25 @@ public sealed class FixBatchSettingsTests : IDisposable
     public void The_cleanup_repair_is_told_whether_the_key_is_present()
     {
         var paths = Paths();
+        List<string> warnings = [];
+        string Provider()
+        {
+            warnings.Clear();
+            return ConfigLoader.Load(paths, new SecretRedactor(), _ => null, _ => false, warnings.Add).Settings.Llm.Provider;
+        }
+        // Never agreed to (a first-build settings.json): the key's absence is the repair's reason, logged as such.
         File.WriteAllText(paths.SettingsFile, """{ "llm": { "provider": "anthropic" } }""");
-        CloudConsentFile.Write(paths.ConsentFile, new CloudConsentRecord("anthropic", "api.anthropic.com", DateTimeOffset.UtcNow, "test")); // agreed in the app (SPEC §22)
-        Assert.Equal("local", Load(paths).Settings.Llm.Provider); // no key: the local model
+        Assert.Equal("local", Provider());
+        Assert.Contains(warnings, w => w.Contains("ANTHROPIC_API_KEY is not set", StringComparison.Ordinal));
         File.WriteAllText(paths.EnvFile, "ANTHROPIC_API_KEY=sk-ant-present-123\n");
-        Assert.Equal("anthropic", Load(paths).Settings.Llm.Provider);
+        Assert.Equal("local", Provider()); // the key is there, so only the missing consent is why
+        Assert.DoesNotContain(warnings, w => w.Contains("ANTHROPIC_API_KEY is not set", StringComparison.Ordinal));
+        // Agreed to in the app (SPEC §22): Anthropic with its key, and without it too (22/10/2026), when the clean-up in use sends nothing
+        // and waits for the key (TranscriptCleaner.MissingKey), so the pages can say so.
+        CloudConsentFile.Write(paths.ConsentFile, new CloudConsentRecord("anthropic", "api.anthropic.com", DateTimeOffset.UtcNow, "test"));
+        Assert.Equal("anthropic", Provider());
+        File.Delete(paths.EnvFile);
+        Assert.Equal("anthropic", Provider());
     }
 
     [Fact]

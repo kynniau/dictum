@@ -75,20 +75,28 @@ internal sealed class CleanupPage : SettingsPage
         var on = (host is not null && CloudPolicy.HasConsent(s.Llm)) || server is not null;
         _cloudOn.IsVisible = on;
         _cloudOff.IsVisible = !on;
+        _cloudState.Text = on ? StateLine(Shell) : "";
+        _enable.IsEnabled = !s.OfflineOnly;
+        _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
+    }
+
+    /// <summary>The card's state line while cloud clean-up is on (a host agreed to, or a server on this PC).</summary>
+    private static string StateLine(AppShell shell)
+    {
+        var s = shell.Settings;
+        var host = CloudPolicy.CloudHost(s.Llm);
+        var server = CloudPolicy.LocalServerHost(s.Llm);
         // The settings and the clean-up in use (both from the last load) decide the line, never the .env files as they are now.
         // A server on this PC tidies the text only while the clean-up in use asks it (NothingLeaves is false then): text that is not
         // English (SPEC §23) gets the plain cleaner, which asks no server, so it falls through to the last "On, but" line below.
         // Offline only refuses a host off this PC before the key is looked at, so at most one of the waiting and offline-only lines applies.
         // The last "On, but" line is for whatever else leaves nothing sent although cloud was agreed to, such as an address refused as insecure,
         // or text that is not English, where switching offline only off would send nothing (OfflineOnlyIsWhyNothingIsSent).
-        _cloudState.Text = !on ? ""
-            : server is not null && !Shell.NothingLeaves ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
-            : Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
-            : OfflineOnlyIsWhyNothingIsSent(Shell) ? CloudPolicy.OfflineOnlyLine
-            : Shell.NothingLeaves ? CloudPolicy.NothingSentLine
+        return server is not null && !shell.NothingLeaves ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
+            : shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
+            : OfflineOnlyIsWhyNothingIsSent(shell) ? CloudPolicy.OfflineOnlyLine
+            : shell.NothingLeaves ? CloudPolicy.NothingSentLine
             : $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}";
-        _enable.IsEnabled = !s.OfflineOnly;
-        _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
     }
 
     /// <summary>
@@ -156,8 +164,14 @@ internal sealed class CleanupPage : SettingsPage
             Say("Type the server address, for example http://localhost:11434/v1.");
             return;
         }
-        Run(() => Say(Shell.EnableCloud(new LlmSettings { Provider = provider, BaseUrl = baseUrl, Model = model }) ?? "Cloud clean-up is on."));
+        Run(() => Say(Shell.EnableCloud(new LlmSettings { Provider = provider, BaseUrl = baseUrl, Model = model }) ?? Switched(Shell)));
     }
+
+    /// <summary>
+    /// What switching on says once it is saved, read from the clean-up in use as the card's state line is: "Cloud clean-up is on."
+    /// only while that clean-up sends the text; otherwise the card's own approved line (waiting for a key, or nothing sent), never "on".
+    /// </summary>
+    private static string Switched(AppShell shell) => shell.Cleaner.SendsText ? "Cloud clean-up is on." : StateLine(shell);
 }
 
 /// <summary>Settings → Privacy: what leaves the PC, offline only, clipboard history and transcripts in the log.</summary>

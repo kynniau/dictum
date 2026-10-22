@@ -144,6 +144,7 @@ an edit made in the file is picked up within a second and shows in the window.
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
 | About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
+| See how it works | Record one dictation and watch each step: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up and whether its reply was used, and what would be pasted. Nothing is pasted, and the recording is never saved. See "See how it works". |
 | Help | **How Dictum works** and **Questions and answers** in plain words, readable with no internet; **Open the full guide** (https://dictum.kynni.au/help, in your browser) and **Email support** and **Send feedback or suggest a feature** (each a new email to hello@kynni.com.au in your own mail app). See "Help" and "Feedback and feature requests". |
 
 The windows follow Windows' light or dark setting.
@@ -162,6 +163,18 @@ Help is in two places:
   page opens it in your browser; Dictum itself fetches nothing.
 
 The Help page's words were approved by the owner on 22/10/2026 (docs/DECISIONS.md) and live in `src/Dictum.Core/Help/HelpText.cs`.
+
+### See how it works
+
+Settings > **See how it works** shows what Dictum does with one whole recording. Press **Record** (or hold your hotkey while
+the page is in front), say a sentence or two, and press **Stop**. Five boxes fill in as each step finishes: the
+microphone's level (Dictum starts with sound, not words), the raw text the speech model heard, the rule-based tidy, the
+AI clean-up with whether Dictum accepted its reply and, if not, the check it failed (for example "reply drops a
+negation"), and the text a dictation would paste. Each timed step shows the time Dictum's log records for it. It uses
+your current settings: the same speech model and clean-up as your dictations. The page pastes nothing and keeps the
+recording in memory only; it is never saved to disk. If your clean-up sends text to a cloud service, this text goes
+there too, and the page says so. With cloud speech on, the sound goes to the speech service, as a dictation's does, and the
+page says that instead of "the sound never leaves this PC". The page's words are PROPOSED (docs/DECISIONS.md, 22/10/2026).
 
 ### Feedback and feature requests
 
@@ -772,7 +785,7 @@ warning and the default is used; Dictum never fails to start because of settings
 | `speech.base_url` | `null` | Required for `openai-compatible`; Dictum appends `/audio/transcriptions`. For example `https://api.openai.com/v1`, `https://YOUR-RESOURCE.openai.azure.com/openai/v1/` or `https://api.groq.com/openai/v1`, or your own server. `https://` only, also for a server on this PC (the consent step says the connection is encrypted); an `http://` address is ignored with a warning. A query (such as an `api-version`) stays after the added path. The address decides which key goes with each request (see "Secrets"). |
 | `speech.model` | `null` | Required for `openai-compatible`: the service's transcription model id (for Azure OpenAI, your deployment name). No default is filled in. |
 | `speech.timeout_ms` | `30000` | The deadline for one request (1000–120000); past it the local model hears that recording. Not a measured figure: it is to be set from a measured round trip before cloud speech ships. |
-| `llm.provider` | `"local"` when the key is absent; the first run writes `"none"` when base.en comes with Dictum (a seeded value is kept) | `local` (the cleanup model on this PC; Settings > Models > Add AI clean-up writes it), `none` (rule-based tidy only), `off` (no clean-up: the text as whisper wrote it, spaces tidied only; see "Cleanup"), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
+| `llm.provider` | `"local"` when the key is absent; the first run writes `"none"` when base.en comes with Dictum (a seeded value is kept) | `local` (the cleanup model on this PC; Settings > Models > Add AI clean-up writes it), `none` (rule-based tidy only), `off` (no clean-up: the text as whisper wrote it, spaces tidied only; see "Cleanup"), or the opt-in cloud/server providers `anthropic` and `openai-compatible` (see "Optional cloud polish"). `anthropic` with no `ANTHROPIC_API_KEY` and no consent on file is treated as `local` (logged), so a settings.json written by the first build, which defaulted to `anthropic`, gets local cleanup instead of none. Anthropic agreed to in the consent step but with no key sends nothing: the rule-based tidy runs and Settings > Clean-up and Privacy say "On, but waiting for your ANTHROPIC_API_KEY: nothing is sent until you add it to .env." (unless offline only is on, whose line wins), as for the OpenAI and Google Gemini presets. A cloud provider also needs the in-app consent step (`consent.json`, see "Optional cloud polish"): without it `local` is used and the log says so. |
 | `llm.model` | your first-run pick (`qwen2.5-1.5b` if the file has no value) | For `local`: a cleanup catalogue name or an absolute path to a `.gguf`; the Clean-up picker and Settings > Models write this. Anything else (for example `claude-haiku-5-5` left by the first build) is treated as unset and the recommendation is used (logged). For `openai-compatible`: the server's model id. With `anthropic` a local name means `claude-haiku-5-5`. |
 | `llm.gpu` | `"auto"` | Cleanup model backend. `vulkan`: try Vulkan, then CPU. `auto`: the same, except that when every GPU Vulkan finds is integrated graphics the CPU build is used (faster there: on the development PC's Intel UHD P630 and 6-core Xeon, 2.1-2.2 s per clean-up against 4.2-4.3 s on Vulkan, qwen2.5-1.5b, 17/10/2026). Dictum learns the GPUs from the speech model's runtime, so `auto` keeps Vulkan on such a PC when that runtime is the CPU-only one (`whisper.gpu = cpu`, which **Try on the CPU** writes, or a start after the GPU ended Dictum on the speech model) or when no speech model load has been asked for (a missing speech model, say), and `--bench-cleanup` always times Vulkan there; set `llm.gpu` to `cpu` for the CPU build in those cases. `cpu`: CPU only. The backend is chosen once per start, so a change needs a restart; a model loaded after a change to `cpu` already stays off the GPU. A model whose load or warm-up fails on the GPU is loaded once more on the CPU, and a start after the GPU ended Dictum while it loaded the model uses the CPU build for that run. |
 | `llm.base_url` | `null` | Required for `openai-compatible`, e.g. `http://localhost:11434/v1`. For `anthropic` it is optional and replaces `https://api.anthropic.com` (e.g. a company gateway). The `ANTHROPIC_BASE_URL` environment variable is ignored. Because both providers share this key, a URL left over from `openai-compatible` would receive the Anthropic key and transcripts: Dictum logs a warning and shows a balloon "Anthropic requests will go to <host>" whenever `anthropic` is used with a `base_url`. |
@@ -811,7 +824,7 @@ at all. See `.env.example`.
 
 | Key | Used by |
 |---|---|
-| `ANTHROPIC_API_KEY` | `llm.provider = "anthropic"`. Missing key → the local cleanup model is used (logged), or the rule-based tidy if that model is not downloaded. |
+| `ANTHROPIC_API_KEY` | `llm.provider = "anthropic"`. Missing key → nothing is sent. Agreed to in the consent step, the rule-based tidy runs and Settings says it is waiting for the key; never agreed to (a first-build settings.json), the local cleanup model is used (logged), or the rule-based tidy if that model is not downloaded. |
 | `OPENAI_API_KEY` | The OpenAI preset (`openai-compatible` at `api.openai.com`), sent as `Authorization: Bearer` to that host only. Required: without it nothing is sent and the rule-based tidy is used. Cloud speech at `api.openai.com` uses it the same way (without it nothing is sent and the local speech model is used). |
 | `GEMINI_API_KEY` | The Google Gemini preset (`openai-compatible` at `generativelanguage.googleapis.com`), sent as `Authorization: Bearer` to that host only. Required, as for OpenAI. |
 | `LLM_API_KEY` | `llm.provider = "openai-compatible"` at any other address (a custom server), sent as `Authorization: Bearer` when set. Optional for local servers. Never sent to the OpenAI or Google Gemini hosts (on any port; a final "." in the address does not make another host) or to the Ollama preset address. |
@@ -908,8 +921,9 @@ A settings.json from the first build that says `anthropic` therefore runs the lo
 the consent step is done in the app.
 
 **Anthropic:** choose Anthropic in the consent step and set `ANTHROPIC_API_KEY` (environment variable, or `.env`).
-Model `claude-haiku-5-5` (or another Anthropic model id), thinking off, effort low. Missing key → the local cleanup
-model is used (logged), or the rule-based tidy if that model is not downloaded.
+Model `claude-haiku-5-5` (or another Anthropic model id), thinking off, effort low. Missing key → nothing is sent.
+Agreed to in the consent step, the rule-based tidy runs and Settings shows the waiting line; never agreed to (a
+first-build settings.json), the local cleanup model is used (logged), or the rule-based tidy if that model is not downloaded.
 
 **Your own server (Ollama, LM Studio, a company gateway):** choose "Ollama on this PC" or "Custom server (OpenAI-compatible)", for example
 

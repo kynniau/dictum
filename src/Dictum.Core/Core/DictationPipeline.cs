@@ -25,6 +25,9 @@ public sealed class DictationPipeline
     private readonly Action<string> _inserted;
     private readonly Func<IEnumerable<string>> _names;
 
+    /// <summary>Why a recording whisper found no words in is dropped (the log's wording), as <see cref="PipelineProgress.Reason"/>.</summary>
+    public const string NoSpeech = "no speech recognised";
+
     /// <param name="transcriber">Returns the loaded engine, waiting for a model load still in progress.</param>
     /// <param name="cleaner">Current cleanup configuration (rebuilt on settings reload).</param>
     /// <param name="insert">Inserts text at the cursor; checks the token before the first keystroke.</param>
@@ -53,14 +56,31 @@ public sealed class DictationPipeline
 
     /// <param name="insertedWords">Told how many words were pasted (for the "Pasted · 38 words" pill).</param>
     /// <param name="part">A hands-free part (its context and the boundary with the last part typed), or null for a whole recording.</param>
-    public async Task<ProcessingOutcome> RunAsync(CapturedAudio audio, CancellationToken token, Action<PillView> showPill, Action<int>? insertedWords = null,
-        HandsFreePart? part = null)
+    public Task<ProcessingOutcome> RunAsync(CapturedAudio audio, CancellationToken token, Action<PillView> showPill, Action<int>? insertedWords = null,
+        HandsFreePart? part = null) =>
+        JourneyAsync(audio, token, showPill, insertedWords, part, report: null, paste: true);
+
+    /// <summary>
+    /// Settings &gt; See how it works (SPEC §29): one whole recording takes this same journey, with the speech model, the
+    /// clean-up and the finishing step in use, and <paramref name="report"/> is told each step's result as it finishes, with
+    /// the timings this pipeline logs for every dictation (no other clock). Nothing is pasted and "Fix last dictation" is not
+    /// told: the text stops at what would be pasted. The log gets what a dictation's gets (the transcript only with
+    /// log_transcripts on), and one line saying nothing was pasted.
+    /// </summary>
+    /// <param name="showPill">Told "Polishing…" as a dictation's pill is, so the page can show the clean-up at work.</param>
+    /// <param name="report">Called on the pipeline's thread, in order: Transcribed, CleanedUp, Finished; or Discarded where it stops.</param>
+    public async Task DemonstrateAsync(CapturedAudio audio, CancellationToken token, Action<PillView> showPill, Action<PipelineProgress> report) =>
+        await JourneyAsync(audio, token, showPill, insertedWords: null, part: null, report, paste: false).ConfigureAwait(false);
+
+    private async Task<ProcessingOutcome> JourneyAsync(CapturedAudio audio, CancellationToken token, Action<PillView> showPill, Action<int>? insertedWords,
+        HandsFreePart? part, Action<PipelineProgress>? report, bool paste)
     {
         var settings = _settings();
         var reject = RecordingGate.RejectReason(audio, settings.MinRecordingMs, settings.SilenceThreshold);
         if (reject is not null)
         {
             _log.Info(part is null ? $"Recording discarded: {reject}." : $"Segment {part.Number} discarded: {reject}.");
+            report?.Invoke(new PipelineProgress(PipelineStep.Discarded, "", Reason: reject));
             return ProcessingOutcome.Discarded;
         }
 
@@ -72,9 +92,11 @@ public sealed class DictationPipeline
             : await engine.TranscribeAsync(audio.Samples, carried, token).ConfigureAwait(false);
         var transcribeMs = sw.ElapsedMilliseconds;
         token.ThrowIfCancellationRequested();
+        report?.Invoke(new PipelineProgress(PipelineStep.Transcribed, raw, transcribeMs));
         if (raw.Length == 0)
         {
-            _log.Info($"Transcribed {audio.Duration.TotalSeconds:0.0} s of audio in {transcribeMs} ms: no speech recognised.");
+            _log.Info($"Transcribed {audio.Duration.TotalSeconds:0.0} s of audio in {transcribeMs} ms: {NoSpeech}.");
+            report?.Invoke(new PipelineProgress(PipelineStep.Discarded, "", Reason: NoSpeech));
             return ProcessingOutcome.Discarded;
         }
         _log.Info($"Transcribed {audio.Duration.TotalSeconds:0.0} s of audio in {transcribeMs} ms ({raw.Length} chars).");
@@ -86,8 +108,10 @@ public sealed class DictationPipeline
         // The clean-up hears the carried words only if it is the one that cleaned them. A clean-up built since (a settings
         // reload, such as cloud clean-up switched on mid-session) gets none: they were said before it was switched on.
         var cleaned = await cleaner.CleanAsync(raw, token, ReferenceEquals(part?.CarriedFrom, cleaner) ? carried : null).ConfigureAwait(false);
+        var cleanupMs = sw.ElapsedMilliseconds;
         var text = cleaned.Text;
-        _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : cleaner.IsPlain ? "the whitespace-only tidy" : "the rule-based tidy")} in {sw.ElapsedMilliseconds} ms.");
+        _log.Info($"Cleanup by {(cleaned.Cleaned ? "the model" : cleaner.IsPlain ? "the whitespace-only tidy" : "the rule-based tidy")} in {cleanupMs} ms.");
+        report?.Invoke(new PipelineProgress(PipelineStep.CleanedUp, text, cleanupMs, Raw: raw, Cleanup: cleaned, Cleaner: cleaner));
         if (settings.LogTranscripts) _log.Info($"Cleaned transcript: {text}");
         // The boundary rule decides the first letter before corrections, the profanity filter and snippets run, so a snippet
         // is still pasted exactly as written; the separator goes in front of the finished text. The clean-up is plain (IsPlain):
@@ -107,7 +131,13 @@ public sealed class DictationPipeline
         }
 
         token.ThrowIfCancellationRequested();
+        report?.Invoke(new PipelineProgress(PipelineStep.Finished, text));
         if (string.IsNullOrWhiteSpace(text)) return ProcessingOutcome.Discarded;
+        if (!paste)
+        {
+            _log.Info($"See how it works: nothing pasted ({text.Length} chars would have been)."); // never the text itself
+            return ProcessingOutcome.Discarded;
+        }
         await _insert(separator + text, token).ConfigureAwait(false);
         _log.Info($"Inserted {separator.Length + text.Length} chars via {settings.Insert.Method}.");
         _inserted(text);
