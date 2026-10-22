@@ -30,6 +30,17 @@ public class SettingsRepairTests
         Assert.Empty(warnings);
     }
 
+    [Fact]
+    public void Anthropic_agreed_to_without_a_key_stays_anthropic_so_the_pages_can_say_it_waits_for_the_key()
+    {
+        // 22/10/2026: switched to the local model here, the Clean-up card showed its off state while the page said cloud clean-up was on.
+        // The cleaner built from these settings sends nothing and records ANTHROPIC_API_KEY as the key it waits for.
+        var warnings = new List<string>();
+        var consented = FirstBuild with { Llm = FirstBuild.Llm with { CloudConsent = "api.anthropic.com" } };
+        Assert.Same(consented, EffectiveSettings.Cleanup(consented, anthropicKeyPresent: false, () => throw new InvalidOperationException("not asked"), warnings.Add));
+        Assert.Empty(warnings);
+    }
+
     [Theory]
     [InlineData("claude-haiku-5-5", "qwen2.5-1.5b")]
     [InlineData("llama3.2", "qwen2.5-1.5b")]

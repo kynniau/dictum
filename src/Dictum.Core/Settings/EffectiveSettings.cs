@@ -11,13 +11,17 @@ namespace Dictum.Settings;
 /// </summary>
 public static class EffectiveSettings
 {
-    /// <param name="anthropicKeyPresent">ANTHROPIC_API_KEY found in the environment or .env.</param>
+    /// <param name="anthropicKeyPresent">ANTHROPIC_API_KEY found in the environment or .env; its absence repairs Anthropic only when no consent is on file.</param>
     /// <param name="gpuRuntime">Whether a GPU runtime loads; asked only when a recommendation is needed.</param>
     /// <param name="warn">Receives one line per repair, for the log.</param>
     public static AppSettings Cleanup(AppSettings settings, bool anthropicKeyPresent, Func<bool> gpuRuntime, Action<string> warn)
     {
         var llm = settings.Llm;
-        if (llm.Provider == LlmSettings.Anthropic && !anthropicKeyPresent)
+        // Only without a consent on file (the first build's settings.json): Anthropic agreed to in Settings > Clean-up stays
+        // Anthropic without its key, so the cleaner records the key it waits for (TranscriptCleaner.MissingKey) and the pages say
+        // "waiting" in the approved words, as for the OpenAI and Google Gemini presets. Switching it to the local model here left
+        // the card in its off state while the page said cloud clean-up was on (22/10/2026).
+        if (llm.Provider == LlmSettings.Anthropic && !anthropicKeyPresent && !CloudPolicy.HasConsent(llm))
         {
             warn("llm.provider is \"anthropic\" but ANTHROPIC_API_KEY is not set (environment or .env): using the local cleanup model instead.");
             llm = llm with { Provider = LlmSettings.Local };

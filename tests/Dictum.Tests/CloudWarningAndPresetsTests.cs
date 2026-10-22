@@ -430,6 +430,61 @@ public class CloudWarningAndPresetsTests
     }
 
     [Theory]
+    [InlineData("Anthropic (Claude)", "ANTHROPIC_API_KEY")]
+    [InlineData("OpenAI", "OPENAI_API_KEY")]
+    public Task Switching_on_from_the_page_without_the_key_shows_the_waiting_line_and_never_says_on(string service, string variable)
+    {
+        // Cloud-setup-help lane (22/10/2026): with Anthropic chosen, Allow pressed and no ANTHROPIC_API_KEY, the load switched Anthropic to
+        // the local model, so the card stayed in its off state while the page said "Cloud clean-up is on.". The OpenAI preset had the
+        // waiting line on the card, but the page said "Cloud clean-up is on." above it too. Nothing is sent in either case.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)), $"{variable} is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+            var (shell, _, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            var window = new SettingsWindow(shell);
+            window.Show();
+            window.ShowPage("Clean-up");
+            Named<ComboBox>(window, "Service").SelectedIndex = Array.IndexOf(Named<ComboBox>(window, "Service").ItemsSource!.Cast<string>().ToArray(), service);
+            dialogs.Answers.Enqueue(0); // Allow
+            Click(window, "Use cloud clean-up…");
+            Assert.Equal("Send dictations to a cloud service?", Assert.Single(dialogs.Asked).Title);
+
+            // The clean-up in use waits for the key and sends nothing; the settings keep the service agreed to.
+            Assert.Equal($"rule-based tidy only: {variable} is not set (environment or .env)", shell.CleanupStatus);
+            Assert.Equal(variable, shell.CleanupWaitingForKey);
+            Assert.True(CloudPolicy.HasConsent(shell.Settings.Llm) && CloudPolicy.CloudHost(shell.Settings.Llm) is not null);
+            Assert.True(shell.NothingLeaves);
+
+            // What the page says straight after Allow: the approved waiting line, never "on".
+            var said = All<TextBlock>(window).Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+            Assert.DoesNotContain("Cloud clean-up is on.", said);
+            Assert.Contains(ApprovedWaitingLine(variable), said);
+
+            // The card, drawn afresh: the on state with its off switch and the waiting line.
+            window.ShowPage("Privacy");
+            window.ShowPage("Clean-up");
+            Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text == ApprovedWaitingLine(variable));
+            Assert.Contains(All<Button>(window), b => b.IsEffectivelyVisible && b.Content as string == "Switch cloud clean-up off");
+            Assert.DoesNotContain(All<Button>(window), b => b.IsEffectivelyVisible && b.Content as string == "Use cloud clean-up…");
+            Assert.Contains(ApprovedWaitingLine(variable), PrivacyPageLines(window));
+
+            // About and the tray panel read the same clean-up in use: the rule-based tidy, and nothing leaves this PC (SPEC §5).
+            window.ShowPage("About");
+            Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible
+                && t.Text?.Contains($"Clean-up: rule-based tidy only: {variable} is not set (environment or .env).", StringComparison.Ordinal) == true);
+            window.Close();
+            var flyout = new FlyoutWindow(shell);
+            flyout.ShowNear(null);
+            Assert.True(IconBeside(flyout, "Nothing leaves this PC").IsVisible);
+            Assert.DoesNotContain(All<TextBlock>(flyout), t => t.Text == ApprovedFlyoutCloud);
+            flyout.Close();
+            shell.Dispose();
+        });
+    }
+
+    [Theory]
     [InlineData(true)] // the key leaves the .env beside the exe after the load
     [InlineData(false)] // the key arrives in the .env beside the exe after the load
     public Task The_pages_follow_the_clean_up_in_use_not_the_env_files_on_disk(bool keyAtLoad)
