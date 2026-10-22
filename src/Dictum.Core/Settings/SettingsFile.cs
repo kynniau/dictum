@@ -145,6 +145,7 @@ public static class SettingsFile
     /// <summary>A written value as the log may show it: as JSON, or for a <see cref="PrivateKeys"/> key its length alone.</summary>
     public static string LogValue(string dottedKey, JsonNode? value) =>
         value is null ? "null"
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the length line below.
         : PrivateKeys.Contains(dottedKey) ? $"({(value is JsonValue v && v.TryGetValue<string>(out var text) ? text.Length : 0)} characters, not logged)"
         : value.ToJsonString();
 

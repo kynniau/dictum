@@ -4,10 +4,10 @@ namespace Dictum.UI.Shell;
 
 public sealed partial class AppShell
 {
-    /// <summary>PROPOSED 22/10/2026 (1.3): "Create the key file…" found a .env already there, left it as it was and opened it.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: "Create the key file…" found a .env already there, left it as it was and opened it.</summary>
     public const string KeyFileExists = "Your key file already exists; it has been opened.";
 
-    /// <summary>PROPOSED 22/10/2026 (1.3): "Create the key file…" made the file with the placeholder line and opened it.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: "Create the key file…" made the file with the placeholder line and opened it.</summary>
     public static string KeyFileCreated(string variable) =>
         $"Your key file has been created and opened: put your key in place of {SecretStore.Placeholder} after {variable}=, then save it.";
 
@@ -20,6 +20,7 @@ public sealed partial class AppShell
     public string CreateKeyFile(string variable)
     {
         var created = KeyFile.CreateIfMissing(Paths, variable);
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: both log lines below.
         _log.Info(created ? $"Key file created with a placeholder line for {variable} (no key written)." : "Key file already exists: opened as it is, not changed.");
         return OpenPath(RealPath(Paths.EnvFile), folder: false) ?? (created ? KeyFileCreated(variable) : KeyFileExists);
     }

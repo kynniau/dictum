@@ -10,7 +10,7 @@ namespace Dictum.Settings;
 /// </summary>
 public static class KeyFile
 {
-    /// <summary>PROPOSED 22/10/2026 (1.3): the header of a key file Dictum creates, in .env.example's comment style.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: the header of a key file Dictum creates, in .env.example's comment style.</summary>
     public const string Header =
         "# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself.\n" +
         "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log.\n";

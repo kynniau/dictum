@@ -5012,3 +5012,16 @@ Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incre
      - The lens's 23 classes: 870 total, 869 passed, 0 failed, 1 skipped. "Llm" is run as the four classes of `LlmTests.cs`:
        TranscriptCleanerTests, CleanupValidatorTests, ProviderParsingTests and SecretRedactorTests.
      - Full suite: 2384 total, 2361 passed, 0 failed, 23 skipped.
+
+8. **Owner approval, 22/10/2026 22:52 AEDT.** The owner approved the 1.3 block. Sections A and B of
+   `.demo-preview/approve-1.3-block.md` cover every PROPOSED string of this PR, and no string changed. Each marker now reads
+   "APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword":
+   - the card label and hint; the limit, cloud and Simple-view lines;
+   - the validator reason; the two prompt marker lines;
+   - the log lines and the loader warnings;
+   - the button, its two status lines, the key-file header lines and the key-file log lines.
+
+   Strings that had no marker of their own (the validator reason, the log lines, the warnings) get a comment line above
+   them. The change to `src` is comments only, counted in the PR body. `OwnerApprovalsTests` gains an approved block that
+   pins each string word for word, independently of the app's constants. The two save-failure log lines are approved but not
+   pinned, because only an exception reaches them. SPEC §5's four PROPOSED marks for these strings now say APPROVED.

@@ -295,7 +295,7 @@ System prompt (ship as the default; overridable by `llm.prompt_file`):
 The user turn is the raw transcript only. Never put the API key or any settings in the
 prompt.
 
-Your own instructions (amendment, 22/10/2026, release 1.3; strings PROPOSED): `llm.instructions` (string or null, default
+Your own instructions (amendment, 22/10/2026, release 1.3; strings APPROVED 22/10/2026 22:52 AEDT): `llm.instructions` (string or null, default
 null; multi-line allowed; at most 2,000 characters, `LlmSettings.InstructionsMaxLength`) holds the user's own clean-up
 instructions, typed in a box on Settings → Clean-up in the Advanced view. When it is set they are added to the system
 prompt in their own section, after the base prompt and before the grammar-assist sentence and the dictionary line: the line
@@ -307,7 +307,7 @@ validator checks every reply whatever the instructions say: a reply that adds a 
 sentence, summarises, translates or answers is rejected and the rule-based tidy is typed.
 
 Final-sentence rule (owner decision, 22/10/2026 20:55 AEDT; reworked after the lens on 5e9c227 and the re-lens on c796dc8;
-reason text PROPOSED): a short sentence added at the end on the same line as the dictation ("… before lunch. Thanks for
+reason text APPROVED 22/10/2026 22:52 AEDT): a short sentence added at the end on the same line as the dictation ("… before lunch. Thanks for
 reading.") had passed every rule. `CleanupValidator` now rejects it as "reply ends with a sentence the speaker did not say":
 in a reply of two sentences or more, the last sentence's words of three letters or more that are not function words,
 fillers or spoken commands (`ValidatorText.IsCorrectionWord`), leaving out words with a digit (the number rule's), must be
@@ -327,7 +327,7 @@ result each gets. The echo rule reads the prompt without the user's own text ins
 (`CleanupPrompt.WithoutOwnText`), so a reply may repeat words of the instructions that the dictation has too; every copy
 of either marker line in the typed text (any case, curly apostrophes read as straight, nested copies included) is taken
 out before the text is wrapped. In the Simple view, which hides the box, the Clean-up page says "Your own clean-up
-instructions are in use (Advanced view)." while `llm.instructions` is set (PROPOSED).
+instructions are in use (Advanced view)." while `llm.instructions` is set (APPROVED 22/10/2026 22:52 AEDT).
 Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
 feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
 first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is
@@ -347,7 +347,7 @@ variable wins; `.env` only fills in variables that are not already set. This let
 staff machine or Azure VM be configured with a machine-level `ANTHROPIC_API_KEY` and no
 `.env` file at all.
 
-Create the key file (amendment, 22/10/2026, release 1.3; strings PROPOSED): a "Create the key file…" button beside "Open
+Create the key file (amendment, 22/10/2026, release 1.3; strings APPROVED 22/10/2026 22:52 AEDT): a "Create the key file…" button beside "Open
 the settings folder" on the Cloud clean-up card writes the config folder's `.env` (`AppPaths.EnvFile`, %APPDATA%\Dictum\.env
 on Windows) with a two-line header in `.env.example`'s comment style and one line, `<VARIABLE>=your-key-here`, for the
 variable the card's key line names for the service and address chosen (Anthropic's own entry: `ANTHROPIC_API_KEY`; a

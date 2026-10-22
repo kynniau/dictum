@@ -113,6 +113,7 @@ public static partial class CleanupValidator
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
         if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
             return (null, "reply repeats words already typed before this part");
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the reason below.
         if (AddedFinalSentence(textLower, rawSet, rawWords, context?.DictionaryTerms)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");

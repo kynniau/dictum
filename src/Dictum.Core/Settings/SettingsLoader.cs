@@ -386,11 +386,13 @@ public static class SettingsLoader
             if (!TryGet(key, out var v) || v.ValueKind == JsonValueKind.Null) return null;
             if (v.ValueKind != JsonValueKind.String)
             {
+                // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the warning below.
                 warnings.Add($"Setting \"{Full(key)}\" has an invalid value: expected a string or null. It is not used.");
                 return null;
             }
             var s = v.GetString()!.Trim();
             if (s.Length <= maxLength) return s.Length == 0 ? null : s;
+            // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the warning below.
             warnings.Add($"Setting \"{Full(key)}\" is {s.Length} characters long; only the first {maxLength} are used.");
             return s[..(char.IsHighSurrogate(s[maxLength - 1]) ? maxLength - 1 : maxLength)].TrimEnd();
         }

@@ -264,6 +264,7 @@ public sealed class TranscriptCleaner
     private static TranscriptCleaner Noted(TranscriptCleaner cleaner, LlmSettings settings, ILog log)
     {
         if (settings.Instructions is { Length: > 0 } own && cleaner.SystemPrompt.Contains(CleanupPrompt.OwnInstructionsStart, StringComparison.Ordinal))
+            // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the log line below.
             log.Info($"Clean-up instructions: Dictum's, with your own added ({own.Length} characters; their text is not logged).");
         return cleaner;
     }

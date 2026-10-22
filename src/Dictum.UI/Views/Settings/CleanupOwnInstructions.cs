@@ -15,17 +15,17 @@ namespace Dictum.UI.Views.Settings;
 /// </summary>
 internal sealed class OwnInstructionsCard
 {
-    // PROPOSED 22/10/2026 (1.3): the card's words.
+    // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: the card's words.
     internal const string Label = "Your own instructions";
     internal const string Hint = "Added to Dictum's clean-up instructions for the AI and cloud clean-up. Dictum still checks every reply against what you said.";
 
-    /// <summary>PROPOSED 22/10/2026 (1.3): shown while the box holds the most Dictum uses (<see cref="LlmSettings.InstructionsMaxLength"/>).</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: shown while the box holds the most Dictum uses (<see cref="LlmSettings.InstructionsMaxLength"/>).</summary>
     internal const string LimitLine = "That is the limit: Dictum uses up to 2,000 characters of your own instructions.";
 
-    /// <summary>PROPOSED 22/10/2026 (1.3): under the box while cloud clean-up is on (a host agreed to in the consent step).</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: under the box while cloud clean-up is on (a host agreed to in the consent step).</summary>
     internal static string CloudLine(string host) => $"With cloud clean-up on, these instructions go to {host} with each dictation.";
 
-    /// <summary>PROPOSED 22/10/2026 (1.3, orchestrator decision after the lens on 5e9c227): the Simple view hides the box, so it says when instructions apply.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3, orchestrator decision after the lens on 5e9c227: the Simple view hides the box, so it says when instructions apply.</summary>
     internal const string SimpleLine = "Your own clean-up instructions are in use (Advanced view).";
 
     private readonly AppShell _shell;
@@ -110,6 +110,7 @@ internal sealed class OwnInstructionsCard
         }
         catch (Exception ex)
         {
+            // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the log line below.
             _shell.Log.Error($"Settings: {ex.GetType().Name} saving llm.instructions.");
             _say($"That did not work: {ex.Message}");
         }
@@ -122,7 +123,7 @@ internal sealed class OwnInstructionsCard
 /// </summary>
 internal static class KeyFileButton
 {
-    /// <summary>PROPOSED 22/10/2026 (1.3).</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3.</summary>
     internal const string Label = "Create the key file…";
 
     /// <summary>
@@ -144,6 +145,7 @@ internal static class KeyFileButton
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the log line below.
                 shell.Log.Error($"Settings: the key file could not be created: {ex.GetType().Name}.");
                 say($"That did not work: {ex.Message}");
             }

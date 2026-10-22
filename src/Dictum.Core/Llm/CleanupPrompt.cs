@@ -44,11 +44,11 @@ public static class CleanupPrompt
     /// <summary>The system prompt with a hands-free part's context line after it (the cloud providers', and the checks', reading).</summary>
     public static string WithCarried(string systemPrompt, string carried) => systemPrompt + "\n" + CarriedLine(carried);
 
-    /// <summary>PROPOSED 22/10/2026 (1.3): the line before the user's own instructions (llm.instructions) in the system prompt.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: the line before the user's own instructions (llm.instructions) in the system prompt.</summary>
     public const string OwnInstructionsStart =
         "The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply.";
 
-    /// <summary>PROPOSED 22/10/2026 (1.3): the line after them.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. 1.3: the line after them.</summary>
     public const string OwnInstructionsEnd = "End of the user's instructions.";
 
     /// <summary>
