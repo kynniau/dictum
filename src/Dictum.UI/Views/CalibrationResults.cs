@@ -36,6 +36,11 @@ internal sealed partial class CalibrationWindow
             _progress.Text = "No speech model is installed in the models folder.";
             return;
         }
+        if (_host.Refusal() is { } refused) // model files are moving (re-lens on PR #61)
+        {
+            _progress.Text = refused;
+            return;
+        }
         _runCts = new CancellationTokenSource();
         SetRunning(true);
         try

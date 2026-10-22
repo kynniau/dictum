@@ -1256,21 +1256,27 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   deleted or chosen (a chosen folder that is it, or inside it, is ignored, and Settings refuses it with a sentence). A
   download is refused, before it is asked and again where it starts, when its drive would keep under 200 MB (decimal); a
   kept `.part` needs only the rest; when the free space cannot be read the download goes ahead, as the 2 GB warning does.
-- **Changing the folder moves no files** unless the user says so (amended 22/10/2026 for 1.3, move-on-change; PROPOSED
-  wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models, Change… on Storage and Use default
+- **Changing the folder moves no files** unless the user says so (amended 22/10/2026 for 1.3, move-on-change; APPROVED 22/10/2026 22:52 AEDT,
+  the 1.3 block; wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models, Change… on Storage and Use default
   on both go through one handler (`ModelFolderActions`) and behave alike (owner decision 22/10/2026 21:45 AEDT: Use default
   moves the files back to the per-user folder). When the folder in use holds model files Dictum
   knows (catalogue files and their `.part` downloads, in that folder itself), it asks once: **Move the files** or **Leave them
-  where they are** (the earlier behaviour, and the default button; closing the question changes nothing). Moving is
-  refused while a download runs and when one folder is inside the other. Otherwise, while the move runs, downloads,
-  preset downloads and Storage's Delete are refused ("Model files are being moved; try again when it finishes.") and no
+  where they are** (the earlier behaviour, and the default button; closing the question changes nothing). A new folder that is the same folder by another path (a junction, a mapped
+  drive, a packaged app's redirected folder; a probe file written there appears in the old one) gets no question: the folder
+  is written and nothing moves. Moving is refused while a download runs and when one folder is inside the other. Otherwise,
+  while the move runs, downloads, preset downloads, Storage's Delete, Delete all app data, Remove Dictum completely and
+  calibration are refused ("Model files are being moved; try again when it finishes.") and no
   model loads; both models are released (a load under way is waited for), then each file is copied to the new folder as
   `<name>.move`, checked (size; for a finished catalogue file the SHA-256 pinned in the catalogue; a `.part` is not
   hashed), renamed into place, and only then is the original deleted and its verified record moved to the copy. A file of
-  the same name already in the new folder counts as moved when it is the same file (size and pinned SHA-256) and is
-  skipped otherwise. A file that fails keeps its original (its copy is deleted) and the move goes on; the models in use move
-  last; files already moved stay moved. Then `models.folder` is written, unless a model in use stayed behind (the folder is
-  then unchanged and the line says so), and the settings reload. The page's status line shows each file, by its catalogue
+  the same name already in the new folder counts as moved when it has the same contents (the pinned SHA-256, or byte for
+  byte where there is none) and is skipped otherwise; an original is never deleted when it and that file may be one file
+  on disk (an exclusive open of the original blocks the open of the other path). A file that fails keeps its original (its copy is deleted) and the move goes on;
+  files already moved stay moved. The models in use move last, as one unit: no original of theirs is deleted until all have
+  arrived, and if one fails or the move is stopped, the copies this move made of them are deleted and every original kept.
+  Then `models.folder` is written, with `whisper.model` or `llm.model` rewritten when it named a moved file by its full
+  path, unless a model in use stayed behind or the move was stopped (the folder is then unchanged and the line says so), and
+  the settings reload. The page's status line shows each file, by its catalogue
   name, as it moves and the result. Quit during a move stops it (the file being copied stops, its original kept; a file
   already checked finishes) and Dictum then quits without changing the folder. The note under the folder on Models and
   Storage reads (APPROVED 22/10/2026 22:42 AEDT): "Dictum looks here first and downloads go here. Changing it asks before

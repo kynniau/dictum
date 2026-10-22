@@ -5089,3 +5089,41 @@ Owner approval 22/10/2026: when the model folder changes, Dictum offers to move 
        - "unfinished {name} download" (a `.part`'s name in the lines)
     9. *Gates:* Release build `--no-incremental` 0 warnings, 0 errors; ModelMoveTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests and PublicCopyNeutralityTests 152 total, 0 failed, 2 skipped; full suite once 1971 total, 0 failed, 23 skipped.
 12. **Model folder note reworded, APPROVED 22/10/2026 22:42 AEDT (owner).** `ModelsPage.FolderNote`, shown on Models and on Storage (one constant), now reads "Dictum looks here first and downloads go here. Changing it asks before moving any files." (was "…Changing it does not move any files."; the second sentence became untrue once the move was offered). Marker "APPROVED 22/10/2026 22:42 AEDT (second sentence reworded for move-on-change; proposed 22/10/2026)". Pins: the literal in `ModelFolderTests.Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` updated; a byte pin added to `OwnerApprovalsTests.The_storage_page_strings_are_pinned` (it held no literal of the note before). SPEC §17 and §24 updated. Mutation: "files." changed to "files!": `The_storage_page_strings_are_pinned` and `Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` observed failing, then restored. Gates: Release build `--no-incremental` 0 warnings, 0 errors; ModelFolderTests, ModelMoveTests, OwnerApprovalsTests and PublicCopyNeutralityTests 90 total, 0 failed, 0 skipped (the full suite was not rerun for this one-string change).
+13. **Re-lens on 8001fa1/ea6303b (Block; fixed on top of 1730818 and the main merge 6a6c3b8, 23/10/2026). Supersedes items 3, 4 and 11.2 where they differ.**
+    1. *Two paths to one folder (blocker).* A junction, subst or mapped drive, a share, or a packaged app's redirected folder can name the folder in use under another path. Each file then looked "already there", matched itself, and the original (the only copy) was deleted.
+       - (a) `ModelMover.SameFolder` writes a uniquely named probe file in the new folder and looks for it in the old one. If it is found, no question is asked, the folder is written, and nothing moves.
+       - (b) The mover never deletes an original that may be the target itself. `SameFileOnDisk` is managed only, because `PlatformTests` (`ArchitectureTests.Shared_code_declares_no_native_call`) forbids a native call in Dictum.Core. The lens suggested a Win32 file-ID comparison; a first version used `GetFileInformationByHandle` and the full suite failed on that rule. The check opens the original for itself alone, then opens the target. A refused open means "may be one file" (or something else holds the target), so the original is kept and the line reports it; both opening means two files. A file of the same name that may be the original counts as in place and its original is kept.
+       - Pinned with a real junction (`mklink /J`, no administrator rights; the tests skip if the host cannot make one; on this PC they ran).
+    2. *The models in use as one unit (blocker).* They move last. Each is copied, checked and renamed, but no original of theirs is deleted until all have arrived. If one fails or the move is stopped, the copies this move made of them are deleted (a file that was already there stays) and every original is kept.
+    3. *A model chosen by its full path* (`whisper.model` / `llm.model`, "Choose model file…") that moved is rewritten to its new path in the same settings write as `models.folder` (`SetModelsFolder(..., alsoWrite)`).
+    4. *No pinned hash means byte for byte.* A file of the same name and size counts as the same only when its bytes match: a `.part`, or a catalogue entry without a SHA-256. Otherwise it is skipped with "a different file of that name is already in the new folder".
+    5. *Guards pinned one by one*:
+       - `EnsureCleanup`
+       - `ApplyWithDownloads`
+       - Browse's and Use default's busy checks
+       - a stopped move never writing the folder
+       - the original's verified record forgotten
+       - the default copy stopping when cancelled
+       - the check before each file
+    6. *Delete all app data* and *Remove Dictum completely* refuse with `MovingRefusal` while files move. Remove Dictum completely says it in a notice titled "Remove Dictum completely".
+    7. *Calibration* loads no model while files move. `CalibrationHost.Refusal()` gives `MovingRefusal`, the results view shows it instead of running, and `CreateEngine` (and each load inside a run already under way) throws it.
+    8. *Quit wording.* When the move was stopped by Quit, the line says " The model folder is still {old}, because the move was stopped." (PROPOSED 23/10/2026; `ModelFolderActions.MoveStopped`) instead of the model-in-use sentence. The PR body is corrected to match: "a different file of that name…", the singular " 1 other file…", the short `FolderKept` form, and failures no longer stopping the move.
+    9. *Mutations, each observed failing on 23/10/2026, full `--no-incremental` rebuild each, then restored:*
+       - 1a, probe removed: `Choosing_another_path_to_the_same_folder_moves_nothing` observed failing.
+       - 1b, file identity always "different": `The_mover_never_deletes_an_original_that_is_the_target_itself` observed failing.
+       - 2, models in use not treated as a unit: `When_one_model_in_use_fails_no_model_in_use_leaves` and `Quit_while_the_models_in_use_move_keeps_every_original` observed failing (and `The_models_in_use_move_last`).
+       - 2, their copies not rolled back: the same two observed failing.
+       - 3, full path not rewritten: `A_model_chosen_by_its_path_follows_the_move` observed failing.
+       - 4, size-only sameness: `Equal_size_but_other_bytes_is_not_the_same_file` observed failing.
+       - 5, `EnsureCleanup` guard removed: `EnsureCleanup_loads_nothing_while_files_move` observed failing.
+       - 5, `ApplyWithDownloads` guard removed: `ApplyWithDownloads_is_refused_while_files_move_before_anything_is_asked` observed failing.
+       - 5, Browse busy check removed: `Browse_opens_no_chooser_while_files_move` observed failing.
+       - 5, Use default busy check removed: `Use_default_changes_nothing_while_files_move` observed failing.
+       - 5, `result.Cancelled ||` removed from `kept`: `A_stopped_move_never_changes_the_folder` observed failing.
+       - 5, `integrity.Forget` removed: `Moving_a_file_forgets_the_originals_verified_record` observed failing.
+       - 5, default copy ignoring the token: `The_default_copy_stops_when_cancelled` observed failing.
+       - 5, check before each file removed: `No_file_starts_after_a_cancel` observed failing.
+       - 6, Delete all app data guard removed: `Delete_all_app_data_is_refused_while_files_move` observed failing.
+       - 6, Remove Dictum completely guard removed: `Remove_Dictum_completely_is_refused_while_files_move` observed failing.
+       - 7, calibration guard removed: `Calibration_loads_no_model_while_files_move` observed failing.
+    10. *Files.* New `tests/Dictum.Tests/ModelMoveSafetyTests.cs`, so `ModelMoveTests.cs` stays under 1,000 lines; its helpers became `internal` for that.

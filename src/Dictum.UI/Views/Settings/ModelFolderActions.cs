@@ -47,9 +47,32 @@ internal static class ModelFolderActions
     /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on PR #61). Added when a model in use stayed behind (or the move was stopped), so the folder
     /// was not changed: dictation goes on with the models where they are.
     /// </summary>
-    internal static string FolderKept(string from, string to, bool someMoved) => someMoved
-        ? $" The model folder is still {from}, because the model in use did not move; the files that did are in {to}; choose that folder again to use them."
-        : $" The model folder is still {from}, because the model in use did not move.";
+    internal static string FolderKept(string from, string to, bool someMoved, bool stopped = false) =>
+        stopped ? MoveStopped(from)
+        : someMoved
+            ? $" The model folder is still {from}, because the model in use did not move; the files that did are in {to}; choose that folder again to use them."
+            : $" The model folder is still {from}, because the model in use did not move.";
+
+    /// <summary>PROPOSED 23/10/2026 (re-lens on PR #61): added when the move was stopped (Quit), not because a model in use stayed behind.</summary>
+    internal static string MoveStopped(string from) => $" The model folder is still {from}, because the move was stopped.";
+
+    /// <summary>
+    /// A model chosen by its full path (whisper.model or llm.model, "Choose model file…") that was among the files moved: its new
+    /// path, written with models.folder so the setting does not point at the old folder (re-lens on PR #61).
+    /// </summary>
+    internal static IReadOnlyList<(string Key, System.Text.Json.Nodes.JsonNode? Value)> MovedModelPaths(AppSettings settings, IReadOnlyList<MovableModel> files,
+        MoveResult result, string to)
+    {
+        var values = new List<(string, System.Text.Json.Nodes.JsonNode?)>();
+        foreach (var (key, value) in new[] { ("whisper.model", settings.Whisper.Model), ("llm.model", settings.Llm.Model) })
+        {
+            if (string.IsNullOrEmpty(value) || !Path.IsPathFullyQualified(value)) continue;
+            if (files.FirstOrDefault(f => PathRegistry.SamePath(f.Path, value)) is not { } moved) continue;
+            if (result.LeftBehind.Any(left => PathRegistry.SamePath(left, value))) continue;
+            values.Add((key, System.Text.Json.Nodes.JsonValue.Create(Path.Combine(to, moved.FileName))));
+        }
+        return values;
+    }
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
@@ -106,7 +129,9 @@ internal static class ModelFolderActions
         var from = shell.ModelsDir;
         var to = folder is null ? shell.Paths.DefaultModelsDir : Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         var files = PathRegistry.SamePath(from, to) || shell.Paths.IsBundled(from) ? [] : ModelMover.Known(from);
-        if (files.Count == 0)
+        // Another path to the same folder (a junction, a mapped drive, a packaged app's redirected folder): nothing to move, and
+        // a move would find each file "already there" and delete it (re-lens on PR #61). The folder is written as before.
+        if (files.Count == 0 || ModelMover.SameFolder(from, to))
         {
             say(shell.Models.SetModelsFolder(folder) ?? "");
             return;
@@ -148,7 +173,7 @@ internal static class ModelFolderActions
             // A model in use left in the old folder would not be found once the folder changes: then the folder stays as it is.
             var kept = result.Cancelled || result.LeftBehind.Any(left => inUse.Any(used => PathRegistry.SamePath(used, left)));
             // Written after the move, not before: the settings watcher's reload would otherwise reload the models mid-move.
-            var written = kept ? null : shell.Models.SetModelsFolder(folder, reloadAfter: false);
+            var written = kept ? null : shell.Models.SetModelsFolder(folder, reloadAfter: false, alsoWrite: MovedModelPaths(shell.Settings, files, result, to));
             finished = true;
             var line = result.Problems.Count == 0 && result.Moved == result.Count
                 ? Moved(result.Count, shell.RealPath(to))
@@ -157,7 +182,7 @@ internal static class ModelFolderActions
                     ? $"Moved {result.Moved} of {result.Count}."
                     : MovedSome(result.Moved, result.Count, ModelMover.DisplayName(result.Problems[0].FileName), result.Problems[0].Reason, shell.RealPath(from)) +
                       (result.Problems.Count > 1 ? MoreProblems(result.Problems.Count - 1) : "");
-            if (kept) line += FolderKept(shell.RealPath(from), shell.RealPath(to), result.Moved > 0);
+            if (kept) line += FolderKept(shell.RealPath(from), shell.RealPath(to), result.Moved > 0, stopped: result.Cancelled);
             say(written is null ? line : $"{line} {written}");
         }
         finally

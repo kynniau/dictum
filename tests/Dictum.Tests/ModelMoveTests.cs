@@ -19,14 +19,14 @@ namespace Dictum.Tests;
 /// </summary>
 public sealed class ModelMoveTests : IDisposable
 {
-    private static readonly long TinyEnBytes = ModelCatalog.Find("tiny.en")!.Bytes;
-    private const string Settings = """{ "hotkey": "F24", "whisper": { "model": "tiny.en" }, "llm": { "provider": "none" } }""";
+    internal static readonly long TinyEnBytes = ModelCatalog.Find("tiny.en")!.Bytes;
+    internal const string Settings = """{ "hotkey": "F24", "whisper": { "model": "tiny.en" }, "llm": { "provider": "none" } }""";
 
     private readonly DirectoryInfo _dir = Directory.CreateTempSubdirectory("dictum-model-move-");
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static string Create(string folder, string fileName, long bytes = 10, byte fill = 0)
+    internal static string Create(string folder, string fileName, long bytes = 10, byte fill = 0)
     {
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, fileName);
@@ -37,7 +37,7 @@ public sealed class ModelMoveTests : IDisposable
     }
 
     /// <summary>The catalogue's pinned SHA-256 for every file, so a copy passes; a file named in <paramref name="corrupt"/> gets another hash.</summary>
-    private static Func<string, CancellationToken, Task<string>> FakeHasher(params string[] corrupt) => (path, _) =>
+    internal static Func<string, CancellationToken, Task<string>> FakeHasher(params string[] corrupt) => (path, _) =>
     {
         var name = Path.GetFileName(path);
         var pinned = ModelIntegrity.Expected(name.EndsWith(ModelMover.TempSuffix, StringComparison.Ordinal) ? name[..^ModelMover.TempSuffix.Length] : name)!.Sha256!;
@@ -579,7 +579,7 @@ public sealed class ModelMoveTests : IDisposable
     });
 
     /// <summary>A model folder whose first file's check waits until the test lets it go, so the test can act mid-move.</summary>
-    private sealed class HeldMove
+    internal sealed class HeldMove
     {
         private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Func<string, CancellationToken, Task<string>> _pinned = FakeHasher();
@@ -710,7 +710,7 @@ public sealed class ModelMoveTests : IDisposable
 
     // ---- Helpers ----
 
-    private static ModelManager SpeechModels() => new(NullLog.Instance, loader: (p, _, d) => new HoldingSpeechEngine(p, d), gpuInUse: () => false);
+    internal static ModelManager SpeechModels() => new(NullLog.Instance, loader: (p, _, d) => new HoldingSpeechEngine(p, d), gpuInUse: () => false);
 
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
 
@@ -718,7 +718,7 @@ public sealed class ModelMoveTests : IDisposable
 
     private static string Texts(ILogical root) => string.Join("\n", All<TextBlock>(root).Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
 
-    private static async Task<bool> Eventually(Func<bool> condition, int timeoutMs = 5000)
+    internal static async Task<bool> Eventually(Func<bool> condition, int timeoutMs = 5000)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         while (!condition())
@@ -730,7 +730,7 @@ public sealed class ModelMoveTests : IDisposable
     }
 
     /// <summary>Records each step as it is reported (not posted later, as <see cref="Progress{T}"/> would).</summary>
-    private sealed class ListProgress(List<MoveStep> steps) : IProgress<MoveStep>
+    internal sealed class ListProgress(List<MoveStep> steps) : IProgress<MoveStep>
     {
         public void Report(MoveStep value)
         {
@@ -739,7 +739,7 @@ public sealed class ModelMoveTests : IDisposable
     }
 
     /// <summary>A speech engine that holds its model file open until disposed.</summary>
-    private sealed class HoldingSpeechEngine(string path, DecodeOptions decode) : ISpeechEngine
+    internal sealed class HoldingSpeechEngine(string path, DecodeOptions decode) : ISpeechEngine
     {
         private readonly FakeSpeechEngine _inner = new(path, decode);
         private readonly FileStream _held = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
