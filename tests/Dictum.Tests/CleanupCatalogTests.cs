@@ -70,11 +70,11 @@ public class CleanupCatalogTests
     [Fact]
     public void Model_setting_resolves_to_the_catalogue_file_or_an_absolute_gguf()
     {
-        Assert.Equal(@"C:\m\qwen2.5-1.5b-instruct-q4_k_m.gguf", CleanupCatalog.ResolvePath("qwen2.5-1.5b", @"C:\m"));
-        Assert.Equal(@"D:\x\my.gguf", CleanupCatalog.ResolvePath(@"D:\x\my.gguf", @"C:\m"));
-        Assert.True(CleanupCatalog.IsValidSetting(@"D:\x\my.gguf"));
+        Assert.Equal(TestPaths.Native(@"C:\m\qwen2.5-1.5b-instruct-q4_k_m.gguf"), CleanupCatalog.ResolvePath("qwen2.5-1.5b", TestPaths.Native(@"C:\m")));
+        Assert.Equal(TestPaths.Native(@"D:\x\my.gguf"), CleanupCatalog.ResolvePath(TestPaths.Native(@"D:\x\my.gguf"), TestPaths.Native(@"C:\m")));
+        Assert.True(CleanupCatalog.IsValidSetting(TestPaths.Native(@"D:\x\my.gguf")));
         Assert.False(CleanupCatalog.IsValidSetting("qwen9"));
-        Assert.False(CleanupCatalog.IsValidSetting(@"D:\x\my.bin"));
+        Assert.False(CleanupCatalog.IsValidSetting(TestPaths.Native(@"D:\x\my.bin")));
     }
 
     [Theory]

@@ -451,8 +451,8 @@ public sealed partial class OnboardingTests
         Assert.False(AppRules.Onboards(SettingsLoader.Parse("""{ "whisper": { "model": "small.en" } }"""), modelOverride: false));
         Assert.False(AppRules.Onboards(SettingsLoader.Parse("{ not json"), modelOverride: false)); // never written over
         Assert.True(AppRules.AsksFolder(SettingsLoader.Parse("{}")));
-        Assert.False(AppRules.AsksFolder(SettingsLoader.Parse("""{ "models": { "folder": "D:\\Models" } }""")));
-        Assert.False(AppRules.AsksFolder(SettingsLoader.Parse("""{ "whisper": { "models_dir": "D:\\Models" } }""")));
+        Assert.False(AppRules.AsksFolder(SettingsLoader.Parse(TestPaths.InJson("""{ "models": { "folder": "D:\\Models" } }""", @"D:\Models"))));
+        Assert.False(AppRules.AsksFolder(SettingsLoader.Parse(TestPaths.InJson("""{ "whisper": { "models_dir": "D:\\Models" } }""", @"D:\Models"))));
     }
 
     // ---- Lens fixes (21/10/2026), lens on 6bacce9 ----

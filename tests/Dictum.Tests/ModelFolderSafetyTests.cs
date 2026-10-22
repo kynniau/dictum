@@ -589,6 +589,7 @@ public sealed class ModelFolderSafetyTests
     [InlineData(@"\\?\C:", false)]
     public void A_device_path_is_taken_as_the_models_folder_only_as_a_drive_or_a_share(string folder, bool taken)
     {
+        Assert.SkipWhen(taken && !OperatingSystem.IsWindows(), TestPaths.WindowsForm);
         var load = SettingsLoader.Parse(JsonSerializer.Serialize(new { models = new { folder } }));
         var earlier = SettingsLoader.Parse(JsonSerializer.Serialize(new { whisper = new { models_dir = folder } }));
         Assert.Equal(taken ? folder : null, load.Settings.Models.Folder);
