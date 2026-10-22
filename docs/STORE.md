@@ -101,7 +101,7 @@ Dictum turns your speech into text in any Windows app. Hold the right Ctrl key, 
 Dictum is ready to use as soon as it is installed: a small English speech model (base.en, about 148 MB) is included, so nothing is downloaded on first run. Larger, more accurate models are optional downloads from the model makers' official download page in Settings > Models. You also need a microphone. Dictum dictates in English; an optional multilingual model lets it listen in other languages.
 
 PRIVATE BY DESIGN
-Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or to your own server, an advanced option; that service's own terms apply. Turn on offline-only mode and it never connects to anything outside your PC.
+Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or to your own server, an advanced option; that service's own terms apply. Turn on offline-only mode and it never connects to anything outside your PC. Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.
 
 AI THAT RUNS ON YOUR PC
 Dictum uses AI models: whisper.cpp to recognise speech and, if you add it in Settings > Models (a 1.1 GB download), a small generative language model (Qwen2.5 1.5B Instruct, run by llama.cpp) to tidy the result. Out of the box a rule-based tidy fixes punctuation and capitals and follows spoken commands such as "new paragraph"; the language model also removes filler words and smooths grammar. The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. If its answer fails Dictum's checks, a rule-based tidy is used instead, and you can switch AI clean-up off completely. To report a problem with text Dictum produced, email hello@kynni.com.au.
@@ -130,6 +130,8 @@ Free: no subscription, no account, no ads, no analytics, no telemetry. The base 
 
 Free and open source under the MIT licence, by Kynni Pty Ltd.
 ```
+
+The last sentence of PRIVATE BY DESIGN ("Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.") is APPROVED by the owner 22/10/2026 17:36 AEDT (plain-words statement, section 3). Plain text, no URL. Paste the whole description again on the next submission.
 
 ### Product features (one per line, no bullets: the Store adds them)
 

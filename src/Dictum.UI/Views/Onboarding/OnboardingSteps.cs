@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Dictum.App;
 using Dictum.Audio;
 using Dictum.Core;
+using Dictum.Help;
 using Dictum.Hotkey;
 using Dictum.Settings;
 using Dictum.Storage;
@@ -74,7 +75,7 @@ internal abstract class OnboardingStep : UserControl
 internal sealed class WelcomeStep : OnboardingStep
 {
     public WelcomeStep(OnboardingFlow flow) : base(flow, OnboardingText.WelcomeName, OnboardingText.WelcomeHeading) =>
-        Content = Ui.Stack(14, Line(OnboardingText.WelcomeText), Line(OnboardingText.WelcomeNext));
+        Content = Ui.Stack(14, Line(OnboardingText.WelcomeText), Ui.Stack(4, [.. PlainWordsText.Paragraphs.Select(p => Line(p))]), Line(OnboardingText.WelcomeNext));
 
     public override bool AllowsBack => false;
 }

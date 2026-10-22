@@ -13,7 +13,7 @@ namespace Dictum.Tests;
 [Collection("Process-wide state")] // starts git processes: never beside the timing-based download tests
 public class PublicCopyNeutralityTests
 {
-    private static readonly string[] Words =
+    internal static readonly string[] Words =
     [
         "hin" + "di", "taga" + "log", "ceb" + "uano", "ceb" + "u", "fili" + "pino", "philip" + "pin", "off" + "shore", "ilo" + "cano",
         "hili" + "gaynon", "deva" + "nagari", "hing" + "lish", "tag" + "lish",
