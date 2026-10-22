@@ -42,6 +42,8 @@ internal sealed class HowItWorksPage : SettingsPage
     private Window? _window;
     private bool _noMicrophone;
     private bool _speechReady = true;
+    private bool _ownPress; // the page saw this press's key-down and kept it (decided once per press)
+    private bool _recordKeyboardFocus; // Record's focus came from the keyboard (Tab or arrows), not a click
     private bool _listFailureLogged;
     private long _meterShownAt;
     private float _meterPeak;
@@ -51,6 +53,7 @@ internal sealed class HowItWorksPage : SettingsPage
         _record = Ui.Button(HowItWorksText.RecordLabel, "danger", Toggle, Failed, name: HowItWorksText.RecordName);
         _record.MinHeight = 44;
         SpeechReady = () => Shell.SpeechReady;
+        _record.GotFocus += (_, e) => _recordKeyboardFocus = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
         AutomationProperties.SetName(_meter, HowItWorksText.Stages[0].Title);
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         _status.IsVisible = false;
@@ -134,7 +137,10 @@ internal sealed class HowItWorksPage : SettingsPage
     }
 
     /// <summary>The window went behind another: the hotkey dictates again, and a take under way here is dropped (its key-up would not come here).</summary>
-    private void Deactivated(object? sender, EventArgs e)
+    private void Deactivated(object? sender, EventArgs e) => WindowDeactivated();
+
+    /// <summary>The window's Deactivated (tests call it: the headless platform does not deactivate a window).</summary>
+    internal void WindowDeactivated()
     {
         Release();
         if (_capture is not null) Cancel(HowItWorksText.Cancelled);
@@ -148,11 +154,26 @@ internal sealed class HowItWorksPage : SettingsPage
         _hotkey = null;
     }
 
+    /// <summary>
+    /// The hotkey while this page holds it, decided once per press (re-lens on aebd2fd): a press is the page's only if the page
+    /// saw its key-down with no dictation under way (or with its own take open); then its key-up is the page's too. Any other
+    /// press (one whose key-down went to a dictation, before or after the page took the hotkey) goes to the controller whole:
+    /// its key-up and Esc as well, even once that dictation has gone idle, so the controller never keeps a key held that was
+    /// let go (it would ignore the next real press as auto-repeat). Esc is the page's only while its own take is open.
+    /// </summary>
     internal void OnHotkey(HookEvent e)
     {
-        if (_capture is null && !Shell.DictationIdle)
+        var mine = e.Signal switch
         {
-            Shell.ForwardHotkey(e); // a dictation started elsewhere (hands-free, toggle) keeps its key and its Esc
+            HotkeySignal.Down => _ownPress = _capture is not null || Shell.DictationIdle,
+            HotkeySignal.Up => _ownPress,
+            HotkeySignal.Escape => _capture is not null,
+            _ => false,
+        };
+        if (e.Signal == HotkeySignal.Up) _ownPress = false;
+        if (!mine)
+        {
+            Shell.ForwardHotkey(e); // a dictation started elsewhere (held, hands-free, toggle) keeps its key and its Esc
             return;
         }
         try
@@ -239,7 +260,7 @@ internal sealed class HowItWorksPage : SettingsPage
 
     private void Stop(bool limitReached)
     {
-        var hadFocus = _record.IsFocused; // Record is off while the steps run: keyboard focus moves to them, not to nowhere
+        var hadFocus = _record.IsFocused && _recordKeyboardFocus; // Record is off while the steps run: keyboard focus moves to them, not to nowhere
         if (CloseMicrophone() is not { } audio) return;
         _run.Recorded(audio.Duration);
         Tell(limitReached ? HowItWorksText.LimitReached : "");

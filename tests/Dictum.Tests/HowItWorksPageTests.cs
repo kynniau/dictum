@@ -497,6 +497,134 @@ public class HowItWorksPageTests
         shell.Dispose();
     });
 
+    /// <summary>A started shell whose speech model is the fake engine (every recording is heard as "fake-model.bin"), clean-up none.</summary>
+    private static (AppShell Shell, FakePlatform Platform, string Model) Started(Scratch scratch, ModelManager? models = null)
+    {
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
+        File.WriteAllText(model, "");
+        models ??= new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+        var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model));
+        Assert.True(shell.Start(lifetime: null));
+        return (shell, platform, model);
+    }
+
+    private const string StartedSettings = """
+        { "hotkey": "F24", "whisper": { "model": "base.en" }, "pill": { "enabled": false }, "llm": { "provider": "none" } }
+        """;
+
+    [Fact]
+    public Task A_press_that_began_as_a_dictation_ends_as_one_so_the_next_press_still_dictates() => UiSession.Run(() =>
+    {
+        // Re-lens on aebd2fd: Esc during a hold that started on another page was forwarded and cancelled the dictation; the
+        // release then reached the page (now idle) and was dropped, the controller kept the key held, and the next press was
+        // ignored as auto-repeat. The press is decided once: its release goes to the dictation too.
+        using var scratch = new Scratch(StartedSettings);
+        var (shell, platform, _) = Started(scratch);
+        try
+        {
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            var key = platform.LastListener!;
+            var window = new SettingsWindow(shell);
+            window.Show();
+            window.Activate();
+            window.ShowPage("About");
+            Dispatcher.UIThread.RunJobs();
+
+            var t0 = Environment.TickCount64 + 60_000;
+            key.Post(new HookEvent(HotkeySignal.Down, t0)); // hold to dictate from About
+            Assert.True(Eventually(() => !shell.DictationIdle), "the dictation did not start");
+            var page = Open(window, speechReady: false);
+            Assert.True(Eventually(() => RedirectField.GetValue(shell) is not null), "the page did not take the hotkey");
+            key.Post(new HookEvent(HotkeySignal.Escape, t0 + 500)); // Esc while still holding: the dictation is cancelled
+            Assert.True(Eventually(() => shell.DictationIdle), "Esc did not reach the dictation");
+            key.Post(new HookEvent(HotkeySignal.Up, t0 + 1_000)); // the release: that press's, so the dictation's
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(page.IsRecording);
+            Assert.Null(page.Running);
+
+            window.ShowPage("About"); // the page lets the hotkey go
+            Dispatcher.UIThread.RunJobs();
+            key.Post(new HookEvent(HotkeySignal.Down, t0 + 3_000)); // the next press dictates
+            Assert.True(Eventually(() => !shell.DictationIdle), "the next press was ignored as auto-repeat");
+            key.Post(new HookEvent(HotkeySignal.Up, t0 + 4_000));
+            Assert.True(Eventually(() => platform.Desktop.Ops.Contains($"set-text:{DeterministicCleaner.Clean("fake-model.bin")} ")), "the next dictation was not pasted");
+            window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    [Fact]
+    public Task The_window_going_behind_another_drops_the_take_and_lets_the_hotkey_go() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.Activate();
+        var page = Open(window);
+        Assert.True(Eventually(() => RedirectField.GetValue(shell) is not null), "the page did not take the hotkey");
+        Click(Record(page));
+        Assert.True(page.IsRecording);
+        page.WindowDeactivated(); // what the window's Deactivated calls
+        Assert.False(page.IsRecording);
+        Assert.Equal(HowItWorksText.Cancelled, page.Status);
+        Assert.Null(page.Running); // nothing ran
+        Assert.Null(RedirectField.GetValue(shell)); // the hotkey dictates again
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task Stop_by_mouse_leaves_focus_where_the_click_put_it() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        UsePipeline(shell, new FakeTranscriber("hello there"), TranscriptCleaner.RulesOnly("rules"));
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = Open(window);
+        var record = Record(page);
+        record.Focus(NavigationMethod.Pointer); // a click focuses it
+        Click(record);
+        Click(record);
+        var focused = TopLevel.GetTopLevel(window)!.FocusManager!.GetFocusedElement() as Avalonia.StyledElement;
+        Assert.False(focused is not null && AutomationProperties.GetName(focused)?.StartsWith(HowItWorksText.Stages[1].Title, StringComparison.Ordinal) == true,
+            "focus was moved for a mouse user");
+        Assert.True(Eventually(() => page.Running is { IsCompleted: true }));
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task Record_turns_on_when_the_speech_model_finishes_loading_through_the_shells_own_change_events() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(StartedSettings);
+        var loads = new GatedLoads();
+        var (shell, _, model) = Started(scratch, new ModelManager(NullLog.Instance, loader: loads.LoadSpeech, gpuInUse: () => false));
+        try
+        {
+            var window = new SettingsWindow(shell);
+            window.Show();
+            var page = Open(window, speechReady: false); // the shell's own model state
+            Assert.True(Eventually(() => loads.Started.Contains(model)), "the speech model load did not start");
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(Record(page).IsEnabled);
+            Assert.Equal("Getting the speech model ready…", page.Status); // the welcome window's sentence, while it loads
+
+            loads.Release(model); // ModelManager.Changed → ModelStateChanged → StatusChanged → Changed → SettingsWindow → Redraw
+            Assert.True(Eventually(() => Record(page).IsEnabled), "Record stayed off after the model loaded");
+            Assert.Equal("", page.Status);
+            window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
     /// <summary>A microphone stand-in: a level while open, two seconds of "speech" at Stop, or a refusal at Start.</summary>
     private sealed class ScriptedCapture : IAudioCapture
     {
