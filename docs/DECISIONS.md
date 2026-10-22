@@ -4925,3 +4925,24 @@ pass with approved copy, not changed here.
   folder), so the pinned commit, size and SHA-256 stay in Core's catalogue only. `macos-15` runners are Arm64 (actions/
   runner-images README); `secrets` is not available in `if:`, so the job carries two booleans in `env`. The icon is built at
   publish time from site/dictum.svg (ten iconset PNGs, `iconutil`), not committed.
+- *Shell.* Decision reversed on evidence: Avalonia.Native 11.3.22 never raises `TrayIcon.Clicked` (its `trayicon.mm` sets no
+  target or action on the NSStatusItem and `avn.idl`'s `IAvnTrayIcon` has no click callback, **Verified** in the Avalonia
+  source for the tag), so `TrayHost` creates its own NSStatusItem with a target class defined through `ObjC.DefineClass`
+  and `sendActionOn:` left or right mouse-up; Avalonia only encodes `TrayIconArt`'s output as PNG. Kept: the click point from
+  `NSEvent.mouseLocation`, colour icons, creation on the UI thread. Avalonia.Native's screen "pixels" are points with
+  scaling 1 and a top-left origin flipped against the primary display (`Screens.mm`, `main.mm` `ConvertPointY`), so `Move`
+  applies no backing scale and `ForegroundBounds` (CGWindowList, top-left points) needs no conversion. Overlays sit at window
+  level 25 (`NSStatusWindowLevel` = `kCGStatusWindowLevel`, NSWindow.h and CGWindowLevel.h). `TryGetPlatformHandle()` gives
+  descriptor "NSWindow" with the NSWindow pointer (`MacOSTopLevelHandle`, TopLevelImpl.cs). SMAppService registers even a
+  bare executable outside a bundle (a scratch apphost went NotFound → Enabled → NotRegistered), so the bundle-only guard
+  stays a policy, not a necessity; that scratch run left a disabled "exp" record in `sfltool dumpbtm` on the owner's Mac.
+  `AppShell.RemoveEverything` passes `Paths.ExeDir` (Contents/MacOS), so `RemovalSteps` accepts either that or the bundle
+  path when it belongs to the running bundle, refuses anything else, and refuses a path under `/AppTranslocation/` (an
+  unsigned app opened from Downloads runs from a read-only translocated copy). A notification delegate implementing
+  `willPresentNotification:` is needed or macOS suppresses banners while Dictum is frontmost. FileShare.None on Unix is now
+  **Verified** (a second open throws IOException). The tone synthesis moved to Core as `Dictum.Audio.CueTones` (byte-identical;
+  Windows calls it). `// simplification:` in `SingleInstance.ListenForOtherLaunches`: a Unix socket path is limited to 104
+  bytes on macOS (Recalled), so a home path over about 50 characters makes the bind fail and a second launch time out after
+  30 s; retire by binding in a shorter per-user folder when a tester hits it. Approved Windows wording still shown on a Mac
+  and not reworded here: "notification area (system tray)", "Windows did not let Dictum switch back…", "everything Dictum
+  has put on this PC" (AppShell).
