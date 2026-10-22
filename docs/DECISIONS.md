@@ -4149,6 +4149,43 @@ Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOS
    - **FAQ styles.** These now apply only to the FAQ's own items, so the demo player inside an answer is not styled as one.
    - **Demo players.** Each is named "Demo: <title>", and the poster alt text says "a still from the demo".
 
+## Site: Store-first (22/10/2026, branch site/store-first)
+
+**Owner decision (22/10/2026), in substance:** the Microsoft Store is the default and easy-to-find way to get Dictum,
+and in future the Apple App Store; the site does not advertise that the direct download is unsigned; every reference on
+the site to the manual download and to getting past SmartScreen goes; pro users can still download from GitHub without
+an explanation. New wording below is PROPOSED until the owner approves it.
+
+1. **Removed from `site/index.html`:** the hero's "Download for Windows" button (GitHub releases) and its note ("It
+   isn't code-signed yet ... here's what to click", linking `/help#smartscreen`); the FAQ "Windows warned me about the
+   download. What do I click?" (`#faq-smartscreen`); the "What you need" item "Microsoft Visual C++ Redistributable
+   (x64) 14.51 or later, for the direct download" with its installer and administrator-rights caveat; the closing band's
+   "Download for Windows" and "See the source" buttons; the footer's "Source on GitHub" link (replaced by item 3).
+2. **Removed from `site/help.html`:** "The direct download" steps in Get Dictum (the releases link, Dictum-Setup, the
+   SmartScreen and "can't be reached" steps, the Visual C++ Redistributable and vc_redist.x64.exe steps, Setup's pages);
+   the install demo player (its GIF shows the SmartScreen prompt; the files stay, see `docs/DEMOS.md`); the
+   "Windows protected your PC" box (`#smartscreen`: More info, Run anyway, code-signing, the Edge Keep steps). The
+   updates FAQ's last direct-download step now reads "Install the newer version from that page. Your settings and
+   models are kept." (lens, 22/10/2026); it no longer points to section 1, which no longer describes Setup.
+3. **Added:** the Store button is the only button on the landing page (hero and closing band); one quiet footer line on
+   all three pages (replacing their "Source on GitHub" links),
+   "Source code and release files are on GitHub.", linking https://github.com/kynniau/dictum; "What you need" says to
+   get Dictum from the Microsoft Store, which installs everything else Dictum needs (the package declares the
+   `Microsoft.VCLibs.140.00.UWPDesktop` framework, which the Store installs: "Visual C++ runtime" above, MSIX
+   troubleshooting guide, read 17/10/2026); Get Dictum in the guide is Store only.
+4. **Kept, because it is true and needed by people who already have the direct download:** the approved sentence
+   "Only when you open the privacy policy ... click Check for updates in the direct-download version ..." (pinned by
+   `UpdateCheckTests`) on the landing page and the privacy policy; the privacy policy's text (only its footer changed; it covers both
+   builds, and its bullets are approved copy); the guide's FAQ answers on updates, uninstalling and model folders for
+   the direct download (orchestrator's call, 22/10/2026: keep them). The roadmap's "Mac version" line is unchanged: it says nothing about where the Mac version will
+   be sold, and no Apple App Store plan or date is recorded to cite.
+5. **Not the site, so not changed:** `README.md`, `docs/STORE.md`, the release-notes preamble and the in-app Help
+   (`HelpText.cs`).
+6. **Pins:** `ReleaseWorkflowTests` no longer requires the site to state the Visual C++ runtime floor (README and
+   preamble still must, and agree); a new test requires that no page of the site names it.
+   New `SiteStoreFirstTests` pin the Store as every landing-page button, the absence of the removed phrases on all
+   three pages, the one GitHub footer line on each page, a Store-only Get Dictum section, and that every same-site anchor lands.
+
 ## See how it works, stages 1-5 (22/10/2026)
 
 Branch `feat/how-it-works` from origin/main 049b73a. Owner intent and the design are in SPEC §28; the brief was section B
