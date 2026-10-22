@@ -1635,3 +1635,15 @@ cloud speech and the 1.3 features".
 - **Help questions** (§26): sixteen. APPROVED 22/10/2026 22:52 AEDT: "Can I give the clean-up my own instructions?" (`HelpText.OwnInstructionsQuestion`) after "How do I turn on cloud clean-up?",
   and that answer opens with the Create the key file… button, keeping the sixteen Notepad steps as the fallback. Both depend on the own-instructions box and the key file button (PR #60, merged at 672f85b into main 4a4072a). Settings > Storage's offer to move model files is PR #61 (head 1730818 when this was written, open; it offers the move from Change…, Browse… and Use default). Merge order: #60 (done), #61, then the copy PR (#62). §26 reads "sixteen questions" (counted in `HelpText.Questions`) and "unless cloud clean-up or cloud speech is turned on" since main 4a4072a was merged into the copy branch.
 - **Store** (`docs/STORE.md`) and **Mac handover** (`docs/MAC-HANDOVER.md`): see DECISIONS. The Mac beta is Apple Silicon only (owner, 22/10/2026).
+
+## 32. Dialogs opened by a click (amendment, 23/10/2026, fix lane, release 1.3.0)
+
+Every question window (`IShellDialogs.Ask`, `TypeToConfirm` and the model prompts, through `Modal.Run`) opened by a click on a
+button of a Dictum window is that window's modal dialog: owned by it, centred on it, and the window is disabled until the
+dialog closes, then gets its focus back. Avalonia raises a button's Click inside its pointer-released handler, before the
+window releases the mouse capture, and the dialog's nested frame runs inside that Click: a dialog shown on its own got no mouse
+input until it closed (keyboard and UI Automation still worked). A second click on the opener while its dialog is up opens no
+second dialog and answers as Cancel. With no click behind it (first run, a question from the tray or another thread), or when
+the opener is the tray panel (it closes itself when it loses focus, which would close its dialog), the dialog is shown on its
+own, centred on the screen, as before. No text changed. Root cause, probe and pins: DECISIONS.md, "Dialogs: the opener's mouse
+capture".

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Shows Dictum's overlays on the real Win32 backend and reports, line by line, whether any of them took the foreground
-       or caught a click (SPEC §7). Run by PillFocusTests in its own process: a process can host one Avalonia platform,
+       or caught a click (SPEC §7), and, given the dialog-capture argument, that a question opened by a click gets the mouse (SPEC §32). Run by PillFocusTests and DialogOwnerTests in its own process: a process can host one Avalonia platform,
        and the test process hosts the headless one. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

@@ -12,9 +12,10 @@ namespace Dictum.UiProbe;
 /// takes the foreground (SPEC §7's GetForegroundWindow test), each carries the no-activate and click-through styles, a
 /// click at its centre reaches the window below, and the pill is actually drawn. One line per check on stdout.
 /// Exit code 0: all passed; 1: a check failed; 2: this desktop cannot observe activation (a locked or disconnected
-/// session), so nothing was proven either way.
+/// session), so nothing was proven either way. With <c>--dialog-capture</c> it checks instead that a question opened by a
+/// click gets the mouse (Program.Dialogs.cs).
 /// </summary>
-internal static class Program
+internal static partial class Program
 {
     private const int GWL_EXSTYLE = -20;
     private const uint GA_ROOT = 2;
@@ -46,18 +47,18 @@ internal static class Program
     public static int Main(string[] args)
     {
         using var platform = new WindowsPlatform();
-        AppBuilder.Configure(() => new Dictum.UI.App { Started = lifetime => _ = RunAsync(lifetime, platform) })
+        AppBuilder.Configure(() => new Dictum.UI.App { Started = lifetime => _ = args.Contains(DialogCaptureArg) ? RunAsync(lifetime, () => DialogCaptureAsync(lifetime)) : RunAsync(lifetime, () => ProbeAsync(platform)) })
             .UseWin32()
             .UseSkia()
             .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
         return _exit;
     }
 
-    private static async Task RunAsync(IClassicDesktopStyleApplicationLifetime lifetime, WindowsPlatform platform)
+    private static async Task RunAsync(IClassicDesktopStyleApplicationLifetime lifetime, Func<Task<int>> probe)
     {
         try
         {
-            _exit = await ProbeAsync(platform);
+            _exit = await probe();
         }
         catch (Exception ex)
         {
