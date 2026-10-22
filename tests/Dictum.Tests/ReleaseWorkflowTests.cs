@@ -77,7 +77,7 @@ public sealed class ReleaseWorkflowTests
     {
         // Site: Store-first (docs/DECISIONS.md, 22/10/2026). The Store installs the VCLibs framework the package declares,
         // so the site's "What you need" list no longer carries the direct download's runtime requirement.
-        foreach (var page in new[] { "index.html", "help.html" })
+        foreach (var page in new[] { "index.html", "help.html", "privacy.html" })
         {
             var html = File.ReadAllText(Repo("site", page));
             Assert.DoesNotContain("Visual C++", html, StringComparison.Ordinal);

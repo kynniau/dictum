@@ -17,25 +17,24 @@ public sealed class SiteStoreFirstTests
     private static string VisibleHtml(string page) =>
         Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page)), "<!--.*?-->", "", RegexOptions.Singleline);
 
-    private static List<string> ButtonLinks(string html) =>
-        Regex.Matches(html, "<a class=\"btn[^\"]*\" href=\"([^\"]+)\"").Select(m => m.Groups[1].Value).ToList();
-
     [Fact]
     public void Every_button_on_the_landing_page_is_the_Microsoft_Store_and_the_first_is_in_the_hero()
     {
         var html = VisibleHtml("index.html");
-        var buttons = ButtonLinks(html);
+        var buttons = Regex.Matches(html, "<a class=\"btn[^\"]*\" href=\"([^\"]+)\"");
         Assert.NotEmpty(buttons);
-        Assert.All(buttons, href => Assert.Equal(StoreUrl, href));
-        var hero = html[html.IndexOf("<section class=\"hero\"", StringComparison.Ordinal)..];
-        hero = hero[..hero.IndexOf("</section>", StringComparison.Ordinal)];
-        Assert.Contains($"href=\"{StoreUrl}\"", hero);
+        Assert.All(buttons, b => Assert.Equal(StoreUrl, b.Groups[1].Value));
+        var heroStart = html.IndexOf("<section class=\"hero\"", StringComparison.Ordinal);
+        Assert.True(heroStart >= 0, "index.html has no hero section");
+        var heroEnd = html.IndexOf("</section>", heroStart, StringComparison.Ordinal);
+        Assert.InRange(buttons[0].Index, heroStart, heroEnd);
     }
 
     [Theory]
     [InlineData("SmartScreen")]
     [InlineData("code-signed")]
-    [InlineData("Unknown Publisher")]
+    [InlineData("Edge held the download")]
+    [InlineData("Visual C++")]
     [InlineData("Run anyway")]
     [InlineData("More info")]
     [InlineData("Keep anyway")]
@@ -52,13 +51,17 @@ public sealed class SiteStoreFirstTests
             Assert.False(VisibleHtml(page).Contains(phrase, StringComparison.OrdinalIgnoreCase), $"site/{page} still says \"{phrase}\"");
     }
 
-    [Fact]
-    public void The_landing_page_has_one_quiet_GitHub_line_in_its_footer()
+    [Theory]
+    [InlineData("index.html")]
+    [InlineData("help.html")]
+    [InlineData("privacy.html")]
+    public void Every_page_has_the_same_one_quiet_GitHub_line_in_its_footer(string page)
     {
-        var html = VisibleHtml("index.html");
+        var html = VisibleHtml(page);
         var footer = html[html.IndexOf("<footer", StringComparison.Ordinal)..];
         Assert.Contains(GitHubLine, footer);
         Assert.Single(Regex.Matches(html, Regex.Escape(GitHubLine)));
+        Assert.DoesNotContain("Source on GitHub", html, StringComparison.Ordinal);
     }
 
     [Fact]

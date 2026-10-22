@@ -4165,21 +4165,23 @@ an explanation. New wording below is PROPOSED until the owner approves it.
    SmartScreen and "can't be reached" steps, the Visual C++ Redistributable and vc_redist.x64.exe steps, Setup's pages);
    the install demo player (its GIF shows the SmartScreen prompt; the files stay, see `docs/DEMOS.md`); the
    "Windows protected your PC" box (`#smartscreen`: More info, Run anyway, code-signing, the Edge Keep steps). The
-   updates FAQ's last direct-download step no longer points to section 1 (it no longer describes Setup).
-3. **Added:** the Store button is the only button on the landing page (hero and closing band); one quiet footer line,
+   updates FAQ's last direct-download step now reads "Install the newer version from that page. Your settings and
+   models are kept." (lens, 22/10/2026); it no longer points to section 1, which no longer describes Setup.
+3. **Added:** the Store button is the only button on the landing page (hero and closing band); one quiet footer line on
+   all three pages (replacing their "Source on GitHub" links),
    "Source code and release files are on GitHub.", linking https://github.com/kynniau/dictum; "What you need" says to
    get Dictum from the Microsoft Store, which installs everything else Dictum needs (the package declares the
    `Microsoft.VCLibs.140.00.UWPDesktop` framework, which the Store installs: "Visual C++ runtime" above, MSIX
    troubleshooting guide, read 17/10/2026); Get Dictum in the guide is Store only.
 4. **Kept, because it is true and needed by people who already have the direct download:** the approved sentence
    "Only when you open the privacy policy ... click Check for updates in the direct-download version ..." (pinned by
-   `UpdateCheckTests`) on the landing page and the privacy policy; the privacy policy as a whole (it covers both
+   `UpdateCheckTests`) on the landing page and the privacy policy; the privacy policy's text (only its footer changed; it covers both
    builds, and its bullets are approved copy); the guide's FAQ answers on updates, uninstalling and model folders for
-   the direct download. The roadmap's "Mac version" line is unchanged: it says nothing about where the Mac version will
+   the direct download (orchestrator's call, 22/10/2026: keep them). The roadmap's "Mac version" line is unchanged: it says nothing about where the Mac version will
    be sold, and no Apple App Store plan or date is recorded to cite.
 5. **Not the site, so not changed:** `README.md`, `docs/STORE.md`, the release-notes preamble and the in-app Help
    (`HelpText.cs`).
 6. **Pins:** `ReleaseWorkflowTests` no longer requires the site to state the Visual C++ runtime floor (README and
-   preamble still must, and agree); a new test requires that `site/index.html` and `site/help.html` do not name it.
+   preamble still must, and agree); a new test requires that no page of the site names it.
    New `SiteStoreFirstTests` pin the Store as every landing-page button, the absence of the removed phrases on all
-   three pages, the one GitHub footer line, a Store-only Get Dictum section, and that every same-site anchor lands.
+   three pages, the one GitHub footer line on each page, a Store-only Get Dictum section, and that every same-site anchor lands.
