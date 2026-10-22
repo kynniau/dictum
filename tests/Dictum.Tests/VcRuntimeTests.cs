@@ -28,6 +28,7 @@ public sealed class VcRuntimeTests : IDisposable
     [Fact]
     public void Every_whisper_and_llama_runtime_imports_the_VC_runtime_and_only_the_DLLs_publish_copies()
     {
+        TestEnv.WindowsOnly("Reads the Windows x64 native DLLs' imports of the Visual C++ runtime.");
         var importers = VcRuntimeLayout.Importers(BuildOutput);
         var paths = importers.Select(i => i.RelativePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
         string[] engines =
@@ -65,6 +66,7 @@ public sealed class VcRuntimeTests : IDisposable
     [Fact]
     public void A_Store_layout_carrying_its_own_VC_runtime_is_refused()
     {
+        TestEnv.WindowsOnly("Reads the Windows x64 native DLLs' imports of the Visual C++ runtime.");
         var copy = Path.Combine(_dir.FullName, @"runtimes\win-x64\native\avx2\vcruntime140.dll");
         Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
         File.WriteAllBytes(copy, []);
@@ -74,6 +76,7 @@ public sealed class VcRuntimeTests : IDisposable
     [Fact]
     public void A_direct_download_layout_needs_the_VC_runtime_beside_every_native_DLL_that_imports_it()
     {
+        TestEnv.WindowsOnly("Reads the Windows x64 native DLLs' imports of the Visual C++ runtime.");
         // publish.ps1's rule, the four DLLs in every folder under runtimes\ that holds a DLL, applied to a scratch tree
         // shaped like this run's output; the check looks there for each native DLL's runtime instead of beside it.
         var folders = Directory.EnumerateFiles(Path.Combine(BuildOutput, "runtimes"), "*.dll", SearchOption.AllDirectories)

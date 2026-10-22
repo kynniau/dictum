@@ -33,6 +33,7 @@ public class SetupUninstallerTests
     [Fact]
     public void The_copy_its_own_setup_installed_runs_that_uninstaller_after_Dictum_exits()
     {
+        TestEnv.WindowsOnly("Plans the removal through the Windows setup's own uninstaller (unins000.exe and its uninstall string).");
         using var scratch = new Scratch();
         var (folder, record) = InstalledCopy(scratch);
         var launched = new List<ProcessStartInfo>();
@@ -56,6 +57,7 @@ public class SetupUninstallerTests
     [InlineData("Dictum runs from another folder")]
     public void Any_other_copy_gets_the_manifest_step_never_the_uninstaller(string change)
     {
+        TestEnv.WindowsOnly("Plans the removal through the Windows setup's own uninstaller (unins000.exe and its uninstall string).");
         using var scratch = new Scratch();
         var (folder, record) = InstalledCopy(scratch);
         var exeFolder = folder;
@@ -106,6 +108,7 @@ public class SetupUninstallerTests
     [Fact]
     public void In_uninstaller_mode_the_detached_step_leaves_every_file_to_the_uninstaller()
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var (folder, shipped, _) = RestructureFixTests.PortableCopy(scratch);
         var start = Steps(folder, folder, [], setup: null).RemovalStart(folder);
@@ -132,12 +135,16 @@ public class SetupUninstallerTests
     [InlineData(@"unins000.exe", null)]
     [InlineData(@"""C:\Programs\Dictum\unins000.exe", null)]
     [InlineData(null, null)]
-    public void An_uninstall_string_is_one_absolute_path_or_nothing(string? command, string? expected) =>
+    public void An_uninstall_string_is_one_absolute_path_or_nothing(string? command, string? expected)
+    {
+        Assert.SkipWhen(expected is not null && !OperatingSystem.IsWindows(), "Reads a Windows setup's uninstall string, which names a Windows absolute path.");
         Assert.Equal(expected, RegistrySetupRecord.UninstallerPath(command));
+    }
 
     [Fact]
     public void The_detached_step_starts_Windows_PowerShell_by_full_path_never_one_beside_Dictum()
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var (folder, _, _) = RestructureFixTests.PortableCopy(scratch);
         File.WriteAllText(Path.Combine(folder, "powershell.exe"), ""); // planted beside Dictum.exe

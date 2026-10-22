@@ -31,6 +31,7 @@ public sealed class NoVulkanCrashTests
     [Fact]
     public void Apply_sets_GGML_NO_BACKTRACE_where_the_C_runtimes_getenv_reads_it()
     {
+        TestEnv.WindowsOnly("Sets and reads the variable through the Windows C runtime (ucrtbase _putenv_s and getenv).");
         Assert.Equal(0, _putenv_s(GgmlEnvironment.NoBacktrace, "")); // an empty value removes it: start from "not set"
         Environment.SetEnvironmentVariable(GgmlEnvironment.NoBacktrace, null);
         Assert.Null(CGetenv(GgmlEnvironment.NoBacktrace));

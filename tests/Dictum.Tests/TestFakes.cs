@@ -75,6 +75,12 @@ internal static class TestEnv
 {
     public static string? Get(string name) => Value("DICTUM_" + name) ?? Value("DICTATE_" + name);
 
+    /// <summary>Skips a test that needs a Windows-only mechanism (named in <paramref name="reason"/>); a no-op on Windows.</summary>
+    public static void WindowsOnly(string reason) => Assert.SkipUnless(OperatingSystem.IsWindows(), reason);
+
+    /// <summary>Why a test that holds a file open to make it undeletable runs only on Windows.</summary>
+    public const string HeldOpen = "Holds a file open so it cannot be deleted, a Windows sharing rule; elsewhere an open file can still be deleted.";
+
     private static string? Value(string variable) => Environment.GetEnvironmentVariable(variable) is { Length: > 0 } value ? value : null;
 }
 

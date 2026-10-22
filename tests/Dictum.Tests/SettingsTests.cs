@@ -243,6 +243,7 @@ public class SettingsTests
     [Fact]
     public void Scripts_use_the_app_models_folder()
     {
+        TestEnv.WindowsOnly("Checks the Windows PowerShell scripts against the Windows models-folder layout (%LOCALAPPDATA%\\Dictum\\models).");
         // Regression: install.ps1 -ModelsFrom once copied into "%LOCALAPPDATA%\Dictummodels" (a lost backslash),
         // found by the scratch-profile install on 15/10/2026.
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

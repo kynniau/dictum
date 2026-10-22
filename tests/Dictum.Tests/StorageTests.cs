@@ -233,6 +233,7 @@ public class LegacyMigrationTests
     [Fact]
     public void A_file_held_open_is_reported_and_left_for_the_next_start()
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         using var scratch = new Scratch();
         var (paths, legacy) = Layout(scratch);
         Seed(legacy);

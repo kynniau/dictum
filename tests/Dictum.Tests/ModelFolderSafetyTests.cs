@@ -185,6 +185,7 @@ public sealed class ModelFolderSafetyTests
     [Fact]
     public Task A_file_that_could_not_be_deleted_is_counted_as_in_use_or_not_permitted() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly("Relies on Windows refusing to delete a read-only file; elsewhere the folder's permissions decide.");
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
         var kept = Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", 10);
         File.SetAttributes(kept, FileAttributes.ReadOnly); // Windows refuses to delete a read-only file
@@ -389,6 +390,7 @@ public sealed class ModelFolderSafetyTests
     [Fact]
     public async Task A_copy_in_use_that_cannot_be_deleted_leaves_its_model_loaded_again()
     {
+        TestEnv.WindowsOnly("Relies on Windows refusing to delete a read-only file; elsewhere the folder's permissions decide.");
         var (loaded, own, ownLeft) = await UiSession.RunAsync(async () =>
         {
             using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");

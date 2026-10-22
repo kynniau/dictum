@@ -94,6 +94,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task Switching_on_a_server_on_this_PC_leaves_the_consent_withdrawn_until_consent_json_is_deleted() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // Lens on eaa3a04 (P2L): with consent.json held open by another program, switching on a server on this PC ended the tries,
         // so once the program let go and Settings > About > Reload settings ran, consent.json was still there, and a hand edit back to
         // the host was used with no consent dialog. Only "Allow" ends the withdrawal: until consent.json is gone, the consent on file
@@ -133,6 +134,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task Allowing_cloud_clean_up_again_ends_a_consent_withdrawal_not_saved_yet() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // "Allow" records a new consent, which ends the withdrawal: otherwise the switch-on's own reload would drop the consent just
         // given, and the next try would delete it.
         using var scratch = new Scratch(CloudSettings);
@@ -166,6 +168,7 @@ public partial class CloudOffTakesEffectTests
     [InlineData(true)] // consent.json held open by another program until after the quit, settings.json read-only
     public Task After_a_quit_that_could_not_save_the_switch_off_the_next_start_does_what_the_files_say(bool heldOpen) => UiSession.Run(() =>
     {
+        Assert.SkipWhen(heldOpen && !OperatingSystem.IsWindows(), TestEnv.HeldOpen);
         // Lens on eaa3a04 (P3a, P3aL): with nothing fixed, the quit's try failed too, and the next start sent again with no notice.
         // The switch-off lives in this session; a later start can only read the files. Read-only no longer keeps consent.json, so with
         // no consent on file nothing is sent. Held open past the quit, both files are as they were and the next start sends again:
@@ -206,6 +209,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task With_both_files_unchanged_and_settings_json_unreadable_the_next_start_is_offline_as_the_page_says() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // The page's sentence for both files ends "unless settings.json cannot be read, in which case Dictum starts offline" (lens on
         // eaa3a04, finding 2). consent.json held open until after the quit, settings.json not valid JSON through it.
         using var scratch = new Scratch(StartingCloudSettings);
@@ -236,6 +240,7 @@ public partial class CloudOffTakesEffectTests
     [InlineData(true)] // consent.json held open by another program until after the quit
     public Task After_the_switch_off_and_a_restart_a_hand_edit_back_to_the_host_is_used_only_while_consent_json_is_on_file(bool heldOpen) => UiSession.Run(() =>
     {
+        Assert.SkipWhen(heldOpen && !OperatingSystem.IsWindows(), TestEnv.HeldOpen);
         // Lens on eaa3a04 (P3b): consent.json alone read-only, through the quit: the next start used the local model, but a hand
         // edit back to the host was then used with no consent dialog. Read-only no longer keeps consent.json. Held open past the quit,
         // it is still on file, and that hand edit is used: the limit, which the page now says ("until it is deleted, your consent
@@ -455,6 +460,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task A_consent_json_whose_attributes_cannot_be_written_is_still_deleted_by_the_switch_off() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly("Denies write-attributes through a Windows access-control entry and reads the Archive attribute.");
         // Lens on cb2290c (R1): CloudConsentFile.Delete set the attributes to Normal whatever they were, so a consent.json whose access
         // list denies write-attributes but allows delete was kept (the call threw before the delete), and Normal also cleared hidden,
         // system and archive. It now clears read-only alone, and only when it is set. The deny is an access-list entry on a file made
@@ -485,6 +491,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task Allowing_cloud_clean_up_when_settings_json_cannot_be_written_and_the_consent_cannot_be_deleted_again_keeps_it_withdrawn() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // Lens on cb2290c (contract): the consent just recorded is deleted again when settings.json cannot be written, and when that
         // delete threw (another program had consent.json open) the page said "That did not work: Access to the path ... is denied."
         // with the full path, while the consent stayed on file and the doc said it was withdrawn again. The write failure is returned
@@ -573,6 +580,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task A_read_only_consent_json_that_cannot_be_deleted_keeps_its_other_attributes() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         using var scratch = new Scratch(CloudSettings);
         Consent(scratch);
         var (shell, _, _) = scratch.Shell();
