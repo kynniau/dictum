@@ -17,7 +17,7 @@ namespace Dictum.UI.Views.Settings;
 /// </summary>
 internal sealed class ModelsPage : SettingsPage
 {
-    // PROPOSED copy (17/10/2026), for the product owner to approve before release (Decisions 15 and 16).
+    // APPROVED 22/10/2026 copy (proposed 17/10/2026) (Decisions 15 and 16).
     internal const string FolderLabel = "Model folder";
     internal const string BrowseLabel = "Browse…";
     internal const string UseDefaultLabel = "Use default";
@@ -26,32 +26,32 @@ internal sealed class ModelsPage : SettingsPage
     internal const string IncludedState = "Included";
     internal const string AddCleanupLabel = "Add AI clean-up";
 
-    // PROPOSED copy (19/10/2026), for the product owner to approve: a catalogue row whose file is downloading or waiting its
+    // APPROVED 22/10/2026 copy (proposed 19/10/2026): a catalogue row whose file is downloading or waiting its
     // turn (Store 10.1.2.10). Its button is disabled, so choosing it again cannot restart or cancel anything.
     internal const string WaitingState = "Waiting to download";
     internal const string DownloadingButton = "Downloading…";
     internal const string WaitingButton = "Waiting…";
 
-    /// <summary>PROPOSED: the state of the row whose file is downloading now, "Downloading 42%".</summary>
+    /// <summary>APPROVED 22/10/2026: the state of the row whose file is downloading now, "Downloading 42%".</summary>
     internal static string DownloadingState(string? progress) => progress is null ? "Downloading" : $"Downloading {progress}";
 
-    /// <summary>PROPOSED: the disabled button's accessible name, saying why it cannot be pressed.</summary>
+    /// <summary>APPROVED 22/10/2026: the disabled button's accessible name, saying why it cannot be pressed.</summary>
     internal static string BusyButtonName(string model, DownloadState state) =>
         state == DownloadState.Running ? $"{model} is already downloading" : $"{model} is already waiting to download";
 
-    /// <summary>PROPOSED: "Add AI clean-up (1.1 GB download)", the size read from the catalogue; without the download part once the model is on this PC.</summary>
+    /// <summary>APPROVED 22/10/2026: "Add AI clean-up (1.1 GB download)", the size read from the catalogue; without the download part once the model is on this PC.</summary>
     internal static string AddCleanupText(CleanupModelInfo model, bool onThisPc) => onThisPc ? AddCleanupLabel : $"{AddCleanupLabel} ({model.SizeText} download)";
 
-    // PROPOSED copy (21/10/2026): the Simple | Advanced segments' accessible name ("Models view: Simple"); the rest is in SimpleView.
+    // APPROVED 22/10/2026 copy (proposed 21/10/2026): the Simple | Advanced segments' accessible name ("Models view: Simple"); the rest is in SimpleView.
     internal const string ViewName = "Models view";
 
-    /// <summary>The Language card in the Simple view: no model names (PROPOSED, 1.2 polish, 22/10/2026, the orchestrator's wording).</summary>
+    /// <summary>The Language card in the Simple view: no model names (APPROVED 22/10/2026; proposed 1.2 polish, 22/10/2026, the orchestrator's wording).</summary>
     internal const string LanguageIntroSimple =
         "Dictum comes with an English-only model. For other languages it downloads a model that understands them; choose the language here.";
 
     /// <summary>
     /// The Language card in the Advanced view, as before but for the capital after its semicolon (1.2 polish: "…\".en\" one;
-    /// any of …"; PROPOSED as changed).
+    /// any of …"; APPROVED 22/10/2026 as changed).
     /// </summary>
     internal const string LanguageIntroAdvanced =
         "The language you speak. Anything but English needs a multilingual model (small, medium or large-v3), not an English-only \".en\" one; " +
@@ -411,7 +411,7 @@ internal sealed class ModelsPage : SettingsPage
 /// </summary>
 internal sealed class StoragePage : SettingsPage
 {
-    // PROPOSED copy (17/10/2026), for the product owner to approve before release (Decisions 15 and 16).
+    // APPROVED 22/10/2026 copy (proposed 17/10/2026) (Decisions 15 and 16).
     internal const string LookupIntro = "Dictum looks for a model in these folders, in this order:";
     internal const string NoModels = "No model files yet.";
 

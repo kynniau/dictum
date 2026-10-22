@@ -20,12 +20,12 @@ public sealed record ShellStatus(string State, string Tone, string Models, strin
 
 public sealed partial class AppShell
 {
-    /// <summary>The button beside a model problem. PROPOSED copy (17/10/2026), awaiting the product owner's review: do not reword.</summary>
+    /// <summary>The button beside a model problem. APPROVED 22/10/2026 copy (proposed 17/10/2026): do not reword.</summary>
     public const string TryOnCpuLabel = "Try on the CPU";
 
     /// <summary>
     /// After a model's reason when it failed on the CPU inside a GPU runtime with its gpu setting at cpu: the CPU-only runtime
-    /// loads only at a start. PROPOSED copy (17/10/2026), awaiting the product owner's review: do not reword.
+    /// loads only at a start. APPROVED 22/10/2026 copy (proposed 17/10/2026): do not reword.
     /// </summary>
     public const string RestartForCpuHint = "Restart Dictum to use the CPU.";
 
@@ -92,7 +92,7 @@ public sealed partial class AppShell
     /// <summary>
     /// The Simple view's header line (1.2 polish, 22/10/2026), in the names Settings > Models and the pickers use, from
     /// <see cref="SimpleView"/>'s one table: the speech tier ("Standard", or "Custom: tiny.en"), "loading…" or "model error"
-    /// while that holds, and the clean-up ("Tidy my words", "AI clean-up", "Off"). No runtime: "Vulkan" and "CPU" are Advanced
+    /// while that holds, and the clean-up ("Tidy my words", "AI clean-up", "No clean-up"). No runtime: "Vulkan" and "CPU" are Advanced
     /// detail, and a model kept on the CPU has its own problem line.
     /// </summary>
     internal string SimpleModelsLine
@@ -114,9 +114,13 @@ public sealed partial class AppShell
         }
     }
 
-    /// <summary>"qwen2.5-1.5b · Vulkan", "rules", "anthropic"…; the backend only for the local provider.</summary>
+    /// <summary>
+    /// "qwen2.5-1.5b · Vulkan", "rules", "anthropic"…; the backend only for the local provider. Off is "No clean-up" (owner
+    /// decision 6, 22/10/2026), as the Simple header says it.
+    /// </summary>
     private string CleanupLabel()
     {
+        if (SimpleView.OffInUse(_settings.Llm)) return SimpleView.OffHeaderLabel;
         var name = Models.CurrentCleanupName;
         if (_settings.Llm.Provider != LlmSettings.Local) return name;
         var state = _llm.IsLoading ? "loading…"
@@ -129,7 +133,7 @@ public sealed partial class AppShell
     /// The second line under the models line, in the tray panel and on About: why a model could not load, or why it runs on the
     /// CPU, in plain words when the cause is known (<see cref="ModelFailure"/>), else the engine's own message. One line names
     /// both models when they share the reason (a missing Visual C++ runtime stops both). Null while nothing is wrong, and for a
-    /// model still loading. The line's prefixes are PROPOSED copy (17/10/2026), awaiting the product owner's review.
+    /// model still loading. The line's prefixes are APPROVED 22/10/2026 copy (proposed 17/10/2026).
     /// </summary>
     internal string? ModelProblem => ProblemLine(
         _models.IsLoading ? null : Reason(_models.LastError, _models.RestartForCpu, _models.Notice),

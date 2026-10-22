@@ -28,15 +28,15 @@ internal sealed partial class CalibrationWindow : Window
     public const string Framing = "Calibration measures which installed model hears you best and suggests words for your dictionary. It does not train or change the model.";
 
     /// <summary>
-    /// Where the recordings are, without the path (PROPOSED, 1.2 polish, 22/10/2026). The folder is Dictum's own
+    /// Where the recordings are, without the path (APPROVED 22/10/2026; proposed 1.2 polish, 22/10/2026). The folder is Dictum's own
     /// (AppPaths.CalibrationDir), not one the user chose, and Settings > Storage lists it under "Models, logs, calibration recordings".
     /// </summary>
     public const string RecordingsNote = "Nothing is uploaded: the recordings stay in Dictum's folder on this PC (Settings > Storage lists it), so the test can be re-run when you add a model.";
 
-    /// <summary>The button beside <see cref="RecordingsNote"/> (PROPOSED, 1.2 polish).</summary>
+    /// <summary>The button beside <see cref="RecordingsNote"/> (APPROVED 22/10/2026; proposed 1.2 polish).</summary>
     public const string OpenRecordingsLabel = "Open the recordings folder";
 
-    /// <summary>Said when the recordings folder could not be opened; the reason, with the path, goes to the log (PROPOSED, lens on 4abba54).</summary>
+    /// <summary>Said when the recordings folder could not be opened; the reason, with the path, goes to the log (APPROVED 22/10/2026; proposed lens on 4abba54).</summary>
     public const string OpenRecordingsFailed = "The recordings folder could not be opened.";
 
     private readonly AppShell _shell;

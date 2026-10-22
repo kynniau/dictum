@@ -29,11 +29,11 @@ public static class DiskSpace
     public const long SpareBytes = 200_000_000;
 
     /// <summary>
-    /// PROPOSED copy (17/10/2026), for the product owner to approve: why a download of <paramref name="bytes"/> into
+    /// APPROVED 22/10/2026 copy (proposed 17/10/2026): why a download of <paramref name="bytes"/> into
     /// <paramref name="folder"/> is refused, when the drive has less free than the file plus <see cref="SpareBytes"/>; null
     /// otherwise, or when the free space cannot be read (a network share, say: the download then goes ahead).
     /// <paramref name="pendingBytes"/> is what the downloads already under way will still write there (lens, 19/10/2026): the
-    /// file must fit beside them, and the message then says so (PROPOSED copy, 19/10/2026).
+    /// file must fit beside them, and the message then says so (APPROVED 22/10/2026; proposed 19/10/2026).
     /// </summary>
     public static string? DownloadRefusal(string folder, string fileName, long bytes, Func<string, long?>? freeBytes = null, long pendingBytes = 0) =>
         (freeBytes ?? FreeBytes)(folder) is long free && free - pendingBytes < bytes + SpareBytes
@@ -80,7 +80,7 @@ public static class DiskSpace
         if (after >= WarnBelowBytes) return null;
         return after < 0
             ? pendingBytes > 0
-                ? $"Warning: only {ModelCatalog.FormatSize(free)} is free on that drive, not enough for this download beside the downloads already under way" // PROPOSED copy, 19/10/2026
+                ? $"Warning: only {ModelCatalog.FormatSize(free)} is free on that drive, not enough for this download beside the downloads already under way" // APPROVED 22/10/2026 copy (proposed 19/10/2026)
                 : $"Warning: only {ModelCatalog.FormatSize(free)} is free on that drive, not enough for this download"
             : $"Warning: this leaves only {ModelCatalog.FormatSize(after)} free on that drive (under 2 GB)";
     }

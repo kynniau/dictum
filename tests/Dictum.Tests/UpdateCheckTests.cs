@@ -22,7 +22,7 @@ namespace Dictum.Tests;
 /// </summary>
 public class UpdateCheckTests
 {
-    // Proposed 16/10/2026, awaiting the product owner's approval; do not reword. Pinned word for word, independently of the
+    // APPROVED 22/10/2026 (proposed 16/10/2026); do not reword. Pinned word for word, independently of the
     // app's copy (UpdateCheck), so any change is deliberate.
     private const string ProposedButton = "Check for updates";
     private const string ProposedPrivacyLine = "Checking reads one small file from dictum.kynni.au and sends nothing about you.";
@@ -34,7 +34,7 @@ public class UpdateCheckTests
     private const string ProposedStoreLine = "Updates come from the Microsoft Store.";
 
     // The site's sentence for dictum.kynni.au (the privacy policy and the landing page), and the privacy policy's short-version
-    // bullet. Proposed 16/10/2026, awaiting the product owner's approval; do not reword.
+    // bullet. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.
     private const string ProposedSiteSentence = "Only when you open the privacy policy or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
     private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, to check for updates in the direct-download version, or, if you switch it on, to send text to a cloud clean-up service or a server you choose.</li>";
 

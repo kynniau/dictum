@@ -293,7 +293,7 @@ internal sealed class AboutPage : SettingsPage
         _offline.IsVisible = Shell.Settings.OfflineOnly; // SPEC §5: the About box says "Offline only"
     }
 
-    /// <summary>The clean-up line while the local model failed to load. PROPOSED copy (17/10/2026), awaiting the product owner's review: do not reword.</summary>
+    /// <summary>The clean-up line while the local model failed to load. APPROVED 22/10/2026 copy (proposed 17/10/2026): do not reword.</summary>
     internal static string CleanupFailedLine(string model) => $"Clean-up: {model} could not be loaded, so the rule-based tidy is used.";
 
     /// <summary>

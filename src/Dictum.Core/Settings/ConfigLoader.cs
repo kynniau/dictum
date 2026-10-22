@@ -55,7 +55,7 @@ public static class ConfigLoader
     /// <summary>
     /// The log line when models.folder (or whisper.models_dir) names the folder of the models that come with Dictum, or one
     /// inside it, by a name <see cref="AppPaths.IsBundled"/> sees through: <see cref="AppPaths.ChosenModelsDir"/> ignores it (lens,
-    /// 17/10/2026). PROPOSED copy (17/10/2026), for the product owner to approve; only the log and the --selftest note show it,
+    /// 17/10/2026). APPROVED 22/10/2026 copy (proposed 17/10/2026); only the log and the --selftest note show it,
     /// no window does.
     /// </summary>
     internal static string BundledFolderIgnored(string key, string folder, string defaultFolder) =>

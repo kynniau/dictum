@@ -97,7 +97,7 @@ public sealed class TranscriptCleaner
     public static TranscriptCleaner Off() => new(null, CleanupPrompt.Default, TimeSpan.Zero, NullLog.Instance, OffStatus, plain: true);
 
     /// <summary>
-    /// The off cleaner's <see cref="Status"/>, shown on Settings > Clean-up and About. PROPOSED copy (21/10/2026). It starts "no clean-up",
+    /// The off cleaner's <see cref="Status"/>, shown on Settings > Clean-up and About. APPROVED 22/10/2026 copy (proposed 21/10/2026). It starts "no clean-up",
     /// not "off", as the tray name does (lens on 787b300): "Clean-up: off" read as Dictum being off.
     /// </summary>
     public const string OffStatus = "no clean-up: whitespace tidied only; your corrections, snippets and the profanity filter still apply (llm.provider = off)";

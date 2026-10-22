@@ -270,7 +270,8 @@ public class PolishTests
 
     /// <summary>
     /// Pin (item 10): in the Simple view the panel's header names the tier and the clean-up as Settings > Models does, with no
-    /// model file name or runtime; Advanced keeps them. The Mode line under Light | Full follows the view.
+    /// model file name or runtime; Advanced keeps them. Only Advanced shows the Mode line under Light | Full (owner decision 5,
+    /// 22/10/2026).
     /// </summary>
     [Theory]
     [InlineData("simple")]
@@ -290,7 +291,7 @@ public class PolishTests
             Assert.StartsWith($"{SimpleView.StandardLabel} · ", models);
             Assert.EndsWith($" · {SimpleView.TidyLabel} · Right Ctrl", models);
             Assert.DoesNotMatch(@"base\.en|Vulkan|CPU|rules", models);
-            Assert.Contains("Full: More accurate and AI clean-up.\nLight: Standard and Tidy my words.", texts);
+            Assert.DoesNotContain(texts, t => t is not null && t.Contains("Light: ", StringComparison.Ordinal)); // owner decision 5
         }
         else
         {
@@ -316,9 +317,8 @@ public class PolishTests
         Assert.Equal(SimpleView.TidyLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.NoProvider }, false, "en", false, "rules"));
         Assert.Equal(SimpleView.AiCleanupLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.Local, Model = tidy }, false, "en", false, tidy));
         Assert.Equal(SimpleView.TidyLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.Local, Model = tidy }, false, "es", false, tidy)); // no model runs on it
-        Assert.Equal(SimpleView.OffLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.Off }, false, "en", false, "no clean-up"));
+        Assert.Equal(SimpleView.OffHeaderLabel, SimpleView.CleanupName(new LlmSettings { Provider = LlmSettings.Off }, false, "en", false, "no clean-up")); // owner decision 6
         Assert.Equal("Custom: anthropic", SimpleView.CleanupName(new LlmSettings { Provider = "anthropic" }, false, "en", false, "anthropic"));
-        Assert.Equal(["Full: Most accurate and AI clean-up.", "Light: Standard and Tidy my words."], SimpleView.ModeHint(gpuMachine: true, "en", false)!);
     }
 
     /// <summary>
@@ -539,41 +539,6 @@ public class PolishTests
         Assert.Empty(platform.Opened);
         Assert.Contains("the recordings folder could not be opened", log.All, StringComparison.Ordinal);
         window.Close();
-        shell.Dispose();
-    });
-
-    /// <summary>
-    /// Pin (major 2): the Simple Mode line only where it is true. With text that is not plain English (another language, Detect
-    /// automatically) or with translate, the presets' models are no tier and no clean-up model runs on the text, so there is no
-    /// Simple line and the panel keeps the model names; on a CPU and on a GPU machine.
-    /// </summary>
-    [Theory]
-    [InlineData("de", false, false)]
-    [InlineData("de", false, true)]
-    [InlineData("auto", false, false)]
-    [InlineData("auto", false, true)]
-    [InlineData("en", true, false)]
-    [InlineData("en", true, true)]
-    [InlineData("de", true, true)]
-    public void The_simple_mode_line_is_only_for_plain_English(string language, bool translate, bool gpu)
-    {
-        Assert.Null(SimpleView.ModeHint(gpu, language, translate));
-        Assert.NotNull(SimpleView.ModeHint(gpu, "en", translate: false));
-    }
-
-    /// <summary>Pin (major 2): the panel in the Simple view with German speech keeps the model-name Mode line.</summary>
-    [Fact]
-    public Task The_panel_keeps_model_names_in_the_mode_line_for_another_language() => UiSession.Run(() =>
-    {
-        using var scratch = new Scratch("""{ "ui": { "view": "simple" }, "whisper": { "model": "small", "language": "de" }, "llm": { "provider": "none" } }""");
-        var (shell, _, _) = scratch.Shell();
-        shell.Reload(userRequested: false);
-        var flyout = new FlyoutWindow(shell);
-        flyout.ShowNear(null);
-        var texts = Texts(flyout);
-        Assert.Contains(texts, t => t is not null && t.EndsWith("Full: small.en and qwen2.5-1.5b.\nLight: base.en and the rule-based tidy.", StringComparison.Ordinal)); // after "Custom: …" when the settings match neither preset
-        Assert.DoesNotContain(texts, t => t is not null && t.Contains(SimpleView.AiCleanupLabel, StringComparison.Ordinal));
-        flyout.Close();
         shell.Dispose();
     });
 
