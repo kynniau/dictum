@@ -3342,6 +3342,18 @@ tests only), including the two buttons sitting side by side at 150 % scaling. Th
 the Help note for the feedback button ends "…the version of Dictum, your Windows build and the models in use filled in…"; the Try on the
 CPU paragraph moves one place up in the "Dictum closed straight away" answer.
 
+## Privacy sentence for dictum.kynni.au covers "Open the full guide" (PROPOSED, 21/10/2026, branch site/privacy-guide-sentence)
+
+**PROPOSED, pending the product owner's approval. Do not merge or deploy until approved.**
+
+- **Why.** The 1.2 in-app Help page (PR #24) adds "Open the full guide", which opens https://dictum.kynni.au/help in the browser. The current site sentence says the app reaches dictum.kynni.au only for the privacy policy or Check for updates, so it would no longer be complete.
+- **Old sentence** (privacy.html and index.html, pinned by `UpdateCheckTests.ProposedSiteSentence`): "Only when you open the privacy policy from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store."
+- **Proposed sentence:** "Only when you open the privacy policy or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store."
+- **Where.** `site/privacy.html` (paragraph under "This website: dictum.kynni.au") and `site/index.html` (the dictum.kynni.au card). The pin in `tests/Dictum.Tests/UpdateCheckTests.cs` is updated to match.
+- **On approval.** The policy's "Changes to this policy" section says "we will update this page and its date before that version is released". The date is the `Last updated` line in `site/privacy.html` (line 34, `<time datetime="2026-10-16">16/10/2026</time>`). It must be changed to the approval date, in both the `datetime` attribute and the text. This lane did not change it: no document in docs/ lets a lane set that date, so it stays with the owner's approval step.
+
+**Second PROPOSED sentence, same branch (21/10/2026).** The 1.2 Help page's Email support, Report a problem and Send feedback buttons open the user's own mail program with a pre-filled email (Dictum version, speech model and runtime, clean-up choice; Send feedback alone adds the Windows build number, per the orchestrator's reading of the code on feat/in-app-help 65b99a4; no paths or names). Dictum sends nothing itself. Proposed addition to `site/privacy.html`, "What we collect" paragraph, after "...for example if you email us.": "The Email support, Report a problem and Send feedback buttons in Settings open a new email in your own mail program with Dictum’s version and the models in use filled in; Send feedback also includes your Windows build number. You can change or delete any of it before you send it." Also PROPOSED pending the owner's approval; the same `Last updated` line (`site/privacy.html:34`) applies on approval. No test pins this sentence yet.
+
 ## Warn when the microphone delivers no sound (21/10/2026, branch feat/silence-warning)
 
 **The report** (product owner, 21/10/2026, relayed by the orchestrator): on a virtual desktop whose microphone was not passed through, he pressed the hotkey and the pill showed "Recording" and stayed there. Nothing said the microphone was delivering no audio, so the app looked broken.
