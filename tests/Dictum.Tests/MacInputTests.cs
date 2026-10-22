@@ -312,6 +312,19 @@ public class MacInputTests
         Assert.Equal(["public.utf8-plain-text", "public.rtf", "public.html"], Pasteboard.TextTypes);
     }
 
+    /// <summary>
+    /// A dictation is written current-host-only (NSPasteboardContentsCurrentHostOnly = 1 &lt;&lt; 0, NSPasteboard.h), so Universal
+    /// Clipboard cannot hand it to the user's other devices; allowing clipboard history lifts it, as the same switch lets
+    /// Windows upload to its cloud clipboard.
+    /// </summary>
+    [Fact]
+    public void MacInput_pasteboard_dictation_is_current_host_only_unless_history_is_allowed()
+    {
+        Assert.Equal((nuint)1, Pasteboard.CurrentHostOnly);
+        Assert.Equal(Pasteboard.CurrentHostOnly, Pasteboard.ContentsOptions(keepOutOfHistory: true));
+        Assert.Equal((nuint)0, Pasteboard.ContentsOptions(keepOutOfHistory: false));
+    }
+
     // ---- On a Mac ---------------------------------------------------------------------------------------------------
 
     [Fact]

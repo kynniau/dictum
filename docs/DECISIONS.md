@@ -5651,3 +5651,25 @@ shared UI code, so Windows had the first as well:
    - **Checked and owned** (a `Ui.Button`, synchronous up to the question): every calibration button; both cloud consents; delete model (every question before its first await); delete data; Remove Dictum completely (both warnings); the model folder move question; the Settings > Models catalogue and Simple rows; and the Welcome window's buttons. The Fix last dictation, Add word and Add snippet windows open no question.
 7. **Not verified.** Nothing ran on a Mac. The calibration path was not run on the real Win32 backend: `DICTUM_UI_TESTS` was not set, so the gated probe pin skipped. The installed app was not run, because tray mode is never run on this host. After Download, keyboard focus leaves the clicked button, as it already did when a download ended and the list was redrawn.
 8. **Gates, on this branch after the lens follow-up (23/10/2026).** Release build `--no-incremental`: 0 errors, 5 warnings, all xUnit2013 in `MacPackagingTests.cs` and `SiteStoreFirstTests.cs`, which this branch does not touch. `DialogOwnerTests`: 10 total, 9 passed, 1 skipped (the gated Win32 probe). Full suite (`dotnet test Dictum.sln`, Debug, without `DICTUM_UI_TESTS`): 2629 total, 0 failed, 2588 passed, 41 skipped. It ran on the final tree before these counts were written into this file. On f0b1bed, before pin (f): 2628 total, 0 failed, 2587 passed, 41 skipped.
+
+### Pasteboard writes are current-host-only (23/10/2026, branch mac/pasteboard-host-only)
+
+- **Finding (privacy re-lens, via the orchestrator):** a dictation written to the general pasteboard with Handoff on could be
+  carried to the user's other Apple devices by Universal Clipboard, which contradicts "nothing you say leaves this Mac".
+- **API, verified 23/10/2026 from the installed macOS SDK header** (`AppKit.framework/Headers/NSPasteboard.h`, Xcode SDK):
+  `- (NSInteger)prepareForNewContentsWithOptions:(NSPasteboardContentsOptions)options`, `API_AVAILABLE(macos(10.12))`,
+  "Prepares the pasteboard for new contents, clearing the existing contents … Any options specified will persist until
+  prepareForNewContentsWithOptions: or clearContents is called"; `NSPasteboardContentsCurrentHostOnly = 1 << 0`, "the pasteboard
+  contents should not be available to other devices". Apple's web pages for both symbols returned 404 or an empty body that day.
+- **Change:** `Pasteboard.Write` replaces its `clearContents` with `prepareForNewContentsWithOptions:`; `SetText` passes
+  `ContentsOptions(keepOutOfHistory)` = current-host-only when history is kept off (the default), 0 when the user allows
+  clipboard history. `Restore` passes 0, so the user's own contents are offered to their devices again as before. The
+  nspasteboard.org concealed, transient and source types are unchanged. Reasoning for tying it to the history switch
+  rather than always on: Windows already gates `CanUploadToCloudClipboard` (cloud clipboard sync) by the same setting, so a
+  user who allows history gets the same behaviour on both platforms; making it unconditional is a one-line change if the
+  owner prefers. No user-visible string changes. The Privacy page's line under the switch still reads "Windows clipboard
+  history (Win+V) and cloud clipboard sync." on a Mac: a copy item for the owner's Mac copy block, not changed here.
+- **Pin:** `MacInput_pasteboard_dictation_is_current_host_only_unless_history_is_allowed` (constant, both switch states).
+  Mutation check recorded in the PR.
+- **Not verified:** that another device actually declines to show the dictation (no second device in the lane); what is
+  verified is the selector exists and the write path still pastes (guest check in the PR).
