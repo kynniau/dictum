@@ -357,6 +357,25 @@ public sealed class ModelManager : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// <see cref="Unload"/>, then waits for a load still under way to finish, which releases its engine as stale (1.3, moving the
+    /// model files): when this completes no engine of this manager holds a model file. Its failure is the load's own.
+    /// </summary>
+    public async Task ReleaseAsync()
+    {
+        Task tail;
+        lock (_gate) tail = _tail;
+        Unload();
+        try
+        {
+            await tail.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // a stale load ends cancelled, and a failed one has already been reported by Finished
+        }
+    }
+
     public void Dispose()
     {
         ISpeechEngine? engine;

@@ -22,7 +22,8 @@ internal sealed class ModelsPage : SettingsPage
     internal const string FolderLabel = "Model folder";
     internal const string BrowseLabel = "Browse…";
     internal const string UseDefaultLabel = "Use default";
-    internal const string FolderNote = "Dictum looks here first and downloads go here. Changing it does not move any files.";
+    // APPROVED 22/10/2026 22:42 AEDT (second sentence reworded for move-on-change; proposed 22/10/2026): do not reword. Shown on Models and Storage.
+    internal const string FolderNote = "Dictum looks here first and downloads go here. Changing it asks before moving any files.";
     internal const string NetworkWarning = "Models load slowly from a network folder; a folder on this PC is faster.";
     internal const string IncludedState = "Included";
     internal const string AddCleanupLabel = "Add AI clean-up";
@@ -599,8 +600,8 @@ internal sealed class StoragePage : SettingsPage
         // The model folder's row: where downloads go, with the two actions of Settings > Models. Only this folder can be moved:
         // the settings, dictionary and log folders get no button.
         _folder.VerticalAlignment = VerticalAlignment.Center;
-        var change = Ui.Button(ChangeLabel, "secondary", () => Run(() => { ModelFolderActions.BrowseFolder(Shell, Say); Draw(); }), name: ChangeName);
-        _useDefault = Ui.Button(ModelsPage.UseDefaultLabel, "secondary", () => Run(() => { ModelFolderActions.UseDefaultFolder(Shell, Say); Draw(); }), name: ModelFolderActions.UseDefaultName);
+        var change = Ui.Button(ChangeLabel, "secondary", () => Run(() => ModelFolderActions.BrowseFolder(Shell, Say, Draw)), name: ChangeName);
+        _useDefault = Ui.Button(ModelsPage.UseDefaultLabel, "secondary", () => Run(() => ModelFolderActions.UseDefaultFolder(Shell, Say, Draw)), name: ModelFolderActions.UseDefaultName);
         var folderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 8 };
         Grid.SetColumn(change, 1);
         Grid.SetColumn(_useDefault, 2);
@@ -720,25 +721,4 @@ internal sealed class StoragePage : SettingsPage
         }
         Draw();
     }
-}
-
-/// <summary>
-/// The model folder's two actions, shared by Settings > Models (Browse…, Use default) and Settings > Storage (Change…, Use default):
-/// one chooser seam and one write, so the two pages cannot drift apart. Both write models.folder through
-/// <see cref="ModelCoordinator.SetModelsFolder"/>, which refuses the bundled folder and reloads the settings.
-/// </summary>
-internal static class ModelFolderActions
-{
-    /// <summary>The accessible name of "Use default" on both pages.</summary>
-    internal const string UseDefaultName = "Use the default model folder";
-
-    /// <summary>The system's folder chooser (opened in the folder in use), then models.folder is written; cancelling changes nothing.</summary>
-    internal static void BrowseFolder(AppShell shell, Action<string> say)
-    {
-        if (shell.Dialogs.ChooseFolder(shell.ModelsDir) is not { } folder) return;
-        say(shell.Models.SetModelsFolder(folder) ?? "");
-    }
-
-    /// <summary>models.folder goes back to the per-user default folder.</summary>
-    internal static void UseDefaultFolder(AppShell shell, Action<string> say) => say(shell.Models.SetModelsFolder(null) ?? "");
 }
