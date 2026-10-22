@@ -1428,9 +1428,10 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
   (`SettingsWindow`'s page list). The arrow keys reach it in the list like every other page.
 - **Recording**: **Record** / **Stop**, or hold the dictation hotkey while the page is shown in the window in front (as
   calibration: `AppShell.RedirectHotkey`, released when the window loses focus or another page is shown; Esc drops the
-  take). A dictation already under way when the page takes the hotkey (hands-free or toggle, started elsewhere) keeps it:
-  while the page has no take of its own, the hotkey and Esc are handed to the controller (`AppShell.ForwardHotkey`), and
-  Record says "A dictation is in progress". Record is off until a speech model is ready (the welcome window's "Getting the
+  take). A dictation already under way when the page takes the hotkey (held, hands-free or toggle, started elsewhere) keeps
+  it: the hotkey is decided once per press, so a press whose key-down went to a dictation goes to the controller whole (its
+  key-up and Esc too, even after that dictation has gone idle; `AppShell.ForwardHotkey`), and Record says "A dictation is
+  in progress". Esc is the page's only while its own take is open. Record is off until a speech model is ready (the welcome window's "Getting the
   speech model ready…" while one loads, else `HowItWorksText.NoSpeechModel`). A take is dropped, with the reason, when the
   microphone fails (`IAudioCapture.Failed`) or the window goes behind another. One take at a time, stopped at calibration's 30 s take limit (`CalibrationSession.TakeLimit`). The capture is
   opened for this page only and its audio stays a `CapturedAudio` in memory: nothing is written to disk.
@@ -1461,7 +1462,8 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
   No other clock is added.
 - **Accessibility**: every control named; each stage is a tab stop named with all it shows, with a ring only for keyboard
   focus; the status line under Record and each stage's text and verdict are polite live regions; Stop from the keyboard
-  moves focus to step 2 (Record is off while the steps run); the page title is heading level 1, each stage title level 2.
+  (Record focused by Tab or the arrows) moves focus to step 2, as Record is off while the steps run; after a click it is left
+  where it was; the page title is heading level 1, each stage title level 2.
 - **Not in this lane**: a link from Settings → Help (Help's page and copy belong to other lanes); compare mode.
 - **Pins**: `HowItWorksTests` (pipeline and stages), `HowItWorksPageTests` (the page, headless).
 

@@ -4293,3 +4293,16 @@ of the design note "four asks, designed and sized" (22/10/2026), stages 1-5 only
 9. The 30 s limit path is pinned (it stops, runs, and keeps "Stopped at 30 s…").
 10. Each stage's text and verdict TextBlocks are polite live regions (a Border has no automation peer, so the text carries it).
 11. A missing space in `AppShell.cs` is fixed.
+
+**Re-lens fixes (22/10/2026), re-lens on aebd2fd:**
+
+1. **One decision per press (major).** Forwarding was decided per event. A press could be split: its key-down went to a
+   dictation, Esc was forwarded and cancelled it, and the key-up then reached the page (now idle) and was dropped. The
+   controller kept the key held and ignored the next real press as auto-repeat (`DictationStateMachine`). Now a press is the
+   page's only if the page saw its key-down with no dictation under way, or with its own take open. Any other press goes to
+   the controller whole, its key-up and Esc included. Pinned with that exact sequence: the next press dictates and pastes.
+2. The window-deactivated drop is pinned through `WindowDeactivated()`, which the Deactivated handler calls.
+3. Stop moves focus to step 2 only when Record's focus came from the keyboard (Tab or the arrows); after a click focus is left
+   alone. Both cases are pinned.
+4. Record turning on when the model finishes loading is pinned end to end through the shell's own events (ModelManager.Changed,
+   ModelStateChanged, StatusChanged, Changed, SettingsWindow's refresh, the page's Redraw), not `page.Refresh()`.
