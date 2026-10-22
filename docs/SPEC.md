@@ -1318,6 +1318,9 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
   into view with its focus ring. Amended 22/10/2026 (round 2): the page scrolls so the answer's heading is 8 px below
   the top of the view (`HelpPage.JumpGap`); an answer the page cannot scroll that far (the last ones) shows whole.
+  Proposed 22/10/2026 (clean-up explainers; not approved): two more questions after "Why did it type the wrong words?", "What is
+  clean-up?" and "How can I see what Dictum does with my words?" (`HelpText.CleanupQuestion`, `SeeHowQuestion`), which make fifteen;
+  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers (PROPOSED copy)").
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does

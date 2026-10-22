@@ -223,4 +223,48 @@ public class OwnerApprovalsTests
         Assert.Equal("A dictation would paste this. This page pasted nothing.", HowItWorksText.WouldPaste);
         Assert.Equal("Your corrections, the profanity filter or snippets changed the text.", HowItWorksText.Changed);
     }
+
+    // ---- PROPOSED (22/10/2026, clean-up explainers lane): NOT approved ----
+    // Pinned word for word so the copy cannot drift before the owner decides, independently of the app's constants. This block is
+    // the only claim these strings make: nothing here records an approval, and the markers in the code stay PROPOSED. Reworded on
+    // approval means these literals change with them, in the same commit as the owner's decision.
+
+    /// <summary>PROPOSED pin: the three row explainers for Tidy my words, AI clean-up and Off, each under 120 characters.</summary>
+    [Fact]
+    public void The_proposed_clean_up_row_explainers_are_pinned()
+    {
+        Assert.Equal("Fixes punctuation and capitals and takes out ums and ahs, without rewriting. A good choice for most people.", SimpleView.TidyExplainer);
+        Assert.Equal("Also takes out \"you know\" and false starts, and follows \"scratch that\". Pick it if plain tidying leaves too much in.", SimpleView.AiExplainer);
+        Assert.Equal("Pastes what was heard, with no tidying. Pick it if you would rather fix the text yourself.", SimpleView.OffExplainer);
+        Assert.All(new[] { SimpleView.TidyExplainer, SimpleView.AiExplainer, SimpleView.OffExplainer }, line => Assert.True(line.Length < 120, $"{line.Length} characters: {line}"));
+    }
+
+    /// <summary>PROPOSED pin: the two new Help questions, their answers word for word, and their place in the list.</summary>
+    [Fact]
+    public void The_proposed_clean_up_help_questions_are_pinned()
+    {
+        Assert.Equal("What is clean-up?", HelpText.CleanupQuestion);
+        Assert.Equal(
+        [
+            "Clean-up is the tidying Dictum does between hearing you and typing. When we speak, we say ums and ahs and repeat ourselves. Clean-up takes those out and sets the punctuation and capitals right before your words are typed.",
+            "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, and takes out ums, ahs and doubled words such as \"the the\". It does not rewrite your sentences, and it needs no download.",
+            "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts, and follows \"scratch that\". Dictum checks its answer against what you said; if the check fails, it uses the rule-based tidy instead.",
+            "Off pastes what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.",
+            "Tidy my words and AI clean-up work on English dictations today. For other languages, only the spacing is tidied.",
+            "Clean-up happens on this PC. Text goes to another service only if you switch on a cloud option in Settings > Clean-up, and that is off unless you switch it on.",
+            "To watch clean-up work on your own words, open Settings > See how it works and record a short dictation.",
+        ], HelpText.CleanupAnswer);
+        Assert.Equal("How can I see what Dictum does with my words?", HelpText.SeeHowQuestion);
+        Assert.Equal(
+        [
+            "Open Settings > See how it works, press Record, say a sentence or two, then press Stop. The page shows five steps: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up, and what would be pasted.",
+            "It uses your current settings. It pastes nothing, and the recording is never saved to disk.",
+        ], HelpText.SeeHowAnswer);
+
+        var questions = HelpText.Questions.Select(q => q.Question).ToList();
+        Assert.Equal(["Why did it type the wrong words?", "What is clean-up?", "How can I see what Dictum does with my words?"],
+            questions.Skip(questions.IndexOf("Why did it type the wrong words?")).Take(3)); // together, after the question about wrong words
+        Assert.Contains(HelpText.Questions, q => q.Question == "What is clean-up?" && ReferenceEquals(q.Answer, HelpText.CleanupAnswer));
+        Assert.Contains(HelpText.Questions, q => q.Question == "How can I see what Dictum does with my words?" && ReferenceEquals(q.Answer, HelpText.SeeHowAnswer));
+    }
 }

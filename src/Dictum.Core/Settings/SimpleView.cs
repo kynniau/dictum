@@ -78,6 +78,18 @@ public static class SimpleView
     /// </summary>
     public const string TidyWithAiState = "With AI clean-up";
 
+    // PROPOSED 22/10/2026 (clean-up explainers lane; none approved, DECISIONS "Clean-up explainers (PROPOSED copy)"). One sentence or
+    // two for each clean-up choice, saying what it does and when to pick it, each under 120 characters (SimpleViewTests pins the
+    // length). Not shown yet: the Models page (ModelPages.cs, another lane's file) decides where; the existing sub-lines are unchanged.
+    /// <summary>PROPOSED: what "Tidy my words" does (the rule-based tidy) and when to pick it.</summary>
+    public const string TidyExplainer = "Fixes punctuation and capitals and takes out ums and ahs, without rewriting. A good choice for most people.";
+
+    /// <summary>PROPOSED: what "Add AI clean-up" adds to the tidy (CleanupPrompt.Default: filler phrases, false starts, "scratch that") and when to pick it.</summary>
+    public const string AiExplainer = "Also takes out \"you know\" and false starts, and follows \"scratch that\". Pick it if plain tidying leaves too much in.";
+
+    /// <summary>PROPOSED: what "Off" does and when to pick it.</summary>
+    public const string OffExplainer = "Pastes what was heard, with no tidying. Pick it if you would rather fix the text yourself.";
+
     // APPROVED 22/10/2026 copy (proposed 21/10/2026, the clean-up Off lane) (DECISIONS, 21/10/2026).
     /// <summary>The Simple view's no-clean-up row (llm.provider = off), and the tray panel's Simple clean-up entry.</summary>
     public const string OffLabel = "Off";

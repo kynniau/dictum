@@ -73,7 +73,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Contains(text, shown);
 
-        Assert.Equal(13, HelpText.Questions.Count);
+        Assert.Equal(15, HelpText.Questions.Count); // the thirteen before, and the two clean-up questions (PROPOSED 22/10/2026)
         var blocks = All<Border>(page).Where(b => b.Focusable).Select(AutomationProperties.GetName).ToList();
         foreach (var entry in HelpText.Questions)
             Assert.Contains(entry.Question, blocks); // each question is its own tab stop, named after it
@@ -319,6 +319,105 @@ public class HelpPageTests
             Assert.Contains("the words in your dictionary", t);
             Assert.Contains("Your voice still stays here", t, StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (clean-up explainers lane): "What is clean-up?" names the choices as the Simple view and Settings > Models do,
+    /// and every claim it makes about what clean-up does is checked against the code that does it: the rule-based tidy removes ums, ahs
+    /// and a doubled "the the" and leaves its sentences alone; the model's prompt asks for "you know", false starts and "scratch that";
+    /// the rule-based tidy is Off's neighbour in the Simple view; and a non-English dictation is not cleaned beyond its spacing.
+    /// </summary>
+    [Fact]
+    public void The_clean_up_answer_names_the_choices_and_its_claims_hold()
+    {
+        var answer = Assert.Single(HelpText.Questions, q => q.Question == HelpText.CleanupQuestion).Answer;
+        var text = string.Join("\n", answer);
+        Assert.Contains(Dictum.Settings.SimpleView.TidyLabel, text);
+        Assert.Contains(ModelsPage.AddCleanupLabel, text);
+        Assert.Contains(Dictum.Settings.SimpleView.OffLabel + " pastes what was heard", text);
+        Assert.Contains("Settings > Models", text);
+        Assert.Contains("Settings > Clean-up", text);
+        Assert.Contains("Settings > " + Dictum.Core.HowItWorksText.PageTitle, text);
+        Assert.EndsWith("Only your own corrections, snippets and the profanity filter (if on) still apply.", Dictum.Settings.SimpleView.OffSubLine); // Off's second sentence is the app's own
+        Assert.Contains("Only your own corrections, snippets and the profanity filter (if on) still apply.", text);
+
+        // "Takes out ums, ahs and doubled words such as \"the the\"", "does not rewrite your sentences".
+        Assert.Equal("So the report is ready.", DeterministicCleaner.Clean("um so the the report is ready uh"));
+        Assert.Equal("The quick brown fox jumps over the lazy dog.", DeterministicCleaner.Clean("the quick brown fox jumps over the lazy dog"));
+        // The model "also takes out \"you know\" and false starts, and follows \"scratch that\"": the prompt it is given asks for each.
+        foreach (var asked in new[] { "you know", "false starts", "scratch that" })
+            Assert.Contains(asked, CleanupPrompt.Default);
+        // "Work on English dictations today. For other languages, only the spacing is tidied."
+        Assert.True(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("en", translate: false));
+        Assert.False(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("es", translate: false));
+        Assert.True(TranscriptCleaner.Plain("not English").IsPlain);
+        // The answer never says it turns on cloud clean-up (the pin on those mentions is for the paragraphs that do).
+        Assert.DoesNotContain("turn on cloud clean-up", text);
+    }
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (clean-up explainers lane): "How can I see what Dictum does with my words?" names the page, its two buttons
+    /// and its five stages as <see cref="Dictum.Core.HowItWorksText"/> does, and says it pastes nothing and saves nothing.
+    /// </summary>
+    [Fact]
+    public void The_see_how_it_works_answer_names_the_page_buttons_and_five_steps()
+    {
+        var answer = Assert.Single(HelpText.Questions, q => q.Question == HelpText.SeeHowQuestion).Answer;
+        var text = string.Join("\n", answer);
+        Assert.Contains("Open Settings > " + Dictum.Core.HowItWorksText.PageTitle, text);
+        Assert.Contains("press " + Dictum.Core.HowItWorksText.RecordLabel, text);
+        Assert.Contains("press " + Dictum.Core.HowItWorksText.StopLabel, text);
+        Assert.Equal(5, Dictum.Core.HowItWorksText.Stages.Count);
+        var at = 0;
+        foreach (var (title, _) in Dictum.Core.HowItWorksText.Stages) // each stage, by its title without the number, in the page's order
+        {
+            var name = Regex.Replace(title, @"^\d+\. ", "");
+            var found = text.IndexOf(name, at, StringComparison.OrdinalIgnoreCase);
+            Assert.True(found >= 0, $"the answer does not name step \"{name}\" in order");
+            at = found + name.Length;
+        }
+        Assert.Contains("It pastes nothing, and the recording is never saved to disk.", text);
+        Assert.StartsWith("This page pastes nothing.", Dictum.Core.HowItWorksText.MemoryNote); // the page says the same
+        Assert.StartsWith("This page pastes nothing.", Dictum.Core.HowItWorksText.CloudSpeechNote("HOST"));
+        Assert.Contains("never saved to disk", Dictum.Core.HowItWorksText.MemoryNote);
+        Assert.Contains("never saved to disk", Dictum.Core.HowItWorksText.CloudSpeechNote("HOST"));
+    }
+
+    /// <summary>PROPOSED 22/10/2026 (clean-up explainers lane): "Questions on this page" lists both new questions as links, one after the other, after the one about wrong words.</summary>
+    [Fact]
+    public Task The_index_lists_the_two_clean_up_questions() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = OpenHelp(window);
+        var links = All<Button>(page).Where(b => b.Classes.Contains("link") && b.Content is TextBlock).Select(b => ((TextBlock)b.Content!).Text).ToList();
+        var at = links.IndexOf("Why did it type the wrong words?");
+        Assert.True(at >= 0, "the list has no \"Why did it type the wrong words?\"");
+        Assert.Equal(["What is clean-up?", "How can I see what Dictum does with my words?"], links.Skip(at + 1).Take(2));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (clean-up explainers lane): the website guide's questions "What is clean-up?" and "How can I see what Dictum does
+    /// with my words?" carry the in-app answers word for word, paragraph for paragraph (markup, and quotation marks, aside).
+    /// </summary>
+    [Theory]
+    [InlineData("faq-what-is-cleanup", "What is clean-up?")]
+    [InlineData("faq-see-how", "How can I see what Dictum does with my words?")]
+    public void The_site_guide_carries_the_clean_up_answers_word_for_word(string id, string question)
+    {
+        static string Plain(string s) => Regex.Replace(Regex.Replace(s, "<[^>]+>", "").Replace("&gt;", ">").Replace("&amp;", "&").Replace("\"", ""), @"\s+", " ").Trim();
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        var start = html.IndexOf($"<details id=\"{id}\">", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"site/help.html has no #{id}");
+        var block = html[start..html.IndexOf("</details>", start, StringComparison.Ordinal)];
+        Assert.Equal(question, Plain(Regex.Match(block, "<summary>(.*?)</summary>", RegexOptions.Singleline).Groups[1].Value));
+        var site = Regex.Matches(block, "<p>(.*?)</p>", RegexOptions.Singleline).Select(m => Plain(m.Groups[1].Value)).ToList();
+        var app = HelpText.Questions.Single(q => q.Question == question).Answer.Select(Plain).ToList();
+        Assert.Equal(app, site);
     }
 
     // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy
