@@ -48,12 +48,9 @@
         <p class="lede">Hold a key, talk, let go. Dictum types what you said into whatever you’re working in. Your voice never leaves your PC.</p>
 
         <div class="cta" id="get">
-          <a class="btn btn-primary" href="https://github.com/kynniau/dictum/releases/latest" aria-describedby="direct-note">Download for Windows</a>
-          <div class="cta-item">
-            <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>
-          </div>
+          <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57" aria-describedby="store-note">Get it from the Microsoft Store</a>
         </div>
-        <p class="note" id="direct-note">Free installer for Windows 10 and 11 (x64). It isn’t code-signed yet, so Windows may warn you before it runs: <a href="/help#smartscreen">here’s what to click</a>.</p>
+        <p class="note" id="store-note">Free for Windows 10 and 11 (x64). The Microsoft Store installs it and keeps it up to date.</p>
 
         <ul class="trust" aria-label="At a glance">
           <li>Free for life</li>
@@ -78,7 +75,7 @@
           <div class="pill">
             <span class="pill-dot"></span>
             <span class="pill-bars"><i></i><i></i><i></i><i></i><i></i></span>
-            <span>Recording · hold</span>
+            <span>Recording · let go to finish</span>
           </div>
         </div>
       </div>
@@ -173,8 +170,8 @@
       <p class="section-intro">Dictum lives in the system tray and stays out of your way. Everything you might want to change is in one small panel and a Settings window.</p>
       <div class="gallery">
         <figure class="shot shot-tall">
-          <img src="/img/flyout.png" width="440" height="700" loading="lazy" alt="The Dictum tray panel: a Light or Full mode switch, speech model and clean-up pickers, the microphone, the big recording indicator choice, profanity filter, grammar assist and sound toggles, and buttons for calibration, dictionary, fix last dictation and settings.">
-          <figcaption>The tray panel. Pick Light or Full mode, your model and your microphone, and go.</figcaption>
+          <img src="/img/flyout.png" width="440" height="700" loading="lazy" alt="The Dictum tray panel in the Advanced view: a Light or Full mode switch (the Simple view hides it), speech model and clean-up pickers, the microphone, the big recording indicator choice, profanity filter, grammar assist and sound toggles, and buttons for calibration, dictionary, fix last dictation and settings.">
+          <figcaption>The tray panel. Pick your speech model, your clean-up and your microphone, and go.</figcaption>
         </figure>
         <figure class="shot">
           <img src="/img/settings-general.png" width="900" height="712" loading="lazy" alt="Dictum settings, General page: the hotkey, a fix-last-dictation hotkey, the on-screen pill and big recording indicator, start and stop sounds, and how text is pasted.">
@@ -304,7 +301,7 @@
         <h2 id="req-title">What you need</h2>
         <ul class="feature-list">
           <li><strong>Windows 10 or 11</strong>, 64-bit.</li>
-          <li><strong>Microsoft Visual C++ Redistributable (x64) 14.51 or later</strong>, for the direct download. The installer checks, and offers Microsoft’s download if your PC has none or an older one. Installing it needs administrator rights.</li>
+          <li><strong>The Microsoft Store.</strong> Get Dictum there; the Store installs everything else Dictum needs.</li>
           <li><strong>A microphone.</strong> Any one Windows can use.</li>
           <li><strong>4 GB of RAM</strong> for the small models. A graphics card is optional and makes the bigger, more accurate models fast.</li>
           <li><strong>Some disk space</strong> for the models you pick: from 78 MB, up to 1.6 GB for the most accurate speech model, plus an optional 1.1 GB tidy-up model.</li>
@@ -318,13 +315,6 @@
     <div class="wrap">
       <h2 id="faq-title">Questions</h2>
       <div class="faq">
-
-        <details id="faq-smartscreen" open>
-          <summary>Windows warned me about the download. What do I click?</summary>
-          <div class="answer">
-            <p>That warning is expected for now, because the direct download isn’t code-signed yet. <a href="/help#smartscreen">Here is what to click, step by step</a>.</p>
-          </div>
-        </details>
 
         <details id="faq-voice">
           <summary>Does it learn my voice?</summary>
@@ -366,8 +356,7 @@
       <h2 id="cta-title">Try it on your next email</h2>
       <p class="section-intro">Two minutes to install, one key to hold. If it isn’t for you, one button removes everything.</p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/kynniau/dictum/releases/latest">Download for Windows</a>
-        <a class="btn btn-secondary" href="https://github.com/kynniau/dictum">See the source</a>
+        <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>
       </div>
     </div>
   </section>
@@ -381,7 +370,6 @@
       <span>Dictum by <a href="https://www.kynni.com.au">Kynni</a></span>
     </p>
     <ul class="footer-links">
-      <li><a href="https://github.com/kynniau/dictum">Source on GitHub</a></li>
       <li><a href="/privacy">Privacy policy</a></li>
       <li><a href="/help">Help guide</a></li>
       <li><a href="mailto:hello@kynni.com.au">hello@kynni.com.au</a></li>
@@ -389,6 +377,7 @@
     </ul>
   </div>
   <div class="wrap">
+    <p class="legal">Source code and release files are on <a href="https://github.com/kynniau/dictum">GitHub</a>.</p>
     <p class="legal">© 2026 Kynni Pty Ltd. Dictum is free software under the MIT licence. Wispr Flow, Aqua Voice, Superwhisper and Windows are trademarks of their owners, none of whom is affiliated with Kynni.</p>
   </div>
 </footer>

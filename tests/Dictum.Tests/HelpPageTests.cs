@@ -152,7 +152,7 @@ public class HelpPageTests
     }
 
     /// <summary>
-    /// The reconciliation with main (21/10/2026), all PROPOSED copy: the crash answer carries the 1.1.2 note's sentence, the
+    /// The reconciliation with main (21/10/2026), all APPROVED 22/10/2026 copy: the crash answer carries the 1.1.2 note's sentence, the
     /// free answer is the two approved paragraphs plus the licence and no-limit facts, the calibration feature goes by the name its button shows,
     /// the cloud answer names the dictionary and the on/off switch is described rather than named.
     /// </summary>
@@ -178,11 +178,11 @@ public class HelpPageTests
             Assert.Equal(calibration.Matches(text).Count, Regex.Matches(text, "Calibrate my voice").Count); // every "calibrat…" word sits inside "Calibrate my voice"
         Assert.Contains(HelpText.AllText(), t => t.Contains("Calibrate my voice", StringComparison.Ordinal));
 
-        // Cloud clean-up sends the dictionary line too (CleanupPrompt.Build), so the answer says so (PROPOSED, 21/10/2026).
+        // Cloud clean-up sends the dictionary line too (CleanupPrompt.Build), so the answer says so (APPROVED 22/10/2026; proposed 21/10/2026).
         var voice = HelpText.Questions.Single(q => q.Question == "Where does my voice go?");
         Assert.Contains(voice.Answer, p => p.Contains("cloud clean-up", StringComparison.Ordinal) && p.Contains("the words in your dictionary", StringComparison.Ordinal));
 
-        // "Dictation on" is only the switch's screen-reader name (it shows no text), so the help describes where the switch is (PROPOSED, 21/10/2026).
+        // "Dictation on" is only the switch's screen-reader name (it shows no text), so the help describes where the switch is (APPROVED 22/10/2026; proposed 21/10/2026).
         Assert.DoesNotContain(HelpText.AllText(), x => x.Contains("Dictation on", StringComparison.Ordinal));
         Assert.Contains(HelpText.AllText(), x => x.Contains("the on/off switch at the top right of the Dictum menu", StringComparison.Ordinal));
     }
@@ -268,7 +268,7 @@ public class HelpPageTests
     });
 
     /// <summary>
-    /// Final round on the Simple view (21/10/2026), PROPOSED copy: the help names the speech and clean-up choices as the
+    /// Final round on the Simple view (21/10/2026), APPROVED 22/10/2026 copy: the help names the speech and clean-up choices as the
     /// Simple view (the default) shows them, says where Advanced is, and offers Add AI clean-up only where the app does.
     /// </summary>
     [Fact]
@@ -302,7 +302,7 @@ public class HelpPageTests
     }
 
     /// <summary>
-    /// Final round (21/10/2026), PROPOSED copy: every paragraph that tells the user how to turn on cloud clean-up also says
+    /// Final round (21/10/2026), APPROVED 22/10/2026 copy: every paragraph that tells the user how to turn on cloud clean-up also says
     /// that the dictation's text and the dictionary go to the service (CleanupPrompt.Build sends both); the voice never does.
     /// </summary>
     [Fact]

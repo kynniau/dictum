@@ -14,7 +14,7 @@ internal static class MicrophoneChoices
 {
     public const string SystemDefault = "System default";
 
-    /// <summary>The first entry when the system lists no microphone (PROPOSED, 1.2 polish, 22/10/2026).</summary>
+    /// <summary>The first entry when the system lists no microphone (APPROVED 22/10/2026; proposed 1.2 polish, 22/10/2026).</summary>
     public const string NoneFound = "No microphone found";
 
     /// <summary>

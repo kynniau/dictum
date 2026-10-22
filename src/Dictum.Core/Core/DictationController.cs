@@ -209,7 +209,7 @@ public sealed class DictationController : IDisposable
             {
                 case StartCaptureEffect start:
                     // A microphone that could not be opened has already ended the session ("Mic error" or the no-microphone
-                    // warning): the rest of this batch (the "Recording · hold" pill) belonged to the recording that never started,
+                    // warning): the rest of this batch (the hold pill) belonged to the recording that never started,
                     // and shown after the flash it stayed on screen with nothing recording (found 21/10/2026).
                     if (!StartCapture(start.SessionId)) return;
                     break;

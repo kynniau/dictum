@@ -4148,3 +4148,81 @@ Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOS
    - **Landing page wording.** The landing page's "No account, no cloud, no telemetry" and its meta and og descriptions now name opt-in cloud clean-up.
    - **FAQ styles.** These now apply only to the FAQ's own items, so the demo player inside an answer is not styled as one.
    - **Demo players.** Each is named "Demo: <title>", and the poster alt text says "a still from the demo".
+
+## Site: Store-first (22/10/2026, branch site/store-first)
+
+**Owner decision (22/10/2026), in substance:** the Microsoft Store is the default and easy-to-find way to get Dictum,
+and in future the Apple App Store; the site does not advertise that the direct download is unsigned; every reference on
+the site to the manual download and to getting past SmartScreen goes; pro users can still download from GitHub without
+an explanation. New wording below is PROPOSED until the owner approves it.
+
+1. **Removed from `site/index.html`:** the hero's "Download for Windows" button (GitHub releases) and its note ("It
+   isn't code-signed yet ... here's what to click", linking `/help#smartscreen`); the FAQ "Windows warned me about the
+   download. What do I click?" (`#faq-smartscreen`); the "What you need" item "Microsoft Visual C++ Redistributable
+   (x64) 14.51 or later, for the direct download" with its installer and administrator-rights caveat; the closing band's
+   "Download for Windows" and "See the source" buttons; the footer's "Source on GitHub" link (replaced by item 3).
+2. **Removed from `site/help.html`:** "The direct download" steps in Get Dictum (the releases link, Dictum-Setup, the
+   SmartScreen and "can't be reached" steps, the Visual C++ Redistributable and vc_redist.x64.exe steps, Setup's pages);
+   the install demo player (its GIF shows the SmartScreen prompt; the files stay, see `docs/DEMOS.md`); the
+   "Windows protected your PC" box (`#smartscreen`: More info, Run anyway, code-signing, the Edge Keep steps). The
+   updates FAQ's last direct-download step now reads "Install the newer version from that page. Your settings and
+   models are kept." (lens, 22/10/2026); it no longer points to section 1, which no longer describes Setup.
+3. **Added:** the Store button is the only button on the landing page (hero and closing band); one quiet footer line on
+   all three pages (replacing their "Source on GitHub" links),
+   "Source code and release files are on GitHub.", linking https://github.com/kynniau/dictum; "What you need" says to
+   get Dictum from the Microsoft Store, which installs everything else Dictum needs (the package declares the
+   `Microsoft.VCLibs.140.00.UWPDesktop` framework, which the Store installs: "Visual C++ runtime" above, MSIX
+   troubleshooting guide, read 17/10/2026); Get Dictum in the guide is Store only.
+4. **Kept, because it is true and needed by people who already have the direct download:** the approved sentence
+   "Only when you open the privacy policy ... click Check for updates in the direct-download version ..." (pinned by
+   `UpdateCheckTests`) on the landing page and the privacy policy; the privacy policy's text (only its footer changed; it covers both
+   builds, and its bullets are approved copy); the guide's FAQ answers on updates, uninstalling and model folders for
+   the direct download (orchestrator's call, 22/10/2026: keep them). The roadmap's "Mac version" line is unchanged: it says nothing about where the Mac version will
+   be sold, and no Apple App Store plan or date is recorded to cite.
+5. **Not the site, so not changed:** `README.md`, `docs/STORE.md`, the release-notes preamble and the in-app Help
+   (`HelpText.cs`).
+6. **Pins:** `ReleaseWorkflowTests` no longer requires the site to state the Visual C++ runtime floor (README and
+   preamble still must, and agree); a new test requires that no page of the site names it.
+   New `SiteStoreFirstTests` pin the Store as every landing-page button, the absence of the removed phrases on all
+   three pages, the one GitHub footer line on each page, a Store-only Get Dictum section, and that every same-site anchor lands.
+
+## TimeProvider seam (22/10/2026, branch fix/slow-connection-test)
+
+`OfflineAndDownloadTests.A_slow_but_live_connection_is_not_a_stall` failed intermittently on CI (run 39689142461 attempts 1 and 2, earlier runs on PRs #15 and #26): `Assert.Equal(1, attempts)` saw 2. Cause: the downloader's stall limit was a real timer (`CancelAfter`), and the test raced it with 40 ms reads against a 150 ms limit, so a ~110 ms scheduling hiccup on a loaded runner was reported, correctly, as a stall. The detector had no bug.
+
+1. **The seam** (owner, 22/10/2026): the stall timer and the back-off wait take a clock. `ModelDownloader` is a static class with no constructor, so the clock is an optional `TimeProvider? Time` on `DownloadPolicy`, which the tests already vary with `Fast with { ... }`. Null means `TimeProvider.System`; no caller outside the tests sets it (`grep "DownloadPolicy("` finds only the record itself and `DownloadPolicy.Default`).
+2. **The stall timer** is now `policy.Time.CreateTimer(...)` cancelling the attempt's linked token source, restarted with `Change(StallTimeout, Infinite)` before every read (the line that used to be `stall.CancelAfter`). It does not use `new CancellationTokenSource(TimeSpan, TimeProvider)`, because the attempt's source is a linked source (`CreateLinkedTokenSource`), which takes no clock. The callback swallows `ObjectDisposedException`: the timer is disposed just before the source, and a callback already running could otherwise reach a disposed source on a thread-pool thread.
+3. **No new package.** `tests/Dictum.Tests/FakeTimeProvider.cs` is a 98-line clock that moves only on `Advance`, firing due timers in order on the advancing thread. `Microsoft.Extensions.TimeProvider.Testing` would do the same; a test helper this small does not justify a dependency (build ladder, rung 5).
+4. **Pins.** `A_slow_but_live_connection_is_not_a_stall` (13 reads, the clock advanced 40 ms per read against a 150 ms limit, 520 ms in all: one attempt) and its inverse `A_connection_that_stops_sending_is_a_stall` (one advance past a 200 ms limit with no byte: two attempts, "connection stalled: no data for 0.2 s" logged). Neither waits on real time; the 30 s in the test driver only bounds how long a hang takes to fail. `A_stalled_connection_counts_as_a_drop_and_is_retried` is kept on the real 300 ms timer on purpose: it is the one test that runs the default (system clock) path end to end.
+5. **Mutation.** Removing the per-read restart fails the slow pin; making the timer callback do nothing fails the stall pin (observed 22/10/2026).
+6. **Not checked:** whether `CancellationTokenSource.CancelAfter` itself honours a `TimeProvider` given at construction. The seam does not depend on it.
+
+## Owner approvals (22/10/2026)
+
+Recorded on branch `fix/1.2.1-copy` for 1.2.1 (no version bump in this change). The earlier entries are left as written;
+this entry supersedes their "PROPOSED" and "awaiting the product owner" notes where it says so.
+
+1. **Decision 3, the hold pill.** "Recording · hold" becomes "Recording · let go to finish" (`PillText.RecordingHold`).
+   Hands-free's line is unchanged. The landing page's static pill and the two design files show the new words. The demo
+   GIF `site/img/demos/dictation-stills.gif` is re-rendered with the new pill (see docs/DEMOS.md).
+2. **Decision 4, no microphone.** With no microphone listed, the tray panel's state word is "No microphone"
+   (`NoSoundText.NoMicrophoneState`), and "Ready" again once one is listed (the panel reads the list on every refresh).
+   It replaces "Ready" only: Off, Recording, Working, Downloading, Loading, No model, Model error and Error are kept, as
+   each says more than the microphone does. The dot takes the error colour, as "No model" does (this lane's choice: the
+   decision names the word, not the colour). The no-microphone sentence under the header is unchanged.
+3. **Decision 5, Light | Full.** In the Simple view the tray panel hides "Mode", the Light | Full switch and the line
+   under it; the Advanced view keeps all three, with the presets' model names. `SimpleView.ModeHint` (the Simple names
+   for that line) had no caller left and is removed, with its two pins; the line's layout pin now measures the model-name
+   line only.
+4. **Decision 6, "No clean-up".** With clean-up off, the panel header's clean-up part reads "No clean-up" in both views
+   (`SimpleView.OffHeaderLabel`). The Advanced header shares its clean-up part with the icon's tooltip and the support
+   email's models line, so those say "No clean-up" too. The choice keeps its name: "Off" in the Simple view and the
+   Simple picker, "Off (paste what was heard)" in the Advanced view. Settings > Models' Advanced "In use:" line keeps
+   "no clean-up" (`ModelCoordinator.CurrentCleanupName`).
+5. **Block approval (item 8).** The owner approved every PROPOSED 1.2 string as a block. Every "PROPOSED" marker in
+   `src/` and `tests/` comments now reads "APPROVED 22/10/2026", keeping the date it was proposed, and the "awaiting the
+   product owner" and "for the product owner to approve" notes beside them are removed. That includes the lower-case
+   "Proposed 16/10/2026" markers in `UpdateCheck.cs`. Of the 92 lines with an upper-case marker, 45 were already in the v1.1.2 tag (each line's text looked
+   up in `git show v1.1.2:<file>`); they are flipped too, because the brief names `NoSoundText.cs` and `ModelPrompts.cs`, whose markers date from before v1.1.2. No
+   string's wording changed. docs/STORE.md and the README change only where a sentence now read wrong. The PROPOSED notes
+   in docs/SPEC.md, docs/DEMOS.md and docs/MAC-HANDOVER.md, and in earlier entries of this file, are left as written.

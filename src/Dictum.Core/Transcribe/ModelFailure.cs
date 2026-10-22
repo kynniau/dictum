@@ -14,22 +14,22 @@ namespace Dictum.Transcribe;
 public static class ModelFailure
 {
     /// <summary>
-    /// An engine's native library cannot load because the Visual C++ runtime it imports is not on this PC. PROPOSED copy
-    /// (17/10/2026), awaiting the product owner's review: pinned word for word; do not reword.
+    /// An engine's native library cannot load because the Visual C++ runtime it imports is not on this PC. APPROVED 22/10/2026 copy
+    /// (proposed 17/10/2026): pinned word for word; do not reword.
     /// </summary>
     public const string RuntimeMissing = "The Microsoft Visual C++ runtime is missing; install it from Microsoft, then restart Dictum";
 
     /// <summary>
-    /// The model failed on the GPU and was loaded again on the CPU, where it runs now. PROPOSED copy (17/10/2026), awaiting the
-    /// product owner's review: pinned word for word; do not reword.
+    /// The model failed on the GPU and was loaded again on the CPU, where it runs now. APPROVED 22/10/2026 copy (proposed 17/10/2026):
+    /// pinned word for word; do not reword.
     /// </summary>
     public const string GpuFailed = "The graphics driver could not run the model; Dictum will use the CPU";
 
     /// <summary>
     /// The GPU ended Dictum while it loaded this model at an earlier start, so this start loads it on the CPU
-    /// (<see cref="GpuLoadMarker"/>); true at every start while the marker stays. PROPOSED copy (17/10/2026, lens fix replacing
-    /// "… could not run the model last time; Dictum is using the CPU", which was untrue from the second start on), awaiting the
-    /// product owner's review: pinned word for word; do not reword.
+    /// (<see cref="GpuLoadMarker"/>); true at every start while the marker stays. APPROVED 22/10/2026 copy (proposed 17/10/2026, lens fix replacing
+    /// "… could not run the model last time; Dictum is using the CPU", which was untrue from the second start on):
+    /// pinned word for word; do not reword.
     /// </summary>
     public const string GpuFailedLastTime = "The graphics driver could not run this model, so Dictum uses the CPU for it.";
 

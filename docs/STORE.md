@@ -186,8 +186,8 @@ build: never upload the design-canvas mockups. Use made-up sample text, never re
 
 | # | Capture | Caption |
 |---|---|---|
-| 1 | The pill while recording ("Recording · hold"), over a text document, edge glow on | Hold Right Ctrl and talk. The pill shows Dictum is listening. |
-| 2 | The tray flyout, opened from the notification area | Everything in one place: on or off, Light or Full mode, models, microphone and tools. |
+| 1 | The pill while recording ("Recording · let go to finish"), over a text document, edge glow on | Hold Right Ctrl and talk. The pill shows Dictum is listening. |
+| 2 | The tray flyout, opened from the notification area, in the Advanced view (the Simple view hides the Light or Full switch since 1.2.1) | Everything in one place: on or off, Light or Full mode, models, microphone and tools. |
 | 3 | The calibration window with results | Calibration finds the installed model that hears you best. It does not train the model. |
 | 4 | Settings, Storage page (or the hotkey capture box) | See and delete everything Dictum stores, or remove it completely. |
 | 5 (optional) | Settings, Models page (replaces the first-run model picker, which a package with base.en no longer shows; noted 17/10/2026) | Choose a bigger speech model or add AI clean-up; base.en comes with Dictum. |
@@ -371,7 +371,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 14 | Personal information transmitted insecurely | Store Policies 10.5.4 | Hugging Face, Anthropic and the update check use HTTPS. A user-entered `http://` server that is not on the PC would carry transcripts unencrypted: refuse or warn for non-loopback `http://` addresses. | Risk: app change needed |
 | 15 | Cannot be cleanly uninstalled | Store Policies 10.2.7 | Uninstalling an MSIX removes the package and the AppData files Windows redirected for it (Microsoft Learn, "Understanding how packaged desktop apps run on Windows"). Settings → Storage → "Remove Dictum completely" deletes the data first. Files that already existed in the real AppData folder (for example from an earlier direct-download install) are modified in place and survive uninstall, which is one more reason the app warns when both builds are installed (SPEC §18.2). | Done in SPEC; verify in build |
 | 16 | Changes Windows settings without consent | Store Policies 10.2.8 | Launch at login only when the user ticks it; no default-app changes. | Verify manifest |
-| 17 | Value not clear on first run | Store Policies 10.1.1 | With base.en in the package the first run shows no model picker and starts ready (amended 17/10/2026). PROPOSED (22/10/2026), for 1.2.0: the first run opens the Welcome window with a hotkey check, a microphone test and a choice of where model files are kept, and Esc keeps the defaults; after setup, show how to dictate ("Hold Right Ctrl and talk"). | Verify in build |
+| 17 | Value not clear on first run | Store Policies 10.1.1 | With base.en in the package the first run shows no model picker and starts ready (amended 17/10/2026). Approved by the owner 22/10/2026, for 1.2.0: the first run opens the Welcome window with a hotkey check, a microphone test and a choice of where model files are kept, and Esc keeps the defaults; after setup, show how to dictate ("Hold Right Ctrl and talk"). | Verify in build |
 | 18 | No message on an unsupported device | Store Policies 10.4.1 | No microphone: the pill shows "Mic error" and the README explains it; make sure first run says so plainly too. The package is x64 only; whether Windows on Arm runs it under emulation is **recalled, not verified** and untested. | Decide and test |
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |
@@ -433,6 +433,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 22/10/2026 | 1.1.2 (Submission 2) passed certification and is live in the Store (Partner Center overview: "Your product is now updated"; read 22/10/2026 03:54 AEDT). |
 | 22/10/2026 | Dictum 1.2.0 prepared (version bump, tester notes, listing text); all new wording is PROPOSED until the owner approves it. |
 | 22/10/2026 | 1.2.0 submitted (Submission 3, id 1152921505702194758) at about 09:00 AEDT; package Dictum-1.2.0-store.msix 240,077,036 bytes, SHA-256 7AF77EA8D5E695D4DA974E3CD4F0198BFB71575543F2702F96994B79B76A100F, v1.2.0.0 x64, validated with only the runFullTrust warning; 1.1.2 package removed on save; not marked mandatory; certification notes and What's new as in this file (owner approved 22/10/2026). |
+| 22/10/2026 | The owner approved every PROPOSED 1.2 string as a block (DECISIONS, "Owner approvals (22/10/2026)"). 1.2.1 (not yet built or submitted) changes the hold pill to "Recording · let go to finish"; screenshot 1 needs retaking with it. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The

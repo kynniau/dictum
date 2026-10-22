@@ -48,7 +48,7 @@ public class UiWindowTests
         var start = Environment.TickCount64;
         pill.Present(new PillState(PillView.RecordingHold, start));
         Assert.True(pill.IsVisible);
-        Assert.Equal("Recording · hold", pill.Text);
+        Assert.Equal("Recording · let go to finish", pill.Text); // owner decision 3, 22/10/2026
         pill.Present(new PillState(PillView.RecordingHandsFree, start));
         Assert.StartsWith("Hands-free 0:0", pill.Text);
         Assert.Contains(PillText.HandsFreeHint, Texts(pill));

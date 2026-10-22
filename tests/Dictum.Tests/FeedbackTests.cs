@@ -249,6 +249,22 @@ public class FeedbackTests
         shell.Dispose();
     });
 
+    /// <summary>
+    /// Pin (1.2.1 lens): with clean-up off, Send feedback says "Clean-up: no clean-up", as the header ("No clean-up") and Report
+    /// a problem do, never "off", which reads as Dictum being off.
+    /// </summary>
+    [Fact]
+    public Task The_cleanup_fact_says_no_clean_up_when_clean_up_is_off() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "llm": { "provider": "off" } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Assert.Equal("no clean-up", shell.FeedbackFacts().Cleanup);
+        Assert.EndsWith("\r\nClean-up: no clean-up", Uri.UnescapeDataString(SupportMail.FeedbackUri(shell.FeedbackFacts())), StringComparison.Ordinal);
+        Assert.Contains(" · No clean-up", shell.ModelsLine, StringComparison.Ordinal); // what Report a problem carries
+        shell.Dispose();
+    });
+
     [Fact]
     public void The_mic_help_answer_quotes_the_no_sound_message_from_the_same_constants()
     {

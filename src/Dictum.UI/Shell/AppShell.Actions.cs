@@ -70,7 +70,7 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (17/10/2026), for the product owner to approve: the question Settings > Storage > Delete asks, titled "Delete a
+    /// APPROVED 22/10/2026 copy (proposed 17/10/2026): the question Settings > Storage > Delete asks, titled "Delete a
     /// model", on the copy of a model in use when the same model is also further along the lookup (a base.en downloaded by 1.0.x,
     /// beside the one that comes with Dictum; <paramref name="otherFolder"/> is null for that one). The second sentence says what
     /// Dictum uses afterwards; for a copy in another of Dictum's folders it names that folder.
@@ -114,7 +114,7 @@ public sealed partial class AppShell
         : ModelCatalog.Find(model.Name) is { } speech && Models.Find(speech) is { } found && PathRegistry.SamePath(found, model.Path);
 
     /// <summary>
-    /// PROPOSED copy (17/10/2026), for the product owner to approve: what "Delete all app data" asks about a chosen models folder
+    /// APPROVED 22/10/2026 copy (proposed 17/10/2026): what "Delete all app data" asks about a chosen models folder
     /// outside the user's profile, which it leaves alone (lens, 17/10/2026: other users may load the models in it).
     /// </summary>
     internal static string LeftAlone(string folder) => $"Left alone: {folder} (outside your user folder, so other users may share its models; Delete beside a model removes one).";
@@ -171,7 +171,7 @@ public sealed partial class AppShell
         if (scope is RemovalScope.Logs or RemovalScope.AllData or RemovalScope.AllDataIncludingSettings) _fileLog?.Release();
         var result = plan.Execute();
         _modelFileChanges++;
-        // PROPOSED copy (17/10/2026), for the product owner to approve: "(in use or not permitted)" was "(in use)"; a file Windows refuses to delete counts too.
+        // APPROVED 22/10/2026 copy (proposed 17/10/2026): "(in use or not permitted)" was "(in use)"; a file Windows refuses to delete counts too.
         var message = $"Deleted {ModelCatalog.FormatSize(result.FreedBytes)}." + (result.Failures.Count > 0 ? $" {result.Failures.Count} item(s) could not be deleted (in use or not permitted); see the log." : "");
         foreach (var failure in result.Failures) _log.Warn($"Not deleted: {failure}");
         _log.Info($"Storage: {scope} {message}");
@@ -313,8 +313,8 @@ public sealed partial class AppShell
     }
 
     /// <summary>
-    /// PROPOSED copy (16/10/2026, fifth draft), not yet approved: the product owner reviews it before release. Pinned word for
-    /// word in CloudOffTakesEffectTests; do not reword it until that review. What Switch cloud clean-up off says when a file
+    /// APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft). Pinned word for
+    /// word in CloudOffTakesEffectTests; do not reword it. What Switch cloud clean-up off says when a file
     /// could not be changed: consent.json still there (<paramref name="consent"/>, why it could not be deleted), settings.json
     /// not saved (<paramref name="settings"/>), or both. Only the first says plain "off": settings.json was saved, or names no
     /// cloud service. The first, the one for both files and the variant for a server on this PC say what the files mean if the
@@ -382,6 +382,7 @@ public sealed partial class AppShell
         var cleanup = _settings.Llm.Provider switch
         {
             LlmSettings.NoProvider => "rule-based tidy",
+            LlmSettings.Off => "no clean-up", // as the header says it (owner decision 6), not "off" from the cloud arm
             // The same order as the header's clean-up label: loaded or loading, else failed, else not downloaded (rules until it is).
             LlmSettings.Local => _llm.Ready is not null || _llm.IsLoading ? $"{Models.CurrentCleanupName} on this PC"
                 : _llm.LastError is not null ? "rule-based tidy (the clean-up model could not be loaded)"

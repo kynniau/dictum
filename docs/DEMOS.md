@@ -205,7 +205,15 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   (`scripts\demos\dictation-stills.json`, kind `stills`). It is an illustration of the indicator, not a recording:
   no text is shown being typed. The headless frame has an opaque black background (no window transparency there),
   which the script keys out; the pill's shadow goes with it. The 1.2 stills were rendered by the 1.2 code (the script
-  run from a checkout of that build, `-Out` pointing here).
+  run from a checkout of that build, `-Out` pointing here). 1.2.1 changed the hold pill to "Recording · let go to
+  finish" (owner decision 3, 22/10/2026), so `dictation-stills` was re-rendered on branch `fix/1.2.1-copy`
+  (`scripts\demo-stills.ps1 -Out <folder>`, headless, no sandbox) and `site/img/demos/dictation-stills.gif` replaced;
+  the poster (the last slide, "Pasted 12 words") came out byte-identical and is unchanged. Whether a frame of any other demo shows the hold pill was not checked.
+- **Due for a retake on the 1.2.1 build (not re-recorded yet).** `change-model`, `help` and `test-setup`, with their
+  GIFs and posters in `site/img/demos/`, are 1.2.0 footage. Per the 1.2.1 lens (22/10/2026), they show the tray panel's
+  Light | Full switch and its Mode line, which the Simple view now hides (owner decision 5), and the state word "Ready"
+  beside "No microphone found", where 1.2.1 says "No microphone" (owner decision 4). Record them again from a 1.2.1
+  build; until then they show the 1.2.0 panel.
 - **No network.** SmartScreen cannot reach Microsoft, so the install demo shows "SmartScreen can't be reached right
   now" (Run / Don't run) where a real download shows "Windows protected your PC" (More info, then Run anyway). The data
   file has optional steps for both; only the offline one has been seen in the sandbox.
@@ -254,6 +262,11 @@ Setup built at 4abba54, SHA-256 `D12A9D96DCD5906DD70A7AADF023A87D91DAA0C62F79469
 `<name>.gif` and `<name>-poster.png` are committed; `<name>.mp4` is not, because the private-material guard
 (`.githooks/private-guard.sh`, and `.gitignore`) refuses every `.mp4` in the repository, with no exception. Where the
 videos are hosted is the product owner's decision.
+
+**`install` is retired from the site (22/10/2026, Site: Store-first in `docs/DECISIONS.md`).** Its GIF shows the
+direct download's Setup and the SmartScreen prompt, and the site now shows the Microsoft Store as the one install path,
+so `site/help.html` no longer plays it. `site/img/demos/install.gif` and `install-poster.png` stay in the repository for
+now. Re-record it as a Microsoft Store install when that is possible (the recording sandbox has no network: see Limitations).
 
 | Demo | File | Shows |
 |---|---|---|

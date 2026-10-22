@@ -29,6 +29,10 @@ public sealed class OfflineAndDownloadTests : IDisposable
         public Queue<HttpStatusCode> Statuses { get; } = new();
         public int WrongRangeOnRequest { get; init; } = -1; // answers 206 but from byte 0
         public (int Chunk, int DelayMs) Slow { get; init; } // delivers Chunk bytes per read, DelayMs apart
+        /// <summary>The clock the slow and stalled reads wait on; null is the system clock.</summary>
+        public TimeProvider? Clock { get; init; }
+        /// <summary>Released each time a slow or stalled read starts waiting, so a test advancing a fake clock knows when to.</summary>
+        public SemaphoreSlim? ReadPending { get; init; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -40,9 +44,9 @@ public sealed class OfflineAndDownloadTests : IDisposable
             var wrong = partial && Requests == WrongRangeOnRequest;
             var start = partial && !wrong ? (int)from!.Value : 0;
             var body = content[start..];
-            Stream stream = Requests <= StallFirst ? new StallingStream()
+            Stream stream = Requests <= StallFirst ? new StallingStream(ReadPending)
                 : Requests <= StallFirst + BreakFirst ? new BreakingStream(body, BreakAfter)
-                : Slow.Chunk > 0 ? new SlowStream(body, Slow.Chunk, Slow.DelayMs)
+                : Slow.Chunk > 0 ? new SlowStream(body, Slow.Chunk, Slow.DelayMs, Clock ?? TimeProvider.System, ReadPending)
                 : new MemoryStream(body);
             var response = new HttpResponseMessage(partial ? HttpStatusCode.PartialContent : HttpStatusCode.OK) { Content = new StreamContent(stream) };
             response.Content.Headers.ContentLength = body.Length;
@@ -52,11 +56,13 @@ public sealed class OfflineAndDownloadTests : IDisposable
     }
 
     /// <summary>A live but slow connection: a little data at a time, never pausing as long as the stall limit.</summary>
-    private sealed class SlowStream(byte[] data, int chunk, int delayMs) : MemoryStream(data)
+    private sealed class SlowStream(byte[] data, int chunk, int delayMs, TimeProvider clock, SemaphoreSlim? pending) : MemoryStream(data)
     {
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(delayMs, cancellationToken);
+            var delay = Task.Delay(TimeSpan.FromMilliseconds(delayMs), clock, cancellationToken); // armed before the signal, so an advance always finds it
+            pending?.Release();
+            await delay;
             var n = Read(buffer.Span[..Math.Min(chunk, buffer.Length)]);
             return n;
         }
@@ -66,10 +72,11 @@ public sealed class OfflineAndDownloadTests : IDisposable
     }
 
     /// <summary>A connection that never delivers a byte.</summary>
-    private sealed class StallingStream : MemoryStream
+    private sealed class StallingStream(SemaphoreSlim? pending) : MemoryStream
     {
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
+            pending?.Release();
             await Task.Delay(Timeout.Infinite, cancellationToken);
             return 0;
         }
@@ -220,16 +227,55 @@ public sealed class OfflineAndDownloadTests : IDisposable
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));
     }
 
+    /// <summary>
+    /// Lets a download run on a <see cref="FakeTimeProvider"/>: each time a read starts waiting, moves the clock on by
+    /// <paramref name="step"/>. Nothing here waits on real time; the 30 s bound only limits how long a hang takes to fail.
+    /// </summary>
+    private static async Task<int> DriveAsync(Task<int> download, FakeTimeProvider clock, SemaphoreSlim readPending, TimeSpan step)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        while (!download.IsCompleted)
+        {
+            var waiting = readPending.WaitAsync(TimeSpan.FromSeconds(30), ct);
+            if (await Task.WhenAny(waiting, download) != waiting) break;
+            Assert.True(await waiting, "the download never reached its next read");
+            clock.Advance(step);
+        }
+        return await download.WaitAsync(TimeSpan.FromSeconds(30), ct);
+    }
+
     [Fact]
     public async Task A_slow_but_live_connection_is_not_a_stall()
     {
         var (content, spec) = Sample();
-        var server = new FileServer(content) { Slow = (256 << 10, 40) }; // 12 reads 40 ms apart: 0.5 s in all, never 150 ms idle
+        var clock = new FakeTimeProvider();
+        var pending = new SemaphoreSlim(0);
+        // 13 reads (12 of 256 KiB, then the end of the file), each 40 ms of fake time after the last: 520 ms in all, never 150 ms idle.
+        var server = new FileServer(content) { Slow = (256 << 10, 40), Clock = clock, ReadPending = pending };
         var target = Path.Combine(_dir.FullName, "x.gguf");
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        Assert.Equal(1, await ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, NullLog.Instance,
-            Fast with { StallTimeout = TimeSpan.FromMilliseconds(150) }));
-        Assert.True(sw.Elapsed > TimeSpan.FromMilliseconds(150), $"took {sw.Elapsed}"); // longer than the stall limit overall
+        var started = clock.GetUtcNow();
+        var attempts = await DriveAsync(ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, NullLog.Instance,
+            Fast with { StallTimeout = TimeSpan.FromMilliseconds(150), Time = clock }), clock, pending, TimeSpan.FromMilliseconds(40));
+        Assert.Equal(1, attempts);
+        Assert.True(clock.GetUtcNow() - started > TimeSpan.FromMilliseconds(150), $"took {clock.GetUtcNow() - started}"); // longer than the stall limit overall
+        Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_connection_that_stops_sending_is_a_stall()
+    {
+        var (content, spec) = Sample();
+        var clock = new FakeTimeProvider();
+        var pending = new SemaphoreSlim(0);
+        var server = new FileServer(content) { StallFirst = 1, Clock = clock, ReadPending = pending };
+        var target = Path.Combine(_dir.FullName, "x.gguf");
+        var log = new RecordingLog();
+        // The first response never sends a byte. One advance past the 200 ms limit is all the stall needs; the retry then runs to the end.
+        var attempts = await DriveAsync(ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, log,
+            Fast with { StallTimeout = TimeSpan.FromMilliseconds(200), Time = clock }), clock, pending, TimeSpan.FromMilliseconds(201));
+        Assert.Equal(2, attempts); // one retry
+        Assert.Equal(2, server.Requests);
+        Assert.Contains("connection stalled: no data for 0.2 s", log.All);
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));
     }
 
@@ -282,7 +328,7 @@ public sealed class OfflineAndDownloadTests : IDisposable
         var target = Path.Combine(_dir.FullName, "x.gguf");
         var log = new RecordingLog();
         var attempts = await ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, log,
-            Fast with { StallTimeout = TimeSpan.FromMilliseconds(300) });
+            Fast with { StallTimeout = TimeSpan.FromMilliseconds(300) }).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken); // a broken timer fails at 30 s, not never
         Assert.Equal(2, attempts);
         Assert.Contains("connection stalled: no data for 0.3 s", log.All);
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));

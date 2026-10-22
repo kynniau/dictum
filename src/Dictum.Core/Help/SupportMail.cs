@@ -17,10 +17,10 @@ public static class SupportMail
     /// <summary>The support address: the only copy in code. AppShell.SupportEmail is an alias of it and HelpText names it directly.</summary>
     public const string Address = "hello@kynni.com.au";
 
-    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): do not reword.</summary>
     public const string FeedbackSubject = "Dictum feedback";
 
-    /// <summary>PROPOSED copy (21/10/2026), awaiting the product owner's review: do not reword. Line breaks are CRLF, as RFC 6068 asks of a mailto body.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): do not reword. Line breaks are CRLF, as RFC 6068 asks of a mailto body.</summary>
     public const string FeedbackIntro = "What I'd like to say:\r\n\r\n\r\n(You can delete the lines below. They help us understand your setup.)";
 
     /// <summary>
