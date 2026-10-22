@@ -252,8 +252,7 @@ public sealed class TranscriptCleaner
         return settings.Provider switch
         {
             LlmSettings.Anthropic => "offline_only is on: the anthropic provider is refused (it would send transcripts to a cloud API)",
-            LlmSettings.OpenAiCompatible when settings.BaseUrl is { } u && !new Uri(u).IsLoopback =>
-                $"offline_only is on: the openai-compatible provider at {new Uri(u).Host} is refused (only a server on this machine is allowed)",
+            LlmSettings.OpenAiCompatible => CloudPolicy.OfflineRefusal("the openai-compatible provider", settings.BaseUrl, offlineOnly),
             _ => null,
         };
     }

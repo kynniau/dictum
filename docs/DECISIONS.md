@@ -4148,3 +4148,67 @@ Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOS
    - **Landing page wording.** The landing page's "No account, no cloud, no telemetry" and its meta and og descriptions now name opt-in cloud clean-up.
    - **FAQ styles.** These now apply only to the FAQ's own items, so the demo player inside an answer is not styled as one.
    - **Demo players.** Each is named "Demo: <title>", and the poster alt text says "a still from the demo".
+
+## Cloud speech, Core (22/10/2026)
+
+Branch `feat/cloud-speech-core` from origin/main 049b73a. Owner decision 22/10/2026 (10:31): cloud speech is approved behind
+its own express consent, and local speech stays the default. This is the Core lane of the three in the design brief's
+"Cloud speech" appendix (Core, UI, Copy): no window, no site and no Store copy change here. The speech consent text and its
+two buttons are APPROVED (owner, 22/10/2026, 10:50 AEDT); every other new user-facing string is PROPOSED (item 10).
+
+1. **Settings (`speech.*`).** `provider` (`local`, the default, or `openai-compatible`), `base_url` (clean-up's rule: plain
+   `http://` only on this PC), `model` (required; for Azure OpenAI the deployment name), `timeout_ms` (1000-120000).
+   `whisper.*` stays the local engine's. No key can grant consent; an unknown key such as `speech.consent` warns.
+   `timeout_ms` defaults to 30000, which is not measured: it carries a `simplification:` comment and is to be set from a
+   measured round trip (the demo screen) before cloud speech ships.
+2. **Keys.** `CloudPresets.ForAddress`'s address rule is now `CloudPresets.Match`, shared by the clean-up presets and the new
+   `SpeechPresets`; a preset may carry a `HostSuffix` (Azure OpenAI: any `https://` host ending `.openai.azure.com`).
+   `OPENAI_API_KEY` goes to `api.openai.com`, new `AZURE_OPENAI_API_KEY` to Azure OpenAI hosts, new `GROQ_API_KEY` to
+   `api.groq.com` (each required there), new `SPEECH_API_KEY` to any other address (optional). The three new names are in
+   `SecretStore.KeyNames`, so the log redactor and the self-test cover them. No default model id is filled in: the ids in
+   the brief came from a page summary it says to re-read first.
+3. **Consent file.** `consent.json` is now `{ "cleanup": {...}, "speech": {...} }`, each the existing record (provider,
+   host, time, app version). The earlier single-record file reads as a clean-up consent and never as a speech consent.
+   Every write uses the new shape (`Write` keeps a speech entry, `WriteSpeech` keeps a clean-up entry, `WithdrawSpeech`
+   removes only the speech entry and deletes the file when nothing is left). `Delete` still withdraws everything, which is
+   what Switch cloud clean-up off calls today; the UI lane narrows that once a speech consent can exist. An earlier Dictum
+   reading a new-shape file finds no top-level record, so no consent (it fails closed).
+4. **The gate** (`CloudSpeech.Create`, at every settings load, in this order): `local` gives the local model; `base_url` or
+   `model` unset, nothing sent; `offline_only` with a host off this PC, refused (`CloudPolicy.OfflineRefusal`, now one rule
+   and one wording for clean-up and speech); plain `http://` off this PC, refused (`CloudPolicy.PlainHttpRefusal`, shared
+   likewise); no speech consent naming this exact host, nothing sent; `whisper.translate` on, refused (v1; the owner's open
+   question was refuse or route to the local model, and the brief chose refuse); the key the address needs missing, nothing
+   sent and `MissingKey` set. Each logs one line and leaves a status. Unlike clean-up, a server on this PC still needs the
+   speech consent: the audio leaves Dictum either way.
+5. **The request.** One multipart POST per recording (per part in hands-free) to `{base_url}/audio/transcriptions`: `file`
+   (16 kHz mono 16-bit WAV built in memory by `Wav.Encode`, now also what calibration's `Save` writes), `model`, `language`
+   from `whisper.language` (left out for `auto`), `prompt` (the dictionary terms, then a part's carried words, exactly as
+   `DecodeOptions.WithCarried` gives whisper), `response_format=json`; the reply's `text` is tidied by
+   `TranscriptText.Normalise`. `Authorization: Bearer` with the key the address decides. The `HttpClient` is the shell's
+   offline-guarded provider client (no redirects), so `OfflineGuardHandler` is still the backstop.
+6. **Failure is never silent.** An HTTP error, the deadline, an empty or non-JSON reply, the offline guard, or a settings
+   reload: the local model hears the same samples, the log says "Cloud speech via {host} not used, the local model heard
+   this dictation instead: {reason}." (status code and host, never audio, text or key), and `Status` says the last request
+   failed until the next success. Esc propagates and pastes nothing. A reload retires the old provider: its request is
+   cancelled and it starts no other. The local model stays loaded as before (`ModelManager` is unchanged); with none
+   installed, a failed request fails the dictation as a missing model does today.
+7. **Wiring.** The pipeline's one transcriber seam now asks `CloudSpeech.GetAsync` (`AppShell.cs`), rebuilt in
+   `LoadConfiguration` beside the cleaner; the "Settings loaded" log line and the self-test gain a speech status. The cloud
+   engine does not wait for the local model; it asks for it only when a request fails.
+8. **Network sweep.** The Help page's sweep (`HelpPageTests.The_page_reaches_the_network_only_through_the_platform_seam`)
+   covers that page only; Core had no sweep, so `CloudSpeechTests.Only_the_known_clients_make_network_requests` pins the
+   files that make HTTP requests, with `CloudSpeechEngine.cs` the one new entry.
+9. **For the UI lane.** The consent dialog shows `SpeechPolicy.ConsentText`, `AgreeButton` and `DeclineButton` and records
+   with `CloudConsentFile.WriteSpeech`; switching off calls `WithdrawSpeech`. `CloudSpeech.Status`, `SendsAudio`, `Host`
+   and `MissingKey` feed Settings > Models, Privacy, About and the tray; `SpeechStatus.FallbackPill` is the pill after a
+   failed request. There is no change event yet: after a failed request the status changes without telling the UI.
+10. **Approved and PROPOSED strings.** APPROVED 22/10/2026 (owner, 10:50 AEDT), verbatim from the brief's §3, with `{host}`
+    and `{VAR}` filled in; marked "do not reword" and pinned byte for byte in `CloudSpeechTests`: `SpeechPolicy.ConsentText`,
+    `AgreeButton` ("Send my voice to {host}") and `DeclineButton` ("Keep speech on this PC"). PROPOSED, awaiting the owner:
+    `SpeechStatus.Local`, `On`, `Failed`, `NotAgreed`, `TranslateRefused`, `NothingSent`, `FallbackPill`;
+    the log lines in items 4 and 6; the `speech` entry in the default settings.json's `_doc`. `SpeechStatus.WaitingForKey`
+    and `OfflineOnly` reuse clean-up's approved lines word for word.
+11. **Not verified.** No request was made to any real service. That Azure OpenAI and Groq accept the key as
+    `Authorization: Bearer` on `/audio/transcriptions` (the brief: Azure's REST reference lists the key in the
+    `authorization` header; Groq's header is Recalled); that `gpt-transcribe` takes `language` (the brief's table says it
+    takes `languages`) and `prompt`; any latency or cost figure.

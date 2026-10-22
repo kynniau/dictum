@@ -40,6 +40,7 @@ public sealed partial class AppShell : IDisposable
     private readonly Func<bool> _gpuMachine;
     private volatile AppSettings _settings = new();
     private volatile TranscriptCleaner _cleaner = TranscriptCleaner.RulesOnly("not configured yet");
+    private volatile CloudSpeech _speech; // the speech step: the local model, or cloud speech with the local model as its fallback
     private IClassicDesktopStyleApplicationLifetime? _lifetime;
     private ITrayHost? _tray;
     private OverlayPresenter? _overlays;
@@ -82,7 +83,8 @@ public sealed partial class AppShell : IDisposable
         Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, _settings));
         _llm = cleanupModels ?? new LocalLlmManager(log, Integrity);
         _models = speechModels ?? new ModelManager(log, Integrity);
-        Models = new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
+        _speech = CloudSpeech.Local(_models.GetAsync); // until the settings load builds the configured one (LoadConfiguration)
+        Models =new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
             reload: () => Reload(userRequested: false), shutdown: Quit, refreshTooltip: StatusChanged,
             balloon: (text, warning) => Notify("Dictum", text, warning), integrity: Integrity, gpuMachine: gpuMachine);
         Personal = new PersonalService(paths, log, () => _settings, Models, reload: () => Reload(userRequested: false), _gpuMachine);
@@ -174,7 +176,7 @@ public sealed partial class AppShell : IDisposable
         _tray = Platform.CreateTray(point => Dispatcher.UIThread.Post(() => ToggleFlyout(point)), _log);
 
         var machine = new DictationStateMachine(AppRules.Options(_settings), _settings.Enabled);
-        var pipeline = new DictationPipeline(_models.GetAsync, () => _cleaner, InsertAsync, () => _settings, _log, Personal.Finish, RememberPasted,
+        var pipeline = new DictationPipeline(token => _speech.GetAsync(token), () => _cleaner, InsertAsync, () => _settings, _log, Personal.Finish, RememberPasted,
             names: () => Personal.Text.Dictionary.Terms);
         _controller = new DictationController(machine, _capture, pipeline, new UiBridge(this), () => _settings, _log, hotkeyBlocked: () => !_models.IsReady,
             microphoneListed: () => Platform.ListCaptureDevices().Count > 0);

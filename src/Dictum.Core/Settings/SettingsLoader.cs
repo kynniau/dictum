@@ -97,6 +97,7 @@ public static class SettingsLoader
             SilenceThreshold = r.Double("silence_threshold", d.SilenceThreshold, 0, 1),
             Audio = BindAudio(r.Child("audio")),
             Whisper = BindWhisper(r.Child("whisper")),
+            Speech = BindSpeech(r.Child("speech")),
             Models = BindModels(r.Child("models")),
             Llm = BindLlm(r.Child("llm")),
             Insert = BindInsert(r.Child("insert")),
@@ -224,6 +225,25 @@ public static class SettingsLoader
             Threads = r.Int("threads", d.Threads, 0, 64),
             Gpu = r.String("gpu", d.Gpu, OneOf("auto", "vulkan", "cpu")).ToLowerInvariant(),
             BeamSize = r.Int("beam_size", d.BeamSize, 0, 8),
+        };
+        r.WarnUnknown();
+        return s;
+    }
+
+    /// <summary>
+    /// speech.* (cloud speech, 22/10/2026). base_url has clean-up's rule (https:// off this PC). Like llm.cloud_consent, no key
+    /// here can grant consent: cloud speech runs only after its own consent step, which records it in consent.json.
+    /// </summary>
+    private static SpeechSettings BindSpeech(ObjectReader? r)
+    {
+        var d = new SpeechSettings();
+        if (r is null) return d;
+        var s = new SpeechSettings
+        {
+            Provider = r.String("provider", d.Provider, OneOf(SpeechSettings.Local, SpeechSettings.OpenAiCompatible)).ToLowerInvariant(),
+            BaseUrl = r.NullableString("base_url", BaseUrlProblem),
+            Model = r.NullableString("model"),
+            TimeoutMs = r.Int("timeout_ms", d.TimeoutMs, 1000, 120000),
         };
         r.WarnUnknown();
         return s;

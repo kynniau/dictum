@@ -9,7 +9,12 @@ namespace Dictum.Llm;
 /// <param name="KeyVariable">The .env variable whose key goes to this preset's server and to no other; null: no key is ever sent there.</param>
 /// <param name="KeyRequired">True: without that key nothing is sent (the rule-based tidy is used); false: the key goes only when it is set.</param>
 /// <param name="ModelHint">The Model field's hint when there is no default model.</param>
-public sealed record CloudPreset(string Name, string? BaseUrl, string? DefaultModel, string? KeyVariable, bool KeyRequired, string? ModelHint = null)
+/// <param name="HostSuffix">
+/// For a service whose address has the customer's own name in it (Azure OpenAI's {resource}.openai.azure.com): any https://
+/// address whose host ends with this is the preset's server. Null: <paramref name="BaseUrl"/>'s host and port decide.
+/// </param>
+public sealed record CloudPreset(string Name, string? BaseUrl, string? DefaultModel, string? KeyVariable, bool KeyRequired, string? ModelHint = null,
+    string? HostSuffix = null)
 {
     /// <summary>Every preset runs on the existing <see cref="OpenAiCompatibleLlmClient"/>.</summary>
     public string Provider => LlmSettings.OpenAiCompatible;
@@ -76,11 +81,20 @@ public static class CloudPresets
     /// <see cref="Custom"/>. Which key goes with each request is read from the result, so a preset's key only ever goes to
     /// that preset's server, and Ollama on this PC gets none however its address is written.
     /// </summary>
-    public static CloudPreset ForAddress(string? baseUrl) =>
+    public static CloudPreset ForAddress(string? baseUrl) => Match(All, Custom, baseUrl);
+
+    /// <summary>
+    /// The one address rule for every preset list (clean-up here, cloud speech in SpeechPresets): the preset whose server
+    /// <paramref name="baseUrl"/> names, else <paramref name="custom"/>. A preset with a <see cref="CloudPreset.HostSuffix"/>
+    /// matches any https:// host ending with it; the others match their own host and port, with localhost, 127.0.0.1 and ::1 one host.
+    /// </summary>
+    public static CloudPreset Match(IEnumerable<CloudPreset> presets, CloudPreset custom, string? baseUrl) =>
         Uri.TryCreate(baseUrl?.Trim(), UriKind.Absolute, out var address)
-            ? All.FirstOrDefault(p => Uri.TryCreate(p.BaseUrl, UriKind.Absolute, out var own) && own.Port == address.Port
-                                      && (string.Equals(own.Host, address.Host, StringComparison.OrdinalIgnoreCase) || (own.IsLoopback && address.IsLoopback))) ?? Custom
-            : Custom;
+            ? presets.FirstOrDefault(p => p.HostSuffix is { } suffix
+                    ? address.Scheme == Uri.UriSchemeHttps && address.Host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+                    : Uri.TryCreate(p.BaseUrl, UriKind.Absolute, out var own) && own.Port == address.Port
+                      && (string.Equals(own.Host, address.Host, StringComparison.OrdinalIgnoreCase) || (own.IsLoopback && address.IsLoopback))) ?? custom
+            : custom;
 
     /// <summary>True while <paramref name="address"/> is still the preset's own (ignoring spaces and a final slash), not one typed over it.</summary>
     public static bool IsPresetAddress(CloudPreset preset, string? address) =>

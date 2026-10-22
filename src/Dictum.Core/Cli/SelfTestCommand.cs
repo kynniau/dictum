@@ -132,6 +132,9 @@ public static partial class SelfTestCommand
         {
             Line("cleanup", TranscriptCleaner.Create(settings.Llm, settings.OfflineOnly, secrets, http, log, () => local,
                 englishText: WhisperLanguages.OutputIsEnglish(whisper.Language, whisper.Translate)).Status);
+            // Building it sends nothing: the self-test reports whether cloud speech would run, and why not.
+            Line("speech", CloudSpeech.Create(settings.Speech, new DecodeOptions(null, whisper.BeamSize, whisper.Language, whisper.Translate), settings.OfflineOnly,
+                secrets, http, log, _ => throw new InvalidOperationException("the self-test transcribes nothing")).Status);
         }
         var (recommendedCleanup, cleanupWhy) = CleanupCatalog.Recommend(WhisperEngine.GpuMachine);
         Line("recommended cleanup", $"{recommendedCleanup} ({cleanupWhy})");

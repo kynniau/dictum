@@ -1411,3 +1411,28 @@ counted) and moved inside it, so on that screen the body scrolls, under a scroll
 never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
 
 Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.
+
+## 28. Cloud speech, Core (amendment, 22/10/2026)
+
+Owner decision 22/10/2026: cloud speech is approved behind its own express consent; the speech model on this PC stays the
+default and is always loaded as the fallback. This section is the Core half (settings, consent record, gate, request,
+fallback); the windows and the public copy follow in later lanes. Decisions and hand-offs: DECISIONS, "Cloud speech, Core".
+
+- **Settings.** `speech.provider` = `local` (default) | `openai-compatible`; `speech.base_url` (required for
+  openai-compatible; plain `http://` only on this PC); `speech.model` (required; the Azure OpenAI deployment name);
+  `speech.timeout_ms` (1000-120000, default 30000, not yet measured). Keys: `OPENAI_API_KEY` to `api.openai.com`,
+  `AZURE_OPENAI_API_KEY` to hosts ending `.openai.azure.com`, `GROQ_API_KEY` to `api.groq.com` (each required there),
+  `SPEECH_API_KEY` to any other address (optional). A preset's key goes to its own host only.
+- **Consent.** `consent.json` holds a `cleanup` entry and a `speech` entry. Only the speech consent step writes the speech
+  entry; settings.json cannot. The earlier single-record file is a clean-up consent and never a speech consent. Cloud
+  speech runs only while the speech entry names the exact host in `speech.base_url`, a server on this PC included.
+- **Refusals** (the local model hears every recording, with a logged reason and a status): base_url or model unset;
+  `offline_only` with a host off this PC (clean-up's rule); plain `http://` off this PC; no speech consent for this host;
+  `whisper.translate` on (v1: the transcriptions endpoint does not translate); the key the address needs missing.
+- **Request.** One multipart POST per recording, and per part in hands-free, to `{base_url}/audio/transcriptions`:
+  `file` (16 kHz mono 16-bit WAV, built in memory, never written to disk), `model`, `language` (from `whisper.language`;
+  none for `auto`), `prompt` (the dictionary terms whisper gets, then a part's carried words), `response_format=json`. The
+  reply's `text` is tidied as whisper's own output is. The client is the offline-guarded provider client.
+- **Failure.** An HTTP error, the deadline, an empty or unreadable reply, the offline guard or a settings reload: the local
+  model hears the same samples; the log names the reason (status and host, never audio, text or key); the status says the
+  last request failed until the next success. Esc pastes nothing. A settings reload cancels a request under way.

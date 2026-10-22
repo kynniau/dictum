@@ -611,6 +611,9 @@ public class CloudWarningAndPresetsTests
                 ("OPENAI_API_KEY", "present (config-folder .env)", null),
                 ("GEMINI_API_KEY", "present (exe-folder .env)", null),
                 ("LLM_API_KEY", "absent", null),
+                ("AZURE_OPENAI_API_KEY", "absent", null), // cloud speech's keys (22/10/2026)
+                ("GROQ_API_KEY", "absent", null),
+                ("SPEECH_API_KEY", "absent", null),
             },
             lines);
     }

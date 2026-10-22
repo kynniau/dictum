@@ -43,7 +43,13 @@ public sealed partial class AppShell
         // settings. The local model sends nothing, so its clean-up under way finishes (a dictionary word, a finished download).
         if (outgoing.SendsText) outgoing.Retire();
         _llm.SetPrompt(_cleaner.SystemPrompt); // a loaded model re-evaluates a changed prompt now, not during the next dictation
-        _models.SetDecoding(new DecodeOptions(personal.Dictionary.WhisperPrompt, _settings.Whisper.BeamSize, _settings.Whisper.Language, _settings.Whisper.Translate));
+        var decode = new DecodeOptions(personal.Dictionary.WhisperPrompt, _settings.Whisper.BeamSize, _settings.Whisper.Language, _settings.Whisper.Translate);
+        _models.SetDecoding(decode);
+        // Cloud speech (speech.*) sends what the local decoder gets; a request the old one still has under way is cancelled
+        // and heard on this PC instead, so nothing more goes out on settings the pages no longer show.
+        var outgoingSpeech = _speech;
+        _speech = CloudSpeech.Create(_settings.Speech, decode, _settings.OfflineOnly, config.Secrets, _http, _log, _models.GetAsync);
+        outgoingSpeech.Retire();
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)
         {
             _offlineWarned = refusal; // once per distinct refusal
@@ -54,7 +60,7 @@ public sealed partial class AppShell
             _redirectWarned = _settings.Llm.BaseUrl; // once per URL, not on every reload
             Dispatcher.UIThread.Post(() => Notify("Dictum", $"Anthropic requests will go to {new Uri(_settings.Llm.BaseUrl!).Host} (llm.base_url).", warning: true));
         }
-        _log.Info($"{(isReload ? "Settings reloaded" : "Settings loaded")}: hotkey {_settings.Hotkey}, model {_settings.Whisper.Model}, insert {_settings.Insert.Method}, cleanup {_cleaner.Status}.");
+        _log.Info($"{(isReload ? "Settings reloaded" : "Settings loaded")}: hotkey {_settings.Hotkey}, model {_settings.Whisper.Model}, insert {_settings.Insert.Method}, cleanup {_cleaner.Status}, speech {_speech.Status.TrimEnd('.')}.");
     }
 
     /// <summary>
