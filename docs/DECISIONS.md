@@ -5540,3 +5540,8 @@ unless marked:
   hotkey, transcribed, and pasted the text into another app. That covers the launch, the two permission dialogs, the event
   tap, the hotkey and Cmd-V paste end to end. Not yet exercised by the owner: the login item, removal, the owned dialogs,
   and whether the launch was from the quarantined zip copy (the Gatekeeper first-open dialog) or from dist/Dictum.app.
+- Mac copy APPROVED by the owner (23/10/2026 06:2x AEDT, "approved both"): the release-notes paragraph in
+  packaging/release-notes-mac.md and the install paragraph in src/Dictum.Mac/README.md. The PROPOSED label is gone from
+  both and the packaging test now pins it absent (observed failing against the labelled file before the file changed).
+  Still PROPOSED, not covered by that approval: the `NSMicrophoneUsageDescription` sentence (M2 above) and the Right Option
+  default hotkey (decision d). The public README stays silent about the Mac until the beta ships.
