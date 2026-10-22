@@ -9,8 +9,9 @@ namespace Dictum.UI.Views.Settings;
 /// The model folder's two actions, shared by Settings > Models (Browse…, Use default) and Settings > Storage (Change…, Use default):
 /// one chooser seam and one write, so the two pages cannot drift apart. Both write models.folder through
 /// <see cref="ModelCoordinator.SetModelsFolder"/>, which refuses the bundled folder and reloads the settings. Since 1.3 (owner
-/// approval 22/10/2026) a change away from a folder that holds model files Dictum knows first offers to move them
-/// (<see cref="ModelMover"/>); leaving them is the earlier behaviour, and no file moves without the user's choice.
+/// approval 22/10/2026; Use default too, owner decision 22/10/2026 21:45 AEDT) a change away from a folder that holds model
+/// files Dictum knows first offers to move them (<see cref="ModelMover"/>); leaving them is the earlier behaviour, and no file
+/// moves without the user's choice.
 /// </summary>
 internal static class ModelFolderActions
 {
@@ -20,7 +21,7 @@ internal static class ModelFolderActions
     // PROPOSED 22/10/2026 copy (1.3, move-on-change): the offer, its buttons, the refusals and the progress and result lines.
     internal const string MoveTitle = "Move your model files?";
     internal const string MoveLabel = "Move the files";
-    internal const string LeaveLabel = "Leave them where they are";
+    internal const string LeaveLabel = "Leave them where they are"; // the default button (orchestrator, lens on PR #61): Enter never starts a long move
     internal const string DownloadRunning = "A download is running; wait for it to finish, then change the folder again to move the files.";
     internal const string NestedRefused = "One of these folders is inside the other, so Dictum does not move the files. Choose a folder outside the current one.";
 
@@ -29,15 +30,26 @@ internal static class ModelFolderActions
         $"Your model files are in {from}. Move them to {to} so Dictum finds them there? {Files(count)}, {ModelCatalog.FormatSize(bytes)}. " +
         "Dictum copies each file, checks it, then removes the original.";
 
-    /// <summary>PROPOSED 22/10/2026: the progress line while a file moves.</summary>
-    internal static string Moving(string fileName, int index, int count) => $"Moving {fileName} ({index} of {count})…";
+    /// <summary>PROPOSED 22/10/2026: the progress line while a file moves, by its catalogue name (<see cref="ModelMover.DisplayName"/>).</summary>
+    internal static string Moving(string name, int index, int count) => $"Moving {name} ({index} of {count})…";
 
     /// <summary>PROPOSED 22/10/2026: every file moved.</summary>
     internal static string Moved(int count, string to) => $"Moved {Files(count)} to {to}.";
 
-    /// <summary>PROPOSED 22/10/2026: the move stopped at <paramref name="fileName"/>; it and the files after it are still in <paramref name="from"/>.</summary>
-    internal static string MovedSome(int moved, int count, string fileName, string reason, string from) =>
-        $"Moved {moved} of {count}; {fileName} could not be moved: {reason}. The rest stay in {from}.";
+    /// <summary>PROPOSED 22/10/2026: <paramref name="name"/> is the first file that met a problem; the files not moved are still in <paramref name="from"/>.</summary>
+    internal static string MovedSome(int moved, int count, string name, string reason, string from) =>
+        $"Moved {moved} of {count}; {name} could not be moved: {reason}. The rest stay in {from}.";
+
+    /// <summary>PROPOSED 22/10/2026: added when more than one file met a problem.</summary>
+    internal static string MoreProblems(int more) => more == 1 ? " 1 other file could not be moved either; the log says why." : $" {more} other files could not be moved either; the log says why.";
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (lens on PR #61): added when a model in use stayed behind (or the move was stopped), so the folder
+    /// was not changed: dictation goes on with the models where they are.
+    /// </summary>
+    internal static string FolderKept(string from, string to, bool someMoved) => someMoved
+        ? $" The model folder is still {from}, because the model in use did not move; the files that did are in {to}; choose that folder again to use them."
+        : $" The model folder is still {from}, because the model in use did not move.";
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
@@ -47,7 +59,7 @@ internal static class ModelFolderActions
     /// </summary>
     internal static Task BrowseFolder(AppShell shell, Action<string> say, Action? then = null)
     {
-        if (shell.MovingModels) return Task.CompletedTask; // the progress line is showing; one move at a time
+        if (shell.Models.MovingFiles) return Task.CompletedTask; // the progress line is showing; one move at a time
         if (shell.Dialogs.ChooseFolder(shell.ModelsDir) is not { } folder) return Task.CompletedTask;
         return ChangeFolderAsync(shell, folder, say, then);
     }
@@ -57,15 +69,15 @@ internal static class ModelFolderActions
     /// 22/10/2026 21:45 AEDT: all three ways of changing the folder behave alike).
     /// </summary>
     internal static Task UseDefaultFolder(AppShell shell, Action<string> say, Action? then = null) =>
-        shell.MovingModels ? Task.CompletedTask : ChangeFolderAsync(shell, null, say, then);
+        shell.Models.MovingFiles ? Task.CompletedTask : ChangeFolderAsync(shell, null, say, then);
 
     /// <summary>
-    /// Changes the model folder to <paramref name="folder"/> (null: the per-user default; Browse…, Change… and Use default). When the folder Dictum is leaving holds
-    /// model files it knows (<see cref="ModelMover.Known"/>), asks first: "Leave them where they are" writes the folder as before;
-    /// "Move the files" is refused while a download runs or when one folder is inside the other, otherwise releases both engines,
-    /// moves the files (copy, check, rename, then delete the original), then writes the folder and reloads, so the models load
-    /// from the new folder. Closing the question changes nothing. Runs synchronously up to the move, so a change with nothing
-    /// to move is done when this returns.
+    /// Changes the model folder to <paramref name="folder"/> (null: the per-user default; Browse…, Change… and Use default). When
+    /// the folder Dictum is leaving holds model files it knows (<see cref="ModelMover.Known"/>), asks first: "Leave them where
+    /// they are" writes the folder as before; "Move the files" is refused while a download runs or when one folder is inside the
+    /// other, otherwise marks the move (<see cref="ModelCoordinator.MovingFiles"/>), releases both engines, moves the files (the
+    /// models in use last), then writes the folder unless a model in use stayed behind, and reloads. Closing the question changes
+    /// nothing. Runs synchronously up to the move, so a change with nothing to move is done when this returns.
     /// </summary>
     internal static async Task ChangeFolderAsync(AppShell shell, string? folder, Action<string> say, Action? then = null)
     {
@@ -100,7 +112,7 @@ internal static class ModelFolderActions
             return;
         }
         var choice = shell.Dialogs.Ask(MoveTitle, MoveQuestion(shell.RealPath(from), shell.RealPath(to), files.Count, files.Sum(f => f.Bytes)),
-            new DialogChoice(MoveLabel, IsDefault: true), new DialogChoice(LeaveLabel));
+            new DialogChoice(MoveLabel), new DialogChoice(LeaveLabel, IsDefault: true));
         if (choice == 1)
         {
             say(shell.Models.SetModelsFolder(folder) ?? ""); // the approved "Changing it does not move any files." stays true here
@@ -118,32 +130,42 @@ internal static class ModelFolderActions
             say(NestedRefused);
             return;
         }
-        shell.MovingModels = true;
+        var inUse = shell.ModelFilesInUse(); // before the release, which forgets them
+        shell.Models.MovingFiles = true; // downloads and deletions refused, and no model loads, until the reload below
+        using var cancel = new CancellationTokenSource();
+        shell.MoveCancel = cancel;
         var finished = false; // a progress report posted before the end must not overwrite the result line
         try
         {
-            await shell.ReleaseModelsAsync(); // before the first copy: a loaded clean-up model holds its file open
+            await shell.ReleaseModelsAsync(); // before the first copy: an engine holds its model file open
             var progress = new Progress<MoveStep>(step =>
             {
-                if (!finished) say(Moving(step.FileName, step.Index, step.Count));
+                if (!finished) say(Moving(ModelMover.DisplayName(step.FileName), step.Index, step.Count));
             });
-            var result = await ModelMover.MoveAsync(files, to, shell.Integrity, progress, shell.MoveHasher);
-            shell.Log.Info(result.Complete
-                ? $"Moved {result.Count} model file(s) from {from} to {to}."
-                : $"Moved {result.Moved} of {result.Count} model file(s) from {from} to {to}; {result.FailedFile} was not moved: {result.Reason}");
-            // Written after the move, not before: the settings watcher's reload would otherwise load a model mid-move.
-            var written = shell.Models.SetModelsFolder(folder, reloadAfter: false);
+            var result = await ModelMover.MoveAsync(files, to, shell.Integrity, progress, shell.MoveHasher, inUse, cancellationToken: cancel.Token);
+            shell.Log.Info($"Moved {result.Moved} of {result.Count} model file(s) from {from} to {to}{(result.Cancelled ? " (stopped: quitting)" : "")}." +
+                string.Concat(result.Problems.Select(p => $" {p.FileName}: {p.Reason}.")));
+            // A model in use left in the old folder would not be found once the folder changes: then the folder stays as it is.
+            var kept = result.Cancelled || result.LeftBehind.Any(left => inUse.Any(used => PathRegistry.SamePath(used, left)));
+            // Written after the move, not before: the settings watcher's reload would otherwise reload the models mid-move.
+            var written = kept ? null : shell.Models.SetModelsFolder(folder, reloadAfter: false);
             finished = true;
-            var line = result.Complete
+            var line = result.Problems.Count == 0 && result.Moved == result.Count
                 ? Moved(result.Count, shell.RealPath(to))
-                : MovedSome(result.Moved, result.Count, result.FailedFile!, result.Reason!, shell.RealPath(from));
+                : result.Problems.Count == 0
+                    ? $"Moved {result.Moved} of {result.Count}."
+                    : MovedSome(result.Moved, result.Count, ModelMover.DisplayName(result.Problems[0].FileName), result.Problems[0].Reason, shell.RealPath(from)) +
+                      (result.Problems.Count > 1 ? MoreProblems(result.Problems.Count - 1) : "");
+            if (kept) line += FolderKept(shell.RealPath(from), shell.RealPath(to), result.Moved > 0);
             say(written is null ? line : $"{line} {written}");
         }
         finally
         {
             finished = true;
-            shell.MovingModels = false;
-            shell.Reload(userRequested: false); // the models load again: from the new folder, or from where they still are
+            shell.MoveCancel = null;
+            shell.Models.MovingFiles = false;
+            // The models load again, from the new folder or from where they still are; or Dictum quits if Quit was asked meanwhile.
+            if (!shell.QuitIfAskedDuringMove()) shell.Reload(userRequested: false);
         }
     }
 }

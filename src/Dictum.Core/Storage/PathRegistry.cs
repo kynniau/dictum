@@ -116,8 +116,11 @@ public static class PathRegistry
     public static bool IsInside(string path, string folder)
     {
         var full = Path.GetFullPath(path);
-        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
-        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        // A drive root keeps its separator through TrimEndingDirectorySeparator ("D:\"), so one is added only when missing
+        // (lens on PR #61: "D:\Models" was not inside "D:\" because the root became "D:\\").
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        if (!Path.EndsInDirectorySeparator(root)) root += Path.DirectorySeparatorChar;
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && full.Length > root.Length;
     }
 
     /// <summary>

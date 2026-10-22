@@ -28,6 +28,7 @@ public sealed partial class AppShell
     /// </summary>
     public async Task<string> DeleteModelAsync(StoredModel model)
     {
+        if (Models.MovingFiles) return ModelCoordinator.MovingRefusal; // the file may be the one being copied (lens on PR #61)
         var inUse = ModelsInUse().Any(p => p is not null && PathRegistry.SamePath(p, model.Partial ? model.Path[..^5] : model.Path));
         string? released = null; // the copy in use that is deleted after its model is released: the reload then finds the next copy
         if (inUse && NextCopy(model) is { } next)

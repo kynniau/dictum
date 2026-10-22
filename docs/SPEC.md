@@ -1212,13 +1212,18 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   on both go through one handler (`ModelFolderActions`) and behave alike (owner decision 22/10/2026 21:45 AEDT: Use default
   moves the files back to the per-user folder). When the folder in use holds model files Dictum
   knows (catalogue files and their `.part` downloads, in that folder itself), it asks once: **Move the files** or **Leave them
-  where they are** (the earlier behaviour; closing the question changes nothing). Moving is refused while a download runs
-  and when one folder is inside the other. Otherwise both models are released (a load under way is waited for), then each
-  file is copied to the new folder as `<name>.move`, checked (size; for a finished catalogue file the SHA-256 pinned in the
-  catalogue; a `.part` is not hashed), renamed into place, and only then is the original deleted and its verified record
-  moved to the copy. The first file that fails stops the move: its copy is deleted and its original kept; files already
-  moved stay moved. Then `models.folder` is written and the settings reload, so models load from the new folder. The page's
-  status line shows each file as it moves and the result.
+  where they are** (the earlier behaviour, and the default button; closing the question changes nothing). Moving is
+  refused while a download runs and when one folder is inside the other. Otherwise, while the move runs, downloads,
+  preset downloads and Storage's Delete are refused ("Model files are being moved; try again when it finishes.") and no
+  model loads; both models are released (a load under way is waited for), then each file is copied to the new folder as
+  `<name>.move`, checked (size; for a finished catalogue file the SHA-256 pinned in the catalogue; a `.part` is not
+  hashed), renamed into place, and only then is the original deleted and its verified record moved to the copy. A file of
+  the same name already in the new folder counts as moved when it is the same file (size and pinned SHA-256) and is
+  skipped otherwise. A file that fails keeps its original (its copy is deleted) and the move goes on; the models in use move
+  last; files already moved stay moved. Then `models.folder` is written, unless a model in use stayed behind (the folder is
+  then unchanged and the line says so), and the settings reload. The page's status line shows each file, by its catalogue
+  name, as it moves and the result. Quit during a move stops it (the file being copied stops, its original kept; a file
+  already checked finishes) and Dictum then quits without changing the folder.
 - **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no

@@ -63,8 +63,8 @@ public sealed class ModelMoveTests : IDisposable
 
     /// <summary>
     /// Pin: per file, the copy is checked while the original is still there and before the copy has its final name; a copy
-    /// that fails the SHA-256 check is deleted and its original survives; files before it stay moved and files after it are
-    /// not touched (no rollback); the verified record follows the moved file.
+    /// that fails the SHA-256 check is deleted and its original survives; files before it stay moved (no rollback) and the
+    /// move goes on with the next file (lens on f5ec71c); the verified record follows the moved files.
     /// </summary>
     [Fact]
     public async Task Each_file_is_copied_checked_renamed_then_deleted_and_a_failed_check_keeps_the_original()
@@ -84,20 +84,162 @@ public sealed class ModelMoveTests : IDisposable
             var name = Path.GetFileName(path)[..^ModelMover.TempSuffix.Length];
             observed.Add((name, File.Exists(Path.Combine(from, name)), File.Exists(Path.Combine(to, name))));
             return hasher(path, ct);
-        }, Ct);
+        }, cancellationToken: Ct);
 
-        Assert.Equal([("ggml-base.en.bin", true, false), ("ggml-small.en.bin", true, false)], observed); // checked before rename and before delete
-        Assert.Equal(new MoveResult(1, 3, "ggml-small.en.bin", ModelMover.CopyDoesNotMatch), result);
-        Assert.Equal([new MoveStep(1, 3, "ggml-base.en.bin"), new MoveStep(2, 3, "ggml-small.en.bin")], steps);
+        // Each copy is checked while its original is still there and before it has its final name.
+        Assert.Equal([("ggml-base.en.bin", true, false), ("ggml-small.en.bin", true, false), ("ggml-tiny.en.bin", true, false)], observed);
+        Assert.Equal((2, 3, false), (result.Moved, result.Count, result.Cancelled));
+        Assert.Equal([new MoveProblem("ggml-small.en.bin", ModelMover.CopyDoesNotMatch)], result.Problems);
+        Assert.Equal([small], result.LeftBehind);
+        Assert.Equal([new MoveStep(1, 3, "ggml-base.en.bin"), new MoveStep(2, 3, "ggml-small.en.bin"), new MoveStep(3, 3, "ggml-tiny.en.bin")], steps);
         Assert.False(File.Exists(baseEn)); // moved
         Assert.Equal(Enumerable.Repeat((byte)1, 10), File.ReadAllBytes(Path.Combine(to, "ggml-base.en.bin")));
         Assert.Equal(Enumerable.Repeat((byte)2, 10), File.ReadAllBytes(small)); // the original survives its failed copy
         Assert.False(File.Exists(Path.Combine(to, "ggml-small.en.bin")));
         Assert.False(File.Exists(Path.Combine(to, "ggml-small.en.bin" + ModelMover.TempSuffix))); // and its copy is gone
-        Assert.True(File.Exists(tiny)); // after the failure nothing more is moved
-        Assert.False(File.Exists(Path.Combine(to, "ggml-tiny.en.bin")));
+        Assert.False(File.Exists(tiny)); // the move went on with the next file
+        Assert.Equal(Enumerable.Repeat((byte)3, 10), File.ReadAllBytes(Path.Combine(to, "ggml-tiny.en.bin")));
         var record = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(Path.Combine(_dir.FullName, "verified-models.json")))!;
-        Assert.Equal([Path.Combine(to, "ggml-base.en.bin")], record.Keys); // the checked copy is remembered; nothing under the old folder
+        Assert.Equal([Path.Combine(to, "ggml-base.en.bin"), Path.Combine(to, "ggml-tiny.en.bin")], record.Keys.Order()); // the checked copies; nothing under the old folder
+    }
+
+    /// <summary>
+    /// Pin (lens on f5ec71c): the rename comes before the delete. The hasher puts a file under the final name after the
+    /// existence check, so the rename fails: the original survives byte for byte, no .move is left, and the reason is reported
+    /// without a closing full stop.
+    /// </summary>
+    [Fact]
+    public async Task A_rename_that_fails_keeps_the_original_and_leaves_no_copy()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var original = Create(from, "ggml-tiny.en.bin", fill: 4);
+        var hasher = FakeHasher();
+        var result = await ModelMover.MoveAsync(ModelMover.Known(from), to, hasher: (path, ct) =>
+        {
+            Create(to, "ggml-tiny.en.bin", fill: 9); // appears under the final name between the check and the rename
+            return hasher(path, ct);
+        }, cancellationToken: Ct);
+        Assert.Equal(0, result.Moved);
+        Assert.Equal([original], result.LeftBehind);
+        var problem = Assert.Single(result.Problems);
+        Assert.Equal("ggml-tiny.en.bin", problem.FileName);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Reason));
+        Assert.False(problem.Reason.EndsWith('.'));
+        Assert.Equal(Enumerable.Repeat((byte)4, 10), File.ReadAllBytes(original));
+        Assert.False(File.Exists(Path.Combine(to, "ggml-tiny.en.bin" + ModelMover.TempSuffix)));
+    }
+
+    /// <summary>Pin (lens on f5ec71c): a copy of the wrong size is deleted and its original kept.</summary>
+    [Fact]
+    public async Task A_copy_of_the_wrong_size_is_deleted_and_the_original_kept()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var original = Create(from, "ggml-tiny.en.bin", fill: 4);
+        var result = await ModelMover.MoveAsync(ModelMover.Known(from), to, hasher: FakeHasher(),
+            copier: (_, target, _) => File.WriteAllBytesAsync(target, [1, 2, 3], Ct), cancellationToken: Ct);
+        Assert.Equal([new MoveProblem("ggml-tiny.en.bin", ModelMover.CopySizeDiffers)], result.Problems);
+        Assert.Equal(Enumerable.Repeat((byte)4, 10), File.ReadAllBytes(original));
+        Assert.False(File.Exists(Path.Combine(to, "ggml-tiny.en.bin" + ModelMover.TempSuffix)));
+        Assert.False(File.Exists(Path.Combine(to, "ggml-tiny.en.bin")));
+    }
+
+    /// <summary>Pin (lens on f5ec71c): the models in use are moved last, whatever their names.</summary>
+    [Fact]
+    public async Task The_models_in_use_move_last()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var baseEn = Create(from, "ggml-base.en.bin");
+        Create(from, "ggml-small.en.bin");
+        Create(from, "ggml-tiny.en.bin");
+        var steps = new List<MoveStep>();
+        var result = await ModelMover.MoveAsync(ModelMover.Known(from), to, progress: new ListProgress(steps), hasher: FakeHasher(), inUse: [baseEn], cancellationToken: Ct);
+        Assert.True(result.Complete);
+        Assert.Equal(["ggml-small.en.bin", "ggml-tiny.en.bin", "ggml-base.en.bin"], steps.Select(s => s.FileName));
+    }
+
+    /// <summary>
+    /// Pin (lens on f5ec71c): a file of the same name already in the new folder counts as moved when it is the same file (size
+    /// and pinned SHA-256: the original is deleted and the record follows), and is skipped otherwise, the move going on.
+    /// </summary>
+    [Fact]
+    public async Task A_name_already_in_the_new_folder_counts_as_moved_when_it_is_the_same_file_and_is_skipped_otherwise()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var baseEn = Create(from, "ggml-base.en.bin", fill: 1);
+        var small = Create(from, "ggml-small.en.bin", fill: 2);
+        var tiny = Create(from, "ggml-tiny.en.bin", fill: 3);
+        var medium = Create(from, "ggml-medium.en.bin", fill: 5);
+        var sameThere = Create(to, "ggml-base.en.bin", fill: 1);
+        var otherSize = Create(to, "ggml-small.en.bin", 11, fill: 8);
+        var otherHash = Create(to, "ggml-tiny.en.bin", fill: 6); // the same size, another SHA-256
+        var integrity = new ModelIntegrity(Path.Combine(_dir.FullName, "verified-models.json"), NullLog.Instance);
+        var hasher = FakeHasher();
+        var result = await ModelMover.MoveAsync(ModelMover.Known(from), to, integrity,
+            hasher: (path, ct) => PathRegistry.SamePath(path, otherHash) ? Task.FromResult(new string('0', 64)) : hasher(path, ct), cancellationToken: Ct);
+        Assert.Equal((2, 4), (result.Moved, result.Count)); // base.en (already there) and medium.en (copied)
+        Assert.Equal([new MoveProblem("ggml-small.en.bin", ModelMover.AlreadyThere), new MoveProblem("ggml-tiny.en.bin", ModelMover.AlreadyThere)], result.Problems);
+        Assert.Equal([small, tiny], result.LeftBehind);
+        Assert.False(File.Exists(baseEn));
+        Assert.True(File.Exists(sameThere));
+        Assert.Equal(Enumerable.Repeat((byte)2, 10), File.ReadAllBytes(small));
+        Assert.Equal(Enumerable.Repeat((byte)8, 11), File.ReadAllBytes(otherSize));
+        Assert.Equal(Enumerable.Repeat((byte)3, 10), File.ReadAllBytes(tiny));
+        Assert.Equal(Enumerable.Repeat((byte)6, 10), File.ReadAllBytes(otherHash));
+        Assert.False(File.Exists(medium));
+        var record = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(Path.Combine(_dir.FullName, "verified-models.json")))!;
+        Assert.Contains(sameThere, record.Keys);
+    }
+
+    /// <summary>Pin (lens on f5ec71c): an original that cannot be removed after its checked copy is in place counts as moved, with the reason.</summary>
+    [Fact]
+    public async Task An_original_that_cannot_be_removed_counts_as_moved_and_is_reported()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var original = Create(from, "ggml-tiny.en.bin", fill: 4);
+        MoveResult result;
+        using (new FileStream(original, FileMode.Open, FileAccess.Read, FileShare.Read)) // read allowed, delete refused
+            result = await ModelMover.MoveAsync(ModelMover.Known(from), to, hasher: FakeHasher(), cancellationToken: Ct);
+        Assert.Equal(1, result.Moved);
+        Assert.Equal([new MoveProblem("ggml-tiny.en.bin", ModelMover.OriginalKept, Copied: true)], result.Problems);
+        Assert.Empty(result.LeftBehind);
+        Assert.True(File.Exists(original));
+        Assert.True(File.Exists(Path.Combine(to, "ggml-tiny.en.bin")));
+    }
+
+    /// <summary>Pin: cancelling (quit) lets a checked copy finish its rename and delete, and starts no other file.</summary>
+    [Fact]
+    public async Task Cancelling_finishes_the_checked_file_and_starts_no_other()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var baseEn = Create(from, "ggml-base.en.bin", fill: 1);
+        var tiny = Create(from, "ggml-tiny.en.bin", fill: 3);
+        using var cancel = new CancellationTokenSource();
+        var hasher = FakeHasher();
+        var result = await ModelMover.MoveAsync(ModelMover.Known(from), to, hasher: (path, ct) =>
+        {
+            cancel.Cancel(); // quit asked while the first copy is checked
+            return hasher(path, ct);
+        }, cancellationToken: cancel.Token);
+        Assert.Equal((1, true), (result.Moved, result.Cancelled));
+        Assert.Equal([tiny], result.LeftBehind);
+        Assert.False(File.Exists(baseEn));
+        Assert.True(File.Exists(Path.Combine(to, "ggml-base.en.bin")));
+        Assert.Equal(Enumerable.Repeat((byte)3, 10), File.ReadAllBytes(tiny));
+        Assert.False(File.Exists(Path.Combine(to, "ggml-tiny.en.bin" + ModelMover.TempSuffix)));
+    }
+
+    [Fact]
+    public void Display_names_are_the_catalogue_names()
+    {
+        Assert.Equal("small.en", ModelMover.DisplayName("ggml-small.en.bin"));
+        Assert.Equal("qwen2.5-1.5b", ModelMover.DisplayName("qwen2.5-1.5b-instruct-q4_k_m.gguf"));
+        Assert.Equal("unfinished small.en download", ModelMover.DisplayName("ggml-small.en.bin.part"));
     }
 
     [Fact]
@@ -113,25 +255,26 @@ public sealed class ModelMoveTests : IDisposable
         Assert.Equal(Enumerable.Repeat((byte)7, 10), File.ReadAllBytes(Path.Combine(to, "ggml-small.en.bin.part")));
     }
 
-    [Fact]
-    public async Task A_file_already_in_the_new_folder_is_not_overwritten_and_the_original_stays()
-    {
-        var from = Path.Combine(_dir.FullName, "old");
-        var to = Path.Combine(_dir.FullName, "new");
-        var original = Create(from, "ggml-tiny.en.bin", fill: 1);
-        var there = Create(to, "ggml-tiny.en.bin", fill: 9);
-        var result = await ModelMover.MoveAsync(ModelMover.Known(from), to, hasher: FakeHasher(), cancellationToken: Ct);
-        Assert.Equal(new MoveResult(0, 1, "ggml-tiny.en.bin", ModelMover.AlreadyThere), result);
-        Assert.Equal(Enumerable.Repeat((byte)1, 10), File.ReadAllBytes(original));
-        Assert.Equal(Enumerable.Repeat((byte)9, 10), File.ReadAllBytes(there));
-    }
-
     [Theory]
     [InlineData(@"C:\models", @"C:\models\inner", true)]
     [InlineData(@"C:\models\inner", @"C:\models", true)]
     [InlineData(@"C:\models", @"C:\models-new", false)]
     [InlineData(@"C:\models", @"D:\models", false)]
+    [InlineData(@"D:\", @"D:\Models", true)] // a drive root (lens on PR #61)
+    [InlineData(@"D:\Models", @"D:\", true)]
     public void Nested_folders_are_one_inside_the_other(string from, string to, bool nested) => Assert.Equal(nested, ModelMover.Nested(from, to));
+
+    /// <summary>Pin (lens on PR #61): a folder is inside a drive root; a root is not inside itself.</summary>
+    [Fact]
+    public void A_folder_is_inside_its_drive_root()
+    {
+        Assert.True(PathRegistry.IsInside(@"D:\Models", @"D:\"));
+        Assert.True(PathRegistry.IsInside(@"D:\Models\ggml-tiny.en.bin", @"D:\"));
+        Assert.False(PathRegistry.IsInside(@"D:\", @"D:\Models"));
+        Assert.False(PathRegistry.IsInside(@"D:\", @"D:\"));
+        Assert.False(PathRegistry.IsInside(@"D:\Models", @"D:\Models"));
+        Assert.False(PathRegistry.IsInside(@"D:\Models-new", @"D:\Models"));
+    }
 
     // ---- The release seam ----
 
@@ -227,6 +370,7 @@ public sealed class ModelMoveTests : IDisposable
             $"Your model files are in {scratch.Paths.DefaultModelsDir}. Move them to {chosen} so Dictum finds them there? 2 files, " +
             $"{ModelCatalog.FormatSize(TinyEnBytes + 1000)}. Dictum copies each file, checks it, then removes the original."), dialogs.Asked[^1]);
         Assert.Equal(["Move the files", "Leave them where they are"], dialogs.AskedChoices[^1]);
+        Assert.Equal(1, dialogs.AskedDefault[^1]); // Leave is the default: Enter never starts a long move (orchestrator, lens on PR #61)
         Assert.Equal(chosen, shell.Settings.Models.Folder);
         Assert.True(File.Exists(tiny)); // nothing moved
         Assert.False(Directory.Exists(chosen) && Directory.EnumerateFiles(chosen).Any());
@@ -262,7 +406,7 @@ public sealed class ModelMoveTests : IDisposable
 
         // The progress lines are posted to the page as they come; one still queued at the end is dropped, never shown over the result.
         Assert.Equal($"Moved 2 files to {chosen}.", said[^1]);
-        Assert.All(said[..^1], s => Assert.Contains(s, new[] { "Moving ggml-small.en.bin.part (1 of 2)…", "Moving ggml-tiny.en.bin (2 of 2)…" }));
+        Assert.All(said[..^1], s => Assert.Contains(s, new[] { "Moving unfinished small.en download (1 of 2)…", "Moving tiny.en (2 of 2)…" }));
         Assert.False(File.Exists(tiny));
         Assert.False(File.Exists(part));
         var moved = Path.Combine(chosen, "ggml-tiny.en.bin");
@@ -362,6 +506,204 @@ public sealed class ModelMoveTests : IDisposable
         Assert.Equal([ModelFolderActions.NestedRefused], said);
         Assert.Null(shell.Settings.Models.Folder);
         Assert.True(File.Exists(tiny));
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>
+    /// Pin, the lens's reproduction (f5ec71c): the chosen folder holds base.en and tiny.en (in use) and the default folder
+    /// already holds the same base.en. Use default, Move the files: base.en counts as moved (the same file is there), tiny.en
+    /// moves last, the folder is cleared, and the model loads from the default folder.
+    /// </summary>
+    [Fact]
+    public Task Use_default_with_the_same_file_already_in_the_default_folder_moves_everything() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch();
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = "tiny.en" }, llm = new { provider = "none" }, models = new { folder = chosen } }));
+        var baseChosen = Create(chosen, "ggml-base.en.bin", fill: 1);
+        var tinyChosen = Create(chosen, "ggml-tiny.en.bin", TinyEnBytes);
+        Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", fill: 1);
+        var speech = SpeechModels();
+        var (shell, _, dialogs) = scratch.Shell(speech);
+        shell.MoveHasher = FakeHasher();
+        shell.Reload(userRequested: false);
+        Assert.True(await Eventually(() => shell.Models.ModelPath == tinyChosen && speech.IsReady));
+        dialogs.Answers.Enqueue(0);
+        var said = new List<string>();
+        await ModelFolderActions.UseDefaultFolder(shell, said.Add);
+        Assert.Equal($"Moved 2 files to {scratch.Paths.DefaultModelsDir}.", said[^1]);
+        Assert.False(File.Exists(baseChosen));
+        Assert.False(File.Exists(tinyChosen));
+        var tinyDefault = Path.Combine(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin");
+        Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
+        Assert.Equal(tinyDefault, shell.Models.ModelPath);
+        Assert.True(File.Exists(tinyDefault));
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>
+    /// Pin (lens on f5ec71c): when the model in use cannot move (a different file of its name is in the new folder), the
+    /// other files move, the folder is not changed, the model loads from where it is, and the line says so.
+    /// </summary>
+    [Fact]
+    public Task The_folder_is_not_changed_when_the_model_in_use_stays_behind() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch();
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = "tiny.en" }, llm = new { provider = "none" }, models = new { folder = chosen } }));
+        var baseChosen = Create(chosen, "ggml-base.en.bin", fill: 1);
+        var tinyChosen = Create(chosen, "ggml-tiny.en.bin", TinyEnBytes);
+        Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", fill: 7); // another tiny.en: a different size
+        var speech = SpeechModels();
+        var (shell, _, dialogs) = scratch.Shell(speech);
+        shell.MoveHasher = FakeHasher();
+        shell.Reload(userRequested: false);
+        Assert.True(await Eventually(() => shell.Models.ModelPath == tinyChosen && speech.IsReady));
+        dialogs.Answers.Enqueue(0);
+        var said = new List<string>();
+        await ModelFolderActions.UseDefaultFolder(shell, said.Add);
+        Assert.Equal(ModelFolderActions.MovedSome(1, 2, "tiny.en", ModelMover.AlreadyThere, chosen) + ModelFolderActions.FolderKept(chosen, scratch.Paths.DefaultModelsDir, someMoved: true),
+            said[^1]);
+        Assert.Equal("Moved 1 of 2; tiny.en could not be moved: a different file of that name is already in the new folder. The rest stay in " + chosen +
+                     ". The model folder is still " + chosen + ", because the model in use did not move; the files that did are in " + scratch.Paths.DefaultModelsDir +
+                     "; choose that folder again to use them.", said[^1]);
+        Assert.Equal(chosen, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder); // not changed
+        Assert.Equal(tinyChosen, shell.Models.ModelPath); // dictation goes on with the model where it is
+        Assert.True(await Eventually(() => speech.IsReady));
+        Assert.False(File.Exists(baseChosen));
+        Assert.True(File.Exists(Path.Combine(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin")));
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>A model folder whose first file's check waits until the test lets it go, so the test can act mid-move.</summary>
+    private sealed class HeldMove
+    {
+        private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Func<string, CancellationToken, Task<string>> _pinned = FakeHasher();
+        public volatile bool Entered;
+
+        public async Task<string> Hash(string path, CancellationToken ct)
+        {
+            if (Path.GetFileName(path).StartsWith("ggml-base.en.bin", StringComparison.Ordinal))
+            {
+                Entered = true;
+                await _gate.Task;
+            }
+            return await _pinned(path, ct);
+        }
+
+        public void Release() => _gate.TrySetResult();
+    }
+
+    /// <summary>
+    /// Pin S2 (lens on f5ec71c): while files move, a download is refused (it would land in the folder being emptied) and so is
+    /// Storage's Delete of a model; the move then finishes.
+    /// </summary>
+    [Fact]
+    public Task Downloads_and_deletions_are_refused_while_files_move() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch(Settings);
+        var tiny = Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
+        Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", fill: 1); // not in use: moved first, and its check is held
+        var server = new GateHandler([1, 2, 3, 4]);
+        var speech = SpeechModels();
+        var (shell, _, dialogs) = scratch.Shell(speech, downloadHandler: server);
+        var held = new HeldMove();
+        shell.MoveHasher = held.Hash;
+        shell.Reload(userRequested: false);
+        Assert.True(await Eventually(() => speech.IsReady));
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        dialogs.Folder = chosen;
+        dialogs.Answers.Enqueue(0);
+        var said = new List<string>();
+        var move = ModelFolderActions.BrowseFolder(shell, said.Add);
+        Assert.True(await Eventually(() => held.Entered));
+        Assert.True(shell.Models.MovingFiles);
+
+        dialogs.ConfirmDownloads = true;
+        shell.Models.Select("small.en");
+        await Task.Delay(100, Ct);
+        Assert.Empty(server.Requests);
+        Assert.False(shell.Models.IsDownloading);
+        Assert.False(File.Exists(Path.Combine(scratch.Paths.DefaultModelsDir, "ggml-small.en.bin.part")));
+        var stored = ModelFiles.List(scratch.Paths, shell.Settings).Single(m => m.Name == "tiny.en");
+        Assert.Equal("Model files are being moved; try again when it finishes.", await shell.DeleteModelAsync(stored));
+        Assert.True(File.Exists(tiny));
+
+        held.Release();
+        await move;
+        Assert.Equal($"Moved 2 files to {chosen}.", said[^1]);
+        Assert.False(shell.Models.MovingFiles);
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>
+    /// Pin S3 (lens on f5ec71c): a settings reload while files move (the watcher's, after any settings.json write) loads no
+    /// model, so no engine opens a file in the folder being emptied; the reload after the move loads it from the new folder.
+    /// </summary>
+    [Fact]
+    public Task A_reload_while_files_move_loads_no_model() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch(Settings);
+        Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
+        Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", fill: 1);
+        var speech = SpeechModels();
+        var (shell, _, dialogs) = scratch.Shell(speech);
+        var held = new HeldMove();
+        shell.MoveHasher = held.Hash;
+        shell.Reload(userRequested: false);
+        Assert.True(await Eventually(() => speech.IsReady));
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        dialogs.Folder = chosen;
+        dialogs.Answers.Enqueue(0);
+        var said = new List<string>();
+        var move = ModelFolderActions.BrowseFolder(shell, said.Add);
+        Assert.True(await Eventually(() => held.Entered));
+
+        shell.Reload(userRequested: false);
+        Assert.Null(speech.ModelPath); // nothing loads mid-move
+
+        held.Release();
+        await move;
+        Assert.Equal($"Moved 2 files to {chosen}.", said[^1]);
+        Assert.Equal(Path.Combine(chosen, "ggml-tiny.en.bin"), speech.ModelPath);
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>Pin: Quit while files move stops the move after the file being checked, changes no folder, then quits (no reload).</summary>
+    [Fact]
+    public Task Quit_while_files_move_stops_the_move_then_quits() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch(Settings);
+        var tiny = Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
+        Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", fill: 1);
+        var speech = SpeechModels();
+        var log = new RecordingLog();
+        var (shell, _, dialogs) = scratch.Shell(speech, log: log);
+        var held = new HeldMove();
+        shell.MoveHasher = held.Hash;
+        shell.Reload(userRequested: false);
+        Assert.True(await Eventually(() => speech.IsReady));
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        dialogs.Folder = chosen;
+        dialogs.Answers.Enqueue(0);
+        var move = ModelFolderActions.BrowseFolder(shell, _ => { });
+        Assert.True(await Eventually(() => held.Entered));
+
+        shell.Quit();
+        Assert.True(shell.Models.MovingFiles); // deferred until the move stops
+        held.Release();
+        await move;
+        Assert.Contains("Quit asked while model files move", log.All);
+        Assert.True(File.Exists(Path.Combine(chosen, "ggml-base.en.bin"))); // the checked file finished
+        Assert.True(File.Exists(tiny)); // the next did not start
+        Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
+        Assert.Null(speech.ModelPath); // quit, not reloaded
         shell.Dispose();
         return true;
     });
