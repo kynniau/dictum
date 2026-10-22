@@ -4601,4 +4601,4 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
       speech off" in Simple while cloud speech is on).
     - *Correction.* Item 10 earlier called the 23 skips "the existing environment-gated skips"; that was not checked against
       main, so the claim is removed.
-12. **Gates after the fix round.** GATE_TOTALS_2
+12. **Gates after the fix round** (after merging origin/main): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1906 total, 0 failed, 23 skipped, 0 errors.
