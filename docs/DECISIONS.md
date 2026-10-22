@@ -5266,3 +5266,32 @@ Owner approval 22/10/2026: when the model folder changes, Dictum offers to move 
 6. **Mutations, observed failing (23/10/2026), each restored.** (M1) `Modal.Run`'s owner forced to null (the dialog shown on its own, as before the fix): (a) failed (two windows) and (d) failed with "FAIL ordinary opener: inside the dialog's frame the opener no longer holds the mouse capture (GetCapture 0x13E12BC, opener 0x13E12BC)", the same for the Topmost and closed openers, and "Ask returned -1 (0, the OK clicked)": OK clicked with mouse messages did nothing, the reported symptom. (M2) the tray panel exclusion removed: (c) failed (owner FlyoutWindow, CenterOwner). (M3) the second-click guard removed: (a) failed (two windows).
 7. **Not verified.** The installed Dictum.exe was not run (tray mode is never run on this host); the fix is proven on Avalonia's real Win32 backend through the probe, not in the app's own Settings window. Whether UI Automation's Invoke reaches a button of a disabled window was not tested; the guard covers it either way. A download question raised by a choice in a combo box (the tray panel's model lists) is not a `Ui.Button` click, so it keeps the earlier behaviour; it was not probed. Focus returning to the button is checked in the probe, not on a Settings page that redraws after its action.
 8. **Gates, on de892f5 (this branch with origin/main 1960a5a, PR #61, merged in; the commit after it changes only this file).** Release build `--no-incremental`: 0 warnings, 0 errors. `DialogOwnerTests` and `DialogTests` with `DICTUM_UI_TESTS=1`: 8 total, 8 passed (the Win32 pin ran). Full suite once (without `DICTUM_UI_TESTS`): 2502 total, 0 failed, 24 skipped. PR #61's move question (Change…, Browse…, Use default in Settings) is asked from a `Ui.Button` too, so it is now owned by Settings like the others.
+
+## 1.3.0 released; 1.3.1 backlog (23/10/2026)
+
+1. **Released.** v1.3.0 was tagged on b8b072d at 02:21 AEDT; the workflow published the GitHub release (run 39803808616); dictum.kynni.au was deployed at 02:33 AEDT with version.json 1.3.0. The Store package and the sizes are in STORE.md, section 11. SPEC.md needed no change (no version line called 1.3.0 "prepared").
+2. **PR #65 lens minors (1.3.1).**
+   - Pins for `Modal.Run`'s opener clear (line ~68) and restore (~75). Scratch tests exist at `C:\Users\Kynni\AppData\Local\Temp\claude\E--Dictation-tool\bcfca6f1-7a8d-40ba-8c95-d1b0dbd7c70f\scratchpad\LensScratchTests.cs`: copy them into `DialogOwnerTests` in 1.3.1, not now.
+   - `Modal.Wait` frames should clear and restore the opener like `Run`.
+   - SPEC §32 wording: "opens no second dialog; that second request is answered as Cancel and the open dialog is brought forward".
+3. **PR #61 not-built list (1.3.1).**
+   - Free-space pre-check.
+   - Rename on the same drive.
+   - Start-up clean-up of stray `.move` files.
+   - The fuller Quit sentence " The model folder is still {old}, because the move was stopped." (PROPOSED).
+4. **PR #60 lens notes.**
+   - The ceiling of the final-sentence rule: a closing made of dictated words passes.
+   - Two log lines are approved but not pinned (the save-failure paths).
+5. **PR #62 lens.**
+   - The privacy "Cloud speech (off by default)" paragraph's two extra sentences await the owner's confirmation.
+   - The README validator list is complete.
+6. **Demos.**
+   - PR #64 captions are PROPOSED.
+   - help.html section 8 figcaption "stops at the consent step without agreeing" is to be reworded on the owner's approval.
+   - The consent-dialog click defect was real and was fixed in PR #65 (demo lane finding).
+7. **Owner-only items outstanding.**
+   - Store upload of 1.3.0.
+   - Store screenshot 1.
+   - flyout.png.
+   - The tester paragraph.
+   - Counsel review of the consents and the privacy policy.
