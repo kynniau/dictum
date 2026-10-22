@@ -123,7 +123,7 @@ public sealed partial class AppShell
         string? consent = null, settings = null;
         try
         {
-            CloudConsentFile.Delete(Paths.ConsentFile);
+            CloudConsentFile.WithdrawCleanup(Paths.ConsentFile); // a speech consent on file stays (lens F1, 22/10/2026)
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

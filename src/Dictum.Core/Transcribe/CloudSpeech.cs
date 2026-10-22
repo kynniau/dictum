@@ -55,6 +55,9 @@ public sealed class CloudSpeech
     /// </summary>
     public void Retire() => _engine?.Retire();
 
+    /// <summary>True once a cloud engine was retired (a settings reload or quit replaced it); false for the local model, which sends nothing.</summary>
+    public bool IsRetired => _engine?.IsRetired ?? false;
+
     /// <summary>
     /// Builds the configured provider. Anything that stops cloud speech (not configured, offline_only, an http:// address off
     /// this PC, no speech consent, translate on, no key) gives the local model, with the reason logged and in <see cref="Status"/>.
@@ -88,7 +91,7 @@ public sealed class CloudSpeech
             return Refused($"{service.KeyVariable} is not set (environment or .env), so nothing is sent to {host}", SpeechStatus.WaitingForKey(service.KeyVariable!), service.KeyVariable);
 
         log.Info($"Cloud speech on: audio goes to {host} ({settings.Model}); the speech model on this PC is the fallback.");
-        var engine = new CloudSpeechEngine(http, settings.BaseUrl, settings.Model, key, decode, TimeSpan.FromMilliseconds(settings.TimeoutMs), local, log);
+        var engine = new CloudSpeechEngine(http, settings.BaseUrl, settings.Model, key, service.KeyHeader, decode, TimeSpan.FromMilliseconds(settings.TimeoutMs), local, log);
         return new CloudSpeech(local, engine, "", null);
     }
 }

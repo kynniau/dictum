@@ -80,12 +80,36 @@ public sealed class SpeechConsentFileTests : IDisposable
         CloudConsentFile.WithdrawSpeech(ConsentFile);
         Assert.Equal(("llm2.example.com", null), Hosts());
         CloudConsentFile.WriteSpeech(ConsentFile, Record("api.groq.com"));
-        CloudConsentFile.Delete(ConsentFile); // Switch cloud clean-up off still withdraws everything (the UI lane narrows it)
-        Assert.False(File.Exists(ConsentFile));
-
-        CloudConsentFile.WriteSpeech(ConsentFile, Record("api.groq.com"));
+        CloudConsentFile.WithdrawCleanup(ConsentFile); // Switch cloud clean-up off: the speech consent stays (lens F1)
+        Assert.Equal((null, "api.groq.com"), Hosts());
         CloudConsentFile.WithdrawSpeech(ConsentFile);
         Assert.False(File.Exists(ConsentFile)); // nothing left on file
+
+        CloudConsentFile.Write(ConsentFile, Record("llm.example.com"));
+        CloudConsentFile.WithdrawCleanup(ConsentFile);
+        Assert.False(File.Exists(ConsentFile)); // clean-up only: the file goes, as before
+        CloudConsentFile.WriteSpeech(ConsentFile, Record("api.groq.com"));
+        CloudConsentFile.Delete(ConsentFile); // Delete still withdraws everything
+        Assert.False(File.Exists(ConsentFile));
+    }
+
+    /// <summary>A read-only consent.json is Dictum's own record: withdrawing one consent clears read-only and keeps the other.</summary>
+    [Fact]
+    public void Withdrawing_one_consent_from_a_read_only_file_keeps_the_other()
+    {
+        CloudConsentFile.Write(ConsentFile, Record("llm.example.com"));
+        CloudConsentFile.WriteSpeech(ConsentFile, Record("api.groq.com"));
+        File.SetAttributes(ConsentFile, FileAttributes.ReadOnly);
+        try
+        {
+            CloudConsentFile.WithdrawCleanup(ConsentFile);
+            Assert.Equal((null, "api.groq.com"), Hosts());
+            Assert.False(File.Exists(ConsentFile + ".tmp"));
+        }
+        finally
+        {
+            if (File.Exists(ConsentFile)) File.SetAttributes(ConsentFile, FileAttributes.Normal);
+        }
     }
 
     /// <summary>A damaged entry is no consent and does not take the other entry with it; a damaged file is no consent at all.</summary>

@@ -75,14 +75,32 @@ public static class CloudConsentFile
     public static void WriteSpeech(string path, CloudConsentRecord record) => Save(path, ReadAll(path) with { Speech = record });
 
     /// <summary>
-    /// Withdraws the speech consent only, keeping a clean-up consent on file; with nothing left the file is deleted
-    /// (<see cref="Delete"/>). Throws as <see cref="Write"/> and <see cref="Delete"/> do, and the caller tries again later.
+    /// Withdraws the clean-up consent only (Settings > Clean-up > Switch cloud clean-up off, and "Allow" undone when settings.json
+    /// cannot be written), keeping a speech consent on file; with nothing left the file is deleted (<see cref="Delete"/>). Throws
+    /// as <see cref="Delete"/> does, and the caller tries again later.
     /// </summary>
-    public static void WithdrawSpeech(string path)
+    public static void WithdrawCleanup(string path) => Withdraw(path, c => c with { Cleanup = null });
+
+    /// <summary>Withdraws the speech consent only, keeping a clean-up consent on file; otherwise as <see cref="WithdrawCleanup"/>.</summary>
+    public static void WithdrawSpeech(string path) => Withdraw(path, c => c with { Speech = null });
+
+    /// <summary>
+    /// The other consent is kept; with none left the file is deleted. consent.json is Dictum's own record, so a read-only
+    /// attribute on it is cleared to honour the withdrawal, as <see cref="Delete"/> does.
+    /// </summary>
+    private static void Withdraw(string path, Func<CloudConsents, CloudConsents> without)
     {
-        var consents = ReadAll(path);
-        if (consents.Cleanup is null) Delete(path);
-        else if (consents.Speech is not null) Save(path, consents with { Speech = null });
+        var before = ReadAll(path);
+        var after = without(before);
+        if (after == CloudConsents.None)
+        {
+            Delete(path);
+            return;
+        }
+        if (after == before) return; // nothing of that kind on file
+        var attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.ReadOnly) != 0) File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+        Save(path, after);
     }
 
     private static void Save(string path, CloudConsents consents)
@@ -95,7 +113,7 @@ public static class CloudConsentFile
     }
 
     /// <summary>
-    /// Withdraws every consent on file (Settings > Clean-up > Switch cloud clean-up off). consent.json is Dictum's own record of
+    /// Withdraws every consent on file (the whole file; switching clean-up off uses <see cref="WithdrawCleanup"/>). consent.json is Dictum's own record of
     /// the user's agreement, so a read-only attribute on it is cleared to honour the withdrawal. That is the only attribute
     /// written, and only when it is set: a file whose access list allows delete but not write-attributes is still deleted. A
     /// file another program holds open still throws, and the caller tries again later.

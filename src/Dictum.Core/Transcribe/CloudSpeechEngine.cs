@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Dictum.Audio;
 using Dictum.Core;
+using Dictum.Llm;
 
 namespace Dictum.Transcribe;
 
@@ -22,6 +23,7 @@ public sealed class CloudSpeechEngine : ITranscriber
     private readonly Uri _endpoint;
     private readonly string _model;
     private readonly string? _key;
+    private readonly string? _keyHeader;
     private readonly DecodeOptions _decode;
     private readonly TimeSpan _timeout;
     private readonly Func<CancellationToken, Task<ITranscriber>> _local;
@@ -29,23 +31,36 @@ public sealed class CloudSpeechEngine : ITranscriber
     private readonly CancellationTokenSource _retired = new();
     private volatile string? _lastFailure;
 
-    /// <param name="key">The bearer key for this service (SpeechPresets decides which), or null to send none.</param>
+    /// <param name="key">The key for this service (SpeechPresets decides which), or null to send none.</param>
+    /// <param name="keyHeader">The header the key goes in: null for <c>Authorization: Bearer</c>, else that header with the key alone (Azure's <c>api-key</c>).</param>
     /// <param name="timeout">speech.timeout_ms: the deadline for one request.</param>
     /// <param name="local">The speech model on this PC, asked only when a request fails.</param>
-    public CloudSpeechEngine(HttpClient http, string baseUrl, string model, string? key, DecodeOptions decode, TimeSpan timeout,
+    public CloudSpeechEngine(HttpClient http, string baseUrl, string model, string? key, string? keyHeader, DecodeOptions decode, TimeSpan timeout,
         Func<CancellationToken, Task<ITranscriber>> local, ILog log)
     {
         _http = http;
-        _endpoint = new Uri(baseUrl.Trim().TrimEnd('/') + "/audio/transcriptions");
+        _endpoint = Endpoint(baseUrl);
         _model = model;
         _key = key;
+        _keyHeader = keyHeader;
         _decode = decode;
         _timeout = timeout;
         _local = local;
         _log = log;
     }
 
-    public string Host => _endpoint.Host;
+    /// <summary>
+    /// {base_url}/audio/transcriptions, with the path joined as a path (lens F7, 22/10/2026): a query in speech.base_url (such as
+    /// an api-version) stays a query after the new path instead of swallowing it, and a fragment is dropped.
+    /// </summary>
+    internal static Uri Endpoint(string baseUrl)
+    {
+        var builder = new UriBuilder(baseUrl.Trim()) { Fragment = "" };
+        builder.Path = builder.Path.TrimEnd('/') + "/audio/transcriptions";
+        return builder.Uri;
+    }
+
+    public string Host => CloudPresets.HostOf(_endpoint);
 
     /// <summary>Why the last request was not used, until the next one succeeds; null when the last one succeeded or none was made.</summary>
     public string? LastFailure => _lastFailure;
@@ -54,6 +69,9 @@ public sealed class CloudSpeechEngine : ITranscriber
 
     /// <summary>A settings reload replaced this engine: a request under way is cancelled and none is started (the local model hears it).</summary>
     public void Retire() => _retired.Cancel();
+
+    /// <summary>True once <see cref="Retire"/> was called: no request is started any more.</summary>
+    public bool IsRetired => _retired.IsCancellationRequested;
 
     public Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken) => TranscribeAsync(samples16kMono, null, cancellationToken);
 
@@ -117,7 +135,11 @@ public sealed class CloudSpeechEngine : ITranscriber
         form.Add(new StringContent("json"), "response_format");
 
         using var message = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = form };
-        if (!string.IsNullOrEmpty(_key)) message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _key);
+        if (!string.IsNullOrEmpty(_key))
+        {
+            if (_keyHeader is { } header) message.Headers.Add(header, _key);
+            else message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _key);
+        }
         using var response = await _http.SendAsync(message, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {

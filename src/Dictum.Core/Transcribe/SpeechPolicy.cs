@@ -13,21 +13,33 @@ public static class SpeechPolicy
 {
     /// <summary>The host recordings would go to with speech.provider = openai-compatible, on this PC or not; null for local.</summary>
     public static string? Host(SpeechSettings s) =>
-        s.Provider == SpeechSettings.OpenAiCompatible && Uri.TryCreate(s.BaseUrl, UriKind.Absolute, out var u) ? u.Host : null;
+        s.Provider == SpeechSettings.OpenAiCompatible && Uri.TryCreate(s.BaseUrl?.Trim(), UriKind.Absolute, out var u) ? CloudPresets.HostOf(u) : null;
 
     /// <summary>
     /// True only when the speech consent on record names the host recordings would go to. Unlike clean-up there is no exemption
     /// for a server on this PC: every address needs the speech consent step, because the audio leaves Dictum either way.
     /// </summary>
-    public static bool HasConsent(SpeechSettings s) => Host(s) is { } host && string.Equals(s.Consent, host, StringComparison.OrdinalIgnoreCase);
+    public static bool HasConsent(SpeechSettings s) => Host(s) is { } host && string.Equals(s.Consent?.TrimEnd('.'), host, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Why offline_only forbids cloud speech, or null: any host off this PC is refused; a server on this PC is allowed.</summary>
     public static string? OfflineRefusal(SpeechSettings s, bool offlineOnly) =>
         s.Provider == SpeechSettings.OpenAiCompatible ? CloudPolicy.OfflineRefusal("cloud speech", s.BaseUrl, offlineOnly) : null;
 
-    /// <summary>A plain http:// speech.base_url off this PC (the recording would cross the network unencrypted), or null.</summary>
-    public static string? InsecureEndpoint(SpeechSettings s) =>
-        s.Provider == SpeechSettings.OpenAiCompatible ? CloudPolicy.PlainHttpRefusal("speech.base_url", s.BaseUrl) : null;
+    /// <summary>
+    /// Why a plain http:// speech.base_url is refused, or null. Off this PC it would carry the recording unencrypted over the
+    /// network (clean-up's rule and wording). On this PC too (orchestrator decision, 22/10/2026, superseding the spec's §2 on
+    /// this point): the approved consent says the recording goes "over the internet" and that Dictum "encrypts the connection
+    /// (HTTPS)", as Anthropic clean-up's refusal of any http:// address does for its consent (<see cref="CloudPolicy.InsecureEndpoint"/>).
+    /// </summary>
+    public static string? InsecureEndpoint(SpeechSettings s)
+    {
+        if (s.Provider != SpeechSettings.OpenAiCompatible || !Uri.TryCreate(s.BaseUrl?.Trim(), UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttp) return null;
+        return CloudPolicy.PlainHttpRefusal("speech.base_url", s.BaseUrl) ?? LoopbackHttpRefusal(CloudPresets.HostOf(u));
+    }
+
+    /// <summary>PROPOSED (22/10/2026): the refusal of a plain http:// speech.base_url on this PC; also the settings loader's warning.</summary>
+    public static string LoopbackHttpRefusal(string host) =>
+        $"speech.base_url {host} uses http://, but cloud speech needs an https:// address, also on this PC, because its consent step says the connection is encrypted";
 
     /// <summary>
     /// The speech consent step's text (spec "Cloud speech" §3), with {host} and {VAR} (<paramref name="keyVariable"/>) filled in.

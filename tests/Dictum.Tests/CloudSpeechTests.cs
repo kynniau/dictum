@@ -84,27 +84,113 @@ public sealed class CloudSpeechTests
         Assert.Contains("offline_only is on: cloud speech at api.openai.com is refused (only a server on this machine is allowed)", log.All);
 
         var loopback = new SpeechRecorder();
-        var (onThisPc, _, _) = Build(Cloud("http://localhost:8000/v1"), loopback, offlineOnly: true);
+        var (onThisPc, _, _) = Build(Cloud("https://localhost:8443/v1"), loopback, offlineOnly: true);
         Assert.Equal("Hello from the cloud.", await Transcribe(onThisPc));
         Assert.Single(loopback.Requests);
     }
 
-    /// <summary>Spec test 3: a plain http:// address off this PC is refused (the loader refuses it too; this is the backstop); http://localhost is allowed.</summary>
+    /// <summary>
+    /// Pin (mutation-checked), orchestrator decision 22/10/2026 (lens F2): plain http:// is refused for cloud speech everywhere,
+    /// a server on this PC included, because the approved consent says the connection is encrypted. The loader refuses it too;
+    /// the gate is the backstop for settings built any other way.
+    /// </summary>
     [Fact]
-    public async Task Plain_http_is_refused_off_this_PC()
+    public async Task Plain_http_is_refused_everywhere_this_PC_included()
     {
         var handler = new CountingHandler(HttpStatusCode.OK);
-        var (speech, _, _) = Build(Cloud("http://speech.example.com/v1"), handler);
-        await Transcribe(speech);
+        var (offPc, _, _) = Build(Cloud("http://speech.example.com/v1"), handler);
+        await Transcribe(offPc);
+        Assert.Equal(SpeechStatus.NothingSent("speech.base_url speech.example.com uses http://, which would send dictations unencrypted; only a server on this PC may use http://"), offPc.Status);
+
+        var (onPc, local, log) = Build(Cloud("http://localhost:8000/v1"), handler);
+        Assert.False(onPc.SendsAudio);
+        Assert.Equal(LocalText, await Transcribe(onPc));
+        Assert.Equal(1, local.Calls);
+        Assert.Equal(SpeechStatus.NothingSent("speech.base_url localhost uses http://, but cloud speech needs an https:// address, also on this PC, because its consent step says the connection is encrypted"), onPc.Status);
+        Assert.Contains("cloud speech needs an https:// address, also on this PC", log.All);
         Assert.Equal(0, handler.Requests);
-        Assert.Equal(SpeechStatus.NothingSent("speech.base_url speech.example.com uses http://, which would send dictations unencrypted; only a server on this PC may use http://"), speech.Status);
-        Assert.Contains("speech.base_url", SettingsLoader.Parse("""{ "speech": { "base_url": "http://speech.example.com/v1" } }""").Warnings.Single());
+
+        foreach (var url in new[] { "http://speech.example.com/v1", "http://localhost:8000/v1", "http://127.0.0.1:8000/v1" })
+        {
+            var parsed = SettingsLoader.Parse($$"""{ "speech": { "base_url": "{{url}}" } }""");
+            Assert.StartsWith("Setting \"speech.base_url\" has invalid value", parsed.Warnings.Single());
+            Assert.Null(parsed.Settings.Speech.BaseUrl);
+        }
+        Assert.Empty(SettingsLoader.Parse("""{ "speech": { "base_url": "https://localhost:8443/v1" } }""").Warnings);
+    }
+
+    /// <summary>Pin F4 (mutation-checked): a server on this PC still needs the speech consent; with it, it is sent to.</summary>
+    [Fact]
+    public async Task A_server_on_this_PC_still_needs_the_speech_consent()
+    {
+        var handler = new SpeechRecorder();
+        var (speech, local, _) = Build(Cloud("https://localhost:8443/v1", agreed: false), handler);
+        Assert.Equal(LocalText, await Transcribe(speech));
+        Assert.Empty(handler.Requests);
+        Assert.Equal(1, local.Calls);
+        Assert.Equal(SpeechStatus.NotAgreed, speech.Status);
+
+        var (agreed, _, _) = Build(Cloud("https://localhost:8443/v1"), handler);
+        await Transcribe(agreed);
+        Assert.Single(handler.Requests);
+    }
+
+    /// <summary>Pin F8 (mutation-checked): Azure OpenAI gets its key in an api-key header and no Authorization header; the others get Bearer.</summary>
+    [Fact]
+    public async Task Azure_gets_its_key_in_the_api_key_header()
+    {
+        var handler = new SpeechRecorder();
+        var (speech, _, _) = Build(Cloud("https://my-resource.openai.azure.com/openai/v1/"), handler);
+        await Transcribe(speech);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("k-azure", request.ApiKey);
+        Assert.Null(request.Authorization);
+
+        var openAi = new SpeechRecorder();
+        var (other, _, _) = Build(Cloud(), openAi);
+        await Transcribe(other);
+        Assert.Null(Assert.Single(openAi.Requests).ApiKey);
+    }
+
+    /// <summary>
+    /// Pin F6 (mutation-checked): a final "." does not make a preset's host another server, and a preset's host on another port
+    /// gets no key at all, neither the preset's nor the custom one; for clean-up's presets too.
+    /// </summary>
+    [Fact]
+    public async Task A_trailing_dot_is_the_same_host_and_another_port_gets_no_key()
+    {
+        var dotted = new SpeechRecorder();
+        var (speech, _, _) = Build(Cloud("https://api.openai.com./v1"), dotted);
+        Assert.Equal("api.openai.com", speech.Host);
+        await Transcribe(speech);
+        Assert.Equal("Bearer k-openai", Assert.Single(dotted.Requests).Authorization);
+
+        var port = new SpeechRecorder();
+        var (otherPort, _, _) = Build(Cloud("https://api.groq.com:8443/openai/v1"), port);
+        await Transcribe(otherPort);
+        var request = Assert.Single(port.Requests);
+        Assert.Null(request.Authorization);
+        Assert.Null(request.ApiKey);
+
+        Assert.Equal("OpenAI", CloudPresets.ForAddress("https://api.openai.com./v1").Name);
+        Assert.Null(CloudPresets.ForAddress("https://api.openai.com:8443/v1").KeyVariable); // not OPENAI_API_KEY, not LLM_API_KEY
+        Assert.Equal(SecretStore.LlmKey, CloudPresets.ForAddress("http://localhost:1234/v1").KeyVariable); // a local server on another port than Ollama's keeps LLM_API_KEY
+        Assert.True(SpeechPolicy.HasConsent(Cloud("https://api.openai.com./v1") with { Consent = "api.openai.com" }));
+    }
+
+    /// <summary>Pin F7 (mutation-checked): the endpoint is joined as a path, so a query in speech.base_url stays a query and a fragment is dropped.</summary>
+    [Fact]
+    public async Task The_endpoint_keeps_a_query_after_the_path()
+    {
+        var handler = new SpeechRecorder();
+        var (speech, _, _) = Build(Cloud("https://my-resource.openai.azure.com/openai/v1?api-version=preview#x"), handler);
+        await Transcribe(speech);
+        Assert.Equal("https://my-resource.openai.azure.com/openai/v1/audio/transcriptions?api-version=preview", Assert.Single(handler.Requests).Uri.ToString());
     }
 
     /// <summary>Pin (mutation-checked): each host gets its own key and no other: OpenAI, any Azure OpenAI resource, Groq, and SPEECH_API_KEY for any other address.</summary>
     [Theory]
     [InlineData("https://api.openai.com/v1", "Bearer k-openai")]
-    [InlineData("https://my-resource.openai.azure.com/openai/v1/", "Bearer k-azure")]
     [InlineData("https://api.groq.com/openai/v1", "Bearer k-groq")]
     [InlineData("https://speech.example.net/v1", "Bearer k-speech")]
     [InlineData("https://openai.azure.com.example.net/v1", "Bearer k-speech")] // not an Azure host: only a host ending .openai.azure.com is
@@ -358,22 +444,23 @@ public sealed class CloudSpeechTests
 
     /// <summary>
     /// Network sweep, Core side (the Help page's own sweep, HelpPageTests.The_page_reaches_the_network_only_through_the_platform_seam,
-    /// covers that page only): the only code that makes an HTTP request is the known list, and cloud speech's engine is the one
-    /// new entry. A new file that sends anything fails this until it is added here on purpose.
+    /// covers that page only): the only code that sends an HTTP request, builds a client or handler, or wires a handler in is the known
+    /// list, and cloud speech's engine is the one new sender. A new file that does any of it fails this until it is added here on purpose.
     /// </summary>
     [Fact]
     public void Only_the_known_clients_make_network_requests()
     {
         var bin = $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}";
         var obj = $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}";
-        var request = new Regex(@"new HttpClient\b|HttpRequestMessage|\.PostAsync\(|\.SendAsync\(|\.GetStreamAsync\(|\.GetStringAsync\(|SocketsHttpHandler|WebRequest|WebClient|TcpClient|UdpClient|new Socket\b");
+        // Every HttpClient method that sends, every handler type, the Anthropic SDK client and the raw socket APIs (lens F5, 22/10/2026).
+        var request = new Regex(@"new HttpClient\b|HttpRequestMessage|\.(SendAsync|PostAsync|PutAsync|PatchAsync|DeleteAsync|GetStringAsync|GetStreamAsync|GetByteArrayAsync|GetFromJsonAsync|PostAsJsonAsync|PutAsJsonAsync|PatchAsJsonAsync|DeleteFromJsonAsync)\(|[Hh]ttp\w*\.GetAsync\(|HttpMessageHandler|DelegatingHandler|SocketsHttpHandler|HttpClientHandler|new AnthropicClient\b|WebRequest|WebClient|TcpClient|UdpClient|new Socket\b|ClientWebSocket");
         var senders = Directory.EnumerateFiles(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains(bin) && !f.Contains(obj))
             .Where(f => File.ReadLines(f).Any(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal) && request.IsMatch(l)))
             .Select(Path.GetFileName)
             .Order(StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(["CloudSpeechEngine.cs", "ModelDownloader.cs", "OfflineGuardHandler.cs", "OpenAiCompatibleLlmClient.cs", "UpdateCheck.cs"], senders);
+        Assert.Equal(["AnthropicLlmClient.cs", "AppRules.cs", "AppShell.cs", "CloudSpeechEngine.cs", "ModelDownloader.cs", "OfflineGuardHandler.cs", "OpenAiCompatibleLlmClient.cs", "UpdateCheck.cs"], senders);
     }
 
     /// <summary>Records each request: where it went, its key, and every multipart field's bytes; answers with a transcription.</summary>
@@ -394,7 +481,8 @@ public sealed class CloudSpeechTests
                     if (name == "file") (fileName, fileType) = (part.Headers.ContentDisposition.FileName?.Trim('"'), part.Headers.ContentType?.MediaType);
                 }
             }
-            lock (Requests) Requests.Add(new Recorded(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), fields, fileName, fileType));
+            var apiKey = request.Headers.TryGetValues("api-key", out var values) ? string.Join(",", values) : null;
+            lock (Requests) Requests.Add(new Recorded(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), fields, fileName, fileType, apiKey));
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(body?.Invoke(Requests.Count) ?? """{"text":"Hello from the cloud."}""", Encoding.UTF8, "application/json"),
@@ -402,7 +490,7 @@ public sealed class CloudSpeechTests
         }
     }
 
-    private sealed record Recorded(HttpMethod Method, Uri Uri, string? Authorization, Dictionary<string, byte[]> Fields, string? FileName, string? FileType)
+    private sealed record Recorded(HttpMethod Method, Uri Uri, string? Authorization, Dictionary<string, byte[]> Fields, string? FileName, string? FileType, string? ApiKey)
     {
         public string Text(string field) => Encoding.UTF8.GetString(Fields[field]);
     }

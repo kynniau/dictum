@@ -14,7 +14,8 @@ namespace Dictum.Transcribe;
 /// <remarks>
 /// The addresses are the spec's table (provider pages read on 22/10/2026, OpenAI's and Groq's through a fetch-tool summary);
 /// this lane did not re-read them. Azure OpenAI's address carries the customer's resource name, so its preset matches any
-/// https:// host ending .openai.azure.com.
+/// https:// host ending .openai.azure.com. OpenAI, Groq and a custom server get <c>Authorization: Bearer</c> (Groq's header
+/// is Recalled, not read on its page); Azure OpenAI gets <c>api-key</c>.
 /// </remarks>
 public static class SpeechPresets
 {
@@ -24,7 +25,9 @@ public static class SpeechPresets
     public static IReadOnlyList<CloudPreset> All { get; } =
     [
         new("OpenAI", "https://api.openai.com/v1", null, SecretStore.OpenAiKey, KeyRequired: true, "the transcription model id"),
-        new("Azure OpenAI", null, null, SecretStore.AzureOpenAiKey, KeyRequired: true, "your deployment name", HostSuffix: ".openai.azure.com"),
+        // The key in an api-key header: Microsoft Learn's transcription reference (read by the lens, 22/10/2026:
+        // https://learn.microsoft.com/azure/foundry/openai/reference-preview-latest#create-transcription). Not re-read by this lane.
+        new("Azure OpenAI", null, null, SecretStore.AzureOpenAiKey, KeyRequired: true, "your deployment name", HostSuffix: ".openai.azure.com", KeyHeader: "api-key"),
         new("Groq", "https://api.groq.com/openai/v1", null, SecretStore.GroqKey, KeyRequired: true, "the transcription model id"),
         Custom,
     ];

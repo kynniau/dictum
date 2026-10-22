@@ -266,13 +266,13 @@ public class CloudWarningAndPresetsTests
 
     [Theory]
     // Every key variable holds its own value: each server must get exactly its own key. Ollama names none, so it gets none
-    // even with every key set; any other address, on this PC or off it, gets LLM_API_KEY.
+    // even with every key set; a preset's own host on another port gets none; any other address, on this PC or off it, gets LLM_API_KEY.
     [InlineData("https://api.openai.com/v1", "Bearer k-openai-test")]
     [InlineData("https://generativelanguage.googleapis.com/v1beta/openai/", "Bearer k-gemini-test")]
     [InlineData("http://localhost:11434/v1/", null)]
     [InlineData("http://127.0.0.1:11434/v1", null)]
     [InlineData("https://llm.example.net/v1", "Bearer k-custom-test")]
-    [InlineData("https://api.openai.com:8443/v1", "Bearer k-custom-test")] // OpenAI's host at another port: not OpenAI's server, so not its key
+    [InlineData("https://api.openai.com:8443/v1", null)] // OpenAI's host at another port: neither OpenAI's key nor LLM_API_KEY goes there (lens F6, 22/10/2026)
     [InlineData("http://localhost:1234/v1", "Bearer k-custom-test")]
     public async Task Each_key_goes_only_to_its_own_service(string baseUrl, string? authorization)
     {
