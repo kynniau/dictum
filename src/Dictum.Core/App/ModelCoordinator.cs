@@ -57,7 +57,7 @@ public sealed class ModelCoordinator(
     private string? _firstRunCleanupDownload;
     private string? _languageProblemShown; // the last WhisperLanguages.Problem ballooned, so a reload does not repeat it
 
-    /// <summary>PROPOSED 22/10/2026 (lens on PR #61): a download, a preset's downloads or a model deletion asked for while model files move.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on PR #61). A download, a preset's downloads or a model deletion asked for while model files move.</summary>
     public const string MovingRefusal = "Model files are being moved; try again when it finishes.";
 
     /// <summary>

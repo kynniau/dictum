@@ -61,7 +61,7 @@ public static class ModelMover
     public static bool Nested(string from, string to) => PathRegistry.IsInside(to, from) || PathRegistry.IsInside(from, to);
 
     /// <summary>
-    /// PROPOSED 22/10/2026: the name a file goes by in the progress and result lines: the catalogue's ("small.en",
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. The name a file goes by in the progress and result lines: the catalogue's ("small.en",
     /// "qwen2.5-1.5b"), or "unfinished small.en download" for a .part.
     /// </summary>
     public static string DisplayName(string fileName)
@@ -114,16 +114,16 @@ public static class ModelMover
         return new MoveResult(moved, ordered.Count, problems, leftBehind, Cancelled: cancellationToken.IsCancellationRequested && leftBehind.Count > 0);
     }
 
-    /// <summary>PROPOSED 22/10/2026: why a file was not moved, after "{name} could not be moved: ".</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Why a file was not moved, after "{name} could not be moved: ".</summary>
     public const string AlreadyThere = "a different file of that name is already in the new folder";
 
-    /// <summary>PROPOSED 22/10/2026: the copy was not the original's size.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. The copy was not the original's size.</summary>
     public const string CopySizeDiffers = "the copy is not the same size as the original, so the copy was deleted";
 
-    /// <summary>PROPOSED 22/10/2026: the copy failed its SHA-256 check against the catalogue.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. The copy failed its SHA-256 check against the catalogue.</summary>
     public const string CopyDoesNotMatch = "the copy did not match the catalogue, so the copy was deleted";
 
-    /// <summary>PROPOSED 22/10/2026 (lens on f5ec71c): the checked copy is in the new folder, but the original is still in the old one.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on f5ec71c). The checked copy is in the new folder, but the original is still in the old one.</summary>
     public const string OriginalKept = "it was copied, but the original could not be removed";
 
     /// <summary>

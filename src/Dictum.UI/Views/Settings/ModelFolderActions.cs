@@ -18,33 +18,33 @@ internal static class ModelFolderActions
     /// <summary>The accessible name of "Use default" on both pages.</summary>
     internal const string UseDefaultName = "Use the default model folder";
 
-    // PROPOSED 22/10/2026 copy (1.3, move-on-change): the offer, its buttons, the refusals and the progress and result lines.
+    // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (1.3 block, section C; move-on-change): the offer, its buttons, the refusals and the progress and result lines.
     internal const string MoveTitle = "Move your model files?";
     internal const string MoveLabel = "Move the files";
     internal const string LeaveLabel = "Leave them where they are"; // the default button (orchestrator, lens on PR #61): Enter never starts a long move
     internal const string DownloadRunning = "A download is running; wait for it to finish, then change the folder again to move the files.";
     internal const string NestedRefused = "One of these folders is inside the other, so Dictum does not move the files. Choose a folder outside the current one.";
 
-    /// <summary>PROPOSED 22/10/2026: the offer's body ("1 file" for one).</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. The offer's body ("1 file" for one).</summary>
     internal static string MoveQuestion(string from, string to, int count, long bytes) =>
         $"Your model files are in {from}. Move them to {to} so Dictum finds them there? {Files(count)}, {ModelCatalog.FormatSize(bytes)}. " +
         "Dictum copies each file, checks it, then removes the original.";
 
-    /// <summary>PROPOSED 22/10/2026: the progress line while a file moves, by its catalogue name (<see cref="ModelMover.DisplayName"/>).</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. The progress line while a file moves, by its catalogue name (<see cref="ModelMover.DisplayName"/>).</summary>
     internal static string Moving(string name, int index, int count) => $"Moving {name} ({index} of {count})…";
 
-    /// <summary>PROPOSED 22/10/2026: every file moved.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Every file moved.</summary>
     internal static string Moved(int count, string to) => $"Moved {Files(count)} to {to}.";
 
-    /// <summary>PROPOSED 22/10/2026: <paramref name="name"/> is the first file that met a problem; the files not moved are still in <paramref name="from"/>.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. <paramref name="name"/> is the first file that met a problem; the files not moved are still in <paramref name="from"/>.</summary>
     internal static string MovedSome(int moved, int count, string name, string reason, string from) =>
         $"Moved {moved} of {count}; {name} could not be moved: {reason}. The rest stay in {from}.";
 
-    /// <summary>PROPOSED 22/10/2026: added when more than one file met a problem.</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Added when more than one file met a problem.</summary>
     internal static string MoreProblems(int more) => more == 1 ? " 1 other file could not be moved either; the log says why." : $" {more} other files could not be moved either; the log says why.";
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (lens on PR #61): added when a model in use stayed behind (or the move was stopped), so the folder
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on PR #61). Added when a model in use stayed behind (or the move was stopped), so the folder
     /// was not changed: dictation goes on with the models where they are.
     /// </summary>
     internal static string FolderKept(string from, string to, bool someMoved) => someMoved
@@ -153,6 +153,7 @@ internal static class ModelFolderActions
             var line = result.Problems.Count == 0 && result.Moved == result.Count
                 ? Moved(result.Count, shell.RealPath(to))
                 : result.Problems.Count == 0
+                    // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Stopped by quit with no problem.
                     ? $"Moved {result.Moved} of {result.Count}."
                     : MovedSome(result.Moved, result.Count, ModelMover.DisplayName(result.Problems[0].FileName), result.Problems[0].Reason, shell.RealPath(from)) +
                       (result.Problems.Count > 1 ? MoreProblems(result.Problems.Count - 1) : "");
