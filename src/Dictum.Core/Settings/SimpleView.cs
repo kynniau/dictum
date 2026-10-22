@@ -54,7 +54,7 @@ public static class SimpleView
         cloudHost is null ? Explainer : Explainer.Replace(ExplainerOnThisPc, ExplainerCloudSentence(cloudHost), StringComparison.Ordinal);
 
     /// <summary>
-    /// The explainer at the top of the Simple speech card. The brief's wording named "Settings > Test my setup", whichdoes not
+    /// The explainer at the top of the Simple speech card. The brief's wording named "Settings > Test my setup", which does not
     /// exist in this build; the existing calibration test ("Calibrate my voice", the button under this text) is named instead.
     /// </summary>
     public const string Explainer = "Dictum turns your voice into text on this PC. The speech model does the listening. Standard works for most people. " +

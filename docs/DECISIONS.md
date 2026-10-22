@@ -4494,8 +4494,9 @@ items listed in 1 to 4 below, and for nothing else.
 
 ## Cloud speech, UI (22/10/2026, branch feat/cloud-speech-ui)
 
-Lane C-UI of the design brief's "Cloud speech" appendix (§2, §3, §4, §7 item 9, §8), on the Core half (PR #48). No README,
-site or Store copy changes: that is the C-Copy lane, gated on owner approval.
+Lane C-UI of the design brief's "Cloud speech" appendix (§2, §3, §4, §7 item 9, §8), on the Core half (PR #48). `site/help.html`
+was edited only on the owner's instruction, to keep the site's Help equal to the app's (items 16, 19, 23 and 25); README and Store
+copy are the C-Copy lane's, gated on owner approval.
 
 1. **Cause.** The Core lane built the gate, the request and the fallback, but nothing in the app could record the speech
    consent or switch cloud speech off, and the surfaces that say what leaves this PC did not know about audio: with cloud
@@ -4717,14 +4718,16 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
     5. *Same consent, new paragraph (owner, 16:35 AEDT).* After `ConsentWarning` and before "Nothing is sent until you agree":
        "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there."
        (`CloudPolicy.ConsentResponsibility`). Same marker with 16:35.
-    - *Quoted copies of the consent.* The Help answer, `site/help.html` and `scripts/demos/cloud-cleanup.json` quote only the
-      warning paragraph (`ConsentWarning`), which did not change, so none of them needed an edit. Updated pins:
-      `CloudWarningAndPresetsTests` (the warning-paragraph pin now expects the new paragraph after it; the key-sentence pin
-      likewise; a new whole-text byte pin for Anthropic and a custom host) and `ShellTests` (it checked "never the audio").
-      Not edited (C-Copy): `README.md` describes the consent as sending "the dictation's text, never the audio". The recorded
-      demo images (`site/img/demos/cloud-cleanup.gif` and its poster) may show the old dialog wording; they were not
-      re-recorded.
-    - *Pins.* `CloudSpeechUiTests.The_models_page_on_this_PC_sentences_follow_cloud_speech` (Advanced and Simple, both
+    - *Quoted copies of the consent.* The Help answer and `site/help.html` quote only the warning paragraph (`ConsentWarning`),
+      which did not change, so neither needed an edit. `scripts/demos/cloud-cleanup.json` does not quote the consent: its
+      caption says only "with a warning". Updated pins: `CloudWarningAndPresetsTests` (the warning-paragraph pin now expects the
+      new paragraph after it; the key-sentence pin likewise) and `ShellTests` (it checked "never the audio"), plus a new
+      whole-text byte pin for Anthropic and a custom host, now in `OwnerApprovalsTests` (item 26).
+      Not edited (C-Copy): `README.md` describes the consent as sending "the dictation's text, never the audio". The demo
+      poster (`site/img/demos/cloud-cleanup-poster.png`, step 26 of 29, checked on 22/10/2026) shows the old dialog: "(never the
+      audio)" and no responsibility paragraph. The GIF (`site/img/demos/cloud-cleanup.gif`) comes from the same recording and was
+      not checked frame by frame. Re-recording the cloud clean-up demo is a 1.3 demos item.
+    - *Pins.* `CloudSpeechModelsPageTests.The_models_page_on_this_PC_sentences_follow_cloud_speech` (moved there, item 26) (Advanced and Simple, both
       states, byte for byte); the Help pin gains the "or cloud speech" sentence (app and site); the consent byte pins above.
     - *Mutations (observed 22/10/2026), one character each, restored afterwards.*
       - Advanced replacement ("fallback." to "fallback!") and Simple replacement ("is on." to "is on!"): the models-page pin
@@ -4744,3 +4747,15 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
     byte in the app and on the site, and that neither still says "or cloud speech in Settings". This resolves item 23.3's note.
     Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; HelpPageTests, OwnerApprovalsTests,
     PublicCopyNeutralityTests and SiteStoreFirstTests, 62 total, 0 failed, 0 skipped (the full suite was not rerun for this edit).
+26. **Final lens on 4a3903e (housekeeping).**
+    - *File sizes.* Two test files had grown past 1,000 lines. The whole-text consent byte pin moved to `OwnerApprovalsTests`,
+      with the other literal pins, and carries its own literal copy of the warning. The Models-page pin moved to a new
+      `CloudSpeechModelsPageTests.cs`. Line counts now: `CloudWarningAndPresetsTests.cs` 975, `CloudSpeechUiTests.cs` 972,
+      `OwnerApprovalsTests.cs` 378, `CloudSpeechModelsPageTests.cs` 86.
+    - *Docs.* Item 23's quoted-copies note is corrected. The demo poster does show the old consent wording (checked), the
+      demo data does not quote the consent, and the re-record is listed for 1.3. The entry's opening line now says
+      `site/help.html` was edited on the owner's instruction.
+    - *Typos.* Two typos introduced by this branch's edits are fixed, so both lines match main again: `SimpleView.cs`
+      "whichdoes" and `CloudWarningAndPresetsTests.cs` `ApprovedStateLine ="`.
+    - Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; CloudSpeechModelsPageTests, OwnerApprovalsTests,
+      CloudWarningAndPresetsTests and CloudSpeechUiTests: 110 total, 0 failed, 0 skipped. The full suite was not rerun for this move.

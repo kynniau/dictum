@@ -342,4 +342,37 @@ public class OwnerApprovalsTests
             shell.Dispose();
         }
     });
+
+    // ---- Cloud clean-up consent (owner, 22/10/2026 16:35 and 18:41 AEDT; counsel review pending) ----
+    // Moved here from CloudWarningAndPresetsTests (final lens on PR #54): the literal pins belong with the owner's approvals.
+
+    // Approved by the product owner on 16/10/2026 as written (CloudPolicy.ConsentWarning): a literal copy, independent of the app's.
+    private static string ApprovedCleanupWarning(string host) =>
+        $"WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on {host}'s servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.";
+
+    /// <summary>
+    /// Pin (mutation-checked): the whole clean-up consent text for the Anthropic and a custom OpenAI-compatible host, byte for byte,
+    /// with the owner's 18:41 parenthesis and 16:35 paragraph (22/10/2026; counsel review pending), independently of the app's copy.
+    /// </summary>
+    [Fact]
+    public void The_clean_up_consent_text_is_the_approved_text_byte_for_byte()
+    {
+        var anthropic = new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel };
+        var host = Dictum.Llm.CloudPolicy.CloudHost(anthropic)!;
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
+            $"With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to {host} (Anthropic) together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives.\n\n" +
+            ApprovedCleanupWarning(host) + "\n\n" +
+            "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +
+            "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it."),
+            System.Text.Encoding.UTF8.GetBytes(Dictum.Llm.CloudPolicy.ConsentText(anthropic, host)));
+        var custom = new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://llm.example.com/v1", Model = "m" };
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
+            "With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to llm.example.com together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "It uses your own API key (LLM_API_KEY) if you have set one. Whoever runs that server receives the text; its own terms apply.\n\n" +
+            ApprovedCleanupWarning("llm.example.com") + "\n\n" +
+            "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +
+            "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it."),
+            System.Text.Encoding.UTF8.GetBytes(Dictum.Llm.CloudPolicy.ConsentText(custom, "llm.example.com")));
+    }
 }
