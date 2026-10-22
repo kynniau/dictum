@@ -1,0 +1,196 @@
+{
+  "name": "cloud-cleanup",
+  "title": "Turn on cloud clean-up (optional)",
+  "summary": "Settings > Clean-up: choose a service, open the settings folder, save the key in a .env file with Notepad (the placeholder your-key-here, never a real key), then Use cloud clean-up… shows the consent step with its warning. The demo clicks Cancel there: it never agrees, so nothing is switched on and the On: state line is described, not shown.",
+  "environment": { "notepad": true },
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" },
+    { "do": "launch" },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Use this hotkey" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Finish", "timeout": 60 } },
+    { "do": "wait", "seconds": 10 }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "settings",
+      "caption": "Click Settings.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum$", "type": "Button", "name": "Settings" } } ]
+    },
+    {
+      "id": "cleanup",
+      "caption": "Click Clean-up, on the left.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Clean-up" } } ]
+    },
+    {
+      "id": "service",
+      "caption": "Under Cloud clean-up, open the Service list.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ComboBox", "name": "Service" } } ],
+      "scrollFirst": true,
+      "after": 1
+    },
+    {
+      "id": "anthropic",
+      "caption": "Choose your service. This demo chooses Anthropic.",
+      "do": [ { "do": "click", "target": { "type": "ListItem", "name": "Anthropic (Claude)" } } ]
+    },
+    {
+      "id": "key-line",
+      "caption": "This line says the name your key needs: ANTHROPIC_API_KEY.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "The key goes in .env", "match": "prefix" } } ],
+      "after": 2.5
+    },
+    {
+      "id": "open-folder",
+      "caption": "Click Open the settings folder.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Open the settings folder" } } ],
+      "after": 2.5
+    },
+    {
+      "id": "address",
+      "caption": "Press Ctrl+L. The folder's address shows, highlighted.",
+      "do": [ { "do": "waitFor", "target": { "window": "File Explorer$", "timeout": 30 } }, { "do": "key", "keys": "Ctrl+L" } ],
+      "after": 1.5
+    },
+    {
+      "id": "copy",
+      "caption": "Press Ctrl+C to copy the folder's address.",
+      "do": [ { "do": "key", "keys": "Ctrl+C" } ],
+      "after": 1.2
+    },
+    {
+      "id": "notepad",
+      "caption": "Open Notepad.",
+      "do": [ { "do": "launch", "path": "C:\\sbx\\notepad\\notepad.exe" }, { "do": "waitFor", "target": { "window": "Notepad$", "timeout": 30 } } ],
+      "after": 1.5
+    },
+    {
+      "id": "line",
+      "caption": "Type the line. Put your own key where it says your-key-here.",
+      "do": [ { "do": "type", "into": { "window": "Notepad", "name": "Text editor", "timeout": 30 }, "text": "ANTHROPIC_API_KEY=your-key-here" } ],
+      "after": 2
+    },
+    {
+      "id": "file",
+      "caption": "Click File.",
+      "do": [ { "do": "click", "target": { "window": "Notepad", "type": "MenuItem", "name": "File" } } ],
+      "after": 1
+    },
+    {
+      "id": "save-as",
+      "caption": "Click Save as.",
+      "do": [ { "do": "click", "target": { "type": "MenuItem", "name": "Save as", "match": "prefix" } } ],
+      "after": 1.5
+    },
+    {
+      "id": "type-list",
+      "caption": "Open the Save as type list.",
+      "do": [ { "do": "click", "target": { "window": "Notepad$", "type": "ComboBox", "name": "Save as type:" } } ],
+      "after": 1
+    },
+    {
+      "id": "all-files",
+      "caption": "Choose All files.",
+      "do": [ { "do": "click", "target": { "type": "ListItem", "name": "All files", "match": "prefix" } } ]
+    },
+    {
+      "id": "file-name",
+      "caption": "Click in File name.",
+      "do": [ { "do": "click", "target": { "window": "Notepad$", "type": "Edit", "name": "File name:" } } ],
+      "after": 1
+    },
+    {
+      "id": "select-name",
+      "caption": "Press Ctrl+A to select what is there.",
+      "do": [ { "do": "key", "keys": "Ctrl+A" } ],
+      "after": 1.2
+    },
+    {
+      "id": "paste",
+      "caption": "Press Ctrl+V to paste the folder's address.",
+      "do": [ { "do": "key", "keys": "Ctrl+V" } ],
+      "after": 1.5
+    },
+    {
+      "id": "env",
+      "caption": "Type \\.env straight after it.",
+      "do": [ { "do": "type", "text": "\\.env" } ],
+      "after": 2
+    },
+    {
+      "id": "save",
+      "caption": "Click Save.",
+      "do": [ { "do": "click", "target": { "window": "Notepad$", "type": "Button", "name": "Save" } } ],
+      "after": 2
+    },
+    {
+      "id": "close-notepad",
+      "caption": "Close Notepad.",
+      "do": [ { "do": "click", "target": { "window": "^\\.env - Notepad$", "type": "Button", "name": "Close" } } ],
+      "after": 1.5
+    },
+    {
+      "id": "saved",
+      "caption": "The file .env is now in Dictum's settings folder.",
+      "do": [ { "do": "point", "target": { "window": "File Explorer$", "type": "ListItem", "name": ".env", "timeout": 20 } } ],
+      "after": 2.5
+    },
+    {
+      "id": "close-folder",
+      "caption": "Close the folder window. Dictum settings is behind it.",
+      "do": [ { "do": "click", "target": { "window": "File Explorer$", "type": "Button", "name": "Close" } } ],
+      "after": 1.5
+    },
+    {
+      "id": "use",
+      "caption": "Click Use cloud clean-up.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Use cloud clean-up", "match": "prefix" } } ],
+      "after": 1.5
+    },
+    {
+      "id": "consent",
+      "caption": "Dictum says what it will send, and to whom, with a warning. Read it all.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum: Send dictations", "type": "Text", "name": "Send dictations to a cloud service?", "timeout": 30 } } ],
+      "after": 4,
+      "poster": true
+    },
+    {
+      "id": "allow",
+      "caption": "Click Allow cloud clean-up only if you agree. This demo does not.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum: Send dictations", "type": "Button", "name": "Allow cloud clean-up" } } ],
+      "after": 2.5
+    },
+    {
+      "id": "cancel",
+      "caption": "This demo clicks Cancel, so cloud clean-up stays off.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum: Send dictations", "type": "Button", "name": "Cancel" } } ],
+      "after": 1.5
+    },
+    {
+      "id": "state",
+      "caption": "After Allow, this card would start with On: and name the service.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Cloud clean-up", "match": "exact" } } ],
+      "after": 3
+    }
+  ]
+}

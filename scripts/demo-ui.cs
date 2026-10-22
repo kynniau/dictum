@@ -336,7 +336,10 @@ public static class DemoUi
         foreach (var n in names)
         {
             ushort vk;
-            if (!Keys.TryGetValue(n.Trim(), out vk)) throw new ArgumentException("Unknown key '" + n + "' in '" + chord + "'.");
+            var key = n.Trim();
+            // A single letter (Ctrl+C, Ctrl+V, ...): its virtual-key code is the capital letter's code.
+            if (key.Length == 1 && char.IsLetter(key[0]) && key[0] < 128) vk = (ushort)char.ToUpperInvariant(key[0]);
+            else if (!Keys.TryGetValue(key, out vk)) throw new ArgumentException("Unknown key '" + n + "' in '" + chord + "'.");
             codes.Add(vk);
         }
         foreach (var vk in codes) Key(vk, 0, Extended.Contains(vk) ? KEYEVENTF_EXTENDEDKEY : 0);

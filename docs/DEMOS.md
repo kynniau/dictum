@@ -234,6 +234,18 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   and the tray panel).
 - **Not yet shown: the Help paragraph "In this help, … Simple view …".** The help demo jumps past it, so that sentence
   is never on screen. Noted for a later recording (lens on 7900e49).
+- **The cloud clean-up demo never agrees, and never holds a real key.** It types the placeholder `your-key-here`, saves it
+  as `.env` in the folder Open the settings folder opens, then stops at the consent dialog and clicks Cancel. So the "On: …"
+  state line and the tray panel's "Cloud clean-up on · text leaves this PC" are described in a caption, not shown. Agreeing
+  was not recorded on purpose: with the placeholder saved, Dictum would take it for a key (`EnvFile` reads any value) and
+  show cloud clean-up as on, for a key that cannot work. `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`
+  checks the On: line and the tray line headlessly instead.
+- **Start cannot find Notepad in the sandbox.** Start's search said "No results found for 'Notepad'", and the sandbox has
+  no `C:\Windows\System32\notepad.exe` ("The system cannot find the file specified", observed 22/10/2026). So the cloud
+  clean-up demo borrows this PC's classic Notepad (`environment.notepad`, staged read-only with its en-US resources, used
+  only inside the disposable sandbox, like the Visual C++ runtime) and starts it under the caption "Open Notepad." The
+  help text says to open it from Start. The Windows 11 Notepad on a real PC looks different; that its File > Save as opens
+  the same Save As dialog (Save as type, File name) is recalled, not verified.
 - **The help demo does not press Send feedback**: it opens the user's own mail program, and the sandbox has none. The
   demo shows the button and says what it does.
 - **The Setup's version is 1.1.2.** The 1.2 build (main at d47e7f9) still carries version 1.1.2, so the Setup file,
@@ -264,15 +276,25 @@ now. Re-record it as a Microsoft Store install when that is possible (the record
 | 4. Calibrate my voice | `test-setup.json` | Tray icon, Calibrate my voice, the first sentence, Record, and Record switched off, with the no-microphone message under it |
 | 5. Models on another drive | `model-folder.json` | Settings, Models, Browse, type D:\Dictum models, Select Folder, the new folder shown |
 | 6. Find help | `help.json` | Settings > Help: the "Questions on this page" list, two questions opened from it and their answers, Send feedback (shown, not pressed) |
+| 7. Turn on cloud clean-up | `cloud-cleanup.json` | Settings > Clean-up: the Service list (Anthropic chosen), the key line, Open the settings folder, Ctrl+L and Ctrl+C in File Explorer, Notepad with the placeholder line `ANTHROPIC_API_KEY=your-key-here`, File > Save As, All files, File name, Ctrl+A, Ctrl+V, `\.env`, Save, Notepad closed, the `.env` file in the folder, the folder closed, Use cloud clean-up…, the consent dialog, Allow cloud clean-up (shown, not pressed), Cancel, the Cloud clean-up card. Recorded separately (below) |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
 
 Posters (the step marked `"poster": true`): install, step 9 (the welcome window's first step); first-run, step 12 (Try it,
 the box ready); change-model, step 7 (More accurate In use); test-setup, step 4 (the sentence to read); model-folder, step 8
-(the new folder shown); help, step 10 (Send feedback); dictation-stills, its last slide (Pasted 12 words). None is an
+(the new folder shown); help, step 10 (Send feedback); cloud-cleanup, step 26 (the consent dialog with its warning); dictation-stills, its last slide (Pasted 12 words). None is an
 error screen, except that the no-microphone sentence under the disabled Record is visible in test-setup's: on the 1.2
 build it shows from the moment the calibration window opens on a PC with no microphone, so no frame of that demo is
 without it.
 
+**cloud-cleanup** was recorded on 22/10/2026 (run `20261022-115140-cloud-cleanup`, 29 steps, no fallbacks, 172.9 s) from a
+Setup built locally with `scripts\build-installer.ps1` in a detached worktree at main 049b73a: `Dictum-Setup-1.2.0.exe`,
+SHA-256 `726731A809D39413E0B66642A5CD7789C8041924D1925297860AE57A95F117FD`, `Dictum.exe` version `1.2.0+049b73a`. Its GIF
+is 1,863,368 bytes. Two script changes came with it: `scripts\demo-ui.cs` presses any single letter in a chord (Ctrl+L,
+Ctrl+C, Ctrl+V), and a demo whose `environment` says `"notepad": true` gets this PC's classic Notepad, staged read-only as
+`C:\sbx\notepad\notepad.exe` with its en-US resources (below, "Start cannot find Notepad"). Earlier runs that day failed and
+were re-run: Start found no Notepad; a click on the address bar opened a breadcrumb menu instead (hence Ctrl+L); the Save
+As dialog is inside Notepad's window for UI Automation; a target name with "…" in it was not found (the driver reads the
+data file in another encoding, so the target uses a prefix); one sandbox froze after setup and one lost the tray icon.
 change-model, test-setup, model-folder and help go through the welcome window with its defaults (Next, Next, Next,
 Use this hotkey, Next, Finish) before recording starts. install and first-run do not: install ends on the welcome
 window, and first-run records it.
@@ -345,6 +367,36 @@ window, and first-run records it.
    8. Click another question: Why did it type the wrong words?
    9. Its answer lists what to try.
    10. To tell us something, use Send feedback. It opens an email you can check, then send.
+7. **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`)
+   1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
+   2. Click the Dictum icon.
+   3. Click Settings.
+   4. Click Clean-up, on the left.
+   5. Under Cloud clean-up, open the Service list.
+   6. Choose your service. This demo chooses Anthropic.
+   7. This line says the name your key needs: ANTHROPIC_API_KEY.
+   8. Click Open the settings folder.
+   9. Press Ctrl+L. The folder's address shows, highlighted.
+   10. Press Ctrl+C to copy the folder's address.
+   11. Open Notepad.
+   12. Type the line. Put your own key where it says your-key-here.
+   13. Click File.
+   14. Click Save as.
+   15. Open the Save as type list.
+   16. Choose All files.
+   17. Click in File name.
+   18. Press Ctrl+A to select what is there.
+   19. Press Ctrl+V to paste the folder's address.
+   20. Type \.env straight after it.
+   21. Click Save.
+   22. Close Notepad.
+   23. The file .env is now in Dictum's settings folder.
+   24. Close the folder window. Dictum settings is behind it.
+   25. Click Use cloud clean-up.
+   26. Dictum says what it will send, and to whom, with a warning. Read it all.
+   27. Click Allow cloud clean-up only if you agree. This demo does not.
+   28. This demo clicks Cancel, so cloud clean-up stays off.
+   29. After Allow, this card would start with On: and name the service.
 - **Dictate: hold, speak, let go** (stills, `dictation-stills.json`)
   1. Hold Right Ctrl and speak. The bar at the bottom of the screen says Recording.
   2. Let go of the key when you have finished. Dictum turns your words into text.

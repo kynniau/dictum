@@ -225,6 +225,19 @@ foreach ($name in $Demo) {
             $maps["C:\sbx\models"] = "$stage\models"
             $job.extraModels = @($extra | ForEach-Object { "C:\sbx\models\" + (Split-Path -Leaf $_) })
         }
+        if ($data.PSObject.Properties["environment"] -and $data.environment.PSObject.Properties["notepad"] -and $data.environment.notepad) {
+            # The sandbox (Windows 11 26100 here, 22/10/2026) has no Notepad: notepad.exe is not in its System32 and Start finds
+            # none. A demo that names "notepad" gets this PC's classic Notepad, staged read-only as C:\sbx\notepad\notepad.exe
+            # with its en-US resources beside it (the sandbox's display language), and launches it from there. Like the
+            # Visual C++ runtime, it goes only into the disposable sandbox.
+            $notepad = Join-Path $env:SystemRoot "System32\notepad.exe"
+            $mui = Join-Path $env:SystemRoot "System32\en-US\notepad.exe.mui"
+            foreach ($f in @($notepad, $mui)) { if (-not (Test-Path -LiteralPath $f)) { throw "$($data.name) needs this PC's $f, which is missing." } }
+            New-Item -ItemType Directory -Force -Path "$stage\notepad\en-US" | Out-Null
+            Copy-Item -LiteralPath $notepad -Destination "$stage\notepad"
+            Copy-Item -LiteralPath $mui -Destination "$stage\notepad\en-US"
+            $maps["C:\sbx\notepad"] = "$stage\notepad"
+        }
         if ($vcInfo) {
             New-Item -ItemType Directory -Force -Path "$stage\vcrt" | Out-Null
             $vcInfo.Dlls | ForEach-Object { Copy-Item -LiteralPath $_ -Destination "$stage\vcrt" }
