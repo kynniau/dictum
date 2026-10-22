@@ -4736,4 +4736,4 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
         models-page pin observed failing in both views.
       - The three 18:46 strings, each changed by one character ("encrypted" to "encrypted!", "Speech: " to "Speech - ",
         "offline." to "offline!"): the log-and-loader pin, the About fallback pin and the off-not-saved pin observed failing.
-24. **Gates after items 22 and 23.** GATE_TOTALS_6
+24. **Gates after items 22 and 23** (origin/main d838326 merged): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1920 total, 0 failed, 23 skipped, 0 errors. A first full run printed no summary line (cause not found); the rerun, whose whole output was kept, is the one recorded.
