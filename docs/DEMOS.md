@@ -6,6 +6,7 @@ main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build 
 
 All caption copy below is **PROPOSED**, for the product owner to approve.
 Owner approval, 22/10/2026 14:25 AEDT: the captions of demo 7, **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`), are **APPROVED** (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)"). The marker on the other demos' captions is unchanged by that entry.
+Owner approval, 22/10/2026 17:30 AEDT: step 16 of demo 1, **Start Dictum for the first time** (`first-run.json`, step id `ready`), is **APPROVED** with the wording "This is Dictum's panel. The word beside the switch says what Dictum is doing."; the other first-run captions stay PROPOSED.
 
 ## What it makes
 
@@ -221,6 +222,7 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   string a frame shows), so the footage matches it. One run each of `first-run` and `flyout` first stopped (`first-run` at step 7,
   `flyout` in its prepare steps) with the welcome window still on its Speech model step after the Next click; the cause
   was not established. Both were run again and completed (`flyout.json` was edited between its runs, for the pointer and tooltip, not for this).
+- **first-run step 16 re-captioned (22/10/2026, branch `demos/first-run-caption`).** The owner approved the wording "This is Dictum's panel. The word beside the switch says what Dictum is doing." (17:30 AEDT). The 1.2.1 run folder (`raw.mp4`, `steps.json`) was not kept, so the demo was not run through `demo-post.ps1`. Instead the captioned 1.2.1 `first-run.mp4` (outside the repository) was re-encoded with only the caption band repainted for step 16 (the frames from 102.067 s to 109.667 s, the step's own span read off the video); `Get-CaptionLayout`, `Split-Caption`, `Get-CaptionFilter` and `New-DemoGif` from `demo-common.ps1` set the text, and the GIF came out at the same 800 px, 8 frames a second, 987 frames. Every other frame of the new mp4 is at least 57 dB PSNR against the old one (compression noise only); the 213 frames of step 16 are the only ones that differ. `first-run-poster.png` shows step 12 and was not changed.
 - **The tray panel still (`site/img/flyout.png`).** Not a demo's output: `flyout.json` records the panel in the Advanced
   view (Settings > Models > Advanced, Settings closed, panel opened, pointer parked on the taskbar so no tooltip shows)
   and the still would be that step's raw frame (`frames\raw\09-panel.png`) cropped to the panel with
@@ -352,7 +354,7 @@ window, and first-run records it.
    13. Click Finish.
    14. Dictum now waits by the clock. Click the little up-arrow there. *(skipped when the icon is already on the taskbar)*
    15. Click the Dictum icon.
-   16. This is Dictum's panel. The word beside the switch says how Dictum is. *(PROPOSED 22/10/2026; was "Ready means it is waiting for you.", which the 1.2.1 panel no longer says on a PC without a microphone)*
+   16. This is Dictum's panel. The word beside the switch says what Dictum is doing. *(APPROVED 22/10/2026 17:30 AEDT; was "Ready means it is waiting for you.", which the 1.2.1 panel no longer says on a PC without a microphone, then briefly "...says how Dictum is.")*
    17. This test PC has no microphone, so the panel says so here.
    18. Press Esc to close the panel.
 3. **Change the speech model** (`change-model.json`)
