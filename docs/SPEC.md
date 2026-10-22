@@ -1312,12 +1312,15 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
   tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
-  others, and what to do about it), then twelve questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
+  others, and what to do about it), then thirteen questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
   Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
   themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
   into view with its focus ring. Amended 22/10/2026 (round 2): the page scrolls so the answer's heading is 8 px below
   the top of the view (`HelpPage.JumpGap`); an answer the page cannot scroll that far (the last ones) shows whole.
+  APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): two more questions after "Why did it type the wrong words?", "What is
+  clean-up?" and "How can I see what Dictum does with my words?" (`HelpText.CleanupQuestion`, `SeeHowQuestion`), which make fifteen;
+  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers").
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
