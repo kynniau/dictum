@@ -34,7 +34,8 @@ public sealed class MacPackagingTests
         Assert.Equal("true", plist["NSHighResolutionCapable"].Name.LocalName);
         Assert.Equal("15.0", plist["LSMinimumSystemVersion"].Value); // .NET 10 supports macOS 15 and later
         Assert.Equal("public.app-category.productivity", plist["LSApplicationCategoryType"].Value);
-        Assert.Equal("Dictum listens only while you hold your hotkey, and keeps the audio on this Mac.", plist["NSMicrophoneUsageDescription"].Value);
+        // PROPOSED (docs/MAC-HANDOVER.md §0, public-copy lane 22/10/2026): true with cloud speech (1.3) on as well.
+        Assert.Equal("Dictum listens only while you hold your hotkey, and keeps the audio on this Mac unless you turn on cloud speech.", plist["NSMicrophoneUsageDescription"].Value);
         Assert.Equal("© 2026 Kynni Pty Ltd", plist["NSHumanReadableCopyright"].Value);
         // The script fills both version keys from Directory.Build.props.
         Assert.Equal("@VERSION@", plist["CFBundleShortVersionString"].Value);

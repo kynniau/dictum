@@ -5423,3 +5423,6 @@ unless marked:
 - Nothing else on main touches a platform seam: the cloud speech UI, own clean-up instructions, Help questions, plain-words
   page and the key file are Core/UI code the Mac build takes as is (the key file, `KeyFile.cs`, is a plain .NET
   create-new write of `.env` in the config folder).
+- `NSMicrophoneUsageDescription` now reads "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac
+  unless you turn on cloud speech." (PROPOSED), the wording main's handover §0 replaced the earlier proposal with, because
+  the earlier sentence is untrue once cloud speech (1.3) is on. Pinned in MacPackagingTests.
