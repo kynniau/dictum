@@ -243,6 +243,11 @@ Setup built at 4abba54, SHA-256 `D12A9D96DCD5906DD70A7AADF023A87D91DAA0C62F79469
 (`.githooks/private-guard.sh`, and `.gitignore`) refuses every `.mp4` in the repository, with no exception. Where the
 videos are hosted is the product owner's decision.
 
+**`install` is retired from the site (22/10/2026, Site: Store-first in `docs/DECISIONS.md`).** Its GIF shows the
+direct download's Setup and the SmartScreen prompt, and the site now shows the Microsoft Store as the one install path,
+so `site/help.html` no longer plays it. `site/img/demos/install.gif` and `install-poster.png` stay in the repository for
+now. Re-record it as a Microsoft Store install when that is possible (the recording sandbox has no network: see Limitations).
+
 | Demo | File | Shows |
 |---|---|---|
 | 1. Install | `install.json` | Downloads folder, double-click Setup, SmartScreen (offline variant), Next, Install, Launch Dictum ticked, Finish, the "Welcome to Dictum" window |
