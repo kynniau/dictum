@@ -311,11 +311,11 @@ public class HelpPageTests
         // The question "How do I turn on cloud clean-up?" is a heading, not a paragraph: its answer's first paragraph says it.
         var questions = HelpText.Questions.Select(q => q.Question).ToHashSet(StringComparer.Ordinal);
         var mentions = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
-        Assert.Equal(3, mentions.Count); // "How Dictum works", "Where does my voice go?" and "How do I turn on cloud clean-up?"
+        Assert.Equal(4, mentions.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and (PROPOSED 22/10/2026) "What is clean-up?"
         Assert.Contains(HelpText.CloudAnswer[0], mentions);
         Assert.All(mentions, t =>
         {
-            Assert.Contains("the text of each dictation", t);
+            Assert.Contains("the text of each dictation", t, StringComparison.OrdinalIgnoreCase); // "The text of each dictation" opens the PROPOSED clean-up paragraph
             Assert.Contains("the words in your dictionary", t);
             Assert.Contains("Your voice still stays here", t, StringComparison.OrdinalIgnoreCase);
         });
@@ -323,9 +323,9 @@ public class HelpPageTests
 
     /// <summary>
     /// PROPOSED 22/10/2026 (clean-up explainers lane): "What is clean-up?" names the choices as the Simple view and Settings > Models do,
-    /// and every claim it makes about what clean-up does is checked against the code that does it: the rule-based tidy removes ums, ahs
-    /// and a doubled "the the" and leaves its sentences alone; the model's prompt asks for "you know", false starts and "scratch that";
-    /// the rule-based tidy is Off's neighbour in the Simple view; and a non-English dictation is not cleaned beyond its spacing.
+    /// and every claim it makes about what clean-up does is checked against the code that does it: the rule-based tidy removes ums, ahs,
+    /// a doubled "the the", and follows a "scratch that" or "new line" said as a phrase of its own; the model's prompt asks for "you know", false starts and "scratch that";
+    /// and the gate is the language setting (Detect automatically gives spacing only; Translate to English on gives the full tidy).
     /// </summary>
     [Fact]
     public void The_clean_up_answer_names_the_choices_and_its_claims_hold()
@@ -339,20 +339,24 @@ public class HelpPageTests
         Assert.Contains("Settings > Clean-up", text);
         Assert.Contains("Settings > " + Dictum.Core.HowItWorksText.PageTitle, text);
         Assert.EndsWith("Only your own corrections, snippets and the profanity filter (if on) still apply.", Dictum.Settings.SimpleView.OffSubLine); // Off's second sentence is the app's own
-        Assert.Contains("Only your own corrections, snippets and the profanity filter (if on) still apply.", text);
+        Assert.Contains("; only your own corrections, snippets and the profanity filter (if on) still apply.", text);
 
-        // "Takes out ums, ahs and doubled words such as \"the the\"", "does not rewrite your sentences".
+        // "Takes out ums, ahs and doubled words such as \"the the\", and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own."
         Assert.Equal("So the report is ready.", DeterministicCleaner.Clean("um so the the report is ready uh"));
-        Assert.Equal("The quick brown fox jumps over the lazy dog.", DeterministicCleaner.Clean("the quick brown fox jumps over the lazy dog"));
-        // The model "also takes out \"you know\" and false starts, and follows \"scratch that\"": the prompt it is given asks for each.
+        Assert.Equal("Keep this one. Keep.", DeterministicCleaner.Clean("Keep this one. Drop this bit. Scratch that. Keep."));
+        Assert.Equal("First point.\nSecond point.",DeterministicCleaner.Clean("First point. New line. Second point."));
+        Assert.Equal("We need a new line of credit.", DeterministicCleaner.Clean("We need a new line of credit.")); // inside a phrase it is left alone, so the answer says "a phrase of their own"
+        // The model "also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\"": the prompt it is given asks for each.
         foreach (var asked in new[] { "you know", "false starts", "scratch that" })
             Assert.Contains(asked, CleanupPrompt.Default);
-        // "Work on English dictations today. For other languages, only the spacing is tidied."
+        // The language sentence is the approved one in "How Dictum works", and the gate is the language SETTING, not what was spoken.
+        Assert.Contains("Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.", HelpText.HowItWorks.Single(p => p.StartsWith("Tidy my words, in Settings", StringComparison.Ordinal)));
+        Assert.Contains("Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.", answer);
         Assert.True(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("en", translate: false));
+        Assert.False(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("auto", translate: false)); // Detect automatically: spacing only, even for English
         Assert.False(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("es", translate: false));
+        Assert.True(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("es", translate: true)); // Translate to English on: tidied in full
         Assert.True(TranscriptCleaner.Plain("not English").IsPlain);
-        // The answer never says it turns on cloud clean-up (the pin on those mentions is for the paragraphs that do).
-        Assert.DoesNotContain("turn on cloud clean-up", text);
     }
 
     /// <summary>

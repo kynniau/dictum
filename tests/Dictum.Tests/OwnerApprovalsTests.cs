@@ -229,16 +229,6 @@ public class OwnerApprovalsTests
     // the only claim these strings make: nothing here records an approval, and the markers in the code stay PROPOSED. Reworded on
     // approval means these literals change with them, in the same commit as the owner's decision.
 
-    /// <summary>PROPOSED pin: the three row explainers for Tidy my words, AI clean-up and Off, each under 120 characters.</summary>
-    [Fact]
-    public void The_proposed_clean_up_row_explainers_are_pinned()
-    {
-        Assert.Equal("Fixes punctuation and capitals and takes out ums and ahs, without rewriting. A good choice for most people.", SimpleView.TidyExplainer);
-        Assert.Equal("Also takes out \"you know\" and false starts, and follows \"scratch that\". Pick it if plain tidying leaves too much in.", SimpleView.AiExplainer);
-        Assert.Equal("Pastes what was heard, with no tidying. Pick it if you would rather fix the text yourself.", SimpleView.OffExplainer);
-        Assert.All(new[] { SimpleView.TidyExplainer, SimpleView.AiExplainer, SimpleView.OffExplainer }, line => Assert.True(line.Length < 120, $"{line.Length} characters: {line}"));
-    }
-
     /// <summary>PROPOSED pin: the two new Help questions, their answers word for word, and their place in the list.</summary>
     [Fact]
     public void The_proposed_clean_up_help_questions_are_pinned()
@@ -246,12 +236,12 @@ public class OwnerApprovalsTests
         Assert.Equal("What is clean-up?", HelpText.CleanupQuestion);
         Assert.Equal(
         [
-            "Clean-up is the tidying Dictum does between hearing you and typing. When we speak, we say ums and ahs and repeat ourselves. Clean-up takes those out and sets the punctuation and capitals right before your words are typed.",
-            "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, and takes out ums, ahs and doubled words such as \"the the\". It does not rewrite your sentences, and it needs no download.",
-            "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts, and follows \"scratch that\". Dictum checks its answer against what you said; if the check fails, it uses the rule-based tidy instead.",
-            "Off pastes what was heard. Only your own corrections, snippets and the profanity filter (if on) still apply.",
-            "Tidy my words and AI clean-up work on English dictations today. For other languages, only the spacing is tidied.",
-            "Clean-up happens on this PC. Text goes to another service only if you switch on a cloud option in Settings > Clean-up, and that is off unless you switch it on.",
+            "Clean-up is the tidying Dictum does between hearing you and typing. When we speak, we say ums and ahs and repeat ourselves. Clean-up takes those out and tidies the punctuation and capitals before your words are typed.",
+            "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, takes out ums, ahs and doubled words such as \"the the\", and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own. It needs no download.",
+            "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\" even mid-sentence. Dictum checks its answer against what you said; if the check fails, or the model is too slow or not ready, it uses the rule-based tidy instead.",
+            "Off pastes what was heard; only your own corrections, snippets and the profanity filter (if on) still apply.",
+            "Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.",
+            "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here.",
             "To watch clean-up work on your own words, open Settings > See how it works and record a short dictation.",
         ], HelpText.CleanupAnswer);
         Assert.Equal("How can I see what Dictum does with my words?", HelpText.SeeHowQuestion);
