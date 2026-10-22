@@ -11,7 +11,7 @@ unverified: treat it as a lead and check it against Apple's or the package's doc
 Recorded 22/10/2026 by the public-copy lane from the owner's decisions of that day (memory note dictum-mac-beta; not re-asked).
 
 - **Developer ID signed and notarised GitHub pre-release.** The owner joined the Apple Developer Program on 22/10/2026 and chose, at 22:05 AEDT,
-  a Developer ID signed and notarised GitHub pre-release as the beta, so a first open shows no Gatekeeper warning. This replaces the 19/10/2026
+  a Developer ID signed and notarised GitHub pre-release as the beta, so a first open is not blocked by Gatekeeper (Recalled: macOS still asks once to confirm an app downloaded from the internet; the Mac lane records the exact prompt). This replaces the 19/10/2026
   decision (ad-hoc signed, no Apple Developer Program membership). The Mac App Store is a later train, not part of the beta.
 - **Apple Silicon only (arm64) for the beta.** One zip: `Dictum-<version>-osx-arm64.zip`. Intel (osx-x64) is built **only if a
   tester needs it**; until then no Intel publish, no second zip, no Intel test run.
@@ -37,7 +37,7 @@ Windows app is the reference: the Mac app must behave the same wherever the plat
 (arm64, one zip) for the beta; Intel (a second zip) only if a tester needs it (owner decision 22/10/2026, section 0).
 
 What this means for the user, to be stated plainly in the release notes (all **Recalled**, verify before writing):
-- (Superseded by section 0: a Developer ID signed and notarised build should open without this.) First open is blocked by Gatekeeper; the user opens it through System Settings > Privacy & Security > Open Anyway.
+- (Superseded by section 0: a Developer ID signed and notarised build should open without this; Recalled, not verified.) First open is blocked by Gatekeeper; the user opens it through System Settings > Privacy & Security > Open Anyway.
 - Three permission prompts: Microphone, Accessibility (to post Cmd-V) and Input Monitoring (the event tap).
 - Grants are tied to the app's signature; an ad-hoc signed app may be asked again after each update.
 

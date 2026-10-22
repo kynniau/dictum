@@ -155,7 +155,7 @@ Help is in two places:
 
 - **In the app**, with no internet needed: Settings > Help, or **Help** in the tray panel. It opens with a list of its
   questions; each is a link (Tab reaches it) that moves to its answer further down. It explains how Dictum works in
-  plain words (hold the key, speak, let go; your voice becomes text on this PC; the tidy; the paste; why some people are
+  plain words (hold the key, speak, let go; your voice becomes text on this PC unless you turn on cloud speech; the tidy; the paste; why some people are
   heard better than others) and answers the common questions: where your voice goes, wrong words, "Mic error", a Dictum
   that closes at start, changing the key, stopping, which programs it types into, model files and sizes, removing
   Dictum, and the price.
