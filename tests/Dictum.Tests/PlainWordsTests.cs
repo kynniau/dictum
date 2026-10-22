@@ -49,7 +49,7 @@ public sealed class PlainWordsTests
             "There is no spyware in Dictum. It does not watch what you type. It keeps no usage statistics for anyone but you: its log stays on your PC and never records what you said. It does not phone home: the only request to Kynni's website is Check for updates, which you press, and it sends nothing about you.",
             "Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence. That licence lets anyone use, copy and change Dictum, for free.",
             "How we protect you",
-            "Your voice is turned into text on your own PC. The text is tidied on your own PC.",
+            "Your voice is turned into text on your own PC unless you turn on cloud speech. The text is tidied on your own PC.", // APPROVED 22/10/2026 22:05 AEDT (qualifier added)
             "Nothing you say leaves your PC unless you switch on a cloud option and agree to it. Dictum tells you what would be sent, and to where, before you agree.",
             "Dictum refuses to send your words over an unencrypted connection.",
             "Offline only, in Settings > Privacy, stops Dictum itself from connecting to any other computer at all.",
@@ -177,7 +177,7 @@ public sealed class PlainWordsTests
     {
         const string sentence = "Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.";
         var store = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "docs", "STORE.md"));
-        var line = store.Split('\n').Single(l => l.StartsWith("Speech recognition and clean-up run on your PC.", StringComparison.Ordinal)).TrimEnd();
+        var line = store.Split('\n').Single(l => l.StartsWith("Speech recognition and clean-up run on your PC by default.", StringComparison.Ordinal)).TrimEnd();
         Assert.EndsWith(" " + sentence, line);
         Assert.Contains("APPROVED by the owner 22/10/2026 17:36 AEDT", store);
         Assert.DoesNotContain("http", sentence);
@@ -227,12 +227,14 @@ public sealed class PlainWordsTests
         var store = Repo("docs", "STORE.md");
         var flat = Flat(store);
         Assert.Contains("or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or your voice to a cloud speech service (OpenAI, Azure OpenAI or Groq) with your own API key, or to your own server, an advanced option; that service's own terms apply.", flat);
-        Assert.Contains("The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. With cloud speech on, off by default, the recording goes to the service you chose. If its answer fails", flat);
+        Assert.Contains("The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. If its answer fails Dictum's checks, a rule-based tidy is used instead, and you can switch AI clean-up off completely. With cloud speech on (off by default), the recording goes to the speech service you chose instead of whisper.cpp; if that request fails, whisper.cpp on your PC hears it. To report", flat);
         Assert.Contains("or cloud speech (their own OpenAI, Azure OpenAI or Groq key, or their own server), the audio of each dictation goes to that service.", flat);
         Assert.Contains("it also lists the cloud speech hosts (api.openai.com, {resource}.openai.azure.com, api.groq.com and a custom address) under \"Cloud speech (off by default)\"", flat);
         Assert.Contains("the cloud speech consent dialog (its own, apart from clean-up's", flat);
-        // The approved sentence and the line that opens the description are unchanged (see The_store_listing_carries_the_approved_sentence).
-        Assert.Contains("Speech recognition and clean-up run on your PC. There is no account", flat);
+        // The approved sentence is unchanged (see The_store_listing_carries_the_approved_sentence); the opening line gained "by default" (owner, 22/10/2026 22:05 AEDT).
+        Assert.Contains("Speech recognition and clean-up run on your PC by default. There is no account", flat);
+        Assert.Contains("Speech recognition runs on your PC by default with whisper.cpp and works offline", flat); // the feature bullet (owner, 22/10/2026 22:05 AEDT)
+        Assert.DoesNotContain("\nSpeech recognition runs on your PC with whisper.cpp and works offline\n", store.Replace("\r\n", "\n")); // the old bullet line (the note quotes it as history)
 
         var now = store.IndexOf("### What's new in this version (1.3.0)", StringComparison.Ordinal);
         var before = store.IndexOf("### What's new in this version (1.2.1)", StringComparison.Ordinal);
@@ -262,7 +264,10 @@ public sealed class PlainWordsTests
         var mac = Repo("docs", "MAC-HANDOVER.md");
         var flat = Flat(mac);
         Assert.Contains("## 0. Owner decisions of 22/10/2026 (these win over anything below that says otherwise)", flat);
-        Assert.Contains("**GitHub beta first.** The Mac build is an ad-hoc signed GitHub pre-release. No Apple Developer Program membership and no fee", flat);
+        Assert.Contains("**Developer ID signed and notarised GitHub pre-release.** The owner joined the Apple Developer Program on 22/10/2026", flat);
+        Assert.Contains("The Mac session never handles Apple credentials", flat);
+        Assert.Contains("to be re-evaluated by the Mac lane now that signing is available", flat);
+        Assert.DoesNotContain("ad-hoc signed GitHub pre-release", flat);
         Assert.Contains("**Apple Silicon only (arm64) for the beta.** One zip:", flat);
         Assert.Contains("Intel (osx-x64) is built **only if a tester needs it**", flat);
         Assert.Contains("**Timing.** The Mac build ships after 1.3 is live.", flat);

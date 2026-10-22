@@ -86,8 +86,9 @@ public sealed class SiteStoreFirstTests
 
     /// <summary>
     /// The release gate: no page of the site says the voice "never leaves" the PC without an "unless" in the same sentence, and none says the
-    /// voice "stays" on or here without "unless" or "by default". Mutation (observed failing, 22/10/2026): "Your voice never leaves this PC."
-    /// put back in site/help.html, section 7.
+    /// voice "stays" on or here, or is "turned into text on" the PC, without "unless" or "by default". Mutations (observed failing, 22/10/2026):
+    /// "Your voice never leaves this PC." put back in site/help.html, section 7; and the privacy short version put back to "Your speech is turned into
+    /// text on your PC, and the text is tidied on your PC."
     /// </summary>
     [Theory]
     [InlineData("index.html")]
@@ -102,6 +103,9 @@ public sealed class SiteStoreFirstTests
         foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"voice\s+(still\s+)?stays\s+(on|here)", RegexOptions.IgnoreCase)))
             Assert.True(s.Contains("unless", StringComparison.OrdinalIgnoreCase) || s.Contains("by default", StringComparison.OrdinalIgnoreCase),
                 $"site/{page} says \"{s}\" with neither \"unless\" nor \"by default\"");
+        foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"turned\s+into\s+text\s+on\s+(this|your(\s+own)?)\s+PC", RegexOptions.IgnoreCase)))
+            Assert.True(s.Contains("unless", StringComparison.OrdinalIgnoreCase) || s.Contains("by default", StringComparison.OrdinalIgnoreCase),
+                $"site/{page} says \"{s}\" with neither \"unless\" nor \"by default\"");
         Assert.DoesNotMatch(new Regex(@"never\s+sends?\s+it\s+anywhere\.", RegexOptions.IgnoreCase), Prose(page));
     }
 
@@ -109,10 +113,15 @@ public sealed class SiteStoreFirstTests
     [Theory]
     [InlineData("index.html", "Hold a key, talk, let go. Dictum types what you said into whatever you’re working in. Your voice stays on your PC unless you turn on cloud speech.")]
     [InlineData("index.html", "Cloud clean-up and cloud speech only if you turn them on. Once your models are downloaded it works with the internet off.")]
-    [InlineData("index.html", "Cloud speech (off by default): the recording of each dictation goes to the service you chose, OpenAI, Azure OpenAI, Groq or a server you name, with your own key, behind its own consent step. Your dictionary words go with it as a hint. Dictum does not validate or certify how that service handles your voice.")]
+    [InlineData("index.html", "Cloud speech (off by default): the recording of each dictation goes to the service you chose, OpenAI, Azure OpenAI, Groq or a server you name, with your own key where the service needs one, behind its own consent step. Your dictionary words go with it as a hint. Dictum does not validate or certify how that service handles your voice.")]
     [InlineData("index.html", "api.openai.com, {resource}.openai.azure.com, api.groq.com Off by default")]
     [InlineData("index.html", "No. Nothing is trained, and your voice stays on your PC unless you turn on cloud speech. More in the help guide.")]
     [InlineData("index.html", "Where your speech is processed On your PC by default")]
+    [InlineData("index.html", "Runs on your PC by default")] // owner, 22/10/2026 22:05 AEDT (qualifier added)
+    [InlineData("index.html", "Dictum does the work on your own computer by default, for free.")] // owner, 22/10/2026 22:05 AEDT (qualifier added)
+    [InlineData("plain-words.html", "Your voice is turned into text on your own PC unless you turn on cloud speech. The text is tidied on your own PC.")] // owner, 22/10/2026 22:05 AEDT
+    [InlineData("help.html", "First, your voice is turned into text on this PC (unless you turn on cloud speech) by a speech model.")] // owner, 22/10/2026 22:05 AEDT
+    [InlineData("help.html", "Nowhere, by default. Dictum turns your voice into text on this PC")] // owner, 22/10/2026 22:05 AEDT
     [InlineData("index.html", "Dictum’s optional cloud clean-up and cloud speech are off by default and come with a warning.")]
     [InlineData("index.html", "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates")]
     [InlineData("help.html", "Dictum turns your voice into text on this PC, then throws the recording away. Your voice stays on this PC unless you turn on cloud speech, an advanced option that is off by default.")]
@@ -123,7 +132,7 @@ public sealed class SiteStoreFirstTests
     [InlineData("privacy.html", "to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose.")]
     [InlineData("privacy.html", "It is never written to disk, except the calibration recordings you make on purpose (below). With cloud speech on, the recording is sent to the service you chose and then discarded here.")]
     [InlineData("privacy.html", "an API key, only if you add one for cloud clean-up or cloud speech.")]
-    [InlineData("privacy.html", "Cloud speech (off by default) Only if you switch on cloud speech in Settings > Models, agree to the service in its own consent step and add your own API key.")]
+    [InlineData("privacy.html", "Cloud speech (off by default) Only if you switch on cloud speech in Settings > Models, agree to the service in its own consent step and, for OpenAI, Azure OpenAI or Groq, add your own API key (a server you name may need none).")]
     [InlineData("privacy.html", "sends that dictation’s recording, as a WAV file, to the service you chose, together with the words in your personal dictionary as a hint and, in hands-free, the closing words of the part before.")]
     [InlineData("privacy.html", "The service is OpenAI (api.openai.com), Azure OpenAI ({resource}.openai.azure.com, your own resource), Groq (api.groq.com) or a custom https:// address you enter.")]
     [InlineData("privacy.html", "This is an advanced option: Dictum cannot validate or certify how that service stores, protects or uses your voice. Check its terms before dictating anything sensitive.")]

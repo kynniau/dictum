@@ -1,7 +1,7 @@
 # Dictum
 
 System-wide voice dictation for Windows 10/11 (x64), in the style of Wispr Flow. Hold a key, talk, let go:
-your speech is transcribed **on this PC** with whisper.cpp, tidied (by a rule-based tidy, or by a small language model
+your speech is transcribed **on this PC by default** with whisper.cpp, tidied (by a rule-based tidy, or by a small language model
 that also runs **on this PC** with llama.cpp, once you add it), and pasted at the cursor of whatever app has focus.
 
 - **Nothing leaves the machine by default.** No accounts, telemetry, analytics, crash reporting or automatic update
@@ -121,7 +121,7 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
   Clean-up), **Grammar assist**, **Start and stop sounds** (`sounds.enabled`, off by default).
 - **Calibrate my voice**, **Dictionary** (add a word, open the dictionary or corrections file), **Snippets** (a phrase
   you say and the text pasted in its place, see "Snippets"), **Fix last dictation**, **Settings**, **Help** (opens Settings > Help).
-- The privacy line ("Nothing leaves this PC", or that clean-up uses a server on this PC or sends text off it) and **Quit**.
+- The privacy line ("Nothing leaves this PC", that clean-up uses a server on this PC or sends text off it, or, while cloud speech is on, "Cloud speech · audio leaves this PC ({host})") and **Quit**.
 
 The icon's tooltip reads `Dictum · <speech model> · <runtime> · <cleanup model> · <runtime> · <hotkey>`. Notices
 (a model missing, a second copy started, settings.json unreadable) appear as Windows notifications from the icon.
@@ -1111,7 +1111,7 @@ every download, in the app and on the command line, with a message saying why, r
 sending anything, and refuses the `anthropic` provider and any `openai-compatible` server that is not on this
 machine, falling back to the rule-based tidy with a notification. It refuses cloud speech to any service that is not on
 this machine too, and the speech model on this PC hears the dictation.
-Settings > Privacy shows the switch, Settings > About says "Offline only", and the tray panel's privacy line says "Nothing leaves this PC" (unless an OpenAI-compatible server on this PC does the clean-up: it may forward the text, which Dictum cannot see). Install models on such machines with `install.ps1 -ModelsFrom <folder>`.
+Settings > Privacy shows the switch, Settings > About says "Offline only", and the tray panel's privacy line says "Nothing leaves this PC" (unless an OpenAI-compatible server on this PC does the clean-up: it may forward the text, which Dictum cannot see; `offline_only` also still allows a speech server on this PC, and Dictum cannot see whether that server forwards the audio). Install models on such machines with `install.ps1 -ModelsFrom <folder>`.
 Behind those messages, every HTTP client in Dictum sends through one guard that refuses any request to a host off
 this machine while `offline_only` is on (read per request, so it follows a settings change), and a download in
 progress stops at its next chunk when the setting is turned on. A request to a server on this machine never goes

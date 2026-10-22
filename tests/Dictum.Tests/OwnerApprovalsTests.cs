@@ -426,7 +426,7 @@ public class OwnerApprovalsTests
     /// <summary>
     /// PROPOSED 22/10/2026 pin (cloud speech copy lane; pending the owner): the Help strings for the own-instructions box and the Create the
     /// key file… button, word for word. The sentences are the own-instructions lane's (PR #60), except the cloud answer's second paragraph and the
-    /// answer's last sentence, which are this lane's. When the owner approves them, move this test under "APPROVED" with the date.
+    /// own-instructions answer's second paragraph and last clause, which are the lens's wording (22/10/2026). When the owner approves them, move this test under "APPROVED" with the date.
     /// </summary>
     [Fact]
     public void The_proposed_own_instructions_and_key_file_help_strings_are_pinned()
@@ -438,8 +438,8 @@ public class OwnerApprovalsTests
         Assert.Equal("Can I give the clean-up my own instructions?", HelpText.OwnInstructionsQuestion);
         Assert.Equal(
         [
-            "In the Advanced view, Settings > Clean-up has a box for your own instructions, such as \"use short sentences\" or \"write product names in capitals\". Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies.",
-            "Dictum still checks every reply against what you said, so instructions to translate, summarise, answer or add a line are not followed. A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead.",
+            "In the Advanced view, Settings > Clean-up has a box for your own instructions, such as \"use short sentences\" or \"write product names in capitals\". Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. With cloud clean-up on, your instructions go to that service with each dictation, as part of Dictum's clean-up instructions.",
+            "Dictum still checks every reply against what you said. A reply that drops or changes your words, translates or summarises them, answers you instead of tidying, or adds a sign-off you did not say is usually rejected, and the rule-based tidy is pasted instead. The check cannot catch everything, so read what Dictum typed.",
         ], HelpText.OwnInstructionsAnswer);
         Assert.Contains(HelpText.Questions, q => q.Question == "Can I give the clean-up my own instructions?" && ReferenceEquals(q.Answer, HelpText.OwnInstructionsAnswer));
     }

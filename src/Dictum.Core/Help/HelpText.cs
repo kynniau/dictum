@@ -52,7 +52,8 @@ public static class HelpText
         "2. Hold down the Dictum key. Unless you changed it, this is the Ctrl key on the right-hand side of the keyboard.",
         "3. Speak in your normal voice. A small bar above the taskbar shows that Dictum is listening.",
         "4. Let go of the key. A moment later, your words appear where you clicked.",
-        "In that moment, three things happen. First, your voice is turned into text on this PC by a speech model. A speech model is a program that has learned what spoken words sound like. " +
+        // APPROVED 22/10/2026 22:05 AEDT (qualifier added: "(unless you turn on cloud speech)"; proposed 21/10/2026): do not reword.
+        "In that moment, three things happen. First, your voice is turned into text on this PC (unless you turn on cloud speech) by a speech model. A speech model is a program that has learned what spoken words sound like. " +
         "Next, the text is tidied up: punctuation and capital letters go in, and ums and ahs come out. Last, the text is pasted where you clicked, as if you had typed it.",
         // APPROVED 22/10/2026 (proposed 21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
         "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. " +
@@ -122,7 +123,7 @@ public static class HelpText
         "To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.",
         // PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the first paragraph is the own-instructions lane's Help sentence for the
         // Create the key file… button (PR #60), verbatim; the second keeps the Notepad steps below as the fallback and is this lane's. True only
-        // once the button is on Settings > Clean-up (PR #60 plus the CleanupPage wiring).
+        // once the button is on Settings > Clean-up (PR #60, wired at 5e9c227, not merged when this was written).
         "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
         "If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.",
         "1. Open Settings > Clean-up. Under Cloud clean-up, choose your service in the Service list: Anthropic (Claude), OpenAI, Google Gemini, Ollama on this PC, or Custom server (OpenAI-compatible) for your own server. " +
@@ -158,18 +159,19 @@ public static class HelpText
     public const string OwnInstructionsQuestion = "Can I give the clean-up my own instructions?";
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (C-Copy lane; pending the owner): every sentence is the own-instructions lane's Help sentence (PR #60), verbatim,
-    /// except the last, "A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead.", which is this
-    /// lane's, for the owner's closing-line rule. True only once the box is on Settings > Clean-up and the final-sentence rule
-    /// (CleanupValidator.AddedFinalSentence, PR #60 commit c03af46) is merged. The site's help page carries the same two paragraphs word for word (pinned).
+    /// PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the first paragraph is the own-instructions lane's Help text (PR #60), verbatim except
+    /// its last words ("as part of Dictum's clean-up instructions.": the instructions go in the system prompt, not the dictation text; lens fix). The
+    /// second paragraph is the lens's wording: the check is usually right, not always, and the paragraph says so. True only once the box is on
+    /// Settings > Clean-up (PR #60, wired at 5e9c227, not merged when this was written). The site's help page carries the same two paragraphs word for word (pinned).
     /// </summary>
     public static readonly IReadOnlyList<string> OwnInstructionsAnswer =
     [
         "In the Advanced view, Settings > Clean-up has a box for your own instructions, such as \"use short sentences\" or \"write product names in capitals\". " +
         "Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. " +
-        "With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies.",
-        "Dictum still checks every reply against what you said, so instructions to translate, summarise, answer or add a line are not followed. " +
-        "A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead.",
+        "With cloud clean-up on, your instructions go to that service with each dictation, as part of Dictum's clean-up instructions.",
+        "Dictum still checks every reply against what you said. " +
+        "A reply that drops or changes your words, translates or summarises them, answers you instead of tidying, or adds a sign-off you did not say is usually rejected, and the rule-based tidy is pasted instead. " +
+        "The check cannot catch everything, so read what Dictum typed.",
     ];
 
     /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The question that explains clean-up to someone who has never heard the word.</summary>
@@ -209,8 +211,8 @@ public static class HelpText
     [
         new("Where does my voice go?",
         [
-            // APPROVED 22/10/2026 17:45 AEDT (qualifier added; proposed 21/10/2026): do not reword.
-            "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.",
+            // APPROVED 22/10/2026 17:45 AEDT (qualifier added; proposed 21/10/2026) and 22/10/2026 22:05 AEDT (qualifier added: "Nowhere, by default."): do not reword.
+            "Nowhere, by default. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.",
             "The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.",
             // APPROVED 22/10/2026 17:22 AEDT (qualifier added; proposed 21/10/2026): do not reword.
             "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here unless you also turn on cloud speech.",

@@ -457,7 +457,7 @@ public class HelpPageTests
         Assert.Equal(5, Regex.Matches(html, "still stays here", RegexOptions.IgnoreCase).Count); // none without it
 
         // Owner, 22/10/2026 ~17:45 AEDT: "Where does my voice go?"'s first paragraph, in the app and on the site, byte for byte.
-        const string first = "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.";
+        const string first = "Nowhere, by default. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.";
         Assert.Equal(first, HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[0]);
         Assert.Contains($"<p>{first}</p>", html);
         Assert.DoesNotContain("never sends it anywhere.", html);
@@ -469,6 +469,23 @@ public class HelpPageTests
         Assert.Contains(nothing.Replace(">", "&gt;", StringComparison.Ordinal), html);
         Assert.DoesNotContain("unless you turn on cloud clean-up in Settings", html);
         Assert.DoesNotContain("or cloud speech in Settings", html);
+    }
+
+    /// <summary>
+    /// Owner, 22/10/2026 22:05 AEDT (qualifiers added; mutation-checked): "Where does my voice go?" opens "Nowhere, by default." and "How Dictum works" says
+    /// "First, your voice is turned into text on this PC (unless you turn on cloud speech) by a speech model.", in the app and on the site, byte for byte.
+    /// </summary>
+    [Fact]
+    public void The_two_22_05_qualifiers_are_in_the_app_and_on_the_site()
+    {
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        const string first = "First, your voice is turned into text on this PC (unless you turn on cloud speech) by a speech model.";
+        Assert.Contains(first, Assert.Single(HelpText.HowItWorks, p => p.Contains("three things happen", StringComparison.Ordinal)));
+        Assert.Contains(first, html);
+        Assert.DoesNotContain("turned into text on this PC by a speech model", html);
+        Assert.StartsWith("Nowhere, by default. Dictum turns your voice into text", HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[0]);
+        Assert.Contains("<p>Nowhere, by default. Dictum turns your voice into text", html);
+        Assert.DoesNotContain("<p>Nowhere. ", html);
     }
 
     // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy
@@ -853,7 +870,7 @@ public class HelpPageTests
     /// <summary>
     /// PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): "Can I give the clean-up my own instructions?" sits after the cloud
     /// setup question, answers in two paragraphs that say what the box does, where it goes (and that cloud clean-up receives it) and that
-    /// every reply is still checked, a closing sentence the speaker did not say included, and names the labels PR #60 builds. It makes no
+    /// every reply is still checked (usually, not always: it says to read what was typed), and names the labels PR #60 builds. It makes no
     /// claim the rule-based tidy or Off use the box.
     /// </summary>
     [Fact]
@@ -864,9 +881,11 @@ public class HelpPageTests
         Assert.Same(HelpText.OwnInstructionsAnswer, HelpText.Questions[at].Answer);
         Assert.Equal(2, HelpText.OwnInstructionsAnswer.Count);
         Assert.Contains("the rule-based tidy and Off do not use them", HelpText.OwnInstructionsAnswer[0]);
-        Assert.Contains("With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies.", HelpText.OwnInstructionsAnswer[0]);
-        Assert.Contains("Dictum still checks every reply against what you said", HelpText.OwnInstructionsAnswer[1]);
-        Assert.Contains("A reply that ends with a sentence you did not say is rejected", HelpText.OwnInstructionsAnswer[1]);
+        Assert.Contains("With cloud clean-up on, your instructions go to that service with each dictation, as part of Dictum's clean-up instructions.", HelpText.OwnInstructionsAnswer[0]);
+        Assert.StartsWith("Dictum still checks every reply against what you said. ", HelpText.OwnInstructionsAnswer[1]);
+        Assert.Contains("is usually rejected", HelpText.OwnInstructionsAnswer[1]);
+        Assert.EndsWith("The check cannot catch everything, so read what Dictum typed.", HelpText.OwnInstructionsAnswer[1]); // never "always": the validator has a ceiling
+        Assert.DoesNotContain("are not followed", HelpText.OwnInstructionsAnswer[1]);
         Assert.Equal(HelpText.NameQuestion, HelpText.Questions[^1].Question); // still the last question
     }
 }
