@@ -62,6 +62,9 @@ public sealed class CloudSpeechEngine : ITranscriber
 
     public string Host => CloudPresets.HostOf(_endpoint);
 
+    /// <summary>The model (or Azure deployment) each request names.</summary>
+    public string Model => _model;
+
     /// <summary>Why the last request was not used, until the next one succeeds; null when the last one succeeded or none was made.</summary>
     public string? LastFailure => _lastFailure;
 

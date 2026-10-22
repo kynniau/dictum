@@ -56,6 +56,11 @@ internal sealed class FlyoutWindow : Window
     private readonly StackPanel _download;
     private readonly TextBlock _privacy = Ui.Text("", "caption");
     private readonly Control _lock = Ui.Icon(Ui.LockIcon, 14);
+    // Cloud speech (spec §4): the Speech model's value while each recording goes to a service, and the footer's line in place
+    // of "Nothing leaves this PC", which would then be untrue (the approved row is hidden, never reworded).
+    private readonly TextBlock _cloudSpeech = Ui.Text("", "caption");
+    private readonly TextBlock _speechPrivacy = Ui.Text("", "caption");
+    private readonly Control _privacyRow;
     private readonly DispatcherTimer _meterTimer;
     private List<string?> _micIds = [];
     private Dictionary<string, string>? _speechPlain; // Simple view: each listed model's tier name; null in Advanced
@@ -141,7 +146,8 @@ internal sealed class FlyoutWindow : Window
             settings, Wide(Ui.Button("Help", "secondary", () => shell.OpenSettings("Help")))); // six buttons: three full rows
 
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        footer.Children.Add(Ui.Row(6, _lock, _privacy));
+        _privacyRow = Ui.Row(6, _lock, _privacy);
+        footer.Children.Add(Ui.Stack(2, _speechPrivacy, _privacyRow));
         var quit = Ui.Button("Quit", "quiet", shell.Quit);
         Grid.SetColumn(quit, 1);
         footer.Children.Add(quit);
@@ -153,7 +159,7 @@ internal sealed class FlyoutWindow : Window
             _problemBox,
             _download,
             _modeBox,
-            Ui.Columns(2, 10, Labelled("Speech model", _speech), Labelled("Clean-up", _cleanup)),
+            Ui.Stack(6, Ui.Columns(2, 10, Labelled("Speech model", _speech), Labelled("Clean-up", _cleanup)), _cloudSpeech),
             micBox,
             Ui.Stack(2,
                 Ui.Line("Big recording indicator", _indicator),
@@ -259,6 +265,7 @@ internal sealed class FlyoutWindow : Window
             _modeHint.Text = ModeLine(preset == ModePreset.Custom, ModelModeHint(_shell.GpuMachine));
 
             FillSpeech(s);
+            ShowCloudSpeech();
             FillCleanup(s);
             FillMicrophones(s, devices);
             _indicator.Select(Math.Max(0, Array.IndexOf(IndicatorSettings.Modes, s.Indicator.Mode)));
@@ -276,6 +283,21 @@ internal sealed class FlyoutWindow : Window
         {
             _refreshing = false;
         }
+    }
+
+    /// <summary>
+    /// Cloud speech, read from the speech step in use: under the pickers, the Speech model's value ("Cloud speech · audio leaves
+    /// this PC (host)", with the failed line after a fallback); in the footer, the same line, which takes the place of the approved
+    /// "Nothing leaves this PC" row while clean-up sends nothing (that row would be untrue) and sits above the clean-up row otherwise.
+    /// </summary>
+    private void ShowCloudSpeech()
+    {
+        var value = _shell.SpeechTrayValue;
+        _cloudSpeech.Text = value ?? "";
+        _cloudSpeech.IsVisible = value is not null;
+        _speechPrivacy.Text = _shell.Speech.Host is { } host && _shell.SpeechSendsAudio ? AppShell.SpeechTrayLine(host) : "";
+        _speechPrivacy.IsVisible = _shell.SpeechSendsAudio;
+        _privacyRow.IsVisible = !(_shell.SpeechSendsAudio && _shell.NothingLeaves);
     }
 
     private void FillSpeech(AppSettings s)

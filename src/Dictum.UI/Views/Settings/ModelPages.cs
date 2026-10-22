@@ -2,6 +2,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Dictum.App;
+using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.Storage;
 using Dictum.Transcribe;
@@ -66,6 +67,37 @@ internal sealed class ModelsPage : SettingsPage
     /// <summary>The line under the folder when models would load from the network (a UNC path or a mapped network drive), else null.</summary>
     internal static string? FolderWarning(string folder) => DiskSpace.IsNetwork(folder) ? NetworkWarning : null;
 
+    // PROPOSED 22/10/2026 (cloud speech, UI lane), awaiting the product owner: the Cloud speech card's own words. The consent
+    // text and its buttons (SpeechPolicy, APPROVED) and the state lines (SpeechStatus, AppShell.CloudSpeech) are not here.
+    internal const string CloudSpeechTitle = "Cloud speech"; // PROPOSED
+    internal const string UseCloudSpeechLabel = "Use cloud speech…"; // PROPOSED
+    internal const string CloudSpeechOffLabel = "Switch cloud speech off"; // PROPOSED
+
+    /// <summary>PROPOSED: the card's introduction while cloud speech is off.</summary>
+    internal const string CloudSpeechIntro =
+        "Optional, for a slow PC or one without a GPU. A cloud service turns each recording into text instead of the speech model on this PC, but the recording of every dictation, your voice, then goes to that service. The speech model on this PC stays as the fallback.";
+
+    /// <summary>PROPOSED: the hint under the server address (Azure OpenAI and a custom server).</summary>
+    internal const string CloudSpeechAddressHint = "Dictum adds /audio/transcriptions. Cloud speech needs an https:// address, also for a server on this PC.";
+
+    /// <summary>PROPOSED: the line while offline only refuses switching on.</summary>
+    internal const string CloudSpeechOfflineNote = "Offline only is on (Privacy), so cloud speech cannot be switched on."; // PROPOSED
+
+    /// <summary>PROPOSED: switching on saved and the service is in use; otherwise the page says the card's own state line.</summary>
+    internal const string CloudSpeechSwitchedOn = "Cloud speech is on."; // PROPOSED
+
+    /// <summary>PROPOSED: Switch cloud speech off, saved.</summary>
+    internal const string CloudSpeechSwitchedOff = "Cloud speech is off; the speech model on this PC hears your dictations again."; // PROPOSED
+
+    /// <summary>PROPOSED: where a preset's address carries the customer's own name (Azure OpenAI), or a custom server's, the field's placeholder.</summary>
+    internal static string CloudSpeechAddressWatermark(CloudPreset preset) =>
+        preset.HostSuffix is not null ? "https://your-resource.openai.azure.com/openai/v1" : "https://your-server.example.com/v1"; // PROPOSED
+
+    /// <summary>PROPOSED: the key line, clean-up's sentences for the speech service the address names.</summary>
+    internal static string CloudSpeechKeyLine(CloudPreset service) => service.KeyRequired // PROPOSED
+        ? $"The key goes in .env in the settings folder: {service.KeyVariable}=your {service.Name} API key. Without it nothing is sent."
+        : $"If the server needs a key, it goes in .env in the settings folder: {service.KeyVariable}=your key.";
+
     private static readonly IReadOnlyList<(string Code, string Label)> Languages = WhisperLanguages.PickerItems();
 
     private readonly SettingsWindow _window;
@@ -93,6 +125,20 @@ internal sealed class ModelsPage : SettingsPage
     private List<ModelFolderKind?> _sources = []; // the folder each speech catalogue entry is used from, in catalogue order
     private List<string> _cleanupOnPc = []; // the clean-up catalogue entries on this PC
     private (TextBlock Detail, string TradeOff)? _downloadingRow; // the row whose file downloads now: its percentage changes on every tick
+
+    // The Cloud speech card (Advanced view only), laid out as Settings > Clean-up's Cloud clean-up card: an off state with the
+    // service, its fields, the key line and "Use cloud speech…", and an on state with the state line and the off switch.
+    private readonly StackPanel _speechCloudOn = new() { Spacing = 10 };
+    private readonly StackPanel _speechCloudOff = new() { Spacing = 10 };
+    private readonly TextBlock _speechCloudState = Ui.Text("");
+    private readonly TextBlock _speechCloudPending = Ui.Text("", "caption"); // off state: speech.* set by hand but not agreed to (the speech step's line)
+    private readonly ComboBox _speechService = new() { ItemsSource = SpeechPresets.All.Select(p => p.Name).ToArray(), SelectedIndex = 0, Width = 320 };
+    private readonly TextBox _speechAddress = new() { Width = 320 };
+    private readonly Control _speechAddressLine;
+    private readonly TextBox _speechModel = new() { Width = 320 };
+    private readonly TextBlock _speechKey = Ui.Text("", "caption");
+    private readonly Button _speechEnable;
+    private readonly TextBlock _speechOffline = Ui.Text("", "caption");
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -159,12 +205,31 @@ internal sealed class ModelsPage : SettingsPage
         var cloudNote = Ui.Text("Cloud clean-up is switched on in Clean-up, after a consent step.", "caption");
         var languageSimple = Ui.Text(LanguageIntroSimple);
         var languageAdvanced = Ui.Text(LanguageIntroAdvanced);
+        // Cloud speech (spec "Cloud speech" §3): a preset only fills the fields; switching on goes through the shell's speech consent step.
+        _speechService.SelectionChanged += (_, _) => SpeechDefaultsForService();
+        _speechAddress.TextChanged += (_, _) => ShowSpeechKey();
+        _speechAddressLine = Ui.Line("Server address", _speechAddress, CloudSpeechAddressHint);
+        _speechEnable = Ui.Button(UseCloudSpeechLabel, "primary", EnableCloudSpeech);
+        SpeechDefaultsForService();
+        _speechCloudOff.Children.AddRange([
+            Ui.Text(CloudSpeechIntro),
+            _speechCloudPending,
+            Ui.Line("Service", _speechService),
+            _speechAddressLine,
+            Ui.Line("Model", _speechModel),
+            _speechKey,
+            Ui.Row(8, _speechEnable),
+            _speechOffline]);
+        _speechCloudOn.Children.AddRange([_speechCloudState, Ui.Row(8, Ui.Button(CloudSpeechOffLabel, "secondary", () => Run(() =>
+            Say(Shell.DisableCloudSpeech() ?? CloudSpeechSwitchedOff))))]);
+        var cloudSpeech = Ui.Card(Ui.Stack(10, _speechCloudOn, _speechCloudOff), CloudSpeechTitle);
         _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff, languageSimple];
-        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
+        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, cloudSpeech, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
         Compose(
             Ui.Stack(6, _view, Ui.Text(SimpleView.SwitchHelp, "caption")),
             _download,
             Ui.Card(Ui.Stack(10, speechIntro, explainer, _simpleSpeech, _speech, chooseFile, decoding), "Speech model"),
+            cloudSpeech,
             Ui.Card(Ui.Stack(10,
                 languageSimple,
                 languageAdvanced,
@@ -203,6 +268,7 @@ internal sealed class ModelsPage : SettingsPage
         _useDefault.IsEnabled = Shell.Paths.ChosenModelsDir(s) is not null;
         _folderWarning.Text = FolderWarning(folder) ?? "";
         _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
+        RedrawCloudSpeech(s);
 
         // Every catalogue model is looked up again only after a settings load, a download that ended or a deletion, or when the
         // page is shown again (Leave), never on a download's progress ticks: each lookup reads up to three folders, on the UI
@@ -326,6 +392,69 @@ internal sealed class ModelsPage : SettingsPage
         // Off has no language dependency (it never runs a clean-up), so unlike the tiers it is offered for every language.
         _simpleOff.Children.Add(ModelRow(SimpleView.OffLabel, SimpleView.OffSubLine,
             off ? null : "Use", () => Run(Shell.Models.SelectOff), out _, name: off ? null : SimpleView.ActionName("Use", SimpleView.OffLabel)));
+    }
+
+    /// <summary>
+    /// The Cloud speech card from the settings and the speech step in use (both from the last load), never the .env files as they
+    /// are now: on while the speech consent names the host speech.base_url sends to, with the speech step's own line (on, failed
+    /// and fallen back, waiting for the key, offline only, nothing sent); off otherwise, with that line too when speech.* was set
+    /// by hand without the consent step.
+    /// </summary>
+    private void RedrawCloudSpeech(AppSettings s)
+    {
+        var on = Shell.CloudSpeechOn;
+        _speechCloudOn.IsVisible = on;
+        _speechCloudOff.IsVisible = !on;
+        _speechCloudState.Text = on ? Shell.SpeechStatusLine : "";
+        _speechCloudPending.Text = !on && s.Speech.Provider != SpeechSettings.Local ? Shell.SpeechStatusLine : "";
+        _speechCloudPending.IsVisible = _speechCloudPending.Text.Length > 0;
+        _speechEnable.IsEnabled = !s.OfflineOnly;
+        _speechOffline.Text = s.OfflineOnly ? CloudSpeechOfflineNote : "";
+        _speechOffline.IsVisible = s.OfflineOnly;
+    }
+
+    /// <summary>The speech preset chosen in the Service list.</summary>
+    private CloudPreset SpeechPreset => SpeechPresets.All[Math.Max(0, _speechService.SelectedIndex)];
+
+    /// <summary>The address switching on would use: the one typed, else the chosen preset's own.</summary>
+    private string? SpeechAddress(CloudPreset preset) => string.IsNullOrWhiteSpace(_speechAddress.Text) ? preset.BaseUrl : _speechAddress.Text.Trim();
+
+    /// <summary>
+    /// Fills the fields for the chosen service; nothing is saved here. OpenAI and Groq have their own address, so the address
+    /// line is shown only for Azure OpenAI (the customer's resource name) and a custom server. No model is filled in: the
+    /// presets carry no model id (SpeechPresets), so the field's placeholder says what to type.
+    /// </summary>
+    private void SpeechDefaultsForService()
+    {
+        var preset = SpeechPreset;
+        _speechAddress.Text = preset.BaseUrl;
+        _speechAddress.Watermark = CloudSpeechAddressWatermark(preset);
+        _speechAddressLine.IsVisible = preset.BaseUrl is null;
+        _speechModel.Text = null;
+        _speechModel.Watermark = preset.ModelHint;
+        ShowSpeechKey();
+    }
+
+    /// <summary>The key line follows the address (SpeechPresets.ForAddress): an address typed over a preset's gets SPEECH_API_KEY, never that preset's key.</summary>
+    private void ShowSpeechKey()
+    {
+        var preset = SpeechPreset;
+        _speechKey.Text = CloudSpeechKeyLine(string.IsNullOrWhiteSpace(_speechAddress.Text) ? preset : SpeechPresets.ForAddress(SpeechAddress(preset)));
+    }
+
+    /// <summary>A preset only filled the fields: switching on goes through the shell's speech consent step, as for a typed address.</summary>
+    private void EnableCloudSpeech()
+    {
+        var preset = SpeechPreset;
+        var address = SpeechAddress(preset);
+        var model = string.IsNullOrWhiteSpace(_speechModel.Text) ? null : _speechModel.Text.Trim();
+        if (address is null || model is null)
+        {
+            Say(AppShell.SpeechAddressMissing);
+            return;
+        }
+        Run(() => Say(Shell.EnableCloudSpeech(new SpeechSettings { Provider = SpeechSettings.OpenAiCompatible, BaseUrl = address, Model = model })
+            ?? (Shell.SpeechSendsAudio ? CloudSpeechSwitchedOn : Shell.SpeechStatusLine)));
     }
 
     /// <summary>A row with a title and a line and no button: a tier the Simple view cannot offer, with why.</summary>

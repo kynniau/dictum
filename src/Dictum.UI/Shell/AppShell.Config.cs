@@ -48,7 +48,9 @@ public sealed partial class AppShell
         // Cloud speech (speech.*) sends what the local decoder gets; a request the old one still has under way is cancelled
         // and heard on this PC instead, so nothing more goes out on settings the pages no longer show.
         var outgoingSpeech = _speech;
-        _speech = CloudSpeech.Create(_settings.Speech, decode, _settings.OfflineOnly, config.Secrets, _http, _log, _models.GetAsync);
+        // The load line names the consent's date and the local model that is the fallback (spec §4); consent.json is read for the date only.
+        var agreedAt = _settings.Speech.Consent is null ? null : CloudConsentFile.ReadAll(Paths.ConsentFile).Speech?.AgreedAt;
+        _speech = CloudSpeech.Create(_settings.Speech, decode, _settings.OfflineOnly, config.Secrets, _http, _log, _models.GetAsync, Models.CurrentName, agreedAt);
         outgoingSpeech.Retire();
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)
         {
@@ -78,6 +80,7 @@ public sealed partial class AppShell
             _log.Info("Offline only is on for this session: the settings loaded have it off, because settings.json does not keep it yet.");
             settings = settings with { OfflineOnly = true };
         }
+        settings = SpeechChoices(settings); // Switch cloud speech off holds until both files keep it (AppShell.CloudSpeech)
         var anthropicKey = secrets.Get(SecretStore.AnthropicKey) is not null;
         if (_cloudWithdrawn && settings.Llm.Provider is (LlmSettings.Anthropic or LlmSettings.OpenAiCompatible))
         {
@@ -108,6 +111,7 @@ public sealed partial class AppShell
     private void SaveSessionChoices()
     {
         if (_cloudWithdrawn || _consentWithdrawn) SaveCloudOff();
+        if (_speechWithdrawn) SaveSpeechOff();
         if (_offlineOnlyThisSession) SaveOfflineOnly();
     }
 
