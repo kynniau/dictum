@@ -4227,6 +4227,104 @@ this entry supersedes their "PROPOSED" and "awaiting the product owner" notes wh
    string's wording changed. docs/STORE.md and the README change only where a sentence now read wrong. The PROPOSED notes
    in docs/SPEC.md, docs/DEMOS.md and docs/MAC-HANDOVER.md, and in earlier entries of this file, are left as written.
 
+## Cloud speech, Core (22/10/2026)
+
+Branch `feat/cloud-speech-core` from origin/main 049b73a. Owner decision 22/10/2026 (10:31): cloud speech is approved behind
+its own express consent, and local speech stays the default. This is the Core lane of the three in the design brief's
+"Cloud speech" appendix (Core, UI, Copy): no window, no site and no Store copy change here. The speech consent text and its
+two buttons are APPROVED (owner, 22/10/2026, 10:50 AEDT); every other new user-facing string is PROPOSED (item 10).
+
+1. **Settings (`speech.*`).** `provider` (`local`, the default, or `openai-compatible`), `base_url` (`https://` only, on this PC too: lens fix 2
+   below), `model` (required; for Azure OpenAI the deployment name), `timeout_ms` (1000-120000).
+   `whisper.*` stays the local engine's. No key can grant consent; an unknown key such as `speech.consent` warns.
+   `timeout_ms` defaults to 30000, which is not measured: it carries a `simplification:` comment and is to be set from a
+   measured round trip (the demo screen) before cloud speech ships.
+2. **Keys.** `CloudPresets.ForAddress`'s address rule is now `CloudPresets.Match`, shared by the clean-up presets and the new
+   `SpeechPresets`; a preset may carry a `HostSuffix` (Azure OpenAI: any `https://` host ending `.openai.azure.com`).
+   `OPENAI_API_KEY` goes to `api.openai.com`, new `AZURE_OPENAI_API_KEY` to Azure OpenAI hosts, new `GROQ_API_KEY` to
+   `api.groq.com` (each required there), new `SPEECH_API_KEY` to any other address (optional). The three new names are in
+   `SecretStore.KeyNames`, so the log redactor and the self-test cover them. No default model id is filled in: the ids in
+   the brief came from a page summary it says to re-read first.
+3. **Consent file.** `consent.json` is now `{ "cleanup": {...}, "speech": {...} }`, each the existing record (provider,
+   host, time, app version). The earlier single-record file reads as a clean-up consent and never as a speech consent.
+   Every write uses the new shape (`Write` keeps a speech entry, `WriteSpeech` keeps a clean-up entry, `WithdrawSpeech`
+   removes only the speech entry and deletes the file when nothing is left). `Delete` withdraws everything; Switch cloud clean-up
+   off now uses `WithdrawCleanup` (lens fix 1 below). An earlier Dictum
+   reading a new-shape file finds no top-level record, so no consent (it fails closed).
+4. **The gate** (`CloudSpeech.Create`, at every settings load, in this order): `local` gives the local model; `base_url` or
+   `model` unset, nothing sent; `offline_only` with a host off this PC, refused (`CloudPolicy.OfflineRefusal`, now one rule
+   and one wording for clean-up and speech); plain `http://` refused (`CloudPolicy.PlainHttpRefusal` off this PC, shared likewise; on this PC too since lens fix 2
+   below); no speech consent naming this exact host, nothing sent; `whisper.translate` on, refused (v1; the owner's open
+   question was refuse or route to the local model, and the brief chose refuse); the key the address needs missing, nothing
+   sent and `MissingKey` set. Each logs one line and leaves a status. Unlike clean-up, a server on this PC still needs the
+   speech consent: the audio leaves Dictum either way.
+5. **The request.** One multipart POST per recording (per part in hands-free) to `{base_url}/audio/transcriptions`: `file`
+   (16 kHz mono 16-bit WAV built in memory by `Wav.Encode`, now also what calibration's `Save` writes), `model`, `language`
+   from `whisper.language` (left out for `auto`), `prompt` (the dictionary terms, then a part's carried words, exactly as
+   `DecodeOptions.WithCarried` gives whisper), `response_format=json`; the reply's `text` is tidied by
+   `TranscriptText.Normalise`. The key the address decides goes as `Authorization: Bearer` (Azure OpenAI: `api-key`, lens fix 8). The `HttpClient` is the shell's
+   offline-guarded provider client (no redirects), so `OfflineGuardHandler` is still the backstop.
+6. **Failure is never silent.** An HTTP error, the deadline, an empty or non-JSON reply, the offline guard, or a settings
+   reload: the local model hears the same samples, the log says "Cloud speech via {host} not used, the local model heard
+   this dictation instead: {reason}." (status code and host, never audio, text or key), and `Status` says the last request
+   failed until the next success. Esc propagates and pastes nothing. A reload retires the old provider: its request is
+   cancelled and it starts no other. The local model stays loaded as before (`ModelManager` is unchanged); with none
+   installed, a failed request fails the dictation as a missing model does today.
+7. **Wiring.** The pipeline's one transcriber seam now asks `CloudSpeech.GetAsync` (`AppShell.cs`), rebuilt in
+   `LoadConfiguration` beside the cleaner; the "Settings loaded" log line and the self-test gain a speech status. The cloud
+   engine does not wait for the local model; it asks for it only when a request fails.
+8. **Network sweep.** The Help page's sweep (`HelpPageTests.The_page_reaches_the_network_only_through_the_platform_seam`)
+   covers that page only; Core had no sweep, so `CloudSpeechTests.Only_the_known_clients_make_network_requests` pins the
+   files that make HTTP requests, with `CloudSpeechEngine.cs` the one new entry.
+9. **For the UI lane.** The consent dialog shows `SpeechPolicy.ConsentText`, `AgreeButton` and `DeclineButton` and records
+   with `CloudConsentFile.WriteSpeech`; switching off calls `WithdrawSpeech`. `CloudSpeech.Status`, `SendsAudio`, `Host`
+   and `MissingKey` feed Settings > Models, Privacy, About and the tray; `SpeechStatus.FallbackPill` is the pill after a
+   failed request. There is no change event yet: after a failed request the status changes without telling the UI.
+10. **Approved and PROPOSED strings.** APPROVED 22/10/2026 (owner, 10:50 AEDT), verbatim from the brief's §3, with `{host}`
+    and `{VAR}` filled in; marked "do not reword" and pinned byte for byte in `CloudSpeechTests`: `SpeechPolicy.ConsentText`,
+    `AgreeButton` ("Send my voice to {host}") and `DeclineButton` ("Keep speech on this PC"). PROPOSED, awaiting the owner:
+    `SpeechStatus.Local`, `On`, `Failed`, `NotAgreed`, `TranslateRefused`, `NothingSent`, `FallbackPill`;
+    the log lines in items 4 and 6; the `speech` entry in the default settings.json's `_doc`. `SpeechStatus.WaitingForKey`
+    and `OfflineOnly` reuse clean-up's approved lines word for word.
+11. **Not verified.** No request was made to any real service. That Azure OpenAI and Groq accept the key as
+    `Authorization: Bearer` on `/audio/transcriptions` (the brief: Azure's REST reference lists the key in the
+    `authorization` header; Groq's header is Recalled); that `gpt-transcribe` takes `language` (the brief's table says it
+    takes `languages`) and `prompt`; any latency or cost figure.
+
+### Lens fixes on b190186 (22/10/2026, same branch)
+
+The lens on b190186 (and the merge 94e8621) found no path that sends audio or a key without consent for the exact host, and
+returned Needs changes. Fixed:
+
+1. **F1, clean-up off kept withdrawing the speech consent.** `SaveCloudOff` (Switch cloud clean-up off) and "Allow" undone
+   when settings.json cannot be written called `CloudConsentFile.Delete`. Both now call the new `WithdrawCleanup`, which keeps a
+   speech entry and deletes the file only when nothing is left (clearing read-only, as `Delete` does). `Delete` is unused by the
+   shell now.
+2. **F2, orchestrator decision: plain `http://` is refused for cloud speech everywhere, a server on this PC included.** The
+   approved consent says the recording goes "over the internet" and that Dictum "encrypts the connection (HTTPS)"; the precedent
+   is Anthropic clean-up's refusal of any `http://` address. This supersedes the spec's §2 on this point and item 4 above. The
+   loader ignores an `http://` `speech.base_url` with a warning, and the gate refuses one built any other way, with its own
+   PROPOSED reason (`SpeechPolicy.LoopbackHttpRefusal`) on this PC.
+3. **F3, the shell wiring is pinned:** a started shell with the speech consent sends one dictation's audio through its pipeline
+   to a fake server under the real offline guard (`AppShell` and `AppRules.CreateClients` take a `providerHandler`, like the
+   download and update handlers). **When feat/how-it-works merges, `AppShell.HowItWorks.cs` must use `_speech.GetAsync`.**
+4. **F4:** a server on this PC still needs the speech consent (pinned with `https://localhost`).
+5. **F5:** the Core network sweep matches every `HttpClient` sending method, the handler types and the Anthropic SDK client;
+   the allow-list is `AnthropicLlmClient`, `AppRules`, `AppShell`, `CloudSpeechEngine`, `ModelDownloader`, `OfflineGuardHandler`,
+   `OpenAiCompatibleLlmClient` and `UpdateCheck`.
+6. **F6:** hosts are compared without a final "." (`CloudPresets.HostOf`), and a preset's own host name on another port gets
+   no key at all, for clean-up and speech alike; the README and `.env.example` "never sent to" lines say so.
+7. **F7:** the endpoint is built with `UriBuilder.Path`, so a query in `speech.base_url` stays after `/audio/transcriptions`
+   and a fragment is dropped.
+8. **F8:** Azure OpenAI gets its key in an `api-key` header (`CloudPreset.KeyHeader`), per Microsoft Learn's transcription
+   reference as read by the lens on 22/10/2026
+   (https://learn.microsoft.com/azure/foundry/openai/reference-preview-latest#create-transcription; not re-read by this lane).
+   OpenAI, Groq and custom servers keep `Authorization: Bearer`. Groq's header is **Recalled**, not read on its page.
+9. **F9:** the storage list labels consent.json "consent to cloud clean-up and cloud speech" (PROPOSED).
+10. **Reload and quit:** the reload's retire of the old speech step is pinned, and `AppShell.Dispose` retires the speech step
+    before the controller, the models and the provider client go, so quitting mid-request starts nothing more.
+11. **F10:** the consent text has the owner's approval (22/10/2026, 10:50 AEDT) and no separate legal review.
+
 ## Storage page can change the model folder (22/10/2026, branch fix/storage-change-folder)
 
 Owner report: "in 1.2 I can see where the folders and data is saved, but I have no option to change this location."
