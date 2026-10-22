@@ -389,4 +389,37 @@ public class OwnerApprovalsTests
             "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it."),
             System.Text.Encoding.UTF8.GetBytes(Dictum.Llm.CloudPolicy.ConsentText(custom, "llm.example.com")));
     }
+
+    // ---- The two clean-up Help questions: APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026), as a block ----
+    // Pinned word for word, independently of the app's constants. Reworded only on the owner's written replacement, and then these
+    // literals change with the strings in the same commit.
+
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT pin: the two new Help questions, their answers word for word, and their place in the list.</summary>
+    [Fact]
+    public void The_proposed_clean_up_help_questions_are_pinned()
+    {
+        Assert.Equal("What is clean-up?", HelpText.CleanupQuestion);
+        Assert.Equal(
+        [
+            "Clean-up is the tidying Dictum does between hearing you and typing. When we speak, we say ums and ahs and repeat ourselves. Clean-up takes those out and tidies the punctuation and capitals before your words are typed.",
+            "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, takes out ums, ahs, doubled words such as \"the the\" and fillers such as \"you know\" set off by commas, and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own. It needs no download.",
+            "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\" even mid-sentence. Dictum checks its answer against what you said; if the check fails, or the model is too slow, not ready or runs into an error, it uses the rule-based tidy instead.",
+            "Off pastes what was heard; only your own corrections, snippets and the profanity filter (if on) still apply.",
+            "Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.",
+            "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here unless you also turn on cloud speech. Cloud speech also sends the words in your dictionary, as a hint.",
+            "To watch clean-up work on your own words, open Settings > See how it works and record a short dictation.",
+        ], HelpText.CleanupAnswer);
+        Assert.Equal("How can I see what Dictum does with my words?", HelpText.SeeHowQuestion);
+        Assert.Equal(
+        [
+            "Open Settings > See how it works, press Record, say a sentence or two, then press Stop. The page shows five steps: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up, and what would be pasted.",
+            "It uses your current settings. It pastes nothing, and the recording is never saved to disk.",
+        ], HelpText.SeeHowAnswer);
+
+        var questions = HelpText.Questions.Select(q => q.Question).ToList();
+        Assert.Equal(["Why did it type the wrong words?", "What is clean-up?", "How can I see what Dictum does with my words?"],
+            questions.Skip(questions.IndexOf("Why did it type the wrong words?")).Take(3)); // together, after the question about wrong words
+        Assert.Contains(HelpText.Questions, q => q.Question == "What is clean-up?" && ReferenceEquals(q.Answer, HelpText.CleanupAnswer));
+        Assert.Contains(HelpText.Questions, q => q.Question == "How can I see what Dictum does with my words?" && ReferenceEquals(q.Answer, HelpText.SeeHowAnswer));
+    }
 }

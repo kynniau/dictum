@@ -149,6 +149,38 @@ public static class HelpText
         "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
     ];
 
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The question that explains clean-up to someone who has never heard the word.</summary>
+    public const string CleanupQuestion = "What is clean-up?";
+
+    /// <summary>
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. DECISIONS "Clean-up explainers". The facts are the app's:
+    /// the rule-based tidy (DeterministicCleaner: ums, ahs, doubled words, capitals, full stops, a clause-of-its-own "scratch that" and "new line"), the model's extras (CleanupPrompt.Default:
+    /// filler phrases, false starts, "scratch that"), the checked reply with the rule-based tidy as the fallback (HowItWorksText.Rejected), Off
+    /// (SimpleView.OffSubLine), the language setting that gates both (WhisperLanguages.OutputIsEnglish, the approved sentence in "How Dictum works") and what leaves the PC (cloud clean-up, off unless turned on). The
+    /// site's help page carries the same paragraphs word for word (pinned).
+    /// </summary>
+    public static readonly IReadOnlyList<string> CleanupAnswer =
+    [
+        "Clean-up is the tidying Dictum does between hearing you and typing. When we speak, we say ums and ahs and repeat ourselves. Clean-up takes those out and tidies the punctuation and capitals before your words are typed.",
+        "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, takes out ums, ahs, doubled words such as \"the the\" and fillers such as \"you know\" set off by commas, and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own. It needs no download.",
+        "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\" even mid-sentence. Dictum checks its answer against what you said; if the check fails, or the model is too slow, not ready or runs into an error, it uses the rule-based tidy instead.",
+        "Off pastes what was heard; only your own corrections, snippets and the profanity filter (if on) still apply.",
+        "Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.",
+        "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here unless you also turn on cloud speech. Cloud speech also sends the words in your dictionary, as a hint.",
+        "To watch clean-up work on your own words, open Settings > " + HowItWorksText.PageTitle + " and record a short dictation.",
+    ];
+
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The question that points at Settings > See how it works.</summary>
+    public const string SeeHowQuestion = "How can I see what Dictum does with my words?";
+
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The page, its two buttons and its five stages as <see cref="HowItWorksText"/> names them (pinned).</summary>
+    public static readonly IReadOnlyList<string> SeeHowAnswer =
+    [
+        "Open Settings > " + HowItWorksText.PageTitle + ", press " + HowItWorksText.RecordLabel + ", say a sentence or two, then press " + HowItWorksText.StopLabel + ". " +
+        "The page shows five steps: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up, and what would be pasted.",
+        "It uses your current settings. It pastes nothing, and the recording is never saved to disk.",
+    ];
+
     /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
     public static readonly IReadOnlyList<HelpEntry> Questions =
     [
@@ -168,6 +200,9 @@ public static class HelpText
             "• To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.",
             "• For better accuracy overall, see \"Why Dictum hears some people better than others\" above.",
         ]),
+        // APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The two questions that explain clean-up and the page that shows it, next to the one about wrong words.
+        new(CleanupQuestion, CleanupAnswer),
+        new(SeeHowQuestion, SeeHowAnswer),
         new("It says \"Mic error\" or \"" + NoSoundText.Pill + "\", or nothing happens when I talk. What do I check?",
         [
             // APPROVED 22/10/2026 (proposed 21/10/2026): the two paragraphs reuse NoSoundText's wording, so the help and the message cannot drift apart.
