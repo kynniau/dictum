@@ -11,8 +11,9 @@ public static class PlainWordsText
     /// <summary>Settings > About card title.</summary>
     public const string CardTitle = "In plain words";
 
+    /// <summary>"sends nothing about you to Kynni": APPROVED 22/10/2026 20:45 AEDT (replaces the 17:36 sentence "sends nothing to Kynni").</summary>
     public const string Free =
-        "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing to Kynni.";
+        "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing about you to Kynni.";
 
     public const string OpenSource =
         "Dictum is open source under the MIT licence. It is provided as is, without warranty. We built it with care, but we cannot promise it will always hear you right.";

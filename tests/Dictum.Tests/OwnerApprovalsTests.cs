@@ -231,7 +231,7 @@ public class OwnerApprovalsTests
     [Fact]
     public void The_plain_words_short_version_is_pinned()
     {
-        Assert.Equal("Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing to Kynni.", PlainWordsText.Free);
+        Assert.Equal("Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing about you to Kynni.", PlainWordsText.Free);
         Assert.Equal("Dictum is open source under the MIT licence. It is provided as is, without warranty. We built it with care, but we cannot promise it will always hear you right.", PlainWordsText.OpenSource);
         Assert.Equal("Nothing you say leaves this PC unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.", PlainWordsText.Cloud);
         Assert.Equal("Read the whole statement at dictum.kynni.au/plain-words.", PlainWordsText.ReadAll);

@@ -32,7 +32,7 @@ public sealed class PlainWordsTests
     /// <summary>The short version, section 2b, one entry per paragraph.</summary>
     internal static readonly string[] ShortVersion =
     [
-        "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing to Kynni.",
+        "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing about you to Kynni.",
         "Dictum is open source under the MIT licence. It is provided as is, without warranty. We built it with care, but we cannot promise it will always hear you right.",
         "Nothing you say leaves this PC unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.",
         "Read the whole statement at dictum.kynni.au/plain-words.",
@@ -46,7 +46,7 @@ public sealed class PlainWordsTests
         [
             "Dictum in plain words",
             "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. The base product stays free to keep on your PC; optional paid extras may come later.",
-            "There is no spyware in Dictum. It does not watch what you type. It does not count how you use it. It does not phone home. Dictum sends nothing to Kynni.",
+            "There is no spyware in Dictum. It does not watch what you type. It keeps no usage statistics for anyone but you: its log stays on your PC and never records what you said. It does not phone home: the only request to Kynni's website is Check for updates, which you press, and it sends nothing about you.",
             "Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence. That licence lets anyone use, copy and change Dictum, for free.",
             "How we protect you",
             "Your voice is turned into text on your own PC. The text is tidied on your own PC.",
@@ -66,6 +66,7 @@ public sealed class PlainWordsTests
         ];
         Assert.Equal(expected, MainLines("plain-words.html"));
         Assert.Contains("APPROVED by the owner 22/10/2026 17:36 AEDT", Site("plain-words.html"));
+        Assert.Contains("APPROVED 22/10/2026 20:45 AEDT (replaces the 17:36 sentence)", Site("plain-words.html"));
     }
 
     /// <summary>Pin: the page prints no file path (the brief's code citations stay out of public copy).</summary>
@@ -159,6 +160,17 @@ public sealed class PlainWordsTests
         shell.Dispose();
     });
 
+    /// <summary>Pin (20:47 AEDT): the privacy policy's "This website" list names the plain-words route, and the README's network table does too.</summary>
+    [Fact]
+    public void The_privacy_policy_and_the_readme_name_the_plain_words_route()
+    {
+        var privacy = Site("privacy.html");
+        Assert.Contains("<p>Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you;", privacy);
+        Assert.Contains("APPROVED 22/10/2026 20:47 AEDT (plain-words route added)", privacy);
+        var readme = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md"));
+        Assert.Contains(readme.Split('\n'), l => l.StartsWith("| Only when you open the privacy policy, Dictum in plain words", StringComparison.Ordinal) && l.Contains("/plain-words"));
+    }
+
     /// <summary>Pin (section 3): the Store description ends PRIVATE BY DESIGN with the approved sentence, and the sentence has no URL.</summary>
     [Fact]
     public void The_store_listing_carries_the_approved_sentence()
@@ -176,7 +188,7 @@ public sealed class PlainWordsTests
     public void The_landing_page_says_free_to_keep_on_your_PC()
     {
         var html = Regex.Replace(Site("index.html"), "<!--.*?-->", "", RegexOptions.Singleline);
-        Assert.Contains("Free to keep on your PC", html);
+        Assert.Equal(4, Regex.Matches(html, "Free to keep on your PC", RegexOptions.None).Count); // meta description, at-a-glance list, Free card heading, comparison table
         Assert.DoesNotContain("Free for life", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<p class=\"section-intro\">Free: no subscription, no account, no ads, no analytics, no telemetry.</p>", html);
         Assert.Contains("<p class=\"section-outro\">The base product stays free to keep on your PC; optional paid extras may come later.</p>", html);

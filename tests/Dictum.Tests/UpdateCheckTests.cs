@@ -36,6 +36,9 @@ public class UpdateCheckTests
     // The site's sentence for dictum.kynni.au (the privacy policy and the landing page), and the privacy policy's short-version
     // bullet. APPROVED 22/10/2026 (proposed 16/10/2026); do not reword.
     private const string ProposedSiteSentence = "Only when you open the privacy policy or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
+
+    /// <summary>The privacy policy's sentence since 22/10/2026 20:47 AEDT (plain-words route added, APPROVED); the landing page's card keeps ProposedSiteSentence.</summary>
+    private const string PrivacySiteSentence = "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
     private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, to check for updates in the direct-download version, or, if you switch it on, to send text to a cloud clean-up service or a server you choose.</li>";
 
     private const string DownloadPage = "https://github.com/kynniau/dictum/releases/latest";
@@ -677,7 +680,7 @@ public class UpdateCheckTests
     public void The_privacy_policy_says_when_Dictum_reads_dictum_kynni_au()
     {
         var html = VisibleHtml("privacy.html");
-        Assert.Equal(ProposedSiteSentence, ParagraphAfter(html, "<h3>This website: <code>dictum.kynni.au</code></h3>"));
+        Assert.Equal(PrivacySiteSentence, ParagraphAfter(html, "<h3>This website: <code>dictum.kynni.au</code></h3>"));
         Assert.Contains(ProposedShortVersionBullet, html);
         Assert.DoesNotContain("no update check", html, StringComparison.OrdinalIgnoreCase);
     }
