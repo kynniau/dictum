@@ -462,7 +462,10 @@ public sealed class CloudSpeechTests
             .Select(Path.GetFileName)
             .Order(StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(["AnthropicLlmClient.cs", "AppRules.cs", "AppShell.cs", "CloudSpeechEngine.cs", "ModelDownloader.cs", "OfflineGuardHandler.cs", "OpenAiCompatibleLlmClient.cs", "UpdateCheck.cs"], senders);
+        // SingleInstance.cs is the macOS one (src/Dictum.Mac/Shell): a Unix domain socket under the app's own folder, through
+        // which a second launch tells the running copy to show itself. It never leaves this Mac (docs/DECISIONS.md, "Dictum
+        // for macOS", 22/10/2026); it is listed so the audit stays exact.
+        Assert.Equal(["AnthropicLlmClient.cs", "AppRules.cs", "AppShell.cs", "CloudSpeechEngine.cs", "ModelDownloader.cs", "OfflineGuardHandler.cs", "OpenAiCompatibleLlmClient.cs", "SingleInstance.cs", "UpdateCheck.cs"], senders);
     }
 
     /// <summary>Records each request: where it went, its key, and every multipart field's bytes; answers with a transcription.</summary>
