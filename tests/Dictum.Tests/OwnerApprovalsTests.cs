@@ -224,6 +224,20 @@ public class OwnerApprovalsTests
         Assert.Equal("Your corrections, the profanity filter or snippets changed the text.", HowItWorksText.Changed);
     }
 
+    /// <summary>
+    /// Pin (plain words, section 2b, APPROVED 22/10/2026 17:36 AEDT): the short version on Settings > About and in the Welcome window,
+    /// its card title, its button and the page it opens, word for word, independently of the app's constants.
+    /// </summary>
+    [Fact]
+    public void The_plain_words_short_version_is_pinned()
+    {
+        Assert.Equal("Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing about you to Kynni.", PlainWordsText.Free);
+        Assert.Equal("Dictum is open source under the MIT licence. It is provided as is, without warranty. We built it with care, but we cannot promise it will always hear you right.", PlainWordsText.OpenSource);
+        Assert.Equal("Nothing you say leaves this PC unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.", PlainWordsText.Cloud);
+        Assert.Equal("Read the whole statement at dictum.kynni.au/plain-words.", PlainWordsText.ReadAll);
+        Assert.Equal(("In plain words", "Open in your browser", "https://dictum.kynni.au/plain-words"), (PlainWordsText.CardTitle, PlainWordsText.OpenLabel, PlainWordsText.Url));
+    }
+
     // ---- Cloud speech UI block (22/10/2026 17:22 AEDT): the owner's list for PR #54, sections 1 to 3 ----
     // Pinned word for word, independently of the app's constants, one test per surface. The three approved at 18:46 AEDT
     // (SpeechPolicy.LoopbackHttpRefusal, About's fallback form "Speech: {status}.", the both-files switch-off sentence whole)
