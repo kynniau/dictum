@@ -1,0 +1,78 @@
+{
+  "name": "flyout",
+  "title": "The tray panel, Advanced view",
+  "summary": "Not published as a video: a run to take the still behind site/img/flyout.png. The Advanced view is chosen in Settings > Models, Settings is closed, and the tray panel is opened and pointed at once its pickers have settled; the still is the step's raw frame, cropped to the panel (docs/DEMOS.md, \"The tray panel still\").",
+  "pace": { "hover": 2.5 },
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" },
+    { "do": "launch" },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Use this hotkey" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Finish", "timeout": 60 } },
+    { "do": "wait", "seconds": 10 }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "settings",
+      "caption": "Click Settings.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum$", "type": "Button", "name": "Settings" } } ]
+    },
+    {
+      "id": "models",
+      "caption": "Click Models, on the left.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Models" } } ]
+    },
+    {
+      "id": "advanced",
+      "caption": "To see every model by its name and size, click Advanced.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "name": "Models view: Advanced" } } ]
+    },
+    {
+      "id": "close",
+      "caption": "Close Settings.",
+      "do": [ { "do": "key", "keys": "Alt+F4" } ]
+    },
+    {
+      "id": "arrow-again",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray-again",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "panel",
+      "caption": "This is Dictum's panel in the Advanced view.",
+      "lead": 3,
+      "do": [
+        { "do": "waitFor", "target": { "window": "^Dictum$", "type": "Button", "name": "Settings", "timeout": 30 } },
+        { "do": "point", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Start" } }
+      ],
+      "after": 2,
+      "poster": true
+    }
+  ]
+}
