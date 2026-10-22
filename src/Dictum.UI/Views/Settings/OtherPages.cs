@@ -33,6 +33,7 @@ internal sealed class CleanupPage : SettingsPage
     private readonly TextBlock _key = Ui.Text("", "caption");
     private readonly Button _enable;
     private readonly TextBlock _offline = Ui.Text("", "caption");
+    private readonly OwnInstructionsCard _own; // your own instructions (1.3), Advanced view only
 
     /// <summary>
     /// The card's introduction (approved: never reword it). Its last sentence, "Audio never leaves this PC.", is untrue while cloud
@@ -59,17 +60,27 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Line("Server address", _baseUrl, "Leave empty for Anthropic. A plain http:// address must be on this PC."),
             Ui.Line("Model", _model),
             _key,
-            Ui.Row(8, _enable, Ui.Button("Open the settings folder", "secondary", () => Say(Shell.OpenPath(Shell.RealPath(Shell.Paths.ConfigDir), folder: true) ?? ""))),
+            Ui.Row(8, _enable, Ui.Button("Open the settings folder", "secondary", () => Say(Shell.OpenPath(Shell.RealPath(Shell.Paths.ConfigDir), folder: true) ?? "")),
+                KeyFileButton.Create(Shell, () => KeyFileButton.VariableFor(Preset, Address(Preset)), () => _key.Text ?? "", Say)),
             _offline]);
         _cloudOn.Children.AddRange([_cloudState, Ui.Row(8, Ui.Button("Switch cloud clean-up off", "secondary", () => Run(() =>
             Say(Shell.DisableCloud() ?? "Cloud clean-up is off; the local model tidies your dictations again."))))]);
+        _own = new OwnInstructionsCard(Shell, Say);
 
         Compose(
             Ui.Card(_now, "Now"),
             Ui.Card(Ui.Stack(8, _profanity,
                 Ui.Text("Mask keeps the first letter (f***); Remove drops the word. The clean-up model keeps every word you said, swear words included: this setting is the only thing that changes them.", "caption")), "Profanity filter"),
             Ui.Card(Ui.Line("Grammar assist", _grammar, "For speakers whose first language is not English: also fixes articles, tenses, prepositions and word order, keeping every fact and name."), "Grammar"),
+            _own.Card,
             Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff), "Cloud clean-up"));
+    }
+
+    /// <summary>Leaving the page (another page, or the window closed) saves your own instructions if they changed.</summary>
+    public override void Leave()
+    {
+        _own.Save();
+        base.Leave();
     }
 
     protected override void Redraw()
@@ -78,6 +89,7 @@ internal sealed class CleanupPage : SettingsPage
         _now.Text = Shell.CleanupStatus;
         _profanity.Select(Math.Max(0, Array.IndexOf([ProfanitySettings.Off, ProfanitySettings.Mask, ProfanitySettings.Remove], s.Profanity.Mode)));
         Ui.SetQuietly(_grammar, s.Llm.GrammarAssist);
+        _own.Redraw(s);
         // On for anthropic or openai-compatible: a host off this PC the user agreed to, or a server on this PC (no consent step).
         var host = CloudPolicy.CloudHost(s.Llm);
         var server = CloudPolicy.LocalServerHost(s.Llm);

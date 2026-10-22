@@ -4834,9 +4834,9 @@ Two owner requests for Settings > Clean-up, built from main 04287d6. Every new s
      sentence added on the same line as the dictation passed every rule. Probed 22/10/2026 with "um so i think we should uh
      move the meeting to thursday and tell the whole team before lunch": "… before lunch. Thanks for reading.", "… before
      lunch. Kind regards." and "… before lunch. Please call me if you have any questions." were all accepted.
-   - *Page placement pending.* The Clean-up page is `CleanupPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, a file
-     another lane owns. The box is `OwnInstructionsCard` and the button `KeyFileButton` (both in `CleanupOwnInstructions.cs`).
-     Wiring them in takes five small edits in `CleanupPage`, listed in the PR body. They are not made here.
+   - *Page placement (done after PR #59 merged; see item 5).* The Clean-up page is `CleanupPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, which
+     PR #59 owned until it merged. The box is `OwnInstructionsCard` and the button `KeyFileButton` (both in `CleanupOwnInstructions.cs`).
+     Before PR #59 merged, the wiring was only tried in this worktree and then removed.
 2. **Create the key file.** `KeyFile.CreateIfMissing` writes `AppPaths.EnvFile` with `KeyFile.Header` and
    `<VARIABLE>=your-key-here` (the variable must be one of `SecretStore.KeyNames`). It opens with `FileMode.CreateNew` after an
    exists check, so an existing `.env` is never changed. `AppShell.CreateKeyFile` then opens the file through `OpenPath` at
@@ -4911,3 +4911,17 @@ Mutations (each observed failing, 22/10/2026, then restored):
 
 Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnInstructionsTests, KeyFileTests, CloudWarningAndPresetsTests, CleanupOffTests, FixBatchSettingsTests, PublicCopyNeutralityTests and HelpPageTests: 166 total, 0 failed, 0 skipped. Full suite, first run: 1951 total, 1 failed (`HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`, the placeholder stand-in, fixed as above), 23 skipped. Full suite after the fix: 1951 total, 1928 passed, 0 failed, 23 skipped.
 Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incremental`, 0 warnings, 0 errors; the named classes plus HelpPageTests and OwnerApprovalsTests 192 total, 0 failed; full suite 1957 total, 1934 passed, 0 failed, 23 skipped. Gates with the final-sentence rule (item 4): Release build with `--no-incremental`, 0 warnings, 0 errors; the same classes 198 total, 0 failed, 0 skipped; full suite 1963 total, 1940 passed, 0 failed, 23 skipped.
+
+5. **Clean-up page wiring (after PR #59 merged; main 28c3e65 merged as 8e2f205).** `CleanupPage` (OtherPages.cs) gains:
+   the `_own` field and its construction; `_own.Card` between the Grammar and Cloud clean-up cards; `_own.Redraw(s)` in
+   `Redraw`; `KeyFileButton.Create(…)` beside "Open the settings folder" (variable from `KeyFileButton.VariableFor(Preset,
+   Address(Preset))`, the card's own key line for a service with no key); and a `Leave` override that saves the box, so
+   text is kept when another page is chosen or the window closes, besides focus loss. Every other card is unchanged.
+   Pins (`CleanupPageOwnInstructionsTests`): the Advanced view shows the box in place and saves it on leaving the page and
+   on closing the window; the Simple view hides it (and a switch to Advanced shows it); the button sits in the folder
+   button's row, creates the Anthropic key file and shows the created line; an existing `.env` is opened and not changed.
+   Mutation: `OwnInstructionsCard.Redraw` showing the card in both views; `The_Simple_view_hides_the_box` observed failing,
+   then restored. Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; OwnInstructionsTests, KeyFileTests,
+   CleanupPageOwnInstructionsTests, CleanupOffTests, CloudOffTakesEffectTests, CloudWarningAndPresetsTests, HelpPageTests,
+   OwnerApprovalsTests and PublicCopyNeutralityTests 230 total, 0 failed, 0 skipped; full suite 1982 total, 1959 passed,
+   0 failed, 23 skipped.

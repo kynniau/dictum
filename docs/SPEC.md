@@ -317,7 +317,7 @@ rejection costs polish only).
 Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
 feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
 first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is
-`OwnInstructionsCard`; placing it in `CleanupPage` (OtherPages.cs, another lane's file) is pending: DECISIONS, 22/10/2026.
+`OwnInstructionsCard`, placed in `CleanupPage` between the Grammar and Cloud clean-up cards; it is saved when focus leaves it and when the page is left or the window closes (`CleanupPage.Leave`).
 
 Providers (`llm.provider`):
 
@@ -342,7 +342,7 @@ does (at the real path in a packaged build). A `.env` that already exists is nev
 overwrite) and is opened as it is. A service that takes no key (Ollama on this PC) gets no file, only the card's own "needs
 no key" line. The placeholder `your-key-here` (`SecretStore.Placeholder`) counts as not set, as a blank value does, so no
 dictation is sent with it and the pages keep their waiting-for-key line until a real key is saved over it. The button is
-`KeyFileButton`; placing it in `CleanupPage` (OtherPages.cs) is pending: DECISIONS, 22/10/2026.
+`KeyFileButton`, beside "Open the settings folder" on the Cloud clean-up card.
 
 ## 6. Text insertion
 
