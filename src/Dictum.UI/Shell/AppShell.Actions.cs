@@ -389,6 +389,8 @@ public sealed partial class AppShell
                 : "rule-based tidy (clean-up model not downloaded)",
             var cloud => cloud + (_cleaner.MissingKey is null ? "" : " (no key, so rule-based tidy)"),
         };
-        return new Help.FeedbackSetup(AppVersion, $"{Platform.Name} build {Environment.OSVersion.Version.ToString(3)}", Models.CurrentName, speechRuntime, cleanup);
+        // Cloud speech: the provider only, never the host (a company's own address could be private), as for clean-up above. Wording APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
+        var cloudSpeech = _speech.SendsAudio ? $"cloud speech ({_settings.Speech.Provider})" : null;
+        return new Help.FeedbackSetup(AppVersion, $"{Platform.Name} build {Environment.OSVersion.Version.ToString(3)}", Models.CurrentName, speechRuntime, cleanup, cloudSpeech);
     }
 }

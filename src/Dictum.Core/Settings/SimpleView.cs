@@ -40,6 +40,31 @@ public static class SimpleView
     public const string AdvancedLabel = "Advanced";
     public const string SwitchHelp = "Simple shows what each choice means. Advanced shows every model and its details.";
 
+    /// <summary>The explainer's first sentence, which is untrue while cloud speech sends each recording.</summary>
+    public const string ExplainerOnThisPc = "Dictum turns your voice into text on this PC.";
+
+    /// <summary>
+    /// APPROVED 22/10/2026 18:41 AEDT (owner): do not reword. The explainer's first sentence while cloud speech sends each
+    /// recording to <paramref name="host"/>; the approved original (<see cref="ExplainerOnThisPc"/>) shows otherwise.
+    /// </summary>
+    public static string ExplainerCloudSentence(string host) => $"Dictum sends your voice to {host} to be turned into text while cloud speech is on.";
+
+    /// <summary>The explainer's second sentence, which is untrue while cloud speech sends each recording.</summary>
+    public const string ExplainerListening = "The speech model does the listening.";
+
+    /// <summary>APPROVED 22/10/2026 19:45 AEDT (owner): do not reword. The explainer's second sentence while cloud speech sends each recording.</summary>
+    public const string ExplainerCloudListening = "The cloud service does the listening; the speech model on this PC is the fallback.";
+
+    /// <summary>
+    /// The explainer as shown: unchanged, or, while cloud speech sends audio, with <see cref="ExplainerCloudSentence"/> and
+    /// <see cref="ExplainerCloudListening"/> in place of its first two sentences.
+    /// </summary>
+    public static string ExplainerFor(string? cloudHost) =>
+        cloudHost is null
+            ? Explainer
+            : Explainer.Replace(ExplainerOnThisPc, ExplainerCloudSentence(cloudHost), StringComparison.Ordinal)
+                .Replace(ExplainerListening, ExplainerCloudListening, StringComparison.Ordinal);
+
     /// <summary>
     /// The explainer at the top of the Simple speech card. The brief's wording named "Settings > Test my setup", which does not
     /// exist in this build; the existing calibration test ("Calibrate my voice", the button under this text) is named instead.

@@ -435,6 +435,41 @@ public class HelpPageTests
         Assert.Equal(app, site);
     }
 
+    /// <summary>
+    /// Pin (owner, 22/10/2026 17:22 AEDT; mutation-checked): the four answers that say the voice stays on this PC carry the approved
+    /// qualifier "unless you also turn on cloud speech", in the app and on the site, and no answer says it without the qualifier.
+    /// </summary>
+    [Fact]
+    public void The_voice_stays_here_answers_carry_the_cloud_speech_qualifier()
+    {
+        const string qualified = "still stays here unless you also turn on cloud speech.";
+        var questions = HelpText.Questions.Select(q => q.Question).ToHashSet(StringComparer.Ordinal);
+        var answers = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("still stays here", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Equal(4, answers.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and "What is clean-up?"
+        Assert.All(answers, t => Assert.Contains(qualified, t, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("; your voice still stays here unless you also turn on cloud speech.", HelpText.HowItWorks.First(t => t.Contains("still stays here", StringComparison.Ordinal)));
+        Assert.Contains("to be tidied; your voice still stays here unless you also turn on cloud speech. Most people", HelpText.CloudAnswer[0]);
+        Assert.Contains(" Your voice still stays here unless you also turn on cloud speech.", HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[^1]);
+        Assert.Contains(" Your voice still stays here unless you also turn on cloud speech. Cloud speech also sends the words in your dictionary, as a hint.", HelpText.CleanupAnswer.Single(p => p.Contains("still stays here", StringComparison.Ordinal))); // "What is clean-up?", paragraph 6
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        Assert.Equal(5, Regex.Matches(html, Regex.Escape(qualified), RegexOptions.IgnoreCase).Count); // the cloud answer is on the page twice, "What is clean-up?" once
+        Assert.Equal(5, Regex.Matches(html, "still stays here", RegexOptions.IgnoreCase).Count); // none without it
+
+        // Owner, 22/10/2026 ~17:45 AEDT: "Where does my voice go?"'s first paragraph, in the app and on the site, byte for byte.
+        const string first = "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.";
+        Assert.Equal(first, HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[0]);
+        Assert.Contains($"<p>{first}</p>", html);
+        Assert.DoesNotContain("never sends it anywhere.", html);
+
+        // Owner, 22/10/2026 18:41 AEDT (qualifier) and 19:10 AEDT (paths named): "How Dictum works" names cloud speech beside cloud
+        // clean-up, each with its own Settings page, in the app and on the site, byte for byte.
+        const string nothing = "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech (Settings > Models), and it is off unless you turn it on. ";
+        Assert.StartsWith(nothing, HelpText.HowItWorks.Single(t => t.Contains("Nothing you say is sent anywhere", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.Contains(nothing.Replace(">", "&gt;", StringComparison.Ordinal), html);
+        Assert.DoesNotContain("unless you turn on cloud clean-up in Settings", html);
+        Assert.DoesNotContain("or cloud speech in Settings", html);
+    }
+
     // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy
     // (the same literals as CloudWarningAndPresetsTests), so the help can only quote them, never reword them.
     private static string ApprovedWarning(string host) =>

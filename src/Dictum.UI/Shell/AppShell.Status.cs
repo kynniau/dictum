@@ -37,7 +37,7 @@ public sealed partial class AppShell
     /// The speech model, its runtime and the clean-up in use, as the header shows them but without the hotkey ("base.en · Vulkan · rules").
     /// What the support emails carry (Report a problem, Email support): the hotkey is the user's own setting and is not part of "version and models".
     /// </summary>
-    internal string ModelsLine => $"{Models.CurrentName} · {HeaderRuntime()} · {CleanupLabel()}";
+    internal string ModelsLine => $"{Models.CurrentName} · {HeaderRuntime()}{CloudSpeechPart} · {CleanupLabel()}";
 
     private string HeaderRuntime() => _models.IsLoading ? "loading…" : _models.LastError is not null ? "model error" : SpeechRuntime();
 
@@ -70,7 +70,7 @@ public sealed partial class AppShell
     /// settings token in the log ("RightCtrl"), which is what a person types into settings.json (lens on 4abba54).
     /// </summary>
     private string TooltipLine(string hotkey) =>
-        $"Dictum · {Models.CurrentName} · {Models.DownloadStatus ?? HeaderRuntime()} · {CleanupLabel()} · {hotkey}{(_settings.Enabled ? "" : " (off)")}";
+        $"Dictum · {Models.CurrentName} · {Models.DownloadStatus ?? HeaderRuntime()}{CloudSpeechPart} · {CleanupLabel()} · {hotkey}{(_settings.Enabled ? "" : " (off)")}";
 
     /// <summary>
     /// The speech runtime: "CPU" for a model kept off the GPU inside a GPU runtime (whisper.gpu = cpu after it loaded, or the retry
@@ -110,7 +110,7 @@ public sealed partial class AppShell
                     : _llm.LastError is not null ? $"{cleanup} · error"
                     : SimpleView.TidyLabel; // the rule-based tidy does the tidying until the model is on this PC
             }
-            return $"{speech}{state} · {cleanup}";
+            return $"{speech}{state}{CloudSpeechPart} · {cleanup}";
         }
     }
 

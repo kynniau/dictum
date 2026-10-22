@@ -40,6 +40,15 @@ public sealed class CloudSpeech
     /// <summary>The host recordings go to while <see cref="SendsAudio"/>, else null.</summary>
     public string? Host => _engine?.Host;
 
+    /// <summary>The model (or Azure deployment) recordings are sent for while <see cref="SendsAudio"/>, else null.</summary>
+    public string? Model => _engine?.Model;
+
+    /// <summary>
+    /// Why the last request was not used (the speech model on this PC heard that dictation), until the next one succeeds; null
+    /// while the last request succeeded, none was made, or nothing is sent. The UI's fallback surfaces read it from here.
+    /// </summary>
+    public string? LastFailure => _engine?.LastFailure;
+
     /// <summary>
     /// The key variable whose absence stopped the service when this was built, or null; the UI reads it from here, never from
     /// the .env files, as clean-up's <see cref="Llm.TranscriptCleaner.MissingKey"/>.
@@ -65,8 +74,10 @@ public sealed class CloudSpeech
     /// <param name="decode">The decoding the local model uses (dictionary prompt, language, translate): cloud speech sends the same hint and language.</param>
     /// <param name="http">The offline-guarded provider client (<see cref="OfflineGuardHandler.CreateClient"/>) that clean-up uses; tests pass a fake handler.</param>
     /// <param name="local">The local model (<see cref="ModelManager.GetAsync"/>): every recording when cloud speech cannot run, and the fallback when a request fails.</param>
+    /// <param name="fallbackModel">The local model's name for the load line ("base.en"); null says "the speech model on this PC".</param>
+    /// <param name="consentAgreedAt">When the speech consent on record was given, for the load line; null leaves that clause out.</param>
     public static CloudSpeech Create(SpeechSettings settings, DecodeOptions decode, bool offlineOnly, SecretStore secrets, HttpClient http, ILog log,
-        Func<CancellationToken, Task<ITranscriber>> local)
+        Func<CancellationToken, Task<ITranscriber>> local, string? fallbackModel = null, DateTimeOffset? consentAgreedAt = null)
     {
         if (settings.Provider != SpeechSettings.OpenAiCompatible) return Local(local);
 
@@ -90,8 +101,18 @@ public sealed class CloudSpeech
         if (!service.TryGetKey(secrets, out var key))
             return Refused($"{service.KeyVariable} is not set (environment or .env), so nothing is sent to {host}", SpeechStatus.WaitingForKey(service.KeyVariable!), service.KeyVariable);
 
-        log.Info($"Cloud speech on: audio goes to {host} ({settings.Model}); the speech model on this PC is the fallback.");
+        log.Info(LoadLine(host, settings.Model, consentAgreedAt, fallbackModel));
         var engine = new CloudSpeechEngine(http, settings.BaseUrl, settings.Model, key, service.KeyHeader, decode, TimeSpan.FromMilliseconds(settings.TimeoutMs), local, log);
         return new CloudSpeech(local, engine, "", null);
     }
+
+    /// <summary>
+    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec "Cloud speech" §4; UI lane): the log line when cloud speech is on at a load, "Cloud speech on:
+    /// audio goes to {host} ({model}); consent recorded {date}; {local model} is the fallback." The date is the consent record's,
+    /// on this PC's clock, as yyyy-MM-dd.
+    /// </summary>
+    public static string LoadLine(string host, string model, DateTimeOffset? consentAgreedAt, string? fallbackModel) =>
+        $"Cloud speech on: audio goes to {host} ({model})" +
+        (consentAgreedAt is { } at ? $"; consent recorded {at.ToLocalTime():yyyy-MM-dd}" : "") +
+        $"; {fallbackModel ?? "the speech model on this PC"} is the fallback.";
 }
