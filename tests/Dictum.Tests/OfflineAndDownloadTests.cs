@@ -328,7 +328,7 @@ public sealed class OfflineAndDownloadTests : IDisposable
         var target = Path.Combine(_dir.FullName, "x.gguf");
         var log = new RecordingLog();
         var attempts = await ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, log,
-            Fast with { StallTimeout = TimeSpan.FromMilliseconds(300) });
+            Fast with { StallTimeout = TimeSpan.FromMilliseconds(300) }).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken); // a broken timer fails at 30 s, not never
         Assert.Equal(2, attempts);
         Assert.Contains("connection stalled: no data for 0.3 s", log.All);
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));

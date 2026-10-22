@@ -5,6 +5,8 @@ namespace Dictum.Tests;
 /// <c>Task.Delay(delay, timeProvider)</c>) fire, on the advancing thread and in due order, when the clock reaches them, so a test
 /// decides exactly how much time passes between two events instead of racing a real timer. Written here rather than taken from
 /// Microsoft.Extensions.TimeProvider.Testing so the test project gains no package (see DECISIONS.md, "TimeProvider seam").
+/// Contract: a timer made with a due time of zero fires on the next <see cref="Advance"/> (even <c>Advance(TimeSpan.Zero)</c>),
+/// not at once on the creating thread; <see cref="GetTimestamp"/> follows the fake clock; changing a disposed timer returns false.
 /// </summary>
 internal sealed class FakeTimeProvider : TimeProvider
 {
@@ -26,11 +28,18 @@ internal sealed class FakeTimeProvider : TimeProvider
         }
     }
 
+    public override long GetTimestamp() => GetUtcNow().UtcTicks;
+
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = new FakeTimer(this, callback, state);
-        timer.Change(dueTime, period);
-        lock (_gate) _timers.Add(timer);
+        lock (_gate) // armed and registered together, so an Advance never sees one without the other
+        {
+            timer.Change(dueTime, period);
+            _timers.Add(timer);
+        }
         return timer;
     }
 
@@ -60,6 +69,7 @@ internal sealed class FakeTimeProvider : TimeProvider
     private sealed class FakeTimer(FakeTimeProvider clock, TimerCallback callback, object? state) : ITimer
     {
         private TimeSpan _period = Timeout.InfiniteTimeSpan;
+        private bool _disposed;
 
         /// <summary>When the timer next fires; null while it is stopped or disposed.</summary>
         public DateTimeOffset? Due { get; private set; }
@@ -68,6 +78,7 @@ internal sealed class FakeTimeProvider : TimeProvider
         {
             lock (clock._gate)
             {
+                if (_disposed) return false;
                 _period = period;
                 Due = dueTime == Timeout.InfiniteTimeSpan ? null : clock._now + dueTime;
             }
@@ -84,6 +95,7 @@ internal sealed class FakeTimeProvider : TimeProvider
         {
             lock (clock._gate)
             {
+                _disposed = true;
                 Due = null;
                 clock._timers.Remove(this);
             }
