@@ -310,7 +310,7 @@
   <section id="privacy" aria-labelledby="privacy-title">
     <h2 id="privacy-title">7. Your privacy</h2>
     <p>Dictum turns your voice into text on this PC, then throws the recording away. Your voice never leaves this PC.</p>
-    <p>All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings &gt; Clean-up, and it is off unless you turn it on. If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here.</p>
+    <p>All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up (Settings &gt; Clean-up) or cloud speech (Settings &gt; Models), and it is off unless you turn it on. If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here unless you also turn on cloud speech.</p>
     <p>In the words of our privacy policy:</p>
     <blockquote class="card">
       <p>We collect nothing. Dictum has no account, no analytics, no telemetry and no crash reporting. We never receive your audio or your text.</p>
@@ -320,7 +320,7 @@
 
   <section id="cloud" aria-labelledby="cloud-title">
     <h2 id="cloud-title">8. Optional: turn on cloud clean-up</h2>
-    <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.</p>
+    <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here unless you also turn on cloud speech. Most people do not need it: Tidy my words runs on this PC.</p>
     <p>Before Dictum sends text to a service off this PC, it shows a warning. For Anthropic, it says:</p>
     <blockquote class="card">
       <p>WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on api.anthropic.com's servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.</p>
@@ -413,9 +413,9 @@
       <details id="faq-voice">
         <summary>Where does my voice go?</summary>
         <div class="answer">
-          <p>Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.</p>
+          <p>Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.</p>
           <p>The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.</p>
-          <p>If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here.</p>
+          <p>If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here unless you also turn on cloud speech.</p>
         </div>
       </details>
 
@@ -602,7 +602,7 @@
       <details id="faq-cloud-setup">
         <summary>How do I turn on cloud clean-up?</summary>
         <div class="answer">
-          <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.</p>
+          <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here unless you also turn on cloud speech. Most people do not need it: Tidy my words runs on this PC.</p>
           <p>To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.</p>
           <p>Then save the key in a file called .env in Dictum's settings folder, and switch cloud clean-up on in Settings &gt; Clean-up. The steps, with a moving picture, are in <a href="#cloud">Optional: turn on cloud clean-up</a>.</p>
         </div>

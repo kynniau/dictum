@@ -38,6 +38,7 @@ internal sealed class OverlayPresenter(AppShell shell) : IDisposable
     {
         var pill = new PillWindow(shell.Platform);
         pill.SetLevelSource(() => shell.CurrentLevel);
+        pill.SetLabelSource(shell.PillLabel); // cloud speech: "Hearing… (cloud)", and the fallback line after a failed request
         return pill;
     }
 

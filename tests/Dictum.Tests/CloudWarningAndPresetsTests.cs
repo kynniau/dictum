@@ -24,6 +24,9 @@ public class CloudWarningAndPresetsTests
     private static string ApprovedWarning(string host) =>
         $"WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on {host}'s servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.";
 
+    // Approved by the owner 22/10/2026 16:35 AEDT (counsel review pending): the consent dialog's paragraph after the warning.
+    private const string ApprovedResponsibility = "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.";
+
     private const string ApprovedStateLine = "Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.";
 
     // Approved by the product owner on 16/10/2026 as written; pinned word for word, independently of the app's copy. Settings > Clean-up
@@ -116,8 +119,11 @@ public class CloudWarningAndPresetsTests
         {
             var host = CloudPolicy.CloudHost(llm)!;
             var text = CloudPolicy.ConsentText(llm, host);
-            // Its own paragraph, straight before "Nothing is sent until you agree."
-            Assert.Contains("\n\n" + ApprovedWarning(host) + "\n\nNothing is sent until you agree.", text);
+            // Its own paragraph, then the responsibility paragraph (owner, 22/10/2026 16:35 AEDT), then "Nothing is sent until you agree."
+            Assert.Contains("\n\n" + ApprovedWarning(host) + "\n\n" + ApprovedResponsibility + "\n\nNothing is sent until you agree.", text);
+            // The first sentence's parenthesis (owner, 22/10/2026 18:41 AEDT), byte for byte.
+            Assert.StartsWith($"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host}", text);
+            Assert.DoesNotContain("(never the audio)", text);
         }
     }
 
@@ -608,7 +614,7 @@ public class CloudWarningAndPresetsTests
         var host = CloudPolicy.CloudHost(llm)!;
         var text = CloudPolicy.ConsentText(llm, host);
         // A factual sentence beside the others; the approved warning paragraph follows, untouched.
-        Assert.Contains("personal dictionary. " + sentence + " Whoever runs that server receives the text; its own terms apply.\n\n" + ApprovedWarning(host) + "\n\nNothing is sent until you agree.", text);
+        Assert.Contains("personal dictionary. " + sentence + " Whoever runs that server receives the text; its own terms apply.\n\n" + ApprovedWarning(host) + "\n\n" + ApprovedResponsibility + "\n\nNothing is sent until you agree.", text);
         Assert.Single(SecretStore.KeyNames, k => text.Contains(k, StringComparison.Ordinal)); // it names one key: the one that goes
     }
 

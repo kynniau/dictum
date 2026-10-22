@@ -13,6 +13,9 @@ public sealed record ConfigLoadResult(AppSettings Settings, SecretStore Secrets,
 
     /// <summary>Startup found a broken file: defaults, with offline_only forced on.</summary>
     public bool ForcedOffline { get; init; }
+
+    /// <summary>When the speech consent on file (consent.json's speech entry) was given, for cloud speech's load line; null: none, or the previous settings were kept.</summary>
+    public DateTimeOffset? SpeechConsentAgreedAt { get; init; }
 }
 
 /// <summary>
@@ -48,8 +51,8 @@ public static class ConfigLoader
         if ((settings.Models.Folder ?? settings.Whisper.ModelsDir) is { } chosen && paths.IsBundled(chosen))
             warn(BundledFolderIgnored(settings.Models.Folder is null ? "whisper.models_dir" : "models.folder", chosen, paths.DefaultModelsDir));
         return file.Usable
-            ? new ConfigLoadResult(settings, secrets, file, null)
-            : new ConfigLoadResult(settings, secrets, file, BrokenAtStartup) { ForcedOffline = true };
+            ? new ConfigLoadResult(settings, secrets, file, null) { SpeechConsentAgreedAt = consents.Speech?.AgreedAt }
+            : new ConfigLoadResult(settings, secrets, file, BrokenAtStartup) { ForcedOffline = true, SpeechConsentAgreedAt = consents.Speech?.AgreedAt };
     }
 
     /// <summary>
