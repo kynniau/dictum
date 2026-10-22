@@ -339,6 +339,12 @@ public class HelpPageTests
         var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
         Assert.Equal(4, Regex.Matches(html, Regex.Escape(qualified), RegexOptions.IgnoreCase).Count); // the cloud answer is on the page twice
         Assert.Equal(4, Regex.Matches(html, "still stays here", RegexOptions.IgnoreCase).Count); // none without it
+
+        // Owner, 22/10/2026 ~17:45 AEDT: "Where does my voice go?"'s first paragraph, in the app and on the site, byte for byte.
+        const string first = "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.";
+        Assert.Equal(first, HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[0]);
+        Assert.Contains($"<p>{first}</p>", html);
+        Assert.DoesNotContain("never sends it anywhere.", html);
     }
 
     // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy

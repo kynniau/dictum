@@ -223,4 +223,99 @@ public class OwnerApprovalsTests
         Assert.Equal("A dictation would paste this. This page pasted nothing.", HowItWorksText.WouldPaste);
         Assert.Equal("Your corrections, the profanity filter or snippets changed the text.", HowItWorksText.Changed);
     }
+
+    // ---- Cloud speech UI block (22/10/2026 17:22 AEDT): the owner's list for PR #54, sections 1 to 3 ----
+    // Pinned word for word, independently of the app's constants, one test per surface. Still PROPOSED and so not pinned here:
+    // SpeechPolicy.LoopbackHttpRefusal, About's fallback form "Speech: {status}.", and the last clause of the both-files
+    // switch-off sentence. The consent text and buttons, the replacement sentence and the "Cloud clean-up:" caption have their
+    // own byte pins (CloudSpeechTests, CloudSpeechUiTests); the SpeechStatus lines are pinned in CloudSpeechTests.
+
+    /// <summary>Pin (cloud speech UI block): the consent step's title and what switching on can say.</summary>
+    [Fact]
+    public void Cloud_speech_dialog_and_switch_on_lines_are_pinned()
+    {
+        Assert.Equal("Send your voice to a cloud service?", AppShell.SpeechConsentTitle);
+        Assert.Equal("Cloud speech was not switched on; nothing is sent.", AppShell.SpeechNotSwitchedOn);
+        Assert.Equal("offline_only is on, so cloud speech is refused. Switch offline only off in Settings > Privacy first.", AppShell.SpeechOfflineRefused);
+        Assert.Equal("Type the service's https:// address and the model (for Azure OpenAI, the deployment name).", AppShell.SpeechAddressMissing);
+    }
+
+    /// <summary>Pin (cloud speech UI block): Settings > Models' Cloud speech card.</summary>
+    [Fact]
+    public void Cloud_speech_card_words_are_pinned()
+    {
+        Assert.Equal("Cloud speech", ModelsPage.CloudSpeechTitle);
+        Assert.Equal("Use cloud speech…", ModelsPage.UseCloudSpeechLabel);
+        Assert.Equal("Switch cloud speech off", ModelsPage.CloudSpeechOffLabel);
+        Assert.Equal("Optional, for a slow PC or one without a GPU. A cloud service turns each recording into text instead of the speech model on this PC, but the recording of every dictation, your voice, then goes to that service. The speech model on this PC stays as the fallback.",
+            ModelsPage.CloudSpeechIntro);
+        Assert.Equal("Dictum adds /audio/transcriptions. Cloud speech needs an https:// address, also for a server on this PC.", ModelsPage.CloudSpeechAddressHint);
+        Assert.Equal("Offline only is on (Privacy), so cloud speech cannot be switched on.", ModelsPage.CloudSpeechOfflineNote);
+        Assert.Equal("Cloud speech is on.", ModelsPage.CloudSpeechSwitchedOn);
+        Assert.Equal("Cloud speech is off; the speech model on this PC hears your dictations again.", ModelsPage.CloudSpeechSwitchedOff);
+        var azure = SpeechPresets.All.Single(p => p.Name == "Azure OpenAI");
+        Assert.Equal("https://your-resource.openai.azure.com/openai/v1", ModelsPage.CloudSpeechAddressWatermark(azure));
+        Assert.Equal("https://your-server.example.com/v1", ModelsPage.CloudSpeechAddressWatermark(SpeechPresets.Custom));
+        Assert.Equal("The key goes in .env in the settings folder: GROQ_API_KEY=your Groq API key. Without it nothing is sent.",
+            ModelsPage.CloudSpeechKeyLine(SpeechPresets.All.Single(p => p.Name == "Groq")));
+        Assert.Equal("If the server needs a key, it goes in .env in the settings folder: SPEECH_API_KEY=your key.", ModelsPage.CloudSpeechKeyLine(SpeechPresets.Custom));
+    }
+
+    /// <summary>Pin (cloud speech UI block): Switch cloud speech off when a file could not be changed (the approved parts).</summary>
+    [Fact]
+    public void Cloud_speech_off_not_saved_sentences_are_pinned()
+    {
+        Assert.Equal("Cloud speech is off, but consent.json could not be changed (C). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is changed, your speech consent stays on file.",
+            AppShell.SpeechOffNotSaved("C", null));
+        Assert.Equal("Cloud speech is off for this session, but settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits.",
+            AppShell.SpeechOffNotSaved(null, "S"));
+        // Both files: the approved part; its last clause is still PROPOSED and not pinned here.
+        Assert.StartsWith("Cloud speech is off for this session, but consent.json could not be changed (C) and settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits",
+            AppShell.SpeechOffNotSaved("C", "S"));
+    }
+
+    /// <summary>Pin (cloud speech UI block): the tray panel's footer line and the header, tooltip and support-email token.</summary>
+    [Fact]
+    public void Cloud_speech_tray_line_and_token_are_pinned()
+    {
+        Assert.Equal("Cloud speech · audio leaves this PC (speech.example.com)", AppShell.SpeechTrayLine("speech.example.com"));
+        Assert.Equal("cloud speech", AppShell.CloudSpeechToken);
+    }
+
+    /// <summary>Pin (cloud speech UI block): the feedback email's cloud speech line (the provider only).</summary>
+    [Fact]
+    public void Cloud_speech_support_email_line_is_pinned()
+    {
+        var body = Uri.UnescapeDataString(SupportMail.FeedbackUri(new FeedbackSetup("1.2.1", "Windows build 10.0.26100", "base.en", "CPU", "rules", "cloud speech (openai-compatible)")));
+        Assert.Contains("\r\nSpeech model: base.en on CPU\r\nSpeech: cloud speech (openai-compatible)\r\nClean-up: rules", body);
+    }
+
+    /// <summary>Pin (cloud speech UI block): Settings > Privacy's and Settings > About's cloud speech lines.</summary>
+    [Fact]
+    public void Cloud_speech_privacy_and_about_lines_are_pinned()
+    {
+        Assert.Equal("Your voice goes to speech.example.com for speech recognition. Advanced option: your audio leaves this PC. Dictum does not validate or certify how that service handles it.",
+            AppShell.SpeechPrivacyLine("speech.example.com"));
+        Assert.Equal("Speech: cloud, speech.example.com (m); base.en on this PC is the fallback.", AppShell.SpeechAboutLine("speech.example.com", "m", "base.en"));
+    }
+
+    /// <summary>Pin (cloud speech UI block): the pill's two cloud speech labels.</summary>
+    [Fact]
+    public void Cloud_speech_pill_lines_are_pinned()
+    {
+        Assert.Equal("Hearing… (cloud)", AppShell.HearingCloudPill);
+        Assert.Equal("Heard on this PC (cloud speech failed)", SpeechStatus.FallbackPill);
+    }
+
+    /// <summary>Pin (cloud speech UI block): the load log line and the settings loader's https message.</summary>
+    [Fact]
+    public void Cloud_speech_log_and_loader_lines_are_pinned()
+    {
+        var noon = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Unspecified);
+        var at = new DateTimeOffset(noon, TimeZoneInfo.Local.GetUtcOffset(noon)); // noon on this PC's clock: the date cannot shift
+        Assert.Equal("Cloud speech on: audio goes to speech.example.com (m); consent recorded 2026-10-22; base.en is the fallback.",
+            CloudSpeech.LoadLine("speech.example.com", "m", at, "base.en"));
+        Assert.Equal("expected an absolute https:// URL such as \"https://api.openai.com/v1\"; cloud speech needs https://, also for a server on this PC, because its consent step says the connection is encrypted",
+            SettingsLoader.SpeechBaseUrlProblem("http://localhost:8080/v1"));
+    }
 }

@@ -37,7 +37,11 @@ public static class SpeechPolicy
         return CloudPolicy.PlainHttpRefusal("speech.base_url", s.BaseUrl) ?? LoopbackHttpRefusal(CloudPresets.HostOf(u));
     }
 
-    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword. The refusal of a plain http:// speech.base_url on this PC; also the settings loader's warning.</summary>
+    /// <summary>
+    /// PROPOSED (22/10/2026), pending the owner: not in the 17:22 AEDT approved list (re-lens on PR #54). The refusal of a plain
+    /// http:// speech.base_url on this PC, in the speech step's "nothing sent" status and its log line (<see cref="InsecureEndpoint"/>).
+    /// The settings loader's own warning is <c>SettingsLoader.SpeechBaseUrlProblem</c>, not this.
+    /// </summary>
     public static string LoopbackHttpRefusal(string host) =>
         $"speech.base_url {host} uses http://, but cloud speech needs an https:// address, also on this PC, because its consent step says the connection is encrypted";
 

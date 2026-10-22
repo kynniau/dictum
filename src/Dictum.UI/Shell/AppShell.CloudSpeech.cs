@@ -61,8 +61,11 @@ public sealed partial class AppShell
     internal const string HearingCloudPill = "Hearing… (cloud)";
 
     /// <summary>
-    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: what Switch cloud speech off says when a file could not be changed, mirroring clean-up's approved
-    /// <see cref="OffNotSaved"/> sentences with "cloud speech" and "your speech consent".
+    /// What Switch cloud speech off says when a file could not be changed, mirroring clean-up's approved <see cref="OffNotSaved"/>
+    /// sentences with "cloud speech" and "your speech consent". The consent.json-only and settings.json-only sentences are APPROVED
+    /// 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword. The both-files sentence's last clause ("; if both are still
+    /// unchanged then, the next start turns cloud speech back on, unless settings.json cannot be read, in which case Dictum starts
+    /// offline.") is PROPOSED (22/10/2026), pending the owner (re-lens on PR #54); the rest of that sentence is APPROVED as above.
     /// </summary>
     internal static string SpeechOffNotSaved(string? consent, string? settings) => (consent, settings) switch
     {
@@ -104,8 +107,10 @@ public sealed partial class AppShell
         : null;
 
     /// <summary>
-    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4, this composition). Settings > About's speech line: the cloud line while it sends each recording, the speech step's line after a fallback or
-    /// while cloud speech is set but sends nothing, and null for the default (the speech model on this PC, which the models line names).
+    /// Settings > About's speech line: the cloud line while it sends each recording (<see cref="SpeechAboutLine"/>, APPROVED 22/10/2026
+    /// 17:22 AEDT: do not reword); the fallback form "Speech: {status}." after a fallback or while cloud speech is set but sends
+    /// nothing, which is PROPOSED (22/10/2026), pending the owner (re-lens on PR #54); and null for the default (the speech model on
+    /// this PC, which the models line names).
     /// </summary>
     internal string? SpeechAboutValue => _speech switch
     {

@@ -153,7 +153,8 @@ public static class HelpText
     [
         new("Where does my voice go?",
         [
-            "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.",
+            // APPROVED 22/10/2026 17:45 AEDT (qualifier added; proposed 21/10/2026): do not reword.
+            "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.",
             "The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.",
             // APPROVED 22/10/2026 17:22 AEDT (qualifier added; proposed 21/10/2026): do not reword.
             "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here unless you also turn on cloud speech.",

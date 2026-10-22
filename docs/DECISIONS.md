@@ -4638,7 +4638,7 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
       the replacement pin observed failing.
 14. **Gates after the owner's decisions** (after merging origin/main 3f0eb06): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1907 total, 0 failed, 23 skipped, 0 errors.
 15. **Owner approval of the PROPOSED strings (22/10/2026, 17:22 AEDT), markers only.** The owner approved, as a block, every
-    string item 7 lists, the Core lane's `SpeechStatus` lines (with `SpeechPolicy.LoopbackHttpRefusal`), the settings loader's
+    string item 7 lists, the Core lane's `SpeechStatus` lines, the settings loader's
     https message (`SettingsLoader.SpeechBaseUrlProblem`), the load and per-failure log lines, the `speech` note in the default
     settings.json, the "cloud speech" token and the support email's "Speech: cloud speech (provider)" line. Each marker now
     reads "APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword"; the per-failure log line and the `speech`
@@ -4658,3 +4658,38 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
     my voice go?", then restored. Not changed, for the owner: the first paragraph of "Where does my voice go?" still says
     Dictum "never sends it anywhere", which is untrue while cloud speech is on.
 17. **Gates after items 15 and 16** (origin/main 3f0eb06 merged; no newer main): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1908 total, 0 failed, 23 skipped, 0 errors.
+18. **Re-lens on 3423468 (Needs changes, no blocker), fixes.**
+    - *Approvals record (major).* Item 15 claimed `SpeechPolicy.LoopbackHttpRefusal` was approved; it is not in the owner's
+      17:22 list (§3 lists only `SettingsLoader.SpeechBaseUrlProblem`). Its marker is PROPOSED again, and its doc comment no
+      longer says the settings loader uses it (the loader's warning is `SpeechBaseUrlProblem`). Item 15 is corrected. Two more
+      are marked PROPOSED, pending the owner, because the list did not name them. **Still PROPOSED** (verbatim):
+      - `SpeechPolicy.LoopbackHttpRefusal`: "speech.base_url {host} uses http://, but cloud speech needs an https:// address,
+        also on this PC, because its consent step says the connection is encrypted"
+      - About's fallback form (`AppShell.SpeechAboutValue`): "Speech: {status}." (the speech step's line, after a fallback
+        or while cloud speech is set but sends nothing)
+      - The both-files switch-off sentence's last clause (`AppShell.SpeechOffNotSaved`): "; if both are still unchanged
+        then, the next start turns cloud speech back on, unless settings.json cannot be read, in which case Dictum starts
+        offline."
+    - *Word-for-word pins (major).* `OwnerApprovalsTests` gains a "Cloud speech UI block (22/10/2026 17:22 AEDT)": one test per
+      surface, each a literal `Assert.Equal` (the both-files sentence as `StartsWith` up to its PROPOSED clause). The tests cover
+      the dialog and switch-on lines; the card (title, buttons, intro, hint, offline note, switched on/off, both placeholders,
+      both key lines); the off-not-saved sentences; the tray line and token; the support-email line; the Privacy and About
+      lines; the pill lines; the load log line and the loader's https message. *Mutations (observed 22/10/2026), one per
+      group, each restored:* dialog title "?" to "!": the dialog pin observed failing. Card intro "stays as the fallback" to
+      "stays the fallback": the card pin observed failing. Settings-only off-not-saved "quits." to "quits!": the off-not-saved
+      pin observed failing. Tray line "leaves" to "goes off" (the lens's): the tray pin observed failing. Support email
+      "Speech: " to "Speech - ": the email pin observed failing. Privacy "recognition" to "transcription" (the lens's): the
+      Privacy and About pin observed failing. Pill "…" to "...": the pill pin observed failing. Load line "fallback" to
+      "fall-back": the log and loader pin observed failing.
+19. **Help, "Where does my voice go?" (owner, 22/10/2026 about 17:45 AEDT).** Its first paragraph now ends "and never sends it
+    anywhere unless you turn on cloud speech."; nothing else changed. `site/help.html` has the same change. Marker: "APPROVED
+    22/10/2026 17:45 AEDT (qualifier added; proposed 21/10/2026)". This supersedes item 16's "Not changed" note. Pinned byte for byte
+    (app and site) in `HelpPageTests.The_voice_stays_here_answers_carry_the_cloud_speech_qualifier`, which was observed failing
+    with the qualifier removed and then restored. The paragraph still opens "Nowhere."; the owner approved only the clause.
+20. **Owner wording pending (no edit until the owner's words arrive).** Sentences still untrue while audio is sent:
+    `ModelPages.cs` "Turns your voice into words, on this PC."; `SimpleView.cs` "Dictum turns your voice into text on this PC.";
+    `HelpText.cs` and `site/help.html` "Nothing you say is sent anywhere unless you turn on cloud clean-up"; `CloudPolicy.cs`
+    "(never the audio)" in clean-up's consent text when the clean-up and speech hosts are the same. Also recorded, owner
+    option, no change: with both features on under offline only, Privacy can show the offline-only line twice with no caption (the speech
+    step's line and the clean-up line; the caption shows only while audio is sent).
+21. **Gates after items 18 and 19.** GATE_TOTALS_5
