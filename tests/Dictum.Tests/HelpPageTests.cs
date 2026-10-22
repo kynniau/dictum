@@ -73,7 +73,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Contains(text, shown);
 
-        Assert.Equal(15, HelpText.Questions.Count); // the thirteen before, and the two clean-up questions (PROPOSED 22/10/2026)
+        Assert.Equal(15, HelpText.Questions.Count); // the thirteen before, and the two clean-up questions (APPROVED 22/10/2026 19:20 AEDT)
         var blocks = All<Border>(page).Where(b => b.Focusable).Select(AutomationProperties.GetName).ToList();
         foreach (var entry in HelpText.Questions)
             Assert.Contains(entry.Question, blocks); // each question is its own tab stop, named after it
@@ -311,9 +311,9 @@ public class HelpPageTests
         // The question "How do I turn on cloud clean-up?" is a heading, not a paragraph: its answer's first paragraph says it.
         var questions = HelpText.Questions.Select(q => q.Question).ToHashSet(StringComparer.Ordinal);
         var mentions = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
-        Assert.Equal(4, mentions.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and (PROPOSED 22/10/2026) "What is clean-up?"
+        Assert.Equal(4, mentions.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and (APPROVED 22/10/2026 19:20 AEDT) "What is clean-up?"
         Assert.Contains(HelpText.CloudAnswer[0], mentions);
-        // The PROPOSED clean-up paragraph begins with the phrase, so it is checked on its own, in its own case; the other three keep the original exact-case check.
+        // The clean-up paragraph begins with the phrase, so it is checked on its own, in its own case; the other three keep the original exact-case check.
         var proposed = Assert.Single(HelpText.CleanupAnswer, p => p.Contains("turn on cloud clean-up", StringComparison.Ordinal));
         Assert.Contains(proposed, mentions);
         Assert.StartsWith("Clean-up happens on this PC. The text of each dictation", proposed, StringComparison.Ordinal);
@@ -328,7 +328,7 @@ public class HelpPageTests
     }
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (clean-up explainers lane): "What is clean-up?" names the choices as the Simple view and Settings > Models do,
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): "What is clean-up?" names the choices as the Simple view and Settings > Models do,
     /// and every claim it makes about what clean-up does is checked against the code that does it: the rule-based tidy removes ums, ahs,
     /// a doubled "the the", and follows a "scratch that" or "new line" said as a phrase of its own; the model's prompt asks for "you know", false starts and "scratch that";
     /// and the gate is the language setting (Detect automatically gives spacing only; Translate to English on gives the full tidy).
@@ -371,7 +371,7 @@ public class HelpPageTests
     }
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (clean-up explainers lane): "How can I see what Dictum does with my words?" names the page, its two buttons
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): "How can I see what Dictum does with my words?" names the page, its two buttons
     /// and its five stages as <see cref="Dictum.Core.HowItWorksText"/> does, and says it pastes nothing and saves nothing.
     /// </summary>
     [Fact]
@@ -398,7 +398,7 @@ public class HelpPageTests
         Assert.Contains("never saved to disk", Dictum.Core.HowItWorksText.CloudSpeechNote("HOST"));
     }
 
-    /// <summary>PROPOSED 22/10/2026 (clean-up explainers lane): "Questions on this page" lists both new questions as links, one after the other, after the one about wrong words.</summary>
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): "Questions on this page" lists both new questions as links, one after the other, after the one about wrong words.</summary>
     [Fact]
     public Task The_index_lists_the_two_clean_up_questions() => UiSession.Run(() =>
     {
@@ -416,7 +416,7 @@ public class HelpPageTests
     });
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (clean-up explainers lane): the website guide's questions "What is clean-up?" and "How can I see what Dictum does
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): the website guide's questions "What is clean-up?" and "How can I see what Dictum does
     /// with my words?" carry the in-app answers word for word, paragraph for paragraph (markup, and quotation marks, aside).
     /// </summary>
     [Theory]

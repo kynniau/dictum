@@ -147,11 +147,11 @@ public static class HelpText
         "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
     ];
 
-    /// <summary>PROPOSED 22/10/2026 (clean-up explainers lane; none approved): the question that explains clean-up to someone who has never heard the word.</summary>
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The question that explains clean-up to someone who has never heard the word.</summary>
     public const string CleanupQuestion = "What is clean-up?";
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (clean-up explainers lane; none approved, DECISIONS "Clean-up explainers (PROPOSED copy)"). The facts are the app's:
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. DECISIONS "Clean-up explainers". The facts are the app's:
     /// the rule-based tidy (DeterministicCleaner: ums, ahs, doubled words, capitals, full stops, a clause-of-its-own "scratch that" and "new line"), the model's extras (CleanupPrompt.Default:
     /// filler phrases, false starts, "scratch that"), the checked reply with the rule-based tidy as the fallback (HowItWorksText.Rejected), Off
     /// (SimpleView.OffSubLine), the language setting that gates both (WhisperLanguages.OutputIsEnglish, the approved sentence in "How Dictum works") and what leaves the PC (cloud clean-up, off unless turned on). The
@@ -168,10 +168,10 @@ public static class HelpText
         "To watch clean-up work on your own words, open Settings > " + HowItWorksText.PageTitle + " and record a short dictation.",
     ];
 
-    /// <summary>PROPOSED 22/10/2026 (clean-up explainers lane; none approved): the question that points at Settings > See how it works.</summary>
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The question that points at Settings > See how it works.</summary>
     public const string SeeHowQuestion = "How can I see what Dictum does with my words?";
 
-    /// <summary>PROPOSED 22/10/2026 (clean-up explainers lane; none approved): the page, its two buttons and its five stages as <see cref="HowItWorksText"/> names them (pinned).</summary>
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The page, its two buttons and its five stages as <see cref="HowItWorksText"/> names them (pinned).</summary>
     public static readonly IReadOnlyList<string> SeeHowAnswer =
     [
         "Open Settings > " + HowItWorksText.PageTitle + ", press " + HowItWorksText.RecordLabel + ", say a sentence or two, then press " + HowItWorksText.StopLabel + ". " +
@@ -196,7 +196,7 @@ public static class HelpText
             "• To teach Dictum a fix, choose Fix last dictation in the Dictum menu. Correct the text, tick the changes you want kept, then choose Save corrections. Dictum makes that fix from then on.",
             "• For better accuracy overall, see \"Why Dictum hears some people better than others\" above.",
         ]),
-        // PROPOSED 22/10/2026 (clean-up explainers lane): the two questions that explain clean-up and the page that shows it, next to the one about wrong words.
+        // APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The two questions that explain clean-up and the page that shows it, next to the one about wrong words.
         new(CleanupQuestion, CleanupAnswer),
         new(SeeHowQuestion, SeeHowAnswer),
         new("It says \"Mic error\" or \"" + NoSoundText.Pill + "\", or nothing happens when I talk. What do I check?",

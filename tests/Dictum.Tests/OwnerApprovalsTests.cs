@@ -224,12 +224,11 @@ public class OwnerApprovalsTests
         Assert.Equal("Your corrections, the profanity filter or snippets changed the text.", HowItWorksText.Changed);
     }
 
-    // ---- PROPOSED (22/10/2026, clean-up explainers lane): NOT approved ----
-    // Pinned word for word so the copy cannot drift before the owner decides, independently of the app's constants. This block is
-    // the only claim these strings make: nothing here records an approval, and the markers in the code stay PROPOSED. Reworded on
-    // approval means these literals change with them, in the same commit as the owner's decision.
+    // ---- The two clean-up Help questions: APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026), as a block ----
+    // Pinned word for word, independently of the app's constants. Reworded only on the owner's written replacement, and then these
+    // literals change with the strings in the same commit.
 
-    /// <summary>PROPOSED pin: the two new Help questions, their answers word for word, and their place in the list.</summary>
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT pin: the two new Help questions, their answers word for word, and their place in the list.</summary>
     [Fact]
     public void The_proposed_clean_up_help_questions_are_pinned()
     {
