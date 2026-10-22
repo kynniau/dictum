@@ -275,7 +275,8 @@ Settings > Models > **Language** shows the full list:
 
 ## Install
 
-Three routes, each per user and none needing administrator rights. Pick one: the Store build and a direct-download
+<!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (install section: "Four routes" and the Mac (beta) route) -->
+Four routes, each per user and none needing administrator rights. Pick one: the Store build and a direct-download
 build on the same PC is not supported (see "Store and direct-download builds"). Coming from the earlier build, named
 Dictate: see "Moving from Dictate".
 
@@ -294,6 +295,7 @@ Dictate: see "Moving from Dictate".
 3. **Portable zip: `Dictum-<version>-win-x64.zip`** from the same releases. Unzip it anywhere and run `Dictum.exe`,
    or install it per user with `scripts\install.ps1` (see "Deploying to staff machines and Azure VMs"). The build is
    self-contained: no .NET install is needed.
+4. **Mac (beta): `Dictum-<version>-osx-arm64.zip`** from the same releases, for Apple Silicon Macs on macOS 15 or later. Check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it and move `Dictum.app` to Applications. It is signed and notarised, so it opens normally. Dictum lives in the menu bar; on first use macOS asks for Microphone access and for Accessibility access (to see the hotkey and to paste into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app. Intel Macs are not supported.
 
 **The direct download needs the Microsoft Visual C++ Redistributable (x64), version 14.51 or later**, unless its
 `runtimes` folders carry the Visual C++ runtime DLLs (a build made with `publish.ps1 -VcRuntimeDir`; see "Build from

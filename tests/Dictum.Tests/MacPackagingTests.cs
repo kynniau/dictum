@@ -87,7 +87,10 @@ public sealed class MacPackagingTests
         Assert.Contains("mac-v", yaml); // the version check runs on the Mac tag too
         Assert.Contains("startsWith(github.ref, 'refs/tags/mac-v') && (env.HAS_MAC_SIGNING != 'true' || env.HAS_MAC_NOTARY != 'true')", yaml); // never an ad-hoc pre-release
         Assert.DoesNotContain("macOS", File.ReadAllText(Repo("packaging", "release-notes-preamble.md")));
-        Assert.DoesNotContain("macOS (beta)", File.ReadAllText(Repo("README.md"))); // the public README says nothing about the beta until it ships
+        // The beta shipped (mac-v1.3.0) and the owner approved the README route on 23/10/2026 07:10 AEDT (DECISIONS): the README now says four routes, the Mac one the fourth.
+        var readme = File.ReadAllText(Repo("README.md"));
+        Assert.Contains("Four routes, each per user and none needing administrator rights.", readme);
+        Assert.Contains("4. **Mac (beta): `Dictum-<version>-osx-arm64.zip`** from the same releases, for Apple Silicon Macs on macOS 15 or later.", readme);
         // Secrets are not available in `if:`; the job env carries a boolean and the steps test that.
         Assert.DoesNotMatch(new Regex(@"^\s*if:.*secrets\.", RegexOptions.Multiline), yaml);
         foreach (var secret in new[] { "MAC_SIGN_CERT_P12_BASE64", "MAC_SIGN_CERT_PASSWORD", "MAC_NOTARY_KEY_ID", "MAC_NOTARY_ISSUER_ID", "MAC_NOTARY_KEY_P8_BASE64" })

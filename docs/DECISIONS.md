@@ -5598,3 +5598,18 @@ shared UI code, so Windows had the first as well:
 - Not in this change, left for a Mac help pass: `HelpText` "How do I remove Dictum completely?" still says "its Start menu
   shortcut and its start-with-Windows entry" and the Microsoft Store sentence on a Mac; HelpText is plain constants with no
   platform code by design, so that is a copy decision for the owner (PROPOSED Mac wording to follow), not a one-liner.
+- Dictum for Mac (beta) announcement APPROVED by the owner (23/10/2026 07:10 AEDT), sections A, B and C of the proposed block as
+  one block, built word for word in `site/index.html` (meta description, hero eyebrow, second hero button, hero note, the new
+  "Dictum for Mac, in beta" section, the "Runs on" table row, the roadmap item moved up to Done, three "What you need" items,
+  the closing band's second button), `README.md` (the install section's fourth route and "Four routes") and
+  `site/privacy.html` (the scope sentence only). Every Mac button links to
+  https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0, to be updated with each Mac release. Each changed block carries an
+  "APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword" comment. `site/styles.css` gains `.cta-pair` (two buttons stacked
+  on a phone, side by side from 640px) and the unused `.btn-secondary` border is now `--text-3` so the button edge meets the
+  3:1 non-text contrast in both themes. Tests: `SiteStoreFirstTests` accepts the Store or the Mac link as a landing-page button
+  (the first is still the Store, in the hero) and asserts exactly 3 Mac buttons (hero, Mac section, closing band) and 2 Store buttons, each in its section, and pins every approved sentence of the Mac section's two paragraphs, its button note and the other Mac lines; `MacPackagingTests` pins the README's four routes. Mutations observed failing against the pins (23/10/2026): "Intel Macs are not supported." removed (1 failure); "right Option" changed to "right Ctrl" in the Mac section (1); the closing-band Mac button deleted (1); both Next items removed (3); index.html alone put back to origin/main (21 of 91); index.html and privacy.html both put back (22 of 91). `SiteStoreFirstTests` baseline 91 of 91.
+  The Microsoft Store listing stays silent about the Mac (Store policy 10.1.5; the first submission was rejected for mentioning
+  it, `docs/STORE.md`, 16/10/2026), and `docs/STORE.md` is not touched. The privacy policy's storage paragraph still names
+  Windows folders only (on a Mac everything lives in `~/Library/Application Support/Dictum`): FLAGGED FOR COUNSEL, not changed
+  here. Not in this block: Help and the site help page say nothing Mac-specific yet (a later copy block).
+- The owner approved (23/10/2026 07:47 AEDT) two Next items for "What’s next", after the Done items and in this order: "Models on another drive" ("Keep the big model files on a second drive or a shared folder, for shared desktops with little disk.") and "Add a word by hotkey" ("Say a name once, fix its spelling, and Dictum gets it right from then on."). They use the existing `status-next` markup, carry an APPROVED comment, and are pinned by `SiteStoreFirstTests` (observed failing when removed: 3 failures). The section heading and intro are unchanged.
