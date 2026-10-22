@@ -5563,3 +5563,11 @@ unless marked:
   read-only image because it was opened from Downloads rather than Applications. That is the case
   `MacShellTests.A_translocated_copy_is_never_moved` covers; the release notes' "move Dictum.app to Applications" is what a
   tester should do before turning on launch at login, since the translocated path is not stable.
+- Dictum for macOS 1.3.0 (beta) PUBLISHED as a GitHub pre-release, tag `mac-v1.3.0` on main eec9c2e, by the Windows
+  orchestrator at 06:52 AEDT 23/10/2026 on the owner's "yes, tell them to publish" (06:53 AEDT in the Mac session; the
+  owner also answered in the Windows session). Verified by the agent at 06:53 from the public download URL, unauthenticated:
+  `Dictum-1.3.0-osx-arm64.zip` 186,316,219 bytes, `shasum -a 256 -c SHA256SUMS-mac.txt` OK (SHA-256
+  5d8ac4bc9ef79979619d1f6ae81d010ce62939c1429a0bc99a08f42bbf86703f, the owner's locally notarised zip). The CI `release-mac`
+  job for the tag fails by design (no MAC_* secrets); the pre-release was created by hand with the approved notes. Still
+  open from the Mac checklist, none a blocker: login item, removal, the owned dialogs, the clean-up model load without
+  `disable-library-validation` (first tester with that model will show it).
