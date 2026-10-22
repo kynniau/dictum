@@ -176,6 +176,8 @@ public class OwnerApprovalsTests
         Assert.Equal("Change…", StoragePage.ChangeLabel);
         Assert.Equal("Change the model folder", StoragePage.ChangeName);
         Assert.Equal("A slower drive makes the speech model slower to load and to switch.", StoragePage.SlowerDriveNote);
+        // APPROVED 22/10/2026 22:42 AEDT: the model folder note, on Models and Storage (one constant), second sentence reworded for move-on-change.
+        Assert.Equal("Dictum looks here first and downloads go here. Changing it asks before moving any files.", ModelsPage.FolderNote);
         using var scratch = new Scratch();
         var consent = PathRegistry.Locations(scratch.Paths, new AppSettings()).Single(l => l.Path == scratch.Paths.ConsentFile && !l.Path.EndsWith(".tmp", StringComparison.Ordinal));
         Assert.Equal("consent to cloud clean-up and cloud speech", consent.Description);

@@ -369,7 +369,7 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Equal("Browse for a model folder", AutomationProperties.GetName(browse)); // labelled for a screen reader
         Assert.True(browse.Focusable && browse.IsTabStop && field.IsTabStop); // and reached with Tab
         Assert.False(useDefault.IsEnabled); // nothing is chosen yet
-        Assert.Contains("Dictum looks here first and downloads go here. Changing it does not move any files.", Texts(window));
+        Assert.Contains("Dictum looks here first and downloads go here. Changing it asks before moving any files.", Texts(window));
 
         dialogs.Folder = chosen;
         Click(browse);

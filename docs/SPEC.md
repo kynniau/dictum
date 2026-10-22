@@ -831,7 +831,7 @@ Users must be able to remove what the app has put on disk, from inside the app.
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
   model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
   also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
-  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
+  Models' Browse… and Use default (`ModelFolderActions`), with the note (APPROVED 22/10/2026 22:42 AEDT: "Dictum looks here first and downloads go here. Changing it asks before moving any files."), the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
   drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
   and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
@@ -1223,7 +1223,9 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   last; files already moved stay moved. Then `models.folder` is written, unless a model in use stayed behind (the folder is
   then unchanged and the line says so), and the settings reload. The page's status line shows each file, by its catalogue
   name, as it moves and the result. Quit during a move stops it (the file being copied stops, its original kept; a file
-  already checked finishes) and Dictum then quits without changing the folder.
+  already checked finishes) and Dictum then quits without changing the folder. The note under the folder on Models and
+  Storage reads (APPROVED 22/10/2026 22:42 AEDT): "Dictum looks here first and downloads go here. Changing it asks before
+  moving any files."
 - **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
@@ -1231,7 +1233,7 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
-  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
+  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and that changing it asks before moving any files (amended 22/10/2026), and a
   one-line warning when the folder is on a network share: a UNC path, read from the text alone, or a mapped network
   drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
   ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled

@@ -22,7 +22,8 @@ internal sealed class ModelsPage : SettingsPage
     internal const string FolderLabel = "Model folder";
     internal const string BrowseLabel = "Browse…";
     internal const string UseDefaultLabel = "Use default";
-    internal const string FolderNote = "Dictum looks here first and downloads go here. Changing it does not move any files.";
+    // APPROVED 22/10/2026 22:42 AEDT (second sentence reworded for move-on-change; proposed 22/10/2026): do not reword. Shown on Models and Storage.
+    internal const string FolderNote = "Dictum looks here first and downloads go here. Changing it asks before moving any files.";
     internal const string NetworkWarning = "Models load slowly from a network folder; a folder on this PC is faster.";
     internal const string IncludedState = "Included";
     internal const string AddCleanupLabel = "Add AI clean-up";

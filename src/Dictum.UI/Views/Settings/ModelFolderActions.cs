@@ -115,7 +115,7 @@ internal static class ModelFolderActions
             new DialogChoice(MoveLabel), new DialogChoice(LeaveLabel, IsDefault: true));
         if (choice == 1)
         {
-            say(shell.Models.SetModelsFolder(folder) ?? ""); // the approved "Changing it does not move any files." stays true here
+            say(shell.Models.SetModelsFolder(folder) ?? ""); // nothing moves: the approved note says Dictum asks first
             return;
         }
         if (choice != 0) return; // closed: nothing changes
