@@ -829,7 +829,11 @@ Users must be able to remove what the app has put on disk, from inside the app.
   "Delete all app data" leaves a chosen folder outside the user's profile alone, and a
   deletion that fails says "in use or not permitted". After the re-lens (§24): that switch
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
-  model in use can be deleted when the same model is next in the lookup.
+  model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
+  also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
+  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and PROPOSED: "A slower
+  drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
+  and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
   the integrity record, and reports freed bytes; "Delete all app data" never touches
   `.env` or the program folder.
@@ -893,7 +897,7 @@ and adapts, with one code path and a test for each:
 - Launch at login: StartupTask API when packaged, HKCU Run key when not. The tray toggle
   reflects whichever applies.
 - Paths: packaged writes are redirected by Windows to the package's LocalCache; the
-  Settings → Storage page shows the real on-disk path so users can find models.
+  Settings → Storage page shows the real on-disk path so users can find models, and changes the model folder (§17).
 - "Remove Dictum completely": when packaged, it deletes the data it owns and then opens
   Settings → Apps for the package uninstall (a package cannot delete itself); the
   two-warning flow and the path-registry test still apply.
