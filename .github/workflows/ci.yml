@@ -162,10 +162,18 @@ jobs:
         run: dotnet build Dictum.sln -c Release
 
       - name: Check the tag matches the project version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/mac-v')
         run: |
           version="$(dotnet msbuild src/Dictum.Mac/Dictum.Mac.csproj -getProperty:Version -nologo | tr -d '[:space:]')"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then echo "Tag $GITHUB_REF_NAME does not match the project version $version (Directory.Build.props)." >&2; exit 1; fi
+          if [ "v$version" != "${GITHUB_REF_NAME#mac-}" ]; then echo "Tag $GITHUB_REF_NAME does not match the project version $version (Directory.Build.props)." >&2; exit 1; fi
+
+      # Owner decision (22/10/2026): the beta is signed and notarised only. A mac-v* tag without the signing secrets fails here,
+      # before anything is published, instead of producing an ad-hoc zip a pre-release could carry.
+      - name: Refuse a release tag without the signing and notarisation secrets
+        if: startsWith(github.ref, 'refs/tags/mac-v') && (env.HAS_MAC_SIGNING != 'true' || env.HAS_MAC_NOTARY != 'true')
+        run: |
+          echo "Tag $GITHUB_REF_NAME needs the five MAC_* secrets (Developer ID signing and notarisation); the Mac beta is never published ad-hoc signed." >&2
+          exit 1
 
       - name: Test (ungated)
         run: dotnet test --project tests/Dictum.Tests -c Release --no-build
@@ -273,7 +281,8 @@ jobs:
 
   release-mac:
     # Dictum for macOS (beta): a GitHub PRE-release from the Mac zip alone, only on a mac-v<version> tag the owner pushes
-    # on purpose, with its own notes file (packaging/release-notes-mac.md). The Windows release above never includes it.
+    # on purpose, with its own notes file (packaging/release-notes-mac.md, the Mac notes alone; the Windows notes are
+    # packaging/release-notes-preamble.md). The Windows release above never includes it.
     name: GitHub pre-release (macOS beta)
     if: startsWith(github.ref, 'refs/tags/mac-v')
     needs: [build-mac]

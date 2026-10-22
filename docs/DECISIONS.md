@@ -5516,5 +5516,5 @@ unless marked:
 - M5, `HotkeyNames`: pure overloads `Display(hotkey, dialect)`, `Display(spec, dialect)`, `Key(name, dialect)` and
   `DefaultHotkeyFor(dialect)`; MacCoreTests use them and no test sets the global `Dialect` any more (the collection
   attribute is gone with it).
-- m1, this file no longer names the owner's volume path; m2, `.DS_Store` untracked (it was already in .gitignore); m3, the
+- m1, this file no longer names the owner's volume path; m2, `.DS_Store` untracked (and, since the follow-up PR after the merge, listed in .gitignore; the lens found it was not); m3, the
   network-audit pin compares repo-relative paths; m4, the handover's two "Input Monitoring" lines now follow decision c.

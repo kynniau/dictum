@@ -249,14 +249,14 @@ public sealed partial class OnboardingTests
     {
         if (OperatingSystem.IsWindows())
         {
-            Assert.Equal("C: has 41.0 GB free", FolderStep.FreeLine(@"C:\Users\Kyle\AppData\Local\Dictum\models", _ => 41_000_000_000));
+            Assert.Equal("C: has 41.0 GB free", FolderStep.FreeLine(@"C:\Users\Alex\AppData\Local\Dictum\models", _ => 41_000_000_000));
             Assert.Equal(@"\\server\share has 812 MB free", FolderStep.FreeLine(@"\\server\share\models", _ => 812_400_000));
             Assert.Null(FolderStep.FreeLine(@"C:\models", _ => null));
         }
         // A volume mounted in a folder is named by that folder; the startup disk, whose root "/" has no name, by its own words.
         Assert.Equal("/Volumes/Backup has 41.0 GB free", FolderStep.FreeLine("/Volumes/Backup/Dictum/models", _ => 41_000_000_000, _ => "/Volumes/Backup/"));
-        Assert.Equal("The startup disk has 41.0 GB free", FolderStep.FreeLine("/Users/kyle/Library/Dictum/models", _ => 41_000_000_000, _ => "/"));
-        Assert.Null(FolderStep.FreeLine("/Users/kyle/Library/Dictum/models", _ => null, _ => "/"));
+        Assert.Equal("The startup disk has 41.0 GB free", FolderStep.FreeLine("/Users/alex/Library/Dictum/models", _ => 41_000_000_000, _ => "/"));
+        Assert.Null(FolderStep.FreeLine("/Users/alex/Library/Dictum/models", _ => null, _ => "/"));
     }
 
     // ---- 3. The speech model ----

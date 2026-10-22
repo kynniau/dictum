@@ -78,7 +78,13 @@ public sealed class MacPackagingTests
         Assert.Contains("tags: ['v*', 'mac-v*']", yaml);
         Assert.Contains("--prerelease", yaml);
         Assert.Contains("--notes-file packaging/release-notes-mac.md", yaml);
-        Assert.True(File.Exists(Repo("packaging", "release-notes-mac.md")));
+        var macNotes = File.ReadAllText(Repo("packaging", "release-notes-mac.md"));
+        // The Mac notes carry the PROPOSED label until the owner approves the copy; this pin is flipped to DoesNotContain on
+        // that approval (DECISIONS). Nothing else is in the file: the pre-release shows it as it is.
+        Assert.StartsWith("**PROPOSED", macNotes, StringComparison.Ordinal);
+        Assert.Equal(1, macNotes.TrimEnd().Split('\n').Length); // one paragraph, no internal notes (those live in ci.yml)
+        Assert.Contains("mac-v", yaml); // the version check runs on the Mac tag too
+        Assert.Contains("startsWith(github.ref, 'refs/tags/mac-v') && (env.HAS_MAC_SIGNING != 'true' || env.HAS_MAC_NOTARY != 'true')", yaml); // never an ad-hoc pre-release
         Assert.DoesNotContain("macOS", File.ReadAllText(Repo("packaging", "release-notes-preamble.md")));
         Assert.DoesNotContain("macOS (beta)", File.ReadAllText(Repo("README.md"))); // the public README says nothing about the beta until it ships
         // Secrets are not available in `if:`; the job env carries a boolean and the steps test that.

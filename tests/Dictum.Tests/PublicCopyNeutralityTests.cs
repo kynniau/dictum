@@ -21,7 +21,7 @@ public class PublicCopyNeutralityTests
     ];
 
     /// <summary>
-    /// Exact identifiers (case-sensitive, whole) that happen to contain one of the words across a letter boundary and are
+    /// Exact identifiers (case-sensitive, matched as exact substrings) that happen to contain one of the words across a letter boundary and are
     /// Apple's own API names, not copy: they are cut out of a file's text before the sweep. The bare word still fails
     /// (pinned below); a new identifier is added here on purpose, never by widening the match to word boundaries.
     /// </summary>
