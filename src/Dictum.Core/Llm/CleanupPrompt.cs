@@ -57,8 +57,27 @@ public static class CleanupPrompt
     /// </summary>
     public static string OwnInstructions(string instructions) => OwnInstructionsStart + "\n" + OwnText(instructions) + "\n" + OwnInstructionsEnd;
 
-    private static string OwnText(string instructions) =>
-        instructions.Replace(OwnInstructionsStart, "", StringComparison.Ordinal).Replace(OwnInstructionsEnd, "", StringComparison.Ordinal).Trim();
+    /// <summary>
+    /// The user's text with every copy of either marker line taken out, in any case and with curly apostrophes read as straight
+    /// ones, again and again until none is left: one pass would let a nested copy ("End of the user's End of the user's
+    /// instructions.instructions.") close up into a new marker (re-lens on c796dc8).
+    /// </summary>
+    private static string OwnText(string instructions)
+    {
+        var text = instructions;
+        while (true)
+        {
+            var mapped = ValidatorText.MapQuotes(text); // one character for one, so its positions are the text's
+            var (at, length) = (-1, 0);
+            foreach (var marker in new[] { OwnInstructionsStart, OwnInstructionsEnd })
+            {
+                var i = mapped.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (i >= 0 && (at < 0 || i < at)) (at, length) = (i, marker.Length);
+            }
+            if (at < 0) return text.Trim();
+            text = text.Remove(at, length);
+        }
+    }
 
     /// <summary>
     /// <paramref name="prompt"/> without the user's own text inside their section (the marker lines stay): what the validator's

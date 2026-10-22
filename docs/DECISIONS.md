@@ -4888,7 +4888,7 @@ not set and sends nothing.
 
 4. **Final-sentence rule (owner decision 22/10/2026 20:55 AEDT).** `CleanupValidator.AddedFinalSentence`: in a reply of two
    sentences or more, the last sentence's words that the "scratch that" checks count (`IsCorrectionWord`: three letters or
-   more, no function word, filler or spoken command) must be at least half said, as spelt or sounding alike (`SoundsLike`),
+   more, no function word, filler or spoken command) must be at least half said (how a word counts as said was reworked twice: items 6 and 7),
    the share the final-line rule uses. It runs after the dictionary-term and hands-free repeat rules: placed inside the
    final-line checks it first took the reason of `DictionaryInsertionValidatorTests` ("Push it to GitHub. GitHub.", still
    rejected, but with the new reason), so it moved and every existing reason stands. PROPOSED reason: "reply ends with a
@@ -4932,7 +4932,8 @@ Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incre
    1. *"… day." sign-offs passed.* `SoundsLike` matched "day" against function words ("to", "the" share its sound key). The
       rule now sound-matches only against dictated words that are themselves counted (`IsCorrectionWord`).
    2. *Honest tidies rejected.* The lens's trial fix is in: words with a digit are left to the number rule; an apostrophe word
-      is said when the part before the apostrophe was; a word that sounds like two or three dictated words joined is said.
+      is said when the part before the apostrophe was; a word that sounds like two or three dictated words joined is said
+      (the sound-key routes were replaced in item 7).
       `FinalSentenceRuleTests` pins the lens's corpus (its harness `final-fix.fsx`): 36 honest tidies accepted (four of its 40
       are left out: three rejected by older rules on main too, and "i asked him he go" → "I asked him. He went.", pinned as
       the one recorded exception), and 25 closing sentences rejected ("Have a great day.", "Have a nice day.", "Good day.",
@@ -4969,3 +4970,45 @@ Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incre
    FinalSentenceRuleTests, KeyFileTests, CleanupPageOwnInstructionsTests, CleanupOffTests, CloudWarningAndPresetsTests,
    HelpPageTests, OwnerApprovalsTests and PublicCopyNeutralityTests: 644 total, 642 passed, 0 failed, 2 skipped. Full suite:
    2048 total, 2025 passed, 0 failed, 23 skipped.
+
+7. **Re-lens on c796dc8: Needs changes; fixed (22/10/2026).** The lens's trial validator (lens60b/trial) is applied as written,
+   with one addition (item 3 below).
+   1. *Sound-key collisions (compliance).* 14 of 50 sign-offs passed on the lens's five dictations ("Bye.", "Take care.",
+      "Today.", "Sure thing.", "Thanks again.", "Good luck." twice, "Happy to discuss.", "Hope all is well.", "Hope this
+      helps.", "Hope you are well.", "All good.", "Chat soon.", "Have a good one."). Now:
+      - joined and counted words match only exactly, or when both have five letters or more and are one edit apart;
+      - accents are folded;
+      - `SoundsLike` is used only for a reply word that belongs to a dictionary term (the rule now receives `DictionaryTerms`).
+   2. *"-n't" contractions.* A stem map: "won't" → "will", "can't" → "can", "shan't" → "shall", any other "-n't" without it,
+      else the part before the apostrophe.
+   3. *Four letters.* Joins also take four single-letter words ("a s i c" → "ASIC"). This is the one result that differs from
+      the trial's table.
+   4. *Markers.* `CleanupPrompt.OwnText` removes every copy of either marker line, again and again until none is left, in any
+      case, with curly apostrophes read as straight (`ValidatorText.MapQuotes`, one character for one).
+   5. *Apostrophe stem* pinned on its own ("i will call you i would like that" → "… I'd like that.").
+   6. *Docs.* SPEC §5's rule paragraph is rewritten for the new matching; items 4 and 6 here point to this item; the PR body
+      count says fifteen (`HelpText.Questions` at 28c3e65).
+   - *Pins.* `FinalSentenceRuleTests` now pins the re-lens's whole corpus with the result each case gets:
+     - 84 honest tidies: 79 accepted; four rejected by older rules (main rejects them too); and the recorded ceiling "16".
+     - 50 sign-offs on five dictations: 13 recorded passes, 11 rejected first by an older rule, and every other one rejected
+       by this rule.
+     - The first lens's 27 closing sentences.
+     - The 14 collisions, the six "-n't" cases, "ASIC", and twelve honest respellings ("ATO", "email", "tomorrow",
+       "alright", "cancelled", "Catherine", "café", "résumé", "Zoë", "kinney" → "Kynni", "zero" → "Xero", "dictim" →
+       "Dictum").
+     - The lens's harness had "café", "résumé" and "Zoë" double-encoded; they are written correctly here and pass.
+   - Mutations (each observed failing, then restored):
+     - Item 1: SoundsLike in place of the one-edit rule for joined and counted words. All 14 cases of
+       `A_sound_key_collision_does_not_let_a_sign_off_through` observed failing.
+     - Item 2: the "-n't" stem lines removed. `A_contraction_with_nt_is_said_by_its_stem` observed failing on "won't". The
+       other five still pass by other routes ("shouldn" is one edit from "should"; "isnot" joined is one edit from "isn't").
+     - Item 3: the four-letter join removed. `Four_spelt_out_letters_are_said_as_their_initialism` observed failing.
+     - Item 4: a single exact, unmapped pass. All three cases of `Nested_curly_and_capitalised_markers_are_taken_out`
+       observed failing.
+     - Item 5: the apostrophe stem removed (the word kept whole). `An_apostrophe_word_is_said_when_the_part_before_it_was`
+       observed failing.
+   - Gates:
+     - Release build with `--no-incremental`: 0 warnings, 0 errors.
+     - The lens's 23 classes: 870 total, 869 passed, 0 failed, 1 skipped. "Llm" is run as the four classes of `LlmTests.cs`:
+       TranscriptCleanerTests, CleanupValidatorTests, ProviderParsingTests and SecretRedactorTests.
+     - Full suite: 2384 total, 2361 passed, 0 failed, 23 skipped.

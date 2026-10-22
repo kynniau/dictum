@@ -113,7 +113,7 @@ public static partial class CleanupValidator
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
         if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
             return (null, "reply repeats words already typed before this part");
-        if (AddedFinalSentence(textLower, rawSet, rawWords)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
+        if (AddedFinalSentence(textLower, rawSet, rawWords, context?.DictionaryTerms)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -173,27 +173,66 @@ public static partial class CleanupValidator
     /// passed every other rule. Only a reply of two sentences or more is read, and only the words of its last sentence that
     /// the "scratch that" checks count (<see cref="ValidatorText.IsCorrectionWord"/>: three letters or more, no function word,
     /// filler or spoken command), so a grammar fix's "will", "there" or "the" never counts; a word with a digit is left to the
-    /// number rule ("The 21st."). Such a word is said when the dictation has it as spelt; when the part before its apostrophe
-    /// was said ("they're" for "they are"); when it sounds like a dictated word that is itself counted
-    /// (<see cref="ValidatorText.SoundsLike"/>: "their" fixed to "there", "kinney" respelt "Kynni"; never a function word,
-    /// whose sound key "day" shares, lens on 5e9c227); or when it sounds like two or three dictated words joined ("alright"
-    /// for "all right", "ATO" for "a t o", "tomorrow" for "to morrow"). Rejected when fewer than half of them were said, the
-    /// share the final-line rule uses.
+    /// number rule ("The 21st."). Such a word is said when the dictation has it: as spelt; by its stem ("they're" for "they",
+    /// "won't" for "will", "can't" for "can", "shan't" for "shall", any other "-n't" without it); with its accents folded
+    /// ("café" for "cafe"); within one edit of a dictated counted word when both have five letters or more ("cancelled" for
+    /// "canceled", "Catherine" for "katherine"); the same against two or three dictated words joined, or four single letters
+    /// ("alright", "email", "tomorrow" from "to morrow", "ATO", "ASIC"); or, for a word of a dictionary term only, sounding
+    /// like a dictated counted word (<see cref="ValidatorText.SoundsLike"/>: "kinney" respelt "Kynni", "zero" as "Xero").
+    /// Sound keys are not used otherwise: short keys collide ("day" with "to", "bye" with "be"), and the re-lens on c796dc8
+    /// found 14 of 50 sign-offs passing that way. Rejected when fewer than half of the words were said, the share the
+    /// final-line rule uses.
     /// </summary>
     // simplification: words, not an alignment with the dictation's last sentence. Ceiling: a last sentence whose words were
     // all said earlier in the dictation, in another order, passes; and a short last sentence that a grammar fix rewrites into
     // other words is rejected (the tidy is typed: a false rejection costs polish only), pinned: "i asked him he go" → "I asked
     // him. He went." Trigger to retire: either observed in the log or a typed reply.
-    private static bool AddedFinalSentence(string textLower, HashSet<string> rawSet, List<string> rawWords)
+    // A word's stem for the rule above: "won't", "can't" and "shan't" mapped (as NegatorCounts spells "won't" and "can't"), any other "-n't" without it, else the part before the apostrophe.
+    private static string Stem(string w) => w switch
+    {
+        "won't" => "will", "can't" => "can", "shan't" => "shall",
+        _ when w.EndsWith("n't", StringComparison.Ordinal) => w[..^3],
+        _ => w.Split('\x27')[0],
+    };
+
+    // Equal, or both five letters or more and one edit apart ("alright"/"allright", "cancelled"/"canceled").
+    private static bool Near(string a, string b)
+    {
+        if (a == b) return true;
+        if (a.Length < 5 || b.Length < 5 || Math.Abs(a.Length - b.Length) > 1) return false;
+        int i = 0, j = 0, edits = 0;
+        while (i < a.Length && j < b.Length)
+        {
+            if (a[i] == b[j]) { i++; j++; continue; }
+            if (++edits > 1) return false;
+            if (a.Length > b.Length) i++; else if (b.Length > a.Length) j++; else { i++; j++; }
+        }
+        return edits + (a.Length - i) + (b.Length - j) <= 1;
+    }
+
+    // The word with its accents taken off ("café" → "cafe").
+    private static string Folded(string w) =>
+        new(w.Normalize(System.Text.NormalizationForm.FormD).Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+
+    private static bool AddedFinalSentence(string textLower, HashSet<string> rawSet, List<string> rawWords, IReadOnlyCollection<string>? terms)
     {
         var sentences = SentenceEnd().Split(textLower).Select(s => s.Trim()).Where(s => Words(s).Count > 0).ToList();
         if (sentences.Count < 2) return false;
         var words = Comparable(Words(sentences[^1])).Where(w => IsCorrectionWord(w) && !w.Any(char.IsDigit)).ToList();
         if (words.Count == 0) return false;
         var joined = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < rawWords.Count; i++) for (var n = 2; n <= 3 && i + n <= rawWords.Count; n++) joined.Add(string.Concat(rawWords.Skip(i).Take(n)));
+        for (var i = 0; i < rawWords.Count; i++)
+        {
+            for (var n = 2; n <= 3 && i + n <= rawWords.Count; n++) joined.Add(string.Concat(rawWords.Skip(i).Take(n)));
+            // Four letters spelt out ("a s i c" for ASIC): only single letters join that far.
+            if (i + 4 <= rawWords.Count && rawWords.Skip(i).Take(4).All(w => w.Length == 1)) joined.Add(string.Concat(rawWords.Skip(i).Take(4)));
+        }
         var soundable = rawSet.Where(IsCorrectionWord).ToList();
-        var said = words.Count(w => rawSet.Contains(w) || rawSet.Contains(w.Split('\x27')[0]) || joined.Any(j => SoundsLike(j, w)) || soundable.Any(r => SoundsLike(r, w)));
+        var termWords = (terms ?? []).SelectMany(t => Words(MapQuotes(t).ToLowerInvariant())).ToHashSet(StringComparer.Ordinal);
+        var folded = rawSet.Select(Folded).ToHashSet(StringComparer.Ordinal);
+        var said = words.Count(w => rawSet.Contains(w) || rawSet.Contains(Stem(w)) || folded.Contains(Folded(w))
+            || joined.Any(j => Near(j, w)) || soundable.Any(r => Near(r, w))
+            || termWords.Contains(w) && soundable.Any(r => SoundsLike(r, w)));
         return said * 2 < words.Count;
     }
 
