@@ -5426,3 +5426,29 @@ unless marked:
 - `NSMicrophoneUsageDescription` now reads "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac
   unless you turn on cloud speech." (PROPOSED), the wording main's handover §0 replaced the earlier proposal with, because
   the earlier sentence is untrue once cloud speech (1.3) is on. Pinned in MacPackagingTests.
+
+**Launching the signed bundle on this Mac (23/10/2026 02:44-02:56 AEDT), each Verified here:**
+- `Dictum.app/Contents/MacOS/Dictum --selftest` runs from the signed bundle (hardened runtime, Developer ID): speech runtime,
+  profanity list, calibration script and the microphone list all [OK]; the result was FAIL only because the owner's
+  settings name medium.en, which is not downloaded here.
+- The first three tray-mode launches (through `open` and from a terminal, Developer ID and ad-hoc alike, bundled and not)
+  died two seconds after "Dictum 1.3.0 starting": an unhandled `InvalidOperationException`, "Avalonia.Native was not able to
+  start the RenderTimer. Native error code is: -6661". Cause: the display was asleep (`system_profiler SPDisplaysDataType`:
+  "Display Asleep: Yes"); a Swift probe showed `CGGetActiveDisplayList` returning 0 displays and
+  `CVDisplayLinkCreateWithActiveCGDisplays` returning -6661 (kCVReturnInvalidArgument) while
+  `CVDisplayLinkCreateWithCGDisplay(CGMainDisplayID())` succeeded; Avalonia 11.3.22 creates its timer with the former
+  (`native/Avalonia.Native/src/OSX/PlatformRenderTimer.mm` line 24, read through the GitHub API). With the display woken
+  (`caffeinate -u`) the probe passed and the same bundle ran. So Dictum cannot start while every display is asleep (a
+  launch at login or a relaunch over a remote session with the screen off): not a defect in this branch, and not caught
+  anywhere; a tester who sees that crash report (SIGABRT, "RenderTimer", -6661) should check the display. Candidate for a
+  guard in `Program.Main` (wait for an active display, or log a plain message) if a tester hits it.
+- With the display awake the signed bundle (272.0 MiB; `codesign --verify --deep --strict`: valid on disk, satisfies its
+  Designated Requirement; `spctl --assess`: rejected, "source=Unnotarized Developer ID", as expected before notarisation)
+  started Avalonia on its native backend and showed one window, 720 x 528 points at layer 0 (`CGWindowListCopyWindowInfo`
+  for the process): the Welcome to Dictum window (`OnboardingWindow.WindowWidth` = 720), both with the owner's settings (its
+  first-run questions are unanswered on this Mac) and with a scratch `--config`. `--exit-after` did not quit it because
+  `AppShell.Start` runs the Welcome flow before `ScheduleDiagnosticExit`, as on Windows; the windows were closed with
+  SIGTERM after 30 s, so nothing past the Welcome window (menu-bar icon, taps, panel) was exercised: those stay in the
+  owner's test plan.
+- `screencapture` is refused for this session ("could not create image from display": no Screen Recording permission), so
+  no screenshot; the window list above is the evidence.
