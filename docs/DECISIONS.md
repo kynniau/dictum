@@ -5580,8 +5580,12 @@ itself, so it cannot be stored in a setting; the logs and recordings folder; the
 shared UI code, so Windows had the first as well:
 
 - The "Models, logs, calibration recordings" row always printed Dictum's own data folder. That is right while no model folder
-  is chosen (downloads land in that folder's models subfolder, the lookup order's default folder) and wrong once a model
-  folder is chosen (the Models card already lists every model folder in lookup order). The lens on this PR caught that the
+  is chosen (downloads land in that folder's models subfolder, the lookup order's default folder) and redundant once a model
+  folder is chosen (the Models card lists every model folder, Dictum's own models subfolder included, in lookup order). The
+  state is read from the lookup order's first entry, not the raw setting: choosing the default folder's own path in the
+  chooser writes models.folder but LookupOrder drops it, and the row keeps the models (re-lens on PR #71; third test,
+  observed failing against the raw-setting predicate). Rarer edge, left as is: a folder chosen inside Dictum's own data
+  folder (that folder itself, say) is a Chosen entry, so the row drops the models although they are still under it. The lens on this PR caught that the
   first fix dropped the models from the row in both states; the owner decided (07:18 AEDT, through the lens): the row follows
   the state. `StoragePage.DataFolderRow(modelFolderChosen)`: no model folder chosen, "Models, logs, calibration recordings"
   (the existing words, byte for byte); a model folder chosen, "Logs, calibration recordings" (PROPOSED). The Open button's

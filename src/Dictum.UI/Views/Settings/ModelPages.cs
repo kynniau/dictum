@@ -681,7 +681,9 @@ internal sealed class StoragePage : SettingsPage
 
         _places.Children.Clear();
         _places.Children.Add(Place("Settings, dictionary, corrections, .env", Shell.Paths.ConfigDir));
-        _places.Children.Add(Place(DataFolderRow(Shell.Paths.ChosenModelsDir(s) is not null), Shell.Paths.LocalDir));
+        // The lookup order, not the raw setting: a chosen folder that is the default folder's own path is dropped by LookupOrder, and
+        // then the models are still in Dictum's own data folder (re-lens on PR #71).
+        _places.Children.Add(Place(DataFolderRow(order[0].Kind == ModelFolderKind.Chosen), Shell.Paths.LocalDir));
         _places.Children.Add(Place("Program", Shell.Paths.ExeDir));
         if (Shell.Platform.Package.IsPackaged)
             _places.Children.Add(Ui.Text("This copy is installed from a package, so Windows keeps its files in the package's own folder: the paths above are the real ones.", "caption"));

@@ -466,6 +466,29 @@ public sealed class ModelFolderTests : IDisposable
     });
 
     /// <summary>
+    /// Re-lens on PR #71 (23/10/2026): choosing the default folder's own path writes models.folder, but LookupOrder drops a chosen
+    /// folder equal to the default, so the models are still in Dictum's own data folder and the row keeps them.
+    /// </summary>
+    [Fact]
+    public Task Storage_keeps_the_models_in_its_own_folder_row_when_the_chosen_folder_is_the_default_one() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "models_dir": null } }""");
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false));
+        shell.Reload(userRequested: false);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        dialogs.Folder = scratch.Paths.DefaultModelsDir;
+        Click(ButtonNamed(window, StoragePage.ChangeLabel));
+        Assert.Equal(scratch.Paths.DefaultModelsDir, shell.Settings.Models.Folder); // the setting names the default folder's own path
+        Assert.Equal(ModelFolderKind.Default, ModelFolders.LookupOrder(scratch.Paths, shell.Settings)[0].Kind); // which the lookup order drops
+        Assert.Contains("Models, logs, calibration recordings", Texts(window));
+        Assert.Single(All<Button>(window), b => AutomationProperties.GetName(b) == "Open the folder for Models, logs, calibration recordings");
+        window.Close();
+        return Task.CompletedTask;
+    });
+
+    /// <summary>
     /// Pin (22/10/2026, owner report "no option to change this location"): Settings > Storage shows Change… and Use default beside
     /// the model folder, which run the same handlers as Models' Browse… and Use default (the same chooser seam, the same
     /// models.folder write); the note, the drive-speed sentence and the accessible names are there; the folders that cannot be
