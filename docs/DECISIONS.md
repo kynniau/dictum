@@ -4637,3 +4637,24 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
       the clean-up-sentence pin observed failing. One character changed in the caption ("Cloud clean-up:" to "Cloud clean-up;"):
       the replacement pin observed failing.
 14. **Gates after the owner's decisions** (after merging origin/main 3f0eb06): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1907 total, 0 failed, 23 skipped, 0 errors.
+15. **Owner approval of the PROPOSED strings (22/10/2026, 17:22 AEDT), markers only.** The owner approved, as a block, every
+    string item 7 lists, the Core lane's `SpeechStatus` lines (with `SpeechPolicy.LoopbackHttpRefusal`), the settings loader's
+    https message (`SettingsLoader.SpeechBaseUrlProblem`), the load and per-failure log lines, the `speech` note in the default
+    settings.json, the "cloud speech" token and the support email's "Speech: cloud speech (provider)" line. Each marker now
+    reads "APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword"; the per-failure log line and the `speech`
+    note had no marker and now carry that comment. No string changed: in the marker commit, `git diff -U0 HEAD~1 -- src`
+    changes 88 lines. 70 of them are comment lines. The other 18 are code lines whose only change is their trailing
+    comment, checked by stripping the comment and comparing what is left. This supersedes the "PROPOSED" notes in items 7,
+    11 and 13 and in the Core entry's item 10 for exactly these strings.
+16. **Help qualifier (owner, 22/10/2026, 17:22 AEDT).** The three Help answers that said "your voice still stays here" (the
+    "How Dictum works" cloud sentence, "Where does my voice go?"'s last paragraph, and the first paragraph of "How do I turn
+    on cloud clean-up?") now say "your voice still stays here unless you also turn on cloud speech"; nothing else in them
+    changed. `site/help.html` has the same change in its four matching paragraphs (the cloud answer is on the page twice).
+    Markers: "APPROVED 22/10/2026 17:22 AEDT (qualifier added; proposed 21/10/2026)" on the first two; the cloud answer's
+    marker keeps its own history (proposed 22/10/2026) and adds the 17:22 qualifier approval. `OwnerApprovalsTests`' literal
+    for that paragraph is updated. New pin
+    `HelpPageTests.The_voice_stays_here_answers_carry_the_cloud_speech_qualifier` (the three app answers and the four site
+    paragraphs, none without the qualifier). It was observed failing (22/10/2026) with the qualifier removed from "Where does
+    my voice go?", then restored. Not changed, for the owner: the first paragraph of "Where does my voice go?" still says
+    Dictum "never sends it anywhere", which is untrue while cloud speech is on.
+17. **Gates after items 15 and 16** (origin/main 3f0eb06 merged; no newer main): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1908 total, 0 failed, 23 skipped, 0 errors.

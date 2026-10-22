@@ -156,7 +156,7 @@ public class OwnerApprovalsTests
 
     // ---- The 1.2.1 block (22/10/2026, 14:25 AEDT): sections 1 to 3 of the owner's list, markers only ----
     // Pinned word for word, independently of the app's constants. The cloud speech engine lines (SpeechPolicy, CloudSpeech*) are
-    // not in this block and stay PROPOSED, so nothing here claims them.
+    // not in this block (the owner approved them later, 22/10/2026 17:22 AEDT, on PR #54), so nothing here claims them.
 
     /// <summary>Pin (1.2.1 block, section 1): the Help question for turning on cloud clean-up is in the list, under its approved words.</summary>
     [Fact]
@@ -164,7 +164,7 @@ public class OwnerApprovalsTests
     {
         Assert.Equal("How do I turn on cloud clean-up?", HelpText.CloudQuestion);
         Assert.Contains(HelpText.Questions, q => q.Question == "How do I turn on cloud clean-up?" && ReferenceEquals(q.Answer, HelpText.CloudAnswer));
-        Assert.Equal("Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.",
+        Assert.Equal("Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here unless you also turn on cloud speech. Most people do not need it: Tidy my words runs on this PC.",
             HelpText.CloudAnswer[0]);
         Assert.Contains("To turn it off, open Settings > Clean-up and click Switch cloud clean-up off. Your dictations are tidied on this PC again.", HelpText.CloudAnswer);
     }

@@ -57,9 +57,9 @@ public static class HelpText
         // APPROVED 22/10/2026 (proposed 21/10/2026, final round on the Simple view): the clean-up choices as Settings > Models names them.
         "Tidy my words, in Settings > Models, does the tidying. Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied. " +
         "To paste what was heard with no tidying, choose Off there instead; only your own corrections, snippets and the profanity filter (if on) still apply.",
-        // APPROVED 22/10/2026 (proposed 21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does.
+        // APPROVED 22/10/2026 17:22 AEDT (qualifier added; proposed 21/10/2026, final round): the second sentence says what cloud clean-up sends, as "Where does my voice go?" does; the qualifier "unless you also turn on cloud speech" is the owner's.
         "All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. " +
-        "If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here.",
+        "If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here unless you also turn on cloud speech.",
         "The Dictum menu: click the Dictum icon near the clock, usually at the bottom right of the screen. If you cannot see the icon, click the small up arrow beside the clock first. " +
         "The menu has Settings, Help and more.",
         // APPROVED 22/10/2026 (proposed 21/10/2026, final lens): the help names the Simple view's choices, so it says how to get that view.
@@ -107,13 +107,14 @@ public static class HelpText
     public static readonly string CloudExampleHost = CloudPolicy.CloudHost(new LlmSettings { Provider = LlmSettings.Anthropic })!;
 
     /// <summary>
-    /// APPROVED 22/10/2026 (proposed 22/10/2026, lens fixes on 2b20b0f): do not reword. The approved warning, the
+    /// APPROVED 22/10/2026 (proposed 22/10/2026, lens fixes on 2b20b0f); first paragraph APPROVED 22/10/2026 17:22 AEDT (qualifier
+    /// added: "unless you also turn on cloud speech"): do not reword. The approved warning, the
     /// waiting-for-key line and the tray line (<see cref="CloudPolicy.TrayLine"/>) are quoted word for word from the app's own copy;
     /// the variable names are SecretStore's. Steps 2 to 4 and 7 to 15 are one action each, in the cloud-cleanup demo's caption order.
     /// </summary>
     public static readonly IReadOnlyList<string> CloudAnswer =
     [
-        "Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. " +
+        "Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here unless you also turn on cloud speech. " +
         "Most people do not need it: Tidy my words runs on this PC.",
         "Before Dictum sends text to a service off this PC, it shows a warning. For Anthropic, it says: \"" + CloudPolicy.ConsentWarning(CloudExampleHost) + "\"",
         "Dictum can use Anthropic, OpenAI, Google Gemini or your own server. For Anthropic, OpenAI and Google Gemini, you need your own account with that service and an API key.",
@@ -154,7 +155,8 @@ public static class HelpText
         [
             "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere.",
             "The only recordings Dictum keeps are the ones you make on purpose in Calibrate my voice. They stay on this PC until you delete them.",
-            "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here.",
+            // APPROVED 22/10/2026 17:22 AEDT (qualifier added; proposed 21/10/2026): do not reword.
+            "If you turn on cloud clean-up (it is off unless you turn it on), the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays here unless you also turn on cloud speech.",
         ]),
         new("Why did it type the wrong words?",
         [

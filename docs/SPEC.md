@@ -1450,8 +1450,10 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
   model hears the same samples; the log names the reason (status and host, never audio, text or key); the status says the
   last request failed until the next success. Esc pastes nothing. A settings reload cancels a request under way. So does
   quitting.
-- **Windows (UI lane, 22/10/2026).** APPROVED: the consent text and its two buttons, the replacement sentence and the "Cloud
-  clean-up:" caption below. Every other string is PROPOSED, awaiting the owner; the full list is in DECISIONS, "Cloud speech, UI".
+- **Windows (UI lane, 22/10/2026).** Every string below is APPROVED: the consent text and its two buttons (10:50, clause
+  revised 16:31 AEDT), the replacement sentence (16:27) and the "Cloud clean-up:" caption, and every other string as a block
+  (owner, 22/10/2026 17:22 AEDT; the full list is in DECISIONS, "Cloud speech, UI"). The in-app and site Help answers that say
+  "your voice still stays here" now add "unless you also turn on cloud speech" (owner, 17:22 AEDT).
   - *Consent step*: Settings > Models > **Cloud speech** card (its setup in the Advanced view only): Service (OpenAI, Azure
     OpenAI, Groq, Custom server), Server address (shown for Azure OpenAI and a custom server only), Model (the Azure
     deployment name; no preset fills one in), the key line for the service the address names, then **Use cloud speech…**.
