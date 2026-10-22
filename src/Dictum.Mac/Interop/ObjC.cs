@@ -22,18 +22,19 @@ internal static partial class ObjC
     [DllImport(Lib, EntryPoint = "object_getClassName")] private static extern nint object_getClassName(nint obj);
     [DllImport(Lib, EntryPoint = "objc_allocateClassPair")] private static extern nint objc_allocateClassPair(nint superclass, string name, nint extraBytes);
     [DllImport(Lib, EntryPoint = "objc_registerClassPair")] private static extern void objc_registerClassPair(nint cls);
-    [DllImport(Lib, EntryPoint = "class_addMethod")] private static extern bool class_addMethod(nint cls, nint sel, nint imp, string types);
+    [DllImport(Lib, EntryPoint = "class_addMethod")] [return: MarshalAs(UnmanagedType.I1)] private static extern bool class_addMethod(nint cls, nint sel, nint imp, string types);
 
-    // objc_msgSend, one declaration per signature. Names say the argument shapes: P = pointer-sized (id, SEL, nint,
-    // NSInteger, NSUInteger), B = BOOL, D = double, and the return type after the underscore.
+    // objc_msgSend, one declaration per signature, by return type: Send (id or any pointer-sized value), SendBool, SendVoid,
+    // SendPoint, SendRect, SendDouble, SendInt, SendLong. BOOL is one byte (signed char on Apple Silicon), so every bool
+    // crosses as I1: the default four-byte marshalling would read undefined upper bits of the register on arm64.
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern nint Send(nint self, nint sel);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern nint Send(nint self, nint sel, nint a);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern nint Send(nint self, nint sel, nint a, nint b);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern nint Send(nint self, nint sel, nint a, nint b, nint c);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern nint Send(nint self, nint sel, nint a, nint b, nint c, nint d);
-    [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern bool SendBool(nint self, nint sel);
-    [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern bool SendBool(nint self, nint sel, nint a);
-    [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern bool SendBool(nint self, nint sel, nint a, nint b);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool SendBool(nint self, nint sel);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool SendBool(nint self, nint sel, nint a);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool SendBool(nint self, nint sel, nint a, nint b);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern void SendVoid(nint self, nint sel);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern void SendVoid(nint self, nint sel, nint a);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] public static extern void SendVoid(nint self, nint sel, [MarshalAs(UnmanagedType.I1)] bool a);

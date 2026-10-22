@@ -4,7 +4,8 @@ namespace Dictum.Mac.Interop;
 
 /// <summary>
 /// Core Foundation: the C types the Core Graphics, Core Audio and Objective-C calls hand back (CFString, CFArray,
-/// CFDictionary, CFNumber) and the run loop an event tap or audio queue runs on. Every CF object a Create/Copy function
+/// CFDictionary, CFNumber) and the run loop an event tap or audio queue runs on. CF Boolean is one byte, so it crosses as
+/// I1 (see ObjC.cs). Every CF object a Create/Copy function
 /// returns is the caller's to <see cref="Release"/>; a Get function's result is not. Partial so each lane adds the
 /// declarations its framework needs in its own file.
 /// </summary>
@@ -26,13 +27,13 @@ internal static partial class CF
     [DllImport(Lib, EntryPoint = "CFStringCreateWithCString")] public static extern nint StringCreateWithCString(nint allocator, string cString, uint encoding);
     [DllImport(Lib, EntryPoint = "CFStringGetLength")] public static extern nint StringGetLength(nint str);
     [DllImport(Lib, EntryPoint = "CFStringGetMaximumSizeForEncoding")] public static extern nint StringGetMaximumSizeForEncoding(nint length, uint encoding);
-    [DllImport(Lib, EntryPoint = "CFStringGetCString")] public static extern bool StringGetCString(nint str, byte[] buffer, nint bufferSize, uint encoding);
+    [DllImport(Lib, EntryPoint = "CFStringGetCString")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool StringGetCString(nint str, byte[] buffer, nint bufferSize, uint encoding);
     [DllImport(Lib, EntryPoint = "CFArrayGetCount")] public static extern nint ArrayGetCount(nint array);
     [DllImport(Lib, EntryPoint = "CFArrayGetValueAtIndex")] public static extern nint ArrayGetValueAtIndex(nint array, nint index);
     [DllImport(Lib, EntryPoint = "CFDictionaryGetValue")] public static extern nint DictionaryGetValue(nint dictionary, nint key);
-    [DllImport(Lib, EntryPoint = "CFNumberGetValue")] public static extern bool NumberGetValue(nint number, int type, out long value);
-    [DllImport(Lib, EntryPoint = "CFNumberGetValue")] public static extern bool NumberGetValue(nint number, int type, out double value);
-    [DllImport(Lib, EntryPoint = "CFBooleanGetValue")] public static extern bool BooleanGetValue(nint boolean);
+    [DllImport(Lib, EntryPoint = "CFNumberGetValue")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool NumberGetValue(nint number, int type, out long value);
+    [DllImport(Lib, EntryPoint = "CFNumberGetValue")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool NumberGetValue(nint number, int type, out double value);
+    [DllImport(Lib, EntryPoint = "CFBooleanGetValue")] [return: MarshalAs(UnmanagedType.I1)] public static extern bool BooleanGetValue(nint boolean);
 
     [DllImport(Lib, EntryPoint = "CFRunLoopGetCurrent")] public static extern nint RunLoopGetCurrent();
     [DllImport(Lib, EntryPoint = "CFRunLoopRun")] public static extern void RunLoopRun();
