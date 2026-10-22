@@ -15,8 +15,19 @@ public static class HowItWorksText
     public const string Intro =
         "Record one short dictation and watch what Dictum does with it, step by step. It uses your current settings: the same speech model and clean-up as the hotkey.";
 
-    /// <summary>The in-memory line: the recording is never written anywhere and nothing is pasted.</summary>
+    /// <summary>The in-memory line with the speech model on this PC: the recording is never written anywhere and nothing is pasted.</summary>
     public const string MemoryNote = "This page pastes nothing. The recording is kept in memory only, never saved to disk, and the sound never leaves this PC.";
+
+    /// <summary>The in-memory line while cloud speech is on (<see cref="Transcribe.CloudSpeech.SendsAudio"/>): the sound goes to its host, as a dictation's does.</summary>
+    public static string CloudSpeechNote(string host) =>
+        $"This page pastes nothing. The recording is kept in memory only and never saved to disk. With cloud speech on, the sound is sent to {host} to be turned into text.";
+
+    /// <summary>The in-memory line for the speech step in use: <paramref name="speechHost"/> is cloud speech's host, or null for the model on this PC.</summary>
+    public static string Memory(string? speechHost) => speechHost is null ? MemoryNote : CloudSpeechNote(speechHost);
+
+    /// <summary>Step 2's description while cloud speech is on, in place of the one for the model on this PC.</summary>
+    public static string HeardByCloud(string host) =>
+        $"With cloud speech on, {host} turns the sound into words (the speech model on this PC, if that fails). This is the raw text.";
 
     /// <summary>Shown while the clean-up in use sends text to another program (<see cref="Llm.TranscriptCleaner.SendsText"/>).</summary>
     public static string SendsText(string status) =>

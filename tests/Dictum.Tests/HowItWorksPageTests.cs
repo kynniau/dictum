@@ -233,6 +233,7 @@ public class HowItWorksPageTests
             RecordOnce(page);
 
             Assert.Equal(captures + 1, platform.Captures.Count); // a capture opened for this page only
+            Assert.Equal(HowItWorksText.MemoryNote, page.MemoryLine); // the model on this PC: the sound never leaves it
             Assert.Equal("fake-model.bin", page.Stages[1].Text); // the speech model in use heard it
             Assert.Equal(HowItWorksText.TidyIsAll, page.Stages[2].Note); // the clean-up in use (provider none)
             Assert.Equal(DeterministicCleaner.Clean("fake-model.bin"), page.Stages[4].Text);
@@ -624,6 +625,70 @@ public class HowItWorksPageTests
             shell.Dispose();
         }
     });
+
+    private const string CloudSpeechHost = "speech.example.com";
+
+    [Fact]
+    public Task The_demonstration_takes_the_dictations_speech_step_cloud_speech_included_and_says_where_the_sound_goes() => UiSession.Run(() =>
+    {
+        // After PR #48 the pipeline's transcriber is the shell's speech step (CloudSpeech), not the local model. The page must use
+        // that same step: with cloud speech on, the take is one request to the speech service, as a dictation is
+        // (CloudSpeechShellTests.A_dictation_through_the_shell_goes_to_cloud_speech), and the page says the sound goes there.
+        using var scratch = new Scratch($$"""
+            { "hotkey": "F24", "whisper": { "model": "base.en" }, "pill": { "enabled": false }, "llm": { "provider": "none" },
+              "speech": { "provider": "openai-compatible", "base_url": "https://{{CloudSpeechHost}}/v1", "model": "s" } }
+            """);
+        CloudConsentFile.WriteSpeech(scratch.Paths.ConsentFile, new CloudConsentRecord(SpeechSettings.OpenAiCompatible, CloudSpeechHost, DateTimeOffset.UtcNow, "test"));
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin"); // the local model, kept loaded as the fallback
+        File.WriteAllText(model, "");
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+        var server = new CloudSpeechServer();
+        var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model), providerHandler: server);
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.True(shell.Speech.SendsAudio);
+            Assert.True(Eventually(() => shell.SpeechReady), "the local speech model did not load"); // Record gates on it, as the hotkey does
+            var window = new SettingsWindow(shell);
+            window.Show();
+            var page = Open(window, speechReady: false);
+            Assert.Equal(HowItWorksText.CloudSpeechNote(CloudSpeechHost), page.MemoryLine);
+            Assert.Equal("This page pastes nothing. The recording is kept in memory only and never saved to disk. With cloud speech on, the sound is sent to speech.example.com to be turned into text.", page.MemoryLine);
+            Assert.DoesNotContain(HowItWorksText.MemoryNote, Texts(page)); // never "the sound never leaves this PC" while it does
+            Assert.Equal(HowItWorksText.HeardByCloud(CloudSpeechHost), page.Stages[1].Description);
+
+            RecordOnce(page);
+            Assert.Equal(1, server.Count); // one request, to the speech service a dictation uses
+            Assert.Equal($"https://{CloudSpeechHost}/v1/audio/transcriptions", server.LastUri?.ToString());
+            Assert.Equal("Hello from the cloud.", page.Stages[1].Text); // the speech step's text, not the local model's
+            Assert.Empty(platform.Desktop.Ops); // and nothing pasted
+            window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>A speech service stand-in: answers every request with one transcription, counts them, remembers where the last went.</summary>
+    private sealed class CloudSpeechServer : HttpMessageHandler
+    {
+        private int _count;
+
+        public int Count => Volatile.Read(ref _count);
+
+        public Uri? LastUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _count);
+            LastUri = request.RequestUri;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"text":"Hello from the cloud."}""", System.Text.Encoding.UTF8, "application/json"),
+            });
+        }
+    }
 
     /// <summary>A microphone stand-in: a level while open, two seconds of "speech" at Stop, or a refusal at Start.</summary>
     private sealed class ScriptedCapture : IAudioCapture

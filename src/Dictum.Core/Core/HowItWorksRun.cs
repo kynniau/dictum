@@ -36,6 +36,9 @@ public sealed class HowItWorksRun
     private string? _stopped;
     private bool _ended;
 
+    /// <summary>Cloud speech's host while it is the speech step in use, else null: step 2 then says who turns the sound into words.</summary>
+    public string? SpeechHost { get; set; }
+
     /// <summary>The microphone is open for this demonstration.</summary>
     public void StartRecording() => _recording = true;
 
@@ -84,8 +87,9 @@ public sealed class HowItWorksRun
 
     public IReadOnlyList<StageView> Stages() => [Hears(), Heard(), Tidy(), Polish(), Paste()];
 
-    private static StageView View(int stage, StageState state, string? text = null, string? timing = null, string? note = null) =>
-        new(HowItWorksText.Stages[stage].Title, HowItWorksText.Stages[stage].Description, state, text, timing, note);
+    private StageView View(int stage, StageState state, string? text = null, string? timing = null, string? note = null) =>
+        new(HowItWorksText.Stages[stage].Title, stage == 1 && SpeechHost is { } host ? HowItWorksText.HeardByCloud(host) : HowItWorksText.Stages[stage].Description,
+            state, text, timing, note);
 
     /// <summary>The state of a stage the pipeline has not reported: working while the run goes on, else not reached (or waiting).</summary>
     private StageState Pending(bool started) => _ended ? StageState.NotReached : started ? StageState.Working : StageState.Waiting;

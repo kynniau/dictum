@@ -32,6 +32,7 @@ internal sealed class HowItWorksPage : SettingsPage
     private readonly TextBlock _hold = Ui.Text("", "caption");
     private readonly TextBlock _status = Ui.Text("");
     private readonly TextBlock _sendsText = Ui.Text("", "caption");
+    private readonly TextBlock _memory = Ui.Text(HowItWorksText.MemoryNote, "caption");
     private readonly StageCard[] _cards;
     private readonly DispatcherTimer _tick;
     private readonly DispatcherTimer _limit;
@@ -62,7 +63,7 @@ internal sealed class HowItWorksPage : SettingsPage
         _limit = new DispatcherTimer { Interval = CalibrationSession.TakeLimit };
         _limit.Tick += (_, _) => TakeLimitReached();
         Compose(
-            Ui.Card(Ui.Stack(10, Ui.Text(HowItWorksText.Intro), Ui.Text(HowItWorksText.MemoryNote, "caption"), _sendsText)),
+            Ui.Card(Ui.Stack(10, Ui.Text(HowItWorksText.Intro), _memory, _sendsText)),
             Ui.Card(Ui.Stack(10, Ui.Row(10, _record, _hold), _status)),
             Ui.Stack(12, [.. _cards.Select(c => c.Root)]));
         if (Content is Panel { Children: [TextBlock title, ..] }) AutomationProperties.SetHeadingLevel(title, 1);
@@ -92,9 +93,13 @@ internal sealed class HowItWorksPage : SettingsPage
     /// <summary>The cloud line above Record, or "" when the clean-up in use sends nothing (tests).</summary>
     internal string SendsTextLine => _sendsText.IsVisible ? _sendsText.Text ?? "" : "";
 
+    /// <summary>The in-memory line as shown (tests).</summary>
+    internal string MemoryLine => _memory.Text ?? "";
+
     protected override void Redraw()
     {
         _hold.Text = HotkeyParser.TryParse(Shell.Settings.Hotkey, out var spec, out _) ? HowItWorksText.HoldHint(HotkeyNames.Display(spec)) : "";
+        _memory.Text = HowItWorksText.Memory(Shell.Speech.Host); // the speech step in use: the model on this PC, or cloud speech
         var cleaner = Shell.Cleaner;
         _sendsText.Text = cleaner.SendsText ? HowItWorksText.SendsText(cleaner.Status) : "";
         _sendsText.IsVisible = _sendsText.Text.Length > 0;
@@ -378,6 +383,7 @@ internal sealed class HowItWorksPage : SettingsPage
         _record.Content = recording ? HowItWorksText.StopLabel : HowItWorksText.RecordLabel;
         AutomationProperties.SetName(_record, recording ? HowItWorksText.StopName : HowItWorksText.RecordName);
         _record.IsEnabled = recording || (!_noMicrophone && _speechReady && Running is not { IsCompleted: false }); // Stop always works; one run at a time
+        _run.SpeechHost = Shell.Speech.Host;
         var stages = _run.Stages();
         for (var i = 0; i < _cards.Length; i++) _cards[i].Show(stages[i]);
     }
