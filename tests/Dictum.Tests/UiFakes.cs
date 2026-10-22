@@ -202,9 +202,13 @@ internal sealed class ScriptedDialogs : IShellDialogs
     public List<(string Title, string Text)> Asked { get; } = [];
     public List<string> Told { get; } = [];
 
+    /// <summary>The button labels of each <see cref="Ask"/>, in order, so a test can pin a label the help names.</summary>
+    public List<IReadOnlyList<string>> AskedChoices { get; } = [];
+
     public int Ask(string title, string text, params DialogChoice[] choices)
     {
         Asked.Add((title, text));
+        AskedChoices.Add(choices.Select(c => c.Label).ToList());
         return Answers.Count > 0 ? Answers.Dequeue() : -1;
     }
 

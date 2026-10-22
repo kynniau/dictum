@@ -148,6 +148,11 @@ code {
   overflow-wrap: anywhere;
 }
 
+/* Help guide, cloud clean-up steps: a key line such as ANTHROPIC_API_KEY=your-key-here stays on one line, as it is typed. */
+#cloud-steps code {
+  white-space: nowrap;
+}
+
 kbd {
   padding: 0.05em 0.45em;
   border: 1px solid var(--border-strong);
