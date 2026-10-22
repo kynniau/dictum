@@ -275,7 +275,12 @@ public sealed class OfflineAndDownloadTests : IDisposable
             Fast with { StallTimeout = TimeSpan.FromMilliseconds(200), Time = clock }), clock, pending, TimeSpan.FromMilliseconds(201));
         Assert.Equal(2, attempts); // one retry
         Assert.Equal(2, server.Requests);
+        Assert.Equal([null, null], server.RangeStarts); // no bytes had arrived, so the retry starts from zero
         Assert.Contains("connection stalled: no data for 0.2 s", log.All);
+        // A stall is logged as a dropped connection and retried; the retry itself is not stalled.
+        var failures = log.Lines.Where(l => l.Level == LogLevel.Warning && l.Message.Contains("failed at")).Select(l => l.Message).ToList();
+        var failure = Assert.Single(failures);
+        Assert.StartsWith("Download of x.gguf: attempt 1/8 failed at 0 bytes: connection stalled: no data for 0.2 s", failure);
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));
     }
 
@@ -320,17 +325,22 @@ public sealed class OfflineAndDownloadTests : IDisposable
         Assert.False(File.Exists(target + ".part"));
     }
 
+    /// <summary>
+    /// The one end-to-end pin that the default (system) clock drives the stall timer. The exact counts and log lines are pinned on the
+    /// fake clock in <see cref="A_connection_that_stops_sending_is_a_stall"/>; on a loaded machine a retry can itself exceed a short
+    /// real limit, so only "at least one retry" is asserted here, with a limit far above any scheduling delay.
+    /// </summary>
     [Fact]
-    public async Task A_stalled_connection_counts_as_a_drop_and_is_retried()
+    public async Task A_stalled_connection_is_retried_on_the_system_clock()
     {
         var (content, spec) = Sample();
         var server = new FileServer(content) { StallFirst = 1 };
         var target = Path.Combine(_dir.FullName, "x.gguf");
         var log = new RecordingLog();
         var attempts = await ModelDownloader.DownloadAsync(new HttpClient(server), spec, target, false, NoProgress, CancellationToken.None, log,
-            Fast with { StallTimeout = TimeSpan.FromMilliseconds(300) }).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken); // a broken timer fails at 30 s, not never
-        Assert.Equal(2, attempts);
-        Assert.Contains("connection stalled: no data for 0.3 s", log.All);
+            Fast with { StallTimeout = TimeSpan.FromSeconds(2) }).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken); // a broken timer fails at 30 s, not never
+        Assert.True(attempts >= 2, $"attempts: {attempts}");
+        Assert.Contains("connection stalled: no data for 2 s", log.All);
         Assert.Equal(content, await File.ReadAllBytesAsync(target, TestContext.Current.CancellationToken));
     }
 
