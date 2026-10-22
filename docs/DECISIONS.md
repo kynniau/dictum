@@ -5553,3 +5553,21 @@ unless marked:
   platforms: step 4 "Your hotkey" (`HotkeyStep`, the capture box listening from the moment the step appears, "Use this
   hotkey" / skip) and step 6, a first dictation into a box in the window through the real path. No Mac string is PROPOSED
   any more.
+
+**First beta finding, Settings > Storage (owner, 23/10/2026 ~06:58 AEDT, branch fix/storage-page-copy):** the owner asked why
+the page shows the model folder with Change… and Use default at the top, then "Where Dictum keeps things" below with no
+Change. The two panels are different things: the top is the one folder a user can move (models, with the 1.3 move-on-change
+flow); the bottom is a read-only map of the folders Dictum does not let anyone move (the config folder holds settings.json
+itself, so it cannot be stored in a setting; the logs and recordings folder; the program). Two defects on that page, both in
+shared UI code, so Windows had the first as well:
+
+- The "Models, logs, calibration recordings" row always printed Dictum's own data folder, which is wrong for the models once a
+  folder is chosen (the Models card already lists every model folder in lookup order). The row is now `StoragePage.DataFolderRow`
+  = "Logs, calibration recordings". Pinned in ModelFolderTests (observed failing with the old label, then restored).
+- "Remove everything" said "the Start menu shortcut and the launch-at-login entry" on a Mac. The sentence now takes the
+  platform's own words from a new `IRemovalSteps.StartupItemsPhrase`: Windows "the Start menu shortcut and the launch-at-login
+  entry" (unchanged on Windows, pinned in PlatformTests), macOS "the login item" (PROPOSED, pinned in MacShellTests). The page
+  pin was observed failing with the Windows literal put back, then restored.
+- Not in this change, left for a Mac help pass: `HelpText` "How do I remove Dictum completely?" still says "its Start menu
+  shortcut and its start-with-Windows entry" and the Microsoft Store sentence on a Mac; HelpText is plain constants with no
+  platform code by design, so that is a copy decision for the owner (PROPOSED Mac wording to follow), not a one-liner.

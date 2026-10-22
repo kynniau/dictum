@@ -110,6 +110,7 @@ public class PackagingTests
         File.Delete(Path.Combine(scratch.Root.FullName, "Dictum.sln"));
         var steps = new RemovalSteps(new FakeRunKey(), install, Path.Combine(install, "Dictum.exe"), false, scratch.Root.FullName, scratch.Root.FullName, NullLog.Instance,
             waitForProcessId: 1234);
+        Assert.Equal("the Start menu shortcut and the launch-at-login entry", steps.StartupItemsPhrase); // the Storage page's "Remove everything" sentence on Windows
         var start = steps.RemovalStart(install);
         Assert.Equal(install, start.Environment[RemovalSteps.FolderVariable]); // the folder travels outside the script text
         Assert.Equal("1234", start.Environment[RemovalSteps.WaitVariable]);

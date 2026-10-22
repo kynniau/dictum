@@ -448,6 +448,13 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Contains($"Downloads go to: {scratch.Paths.DefaultModelsDir}", Texts(window));
         Assert.False(useDefault.IsEnabled); // nothing is chosen yet, as on Models
         Assert.True(change.Focusable && change.IsTabStop); // reached with Tab
+        // First beta finding (23/10/2026): the folder map's row for Dictum's own data folder no longer claims the models, which the
+        // Models card lists wherever they are; and "Remove everything" names the platform's own startup items, not the Start menu.
+        Assert.Equal("Logs, calibration recordings", StoragePage.DataFolderRow);
+        Assert.Contains(StoragePage.DataFolderRow, Texts(window));
+        Assert.DoesNotContain("Models, logs", Texts(window));
+        Assert.Contains("keys, the fake shortcut and the fake launch-at-login entry, then the program itself.", Texts(window));
+        Assert.DoesNotContain("Start menu", Texts(window));
 
         dialogs.Folder = chosen;
         Click(change);

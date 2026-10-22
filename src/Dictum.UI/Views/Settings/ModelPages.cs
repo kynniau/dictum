@@ -573,6 +573,16 @@ internal sealed class StoragePage : SettingsPage
 
     internal static string DownloadsGoTo(string folder) => $"Downloads go to: {folder}";
 
+    // First beta finding (owner, 23/10/2026): the Storage page's folder map said "Models, logs, calibration recordings" for Dictum's own
+    // data folder even when the models live in a chosen folder, which the Models card above already lists; and "Remove everything"
+    // named the Start menu on a Mac. The data folder's row names only what is always there, and the sentence takes the platform's
+    // own words for what it removes (IRemovalSteps.StartupItemsPhrase).
+    internal const string DataFolderRow = "Logs, calibration recordings";
+
+    internal static string RemoveEverythingText(string startupItems) =>
+        $"Deletes every model, recording, log, setting, your dictionary, corrections and .env keys, {startupItems}, then the program itself. " +
+        "Two warnings come first; the second needs DELETE typed.";
+
     internal static string FolderName(ModelFolderKind kind) => kind switch
     {
         ModelFolderKind.Chosen => "Chosen folder",
@@ -616,8 +626,7 @@ internal sealed class StoragePage : SettingsPage
                 Ui.Text("Dictum keeps no dictation history: the last dictation is held in memory for Fix last dictation and is gone when Dictum quits.", "caption")), "Data"),
             Ui.Card(_places, "Where Dictum keeps things"),
             Ui.Card(Ui.Stack(10,
-                Ui.Text("Deletes every model, recording, log, setting, your dictionary, corrections and .env keys, the Start menu shortcut and the " +
-                        "launch-at-login entry, then the program itself. Two warnings come first; the second needs DELETE typed."),
+                Ui.Text(RemoveEverythingText(Shell.Platform.Removal.StartupItemsPhrase)),
                 Ui.Row(8, Ui.Button("Remove Dictum completely…", "danger", () => Run(() => Shell.RemoveEverything())))), "Remove everything"));
     }
 
@@ -668,7 +677,7 @@ internal sealed class StoragePage : SettingsPage
 
         _places.Children.Clear();
         _places.Children.Add(Place("Settings, dictionary, corrections, .env", Shell.Paths.ConfigDir));
-        _places.Children.Add(Place("Models, logs, calibration recordings", Shell.Paths.LocalDir));
+        _places.Children.Add(Place(DataFolderRow, Shell.Paths.LocalDir));
         _places.Children.Add(Place("Program", Shell.Paths.ExeDir));
         if (Shell.Platform.Package.IsPackaged)
             _places.Children.Add(Ui.Text("This copy is installed from a package, so Windows keeps its files in the package's own folder: the paths above are the real ones.", "caption"));
