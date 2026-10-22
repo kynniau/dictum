@@ -5535,3 +5535,8 @@ unless marked:
   never from an agent session. The hands-on checklist (Welcome window, Microphone, Accessibility, hotkey, Cmd-V, login item,
   removal, Gatekeeper on the quarantined zip) is next and is the owner's; no `mac-v` tag before the owner approves the
   Mac copy.
+- Owner's first dictation (23/10/2026, reported by the owner at about 06:20 AEDT, in a line dictated with Dictum into the
+  agent session's terminal): the notarised 1.3.0 bundle launched, was granted Microphone and Accessibility, recorded on the
+  hotkey, transcribed, and pasted the text into another app. That covers the launch, the two permission dialogs, the event
+  tap, the hotkey and Cmd-V paste end to end. Not yet exercised by the owner: the login item, removal, the owned dialogs,
+  and whether the launch was from the quarantined zip copy (the Gatekeeper first-open dialog) or from dist/Dictum.app.
