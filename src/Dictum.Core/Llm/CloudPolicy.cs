@@ -77,12 +77,13 @@ public static class CloudPolicy
 
     /// <summary>
     /// What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2), then the warning paragraph, then the
-    /// responsibility paragraph (<see cref="ConsentResponsibility"/>). The parenthesis "(the audio only if you also turn on cloud
-    /// speech)" is APPROVED 22/10/2026 18:41 AEDT (clause revised on the owner's instruction; counsel review pending): do not
-    /// reword; it was "(never the audio)", untrue when cloud speech sends to the same host.
+    /// responsibility paragraph (<see cref="ConsentResponsibility"/>). The parenthesis after "every dictation's text" is APPROVED
+    /// 22/10/2026 19:42 AEDT (parenthesis corrected: the earlier 18:41 wording named the clean-up host for the audio; counsel review
+    /// pending): do not reword. It was "(never the audio)" until 18:41, then "(the audio only if you also turn on cloud speech)",
+    /// which, followed by "is sent to {host}", said the audio goes to the clean-up host; cloud speech sends it to its own service.
     /// </summary>
     public static string ConsentText(LlmSettings s, string host) =>
-        $"With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to {host}" +
+        $"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host}" +
         (s.Provider == LlmSettings.Anthropic ? " (Anthropic)" : "") +
         " together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
         (s.Provider == LlmSettings.Anthropic

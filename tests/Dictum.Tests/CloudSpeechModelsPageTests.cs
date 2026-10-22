@@ -8,7 +8,7 @@ using Dictum.UI.Views;
 namespace Dictum.Tests;
 
 /// <summary>
-/// Settings > Models while cloud speech sends audio (owner wording, 22/10/2026 18:41 AEDT): the Advanced Speech model card's
+/// Settings > Models while cloud speech sends audio (owner wording, 22/10/2026 18:41 AEDT; the explainer's second sentence 19:45): the Advanced Speech model card's
 /// introduction and the Simple view's explainer show the owner's replacement sentence only then, and the approved originals
 /// byte for byte otherwise. Kept apart from CloudSpeechUiTests so that file stays under 1,000 lines (final lens on PR #54).
 /// No request is made: the fake server refuses any that would be.
@@ -42,7 +42,7 @@ public sealed class CloudSpeechModelsPageTests
     private const string ReplacedSpeechIntro = "Turns your voice into words; with cloud speech on, speech.example.com does this and the model here is the fallback. Bigger is more accurate and slower.";
     private const string ApprovedExplainer = "Dictum turns your voice into text on this PC. The speech model does the listening. Standard works for most people. " +
                                              "If words come out wrong, try a more accurate model, or press Calibrate my voice to see which hears you best.";
-    private const string ReplacedExplainer = "Dictum sends your voice to speech.example.com to be turned into text while cloud speech is on. The speech model does the listening. Standard works for most people. " +
+    private const string ReplacedExplainer = "Dictum sends your voice to speech.example.com to be turned into text while cloud speech is on. The cloud service does the listening; the speech model on this PC is the fallback. Standard works for most people. " +
                                              "If words come out wrong, try a more accurate model, or press Calibrate my voice to see which hears you best.";
 
     /// <summary>

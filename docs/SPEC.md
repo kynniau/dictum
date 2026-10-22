@@ -1489,9 +1489,11 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
     Owner wording, 22/10/2026 18:41 AEDT, the same way: the Advanced Speech model card's "Turns your voice into words, on this
     PC." gives way to "Turns your voice into words; with cloud speech on, {host} does this and the model here is the fallback.",
     and the Simple view's "Dictum turns your voice into text on this PC." to "Dictum sends your voice to {host} to be turned into
-    text while cloud speech is on." Permanent changes (18:41): Help's "Nothing you say is sent anywhere unless you turn on
+    text while cloud speech is on.", and its "The speech model does the listening." to "The cloud service does the listening;
+    the speech model on this PC is the fallback." (19:45). Permanent changes (18:41): Help's "Nothing you say is sent anywhere unless you turn on
     cloud clean-up" now reads "…unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech (Settings > Models)" (app and site; paths named 19:10), and the cloud clean-up consent (SPEC §22) says "every dictation's
-    text (the audio only if you also turn on cloud speech)" where it said "(never the audio)", with a new paragraph after its
+    text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it)" (19:42; it said "(never
+    the audio)" until 18:41, then briefly "(the audio only if you also turn on cloud speech)"), with a new paragraph after its
     warning (16:35): "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent
     there." Both consent changes were made on the owner's instruction; counsel review is pending.
 

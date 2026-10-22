@@ -360,7 +360,7 @@ public class OwnerApprovalsTests
         var anthropic = new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel };
         var host = Dictum.Llm.CloudPolicy.CloudHost(anthropic)!;
         Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
-            $"With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to {host} (Anthropic) together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            $"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host} (Anthropic) together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
             "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives.\n\n" +
             ApprovedCleanupWarning(host) + "\n\n" +
             "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +
@@ -368,7 +368,7 @@ public class OwnerApprovalsTests
             System.Text.Encoding.UTF8.GetBytes(Dictum.Llm.CloudPolicy.ConsentText(anthropic, host)));
         var custom = new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://llm.example.com/v1", Model = "m" };
         Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
-            "With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to llm.example.com together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to llm.example.com together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
             "It uses your own API key (LLM_API_KEY) if you have set one. Whoever runs that server receives the text; its own terms apply.\n\n" +
             ApprovedCleanupWarning("llm.example.com") + "\n\n" +
             "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +

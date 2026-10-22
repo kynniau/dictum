@@ -49,9 +49,21 @@ public static class SimpleView
     /// </summary>
     public static string ExplainerCloudSentence(string host) => $"Dictum sends your voice to {host} to be turned into text while cloud speech is on.";
 
-    /// <summary>The explainer as shown: unchanged, or with <see cref="ExplainerCloudSentence"/> in place of its first sentence while cloud speech sends audio.</summary>
+    /// <summary>The explainer's second sentence, which is untrue while cloud speech sends each recording.</summary>
+    public const string ExplainerListening = "The speech model does the listening.";
+
+    /// <summary>APPROVED 22/10/2026 19:45 AEDT (owner): do not reword. The explainer's second sentence while cloud speech sends each recording.</summary>
+    public const string ExplainerCloudListening = "The cloud service does the listening; the speech model on this PC is the fallback.";
+
+    /// <summary>
+    /// The explainer as shown: unchanged, or, while cloud speech sends audio, with <see cref="ExplainerCloudSentence"/> and
+    /// <see cref="ExplainerCloudListening"/> in place of its first two sentences.
+    /// </summary>
     public static string ExplainerFor(string? cloudHost) =>
-        cloudHost is null ? Explainer : Explainer.Replace(ExplainerOnThisPc, ExplainerCloudSentence(cloudHost), StringComparison.Ordinal);
+        cloudHost is null
+            ? Explainer
+            : Explainer.Replace(ExplainerOnThisPc, ExplainerCloudSentence(cloudHost), StringComparison.Ordinal)
+                .Replace(ExplainerListening, ExplainerCloudListening, StringComparison.Ordinal);
 
     /// <summary>
     /// The explainer at the top of the Simple speech card. The brief's wording named "Settings > Test my setup", which does not

@@ -4759,3 +4759,21 @@ copy are the C-Copy lane's, gated on owner approval.
       "whichdoes" and `CloudWarningAndPresetsTests.cs` `ApprovedStateLine ="`.
     - Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; CloudSpeechModelsPageTests, OwnerApprovalsTests,
       CloudWarningAndPresetsTests and CloudSpeechUiTests: 110 total, 0 failed, 0 skipped. The full suite was not rerun for this move.
+27. **Owner edits, 22/10/2026 19:42 and 19:45 AEDT.**
+    1. *Clean-up consent parenthesis corrected (19:42; on the owner's instruction, counsel review pending).* Item 23.4's wording
+       was wrong. The sentence reads "every dictation's text (…) is sent to {host}", and {host} is the clean-up host, so "(the
+       audio only if you also turn on cloud speech)" said the audio goes to the clean-up service. Cloud speech sends it to its
+       own service, which may be a different host. The parenthesis is now exactly "(not the audio: cloud speech, if you turn
+       it on, sends the audio to the service you choose for it)"; nothing else in the consent changed. The marker reads
+       "APPROVED 22/10/2026 19:42 AEDT (parenthesis corrected: the earlier 18:41 wording named the clean-up host for the audio;
+       counsel review pending): do not reword". Pins updated: the `OwnerApprovalsTests` consent byte pin, the
+       `CloudWarningAndPresetsTests` warning-paragraph pin and `ShellTests`.
+       Mutation (observed 22/10/2026): "for it)" changed to "for it.)". The consent byte pin, the warning-paragraph pin and
+       `ShellTests.Cloud_clean_up_is_switched_on_only_through_the_consent_dialog` observed failing; then restored.
+    2. *Simple explainer, second sentence (19:45).* While cloud speech sends audio, "The speech model does the listening."
+       becomes "The cloud service does the listening; the speech model on this PC is the fallback."
+       (`SimpleView.ExplainerCloudListening`, marked APPROVED 22/10/2026 19:45 AEDT). The original is byte-identical when cloud
+       speech is off. `CloudSpeechModelsPageTests` now pins both states with both replacements. Mutation (observed
+       22/10/2026): "fallback." changed to "fallback!". The Simple case of the Models-page pin observed failing; then restored.
+    - Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnerApprovalsTests, CloudWarningAndPresetsTests, ShellTests,
+      CloudSpeechModelsPageTests, CloudSpeechUiTests and SimpleViewTests: 138 total, 0 failed. Full suite: 1920 total, 0 failed, 23 skipped.

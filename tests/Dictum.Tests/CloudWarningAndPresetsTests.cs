@@ -122,7 +122,7 @@ public class CloudWarningAndPresetsTests
             // Its own paragraph, then the responsibility paragraph (owner, 22/10/2026 16:35 AEDT), then "Nothing is sent until you agree."
             Assert.Contains("\n\n" + ApprovedWarning(host) + "\n\n" + ApprovedResponsibility + "\n\nNothing is sent until you agree.", text);
             // The first sentence's parenthesis (owner, 22/10/2026 18:41 AEDT), byte for byte.
-            Assert.StartsWith($"With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to {host}", text);
+            Assert.StartsWith($"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host}", text);
             Assert.DoesNotContain("(never the audio)", text);
         }
     }
