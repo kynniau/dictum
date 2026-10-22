@@ -5,7 +5,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dictum by Kynni · Free dictation for Windows that keeps your words on your PC</title>
-<meta name="description" content="Hold a key, talk, let go. Dictum types what you said into almost any app on your Windows PC. Free to keep on your PC, open source, and nothing you say leaves your computer unless you turn on cloud clean-up or cloud speech. Mac version in progress.">
+<!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (meta description: "Now on Mac too, in beta.") -->
+<meta name="description" content="Hold a key, talk, let go. Dictum types what you said into almost any app on your Windows PC. Free to keep on your PC, open source, and nothing you say leaves your computer unless you turn on cloud clean-up or cloud speech. Now on Mac too, in beta.">
 <meta name="color-scheme" content="light dark">
 <link rel="canonical" href="https://dictum.kynni.au/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -44,14 +45,16 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow">Free dictation for Windows PCs · Mac version in progress</p>
+        <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (hero eyebrow, second hero button and hero note: the Mac beta) -->
+        <p class="eyebrow">Free dictation for Windows PCs · Now on Mac (beta)</p>
         <h1 id="hero-title">Say it. It’s written.</h1>
         <p class="lede">Hold a key, talk, let go. Dictum types what you said into whatever you’re working in. Your voice stays on your PC unless you turn on cloud speech.</p>
 
-        <div class="cta" id="get">
+        <div class="cta cta-pair" id="get">
           <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57" aria-describedby="store-note">Get it from the Microsoft Store</a>
+          <a class="btn btn-secondary" href="https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0" aria-describedby="store-note">Download for Mac (beta)</a>
         </div>
-        <p class="note" id="store-note">Free for Windows 10 and 11 (x64). The Microsoft Store installs it and keeps it up to date.</p>
+        <p class="note" id="store-note">Free for Windows 10 and 11 (x64); the Microsoft Store installs it and keeps it up to date. Free for Apple Silicon Macs on macOS 15 or later, as a beta you download from GitHub.</p>
 
         <ul class="trust" aria-label="At a glance">
           <li>Free to keep on your PC</li>
@@ -165,6 +168,19 @@
     </div>
   </section>
 
+  <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (the "Dictum for Mac, in beta" section: heading, two paragraphs, button and note) -->
+  <section class="section" id="mac" aria-labelledby="mac-title">
+    <div class="wrap">
+      <h2 id="mac-title">Dictum for Mac, in beta</h2>
+      <p class="section-intro">The same Dictum, built for Apple Silicon Macs (M1 or later) on macOS 15 or later. It lives in your menu bar: hold the right Option key, talk, let go, and your words are typed into the app you are in. The speech model comes inside the app, so nothing is downloaded to get started, and your voice stays on your Mac unless you turn on cloud speech.</p>
+      <p class="section-intro">It is a beta: signed and notarised with our Apple Developer ID, so it opens like any other Mac app, but it has had fewer hours on fewer Macs than the Windows version. Unzip it, move Dictum to Applications and open it. macOS asks for Microphone access and for Accessibility access (to see your hotkey and to paste into other apps). Intel Macs are not supported. Found something? Tell us from Settings &gt; Help.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0" aria-describedby="mac-note">Download for Mac (beta)</a>
+      </div>
+      <p class="note" id="mac-note">Check the download against SHA256SUMS-mac.txt from the same page.</p>
+    </div>
+  </section>
+
   <section class="section" id="see" aria-labelledby="see-title">
     <div class="wrap">
       <h2 id="see-title">A quick look</h2>
@@ -235,9 +251,10 @@
               <td>Yes, with the local models</td>
               <td>No. Dictation needs online speech recognition switched on.</td>
             </tr>
+            <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (comparison table, "Runs on" row) -->
             <tr>
               <th scope="row">Runs on</th>
-              <td class="is-dictum">Windows 10 and 11. Mac in progress.</td>
+              <td class="is-dictum">Windows 10 and 11. Apple Silicon Macs (beta).</td>
               <td>Mac, Windows, iPhone, Android</td>
               <td>Mac, Windows, iPhone, Android</td>
               <td>Mac, Windows, iPhone, Android</td>
@@ -255,12 +272,13 @@
       <h2 id="next-title">What’s next</h2>
       <p class="section-intro">Dictum 1.0 shipped in October 2026. Here is what is done since, and what comes next, built in the open on GitHub. No dates for what is next, because we would rather ship it right.</p>
       <ul class="roadmap">
+        <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (roadmap: the Mac version item, moved up among the Done items) -->
+        <li><span class="status status-done">Done</span><div><h3>Mac version (beta)</h3><p>The same app, built for Apple Silicon Macs. In beta while it earns its stripes.</p></div></li>
         <li><span class="status status-done">Done</span><div><h3>Long sessions, typed as you speak</h3><p>Hands-free dictation that types each sentence after you pause, so a long session reads back in real time.</p></div></li>
         <li><span class="status status-done">Done</span><div><h3>Dictate in your own language</h3><p>100 languages, with optional translation to English as you go.</p></div></li>
         <li><span class="status status-done">Done</span><div><h3>Mouse-button hotkeys and snippets</h3><p>Hold a side button on your mouse instead of a key. Say a phrase, paste a link or your sign-off.</p></div></li>
         <li><span class="status status-done">Done</span><div><h3>Names spelled right, every time</h3><p>Smarter checks so the tidy-up never inserts a name from your dictionary that you didn’t say.</p></div></li>
         <li><span class="status status-done">Done</span><div><h3>Cloud tidy-up for advanced users</h3><p>Optional presets for OpenAI, Google Gemini and a local Ollama, behind a clear warning that your text would leave your PC.</p></div></li>
-        <li><span class="status status-next">Next</span><div><h3>Mac version</h3><p>The same app, built for macOS.</p></div></li>
       </ul>
     </div>
   </section>
@@ -305,10 +323,11 @@
       </section>
       <section class="card" aria-labelledby="req-title">
         <h2 id="req-title">What you need</h2>
+        <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword ("What you need": first, second and microphone items) -->
         <ul class="feature-list">
-          <li><strong>Windows 10 or 11</strong>, 64-bit.</li>
-          <li><strong>The Microsoft Store.</strong> Get Dictum there; the Store installs everything else Dictum needs.</li>
-          <li><strong>A microphone.</strong> Any one Windows can use.</li>
+          <li><strong>Windows 10 or 11</strong>, 64-bit, or an Apple Silicon Mac on macOS 15 or later (beta).</li>
+          <li><strong>The Microsoft Store</strong> on Windows; the Store installs everything else Dictum needs. On a Mac, the download from GitHub.</li>
+          <li><strong>A microphone.</strong> Any one your computer can use.</li>
           <li><strong>4 GB of RAM</strong> for the small models. A graphics card is optional and makes the bigger, more accurate models fast.</li>
           <li><strong>Some disk space</strong> for the models you pick: from 78 MB, up to 1.6 GB for the most accurate speech model, plus an optional 1.1 GB tidy-up model.</li>
           <li><strong>Dictates in 100 languages</strong>, English included; choose yours under Settings &gt; Models &gt; Spoken language. Languages other than English need a one-time model download.</li>
@@ -361,8 +380,10 @@
     <div class="wrap">
       <h2 id="cta-title">Try it on your next email</h2>
       <p class="section-intro">Two minutes to install, one key to hold. If it isn’t for you, one button removes everything.</p>
-      <div class="cta">
+      <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (closing band: second button) -->
+      <div class="cta cta-pair">
         <a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>
+        <a class="btn btn-secondary" href="https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0">Download for Mac (beta)</a>
       </div>
     </div>
   </section>

@@ -11,6 +11,7 @@ namespace Dictum.Tests;
 public sealed class SiteStoreFirstTests
 {
     private const string StoreUrl = "https://apps.microsoft.com/detail/9N0DG1DHTR57";
+    private const string MacUrl = "https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0"; // the Mac beta announcement, APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword
     private const string GitHubLine = """Source code and release files are on <a href="https://github.com/kynniau/dictum">GitHub</a>.""";
     private static readonly string[] Pages = ["index.html", "help.html", "privacy.html", "plain-words.html"];
 
@@ -19,17 +20,34 @@ public sealed class SiteStoreFirstTests
         Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page)), "<!--.*?-->", "", RegexOptions.Singleline);
 
     [Fact]
-    public void Every_button_on_the_landing_page_is_the_Microsoft_Store_and_the_first_is_in_the_hero()
+    public void Every_button_on_the_landing_page_is_the_Microsoft_Store_or_the_Mac_beta_and_the_first_is_the_Store_in_the_hero()
     {
         var html = VisibleHtml("index.html");
         var buttons = Regex.Matches(html, "<a class=\"btn[^\"]*\" href=\"([^\"]+)\"");
         Assert.NotEmpty(buttons);
-        Assert.All(buttons, b => Assert.Equal(StoreUrl, b.Groups[1].Value));
+        Assert.All(buttons, b => Assert.Contains(b.Groups[1].Value, new[] { StoreUrl, MacUrl }));
+        Assert.Equal(StoreUrl, buttons[0].Groups[1].Value);
+        Assert.Contains(buttons, b => b.Groups[1].Value == MacUrl);
         var heroStart = html.IndexOf("<section class=\"hero\"", StringComparison.Ordinal);
         Assert.True(heroStart >= 0, "index.html has no hero section");
         var heroEnd = html.IndexOf("</section>", heroStart, StringComparison.Ordinal);
         Assert.InRange(buttons[0].Index, heroStart, heroEnd);
     }
+
+    /// <summary>The Mac beta announcement, word for word (APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword).</summary>
+    [Theory]
+    [InlineData("index.html", "Free dictation for Windows PCs · Now on Mac (beta)")]
+    [InlineData("index.html", "Free for Windows 10 and 11 (x64); the Microsoft Store installs it and keeps it up to date. Free for Apple Silicon Macs on macOS 15 or later, as a beta you download from GitHub.")]
+    [InlineData("index.html", "Dictum for Mac, in beta The same Dictum, built for Apple Silicon Macs (M1 or later) on macOS 15 or later.")]
+    [InlineData("index.html", "Check the download against SHA256SUMS-mac.txt from the same page.")]
+    [InlineData("index.html", "Windows 10 and 11. Apple Silicon Macs (beta).")]
+    [InlineData("index.html", "Done Mac version (beta) The same app, built for Apple Silicon Macs. In beta while it earns its stripes.")]
+    [InlineData("index.html", "Windows 10 or 11, 64-bit, or an Apple Silicon Mac on macOS 15 or later (beta).")]
+    [InlineData("index.html", "The Microsoft Store on Windows; the Store installs everything else Dictum needs. On a Mac, the download from GitHub.")]
+    [InlineData("index.html", "A microphone. Any one your computer can use.")]
+    [InlineData("privacy.html", "whether you install it from the Microsoft Store or as the direct download, the Dictum for Mac beta, and this website, dictum.kynni.au. Dictum is made by Kynni Pty Ltd")]
+    public void The_Mac_beta_sentences_are_on_the_page(string page, string sentence) =>
+        Assert.Contains(sentence, Prose(page), StringComparison.Ordinal);
 
     [Theory]
     [InlineData("SmartScreen")]
@@ -146,7 +164,7 @@ public sealed class SiteStoreFirstTests
     {
         Assert.Equal(4, Regex.Matches(Prose("index.html"), "Your voice stays on your PC by default").Count); // the wide badge, the narrow badge, the list item, the card heading
         var raw = VisibleHtml("index.html");
-        Assert.Contains("nothing you say leaves your computer unless you turn on cloud clean-up or cloud speech. Mac version", raw);
+        Assert.Contains("nothing you say leaves your computer unless you turn on cloud clean-up or cloud speech. Now on Mac too, in beta.", raw);
         Assert.Contains("<meta property=\"og:description\" content=\"Free dictation for Windows PCs. Speech becomes text on your own computer, in almost any app. No account, no subscription, nothing leaves your PC unless you turn on cloud clean-up or cloud speech.\">", raw);
         Assert.Contains("viewBox=\"0 0 360 780\" width=\"360\" height=\"780\"", raw); // the narrow graphic made room for the two-line badge
     }

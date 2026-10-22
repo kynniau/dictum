@@ -5571,3 +5571,17 @@ unless marked:
   job for the tag fails by design (no MAC_* secrets); the pre-release was created by hand with the approved notes. Still
   open from the Mac checklist, none a blocker: login item, removal, the owned dialogs, the clean-up model load without
   `disable-library-validation` (first tester with that model will show it).
+- Dictum for Mac (beta) announcement APPROVED by the owner (23/10/2026 07:10 AEDT), sections A, B and C of the proposed block as
+  one block, built word for word in `site/index.html` (meta description, hero eyebrow, second hero button, hero note, the new
+  "Dictum for Mac, in beta" section, the "Runs on" table row, the roadmap item moved up to Done, three "What you need" items,
+  the closing band's second button), `README.md` (the install section's fourth route and "Four routes") and
+  `site/privacy.html` (the scope sentence only). Every Mac button links to
+  https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0, to be updated with each Mac release. Each changed block carries an
+  "APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword" comment. `site/styles.css` gains `.cta-pair` (two buttons stacked
+  on a phone, side by side from 640px) and the unused `.btn-secondary` border is now `--text-3` so the button edge meets the
+  3:1 non-text contrast in both themes. Tests: `SiteStoreFirstTests` accepts the Store or the Mac link as a landing-page button
+  (the first is still the Store, in the hero) and pins the approved sentences; `MacPackagingTests` pins the README's four routes.
+  The Microsoft Store listing stays silent about the Mac (Store policy 10.1.5; the first submission was rejected for mentioning
+  it, `docs/STORE.md`, 16/10/2026), and `docs/STORE.md` is not touched. The privacy policy's storage paragraph still names
+  Windows folders only (on a Mac everything lives in `~/Library/Application Support/Dictum`): FLAGGED FOR COUNSEL, not changed
+  here. Not in this block: Help and the site help page say nothing Mac-specific yet (a later copy block).
