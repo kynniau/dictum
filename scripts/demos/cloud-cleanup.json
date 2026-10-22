@@ -1,11 +1,12 @@
 {
   "name": "cloud-cleanup",
   "title": "Turn on cloud clean-up (optional)",
-  "summary": "Settings > Clean-up: choose a service, open the settings folder, save the key in a .env file with Notepad (the placeholder your-key-here, never a real key), then Use cloud clean-up… shows the consent step with its warning. The demo clicks Cancel there: it never agrees, so nothing is switched on and the On: state line is described, not shown.",
+  "summary": "Settings > Clean-up: choose a service, click Create the key file (1.3: Dictum makes .env with the placeholder line your-key-here, never a real key, and opens it in Notepad), save it, then Use cloud clean-up… shows the consent step with its warning. The demo agrees with the placeholder in place of a key, so the card says it is waiting for the key and nothing is sent.",
   "environment": { "notepad": true },
   "prepare": [
     { "do": "plainDesktop" },
     { "do": "installSilently" },
+    { "do": "openWith", "extension": ".env", "path": "C:\\sbx\\notepad\\notepad.exe" },
     { "do": "launch" },
     { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
     { "do": "wait", "seconds": 1.5 },
@@ -61,104 +62,27 @@
       "after": 2.5
     },
     {
-      "id": "open-folder",
-      "caption": "Click Open the settings folder.",
-      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Open the settings folder" } } ],
+      "id": "create-key-file",
+      "caption": "Click Create the key file. Dictum makes it for you and opens it.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Button", "name": "Create the key file", "match": "prefix" } } ],
       "after": 2.5
     },
     {
-      "id": "address",
-      "caption": "Press Ctrl+L. The folder's address shows, highlighted.",
-      "do": [ { "do": "waitFor", "target": { "window": "File Explorer$", "timeout": 30 } }, { "do": "key", "keys": "Ctrl+L" } ],
-      "after": 1.5
-    },
-    {
-      "id": "copy",
-      "caption": "Press Ctrl+C to copy the folder's address.",
-      "do": [ { "do": "key", "keys": "Ctrl+C" } ],
-      "after": 1.2
-    },
-    {
       "id": "notepad",
-      "caption": "Open Notepad.",
-      "do": [ { "do": "launch", "path": "C:\\sbx\\notepad\\notepad.exe" }, { "do": "waitFor", "target": { "window": "Notepad$", "timeout": 30 } } ],
-      "after": 1.5
-    },
-    {
-      "id": "line",
-      "caption": "Type the line. Put your own key where it says your-key-here.",
-      "do": [ { "do": "type", "into": { "window": "Notepad", "name": "Text editor", "timeout": 30 }, "text": "ANTHROPIC_API_KEY=your-key-here" } ],
-      "after": 2
-    },
-    {
-      "id": "file",
-      "caption": "Click File.",
-      "do": [ { "do": "click", "target": { "window": "Notepad", "type": "MenuItem", "name": "File" } } ],
-      "after": 1
-    },
-    {
-      "id": "save-as",
-      "caption": "Click Save as.",
-      "do": [ { "do": "click", "target": { "type": "MenuItem", "name": "Save as", "match": "prefix" } } ],
-      "after": 1.5
-    },
-    {
-      "id": "type-list",
-      "caption": "Open the Save as type list.",
-      "do": [ { "do": "click", "target": { "window": "Notepad$", "type": "ComboBox", "name": "Save as type:" } } ],
-      "after": 1
-    },
-    {
-      "id": "all-files",
-      "caption": "Choose All files.",
-      "do": [ { "do": "click", "target": { "type": "ListItem", "name": "All files", "match": "prefix" } } ]
-    },
-    {
-      "id": "file-name",
-      "caption": "Click in File name.",
-      "do": [ { "do": "click", "target": { "window": "Notepad$", "type": "Edit", "name": "File name:" } } ],
-      "after": 1
-    },
-    {
-      "id": "select-name",
-      "caption": "Press Ctrl+A to select what is there.",
-      "do": [ { "do": "key", "keys": "Ctrl+A" } ],
-      "after": 1.2
-    },
-    {
-      "id": "paste",
-      "caption": "Press Ctrl+V to paste the folder's address.",
-      "do": [ { "do": "key", "keys": "Ctrl+V" } ],
-      "after": 1.5
-    },
-    {
-      "id": "env",
-      "caption": "Type \\.env straight after it.",
-      "do": [ { "do": "type", "text": "\\.env" } ],
-      "after": 2
+      "caption": "The key file opens in Notepad. Put your own key in place of your-key-here.",
+      "do": [ { "do": "point", "target": { "window": "^\\.env - Notepad$", "name": "Text editor", "timeout": 30 } } ],
+      "after": 3
     },
     {
       "id": "save",
-      "caption": "Click Save.",
-      "do": [ { "do": "click", "target": { "window": "Notepad$", "type": "Button", "name": "Save" } } ],
+      "caption": "After you add your key, press Ctrl+S to save. This demo keeps the placeholder.",
+      "do": [ { "do": "key", "keys": "Ctrl+S" } ],
       "after": 2
     },
     {
       "id": "close-notepad",
       "caption": "Close Notepad.",
       "do": [ { "do": "click", "target": { "window": "^\\.env - Notepad$", "type": "Button", "name": "Close" } } ],
-      "after": 1.5
-    },
-    {
-      "id": "saved",
-      "caption": "The file .env is now in Dictum's settings folder.",
-      "do": [ { "do": "point", "target": { "window": "File Explorer$", "type": "ListItem", "name": ".env", "timeout": 20 } } ],
-      "after": 2.5
-    },
-    {
-      "id": "close-folder",
-      "caption": "Close the folder window. Dictum settings is behind it.",
-      "do": [ { "do": "click", "target": { "window": "File Explorer$", "type": "Button", "name": "Close" } } ],
       "after": 1.5
     },
     {
@@ -176,21 +100,16 @@
     },
     {
       "id": "allow",
-      "caption": "Click Allow cloud clean-up only if you agree. This demo does not.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum: Send dictations", "type": "Button", "name": "Allow cloud clean-up" } } ],
+      "caption": "Click Allow cloud clean-up only if you agree. This demo agrees, with no real key.",
+      "do": [ { "do": "invokeClick", "target": { "window": "^Dictum: Send dictations", "type": "Button", "name": "Allow cloud clean-up" } } ],
       "after": 2.5
     },
     {
-      "id": "cancel",
-      "caption": "This demo clicks Cancel, so cloud clean-up stays off.",
-      "do": [ { "do": "click", "target": { "window": "^Dictum: Send dictations", "type": "Button", "name": "Cancel" } } ],
-      "after": 1.5
-    },
-    {
       "id": "state",
-      "caption": "After Allow, this card would start with On: and name the service.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Cloud clean-up", "match": "exact" } } ],
-      "after": 3
+      "caption": "There is no real key yet, so the card says it is waiting for it. Nothing is sent.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "On, but waiting for your", "match": "prefix", "timeout": 30 } } ],
+      "scrollFirst": true,
+      "after": 4
     }
   ]
 }

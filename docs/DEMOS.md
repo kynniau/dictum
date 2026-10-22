@@ -176,6 +176,8 @@ the first element whose name starts with this text), `index`, `timeout` in secon
 | `modelsFromHost` | Copy `environment.extraModels` into the sandbox's model folder |
 | `secondDrive` | Make drive `letter` (a 2 GB virtual disk labelled `label`, or `subst` if that fails) with `folder` on it |
 | `openFolder` | Open `path` in File Explorer |
+| `openWith` | Make files of `extension` (for example `.env`) open in `path` for the sandbox's user (per-user keys under `HKCU\Software\Classes`): a clean Windows has no handler for `.env`, so Create the key file would show "How do you want to open this file?". Added 23/10/2026 |
+| `invokeClick` | Like `click` (the pointer glides and rests, the highlight shows), but the button is invoked through UI Automation. Always listed under `fallbacks`. Added 23/10/2026: see "Dialog buttons" below |
 | `plainDesktop` | Plain background, desktop icons hidden |
 
 Paths expand environment variables (`%USERPROFILE%`) and `{setup}`, `{app}`, `{installed}`.
@@ -258,13 +260,10 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   and the tray panel).
 - **Not yet shown: the Help paragraph "In this help, … Simple view …".** The help demo jumps past it, so that sentence
   is never on screen. Noted for a later recording (lens on 7900e49).
-- **The cloud clean-up demo never agrees, and never holds a real key.** It types the placeholder `your-key-here`, saves it
-  as `.env` in the folder Open the settings folder opens, then stops at the consent dialog and clicks Cancel. So the "On: …"
-  state line and the tray panel's "Cloud clean-up on · text leaves this PC" are described in a caption, not shown. Agreeing
-  was not recorded on purpose. Since 1.3 (PR #60) the placeholder `your-key-here` counts as not set
-  (`SecretStore.Placeholder`), so agreeing with it saved would show the waiting line ("On, but waiting for your
-  ANTHROPIC_API_KEY …"), not "On: …". `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built` checks that waiting
-  line with the placeholder, and the On: line and the tray line with a stand-in key, headlessly.
+- **The cloud clean-up demo never holds a real key.** Since 1.3 (23/10/2026) it uses the **Create the key file…** button (Settings > Clean-up, beside Open the settings folder), which makes `.env` in Dictum's settings folder with the header and the line `ANTHROPIC_API_KEY=your-key-here` and opens it; the demo saves it unchanged in Notepad, clicks Use cloud clean-up…, reads the consent dialog and **agrees** with the placeholder in place of a key. The placeholder `your-key-here` counts as not set (`SecretStore.Placeholder`), so the card shows "On, but waiting for your ANTHROPIC_API_KEY: nothing is sent until you add it to .env." (the sandbox has no network and no key either). Before 1.3 the demo cancelled at the consent dialog and described the On: line in a caption. The "On: …" state line and the tray panel's "Cloud clean-up on · text leaves this PC" are still not shown on screen; `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built` checks them headlessly with a stand-in key.
+- **Help still describes the old key-file steps.** `HelpText.CloudAnswer` (and `site/help.html` section 8, which carries the same steps word for word) steps 2 to 15 say Open the settings folder, Ctrl+L, Ctrl+C, Notepad, Save as, All files, `\.env`. The 1.3 demo shows Create the key file… instead, so until the owner approves Help copy for that button the demo and the written steps differ (the page's caption "The steps above say the same in words" is then not true of the new demo). Not changed in this lane.
+- **`.env` opens in the borrowed Notepad.** A clean Windows has no program for `.env` files, and the sandbox has no Notepad, so the cloud-cleanup demo's prepare step `openWith` points `.env` at the borrowed classic Notepad (`C:\sbx\notepad\notepad.exe`), as a PC whose editor is set for `.env` files would behave. On a real PC the file opens in whatever program Windows has for `.env` (what the Windows 11 Notepad does is not verified). Ctrl+S in Notepad changes nothing on disk here, because the demo does not edit the file; the caption says so.
+- **Dialog buttons: a mouse click did not reach Dictum's consent dialogs in the sandbox.** In four runs on 23/10/2026 (Setup of 4a4072a), the pointer clicked Allow cloud clean-up (and in two test runs, Cancel) at the right place, the dialog vanished from the screen, and nothing was chosen: no "agreed" log line, no `consent.json`, no status line, and the dialog stayed in UI Automation's window list. With a debug build that logged `Window.Closing` and `Closed` (not committed), neither fired after the click, so the dialog was not closed. Inferred, not observed: the click reached the Settings window and brought it in front of the dialog, which is a separate, unowned window. Pressing Shift+Tab then Enter chose Allow correctly (consent recorded, the waiting line shown). `invokeClick` is therefore used for the buttons of the two consent dialogs (the pointer still glides to the button and the highlight shows it). Not established: whether a real mouse click does the same on a real PC (the sandbox's click is synthetic `SendInput`). The 1.2.1 cloud-cleanup recording clicked Cancel and went on without checking the dialog's result, so it may have shown the same.
 - **Start cannot find Notepad in the sandbox.** Start's search said "No results found for 'Notepad'", and the sandbox has
   no `C:\Windows\System32\notepad.exe` ("The system cannot find the file specified", observed 22/10/2026). So the cloud
   clean-up demo borrows this PC's classic Notepad (`environment.notepad`, staged read-only with its en-US resources, used
@@ -278,6 +277,12 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   `1.2.0+afda8d97e80375fa40ca9b83508a43847d7b596b`, SHA-256
   `3FDF6EB7461896896AA9325C8191A1E0035CC2D0ADDFC650F01B71B5434E78A6`). Setup runs silently and none of these demos opens
   About, so no frame shows a version string (checked by eye on the raw frames of the six demos).
+
+- **1.3 re-records (23/10/2026, branch `demos/1.3`).** `cloud-cleanup` and `help` were recorded again, and `own-instructions` and `cloud-speech` are new, from the Setup built from 4a4072a with `scripts\build-installer.ps1`: `Dictum-Setup-1.2.1.exe`, SHA-256 `BD8B31FCEB605B6F80B1D8B3C13615BCB5143B01CAC4C2CFB64C8324D89A1078` (the third build of that commit; the builds differ byte for byte), `Dictum.exe` product version `1.2.1+4a4072a1ea06068bfcfc409860d67ea4be5f9b60`. The product is 1.2.1 at this head and 1.3.0 is bumped at release time, so no recording says 1.3. No frame shows a version string (Setup runs silently and none of these demos opens About; Dictum's log, which is not in any video, says "Dictum 1.2.1 starting"). The runs: `20261023-004634-cloud-cleanup` (15 steps, 1 fallback: the Allow `invokeClick`), `20261023-005252-help` (10 steps, none), `20261023-011349-own-instructions` (12 steps, none), `20261023-010556-cloud-speech` (12 steps, 1 fallback: the Keep speech on this PC `invokeClick`). The mp4s are in `C:\Users\Kynni\Downloads\dictum-demos-1.2\mp4-1.3\`, outside the repository. Earlier cloud-cleanup runs that day stopped at its last step because of the dialog click above.
+- **`help` shows two of the three new questions.** The "Questions on this page" list now includes "What is clean-up?" and "How can I see what Dictum does with my words?". "Can I give the clean-up my own instructions?" is not in `HelpText.cs` at 4a4072a, so it is not on screen; the demo's steps and captions are unchanged.
+- **`own-instructions` and `cloud-speech` are not on the site's help page.** DEMOS.md does not say how demos are listed there, and `site/help.html` has no section for either feature yet, so only the GIF and the poster are added to `site/img/demos/`.
+- **`cloud-speech` types a placeholder model name.** Cloud speech has no default model (`SpeechPresets`: the model is always the user's), so the demo types `your-model-here` rather than a real model id, and never clicks Send my voice to …: it clicks Keep speech on this PC.
+- **Recording tools added with 1.3:** `demo-inside.ps1` also records Dictum's state when a step fails (progress.txt), and at the end copies a listing of Dictum's settings folder and its `settings.json` and `consent.json` (never `.env`) into the run folder, to show what a demo changed.
 
 ## What each demo shows (1.2 build, 21/10/2026)
 
@@ -304,12 +309,14 @@ now. Re-record it as a Microsoft Store install when that is possible (the record
 | 4. Calibrate my voice | `test-setup.json` | Tray icon, Calibrate my voice, the first sentence, Record, and Record switched off, with the no-microphone message under it |
 | 5. Models on another drive | `model-folder.json` | Settings, Models, Browse, type D:\Dictum models, Select Folder, the new folder shown |
 | 6. Find help | `help.json` | Settings > Help: the "Questions on this page" list, two questions opened from it and their answers, Send feedback (shown, not pressed) |
-| 7. Turn on cloud clean-up | `cloud-cleanup.json` | Settings > Clean-up: the Service list (Anthropic chosen), the key line, Open the settings folder, Ctrl+L and Ctrl+C in File Explorer, Notepad with the placeholder line `ANTHROPIC_API_KEY=your-key-here`, File > Save As, All files, File name, Ctrl+A, Ctrl+V, `\.env`, Save, Notepad closed, the `.env` file in the folder, the folder closed, Use cloud clean-up…, the consent dialog, Allow cloud clean-up (shown, not pressed), Cancel, the Cloud clean-up card. Recorded separately (below) |
+| 7. Turn on cloud clean-up | `cloud-cleanup.json` | Settings > Clean-up: the Service list (Anthropic chosen), the key line, Create the key file… (1.3), Notepad with the new `.env` (the header and `ANTHROPIC_API_KEY=your-key-here`), Ctrl+S, Notepad closed, Use cloud clean-up…, the consent dialog with its warning and the responsibility paragraph, Allow cloud clean-up, the card's "On, but waiting for your ANTHROPIC_API_KEY" line |
+| 8. Give clean-up your own instructions (new in 1.3) | `own-instructions.json` | Settings > Models > Advanced, Clean-up, the Your own instructions box with two short instructions typed, Models (leaving the box saves them), Simple, Clean-up, the line "Your own clean-up instructions are in use (Advanced view)." |
+| 9. Cloud speech (optional; new in 1.3) | `cloud-speech.json` | Settings > Models > Advanced, the Cloud speech card, the Service list (OpenAI), the key line, a placeholder model name, Use cloud speech…, the consent dialog, Keep speech on this PC |
 | Dictation (stills) | `dictation-stills.json` | The pill: Recording, Transcribing, Pasted 12 words |
 
 Posters (the step marked `"poster": true`): install, step 9 (the welcome window's first step); first-run, step 12 (Try it,
 the box ready); change-model, step 7 (More accurate In use); test-setup, step 4 (the sentence to read); model-folder, step 8
-(the new folder shown); help, step 10 (Send feedback); cloud-cleanup, step 26 (the consent dialog with its warning); dictation-stills, its last slide (Pasted 12 words). None is an
+(the new folder shown); help, step 10 (Send feedback); cloud-cleanup, step 13 (the consent dialog with its warning; step 26 before 1.3); own-instructions, step 8 (the two instructions typed); cloud-speech, step 11 (the speech consent dialog); dictation-stills, its last slide (Pasted 12 words). None is an
 error screen, except that the no-microphone sentence under the disabled Record is visible in test-setup's: on the 1.2
 build it shows from the moment the calibration window opens on a PC with no microphone, so no frame of that demo is
 without it.
@@ -395,7 +402,7 @@ window, and first-run records it.
    8. Click another question: Why did it type the wrong words?
    9. Its answer lists what to try.
    10. To tell us something, use Send feedback. It opens an email you can check, then send.
-7. **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`)
+7. **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`; the captions APPROVED 22/10/2026 14:25 AEDT are unchanged where the step is the same; the new and changed ones, marked below, are **PROPOSED**, 23/10/2026)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
    3. Click Settings.
@@ -403,28 +410,40 @@ window, and first-run records it.
    5. Under Cloud clean-up, open the Service list.
    6. Choose your service. This demo chooses Anthropic.
    7. This line says the name your key needs: ANTHROPIC_API_KEY.
-   8. Click Open the settings folder.
-   9. Press Ctrl+L. The folder's address shows, highlighted.
-   10. Press Ctrl+C to copy the folder's address.
-   11. Open Notepad.
-   12. Type the line. Put your own key where it says your-key-here.
-   13. Click File.
-   14. Click Save as.
-   15. Open the Save as type list.
-   16. Choose All files.
-   17. Click in File name.
-   18. Press Ctrl+A to select what is there.
-   19. Press Ctrl+V to paste the folder's address.
-   20. Type \.env straight after it.
-   21. Click Save.
-   22. Close Notepad.
-   23. The file .env is now in Dictum's settings folder.
-   24. Close the folder window. Dictum settings is behind it.
-   25. Click Use cloud clean-up.
-   26. Dictum says what it will send, and to whom, with a warning. Read it all.
-   27. Click Allow cloud clean-up only if you agree. This demo does not.
-   28. This demo clicks Cancel, so cloud clean-up stays off.
-   29. After Allow, this card would start with On: and name the service.
+   8. **PROPOSED, new** (replaces "Click Open the settings folder."): Click Create the key file. Dictum makes it for you and opens it.
+   9. **PROPOSED, new** (replaces the 1.2.1 steps 9 to 12: Ctrl+L, Ctrl+C, Open Notepad, the typed line): The key file opens in Notepad. Put your own key in place of your-key-here.
+   10. **PROPOSED, new** (replaces the 1.2.1 Save as steps 13 to 21): After you add your key, press Ctrl+S to save. This demo keeps the placeholder.
+   11. Close Notepad.
+   12. Click Use cloud clean-up.
+   13. Dictum says what it will send, and to whom, with a warning. Read it all.
+   14. **PROPOSED, changed** (was "Click Allow cloud clean-up only if you agree. This demo does not."): Click Allow cloud clean-up only if you agree. This demo agrees, with no real key.
+   15. **PROPOSED, changed** (was 1.2.1 step 28, "This demo clicks Cancel, so cloud clean-up stays off.", and step 29, "After Allow, this card would start with On: and name the service."): There is no real key yet, so the card says it is waiting for it. Nothing is sent.
+8. **Give clean-up your own instructions** (`own-instructions.json`, new; every caption and the title **PROPOSED**)
+   1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
+   2. Click the Dictum icon.
+   3. Click Settings.
+   4. Click Models, on the left.
+   5. Your own instructions are in the Advanced view. Click Advanced.
+   6. Click Clean-up, on the left.
+   7. Find Your own instructions. Anything you type here is added to Dictum's clean-up instructions.
+   8. Type your instructions. This demo types two short ones.
+   9. Click Models. Dictum saves your instructions when you leave the box.
+   10. To go back to the Simple view, click Simple.
+   11. Click Clean-up again.
+   12. In the Simple view, one line says your own instructions are in use.
+9. **Cloud speech (optional)** (`cloud-speech.json`, new; every caption and the title **PROPOSED**)
+   1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
+   2. Click the Dictum icon.
+   3. Click Settings.
+   4. Click Models, on the left.
+   5. Cloud speech is set up in the Advanced view. Click Advanced.
+   6. Find the Cloud speech card. It is optional, and it would send your voice to a service.
+   7. The Service list starts with OpenAI. This demo uses it.
+   8. This line says the name your key needs: OPENAI_API_KEY. Without a key nothing is sent.
+   9. Type the model name your service gives you. This demo types a placeholder.
+   10. Click Use cloud speech.
+   11. Dictum says that your voice would go to the service, with a warning. Read it all.
+   12. This demo clicks Keep speech on this PC, so your voice stays here.
 - **Dictate: hold, speak, let go** (stills, `dictation-stills.json`)
   1. Hold Right Ctrl and speak. The bar at the bottom of the screen says Recording.
   2. Let go of the key when you have finished. Dictum turns your words into text.

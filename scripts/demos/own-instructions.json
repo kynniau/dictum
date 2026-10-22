@@ -1,0 +1,91 @@
+{
+  "name": "own-instructions",
+  "title": "Give clean-up your own instructions",
+  "summary": "Settings > Clean-up in the Advanced view (1.3): type two short instructions into Your own instructions, leave the box (they are saved), go back to the Simple view and see the line that says your own clean-up instructions are in use.",
+  "prepare": [
+    { "do": "plainDesktop" },
+    { "do": "installSilently" },
+    { "do": "launch" },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Use this hotkey" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
+    { "do": "wait", "seconds": 1.5 },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Finish", "timeout": 60 } },
+    { "do": "wait", "seconds": 10 }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Dictum", "match": "prefix" },
+      "do": [ { "do": "click", "target": { "windowClass": "Shell_TrayWnd", "type": "Button", "name": "Show Hidden Icons" } } ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [ { "do": "click", "target": { "type": "Button", "name": "Dictum", "match": "prefix" } } ]
+    },
+    {
+      "id": "settings",
+      "caption": "Click Settings.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum$", "type": "Button", "name": "Settings" } } ]
+    },
+    {
+      "id": "models",
+      "caption": "Click Models, on the left.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Models" } } ]
+    },
+    {
+      "id": "advanced",
+      "caption": "Your own instructions are in the Advanced view. Click Advanced.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "name": "Models view: Advanced" } } ]
+    },
+    {
+      "id": "cleanup",
+      "caption": "Click Clean-up, on the left.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Clean-up" } } ]
+    },
+    {
+      "id": "box",
+      "caption": "Find Your own instructions. Anything you type here is added to Dictum's clean-up instructions.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Edit", "name": "Your own instructions", "timeout": 30 } } ],
+      "scrollFirst": true,
+      "after": 2.5
+    },
+    {
+      "id": "type",
+      "caption": "Type your instructions. This demo types two short ones.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "Edit", "name": "Your own instructions" } }, { "do": "type", "text": "Use short sentences." }, { "do": "key", "keys": "Enter" }, { "do": "type", "text": "Write product names in capitals." } ],
+      "after": 3,
+      "poster": true
+    },
+    {
+      "id": "leave",
+      "caption": "Click Models. Dictum saves your instructions when you leave the box.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Models" } } ],
+      "after": 1.2
+    },
+    {
+      "id": "simple",
+      "caption": "To go back to the Simple view, click Simple.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "name": "Models view: Simple" } } ]
+    },
+    {
+      "id": "cleanup-again",
+      "caption": "Click Clean-up again.",
+      "do": [ { "do": "click", "target": { "window": "^Dictum settings$", "type": "ListItem", "name": "Clean-up" } } ]
+    },
+    {
+      "id": "line",
+      "caption": "In the Simple view, one line says your own instructions are in use.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum settings$", "type": "Text", "name": "Your own clean-up instructions are in use", "match": "prefix", "timeout": 30 } } ],
+      "after": 3.5
+    }
+  ]
+}
