@@ -1,4 +1,6 @@
 using Dictum.Core;
+using Dictum.Llm;
+using Dictum.Settings;
 
 namespace Dictum.Help;
 
@@ -98,6 +100,48 @@ public static class HelpText
     /// <summary>APPROVED verbatim for Help, site and Store (owner, 21/10/2026 22:18 AEDT): do not reword.</summary>
     public const string FreeLaterNote = "The base product stays free to keep on your PC; optional paid extras may come later.";
 
+    /// <summary>PROPOSED (22/10/2026): the step-by-step answer for the optional cloud clean-up.</summary>
+    public const string CloudQuestion = "How do I turn on cloud clean-up?";
+
+    /// <summary>The host the consent dialog names for Anthropic, so the warning below is quoted exactly as that dialog shows it.</summary>
+    public static readonly string CloudExampleHost = CloudPolicy.CloudHost(new LlmSettings { Provider = LlmSettings.Anthropic })!;
+
+    /// <summary>
+    /// The tray panel's line while cloud clean-up sends text off this PC (FlyoutWindow). Approved by the product owner on 16/10/2026
+    /// as written: never reword it. Quoted here, and pinned against the panel itself by HelpPageTests.
+    /// </summary>
+    public const string CloudTrayLine = "Cloud clean-up on · text leaves this PC";
+
+    /// <summary>
+    /// PROPOSED (22/10/2026), awaiting the product owner's review: do not reword. The approved warning, the waiting-for-key line
+    /// and the tray line are quoted word for word from the app's own copy; the variable names are SecretStore's.
+    /// </summary>
+    public static readonly IReadOnlyList<string> CloudAnswer =
+    [
+        "Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. " +
+        "Most people do not need it: Tidy my words runs on this PC.",
+        "Before it switches on, Dictum shows a warning. For Anthropic, it says: \"" + CloudPolicy.ConsentWarning(CloudExampleHost) + "\"",
+        "Dictum can use Anthropic, OpenAI, Google Gemini or your own server. For Anthropic, OpenAI and Google Gemini, you need your own account with that service and an API key.",
+        "To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.",
+        "1. Open Settings > Clean-up. Under Cloud clean-up, choose your service in the Service list: Anthropic (Claude), OpenAI, Google Gemini, or Custom server (OpenAI-compatible) for your own server. " +
+        "The line under Model says which name its key needs.",
+        "2. Click Open the settings folder. File Explorer opens Dictum's settings folder. Press Ctrl+L: the folder's address shows, highlighted, at the top of that window. Press Ctrl+C to copy it.",
+        "3. Open Notepad: click the Start button, type Notepad, then press Enter.",
+        "4. Type one line: " + SecretStore.AnthropicKey + "=your-key-here, with your own key in place of your-key-here and no spaces. " +
+        "For OpenAI, the line starts " + SecretStore.OpenAiKey + "=; for Google Gemini, " + SecretStore.GeminiKey + "=; for your own server, if it needs a key, " + SecretStore.LlmKey + "=. " +
+        "If you use more than one service, put each on its own line.",
+        "5. In Notepad, choose File, then Save as. Set Save as type to All files. Click in File name and press Ctrl+A to select what is there, then press Ctrl+V to paste the folder's address in its place. " +
+        "Type \\.env straight after it, then click Save.",
+        "The file must be called .env exactly: a dot, then env, with nothing after it. A file called .env.txt is not read.",
+        "6. Go back to Settings > Clean-up and click Use cloud clean-up… to switch it on. Dictum says what it will send and to whom, with the warning above. Read it. " +
+        "Click Allow cloud clean-up only if you agree. Nothing is sent until you do.",
+        "When it is working, the Cloud clean-up card on that page starts with \"On: the text of each dictation is sent to\" and names the service, and the Dictum menu says \"" + CloudTrayLine + "\".",
+        "If the card does not start with \"On:\", Dictum cannot find your key. For OpenAI, for example, it says \"" + CloudPolicy.WaitingForKeyLine(SecretStore.OpenAiKey) + "\" " +
+        "Check the file's name, and the line in it.",
+        "To turn it off, open Settings > Clean-up and click Switch cloud clean-up off. Your dictations are tidied on this PC again.",
+        "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
+    ];
+
     /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
     public static readonly IReadOnlyList<HelpEntry> Questions =
     [
@@ -158,6 +202,9 @@ public static class HelpText
             "If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
             "To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.",
         ]),
+        // PROPOSED (22/10/2026), awaiting the product owner's review: do not reword. The quoted lines are APPROVED copy taken from
+        // CloudPolicy (never reworded here) and the tray panel's line, pinned against the app by HelpPageTests.
+        new(CloudQuestion, CloudAnswer),
         new("How do I remove Dictum completely?",
         [
             "Open Settings > Storage. At the bottom, choose Remove Dictum completely…",

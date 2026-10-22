@@ -45,6 +45,7 @@
       <li><a href="#views">Simple and Advanced</a></li>
       <li><a href="#models">Where the model files live</a></li>
       <li><a href="#privacy">Your privacy</a></li>
+      <li><a href="#cloud">Optional: turn on cloud clean-up</a></li>
       <li><a href="#free">Free</a></li>
       <li><a href="#feedback">Send feedback or report a problem</a></li>
       <li><a href="#faq">Questions and answers</a></li>
@@ -364,15 +365,59 @@
     <p><a href="/privacy">Read the privacy policy</a>. It is short, and it names every address.</p>
   </section>
 
+  <section id="cloud" aria-labelledby="cloud-title">
+    <h2 id="cloud-title">8. Optional: turn on cloud clean-up</h2>
+    <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.</p>
+    <p>Before it switches on, Dictum shows a warning. For Anthropic, it says:</p>
+    <blockquote class="card">
+      <p>WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on api.anthropic.com's servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.</p>
+    </blockquote>
+    <p>Dictum can use Anthropic, OpenAI, Google Gemini or your own server. For Anthropic, OpenAI and Google Gemini, you need your own account with that service and an API key.</p>
+
+    <h3>Get a key</h3>
+    <p>To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.</p>
+
+    <h3>Save the key, then switch it on</h3>
+    <ol id="cloud-steps">
+      <li>Open Settings &gt; Clean-up. Under <b>Cloud clean-up</b>, choose your service in the <b>Service</b> list: <b>Anthropic (Claude)</b>, <b>OpenAI</b>, <b>Google Gemini</b>, or <b>Custom server (OpenAI-compatible)</b> for your own server. The line under <b>Model</b> says which name its key needs.</li>
+      <li>Click <b>Open the settings folder</b>. File Explorer opens Dictum's settings folder. Press Ctrl+L: the folder's address shows, highlighted, at the top of that window. Press Ctrl+C to copy it.</li>
+      <li>Open Notepad: click the Start button, type Notepad, then press Enter.</li>
+      <li>Type one line: <code>ANTHROPIC_API_KEY=your-key-here</code>, with your own key in place of <code>your-key-here</code> and no spaces. For OpenAI, the line starts <code>OPENAI_API_KEY=</code>; for Google Gemini, <code>GEMINI_API_KEY=</code>; for your own server, if it needs a key, <code>LLM_API_KEY=</code>. If you use more than one service, put each on its own line.</li>
+      <li>In Notepad, choose <b>File</b>, then <b>Save as</b>. Set <b>Save as type</b> to <b>All files</b>. Click in <b>File name</b> and press Ctrl+A to select what is there, then press Ctrl+V to paste the folder's address in its place. Type <code>\.env</code> straight after it, then click <b>Save</b>.
+        <p>The file must be called .env exactly: a dot, then env, with nothing after it. A file called .env.txt is not read.</p>
+      </li>
+      <li>Go back to Settings &gt; Clean-up and click <b>Use cloud clean-up…</b> to switch it on. Dictum says what it will send and to whom, with the warning above. Read it. Click <b>Allow cloud clean-up</b> only if you agree. Nothing is sent until you do.</li>
+    </ol>
+
+    <figure class="demo-figure">
+      <details class="demo-play">
+        <summary>
+          <img class="demo-poster" src="img/demos/cloud-cleanup-poster.png" width="1600" height="1116" loading="lazy" alt="Turn on cloud clean-up: a still from the demo.">
+          <span class="demo-play-label"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
+        </summary>
+        <img class="demo-gif" src="img/demos/cloud-cleanup.gif" width="800" height="558" loading="lazy" alt="Turn on cloud clean-up, step by step, as a moving picture.">
+      </details>
+      <figcaption>Turn on cloud clean-up. A moving picture with no sound: each step is written on it. It types the placeholder your-key-here, never a real key, and stops at the consent step without agreeing. The steps above say the same in words.</figcaption>
+    </figure>
+
+    <h3>Is it working?</h3>
+    <p>When it is working, the Cloud clean-up card on that page starts with "On: the text of each dictation is sent to" and names the service, and the Dictum menu says "Cloud clean-up on · text leaves this PC".</p>
+    <p>If the card does not start with "On:", Dictum cannot find your key. For OpenAI, for example, it says "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add it to .env." Check the file's name, and the line in it.</p>
+
+    <h3>Turn it off</h3>
+    <p>To turn it off, open Settings &gt; Clean-up and click <b>Switch cloud clean-up off</b>. Your dictations are tidied on this PC again.</p>
+    <p>Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.</p>
+  </section>
+
   <section id="free" aria-labelledby="free-title">
-    <h2 id="free-title">8. Free</h2>
+    <h2 id="free-title">9. Free</h2>
     <p>Free: no subscription, no account, no ads, no analytics, no telemetry.</p>
     <p>The base product stays free to keep on your PC; optional paid extras may come later.</p>
     <p>There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
   </section>
 
   <section id="feedback" aria-labelledby="feedback-title">
-    <h2 id="feedback-title">9. Send feedback or report a problem</h2>
+    <h2 id="feedback-title">10. Send feedback or report a problem</h2>
     <p>Dictum sends nothing by itself. Instead, it opens a new email in your own email program. You can read and change it before you send it.</p>
 
     <h3>Send feedback or suggest a feature</h3>
@@ -398,7 +443,7 @@
   </section>
 
   <section id="faq" aria-labelledby="faq-title">
-    <h2 id="faq-title">10. Questions and answers</h2>
+    <h2 id="faq-title">11. Questions and answers</h2>
     <p>Click a question to see its answer.</p>
     <div class="faq">
 
@@ -588,6 +633,15 @@
           <p>Dictum shows this warning while it is on:</p>
           <blockquote><p>Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.</p></blockquote>
           <p>Most people do not need it. <b>Tidy my words</b> runs on this PC.</p>
+        </div>
+      </details>
+
+      <details id="faq-cloud-setup">
+        <summary>How do I turn on cloud clean-up?</summary>
+        <div class="answer">
+          <p>Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.</p>
+          <p>To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.</p>
+          <p>Then save the key in a file called .env in Dictum's settings folder, and switch cloud clean-up on in Settings &gt; Clean-up. The steps, with a moving picture, are in <a href="#cloud">Optional: turn on cloud clean-up</a>.</p>
         </div>
       </details>
 

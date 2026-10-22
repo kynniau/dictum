@@ -9,6 +9,8 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Dictum.App;
 using Dictum.Help;
+using Dictum.Llm;
+using Dictum.Settings;
 using Dictum.UI.Shell;
 using Dictum.UI.Views;
 using Dictum.UI.Views.Settings;
@@ -71,7 +73,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Contains(text, shown);
 
-        Assert.Equal(12, HelpText.Questions.Count);
+        Assert.Equal(13, HelpText.Questions.Count);
         var blocks = All<Border>(page).Where(b => b.Focusable).Select(AutomationProperties.GetName).ToList();
         foreach (var entry in HelpText.Questions)
             Assert.Contains(entry.Question, blocks); // each question is its own tab stop, named after it
@@ -306,13 +308,213 @@ public class HelpPageTests
     [Fact]
     public void Every_mention_of_turning_on_cloud_clean_up_says_what_it_sends()
     {
-        var mentions = HelpText.AllText().Where(t => t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
-        Assert.Equal(2, mentions.Count); // "How Dictum works" and "Where does my voice go?"
+        // The question "How do I turn on cloud clean-up?" is a heading, not a paragraph: its answer's first paragraph says it.
+        var questions = HelpText.Questions.Select(q => q.Question).ToHashSet(StringComparer.Ordinal);
+        var mentions = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, mentions.Count); // "How Dictum works", "Where does my voice go?" and "How do I turn on cloud clean-up?"
+        Assert.Contains(HelpText.CloudAnswer[0], mentions);
         Assert.All(mentions, t =>
         {
             Assert.Contains("the text of each dictation", t);
             Assert.Contains("the words in your dictionary", t);
             Assert.Contains("Your voice still stays here", t, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy
+    // (the same literals as CloudWarningAndPresetsTests), so the help can only quote them, never reword them.
+    private static string ApprovedWarning(string host) =>
+        $"WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on {host}'s servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.";
+
+    private const string ApprovedWaitingLine = "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add it to .env.";
+
+    private const string ApprovedTrayLine = "Cloud clean-up on · text leaves this PC";
+
+    /// <summary>
+    /// "How do I turn on cloud clean-up?" (PROPOSED, 22/10/2026) quotes the approved copy word for word, uses only the placeholder
+    /// key, and names every key variable that .env.example lists, so the help cannot drift from the file it tells people to write.
+    /// </summary>
+    [Fact]
+    public void The_cloud_answer_quotes_the_approved_copy_and_only_the_placeholder_key()
+    {
+        var cloud = HelpText.Questions.Single(q => q.Question == "How do I turn on cloud clean-up?");
+        Assert.Same(HelpText.CloudAnswer, cloud.Answer);
+        Assert.Equal(HelpText.NameQuestion, HelpText.Questions[^1].Question); // still the last question
+        var answer = string.Join("\n", cloud.Answer);
+
+        Assert.Equal("api.anthropic.com", HelpText.CloudExampleHost);
+        Assert.Contains("\"" + ApprovedWarning("api.anthropic.com") + "\"", answer);
+        Assert.Contains("\"" + ApprovedWaitingLine + "\"", answer);
+        Assert.Contains("\"" + ApprovedTrayLine + "\"", answer);
+        Assert.Equal(ApprovedTrayLine, HelpText.CloudTrayLine);
+
+        // The four services, and how to get a key, in the words the brief allows.
+        foreach (var service in new[] { "Anthropic", "OpenAI", "Google Gemini", "your own server" })
+            Assert.Contains(service, answer);
+        Assert.Contains("sign in to the service's website and create an API key", answer);
+        Assert.Contains("The key is like a password", answer);
+
+        // Every key .env.example lists is named, each as the start of its own line (KEY=), and the only value shown is the placeholder.
+        var example = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), ".env.example"));
+        var variables = Regex.Matches(example, @"^([A-Z_]+)=", RegexOptions.Multiline).Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal([SecretStore.AnthropicKey, SecretStore.OpenAiKey, SecretStore.GeminiKey, SecretStore.LlmKey], variables);
+        Assert.All(variables, v => Assert.Contains(v + "=", answer));
+        Assert.Contains(SecretStore.AnthropicKey + "=your-key-here", answer);
+        Assert.Contains("your own key in place of your-key-here", answer);
+        foreach (var text in HelpText.AllText())
+            Assert.DoesNotMatch(new Regex(@"sk-[A-Za-z0-9]|sk_[A-Za-z0-9]|AIza[0-9A-Za-z_-]|[A-Z_]+_API_KEY=(?!your-key-here)[^\s;.]"), text); // no real-looking key, ever
+
+        // Where the file goes and what it is called: the folder the button opens, named .env exactly.
+        Assert.Contains("Open the settings folder", answer);
+        Assert.Contains("Type \\.env straight after it", answer);
+        Assert.Contains("The file must be called .env exactly", answer);
+        Assert.Contains("never saves the key in its settings", answer);
+    }
+
+    /// <summary>
+    /// The website guide's section "Optional: turn on cloud clean-up" (site/help.html, #cloud) carries every paragraph of the in-app
+    /// answer word for word, in the same order (markup, the step numbers and quotation marks aside), and plays the cloud-cleanup demo.
+    /// </summary>
+    [Fact]
+    public void The_site_guide_carries_the_cloud_answer_word_for_word()
+    {
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        var start = html.IndexOf("<section id=\"cloud\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "site/help.html has no #cloud section");
+        var section = html[start..html.IndexOf("</section>", start, StringComparison.Ordinal)];
+        static string Plain(string s) // inline tags go without a trace, block tags leave a space
+        {
+            var inline = Regex.Replace(s, @"</?(b|code|em|a)(\s[^>]*)?>", "");
+            return Regex.Replace(Regex.Replace(inline, "<[^>]+>", " ").Replace("&gt;", ">").Replace("&amp;", "&").Replace("\"", ""), @"\s+", " ").Trim();
+        }
+        var site = Plain(section);
+        var at = 0;
+        foreach (var paragraph in HelpText.CloudAnswer)
+        {
+            var words = Plain(Regex.Replace(paragraph, @"^\d+\. ", ""));
+            var found = site.IndexOf(words, at, StringComparison.Ordinal);
+            Assert.True(found >= 0, $"the site's cloud section does not carry, in order: \"{words}\"");
+            at = found + words.Length;
+        }
+        Assert.Contains("<li><a href=\"#cloud\">Optional: turn on cloud clean-up</a></li>", html); // in the page's contents
+        Assert.Contains("<summary>How do I turn on cloud clean-up?</summary>", html); // and in its questions
+        Assert.Contains("src=\"img/demos/cloud-cleanup-poster.png\"", section);
+        Assert.Contains("src=\"img/demos/cloud-cleanup.gif\"", section);
+        foreach (var file in new[] { "cloud-cleanup-poster.png", "cloud-cleanup.gif" })
+            Assert.True(File.Exists(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "img", "demos", file)), $"site/img/demos/{file} is missing");
+    }
+
+    /// <summary>
+    /// The cloud answer, walked through as it says on a scratch profile: every label it names is on Settings > Clean-up, the tray
+    /// panel or the consent dialog; Open the settings folder opens the folder Dictum reads .env from; a .env.txt there is not read
+    /// (the waiting line shows); the line the help gives, saved as .env, is read; the consent dialog carries the warning the help
+    /// quotes; after Allow the card and the tray panel say what the help says; Switch cloud clean-up off puts the tidying back on
+    /// this PC; and the key never reaches settings.json or the screen. Nothing reaches the network: no dictation is made.
+    /// </summary>
+    [Fact]
+    public Task The_cloud_answer_walks_through_the_app_as_built()
+    {
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SecretStore.AnthropicKey)), "ANTHROPIC_API_KEY is set in this machine's environment, which wins over .env.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24", "llm": { "provider": "none" } }""");
+            var (shell, platform, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            var answer = string.Join("\n", HelpText.CloudAnswer);
+            var window = new SettingsWindow(shell);
+            window.Show();
+
+            List<string> Shown(ILogical root)
+            {
+                var seen = new List<string>();
+                foreach (var b in All<Button>(root)) if (b.IsEffectivelyVisible && b.Content is string s) seen.Add(s);
+                foreach (var t in All<TextBlock>(root)) if (t.IsEffectivelyVisible && t.Text is { } s) seen.Add(s);
+                foreach (var c in All<Control>(root)) if (c.IsEffectivelyVisible && AutomationProperties.GetName(c) is { Length: > 0 } s) seen.Add(s);
+                foreach (var p in All<ComboBox>(root)) if (p.ItemsSource is IEnumerable<string> items) seen.AddRange(items);
+                return seen;
+            }
+            List<string> CleanUpPage()
+            {
+                window.ShowPage("Privacy");
+                window.ShowPage("Clean-up");
+                Dispatcher.UIThread.RunJobs();
+                return Shown(window);
+            }
+            List<string> Tray()
+            {
+                var flyout = new FlyoutWindow(shell);
+                flyout.ShowNear(null);
+                var lines = Shown(flyout);
+                flyout.Close();
+                return lines;
+            }
+
+            // Step 1: the page, the card (its overline is in capitals on screen), the Service list and its entries, the Model field
+            // and the key line under it.
+            var page = CleanUpPage();
+            string[] named = ["Clean-up", "Service", "Anthropic (Claude)", "OpenAI", "Google Gemini", "Custom server (OpenAI-compatible)", "Model",
+                "Open the settings folder", "Use cloud clean-up…"];
+            foreach (var label in named)
+            {
+                Assert.True(answer.Contains(label, StringComparison.Ordinal), $"the cloud answer does not name \"{label}\"");
+                Assert.True(page.Contains(label), $"the cloud answer names \"{label}\", which Settings > Clean-up does not show");
+            }
+            Assert.Contains("Cloud clean-up".ToUpperInvariant(), page);
+            Assert.Contains("Under Cloud clean-up", answer);
+            Assert.Contains($"The key goes in .env in the settings folder: {SecretStore.AnthropicKey}=your Anthropic API key.", page);
+
+            // Step 2: the button opens the folder Dictum reads .env from.
+            Click(window, "Open the settings folder");
+            Assert.Equal(scratch.Paths.ConfigDir, Assert.Single(platform.Opened));
+            Assert.Equal(scratch.Paths.ConfigDir, Path.GetDirectoryName(scratch.Paths.EnvFile));
+
+            // Step 6 before the key: the consent dialog, cancelled. Its title, its Allow button and the warning the help quotes.
+            dialogs.Answers.Enqueue(1); // Cancel
+            Click(window, "Use cloud clean-up…");
+            var (title, text) = Assert.Single(dialogs.Asked);
+            Assert.Equal("Send dictations to a cloud service?", title);
+            Assert.Contains("Allow cloud clean-up", Assert.Single(dialogs.AskedChoices));
+            Assert.Contains("Allow cloud clean-up", answer);
+            Assert.Contains(ApprovedWarning(HelpText.CloudExampleHost), text);
+            Assert.Contains("Nothing is sent until you agree.", text);
+            Assert.True(CloudPolicy.NothingLeaves(shell.Settings.Llm, usesModel: true));
+
+            // Allowed with the key saved under the wrong name (.env.txt): the card does not start with "On:" (for Anthropic it stays as
+            // it was, EffectiveSettings using the local model without a key), and nothing is sent.
+            File.WriteAllText(Path.Combine(scratch.Paths.ConfigDir, ".env.txt"), SecretStore.AnthropicKey + "=your-key-here");
+            dialogs.Answers.Enqueue(0); // Allow
+            Click(window, "Use cloud clean-up…");
+            var withoutKey = CleanUpPage();
+            Assert.DoesNotContain(withoutKey, l => l.StartsWith("On:", StringComparison.Ordinal));
+            Assert.Contains("Use cloud clean-up…", withoutKey);
+            Assert.True(shell.NothingLeaves);
+            Assert.Contains("If the card does not start with \"On:\", Dictum cannot find your key.", answer);
+
+            // Steps 4 and 5: the line the help gives, saved as .env in that folder (as Notepad saves it: UTF-8, no line end). Dictum
+            // reloads on a saved .env (AppRules.ReloadsOn); the shell here is not started, so the reload is called as the watcher would.
+            File.WriteAllText(scratch.Paths.EnvFile, SecretStore.AnthropicKey + "=your-key-here");
+            shell.Reload(userRequested: false);
+            Assert.Null(shell.CleanupWaitingForKey);
+            Assert.False(shell.NothingLeaves);
+            var on = CleanUpPage();
+            Assert.Contains(on, l => l.StartsWith("On: the text of each dictation is sent to api.anthropic.com", StringComparison.Ordinal));
+            Assert.Contains("\"On: the text of each dictation is sent to\"", answer);
+            Assert.Contains("Switch cloud clean-up off", on);
+            Assert.Contains("Switch cloud clean-up off", answer);
+            var tray = Tray();
+            Assert.Contains(ApprovedTrayLine, tray);
+
+            // The key is never in settings.json, the page or the tray panel.
+            Assert.DoesNotContain("your-key-here", File.ReadAllText(scratch.Paths.SettingsFile));
+            Assert.DoesNotContain(on.Concat(tray), l => l.Contains("your-key-here", StringComparison.Ordinal));
+
+            // Turning it off: the tidying runs on this PC again, and the tray panel no longer says text leaves it.
+            Click(window, "Switch cloud clean-up off");
+            Assert.True(shell.NothingLeaves);
+            Assert.Contains("Use cloud clean-up…", CleanUpPage());
+            Assert.DoesNotContain(ApprovedTrayLine, Tray());
+            window.Close();
+            shell.Dispose();
         });
     }
 
