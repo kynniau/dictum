@@ -44,17 +44,18 @@ internal static class ModelFolderActions
     internal static string MoreProblems(int more) => more == 1 ? " 1 other file could not be moved either; the log says why." : $" {more} other files could not be moved either; the log says why.";
 
     /// <summary>
-    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on PR #61). Added when a model in use stayed behind (or the move was stopped), so the folder
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on PR #61). Added when a model in use stayed behind, so the folder
     /// was not changed: dictation goes on with the models where they are.
     /// </summary>
-    internal static string FolderKept(string from, string to, bool someMoved, bool stopped = false) =>
-        stopped ? MoveStopped(from)
-        : someMoved
-            ? $" The model folder is still {from}, because the model in use did not move; the files that did are in {to}; choose that folder again to use them."
-            : $" The model folder is still {from}, because the model in use did not move.";
+    internal static string FolderKept(string from, string to, bool someMoved) => someMoved
+        ? $" The model folder is still {from}, because the model in use did not move; the files that did are in {to}; choose that folder again to use them."
+        : $" The model folder is still {from}, because the model in use did not move.";
 
-    /// <summary>PROPOSED 23/10/2026 (re-lens on PR #61): added when the move was stopped (Quit), not because a model in use stayed behind.</summary>
-    internal static string MoveStopped(string from) => $" The model folder is still {from}, because the move was stopped.";
+    /// <summary>
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. The whole line when Quit stopped the move (no folder
+    /// sentence: a fuller one is PROPOSED for 1.3.1, DECISIONS 14).
+    /// </summary>
+    internal static string MovedStopped(int moved, int count) => $"Moved {moved} of {count}.";
 
     /// <summary>
     /// A model chosen by its full path (whisper.model or llm.model, "Choose model file…") that was among the files moved: its new
@@ -175,14 +176,14 @@ internal static class ModelFolderActions
             // Written after the move, not before: the settings watcher's reload would otherwise reload the models mid-move.
             var written = kept ? null : shell.Models.SetModelsFolder(folder, reloadAfter: false, alsoWrite: MovedModelPaths(shell.Settings, files, result, to));
             finished = true;
-            var line = result.Problems.Count == 0 && result.Moved == result.Count
-                ? Moved(result.Count, shell.RealPath(to))
-                : result.Problems.Count == 0
-                    // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Stopped by quit with no problem.
-                    ? $"Moved {result.Moved} of {result.Count}."
+            // Stopped by Quit: only the count (round-3 lens: the folder sentence for this case is not approved yet).
+            var line = result.Cancelled || result.Problems.Count == 0 && result.Moved < result.Count
+                ? MovedStopped(result.Moved, result.Count)
+                : result.Problems.Count == 0 && result.Moved == result.Count
+                    ? Moved(result.Count, shell.RealPath(to))
                     : MovedSome(result.Moved, result.Count, ModelMover.DisplayName(result.Problems[0].FileName), result.Problems[0].Reason, shell.RealPath(from)) +
                       (result.Problems.Count > 1 ? MoreProblems(result.Problems.Count - 1) : "");
-            if (kept) line += FolderKept(shell.RealPath(from), shell.RealPath(to), result.Moved > 0, stopped: result.Cancelled);
+            if (kept && !result.Cancelled) line += FolderKept(shell.RealPath(from), shell.RealPath(to), result.Moved > 0);
             say(written is null ? line : $"{line} {written}");
         }
         finally

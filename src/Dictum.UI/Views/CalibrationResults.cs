@@ -25,6 +25,11 @@ internal sealed partial class CalibrationWindow
             _progress.Text = _session.Recording != 0 ? "Stop the recording first." : "A test is already running; this model can be included when it has finished (Run test).";
             return;
         }
+        if (_host.Refusal() is { } refused) // model files are moving (re-lens on PR #61): said before anything else is checked
+        {
+            _progress.Text = refused;
+            return;
+        }
         var clips = _recordings.LoadClips();
         if (clips.Count == 0)
         {
@@ -34,11 +39,6 @@ internal sealed partial class CalibrationWindow
         if (models.Count == 0)
         {
             _progress.Text = "No speech model is installed in the models folder.";
-            return;
-        }
-        if (_host.Refusal() is { } refused) // model files are moving (re-lens on PR #61)
-        {
-            _progress.Text = refused;
             return;
         }
         _runCts = new CancellationTokenSource();

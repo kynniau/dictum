@@ -694,13 +694,15 @@ public sealed class ModelCoordinator(
     /// False for the onboarding (1.2), which runs before the settings are first loaded: writing alone, so nothing reloads or
     /// loads a model mid-way; a file that cannot be written is then returned (<see cref="WriteFailed"/>) instead of ballooned.
     /// </param>
-    /// <param name="alsoWrite">Keys written in the same write (moving the model files: a model chosen by its full path, now in the new folder).</param>
+    /// <param name="alsoWrite">Keys written first, in the same write (moving the model files: a model chosen by its full path, now in the new folder).</param>
     public string? SetModelsFolder(string? folder, bool reloadAfter = true, IReadOnlyList<(string Key, JsonNode? Value)>? alsoWrite = null)
     {
         if (folder is not null && FolderRefusal(folder) is { } refused) return refused;
-        var values = new List<(string, JsonNode?)> { ("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))) };
+        // alsoWrite first (round-3 lens): the keys are written one by one, and a full path to a moved model's new copy is valid
+        // whichever folder is in force, so if models.folder then fails, nothing names a file that is gone.
+        var values = new List<(string, JsonNode?)>(alsoWrite ?? []);
+        values.Add(("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))));
         if (settings().Whisper.ModelsDir is not null) values.Add(("whisper.models_dir", null));
-        if (alsoWrite is not null) values.AddRange(alsoWrite);
         if (reloadAfter) Write([.. values]);
         else if (!TryWrite(out _, reloadAfter: false, [.. values])) return WriteFailed;
         return null;

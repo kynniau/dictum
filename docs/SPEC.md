@@ -1274,11 +1274,11 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   on disk (an exclusive open of the original blocks the open of the other path). A file that fails keeps its original (its copy is deleted) and the move goes on;
   files already moved stay moved. The models in use move last, as one unit: no original of theirs is deleted until all have
   arrived, and if one fails or the move is stopped, the copies this move made of them are deleted and every original kept.
-  Then `models.folder` is written, with `whisper.model` or `llm.model` rewritten when it named a moved file by its full
-  path, unless a model in use stayed behind or the move was stopped (the folder is then unchanged and the line says so), and
+  Then `models.folder` is written, after `whisper.model` or `llm.model` is rewritten when it named a moved file by its full
+  path (that key first: a path to the new copy is valid whichever folder is in force), unless a model in use stayed behind or the move was stopped (the folder is then unchanged and the line says so), and
   the settings reload. The page's status line shows each file, by its catalogue
   name, as it moves and the result. Quit during a move stops it (the file being copied stops, its original kept; a file
-  already checked finishes) and Dictum then quits without changing the folder. The note under the folder on Models and
+  already checked finishes), the line is only "Moved {k} of {n}.", and Dictum then quits without changing the folder. The note under the folder on Models and
   Storage reads (APPROVED 22/10/2026 22:42 AEDT): "Dictum looks here first and downloads go here. Changing it asks before
   moving any files."
 - **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices

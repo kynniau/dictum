@@ -149,7 +149,8 @@ public sealed class ModelMoveSafetyTests : IDisposable
         var tiny = Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
         File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = tiny }, llm = new { provider = "none" } }));
         var speech = SpeechModels();
-        var (shell, _, dialogs) = scratch.Shell(speech);
+        var log = new RecordingLog();
+        var (shell, _, dialogs) = scratch.Shell(speech, log: log);
         shell.MoveHasher = FakeHasher();
         shell.Reload(userRequested: false);
         Assert.True(await Eventually(() => speech.IsReady && speech.ModelPath == tiny));
@@ -161,6 +162,10 @@ public sealed class ModelMoveSafetyTests : IDisposable
         var written = SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings;
         Assert.Equal((chosen, moved), (written.Models.Folder, written.Whisper.Model));
         Assert.Equal(moved, speech.ModelPath);
+        // The new path is written before models.folder (round-3 lens): the keys go one by one, and a failure after the first leaves
+        // whisper.model naming the new copy, which exists, rather than the original, which is gone.
+        var set = log.Lines.Select(l => l.Message).Single(m => m.StartsWith("Set from the app: ", StringComparison.Ordinal) && m.Contains("models.folder", StringComparison.Ordinal));
+        Assert.True(set.IndexOf("whisper.model = ", StringComparison.Ordinal) is var model && model >= 0 && model < set.IndexOf("models.folder = ", StringComparison.Ordinal), set);
         shell.Dispose();
         return true;
     });
@@ -274,14 +279,15 @@ public sealed class ModelMoveSafetyTests : IDisposable
         var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
         dialogs.Folder = chosen;
         dialogs.Answers.Enqueue(0);
-        var move = ModelFolderActions.BrowseFolder(shell, _ => { });
+        var said = new List<string>();
+        var move = ModelFolderActions.BrowseFolder(shell, said.Add);
         Assert.True(await Eventually(() => held.Entered));
         shell.Quit();
         held.Release();
         await move;
+        Assert.Equal("Moved 1 of 2.", said[^1]); // only the approved count: no folder sentence (round-3 lens)
         Assert.True(File.Exists(small)); // not reached
         Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
-        Assert.Equal(" The model folder is still C:\\a, because the move was stopped.", ModelFolderActions.FolderKept(@"C:\a", @"D:\b", someMoved: true, stopped: true));
         shell.Dispose();
         return true;
     });
@@ -396,6 +402,80 @@ public sealed class ModelMoveSafetyTests : IDisposable
         shell.Models.MovingFiles = false;
         shell.Dispose();
     });
+
+    /// <summary>
+    /// Pin (round-3 lens): a run that began before the move refuses its next load once files move: the loader is never called
+    /// and the run says the approved refusal for that model.
+    /// </summary>
+    [Fact]
+    public Task A_calibration_run_already_under_way_loads_no_model_once_files_move() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch(ModelMoveTests.Settings);
+        var (shell, _, _) = scratch.Shell(SpeechModels());
+        shell.Reload(userRequested: false);
+        var loads = 0;
+        var host = shell.CreateCalibrationHost() with { LoadSpeech = (p, _, d) => { loads++; return new FakeSpeechEngine(p, d); } };
+        var engine = host.CreateEngine(); // before the move: allowed
+        shell.Models.MovingFiles = true;
+        var lines = new List<string>();
+        var model = Create(Path.Combine(scratch.Root.FullName, "models"), "ggml-tiny.en.bin");
+        await engine.RunAsync([new Dictum.Calibration.CalibrationClip(1, "the cat sat", new float[16000])], [new Dictum.Calibration.SpeechCandidate("tiny.en", model)], null,
+            new ListLines(lines), Ct);
+        Assert.Equal(0, loads);
+        Assert.Contains($"tiny.en could not be loaded: {ModelCoordinator.MovingRefusal}", lines);
+        shell.Models.MovingFiles = false;
+        shell.Dispose();
+        return true;
+    });
+
+    /// <summary>Pin (round-3 lens): Run test in the calibration window says the refusal and runs nothing while files move.</summary>
+    [Fact]
+    public Task The_calibration_window_refuses_to_run_while_files_move() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = new Dictum.UI.Views.CalibrationWindow(shell);
+        window.Show();
+        shell.Models.MovingFiles = true;
+        var run = Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(window).OfType<Avalonia.Controls.Button>().First(b => b.Content as string == "Run test");
+        run.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        var texts = string.Join("\n", Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(window).OfType<Avalonia.Controls.TextBlock>()
+            .Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
+        Assert.Contains(ModelCoordinator.MovingRefusal, texts);
+        Assert.DoesNotContain("Record at least one sentence first", texts); // the refusal comes before anything else is checked
+        shell.Models.MovingFiles = false;
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin (round-3 lens): a file of the same contents already in the new folder, whose original cannot be opened for itself
+    /// alone (so it may be the same file), keeps its original and says so with the approved reason; it counts as moved.
+    /// </summary>
+    [Fact]
+    public async Task A_kept_original_beside_a_same_file_is_reported()
+    {
+        var from = Path.Combine(_dir.FullName, "old");
+        var to = Path.Combine(_dir.FullName, "new");
+        var original = Create(from, "ggml-tiny.en.bin", fill: 3);
+        Create(to, "ggml-tiny.en.bin", fill: 3);
+        MoveResult result;
+        using (new FileStream(original, FileMode.Open, FileAccess.Read, FileShare.Read)) // someone else holds it: no exclusive open
+            result = await ModelMover.MoveAsync(ModelMover.Known(from), to, hasher: FakeHasher(), cancellationToken: Ct);
+        Assert.Equal(1, result.Moved);
+        Assert.Equal([new MoveProblem("ggml-tiny.en.bin", ModelMover.OriginalKept, Copied: true)], result.Problems);
+        Assert.True(File.Exists(original));
+    }
+
+    private sealed class ListLines(List<string> lines) : IProgress<string>
+    {
+        public void Report(string value)
+        {
+            lock (lines) lines.Add(value);
+        }
+    }
 
     public void Dispose()
     {

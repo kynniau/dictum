@@ -509,8 +509,8 @@ public class OwnerApprovalsTests
 
     /// <summary>
     /// APPROVED 22/10/2026 22:52 AEDT pin: the move question, its buttons (Leave the default), the refusals, the progress line,
-    /// every result-line form built by a function, and the four reasons, word for word. "Moved {k} of {n}." (quit mid-move)
-    /// is written inline in ModelFolderActions and is not reachable from here.
+    /// every result-line form built by a function ("Moved {k} of {n}." when Quit stopped the move included), and the four reasons,
+    /// word for word.
     /// </summary>
     [Fact]
     public void The_model_move_strings_are_pinned()
@@ -528,6 +528,7 @@ public class OwnerApprovalsTests
         Assert.Equal(@"Moved 3 files to D:\b.", ModelFolderActions.Moved(3, @"D:\b"));
         Assert.Equal(@"Moved 1 of 3; small.en could not be moved: why. The rest stay in C:\a.", ModelFolderActions.MovedSome(1, 3, "small.en", "why", @"C:\a"));
         Assert.Equal(" 2 other files could not be moved either; the log says why.", ModelFolderActions.MoreProblems(2));
+        Assert.Equal("Moved 1 of 3.", ModelFolderActions.MovedStopped(1, 3));
         Assert.Equal(@" The model folder is still C:\a, because the model in use did not move; the files that did are in D:\b; choose that folder again to use them.",
             ModelFolderActions.FolderKept(@"C:\a", @"D:\b", someMoved: true));
         Assert.Equal("a different file of that name is already in the new folder", ModelMover.AlreadyThere);

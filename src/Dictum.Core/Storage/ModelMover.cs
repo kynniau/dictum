@@ -268,7 +268,8 @@ public static class ModelMover
     /// </summary>
     private static MoveProblem? Release(MovableModel file, Placed placed, ModelIntegrity? integrity)
     {
-        if (placed.KeepOriginal) return null; // it may be the only copy
+        // It may be the only copy: kept, and said (round-3 lens: kept silently, it read as moved).
+        if (placed.KeepOriginal) return new MoveProblem(file.FileName, OriginalKept, Copied: true);
         if (SameFileOnDisk(file.Path, placed.Final) != false) return new MoveProblem(file.FileName, OriginalKept, Copied: true); // cannot tell two files: keep both
         try
         {
