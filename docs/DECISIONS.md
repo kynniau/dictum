@@ -4448,6 +4448,17 @@ Found by the cloud-setup-help lane: with Anthropic chosen in Settings > Clean-up
 7. **Mutation (observed 22/10/2026).** Removing the consent condition from the repair fails the repair pin, the ConfigLoader pin and the Anthropic case of the page pin (the clean-up in use is the local model again). Restoring the fixed "Cloud clean-up is on." fails both cases of the page pin.
 8. **README** lines for `llm.provider` and `ANTHROPIC_API_KEY` now say what each case does.
 
+## Release 1.2.1 prepared (22/10/2026)
+
+Branch `release/1.2.1` from origin/main afda8d9. All new wording below is PROPOSED until the owner approves it. `site/version.json` is not touched (set at site deploy time), no tag is created, and nothing is built, published or submitted: the tag and the publish wait for the owner.
+
+1. `Directory.Build.props`: `<Version>` 1.2.0 to 1.2.1 (package 1.2.1.0). `README.md` is unchanged: the 1.2.0 release PR changed one feature bullet (the "Free" line, already in place), and the README carries no version line that moves with a release.
+2. `docs/STORE.md` (PROPOSED): a "What's new in this version (1.2.1)" block above the 1.2.0 one (the 1.2.0 block stays as history); the certification notes header "Notes written 22/10/2026 for Dictum 1.2.1." and a rewritten CHANGED SINCE THE LAST SUBMISSION paragraph, every other paragraph of the block byte-identical; the version references in sections 1 and 6 and the header line; a certification-record row.
+3. **In 1.2.1, user-visible** (each found in the entries above and in `git log v1.2.0..origin/main`): the hold pill "Recording · let go to finish"; the tray state "No microphone"; the Simple view without the Light | Full choice; the tray header "No clean-up" when clean-up is Off ("Owner approvals (22/10/2026)", PR #45); Settings > Storage can change the model folder, with the drive-speed sentence and the network-folder warning (PR #51); Settings > See how it works (PR #47); Help's "How do I turn on cloud clean-up?", also on the site's help page with a demo (PR #49); the "On, but waiting for your ANTHROPIC_API_KEY" line for Anthropic with consent and no key (PR #52).
+4. **Not new in 1.2.1, so left out of the notes:** hotkeys shown by their key names (`HotkeyNames.Display`) and Help's "Questions on this page" index. Both are already in the v1.2.0 tag (commit f6c0950, "1.2 polish").
+5. **Not user-visible, so not in the Store notes:** deterministic test fixes (PRs #42, #43, #44, #50), the TimeProvider seam, and the cloud speech engine (PR #48, Core only), which has no screen yet and is not named in any public note.
+6. **PROPOSED, awaiting the owner:** the 1.2.1 "What's new" paragraph and the 1.2.1 CHANGED paragraph of the certification notes. Store screenshot 1 is to be retaken with the new hold pill. No tag, installer, MSIX, site deploy or Store submission is made until the owner approves the wording.
+
 ## Cloud speech, UI (22/10/2026, branch feat/cloud-speech-ui)
 
 Lane C-UI of the design brief's "Cloud speech" appendix (§2, §3, §4, §7 item 9, §8), on the Core half (PR #48). No README,

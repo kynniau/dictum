@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Product>Dictum</Product>
     <Company>Kynni Pty Ltd</Company>
     <Copyright>© 2026 Kynni Pty Ltd</Copyright>
