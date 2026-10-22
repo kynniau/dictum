@@ -742,7 +742,7 @@ public sealed class ModelCoordinator(
         {
             if (!SettingsFile.SetValue(paths.SettingsFile, key, value?.DeepClone(), out failure)) return false;
         }
-        log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
+        log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {SettingsFile.LogValue(v.Key, v.Value)}"))}.");
         // A written model choice is the latest of its kind: a download still on its way no longer switches to its own model.
         if (values.Any(v => v.Key == "whisper.model")) _speechChoice = $"written {++_choices}";
         if (values.Any(v => v.Key is "llm.provider" or "llm.model")) _cleanupChoice = $"written {++_choices}";

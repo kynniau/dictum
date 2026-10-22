@@ -271,6 +271,7 @@ public static class SettingsLoader
             Gpu = r.String("gpu", d.Gpu, OneOf("auto", "vulkan", "cpu")).ToLowerInvariant(),
             PromptFile = r.NullableString("prompt_file", v => Path.IsPathFullyQualified(v) ? null : "expected an absolute file path"),
             GrammarAssist = r.Bool("grammar_assist", d.GrammarAssist),
+            Instructions = r.PrivateText("instructions", LlmSettings.InstructionsMaxLength),
         };
         if (r.NullableString("cloud_consent") is not null)
             r.Warn("Setting \"llm.cloud_consent\" is ignored: cloud clean-up is agreed to only in Settings > Clean-up, which records it in consent.json.");
@@ -373,6 +374,27 @@ public static class SettingsLoader
             if (s.Length == 0) return null;
             var problem = validate?.Invoke(s);
             return problem is null ? s : Bad<string?>(key, v, problem, null);
+        }
+
+        /// <summary>
+        /// Text the user wrote for Dictum alone (llm.instructions): a string, trimmed, null when empty, cut to its first
+        /// <paramref name="maxLength"/> characters (never through a surrogate pair). A warning names the key and a length, never
+        /// the text, so it cannot reach the log.
+        /// </summary>
+        public string? PrivateText(string key, int maxLength)
+        {
+            if (!TryGet(key, out var v) || v.ValueKind == JsonValueKind.Null) return null;
+            if (v.ValueKind != JsonValueKind.String)
+            {
+                // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the warning below.
+                warnings.Add($"Setting \"{Full(key)}\" has an invalid value: expected a string or null. It is not used.");
+                return null;
+            }
+            var s = v.GetString()!.Trim();
+            if (s.Length <= maxLength) return s.Length == 0 ? null : s;
+            // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the warning below.
+            warnings.Add($"Setting \"{Full(key)}\" is {s.Length} characters long; only the first {maxLength} are used.");
+            return s[..(char.IsHighSurrogate(s[maxLength - 1]) ? maxLength - 1 : maxLength)].TrimEnd();
         }
 
         public ObjectReader? Child(string key)

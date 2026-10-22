@@ -4816,6 +4816,216 @@ The owner approved the plain-words statement (`.demo-preview/terms-disclaimer.md
 12. **Privacy policy route, APPROVED 22/10/2026 20:47 AEDT:** `site/privacy.html`, "This website" list, now reads "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates…", the rest of the sentence unchanged; the README network table has a matching row. The policy's "Last updated" date is not changed here: it is set to the 1.3 release date at tag time (the C-Copy lane owns that).
 13. **Mechanical (lens on a95dd5e):** the `// simplification:` comment is in `WelcomeStep`; the landing-page pin counts exactly four case-sensitive "Free to keep on your PC" (mutation: the at-a-glance item changed to another phrase, observed failing, restored); README's About row and Welcome step 1 describe the card and the short version.
 
+## Clean-up: your own instructions and Create the key file (22/10/2026, branch feat/own-instructions, release 1.3)
+
+Two owner requests for Settings > Clean-up, built from main 04287d6. Every new string is PROPOSED; none is approved yet.
+
+1. **Your own instructions.** New key `llm.instructions` (string or null, default null, multi-line, at most 2,000 characters:
+   `LlmSettings.InstructionsMaxLength`). `CleanupPrompt.Build` adds them after the base prompt (built-in or `llm.prompt_file`)
+   and before the grammar-assist sentence and the dictionary line, once, between `OwnInstructionsStart` and `OwnInstructionsEnd`.
+   With `llm.prompt_file` set too, the file replaces the built-in prompt and the instructions are still added. The local model
+   and cloud clean-up get them; `none` and `off` never do. Every reply is still checked by the validator, which gained one rule on the owner's decision (item 4).
+   - *Private text.* `ModelCoordinator.TryWrite` logged every written value as JSON, so the box would have put the text in the
+     log ("Set from the app: llm.instructions = …"). It now logs `SettingsFile.LogValue`, which gives the length for a key in
+     `SettingsFile.PrivateKeys`. The loader's generic warning quotes up to 57 characters of a bad value, so the key has its own
+     reader (`ObjectReader.PrivateText`), whose warnings give a length only. The clean-up's load line gives the length. The
+     feedback email, the state lines and See how it works carry no prompt text (pinned).
+   - *Validator gap, found by this lane, then closed on the owner's decision (22/10/2026 20:55 AEDT): see item 4.* A short
+     sentence added on the same line as the dictation passed every rule. Probed 22/10/2026 with "um so i think we should uh
+     move the meeting to thursday and tell the whole team before lunch": "… before lunch. Thanks for reading.", "… before
+     lunch. Kind regards." and "… before lunch. Please call me if you have any questions." were all accepted.
+   - *Page placement (done after PR #59 merged; see item 5).* The Clean-up page is `CleanupPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, which
+     PR #59 owned until it merged. The box is `OwnInstructionsCard` and the button `KeyFileButton` (both in `CleanupOwnInstructions.cs`).
+     Before PR #59 merged, the wiring was only tried in this worktree and then removed.
+2. **Create the key file.** `KeyFile.CreateIfMissing` writes `AppPaths.EnvFile` with `KeyFile.Header` and
+   `<VARIABLE>=your-key-here` (the variable must be one of `SecretStore.KeyNames`). It opens with `FileMode.CreateNew` after an
+   exists check, so an existing `.env` is never changed. `AppShell.CreateKeyFile` then opens the file through `OpenPath` at
+   its real path. `KeyFileButton.VariableFor` picks the variable the card's key line names (Anthropic's entry:
+   `ANTHROPIC_API_KEY`; otherwise `CloudPresets.ForAddress`). A service with no key (Ollama on this PC) writes nothing.
+   - *Placeholder is not a key (lane decision).* Before this change `SecretStore` read `your-key-here` as a key. Dictum would then
+     send each dictation to the service with a key that cannot work, and the page would say clean-up was on. `SecretStore.Merge`
+     now treats `SecretStore.Placeholder` as not set, as it treats a blank value. The waiting-for-key line stays until a real key is saved.
+     The first full run caught one consequence: `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built` used the
+     placeholder as its stand-in key. Its walk-through now first saves the placeholder and checks the card still waits, then
+     saves a stand-in key ("k-standin-not-real") and checks the card says On, and that the stand-in is never shown.
+   - *Wiring checked, not committed.* The five `CleanupPage` edits from the PR body were applied in this worktree only. A
+     throwaway headless test then passed: Advanced view, typed text saved on leaving the page and shown again, the button
+     made the Anthropic file and showed the created line, and Simple hid the box. The edits and the test were then removed.
+     (Without a layout pass the page switch did not save, because the box was never attached; a real window lays out.)
+3. **Docs.** SPEC §5 has both amendments. SPEC §26 said "twelve questions and answers". `HelpText.Questions` at 04287d6 had
+   thirteen, counted in its list, so this branch first wrote thirteen. After merging main cc3c0ba (PR #57 added two questions)
+   the list has fifteen, so SPEC §26 now says fifteen, with the main sha it was counted at. README has the `llm.instructions` row.
+
+PROPOSED strings, verbatim:
+- Card label and the box's accessible name: "Your own instructions"
+- Hint: "Added to Dictum's clean-up instructions for the AI and cloud clean-up. Dictum still checks every reply against what you said."
+- At the cap: "That is the limit: Dictum uses up to 2,000 characters of your own instructions."
+- Cloud clean-up on: "With cloud clean-up on, these instructions go to {host} with each dictation."
+- Prompt section start (to the model): "The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply."
+- Prompt section end (to the model): "End of the user's instructions."
+- Button: "Create the key file…"
+- Created: "Your key file has been created and opened: put your key in place of your-key-here after {VARIABLE}=, then save it."
+- Exists: "Your key file already exists; it has been opened."
+- Key file header, line 1: "# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself."
+- Key file header, line 2: "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log."
+- Log (written value): "Set from the app: llm.instructions = ({N} characters, not logged)."
+- Log (clean-up loaded): "Clean-up instructions: Dictum's, with your own added ({N} characters; their text is not logged)."
+- Log (key file): "Key file created with a placeholder line for {VARIABLE} (no key written)." / "Key file already exists: opened as it is, not changed."
+- Validator reason (item 4): "reply ends with a sentence the speaker did not say"
+- Simple view line (item 6): "Your own clean-up instructions are in use (Advanced view)."
+- Log (save failed): "Settings: {exception type} saving llm.instructions." / (key file failed): "Settings: the key file could not be created: {exception type}."
+- Load warnings: "Setting \"llm.instructions\" is {N} characters long; only the first 2000 are used." / "Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used."
+- settings.json `_doc` llm note, added sentence: "instructions: your own clean-up instructions (at most 2,000 characters; Settings > Clean-up in the Advanced view writes them), added after the prompt, built-in or prompt_file, for the local model and cloud clean-up, never for none or off; every reply is still checked against what you said."
+
+Pins (`OwnInstructionsTests`, `KeyFileTests`): round trip through settings.json, multi-line kept and blank read as none;
+added once, in order, also after a prompt file; sent once to a cloud service; never used by `none` or `off`; the validator
+still rejects a sign-off line, a bracketed remark, a translation and a summary that the instructions ask for; the cap (with
+a surrogate pair at the cut) and warnings without the text; the log never has the text (the app's write, the reload, a value
+over the cap); the feedback email never has it; See how it works never shows it; the box is Advanced-only, saves trimmed
+text when focus leaves it, and shows the limit and cloud-host lines; the key file has the right variable for each service;
+an existing file stays the same byte for byte; the file is opened at its path; both status lines; the placeholder counts as
+not set and sends nothing.
+
+4. **Final-sentence rule (owner decision 22/10/2026 20:55 AEDT).** `CleanupValidator.AddedFinalSentence`: in a reply of two
+   sentences or more, the last sentence's words that the "scratch that" checks count (`IsCorrectionWord`: three letters or
+   more, no function word, filler or spoken command) must be at least half said (how a word counts as said was reworked twice: items 6 and 7),
+   the share the final-line rule uses. It runs after the dictionary-term and hands-free repeat rules: placed inside the
+   final-line checks it first took the reason of `DictionaryInsertionValidatorTests` ("Push it to GitHub. GitHub.", still
+   rejected, but with the new reason), so it moved and every existing reason stands. PROPOSED reason: "reply ends with a
+   sentence the speaker did not say". Ceiling (`// simplification:` at the rule): a last sentence of words said earlier in
+   another order passes; a short last sentence a grammar fix rewrites into other words is rejected (polish lost only).
+   Pins: the three probed replies are rejected with that reason; the four earlier cases are still rejected with their own
+   reasons; three replies ending with the speaker's own last sentence, tidied (fillers out, "their" fixed to "there",
+   "scratch that" and "new line" followed), are used. The validator, cleaner, rules, dictionary, hands-free, LLM, calibration
+   and See how it works test classes all pass (421 total, 0 failed, 2 skipped). README's rule list and SPEC §5 updated.
+
+Mutations (each observed failing, 22/10/2026, then restored):
+- Validator pin: `CleanAsync` used the model's reply without `CleanupValidator.Validate`. All four cases of
+  `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing.
+- Log pin: `TryWrite` logged `v.Value?.ToJsonString()` again. `The_log_gets_their_length_and_never_their_text` observed
+  failing on `DoesNotContain(Marker)` ("zebracorn-7316" found).
+- No-overwrite pin: `KeyFile.CreateIfMissing` without its exists check and with `FileMode.Create`.
+  `An_existing_file_is_left_byte_for_byte_and_opened` observed failing on the byte comparison.
+- Placeholder: `Merge` without `v != Placeholder`. `The_placeholder_counts_as_not_set_so_nothing_is_sent_with_it` observed
+  failing ("your-key-here" returned as the key).
+- Final-sentence rule: the rule's call disabled (`false &&`). The three same-line cases of
+  `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing; the other four still passed.
+
+Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnInstructionsTests, KeyFileTests, CloudWarningAndPresetsTests, CleanupOffTests, FixBatchSettingsTests, PublicCopyNeutralityTests and HelpPageTests: 166 total, 0 failed, 0 skipped. Full suite, first run: 1951 total, 1 failed (`HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`, the placeholder stand-in, fixed as above), 23 skipped. Full suite after the fix: 1951 total, 1928 passed, 0 failed, 23 skipped.
+Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incremental`, 0 warnings, 0 errors; the named classes plus HelpPageTests and OwnerApprovalsTests 192 total, 0 failed; full suite 1957 total, 1934 passed, 0 failed, 23 skipped. Gates with the final-sentence rule (item 4): Release build with `--no-incremental`, 0 warnings, 0 errors; the same classes 198 total, 0 failed, 0 skipped; full suite 1963 total, 1940 passed, 0 failed, 23 skipped.
+
+5. **Clean-up page wiring (after PR #59 merged; main 28c3e65 merged as 8e2f205).** `CleanupPage` (OtherPages.cs) gains:
+   the `_own` field and its construction; `_own.Card` between the Grammar and Cloud clean-up cards; `_own.Redraw(s)` in
+   `Redraw`; `KeyFileButton.Create(…)` beside "Open the settings folder" (variable from `KeyFileButton.VariableFor(Preset,
+   Address(Preset))`, the card's own key line for a service with no key); and a `Leave` override that saves the box, so
+   text is kept when another page is chosen or the window closes, besides focus loss. Every other card is unchanged.
+   Pins (`CleanupPageOwnInstructionsTests`): the Advanced view shows the box in place and saves it on leaving the page and
+   on closing the window; the Simple view hides it (and a switch to Advanced shows it); the button sits in the folder
+   button's row, creates the Anthropic key file and shows the created line; an existing `.env` is opened and not changed.
+   Mutation: `OwnInstructionsCard.Redraw` showing the card in both views; `The_Simple_view_hides_the_box` observed failing,
+   then restored. Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; OwnInstructionsTests, KeyFileTests,
+   CleanupPageOwnInstructionsTests, CleanupOffTests, CloudOffTakesEffectTests, CloudWarningAndPresetsTests, HelpPageTests,
+   OwnerApprovalsTests and PublicCopyNeutralityTests 230 total, 0 failed, 0 skipped; full suite 1982 total, 1959 passed,
+   0 failed, 23 skipped.
+
+6. **Lens on 5e9c227: Needs changes, no blocker; fixed (22/10/2026).**
+   1. *"… day." sign-offs passed.* `SoundsLike` matched "day" against function words ("to", "the" share its sound key). The
+      rule now sound-matches only against dictated words that are themselves counted (`IsCorrectionWord`).
+   2. *Honest tidies rejected.* The lens's trial fix is in: words with a digit are left to the number rule; an apostrophe word
+      is said when the part before the apostrophe was; a word that sounds like two or three dictated words joined is said
+      (the sound-key routes were replaced in item 7).
+      `FinalSentenceRuleTests` pins the lens's corpus (its harness `final-fix.fsx`): 36 honest tidies accepted (four of its 40
+      are left out: three rejected by older rules on main too, and "i asked him he go" → "I asked him. He went.", pinned as
+      the one recorded exception), and 25 closing sentences rejected ("Have a great day.", "Have a nice day.", "Good day.",
+      "Kind regards.", "Thanks.", "Talk soon.", "Take care." and the rest). Two of the lens's 27 pass and are not pinned:
+      "Team meeting Thursday." (all its words were said, the recorded ceiling) and "Thanks, team.".
+   3. *Echo rule and the user's own words.* The five-word echo check now reads `CleanupPrompt.WithoutOwnText(prompt)`: the
+      marker lines stay, the user's text between them is left out, so an honest reply that repeats words of the instructions
+      the dictation has too is used ("Write the company name as Kynni Pty Ltd." with "please write the company name as kinney
+      pty ltd in the letter").
+   4. *Markers.* `CleanupPrompt.OwnInstructions` takes typed copies of both marker lines out before wrapping, and text that is
+      only markers adds no section. The clean-up's load line is logged only when the section is in the prompt.
+   5. *Docs.* DEMOS.md (the placeholder no longer counts as a key), item 1 here, SPEC §5 (the widened rule, the echo
+      change, the Simple line), README "Secrets" (the button and the placeholder rule).
+   6. *PROPOSED list.* The two save-failure log lines and the Simple line are added above.
+   7. *Accessibility.* The limit line is a polite live region (`AutomationProperties.SetLiveSetting`), pinned.
+   8. *Pins.* The translate and summarise cases now pin their exact reasons: "reply shares too few words with the dictation
+      (0/14)" and "reply has 0.12x the dictation's words (minimum 0.4x)"; the whole theory compares reasons exactly.
+   9. *Simple view (orchestrator decision).* `OwnInstructionsCard.View` holds the card and one line, "Your own clean-up
+      instructions are in use (Advanced view).", shown in the Simple view while `llm.instructions` is set; the page places
+      `View`. Pinned shown and hidden.
+
+   Mutations (each observed failing, then restored):
+   - Item 1: sound-matching against every dictated word again. "A9 have a great day", "A17 good day" and "A21 have a nice
+     day" observed failing.
+   - Item 2: the digit, apostrophe and joined-words allowances removed. "11 ordinal digits alone", "12 ordinal 1st alone",
+     "13 contraction alone", "19 initialism", "28 tomorrow split", "33 alright" and "37 ordinal 2nd" observed failing.
+   - Item 3: the echo check reading the whole prompt. `A_reply_may_repeat_words_of_the_users_own_instructions_that_were_dictated`
+     observed failing.
+   - Item 4: the text wrapped as typed. `Typed_marker_lines_cannot_step_outside_the_section` observed failing.
+   - Item 9: the Simple line never shown. `The_Simple_view_says_when_your_own_instructions_are_in_use` observed failing.
+
+   Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. The validator, cleaner, rules, dictionary, hands-free,
+   LLM, amendment, Batch 2, personal-text, See how it works and calibration classes with OwnInstructionsTests,
+   FinalSentenceRuleTests, KeyFileTests, CleanupPageOwnInstructionsTests, CleanupOffTests, CloudWarningAndPresetsTests,
+   HelpPageTests, OwnerApprovalsTests and PublicCopyNeutralityTests: 644 total, 642 passed, 0 failed, 2 skipped. Full suite:
+   2048 total, 2025 passed, 0 failed, 23 skipped.
+
+7. **Re-lens on c796dc8: Needs changes; fixed (22/10/2026).** The lens's trial validator (lens60b/trial) is applied as written,
+   with one addition (item 3 below).
+   1. *Sound-key collisions (compliance).* 14 of 50 sign-offs passed on the lens's five dictations ("Bye.", "Take care.",
+      "Today.", "Sure thing.", "Thanks again.", "Good luck." twice, "Happy to discuss.", "Hope all is well.", "Hope this
+      helps.", "Hope you are well.", "All good.", "Chat soon.", "Have a good one."). Now:
+      - joined and counted words match only exactly, or when both have five letters or more and are one edit apart;
+      - accents are folded;
+      - `SoundsLike` is used only for a reply word that belongs to a dictionary term (the rule now receives `DictionaryTerms`).
+   2. *"-n't" contractions.* A stem map: "won't" → "will", "can't" → "can", "shan't" → "shall", any other "-n't" without it,
+      else the part before the apostrophe.
+   3. *Four letters.* Joins also take four single-letter words ("a s i c" → "ASIC"). This is the one result that differs from
+      the trial's table.
+   4. *Markers.* `CleanupPrompt.OwnText` removes every copy of either marker line, again and again until none is left, in any
+      case, with curly apostrophes read as straight (`ValidatorText.MapQuotes`, one character for one).
+   5. *Apostrophe stem* pinned on its own ("i will call you i would like that" → "… I'd like that.").
+   6. *Docs.* SPEC §5's rule paragraph is rewritten for the new matching; items 4 and 6 here point to this item; the PR body
+      count says fifteen (`HelpText.Questions` at 28c3e65).
+   - *Pins.* `FinalSentenceRuleTests` now pins the re-lens's whole corpus with the result each case gets:
+     - 84 honest tidies: 79 accepted; four rejected by older rules (main rejects them too); and the recorded ceiling "16".
+     - 50 sign-offs on five dictations: 13 recorded passes, 11 rejected first by an older rule, and every other one rejected
+       by this rule.
+     - The first lens's 27 closing sentences.
+     - The 14 collisions, the six "-n't" cases, "ASIC", and twelve honest respellings ("ATO", "email", "tomorrow",
+       "alright", "cancelled", "Catherine", "café", "résumé", "Zoë", "kinney" → "Kynni", "zero" → "Xero", "dictim" →
+       "Dictum").
+     - The lens's harness had "café", "résumé" and "Zoë" double-encoded; they are written correctly here and pass.
+   - Mutations (each observed failing, then restored):
+     - Item 1: SoundsLike in place of the one-edit rule for joined and counted words. All 14 cases of
+       `A_sound_key_collision_does_not_let_a_sign_off_through` observed failing.
+     - Item 2: the "-n't" stem lines removed. `A_contraction_with_nt_is_said_by_its_stem` observed failing on "won't". The
+       other five still pass by other routes ("shouldn" is one edit from "should"; "isnot" joined is one edit from "isn't").
+     - Item 3: the four-letter join removed. `Four_spelt_out_letters_are_said_as_their_initialism` observed failing.
+     - Item 4: a single exact, unmapped pass. All three cases of `Nested_curly_and_capitalised_markers_are_taken_out`
+       observed failing.
+     - Item 5: the apostrophe stem removed (the word kept whole). `An_apostrophe_word_is_said_when_the_part_before_it_was`
+       observed failing.
+   - Gates:
+     - Release build with `--no-incremental`: 0 warnings, 0 errors.
+     - The lens's 23 classes: 870 total, 869 passed, 0 failed, 1 skipped. "Llm" is run as the four classes of `LlmTests.cs`:
+       TranscriptCleanerTests, CleanupValidatorTests, ProviderParsingTests and SecretRedactorTests.
+     - Full suite: 2384 total, 2361 passed, 0 failed, 23 skipped.
+
+8. **Owner approval, 22/10/2026 22:52 AEDT.** The owner approved the 1.3 block. Sections A and B of
+   `.demo-preview/approve-1.3-block.md` cover every PROPOSED string of this PR, and no string changed. Each marker now reads
+   "APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword":
+   - the card label and hint; the limit, cloud and Simple-view lines;
+   - the validator reason; the two prompt marker lines;
+   - the log lines and the loader warnings;
+   - the button, its two status lines, the key-file header lines and the key-file log lines.
+
+   Strings that had no marker of their own (the validator reason, the log lines, the warnings) get a comment line above
+   them. The change to `src` is comments only, counted in the PR body. `OwnerApprovalsTests` gains an approved block that
+   pins each string word for word, independently of the app's constants. The two save-failure log lines are approved but not
+   pinned, because only an exception reaches them. SPEC §5's four PROPOSED marks for these strings now say APPROVED.
+
 ## Move the model files when the folder changes (22/10/2026, branch feat/move-on-change, for 1.3)
 
 Owner approval 22/10/2026: when the model folder changes, Dictum offers to move the existing model files. Design brief: `.demo-preview/design-storage.md` sections A-C. **Every new string below is PROPOSED 22/10/2026 for the product owner; no approved string was changed.** The approved note "Dictum looks here first and downloads go here. Changing it does not move any files." stays true for "Leave them where they are".
