@@ -33,6 +33,7 @@ public partial class PillWindow : Window
     private readonly DispatcherTimer _flash;
     private readonly Rectangle[] _bars;
     private Func<float> _level = () => 0f;
+    private Func<PillView, string?> _labelFor = _ => null; // a label the shell puts in place of the pill's own word (cloud speech), or null
     private CancellationTokenSource? _motion;
     private PillState _state = new(PillView.Hidden, 0);
     private PillView _resumeAfterBusy = PillView.Hidden;
@@ -63,6 +64,9 @@ public partial class PillWindow : Window
 
     /// <summary>Where the level meter reads the current input RMS from.</summary>
     public void SetLevelSource(Func<float> level) => _level = level;
+
+    /// <summary>Where a view's label comes from when the shell changes it ("Hearing… (cloud)"); null keeps <see cref="PillText.For"/>.</summary>
+    public void SetLabelSource(Func<PillView, string?> labelFor) => _labelFor = labelFor;
 
     public void Present(PillState state)
     {
@@ -101,7 +105,7 @@ public partial class PillWindow : Window
     private void Render()
     {
         var view = _state.View;
-        Label.Text = PillText.For(view, Elapsed());
+        Label.Text = _labelFor(view) ?? PillText.For(view, Elapsed());
         Label.Foreground = view == PillView.Cancelled ? new SolidColorBrush(Color.Parse("#C7D0E0")) : Brushes.White;
         var detail = PillText.Detail(_state, Elapsed());
         Detail.Text = detail ?? "";

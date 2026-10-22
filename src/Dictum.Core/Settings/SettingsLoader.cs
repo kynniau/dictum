@@ -236,7 +236,7 @@ public static class SettingsLoader
     /// </summary>
     /// <summary>
     /// speech.base_url: an absolute https:// URL, a server on this PC included (orchestrator decision 22/10/2026: the approved
-    /// consent says the connection is encrypted). PROPOSED wording (22/10/2026).
+    /// consent says the connection is encrypted). Wording APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
     /// </summary>
     internal static string? SpeechBaseUrlProblem(string value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps

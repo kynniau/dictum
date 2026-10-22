@@ -156,7 +156,7 @@ public class OwnerApprovalsTests
 
     // ---- The 1.2.1 block (22/10/2026, 14:25 AEDT): sections 1 to 3 of the owner's list, markers only ----
     // Pinned word for word, independently of the app's constants. The cloud speech engine lines (SpeechPolicy, CloudSpeech*) are
-    // not in this block and stay PROPOSED, so nothing here claims them.
+    // not in this block (the owner approved them later, 22/10/2026 17:22 AEDT, on PR #54), so nothing here claims them.
 
     /// <summary>Pin (1.2.1 block, section 1): the Help question for turning on cloud clean-up is in the list, under its approved words.</summary>
     [Fact]
@@ -164,7 +164,7 @@ public class OwnerApprovalsTests
     {
         Assert.Equal("How do I turn on cloud clean-up?", HelpText.CloudQuestion);
         Assert.Contains(HelpText.Questions, q => q.Question == "How do I turn on cloud clean-up?" && ReferenceEquals(q.Answer, HelpText.CloudAnswer));
-        Assert.Equal("Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here. Most people do not need it: Tidy my words runs on this PC.",
+        Assert.Equal("Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here unless you also turn on cloud speech. Most people do not need it: Tidy my words runs on this PC.",
             HelpText.CloudAnswer[0]);
         Assert.Contains("To turn it off, open Settings > Clean-up and click Switch cloud clean-up off. Your dictations are tidied on this PC again.", HelpText.CloudAnswer);
     }
@@ -236,5 +236,157 @@ public class OwnerApprovalsTests
         Assert.Equal("Nothing you say leaves this PC unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.", PlainWordsText.Cloud);
         Assert.Equal("Read the whole statement at dictum.kynni.au/plain-words.", PlainWordsText.ReadAll);
         Assert.Equal(("In plain words", "Open in your browser", "https://dictum.kynni.au/plain-words"), (PlainWordsText.CardTitle, PlainWordsText.OpenLabel, PlainWordsText.Url));
+    }
+
+    // ---- Cloud speech UI block (22/10/2026 17:22 AEDT): the owner's list for PR #54, sections 1 to 3 ----
+    // Pinned word for word, independently of the app's constants, one test per surface. The three approved at 18:46 AEDT
+    // (SpeechPolicy.LoopbackHttpRefusal, About's fallback form "Speech: {status}.", the both-files switch-off sentence whole)
+    // are pinned here too. The consent text and buttons, the replacement sentence and the "Cloud clean-up:" caption have their
+    // own byte pins (CloudSpeechTests, CloudSpeechUiTests); the SpeechStatus lines are pinned in CloudSpeechTests.
+
+    /// <summary>Pin (cloud speech UI block): the consent step's title and what switching on can say.</summary>
+    [Fact]
+    public void Cloud_speech_dialog_and_switch_on_lines_are_pinned()
+    {
+        Assert.Equal("Send your voice to a cloud service?", AppShell.SpeechConsentTitle);
+        Assert.Equal("Cloud speech was not switched on; nothing is sent.", AppShell.SpeechNotSwitchedOn);
+        Assert.Equal("offline_only is on, so cloud speech is refused. Switch offline only off in Settings > Privacy first.", AppShell.SpeechOfflineRefused);
+        Assert.Equal("Type the service's https:// address and the model (for Azure OpenAI, the deployment name).", AppShell.SpeechAddressMissing);
+    }
+
+    /// <summary>Pin (cloud speech UI block): Settings > Models' Cloud speech card.</summary>
+    [Fact]
+    public void Cloud_speech_card_words_are_pinned()
+    {
+        Assert.Equal("Cloud speech", ModelsPage.CloudSpeechTitle);
+        Assert.Equal("Use cloud speech…", ModelsPage.UseCloudSpeechLabel);
+        Assert.Equal("Switch cloud speech off", ModelsPage.CloudSpeechOffLabel);
+        Assert.Equal("Optional, for a slow PC or one without a GPU. A cloud service turns each recording into text instead of the speech model on this PC, but the recording of every dictation, your voice, then goes to that service. The speech model on this PC stays as the fallback.",
+            ModelsPage.CloudSpeechIntro);
+        Assert.Equal("Dictum adds /audio/transcriptions. Cloud speech needs an https:// address, also for a server on this PC.", ModelsPage.CloudSpeechAddressHint);
+        Assert.Equal("Offline only is on (Privacy), so cloud speech cannot be switched on.", ModelsPage.CloudSpeechOfflineNote);
+        Assert.Equal("Cloud speech is on.", ModelsPage.CloudSpeechSwitchedOn);
+        Assert.Equal("Cloud speech is off; the speech model on this PC hears your dictations again.", ModelsPage.CloudSpeechSwitchedOff);
+        var azure = SpeechPresets.All.Single(p => p.Name == "Azure OpenAI");
+        Assert.Equal("https://your-resource.openai.azure.com/openai/v1", ModelsPage.CloudSpeechAddressWatermark(azure));
+        Assert.Equal("https://your-server.example.com/v1", ModelsPage.CloudSpeechAddressWatermark(SpeechPresets.Custom));
+        Assert.Equal("The key goes in .env in the settings folder: GROQ_API_KEY=your Groq API key. Without it nothing is sent.",
+            ModelsPage.CloudSpeechKeyLine(SpeechPresets.All.Single(p => p.Name == "Groq")));
+        Assert.Equal("If the server needs a key, it goes in .env in the settings folder: SPEECH_API_KEY=your key.", ModelsPage.CloudSpeechKeyLine(SpeechPresets.Custom));
+    }
+
+    /// <summary>Pin (cloud speech UI block): Switch cloud speech off when a file could not be changed (the approved parts).</summary>
+    [Fact]
+    public void Cloud_speech_off_not_saved_sentences_are_pinned()
+    {
+        Assert.Equal("Cloud speech is off, but consent.json could not be changed (C). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is changed, your speech consent stays on file.",
+            AppShell.SpeechOffNotSaved("C", null));
+        Assert.Equal("Cloud speech is off for this session, but settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits.",
+            AppShell.SpeechOffNotSaved(null, "S"));
+        // Both files, whole (its last clause APPROVED 22/10/2026 18:46 AEDT).
+        Assert.Equal("Cloud speech is off for this session, but consent.json could not be changed (C) and settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start turns cloud speech back on, unless settings.json cannot be read, in which case Dictum starts offline.",
+            AppShell.SpeechOffNotSaved("C", "S"));
+    }
+
+    /// <summary>Pin (cloud speech UI block): the tray panel's footer line and the header, tooltip and support-email token.</summary>
+    [Fact]
+    public void Cloud_speech_tray_line_and_token_are_pinned()
+    {
+        Assert.Equal("Cloud speech · audio leaves this PC (speech.example.com)", AppShell.SpeechTrayLine("speech.example.com"));
+        Assert.Equal("cloud speech", AppShell.CloudSpeechToken);
+    }
+
+    /// <summary>Pin (cloud speech UI block): the feedback email's cloud speech line (the provider only).</summary>
+    [Fact]
+    public void Cloud_speech_support_email_line_is_pinned()
+    {
+        var body = Uri.UnescapeDataString(SupportMail.FeedbackUri(new FeedbackSetup("1.2.1", "Windows build 10.0.26100", "base.en", "CPU", "rules", "cloud speech (openai-compatible)")));
+        Assert.Contains("\r\nSpeech model: base.en on CPU\r\nSpeech: cloud speech (openai-compatible)\r\nClean-up: rules", body);
+    }
+
+    /// <summary>Pin (cloud speech UI block): Settings > Privacy's and Settings > About's cloud speech lines.</summary>
+    [Fact]
+    public void Cloud_speech_privacy_and_about_lines_are_pinned()
+    {
+        Assert.Equal("Your voice goes to speech.example.com for speech recognition. Advanced option: your audio leaves this PC. Dictum does not validate or certify how that service handles it.",
+            AppShell.SpeechPrivacyLine("speech.example.com"));
+        Assert.Equal("Speech: cloud, speech.example.com (m); base.en on this PC is the fallback.", AppShell.SpeechAboutLine("speech.example.com", "m", "base.en"));
+    }
+
+    /// <summary>Pin (cloud speech UI block): the pill's two cloud speech labels.</summary>
+    [Fact]
+    public void Cloud_speech_pill_lines_are_pinned()
+    {
+        Assert.Equal("Hearing… (cloud)", AppShell.HearingCloudPill);
+        Assert.Equal("Heard on this PC (cloud speech failed)", SpeechStatus.FallbackPill);
+    }
+
+    /// <summary>Pin (cloud speech UI block): the load log line and the settings loader's https message.</summary>
+    [Fact]
+    public void Cloud_speech_log_and_loader_lines_are_pinned()
+    {
+        var noon = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Unspecified);
+        var at = new DateTimeOffset(noon, TimeZoneInfo.Local.GetUtcOffset(noon)); // noon on this PC's clock: the date cannot shift
+        Assert.Equal("Cloud speech on: audio goes to speech.example.com (m); consent recorded 2026-10-22; base.en is the fallback.",
+            CloudSpeech.LoadLine("speech.example.com", "m", at, "base.en"));
+        Assert.Equal("expected an absolute https:// URL such as \"https://api.openai.com/v1\"; cloud speech needs https://, also for a server on this PC, because its consent step says the connection is encrypted",
+            SettingsLoader.SpeechBaseUrlProblem("http://localhost:8080/v1"));
+        // APPROVED 22/10/2026 18:46 AEDT: the refusal of a plain http:// address on this PC (the speech step's status and log).
+        Assert.Equal("speech.base_url localhost uses http://, but cloud speech needs an https:// address, also on this PC, because its consent step says the connection is encrypted",
+            SpeechPolicy.LoopbackHttpRefusal("localhost"));
+    }
+
+    /// <summary>
+    /// Pin (cloud speech UI block, 18:46 AEDT): About's fallback form "Speech: {status}.", here while cloud speech is agreed to and
+    /// offline only refuses it (the status is clean-up's approved offline line, word for word).
+    /// </summary>
+    [Fact]
+    public Task Cloud_speech_about_fallback_form_is_pinned() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "offline_only": true, "speech": { "provider": "openai-compatible", "base_url": "https://speech.example.com/v1", "model": "m" } }""");
+        CloudConsentFile.WriteSpeech(scratch.Paths.ConsentFile, new CloudConsentRecord(SpeechSettings.OpenAiCompatible, "speech.example.com", DateTimeOffset.UtcNow, "test"));
+        var (shell, _, _) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            Assert.Equal("Speech: On, but offline only is on: nothing is sent until you switch offline only off.", shell.SpeechAboutValue);
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    // ---- Cloud clean-up consent (owner, 22/10/2026 16:35 and 18:41 AEDT; counsel review pending) ----
+    // Moved here from CloudWarningAndPresetsTests (final lens on PR #54): the literal pins belong with the owner's approvals.
+
+    // Approved by the product owner on 16/10/2026 as written (CloudPolicy.ConsentWarning): a literal copy, independent of the app's.
+    private static string ApprovedCleanupWarning(string host) =>
+        $"WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on {host}'s servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.";
+
+    /// <summary>
+    /// Pin (mutation-checked): the whole clean-up consent text for the Anthropic and a custom OpenAI-compatible host, byte for byte,
+    /// with the owner's 18:41 parenthesis and 16:35 paragraph (22/10/2026; counsel review pending), independently of the app's copy.
+    /// </summary>
+    [Fact]
+    public void The_clean_up_consent_text_is_the_approved_text_byte_for_byte()
+    {
+        var anthropic = new LlmSettings { Provider = LlmSettings.Anthropic, Model = LlmSettings.AnthropicDefaultModel };
+        var host = Dictum.Llm.CloudPolicy.CloudHost(anthropic)!;
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
+            $"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host} (Anthropic) together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives.\n\n" +
+            ApprovedCleanupWarning(host) + "\n\n" +
+            "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +
+            "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it."),
+            System.Text.Encoding.UTF8.GetBytes(Dictum.Llm.CloudPolicy.ConsentText(anthropic, host)));
+        var custom = new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://llm.example.com/v1", Model = "m" };
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
+            "With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to llm.example.com together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "It uses your own API key (LLM_API_KEY) if you have set one. Whoever runs that server receives the text; its own terms apply.\n\n" +
+            ApprovedCleanupWarning("llm.example.com") + "\n\n" +
+            "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +
+            "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it."),
+            System.Text.Encoding.UTF8.GetBytes(Dictum.Llm.CloudPolicy.ConsentText(custom, "llm.example.com")));
     }
 }

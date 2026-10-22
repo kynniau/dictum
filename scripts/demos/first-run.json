@@ -123,7 +123,7 @@
     },
     {
       "id": "ready",
-      "caption": "This is Dictum's panel. The word beside the switch says how Dictum is.",
+      "caption": "This is Dictum's panel. The word beside the switch says what Dictum is doing.",
       "do": [ { "do": "point", "target": { "window": "^Dictum$", "type": "Text", "name": "No microphone", "timeout": 60 } } ],
       "after": 3
     },

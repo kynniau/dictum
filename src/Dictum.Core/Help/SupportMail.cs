@@ -63,11 +63,15 @@ public static class SupportMail
     /// </summary>
     public static string FeedbackUri(FeedbackSetup setup)
     {
-        var body = FeedbackIntro + "\r\n" + string.Join("\r\n",
+        string[] lines =
+        [
             $"Dictum {Fact(setup.Version)}",
             Fact(setup.System),
             $"Speech model: {Fact(setup.SpeechModel)} on {Fact(setup.SpeechRuntime)}",
-            $"Clean-up: {Fact(setup.Cleanup)}");
+            .. setup.CloudSpeech is { } cloud ? [$"Speech: {Fact(cloud)}"] : Array.Empty<string>(), // label APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (cloud speech)
+            $"Clean-up: {Fact(setup.Cleanup)}",
+        ];
+        var body = FeedbackIntro + "\r\n" + string.Join("\r\n", lines);
         var uri = Uri(FeedbackSubject, body);
         return uri.Length <= MaxUriLength ? uri : Uri(FeedbackSubject, FeedbackIntro);
     }
@@ -97,4 +101,6 @@ public static class SupportMail
 /// What the feedback email says about the setup, as About already shows it: the Dictum version, the system ("Windows 10.0.x"),
 /// the speech model and where it runs ("Vulkan", "CPU"), and the clean-up in use. Nothing else exists to be included.
 /// </summary>
-public sealed record FeedbackSetup(string Version, string System, string SpeechModel, string SpeechRuntime, string Cleanup);
+/// <param name="CloudSpeech">While cloud speech sends each recording, its provider only ("cloud speech (openai-compatible)"), never
+/// the host, as <paramref name="Cleanup"/> names a cloud provider without its server; null otherwise (no line).</param>
+public sealed record FeedbackSetup(string Version, string System, string SpeechModel, string SpeechRuntime, string Cleanup, string? CloudSpeech = null);

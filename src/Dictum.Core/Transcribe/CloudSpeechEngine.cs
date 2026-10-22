@@ -62,6 +62,9 @@ public sealed class CloudSpeechEngine : ITranscriber
 
     public string Host => CloudPresets.HostOf(_endpoint);
 
+    /// <summary>The model (or Azure deployment) each request names.</summary>
+    public string Model => _model;
+
     /// <summary>Why the last request was not used, until the next one succeeds; null when the last one succeeded or none was made.</summary>
     public string? LastFailure => _lastFailure;
 
@@ -111,6 +114,7 @@ public sealed class CloudSpeechEngine : ITranscriber
             }
         }
         _lastFailure = reason;
+        // The per-failure log line (spec "Cloud speech" §4): APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
         _log.Warn($"Cloud speech via {Host} not used, the local model heard this dictation instead: {reason}.");
         var local = await _local(cancellationToken).ConfigureAwait(false);
         return carried is null

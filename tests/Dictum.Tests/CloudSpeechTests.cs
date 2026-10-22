@@ -413,7 +413,9 @@ public sealed class CloudSpeechTests
 
     /// <summary>
     /// Pin (mutation-checked): the speech consent text and buttons, APPROVED by the product owner 22/10/2026 (10:50 AEDT) as the
-    /// spec's §3 text verbatim, byte for byte, with the host and the one key that goes there filled in. Never reword it.
+    /// spec's §3 text verbatim, with one clause of the last paragraph revised and approved at 16:31 AEDT ("offline only mode
+    /// refuses any service that is not on this PC"), byte for byte, with the host and the one key that goes there filled in.
+    /// Never reword it.
     /// </summary>
     [Fact]
     public void The_consent_text_is_the_approved_text_byte_for_byte()
@@ -422,13 +424,13 @@ public sealed class CloudSpeechTests
         Assert.Equal(
             "With cloud speech on, the recording of every dictation, your voice, is sent over the internet to api.groq.com to be turned into text, together with the words in your personal dictionary as a hint. It uses your own API key (GROQ_API_KEY).\n\n" +
             "Dictum encrypts the connection (HTTPS) but cannot see, check or certify what api.groq.com keeps, for how long, how it protects it, or who else can listen to it. By switching cloud speech on you accept responsibility for the security and privacy of the speech sent there. Check that service's terms yourself, and do not dictate confidential, personal or client information with cloud speech on unless you have.\n\n" +
-            "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode refuses it; your speech model on this PC is used again.",
+            "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode refuses any service that is not on this PC; your speech model on this PC is used again.",
             text);
         // The template itself, as the appendix writes it with its two placeholders, compared as UTF-8 bytes.
         Assert.Equal(Encoding.UTF8.GetBytes(
             "With cloud speech on, the recording of every dictation, your voice, is sent over the internet to {host} to be turned into text, together with the words in your personal dictionary as a hint. It uses your own API key ({VAR}).\n\n" +
             "Dictum encrypts the connection (HTTPS) but cannot see, check or certify what {host} keeps, for how long, how it protects it, or who else can listen to it. By switching cloud speech on you accept responsibility for the security and privacy of the speech sent there. Check that service's terms yourself, and do not dictate confidential, personal or client information with cloud speech on unless you have.\n\n" +
-            "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode refuses it; your speech model on this PC is used again."),
+            "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode refuses any service that is not on this PC; your speech model on this PC is used again."),
             Encoding.UTF8.GetBytes(SpeechPolicy.ConsentText("{host}", "{VAR}")));
         Assert.Equal("Send my voice to api.groq.com", SpeechPolicy.AgreeButton("api.groq.com"));
         Assert.Equal("Keep speech on this PC", SpeechPolicy.DeclineButton);

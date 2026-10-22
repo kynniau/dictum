@@ -1450,6 +1450,52 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
   model hears the same samples; the log names the reason (status and host, never audio, text or key); the status says the
   last request failed until the next success. Esc pastes nothing. A settings reload cancels a request under way. So does
   quitting.
+- **Windows (UI lane, 22/10/2026).** APPROVED: the consent text and its two buttons (10:50, clause revised 16:31 AEDT), the
+  replacement sentence (16:27), the "Cloud clean-up:" caption, and every other string as a block (owner, 22/10/2026 17:22
+  AEDT; the full list is in DECISIONS, "Cloud speech, UI"); the plain-http refusal on this PC (`SpeechPolicy.LoopbackHttpRefusal`),
+  About's fallback form "Speech: {status}." and the both-files switch-off sentence whole followed at 18:46 AEDT. The in-app and
+  site Help answers that say "your voice still stays here" now add "unless you also turn
+  on cloud speech" (owner, 17:22 AEDT), and "Where does my voice go?" says it "never sends it anywhere unless you turn on
+  cloud speech" (owner, 17:45 AEDT).
+  - *Consent step*: Settings > Models > **Cloud speech** card (its setup in the Advanced view only): Service (OpenAI, Azure
+    OpenAI, Groq, Custom server), Server address (shown for Azure OpenAI and a custom server only), Model (the Azure
+    deployment name; no preset fills one in), the key line for the service the address names, then **Use cloud speech…**.
+    It opens a second dialog, apart from clean-up's, with `SpeechPolicy.ConsentText` and the buttons "Send my voice to {host}"
+    / "Keep speech on this PC" (the default). The consent text's last paragraph, as revised and approved 22/10/2026 16:31
+    AEDT: "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode
+    refuses any service that is not on this PC; your speech model on this PC is used again." (offline only still allows a
+    speech server on this PC, loopback https, as for clean-up). Only agreeing writes the speech entry of `consent.json`; then
+    `speech.provider`, `speech.base_url` and `speech.model` are written. Declining writes nothing. Offline only and a plain
+    `http://` address are refused before the dialog. When settings.json cannot be written, the speech consent just recorded
+    is withdrawn again.
+  - *Switch cloud speech off*: withdraws the speech entry only (a clean-up consent stays) and writes `speech.provider` =
+    `local`. It holds in memory first (no service, no consent, whatever the files say) until both files keep it, retried at
+    every reload and at quit, as clean-up's switch-off does. While cloud speech is on, the Simple view shows the card's state
+    line and this switch too (owner, 22/10/2026); with it off, Simple shows nothing of the card.
+  - *State lines*, all read from the speech step in use (`CloudSpeech.Status`, `SendsAudio`, `LastFailure`): the card's line
+    (on, failed and fallen back, waiting for the key, offline only, nothing sent); the tray panel's footer line "Cloud speech ·
+    audio leaves this PC ({host})", shown once, where "Nothing leaves this PC" sits when off (that row is hidden, never
+    reworded, while audio leaves and clean-up sends nothing); the Speech model picker keeps the model's name; Settings >
+    Privacy's speech line above the clean-up summary, which then has the caption "Cloud clean-up:"; About's "Speech: cloud,
+    {host} ({model}); {local model} on this PC is the fallback."; the header, tooltip and support emails' "cloud speech"
+    token; the load log line with the consent's date; the pill's "Hearing… (cloud)" while a recording is with the service and
+    "Heard on this PC (cloud speech failed)" in place of "Pasted" after a fallback. After a failed request every surface shows
+    the failed line until the next success.
+  - *Approved sentences made untrue by cloud speech*, never reworded: Privacy's default "Nothing leaves this PC: speech
+    recognition and clean-up both run here." gives way to the speech line. In the Clean-up card's introduction and Privacy's
+    cloud clean-up sentence, "Audio never leaves this PC." gives way to the owner's approved replacement (22/10/2026, 16:27
+    AEDT): "Audio never leaves this PC by default, though advanced users can add their own cloud speech and clean-up services
+    in settings." Each original comes back byte for byte when cloud speech is off.
+    Owner wording, 22/10/2026 18:41 AEDT, the same way: the Advanced Speech model card's "Turns your voice into words, on this
+    PC." gives way to "Turns your voice into words; with cloud speech on, {host} does this and the model here is the fallback.",
+    and the Simple view's "Dictum turns your voice into text on this PC." to "Dictum sends your voice to {host} to be turned into
+    text while cloud speech is on.", and its "The speech model does the listening." to "The cloud service does the listening;
+    the speech model on this PC is the fallback." (19:45). Permanent changes (18:41): Help's "Nothing you say is sent anywhere unless you turn on
+    cloud clean-up" now reads "…unless you turn on cloud clean-up (Settings > Clean-up) or cloud speech (Settings > Models)" (app and site; paths named 19:10), and the cloud clean-up consent (SPEC §22) says "every dictation's
+    text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it)" (19:42; it said "(never
+    the audio)" until 18:41, then briefly "(the audio only if you also turn on cloud speech)"), with a new paragraph after its
+    warning (16:35): "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent
+    there." Both consent changes were made on the owner's instruction; counsel review is pending.
 
 ## 29. See how it works: live stages in Settings (amendment, 22/10/2026)
 
@@ -1511,7 +1557,7 @@ Every new user-facing string is APPROVED 22/10/2026 (DECISIONS, "Owner approvals
 ## 30. Dictum in plain words (amendment, 22/10/2026, APPROVED 22/10/2026 17:36 AEDT)
 
 - **Site page** `/plain-words` (`site/plain-words.html`): the owner-approved statement (what Dictum is, how it protects you, what we cannot take responsibility for), in the privacy page's layout. Linked from the footer of the landing page, the guide, the privacy policy and itself. It prints no file path and names no language, country, region or team.
-- **Short version** (`PlainWordsText`, `src/Dictum.Core/Help/PlainWordsText.cs`): shown under the approved first paragraph of the Welcome window's first step, as plain text. No button, no checkbox, no gate: Esc or closing still keeps the defaults. Settings > About gets a card "In plain words" with the same four paragraphs and a button "Open in your browser" that opens `PlainWordsText.Url` (built after PR #54 merges, which owns `OtherPages.cs`).
+- **Short version** (`PlainWordsText`, `src/Dictum.Core/Help/PlainWordsText.cs`): shown under the approved first paragraph of the Welcome window's first step, as plain text. No button, no checkbox, no gate: Esc or closing still keeps the defaults. Settings > About ends with a card "In plain words" with the same four paragraphs and a button "Open in your browser" that opens `PlainWordsText.Url`.
 - **Acceptance**: none on first run. The two cloud consents are the only places data leaves the PC, and both gate it.
 - **Store listing**: one added sentence at the end of PRIVATE BY DESIGN (`docs/STORE.md`).
 - **Landing page**: "Free for life" became "Free to keep on your PC" (APPROVED 22/10/2026 17:42 AEDT).

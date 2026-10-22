@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Avalonia.Controls;
+using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 using Dictum.Help;
 using Dictum.UI.Views.Onboarding;
@@ -126,6 +127,34 @@ public sealed class PlainWordsTests
         Assert.Empty(window.GetVisualDescendants().OfType<CheckBox>());
         Assert.DoesNotContain(texts, t => t.Contains("I understand", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(OnboardingText.Next, window.PrimaryButton.Content);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin (2b): Settings > About ends with the card "In plain words": the four paragraphs word for word, after the Files card,
+    /// and a button "Open in your browser" that opens the site page and nothing else.
+    /// </summary>
+    [Fact]
+    public Task The_about_page_ends_with_the_plain_words_card() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        var (shell, platform, _) = scratch.Shell();
+        var window = new Dictum.UI.Views.SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("About");
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var texts = window.GetLogicalDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+        var files = texts.IndexOf("FILES");
+        var card = texts.IndexOf("IN PLAIN WORDS");
+        Assert.True(files >= 0 && card > files, "the \"In plain words\" card does not come after the Files card");
+        Assert.Equal(ShortVersion, texts.Skip(card + 1).Take(ShortVersion.Length));
+        var button = window.GetLogicalDescendants().OfType<Button>().Single(b => b.Content as string == "Open in your browser" && b.IsEffectivelyVisible);
+        Assert.Equal("Open in your browser", Avalonia.Automation.AutomationProperties.GetName(button) is { Length: > 0 } name ? name : (string)button.Content!);
+        Assert.Empty(platform.Opened);
+        button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["https://dictum.kynni.au/plain-words"], platform.Opened);
         window.Close();
         shell.Dispose();
     });
