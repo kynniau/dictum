@@ -157,6 +157,7 @@ internal sealed class HowItWorksPage : SettingsPage
     {
         _hotkey?.Dispose();
         _hotkey = null;
+        _ownPress = false; // a press under way when the page lets go ends elsewhere: the next one is decided afresh
     }
 
     /// <summary>

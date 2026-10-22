@@ -690,6 +690,49 @@ public class HowItWorksPageTests
         }
     }
 
+    [Fact]
+    public Task A_press_the_page_let_go_of_does_not_swallow_a_later_dictations_release() => UiSession.Run(() =>
+    {
+        // Final re-lens on 7a40131: the page's take started with the hotkey, then the window went behind another, so the release
+        // went to the controller and the page never saw it. A later hold dictation from About, released after the page took
+        // the hotkey back, had its release swallowed as the page's own. Letting go of the hotkey ends the page's press.
+        using var scratch = new Scratch(StartedSettings);
+        var (shell, platform, _) = Started(scratch);
+        try
+        {
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            var key = platform.LastListener!;
+            var window = new SettingsWindow(shell);
+            window.Show();
+            window.Activate();
+            var page = Open(window, speechReady: false);
+            Assert.True(Eventually(() => RedirectField.GetValue(shell) is not null), "the page did not take the hotkey");
+
+            var t0 = Environment.TickCount64 + 60_000;
+            key.Post(new HookEvent(HotkeySignal.Down, t0)); // the page's own take, started with the hotkey
+            Assert.True(Eventually(() => page.IsRecording), "the hotkey did not start the page's take");
+            page.WindowDeactivated(); // the window goes behind another: the take is dropped, the hotkey let go
+            Assert.False(page.IsRecording);
+            key.Post(new HookEvent(HotkeySignal.Up, t0 + 500)); // that release goes to the controller
+            Dispatcher.UIThread.RunJobs();
+
+            window.ShowPage("About");
+            Dispatcher.UIThread.RunJobs();
+            key.Post(new HookEvent(HotkeySignal.Down, t0 + 2_000)); // hold to dictate from About
+            Assert.True(Eventually(() => !shell.DictationIdle), "the dictation did not start");
+            page = Open(window, speechReady: false); // back to the page, which takes the hotkey again
+            Assert.True(Eventually(() => RedirectField.GetValue(shell) is not null), "the page did not take the hotkey back");
+            key.Post(new HookEvent(HotkeySignal.Up, t0 + 3_000)); // the dictation's release
+            Assert.True(Eventually(() => shell.DictationIdle), "the release was swallowed by the page");
+            Assert.True(Eventually(() => platform.Desktop.Ops.Contains($"set-text:{DeterministicCleaner.Clean("fake-model.bin")} ")), "the dictation was not pasted");
+            window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
     /// <summary>A microphone stand-in: a level while open, two seconds of "speech" at Stop, or a refusal at Start.</summary>
     private sealed class ScriptedCapture : IAudioCapture
     {

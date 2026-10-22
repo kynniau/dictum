@@ -4418,3 +4418,5 @@ of the design note "four asks, designed and sized" (22/10/2026), stages 1-5 only
 3. The `SpeechReady` gate is unchanged. Record gates on the local model, as the hotkey does (`hotkeyBlocked: !_models.IsReady`).
    The local model stays loaded as cloud speech's fallback (`CloudSpeech` summary), so the page and the hotkey agree.
    The page does not say when cloud speech fell back to the local model for a take, because `PipelineProgress` does not carry it.
+
+**Final re-lens on 7a40131 (one minor):** letting go of the hotkey (`Release()`: deactivation, another page, close) now also ends the page's press (`_ownPress = false`). Before, a take started with the hotkey and dropped by deactivation left the page owning that press, so a later hold dictation released after the page took the hotkey back had its release swallowed. Pinned with that sequence.
