@@ -74,7 +74,7 @@ public sealed partial class RuntimeResilienceTests
     [Fact]
     public void The_proposed_words_are_pinned_as_proposed()
     {
-        // PROPOSED copy (17/10/2026), awaiting the product owner's review: pinned word for word.
+        // APPROVED 22/10/2026 copy (proposed 17/10/2026): pinned word for word.
         Assert.Equal("The Microsoft Visual C++ runtime is missing; install it from Microsoft, then restart Dictum", ModelFailure.RuntimeMissing);
         Assert.Equal("The graphics driver could not run the model; Dictum will use the CPU", ModelFailure.GpuFailed);
         Assert.Equal("The graphics driver could not run this model, so Dictum uses the CPU for it.", ModelFailure.GpuFailedLastTime); // lens fix, 17/10/2026

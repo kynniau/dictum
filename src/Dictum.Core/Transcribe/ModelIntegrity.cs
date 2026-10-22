@@ -103,7 +103,7 @@ public sealed class ModelIntegrity(string cacheFile, ILog log, Func<IReadOnlyLis
         _ => "It has the same name as a catalogue file, so it is checked as that file. Rename it, then choose it again.",
     };
 
-    /// <summary>PROPOSED copy (17/10/2026), for the product owner to approve: the advice for a damaged model that came with Dictum.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 17/10/2026): the advice for a damaged model that came with Dictum.</summary>
     internal static string BundledRemedy(string name) => $"It came with Dictum: reinstall Dictum, or download {name} in Settings > Models.";
 
     /// <summary>The model folder that holds <paramref name="path"/> itself (not a folder inside it), or null.</summary>

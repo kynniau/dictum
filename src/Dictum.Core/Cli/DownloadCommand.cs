@@ -66,7 +66,7 @@ public static class DownloadCommand
             }
             if (status is not null)
             {
-                // PROPOSED copy (17/10/2026), for the product owner to approve: the two lines below name the copy the app's lookup found, in
+                // APPROVED 22/10/2026 copy (proposed 17/10/2026): the two lines below name the copy the app's lookup found, in
                 // any model folder, and how it was checked ("SHA-256 verified", or "verified earlier"); they named the download folder's file and the hash.
                 Console.Out.WriteLine(spec.Sha256 is null
                     ? $"{existing} is already present with the catalogue size ({bytes:N0} bytes; no published SHA-256 to check). Nothing to do."

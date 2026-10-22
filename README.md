@@ -52,7 +52,7 @@ A small dark pill appears bottom-centre of the monitor with the focused window, 
 
 | Pill | Meaning |
 |---|---|
-| Recording · hold | Recording while you hold the key (a breathing red dot and five bars following your voice). |
+| Recording · let go to finish | Recording while you hold the key (a breathing red dot and five bars following your voice). |
 | Hands-free  m:ss  typing as you pause · tap to stop · Esc stops and keeps what's typed | Hands-free recording with the elapsed time; each part is typed as you pause, and it auto-stops (typing the rest) at `hands_free_max_seconds`. |
 | Transcribing… | whisper is running (a turning blue ring). |
 | Polishing… | The cleanup model is running (amber; not shown for the rule-based tidy, which is instant). |
@@ -88,9 +88,9 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 (docs/design/Flyout.dc.html). A click anywhere else, Esc, or another click on the icon closes it.
 
 - **Status**: the models in use with their runtimes and the hotkey (in the Simple view, the plain names instead: for
-  example "Standard · Tidy my words · Right Ctrl", with "AI clean-up" or "Off" for the clean-up; keys are shown by name,
+  example "Standard · Tidy my words · Right Ctrl", with "AI clean-up" or "No clean-up" for the clean-up; keys are shown by name,
   "Right Ctrl", while settings.json keeps `RightCtrl`), a coloured state (Ready, Recording, Working,
-  Loading, Downloading, No model, Error, Off) and the **Dictation on** switch (saved as `enabled`). The models line
+  Loading, Downloading, No model, Error, Off; "No microphone" in place of Ready while Windows lists none) and the **Dictation on** switch (saved as `enabled`). The models line
   sits on its own row under them, on one line; one too long for the panel ends in "…", and its tooltip shows it whole.
 - **A model problem**, under the status when there is one: why a model could not load (in plain words for a missing
   Visual C++ runtime, else the engine's own message), or that it runs on the CPU because the graphics driver could not
@@ -104,9 +104,8 @@ Click the Dictum icon in the notification area (or select it and press Enter): a
 - **Download progress** with **Cancel download** while a model downloads or waits its turn. Downloads run one at a
   time; cancelling deletes the partial file and drops any download waiting behind it. A dropped connection is resumed
   automatically (see "Model downloads and checks").
-- **Mode**: **Light** | **Full** (see "Mode presets"); neither is selected when settings.json matches neither (Custom).
-  The line under it names the presets' models; in the Simple view, while the text is English, by their plain names ("Full: More accurate and AI
-  clean-up. Light: Standard and Tidy my words.").
+- **Mode**: **Light** | **Full** (see "Mode presets"), in the Advanced view only; neither is selected when settings.json
+  matches neither (Custom). The line under it names the presets' models.
 - **Speech model** and **Clean-up** pickers. A model marked "(download)" is not on disk yet: choosing it asks first
   (name, size, host), downloads it, then switches. One marked "(downloading)" or "(waiting to download)" is on its way;
   choosing it again cancels nothing (see "Model downloads and checks"). Clean-up also offers **Rule-based tidy** and **Off (paste what was heard)**.
@@ -163,7 +162,7 @@ Help is in two places:
 - **On the web**: the full guide, with pictures, at https://dictum.kynni.au/help. **Open the full guide** on the Help
   page opens it in your browser; Dictum itself fetches nothing.
 
-The Help page's words are PROPOSED (docs/DECISIONS.md, 21/10/2026) and live in `src/Dictum.Core/Help/HelpText.cs`.
+The Help page's words were approved by the owner on 22/10/2026 (docs/DECISIONS.md) and live in `src/Dictum.Core/Help/HelpText.cs`.
 
 ### See how it works
 
@@ -851,7 +850,7 @@ Cleanup removes filler words and false starts, fixes punctuation and casing, app
 **`off`: no clean-up** (Settings > Models > **Off**, or **Off (paste what was heard)** in the Advanced view
 and the tray panel). The text is pasted as whisper wrote it: only the spaces are tidied (the ends trimmed, and runs of
 spaces, tabs, CR and LF made one space; other whitespace inside the text, such as a no-break space, is kept). The tray
-panel's models line and the icon's tooltip say "no clean-up" where the clean-up model would be. Nothing else changes: no filler removal, no capitals, no full stop, and
+panel's models line and the icon's tooltip say "No clean-up" where the clean-up model would be. Nothing else changes: no filler removal, no capitals, no full stop, and
 spoken commands are not applied, so saying "new paragraph", "new line", "comma" or "scratch that" types those words.
 No cleanup model is loaded and nothing is sent anywhere, so Settings > Privacy and the tray panel still say "Nothing
 leaves this PC". Your corrections, the profanity filter and snippets still run after it, as they do with every
@@ -937,7 +936,7 @@ other address.
 
 ## Mode presets
 
-The tray panel's **Mode** (Light | Full, also Settings > Mode) picks a whole setup in one click. Choosing a preset writes plain values into settings.json (you can
+The tray panel's **Mode** (Light | Full, in the Advanced view; also Settings > Mode) picks a whole setup in one click. Choosing a preset writes plain values into settings.json (you can
 see and edit them) and, if a model it needs is not downloaded, asks once (names, total size, huggingface.co) and
 downloads it with the usual checks before switching (after any download already running); refused with a message
 under `offline_only`. "Custom" is ticked when settings.json matches neither preset. Which column applies depends on

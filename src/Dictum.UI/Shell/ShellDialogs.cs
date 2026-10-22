@@ -130,7 +130,7 @@ public sealed class ShellDialogs : IShellDialogs
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     });
 
-    /// <summary>The system's folder chooser (Avalonia's, which is Windows' own; PROPOSED title, 17/10/2026).</summary>
+    /// <summary>The system's folder chooser (Avalonia's, which is Windows' own; title APPROVED 22/10/2026, proposed 17/10/2026).</summary>
     public string? ChooseFolder(string initialDir) => WithStorage(initialDir, (storage, start) =>
     {
         var folders = Modal.Wait(storage.OpenFolderPickerAsync(new FolderPickerOpenOptions

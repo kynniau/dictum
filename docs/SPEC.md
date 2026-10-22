@@ -87,7 +87,7 @@ State machine (pure C#, time injected, fully unit-tested):
 
 | State | Event | Next state and action |
 |---|---|---|
-| Idle | hotkey down | RecordingHold: start capture immediately, show pill "Recording · hold" |
+| Idle | hotkey down | RecordingHold: start capture immediately, show pill "Recording · let go to finish" (1.2.1; "Recording · hold" until then) |
 | RecordingHold | hotkey up, held ≥ `tap_ms` | Processing: stop capture, transcribe |
 | RecordingHold | hotkey up, held < `tap_ms` | PendingTap: keep capturing, start `double_tap_ms` timer |
 | PendingTap | hotkey down within window | RecordingHandsFree: keep capturing (no audio lost), pill "Recording · hands-free 0:00"; this down event is consumed, its matching up is ignored; from now on the recording is cut at pauses and each part is typed while recording goes on (amendment 16/10/2026: "Hands-free segments" below) |
@@ -341,7 +341,7 @@ Ctrl+V.
 - Window styles: `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_TOPMOST`;
   `ShowActivated = false`, `Focusable = false`, `ShowInTaskbar = false`. Click-through.
   Verify with a test that showing the pill does not change `GetForegroundWindow()`.
-- Texts: "Recording · hold", "Recording · hands-free m:ss", "Transcribing…", "Polishing…",
+- Texts: "Recording · let go to finish" (owner decision 3, 22/10/2026; was "Recording · hold"), "Recording · hands-free m:ss", "Transcribing…", "Polishing…",
   "Done", "Cancelled", "Busy", "Mic error". Hide after a short fade.
 - No sound (amendment, 21/10/2026; wording PROPOSED, awaiting the product owner): "No sound from mic" replaces the
   recording label while the microphone has given no sound (the red dot and meter stay: it is still recording), and
@@ -402,6 +402,12 @@ Icon with states: idle, disabled, recording, processing, error. Tooltip:
   after "Custom: your settings match neither preset." when that applies), so it breaks between presets, never inside a
   name. **Open log folder** shows only with a problem the log explains (a model problem, or the heard-nothing line), not
   under the no-microphone sentence alone.
+  Amended 22/10/2026 (1.2.1, owner decisions 4 to 6): with no microphone listed the state word is "No microphone" (the
+  error colour) in place of "Ready", and "Ready" again once one is listed; every other state word is kept, and the
+  no-microphone sentence stays under the header. The Simple view hides Mode, Light | Full and the line under it (the
+  Advanced view keeps all three, with the model names), so the Simple preset names above are no longer shown. With
+  clean-up off the header's clean-up part is "No clean-up" in both views (and in the icon's tooltip and the support
+  email's models line); the choice itself is still labelled "Off" ("Off (paste what was heard)" in the Advanced view).
 - About (version, runtime, no network statement).
 - Help (amendment, 21/10/2026): opens Settings → Help, the offline "How Dictum works" and questions and answers (§26).
 - Quit.

@@ -29,8 +29,11 @@ public sealed class DownloadFailedException(string fileName, int attempts, strin
     public bool Resumable { get; } = resumable;
 }
 
-/// <summary>How hard to try. <see cref="HttpVersion"/> null keeps .NET's default request version (HTTP/1.1).</summary>
-public sealed record DownloadPolicy(int MaxAttempts, Func<int, TimeSpan> Backoff, TimeSpan StallTimeout, Version? HttpVersion = null)
+/// <summary>
+/// How hard to try. <see cref="HttpVersion"/> null keeps .NET's default request version (HTTP/1.1). <see cref="Time"/> is the clock for the
+/// stall timer and the back-off wait; null is the system clock, and only tests set it (see DECISIONS.md, "TimeProvider seam").
+/// </summary>
+public sealed record DownloadPolicy(int MaxAttempts, Func<int, TimeSpan> Backoff, TimeSpan StallTimeout, Version? HttpVersion = null, TimeProvider? Time = null)
 {
     /// <summary>8 attempts, waiting 1, 2, 4, 8, 16, 16, 16 s between them; 30 s without a byte counts as a drop.</summary>
     public static DownloadPolicy Default { get; } = new(8, attempt => TimeSpan.FromSeconds(Math.Min(16, 1 << (attempt - 1))), TimeSpan.FromSeconds(30));
@@ -135,7 +138,7 @@ public static partial class ModelDownloader
                         if (attempt >= policy.MaxAttempts) throw new DownloadFailedException(spec.FileName, attempt, ex.Reason, ex.InnerException, resumable: done > 0);
                         var wait = policy.Backoff(attempt);
                         log.Info($"Download of {spec.FileName}: resuming from byte {done:N0} in {wait.TotalSeconds:0.#} s.");
-                        await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(wait, policy.Time ?? TimeProvider.System, cancellationToken).ConfigureAwait(false);
                     }
                 }
             }
@@ -177,7 +180,9 @@ public static partial class ModelDownloader
         if (offset > 0) request.Headers.Range = new RangeHeaderValue(offset, null);
 
         using var stall = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        stall.CancelAfter(policy.StallTimeout);
+        // The stall limit is a timer on the policy's clock that cancels `stall`; it is restarted before every read, so only a read that
+        // gets no data for the whole limit counts as a stall (a slow but live connection keeps restarting it).
+        using var stallTimer = (policy.Time ?? TimeProvider.System).CreateTimer(CancelStall, stall, policy.StallTimeout, Timeout.InfiniteTimeSpan);
         using var response = await Network(() => http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stall.Token), policy, cancellationToken)
             .ConfigureAwait(false);
         var status = (int)response.StatusCode;
@@ -217,7 +222,7 @@ public static partial class ModelDownloader
         while (true)
         {
             if (offlineOnly()) throw new OfflineOnlyException($"Download of {spec.FileName}"); // the setting was turned on mid-download
-            stall.CancelAfter(policy.StallTimeout); // restarts the stall timer for every read
+            stallTimer.Change(policy.StallTimeout, Timeout.InfiniteTimeSpan); // restarts the stall timer for every read
             var read = await Network(() => source.ReadAsync(buffer, stall.Token).AsTask(), policy, cancellationToken).ConfigureAwait(false);
             if (read == 0) break;
             await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
@@ -232,6 +237,20 @@ public static partial class ModelDownloader
         await target.FlushAsync(cancellationToken).ConfigureAwait(false);
         progress.Report((done, total));
         return done;
+    }
+
+    /// <summary>The stall timer's callback. The timer is disposed just before its source, and a callback already running can still
+    /// reach a source that has just been disposed; that is harmless, so it is swallowed rather than left to crash a thread-pool thread.</summary>
+    private static void CancelStall(object? state)
+    {
+        try
+        {
+            ((CancellationTokenSource)state!).Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // the attempt had already ended
+        }
     }
 
     /// <summary>Runs one network step, turning drops and stalls into <see cref="TransientException"/>; the user's cancel passes through.</summary>

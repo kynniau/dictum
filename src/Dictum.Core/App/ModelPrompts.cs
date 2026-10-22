@@ -76,16 +76,16 @@ public static class ModelPromptText
         $"Download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost}?\n\n{note}. Its size and SHA-256 are checked before use; progress shows in the tray panel and the tray icon's tooltip.";
 
     /// <summary>
-    /// PROPOSED copy (21/10/2026, lens on PR #23): what the Simple view's download question says about where the file comes
+    /// APPROVED 22/10/2026 copy (proposed 21/10/2026, lens on PR #23): what the Simple view's download question says about where the file comes
     /// from and the size and SHA-256 check, without naming the host or the hash.
     /// </summary>
     public const string PlainCheck = "It comes from the model makers' official download page and is checked before use";
 
-    /// <summary>PROPOSED copy (21/10/2026): "Download More accurate (487 MB)? It comes from … checked before use." plus any low-space warning.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): "Download More accurate (487 MB)? It comes from … checked before use." plus any low-space warning.</summary>
     public static string PlainConfirmText(string plainName, string sizeText, string? warning) =>
         $"Download {plainName} ({sizeText})? {PlainCheck}." + (warning is null ? "" : $"\n\n{warning}.");
 
-    /// <summary>PROPOSED copy (21/10/2026): <see cref="BusyText"/> in plain words, naming the models by their Simple names where they have one.</summary>
+    /// <summary>APPROVED 22/10/2026 copy (proposed 21/10/2026): <see cref="BusyText"/> in plain words, naming the models by their Simple names where they have one.</summary>
     public static string PlainBusyText(string plainName, string sizeText, string? warning, string running, string runningProgress, bool canWait = true) =>
         (canWait
             ? $"{running} is downloading ({runningProgress} done). Download {plainName} ({sizeText}) after it, " +
@@ -95,11 +95,11 @@ public static class ModelPromptText
         $"{PlainCheck}." + (warning is null ? "" : $" {warning}.");
 
     /// <summary>
-    /// PROPOSED copy (19/10/2026), for the product owner to approve: the download question while another download runs. It
+    /// APPROVED 22/10/2026 copy (proposed 19/10/2026): the download question while another download runs. It
     /// says what is downloading and how far it has got, and what each answer does; nothing is cancelled before it is answered.
     /// </summary>
     /// When <paramref name="canWait"/> is false (it fits only if the running download stops; second lens, 19/10/2026), the
-    /// text offers only to stop it and says why, naming the model asked for (PROPOSED copy, 19/10/2026; the name, 21/10/2026).
+    /// text offers only to stop it and says why, naming the model asked for (APPROVED 22/10/2026; proposed 19/10/2026, the name 21/10/2026).
     public static string BusyText(string fileName, string sizeText, string note, string chosen, string running, string runningProgress, bool canWait = true) =>
         (canWait
             ? $"{running} is downloading ({runningProgress} done). Download {fileName} ({sizeText}) from {ModelCatalog.DownloadHost} after it, " +
@@ -109,7 +109,7 @@ public static class ModelPromptText
         $"{note}. Its size and SHA-256 are checked before use; progress shows in the tray panel and the tray icon's tooltip.";
 
     /// <summary>
-    /// PROPOSED copy (19/10/2026): the three buttons of <see cref="BusyText"/>, in the order of <see cref="BusyDownloadChoice"/>.
+    /// APPROVED 22/10/2026 copy (proposed 19/10/2026): the three buttons of <see cref="BusyText"/>, in the order of <see cref="BusyDownloadChoice"/>.
     /// The Stop button says "it" (the text names the running model), so the label stays short (lens, 19/10/2026).
     /// </summary>
     public static string[] BusyChoices(string chosen, bool canWait = true) =>

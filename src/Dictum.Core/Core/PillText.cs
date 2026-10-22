@@ -8,7 +8,7 @@ public static class PillText
 {
     public static string For(PillView view, TimeSpan elapsed) => view switch
     {
-        PillView.RecordingHold => "Recording · hold",
+        PillView.RecordingHold => RecordingHold,
         PillView.RecordingHandsFree => "Hands-free",
         PillView.Transcribing => "Transcribing…",
         PillView.Polishing => "Polishing…",
@@ -22,6 +22,12 @@ public static class PillText
         _ => "",
     };
 
+    /// <summary>
+    /// The pill while the hotkey is held. APPROVED 22/10/2026 (owner decision 3; until 1.2.1 it said "Recording · hold"):
+    /// never reword it. Hands-free's line is unchanged.
+    /// </summary>
+    public const string RecordingHold = "Recording · let go to finish";
+
     /// <summary>The lighter text after the label: the hands-free timer, or how many words were pasted.</summary>
     public static string? Detail(PillState state, TimeSpan elapsed) => state.View switch
     {
@@ -32,12 +38,12 @@ public static class PillText
 
     /// <summary>
     /// The small hint after the hands-free timer: each part is typed as the speaker pauses, and Esc keeps what is typed.
-    /// PROPOSED 16/10/2026, awaiting the product owner's approval: with the label it reads "Hands-free · typing as you pause ·
+    /// APPROVED 22/10/2026 (proposed 16/10/2026): with the label it reads "Hands-free · typing as you pause ·
     /// tap to stop · Esc stops and keeps what's typed" (the timer sits between the label and this hint, as before).
     /// </summary>
     public const string HandsFreeHint = "typing as you pause · tap to stop · Esc stops and keeps what's typed";
 
-    /// <summary>Esc during hands-free: the parts already typed stay. PROPOSED 16/10/2026, awaiting the product owner's approval.</summary>
+    /// <summary>Esc during hands-free: the parts already typed stay. APPROVED 22/10/2026 (proposed 16/10/2026).</summary>
     public const string HandsFreeStopped = "Stopped. Text already typed stays.";
 
     /// <summary>"0:42", "12:05": minutes and seconds since capture began.</summary>

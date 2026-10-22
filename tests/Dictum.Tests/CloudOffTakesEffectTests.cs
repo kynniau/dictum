@@ -42,29 +42,29 @@ public partial class CloudOffTakesEffectTests
     // The write path's own failure text (ModelCoordinator.WriteFailed), pinned word for word, independently of the app's copy.
     private const string WriteFailed = "settings.json could not be updated (it is not valid JSON, holds a key twice, or is read-only). Fix it, then choose again.";
 
-    // PROPOSED copy (16/10/2026, fifth draft), awaiting the product owner's review: pinned word for word as proposed,
+    // APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft): pinned word for word as approved,
     // independently of the app's copy (AppShell.OffNotSaved). Shown when consent.json could not be deleted but settings.json
     // keeps cloud clean-up off. Unchanged since the third draft.
     private static string ConsentNotDeleted(string reason) =>
         $"Cloud clean-up is off, but consent.json could not be deleted ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is deleted, your consent stays on file.";
 
-    // PROPOSED copy (16/10/2026, fifth draft), as above: settings.json could not be saved; consent.json is gone or never was; and
+    // APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft), as above: settings.json could not be saved; consent.json is gone or never was; and
     // the file names a service off this PC (the next start refuses it without a consent on file) or cannot be read (that start is
     // offline). Unchanged since the second draft.
     private static string SettingsNotSaved(string reason) =>
         $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits.";
 
-    // PROPOSED copy (16/10/2026, fifth draft), as above: settings.json could not be saved, consent.json is gone or never was, and
+    // APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft), as above: settings.json could not be saved, consent.json is gone or never was, and
     // the file names a server on this PC, which the next start uses again. New in the fifth draft.
     private static string SettingsNotSavedServerOnThisPc(string reason) =>
         $"Cloud clean-up is off for this session, but settings.json could not be saved ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start uses that server again, unless settings.json cannot be read, in which case Dictum starts offline.";
 
-    // PROPOSED copy (16/10/2026, fifth draft), as above: neither file could be changed. The fourth draft ended "the next start
+    // APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft), as above: neither file could be changed. The fourth draft ended "the next start
     // sends dictations again"; the fifth ends "the next start turns cloud clean-up back on".
     private static string NeitherChanged(string consent, string settings) =>
         $"Cloud clean-up is off for this session, but consent.json could not be deleted ({consent}) and settings.json could not be saved ({settings}). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start turns cloud clean-up back on, unless settings.json cannot be read, in which case Dictum starts offline.";
 
-    // PROPOSED copy (16/10/2026, fifth draft), awaiting the product owner's review: pinned word for word as proposed,
+    // APPROVED 22/10/2026 copy (proposed 16/10/2026, fifth draft): pinned word for word as approved,
     // independently of the app's copy. Unchanged since the fourth draft.
     private static string OfflineOnlyNotSaved(string reason) =>
         $"Offline only is on for this session, but settings.json could not be saved ({reason}). Dictum tries again at the next reload and when it quits; if it is still not saved then, the next start runs without offline only, unless settings.json cannot be read, in which case Dictum starts offline.";
