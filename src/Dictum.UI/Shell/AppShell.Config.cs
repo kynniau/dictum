@@ -48,8 +48,8 @@ public sealed partial class AppShell
         // Cloud speech (speech.*) sends what the local decoder gets; a request the old one still has under way is cancelled
         // and heard on this PC instead, so nothing more goes out on settings the pages no longer show.
         var outgoingSpeech = _speech;
-        // The load line names the consent's date and the local model that is the fallback (spec §4); consent.json is read for the date only.
-        var agreedAt = _settings.Speech.Consent is null ? null : CloudConsentFile.ReadAll(Paths.ConsentFile).Speech?.AgreedAt;
+        // The load line names the consent's date (from the loader's one read of consent.json) and the local model that is the fallback (spec §4).
+        var agreedAt = _settings.Speech.Consent is null ? null : config.SpeechConsentAgreedAt;
         _speech = CloudSpeech.Create(_settings.Speech, decode, _settings.OfflineOnly, config.Secrets, _http, _log, _models.GetAsync, Models.CurrentName, agreedAt);
         outgoingSpeech.Retire();
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)

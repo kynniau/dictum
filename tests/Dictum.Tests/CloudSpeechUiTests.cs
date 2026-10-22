@@ -585,6 +585,230 @@ public sealed class CloudSpeechUiTests
         }
     });
 
+    // Lens on PR #54 (22/10/2026): the files that may not be written. Each pin below runs the shell's own paths against a
+    // settings.json marked read-only and/or a consent.json another program holds open (FileShare.Read: it can be read, not
+    // deleted or replaced), as CloudOffTakesEffectTests does for clean-up.
+
+    private static SpeechSettings Custom => new() { Provider = SpeechSettings.OpenAiCompatible, BaseUrl = SpeechUrl, Model = "speech-model" };
+
+    private static FileStream HoldOpen(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+    private static void Writable(string path)
+    {
+        if (File.Exists(path)) File.SetAttributes(path, FileAttributes.Normal);
+    }
+
+    /// <summary>L1: settings.json read-only when agreeing: the write-failed sentence, the speech consent withdrawn again, settings.json unchanged, nothing sent.</summary>
+    [Fact]
+    public Task Agreeing_while_settings_json_cannot_be_written_leaves_no_consent_and_sends_nothing() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings());
+        var server = new SpeechServer(HttpStatusCode.OK);
+        var (shell, _, dialogs) = Shell(scratch, server);
+        try
+        {
+            shell.Reload(userRequested: false);
+            var before = File.ReadAllText(scratch.Paths.SettingsFile);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            dialogs.Answers.Enqueue(0); // Send my voice
+            Assert.Equal(ModelCoordinator.WriteFailed, shell.EnableCloudSpeech(Custom));
+            Assert.False(File.Exists(scratch.Paths.ConsentFile)); // recorded, then withdrawn again: nothing else was on file
+            Assert.Equal(before, File.ReadAllText(scratch.Paths.SettingsFile));
+            shell.Reload(userRequested: false);
+            Assert.False(shell.SpeechSendsAudio);
+            Assert.Equal(0, server.Count);
+        }
+        finally
+        {
+            Writable(scratch.Paths.SettingsFile);
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>
+    /// L2 (mutation-checked): the write fails and consent.json is held open from the moment the agreement is recorded, so it cannot
+    /// be withdrawn again: it stays on file but unused, also after settings.json is edited by hand to that host; once it is let
+    /// go, the next reload withdraws it.
+    /// </summary>
+    [Fact]
+    public Task A_consent_that_cannot_be_withdrawn_again_stays_unused_until_it_is() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings());
+        FileStream? held = null;
+        var log = new HookLog(message =>
+        {
+            if (message.StartsWith("Cloud speech agreed to", StringComparison.Ordinal)) held = HoldOpen(scratch.Paths.ConsentFile);
+        });
+        var server = new SpeechServer(HttpStatusCode.OK);
+        var (shell, _, dialogs) = Shell(scratch, server, log);
+        try
+        {
+            shell.Reload(userRequested: false);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            dialogs.Answers.Enqueue(0); // Send my voice
+            Assert.Equal(ModelCoordinator.WriteFailed, shell.EnableCloudSpeech(Custom));
+            Assert.NotNull(held);
+            Assert.Equal(SpeechHost, CloudConsentFile.ReadAll(scratch.Paths.ConsentFile).Speech?.Host); // still on file
+            Assert.False(shell.SpeechSendsAudio);
+
+            Writable(scratch.Paths.SettingsFile);
+            File.WriteAllText(scratch.Paths.SettingsFile, Settings(SpeechAt())); // edited by hand to the host on file
+            shell.Reload(userRequested: false);
+            Assert.Equal(SpeechHost, CloudConsentFile.ReadAll(scratch.Paths.ConsentFile).Speech?.Host);
+            Assert.False(shell.SpeechSendsAudio); // the consent on file is not used
+            Assert.Equal(0, server.Count);
+
+            held!.Dispose();
+            held = null;
+            shell.Reload(userRequested: false);
+            Assert.Null(CloudConsentFile.ReadAll(scratch.Paths.ConsentFile).Speech); // withdrawn at the next reload
+            Assert.False(shell.SpeechSendsAudio);
+        }
+        finally
+        {
+            held?.Dispose();
+            Writable(scratch.Paths.SettingsFile);
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>L3 (mutation-checked): a clean-up consent on file survives an agreement whose settings.json write fails.</summary>
+    [Fact]
+    public Task A_failed_switch_on_keeps_the_clean_up_consent() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings());
+        CloudConsentFile.Write(scratch.Paths.ConsentFile, new CloudConsentRecord(LlmSettings.OpenAiCompatible, "llm.example.com", DateTimeOffset.UtcNow, "test"));
+        var (shell, _, dialogs) = Shell(scratch);
+        try
+        {
+            shell.Reload(userRequested: false);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            dialogs.Answers.Enqueue(0); // Send my voice
+            Assert.Equal(ModelCoordinator.WriteFailed, shell.EnableCloudSpeech(Custom));
+            var consents = CloudConsentFile.ReadAll(scratch.Paths.ConsentFile);
+            Assert.Equal("llm.example.com", consents.Cleanup?.Host);
+            Assert.Null(consents.Speech);
+        }
+        finally
+        {
+            Writable(scratch.Paths.SettingsFile);
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>L4 (mutation-checked): switching off with settings.json read-only says so; the next start finds no consent and sends nothing.</summary>
+    [Fact]
+    public Task A_switch_off_whose_settings_cannot_be_saved_leaves_nothing_agreed_at_the_next_start() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings(SpeechAt()));
+        SpeechConsent(scratch);
+        var (shell, _, _) = Shell(scratch);
+        try
+        {
+            shell.Reload(userRequested: false);
+            Assert.True(shell.SpeechSendsAudio);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            var said = shell.DisableCloudSpeech();
+            Assert.StartsWith("Cloud speech is off for this session, but settings.json could not be saved (", said);
+            Assert.EndsWith("). Nothing is sent. Dictum tries again at the next reload and when it quits.", said);
+            Assert.False(shell.SpeechSendsAudio);
+        }
+        finally
+        {
+            shell.Dispose(); // the last try at quit fails too: settings.json still names the service
+        }
+        var server = new SpeechServer(HttpStatusCode.OK);
+        var (next, _, _) = Shell(scratch, server);
+        try
+        {
+            next.Reload(userRequested: false);
+            Assert.Equal(SpeechSettings.OpenAiCompatible, next.Settings.Speech.Provider);
+            Assert.Equal(SpeechStatus.NotAgreed, next.SpeechStatusLine);
+            Assert.False(next.SpeechSendsAudio);
+            var window = Models(next);
+            Assert.True(Shown(window, SpeechStatus.NotAgreed));
+            window.Close();
+            Assert.Equal(0, server.Count);
+        }
+        finally
+        {
+            Writable(scratch.Paths.SettingsFile);
+            next.Dispose();
+        }
+    });
+
+    /// <summary>L8 (mutation-checked): switching off with both files blocked holds; both let go before quitting, quitting saves it.</summary>
+    [Fact]
+    public Task A_switch_off_with_both_files_blocked_is_saved_at_quit() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings(SpeechAt()));
+        SpeechConsent(scratch);
+        var (shell, _, _) = Shell(scratch);
+        var held = HoldOpen(scratch.Paths.ConsentFile);
+        try
+        {
+            shell.Reload(userRequested: false);
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+            var said = shell.DisableCloudSpeech();
+            Assert.StartsWith("Cloud speech is off for this session, but consent.json could not be changed (", said);
+            Assert.Contains(") and settings.json could not be saved (", said);
+            Assert.False(shell.SpeechSendsAudio);
+            held.Dispose();
+            Writable(scratch.Paths.SettingsFile);
+        }
+        finally
+        {
+            held.Dispose();
+            Writable(scratch.Paths.SettingsFile);
+            shell.Dispose(); // quitting: the last try, with nothing reloading
+        }
+        Assert.Null(CloudConsentFile.ReadAll(scratch.Paths.ConsentFile).Speech);
+        Assert.Equal(SpeechSettings.Local, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Speech.Provider);
+    });
+
+    /// <summary>
+    /// Lens item 2: while cloud speech sends each recording, the header (both views), the tooltip and the support emails' models line
+    /// carry "cloud speech", and the feedback email names the provider only, never the host.
+    /// </summary>
+    [Fact]
+    public Task The_header_tooltip_and_feedback_email_say_cloud_speech_without_the_host() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings(SpeechAt()));
+        SpeechConsent(scratch);
+        var (shell, _, _) = Shell(scratch);
+        try
+        {
+            shell.Reload(userRequested: false);
+            Assert.True(shell.SpeechSendsAudio);
+            Assert.Contains(" · cloud speech · ", shell.ModelsLine);
+            Assert.Contains(" · cloud speech · ", shell.Status.Models);
+            Assert.Contains(" · cloud speech · ", shell.Status.Tooltip);
+            Assert.Contains(" · cloud speech · ", shell.SimpleModelsLine);
+            var facts = shell.FeedbackFacts();
+            Assert.Equal("cloud speech (openai-compatible)", facts.CloudSpeech);
+            var body = Uri.UnescapeDataString(Dictum.Help.SupportMail.FeedbackUri(facts));
+            Assert.Contains("\r\nSpeech: cloud speech (openai-compatible)\r\nClean-up: ", body);
+            Assert.DoesNotContain(SpeechHost, body);
+            Assert.DoesNotContain(SpeechHost, shell.ModelsLine);
+
+            Assert.Null(shell.DisableCloudSpeech());
+            Assert.DoesNotContain("cloud speech", shell.ModelsLine);
+            Assert.DoesNotContain("cloud speech", shell.Status.Tooltip);
+            Assert.Null(shell.FeedbackFacts().CloudSpeech);
+            Assert.DoesNotContain("\r\nSpeech: ", Uri.UnescapeDataString(Dictum.Help.SupportMail.FeedbackUri(shell.FeedbackFacts())));
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>A log that runs <c>onMessage</c> for each line as it is written (to act at an exact point in a shell path).</summary>
+    private sealed class HookLog(Action<string> onMessage) : ILog
+    {
+        public void Write(LogLevel level, string message) => onMessage(message);
+    }
+
     /// <summary>Every request gets the same status; a 200 carries one transcription. Counts them.</summary>
     private sealed class SpeechServer(HttpStatusCode status) : HttpMessageHandler
     {

@@ -4545,4 +4545,4 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
    and observed failing with the withdrawal replaced by deleting consent.json (the clean-up consent went too). Pin 7 observed
    failing with the Privacy default sentence changed by one word. Pin 2 observed failing with the approved default shown
    while cloud speech sends audio.
-10. **Gates.** Release build with `--no-incremental`: 0 warnings, 0 errors. Full suite (xunit.v3, Release): 1897 total, 0 failed, 23 skipped (the existing environment-gated skips), 0 errors.
+10. **Gates.** Release build with `--no-incremental`: 0 warnings, 0 errors. Full suite (xunit.v3, Release): 1897 total, 0 failed, 23 skipped, 0 errors.

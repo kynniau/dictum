@@ -56,6 +56,16 @@ public sealed partial class AppShell
         _ => throw new ArgumentException("Both files keep the switch: there is nothing to say."),
     };
 
+    /// <summary>
+    /// PROPOSED (lens on PR #54, 22/10/2026): the token after the speech runtime in the tray panel's header, the icon's tooltip and
+    /// the support emails' models line while cloud speech sends each recording ("base.en · Vulkan · cloud speech · …"). No host:
+    /// a company's own address could be private, as the feedback email's clean-up fact leaves it out.
+    /// </summary>
+    internal const string CloudSpeechToken = "cloud speech";
+
+    /// <summary>" · cloud speech" while cloud speech sends each recording, else empty.</summary>
+    private string CloudSpeechPart => _speech.SendsAudio ? $" · {CloudSpeechToken}" : "";
+
     /// <summary>True while each recording goes to a speech service (the speech step built at the last load).</summary>
     public bool SpeechSendsAudio => _speech.SendsAudio;
 
@@ -68,13 +78,16 @@ public sealed partial class AppShell
     /// </summary>
     public bool CloudSpeechOn => _settings.Speech.Provider == SpeechSettings.OpenAiCompatible && SpeechPolicy.HasConsent(_settings.Speech);
 
-    /// <summary>The tray panel's "Speech model" value while cloud speech sends each recording (with the failed line after a fallback), else null.</summary>
+    /// <summary>
+    /// PROPOSED (spec §4; this composition, 22/10/2026): the tray panel's "Speech model" value while cloud speech sends each
+    /// recording, with the failed line under it after a fallback, else null.
+    /// </summary>
     internal string? SpeechTrayValue => _speech is { SendsAudio: true, Host: { } host }
         ? _speech.LastFailure is null ? SpeechTrayLine(host) : $"{SpeechTrayLine(host)}\n{_speech.Status}"
         : null;
 
     /// <summary>
-    /// Settings > About's speech line: the cloud line while it sends each recording, the speech step's line after a fallback or
+    /// PROPOSED (spec §4; this composition, 22/10/2026). Settings > About's speech line: the cloud line while it sends each recording, the speech step's line after a fallback or
     /// while cloud speech is set but sends nothing, and null for the default (the speech model on this PC, which the models line names).
     /// </summary>
     internal string? SpeechAboutValue => _speech switch
