@@ -4815,3 +4815,69 @@ The owner approved the plain-words statement (`.demo-preview/terms-disclaimer.md
 11. **Two replacements, APPROVED 22/10/2026 20:45 AEDT (replace the 17:36 sentences; the lens found the originals contradicted on a literal reading).** Page, second paragraph: "It does not count how you use it. It does not phone home. Dictum sends nothing to Kynni." became "It keeps no usage statistics for anyone but you: its log stays on your PC and never records what you said. It does not phone home: the only request to Kynni's website is Check for updates, which you press, and it sends nothing about you." Short version (About and Welcome): "No spyware: Dictum sends nothing to Kynni." became "No spyware: Dictum sends nothing about you to Kynni." Applied in `site/plain-words.html`, `PlainWordsText.Free` and the test literals.
 12. **Privacy policy route, APPROVED 22/10/2026 20:47 AEDT:** `site/privacy.html`, "This website" list, now reads "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates…", the rest of the sentence unchanged; the README network table has a matching row. The policy's "Last updated" date is not changed here: it is set to the 1.3 release date at tag time (the C-Copy lane owns that).
 13. **Mechanical (lens on a95dd5e):** the `// simplification:` comment is in `WelcomeStep`; the landing-page pin counts exactly four case-sensitive "Free to keep on your PC" (mutation: the at-a-glance item changed to another phrase, observed failing, restored); README's About row and Welcome step 1 describe the card and the short version.
+
+## Dictum for macOS (22-23/10/2026, branch feature/mac-platform)
+
+Built on Kyle's Mac (Apple Silicon, macOS 27.2) from docs/MAC-HANDOVER.md, with the owner's decisions of 22/10/2026 that
+override the handover: an Apple Developer Program membership exists, so the beta is a Developer ID signed and notarised
+GitHub pre-release (no Gatekeeper warning), Apple Silicon only (Intel only if a tester needs it), the Mac App Store as a
+later train. The owner creates the signing certificate and the notarisation credentials himself; nothing in the repo or
+the build sessions ever holds them. The release waits until Dictum 1.3 is live on Windows. Provenance marks as in the
+handover: **Verified** means read this session against the named source; **Recalled** is unverified.
+
+**Owner approvals (APPROVED as a block at 23:59 AEDT 22/10/2026, relayed by the Windows orchestrator session):**
+
+- a. Login item through `SMAppService` (ServiceManagement, macOS 13+), not the handover's LaunchAgent plist: the entry
+  survives a moved bundle and appears under System Settings > General > Login Items. The handover's "retire when signed"
+  simplification is retired before it was built. **Verified** 22/10/2026 on developer.apple.com (SMAppService: macOS
+  13.0+; `register()` returns kSMErrorAlreadyRegistered when already registered and kSMErrorLaunchDeniedByUser when the
+  user denied it).
+- b. Notifications through `UNUserNotificationCenter`, guarded: outside an app bundle (a build tree, `dotnet run`) the
+  centre has no bundle identifier, so the title and text go to the log instead. The handover's transient-panel
+  simplification is not built.
+- c. Permissions: both event taps are active taps (kCGEventTapOptionDefault), so the beta asks for Accessibility and
+  Microphone only, not Input Monitoring as a third prompt. To be confirmed on hardware in the test plan (§7).
+- d. Default hotkey on a Mac: Right Option (settings token `RightAlt`); on screen the Alt key reads "Option" and the Win key
+  "Command" (`HotkeyNames.Dialect`, set by Dictum.Mac's entry point; parser tokens unchanged, so settings.json, logs and
+  --selftest keep `RightAlt`, `Win`). Strings "Option" and "Command" APPROVED 23:59 AEDT 22/10/2026.
+- e. `LSMinimumSystemVersion` 15.0: .NET 10 supports macOS 15 and later, Arm64 and x64 (**Verified** 22/10/2026,
+  github.com/dotnet/core release-notes/10.0/supported-os.md); Avalonia 11 lists macOS 10.14 and later (**Verified**
+  v11.docs.avaloniaui.net, Supported Platforms).
+- f. Speech and clean-up runtimes: `Whisper.net.Runtime` 1.9.1 and `LLamaSharp.Backend.Cpu` 0.27.0 only. Both ship ggml's
+  Metal backend for arm64 (**Verified** 22/10/2026 in the restored packages: `build/macos-arm64/libggml-metal-whisper.dylib`
+  and `LLamaSharpRuntimes/osx-arm64/native/libggml-metal.dylib`), so the "CPU" runtime uses the GPU on Apple Silicon; the
+  log keeps every `ggml_metal` line at info so the truth is in the log. `Whisper.net.Runtime.CoreML` is not referenced:
+  Core ML needs a separate encoder file per model (`ggml-<model>-encoder.mlmodelc`, **Verified** whisper.cpp README) that
+  the catalogue does not carry. The handover's "no Metal-capable backend" lead was wrong: it is inside the CPU package.
+- g. Bundle identifier `au.kynni.dictum`; Developer ID signing with the hardened runtime and these entitlements:
+  `com.apple.security.cs.allow-jit`, `com.apple.security.cs.allow-unsigned-executable-memory`,
+  `com.apple.security.cs.allow-dyld-environment-variables`, `com.apple.security.cs.disable-library-validation` (the .NET
+  host's defaults, **Verified** 22/10/2026 learn.microsoft.com "macOS Catalina notarization", dated 23/04/2026) plus
+  `com.apple.security.device.audio-input` (**Verified** developer.apple.com Hardened Runtime).
+- h. The publish and bundle script is bash (`scripts/publish-mac.sh`): this Mac has no pwsh; the handover allows either.
+
+**Where the Mac keeps things.** Both roots are `~/Library/Application Support/Dictum` (settings.json, consent.json, .env at
+the top; models/, logs/, calibration/ beside them), from `HOME` so a scratch profile can be tested as the Windows build
+tests with APPDATA. Not `~/Library/Caches` (the handover's reason, that the system may purge Caches, stays Recalled and was
+not relied on: one visible folder was reason enough). The owner's own install points `models.folder` at
+`/Volumes/CFC Mac SSD/Claude/Dictum/models` through Settings > Storage; no code knows that path.
+
+**Project shape.** `src/Dictum.Mac` is plain `net10.0` with `RuntimeIdentifiers` osx-arm64 (not `net10.0-macos`, which
+brings a workload and bindings this app does not use); assembly name `Dictum.Mac`, because the tests load it beside
+Dictum.Windows, whose assembly is `Dictum`; the bundle script renames the apphost to `Contents/MacOS/Dictum` (the host finds
+its .dll by the name built into it). The solution builds on macOS: `Directory.Build.props` sets `EnableWindowsTargeting`
+off Windows (the SDK otherwise refuses net10.0-windows with NETSDK1100, **Verified** by the first build here), and the x64
+`PlatformTarget` of Dictum.Windows and the tests applies on Windows only (an x64-marked assembly cannot load into the arm64
+test host: "The assembly architecture is not compatible", **Verified** 22/10/2026). The handover's "the tests are
+platform-neutral by design" was wrong: tests/Dictum.Tests targets net10.0-windows and used Dictum.Windows types in 18
+files; it now also references Dictum.Mac, and the Windows-only tests skip on macOS with a reason (lane report below).
+
+**Core changes for the Mac** (src/Dictum.Core): `HotkeyNames.Dialect` and `DefaultHotkey` (decision d); `AppSettings.Hotkey`
+defaults to `HotkeyNames.DefaultHotkey`; `LocalLlmEngine.LoadedLibraryPath` accepts `libllama.dylib`; both engines keep
+`ggml_metal` lines at info. Pinned in tests/Dictum.Tests/MacCoreTests.cs.
+
+**Known wording left for the orchestrator:** with `WhisperEngine.VulkanLoaderPresent` returning false on a Mac, the
+whisper.gpu = auto log line still says "the Vulkan loader, vulkan-1.dll, does not load on this PC" (NoVulkanCrashTests pins
+it); true as stated, but Windows wording. Also `WhisperEngine.LoadedRuntime` and `LocalLlmEngine.Backend` say "CPU" on a
+Mac while Metal is in use inside that runtime; the ggml_metal log lines carry the fact. Both are candidates for a wording
+pass with approved copy, not changed here.

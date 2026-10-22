@@ -43,9 +43,9 @@ public sealed class ThirdPartyNoticesTests
         return shipping;
     }
 
-    /// <summary>The PackageReference elements of the three projects that make up Dictum.exe (not the test or packaging projects).</summary>
+    /// <summary>The PackageReference elements of the four projects that make up Dictum.exe and Dictum.app (not the test or packaging projects).</summary>
     private static List<string> ReferencedPackages() =>
-        [.. new[] { "Dictum.Core", "Dictum.UI", "Dictum.Windows" }
+        [.. new[] { "Dictum.Core", "Dictum.UI", "Dictum.Windows", "Dictum.Mac" }
             .SelectMany(project => Regex.Matches(File.ReadAllText(Repo("src", project, project + ".csproj")), @"<PackageReference Include=""([^""]+)"" Version=""([^""]+)""")
                 .Select(m => $"{m.Groups[1].Value} {m.Groups[2].Value}"))];
 
@@ -71,6 +71,48 @@ public sealed class ThirdPartyNoticesTests
         Assert.True(referenced.Count >= 14, $"only {referenced.Count} PackageReference elements were found");
         var missing = Missing(referenced, Entries(Notices));
         Assert.True(missing.Length == 0, "THIRD-PARTY-NOTICES.txt has no 'Package: <id> <version>' entry for: " + missing);
+    }
+
+    /// <summary>
+    /// The macOS build's packages (docs/DECISIONS.md "Dictum for macOS", 22/10/2026): every package in src/Dictum.Mac's restore
+    /// result that puts a managed library or a macOS native library (a .dylib under an osx or macos folder) in Dictum.app.
+    /// </summary>
+    private static List<string> MacShippingPackages()
+    {
+        var assets = Repo("src", "Dictum.Mac", "obj", "project.assets.json");
+        Assert.True(File.Exists(assets), $"{assets} is missing: restore the solution first (dotnet build).");
+        using var json = JsonDocument.Parse(File.ReadAllText(assets));
+        var target = json.RootElement.GetProperty("targets").EnumerateObject().First(t => !t.Name.Contains('/')).Value;
+        var libraries = json.RootElement.GetProperty("libraries");
+        var shipping = new List<string>();
+        foreach (var library in target.EnumerateObject().Where(l => l.Value.GetProperty("type").GetString() == "package"))
+        {
+            var managed = library.Value.TryGetProperty("runtime", out var runtime) && runtime.EnumerateObject().Any(p => !p.Name.EndsWith("/_._", StringComparison.Ordinal));
+            var macNative = libraries.GetProperty(library.Name).GetProperty("files").EnumerateArray().Select(f => f.GetString()!)
+                .Any(f => f.EndsWith(".dylib", StringComparison.OrdinalIgnoreCase) && (f.Contains("osx", StringComparison.Ordinal) || f.Contains("macos", StringComparison.Ordinal)));
+            if (managed || macNative) shipping.Add(library.Name.Replace('/', ' '));
+        }
+        return shipping;
+    }
+
+    [Fact]
+    public void Every_package_that_ships_files_into_the_app_bundle_has_a_notice_entry_at_its_version()
+    {
+        var shipping = MacShippingPackages();
+        Assert.True(shipping.Count >= 20, $"only {shipping.Count} shipping packages were found in the Mac restore result");
+        Assert.Contains("Avalonia.Native 11.3.22", shipping);
+        Assert.Contains("SkiaSharp.NativeAssets.macOS 2.88.9", shipping); // native files from a package no csproj names
+        Assert.Contains("HarfBuzzSharp.NativeAssets.macOS 8.3.1.1", shipping);
+        var missing = Missing(shipping, Entries(Notices));
+        Assert.True(missing.Length == 0, "THIRD-PARTY-NOTICES.txt has no 'Package: <id> <version>' entry for: " + missing +
+            ". Read each package's .nuspec and licence files in the NuGet cache, add or update its entry, and record the sources in docs/DECISIONS.md.");
+    }
+
+    [Fact]
+    public void The_macOS_self_contained_runtime_has_an_entry()
+    {
+        // publish-mac.sh builds self-contained for osx-arm64, so that runtime pack ships inside Dictum.app.
+        Assert.Matches(@"(?m)^Package: Microsoft\.NETCore\.App\.Runtime\.osx-arm64 \S+\r?$", Notices);
     }
 
     [Fact]
