@@ -90,3 +90,5 @@ scratch/
 .scratch/
 *.bak
 *.orig
+# macOS Finder metadata
+.DS_Store

@@ -1055,7 +1055,8 @@ the polish lane restructures the solution now:
   styling for click-through and no-activate, the tray icon host. Entry point `Dictum.exe`.
 - `src/Dictum.Mac` (net10.0-macos; created later, empty slot now with the interface
   listed): CGEventTap hotkey, AVAudioEngine capture, NSPasteboard + Cmd-V, NSStatusItem,
-  SMAppService, NSPanel flags. Permissions: Microphone, Accessibility, Input Monitoring.
+  SMAppService, NSPanel flags. Permissions: Microphone and Accessibility (active event taps need no
+  Input Monitoring grant: docs/DECISIONS.md, decision c, 22/10/2026).
 - `IPlatform` is the single seam: hotkey listener, input injector, clipboard, audio
   capture factory, startup registration, single-instance guard, window-flag applier,
   app-paths provider, tray host. Nothing outside `Dictum.Windows`/`Dictum.Mac` may
