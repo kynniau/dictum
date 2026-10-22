@@ -422,7 +422,7 @@ public class HelpPageTests
     [Theory]
     [InlineData("faq-what-is-cleanup", "What is clean-up?")]
     [InlineData("faq-see-how", "How can I see what Dictum does with my words?")]
-    [InlineData("faq-own-instructions", "Can I give the clean-up my own instructions?")] // PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner)
+    [InlineData("faq-own-instructions", "Can I give the clean-up my own instructions?")] // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword
     public void The_site_guide_carries_the_clean_up_answers_word_for_word(string id, string question)
     {
         static string Plain(string s) => Regex.Replace(Regex.Replace(s, "<[^>]+>", "").Replace("&gt;", ">").Replace("&amp;", "&").Replace("\"", ""), @"\s+", " ").Trim();
@@ -839,7 +839,7 @@ public class HelpPageTests
     });
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): the Create the key file… button leads the cloud answer, and the
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the Create the key file… button leads the cloud answer, and the
     /// sixteen steps stay, unchanged and in order, as the fallback it names ("If the button does not work for you…"). The site's section
     /// carries both new paragraphs before its list of sixteen steps. The paragraph is the own-instructions lane's (PR #60), verbatim.
     /// </summary>
@@ -868,7 +868,7 @@ public class HelpPageTests
     }
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): "Can I give the clean-up my own instructions?" sits after the cloud
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: "Can I give the clean-up my own instructions?" sits after the cloud
     /// setup question, answers in two paragraphs that say what the box does, where it goes (and that cloud clean-up receives it) and that
     /// every reply is still checked (usually, not always: it says to read what was typed), and names the labels PR #60 builds. It makes no
     /// claim the rule-based tidy or Off use the box.

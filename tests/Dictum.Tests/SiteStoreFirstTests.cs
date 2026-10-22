@@ -77,7 +77,7 @@ public sealed class SiteStoreFirstTests
         Assert.Equal([StoreUrl], links);
     }
 
-    // ---- Cloud speech: the public pages say the voice stays on the PC unless cloud speech is on (PROPOSED 22/10/2026; pending the owner) ----
+    // ---- Cloud speech: the public pages say the voice stays on the PC unless cloud speech is on (APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword) ----
 
     /// <summary>The words a visitor reads on a page: comments, scripts and tags gone (inline tags leave no gap, so an SVG badge's lines join up), entities decoded, spaces collapsed.</summary>
     private static string Prose(string page) =>

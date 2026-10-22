@@ -424,12 +424,12 @@ public class OwnerApprovalsTests
     }
 
     /// <summary>
-    /// PROPOSED 22/10/2026 pin (cloud speech copy lane; pending the owner): the Help strings for the own-instructions box and the Create the
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: pin of the Help strings for the own-instructions box and the Create the
     /// key file… button, word for word. The sentences are the own-instructions lane's (PR #60), except the cloud answer's second paragraph and the
-    /// own-instructions answer's second paragraph and last clause, which are the lens's wording (22/10/2026). When the owner approves them, move this test under "APPROVED" with the date.
+    /// own-instructions answer's second paragraph and last clause, which are the lens's wording (22/10/2026). Approved by the owner as part of the 1.3 block (22/10/2026 22:52 AEDT).
     /// </summary>
     [Fact]
-    public void The_proposed_own_instructions_and_key_file_help_strings_are_pinned()
+    public void The_approved_own_instructions_and_key_file_help_strings_are_pinned()
     {
         Assert.Equal("To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
             HelpText.CloudAnswer[4]);

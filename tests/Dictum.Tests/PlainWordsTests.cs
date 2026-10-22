@@ -195,7 +195,7 @@ public sealed class PlainWordsTests
         Assert.Contains("APPROVED by the owner 22/10/2026 17:42 AEDT", Site("index.html"));
     }
 
-    // ---- Cloud speech: README, Store and Mac handover (PROPOSED 22/10/2026 by the cloud speech copy lane; pending the owner) ----
+    // ---- Cloud speech: README, Store and Mac handover (APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword) ----
 
     private static string Repo(params string[] path) => File.ReadAllText(Path.Combine([FixBatchDownloadTests.RepoRoot(), .. path]));
 
@@ -220,7 +220,7 @@ public sealed class PlainWordsTests
         Assert.Contains("**Nothing leaves the machine by default.**", readme); // the approved heading line is unchanged
     }
 
-    /// <summary>Store: the listing text, the age-rating answer, the privacy-policy hosts note, row 13, and the 1.3.0 What's new and notes blocks, all marked PROPOSED and above/after the approved 1.2.1 ones.</summary>
+    /// <summary>Store: the listing text, the age-rating answer, the privacy-policy hosts note, row 13, and the 1.3.0 What's new block (APPROVED 22/10/2026 22:52 AEDT) and the 1.3.0 tester notes (still PROPOSED: they go with the Store submission), above/after the approved 1.2.1 ones.</summary>
     [Fact]
     public void The_store_text_names_cloud_speech_and_the_1_3_0_blocks_are_proposed()
     {
@@ -240,7 +240,7 @@ public sealed class PlainWordsTests
         var before = store.IndexOf("### What's new in this version (1.2.1)", StringComparison.Ordinal);
         Assert.True(now > 0 && now < before, "the 1.3.0 block sits above the 1.2.1 one");
         var block = store[now..before];
-        Assert.Contains("PROPOSED 22/10/2026", block);
+        Assert.Contains("APPROVED 22/10/2026 22:52 AEDT", block);
         Assert.Contains("Adds optional cloud speech: an advanced setting, off by default, that sends each recording to OpenAI, Azure OpenAI or Groq with your own API key, after a consent step of its own.", block);
         Assert.Contains("your own clean-up instructions and a Create the key file button", Flat(block));
         Assert.Contains("Settings > Storage offers to move your model files", block);

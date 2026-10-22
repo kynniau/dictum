@@ -121,7 +121,7 @@ public static class HelpText
         "Before Dictum sends text to a service off this PC, it shows a warning. For Anthropic, it says: \"" + CloudPolicy.ConsentWarning(CloudExampleHost) + "\"",
         "Dictum can use Anthropic, OpenAI, Google Gemini or your own server. For Anthropic, OpenAI and Google Gemini, you need your own account with that service and an API key.",
         "To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.",
-        // PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the first paragraph is the own-instructions lane's Help sentence for the
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the first paragraph is the own-instructions lane's Help sentence for the
         // Create the key file… button (PR #60), verbatim; the second keeps the Notepad steps below as the fallback and is this lane's. True only
         // once the button is on Settings > Clean-up (PR #60, wired at 5e9c227, not merged when this was written).
         "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
@@ -155,11 +155,11 @@ public static class HelpText
         "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
     ];
 
-    /// <summary>PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the question for the own-instructions box (PR #60).</summary>
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the question for the own-instructions box (PR #60).</summary>
     public const string OwnInstructionsQuestion = "Can I give the clean-up my own instructions?";
 
     /// <summary>
-    /// PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the first paragraph is the own-instructions lane's Help text (PR #60), verbatim except
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the first paragraph is the own-instructions lane's Help text (PR #60), verbatim except
     /// its last words ("as part of Dictum's clean-up instructions.": the instructions go in the system prompt, not the dictation text; lens fix). The
     /// second paragraph is the lens's wording: the check is usually right, not always, and the paragraph says so. True only once the box is on
     /// Settings > Clean-up (PR #60, wired at 5e9c227, not merged when this was written). The site's help page carries the same two paragraphs word for word (pinned).
@@ -274,7 +274,7 @@ public static class HelpText
         // APPROVED 22/10/2026 (proposed 22/10/2026): do not reword. The quoted lines are APPROVED copy taken from
         // CloudPolicy (never reworded here) and the tray panel's line, pinned against the app by HelpPageTests.
         new(CloudQuestion, CloudAnswer),
-        // PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the own-instructions box (PR #60), next to the cloud clean-up setup it also applies to.
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the own-instructions box (PR #60), next to the cloud clean-up setup it also applies to.
         new(OwnInstructionsQuestion, OwnInstructionsAnswer),
         new("How do I remove Dictum completely?",
         [

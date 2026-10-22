@@ -1320,7 +1320,7 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   the top of the view (`HelpPage.JumpGap`); an answer the page cannot scroll that far (the last ones) shows whole.
   APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): two more questions after "Why did it type the wrong words?", "What is
   clean-up?" and "How can I see what Dictum does with my words?" (`HelpText.CleanupQuestion`, `SeeHowQuestion`), which make fifteen;
-  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers"). PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): a sixteenth
+  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers"). APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: a sixteenth
   question, "Can I give the clean-up my own instructions?", after "How do I turn on cloud clean-up?", and a Create the key file… paragraph at the head of that answer (§31).
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
@@ -1568,7 +1568,7 @@ Every new user-facing string is APPROVED 22/10/2026 (DECISIONS, "Owner approvals
 - **Pins**: `PlainWordsTests`, `OwnerApprovalsTests.The_plain_words_short_version_is_pinned`, `SiteStoreFirstTests` (anchors and the GitHub line on the new page).
 
 
-## 31. Cloud speech: public copy (amendment, 22/10/2026, PROPOSED, pending the owner)
+## 31. Cloud speech: public copy (amendment, 22/10/2026, APPROVED 22/10/2026 22:52 AEDT)
 
 Cloud speech (§28) sends the recording of each dictation to a service the user chooses, so every public surface that says where the
 voice goes says "unless you turn on cloud speech" (or "by default"). Wording and the old sentences: docs/DECISIONS.md, "Public copy for
@@ -1583,6 +1583,6 @@ cloud speech and the 1.3 features".
   https:// address, what is sent (the recording as a WAV file, the personal dictionary words as a hint, in hands-free the closing words of the part before) and that Dictum cannot validate or
   certify how the service handles the voice; This website; Offline only, which now refuses cloud speech to a service that is not on the PC; What any connection reveals); If you install from the
   Microsoft Store; This website; Deleting everything; Changes to this policy; Contact. The "Last updated" date is set at tag time.
-- **Help questions** (§26): sixteen. PROPOSED: "Can I give the clean-up my own instructions?" (`HelpText.OwnInstructionsQuestion`) after "How do I turn on cloud clean-up?",
+- **Help questions** (§26): sixteen. APPROVED 22/10/2026 22:52 AEDT: "Can I give the clean-up my own instructions?" (`HelpText.OwnInstructionsQuestion`) after "How do I turn on cloud clean-up?",
   and that answer opens with the Create the key file… button, keeping the sixteen Notepad steps as the fallback. Both depend on the own-instructions box and the key file button (PR #60, wired into Settings > Clean-up at 5e9c227, not merged when this was written). Settings > Storage's offer to move model files is PR #61 (f5ec71c; it offers the move from Change…, Browse… and Use default). Merge order: #60, #61, then the copy PR (#62); when main is merged into the copy branch, §26 must read "sixteen questions" and "unless cloud clean-up or cloud speech is turned on".
 - **Store** (`docs/STORE.md`) and **Mac handover** (`docs/MAC-HANDOVER.md`): see DECISIONS. The Mac beta is Apple Silicon only (owner, 22/10/2026).

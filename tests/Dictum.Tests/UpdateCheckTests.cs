@@ -38,11 +38,11 @@ public class UpdateCheckTests
 
     /// <summary>
     /// The privacy policy's sentence for dictum.kynni.au since 22/10/2026 20:47 AEDT (plain-words route added, APPROVED). The landing page's
-    /// card carried the earlier sentence ("... the privacy policy or the full guide ...") until the cloud speech copy lane (PROPOSED, pending the
-    /// owner) made it match this one, as the lane's brief asked.
+    /// card carried the earlier sentence ("... the privacy policy or the full guide ...") until the cloud speech copy lane (APPROVED 22/10/2026 22:52 AEDT)
+    /// made it match this one, as the lane's brief asked.
     /// </summary>
     private const string PrivacySiteSentence = "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
-    // PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): the bullet was "... to send text to a cloud clean-up service or a server you choose."
+    // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the bullet was "... to send text to a cloud clean-up service or a server you choose."
     private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, to check for updates in the direct-download version, or, if you switch it on, to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose.</li>";
 
     private const string DownloadPage = "https://github.com/kynniau/dictum/releases/latest";
