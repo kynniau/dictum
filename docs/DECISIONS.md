@@ -4404,3 +4404,17 @@ of the design note "four asks, designed and sized" (22/10/2026), stages 1-5 only
    alone. Both cases are pinned.
 4. Record turning on when the model finishes loading is pinned end to end through the shell's own events (ModelManager.Changed,
    ModelStateChanged, StatusChanged, Changed, SettingsWindow's refresh, the page's Redraw), not `page.Refresh()`.
+
+**After cloud speech Core (PR #48, merged into this branch at 39fd139):**
+
+1. `AppShell.Pipeline` asks the speech step (`token => _speech.GetAsync(token)`), as #48's inline pipeline did, and the
+   controller and the page share it. Pinned: with cloud speech on, the demonstration is one request to the speech service a
+   dictation uses and shows that service's text. Pointing the pipeline back at the local model fails both this pin and
+   `CloudSpeechShellTests.A_dictation_through_the_shell_goes_to_cloud_speech`.
+2. "The sound never leaves this PC" is shown only while the model on this PC is the speech step. PROPOSED for cloud speech:
+   "This page pastes nothing. The recording is kept in memory only and never saved to disk. With cloud speech on, the sound is
+   sent to {host} to be turned into text." and, for step 2, "With cloud speech on, {host} turns the sound into words (the
+   speech model on this PC, if that fails). This is the raw text." Pinned.
+3. The `SpeechReady` gate is unchanged. Record gates on the local model, as the hotkey does (`hotkeyBlocked: !_models.IsReady`).
+   The local model stays loaded as cloud speech's fallback (`CloudSpeech` summary), so the page and the hotkey agree.
+   The page does not say when cloud speech fell back to the local model for a take, because `PipelineProgress` does not carry it.

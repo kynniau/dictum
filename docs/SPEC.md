@@ -1487,6 +1487,12 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
      the pill's own "Polishing…" (the `showPill` event).
   5. *What would be pasted*: the finished text, with a line when corrections, the profanity filter or snippets changed it.
      Not timed: the pipeline does not time this step, so no time is shown.
+- **Speech step** (after §28, cloud speech Core): the pipeline's transcriber is the shell's speech step
+  (`token => _speech.GetAsync(token)`), the same for the controller and the page. While the model on this PC is the speech
+  step, the in-memory line says the sound never leaves this PC; with cloud speech on (`CloudSpeech.SendsAudio`) it says the
+  sound is sent to its host (`HowItWorksText.CloudSpeechNote`), and step 2's description names that host
+  (`HowItWorksText.HeardByCloud`). Record still gates on the local model being ready (`AppShell.SpeechReady`), as the hotkey
+  does (`hotkeyBlocked: !_models.IsReady`): the local model stays loaded as cloud speech's fallback.
 - **Timings**: only the pipeline's two stopwatch readings (transcription; clean-up), the same values its log lines carry.
   No other clock is added.
 - **Accessibility**: every control named; each stage is a tab stop named with all it shows, with a ring only for keyboard

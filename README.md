@@ -173,7 +173,8 @@ AI clean-up with whether Dictum accepted its reply and, if not, the check it fai
 negation"), and the text a dictation would paste. Each timed step shows the time Dictum's log records for it. It uses
 your current settings: the same speech model and clean-up as your dictations. The page pastes nothing and keeps the
 recording in memory only; it is never saved to disk. If your clean-up sends text to a cloud service, this text goes
-there too, and the page says so. The page's words are PROPOSED (docs/DECISIONS.md, 22/10/2026).
+there too, and the page says so. With cloud speech on, the sound goes to the speech service, as a dictation's does, and the
+page says that instead of "the sound never leaves this PC". The page's words are PROPOSED (docs/DECISIONS.md, 22/10/2026).
 
 ### Feedback and feature requests
 
