@@ -318,8 +318,8 @@ PROPOSED. Dictum for macOS is a beta for Apple Silicon Macs on macOS 15 or later
 from the project's GitHub releases, check it against `SHA256SUMS-mac.txt` (`shasum -a 256 Dictum-<version>-osx-arm64.zip`),
 unzip it and move `Dictum.app` to Applications. A build signed with the owner's Developer ID certificate and notarised opens
 normally; an ad-hoc build is refused by Gatekeeper until you allow it in System Settings > Privacy & Security. The app lives in
-the menu bar (no Dock icon). On first use macOS asks for Microphone, Accessibility (to paste into other apps) and Input Monitoring (to see your hotkey) access, and for approval in System
-Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app.
+the menu bar (no Dock icon). On first use macOS asks for Microphone access and for Accessibility access (to see your hotkey and
+to paste into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app.
 
 Testing the self-signed MSIX package before the Store listing is live: see [docs/TESTING-MSIX.md](docs/TESTING-MSIX.md).
 
