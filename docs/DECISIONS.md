@@ -4286,6 +4286,11 @@ two buttons are APPROVED (owner, 22/10/2026, 10:50 AEDT); every other new user-f
     `SpeechStatus.Local`, `On`, `Failed`, `NotAgreed`, `TranslateRefused`, `NothingSent`, `FallbackPill`;
     the log lines in items 4 and 6; the `speech` entry in the default settings.json's `_doc`. `SpeechStatus.WaitingForKey`
     and `OfflineOnly` reuse clean-up's approved lines word for word.
+    *Revised (cloud speech UI lane, owner approval 22/10/2026, 16:31 AEDT):* one clause of `ConsentText`'s last paragraph,
+    because offline only keeps allowing a speech server on this PC (loopback https), as it does for clean-up. "offline only
+    mode refuses it" became "offline only mode refuses any service that is not on this PC"; the last paragraph now reads
+    "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode refuses any
+    service that is not on this PC; your speech model on this PC is used again." The rest of the constant is byte-identical.
 11. **Not verified.** No request was made to any real service. That Azure OpenAI and Groq accept the key as
     `Authorization: Bearer` on `/audio/transcriptions` (the brief: Azure's REST reference lists the key in the
     `authorization` header; Groq's header is Recalled); that `gpt-transcribe` takes `language` (the brief's table says it
@@ -4602,3 +4607,33 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
     - *Correction.* Item 10 earlier called the 23 skips "the existing environment-gated skips"; that was not checked against
       main, so the claim is removed.
 12. **Gates after the fix round** (after merging origin/main): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1906 total, 0 failed, 23 skipped, 0 errors.
+13. **Owner decisions on the open points (22/10/2026, 16:22-16:31 AEDT), applied.**
+    1. *Privacy caption.* While cloud speech sends audio and Privacy shows a clean-up line, the caption "Cloud clean-up:"
+       (`AppShell.CloudCleanupCaption`, APPROVED 22/10/2026; the lens's wording) sits above it, so a clean-up "nothing is
+       sent" line is not read as being about speech. The approved clean-up lines are byte-identical. Pinned.
+    2. *Simple view.* While cloud speech is on (`CloudSpeechOn`), the Simple view shows the card's state line and "Switch
+       cloud speech off"; the setup fields (service, address, model, key line) stay Advanced-only. With it off, Simple shows
+       nothing of the card. This supersedes item 4's "The Simple view hides the whole card". Pinned both ways, and the off
+       switch works from Simple.
+    3. *Replacement sentence.* APPROVED 22/10/2026 16:27 AEDT, verbatim (`AppShell.AudioByDefaultSentence`): "Audio never
+       leaves this PC by default, though advanced users can add their own cloud speech and clean-up services in settings."
+       While cloud speech sends audio it takes the place of "Audio never leaves this PC." in the Clean-up card's introduction
+       and in Privacy's cloud clean-up sentence (`AppShell.WithAudioSentence`, an ordinal replace on the approved line). With
+       cloud speech off both originals are byte-identical. This supersedes item 6's hiding of the introduction and the Clean-up
+       card's on line in Privacy (`CleanupPage.StateLine` is private again). Pinned in both states, byte for byte.
+    4. *Tray.* The speech line is shown once, in the footer, where "Nothing leaves this PC" sits when off (with the failed line
+       under it after a fallback); the Speech model picker keeps the model's name. Pinned (one occurrence; the picker's
+       selection starts with the model's name).
+    5. *Offline only.* The owner keeps allowing a speech server on this PC (loopback https) under offline only, as clean-up
+       does: no gate change. `SpeechPolicy.ConsentText`'s last paragraph has one clause revised and APPROVED (16:31 AEDT):
+       "offline only mode refuses it" became "offline only mode refuses any service that is not on this PC"; the rest of the
+       constant is byte-identical. Marked "APPROVED 22/10/2026 (clause revised 16:31 AEDT): do not reword"; the byte pins in
+       `CloudSpeechTests` and `CloudSpeechUiTests` (now a literal copy too), SPEC §28 and the Core entry's item 10 are updated.
+       The switch-on path still refuses under offline only before any dialog, as clean-up's does.
+    - *Mutations (observed 22/10/2026), each restored.* One character changed in the replacement constant ("settings." to
+      "settings!"): the replacement pin observed failing (the introduction's on state). One character changed in the Clean-up
+      introduction literal ("service." to "service,"): the replacement pin and the default-sentence pin observed failing. One
+      character changed in Privacy's approved clean-up sentence ("on." to "on,"): the replacement pin (Privacy's on state) and
+      the clean-up-sentence pin observed failing. One character changed in the caption ("Cloud clean-up:" to "Cloud clean-up;"):
+      the replacement pin observed failing.
+14. **Gates after the owner's decisions** (after merging origin/main 3f0eb06): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1907 total, 0 failed, 23 skipped, 0 errors.

@@ -36,9 +36,12 @@ internal sealed class CleanupPage : SettingsPage
 
     /// <summary>
     /// The card's introduction (approved: never reword it). Its last sentence, "Audio never leaves this PC.", is untrue while cloud
-    /// speech sends each recording, so the whole line is hidden then rather than reworded; the owner's replacement is pending.
+    /// speech sends each recording, so then it shows the owner's approved replacement (<see cref="AppShell.AudioByDefaultSentence"/>,
+    /// 22/10/2026 16:27 AEDT) in its place; otherwise it is shown byte for byte.
     /// </summary>
-    private readonly TextBlock _intro = Ui.Text("Optional. A cloud model can tidy longer dictations well, but the text of every dictation then goes to that service. Audio never leaves this PC.");
+    private const string Intro = "Optional. A cloud model can tidy longer dictations well, but the text of every dictation then goes to that service. Audio never leaves this PC.";
+
+    private readonly TextBlock _intro = Ui.Text(Intro);
 
     public CleanupPage(AppShell shell) : base(shell, "Clean-up")
     {
@@ -82,13 +85,13 @@ internal sealed class CleanupPage : SettingsPage
         _cloudOn.IsVisible = on;
         _cloudOff.IsVisible = !on;
         _cloudState.Text = on ? StateLine(Shell) : "";
-        _intro.IsVisible = !Shell.SpeechSendsAudio; // its "Audio never leaves this PC." is untrue while cloud speech is on
+        _intro.Text = Shell.WithAudioSentence(Intro); // the owner's replacement for "Audio never leaves this PC." while cloud speech sends audio
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
     }
 
     /// <summary>The card's state line while cloud clean-up is on (a host agreed to, or a server on this PC).</summary>
-    internal static string StateLine(AppShell shell)
+    private static string StateLine(AppShell shell)
     {
         var s = shell.Settings;
         var host = CloudPolicy.CloudHost(s.Llm);
@@ -186,6 +189,7 @@ internal sealed class PrivacyPage : SettingsPage
 {
     private readonly TextBlock _summary = Ui.Text("");
     private readonly TextBlock _speechSummary = Ui.Text(""); // cloud speech's line (SpeechSummary), above the clean-up summary
+    private readonly TextBlock _cleanupCaption = Ui.Text(AppShell.CloudCleanupCaption, "caption"); // above the clean-up summary while cloud speech sends audio
     private readonly ToggleSwitch _offline;
     private readonly ToggleSwitch _history;
     private readonly ToggleSwitch _transcripts;
@@ -199,7 +203,7 @@ internal sealed class PrivacyPage : SettingsPage
         _history = Ui.Switch(true, on => Write(("insert.clipboard_history", Json(!on))));
         _transcripts = Ui.Switch(false, on => Write(("log_transcripts", Json(on))));
         Compose(
-            Ui.Card(Ui.Stack(8, _speechSummary, _summary,
+            Ui.Card(Ui.Stack(8, _speechSummary, Ui.Stack(2, _cleanupCaption, _summary),
                 Ui.Text($"Models download from {ModelCatalog.DownloadHost} only when you choose one, and each file's size and SHA-256 are checked before use.", "caption")), "What leaves this PC"),
             Ui.Card(Ui.Stack(4,
                 Ui.Line("Offline only", _offline, "No network at all: downloads and cloud clean-up are refused."),
@@ -214,10 +218,10 @@ internal sealed class PrivacyPage : SettingsPage
     {
         var s = Shell.Settings;
         var server = CloudPolicy.LocalServerHost(s.Llm);
-        // Cloud speech first (spec §4), read from the speech step in use. While it sends each recording, the two approved
-        // sentences below that it makes untrue are not shown (never reworded): the default "Nothing leaves this PC…" is replaced
-        // by the speech line, and the cloud clean-up sentence, which says "Audio never leaves this PC.", by the Clean-up card's
-        // own state line for the same clean-up.
+        // Cloud speech first (spec §4), read from the speech step in use. While it sends each recording: the approved default
+        // "Nothing leaves this PC…" gives way to the speech line; the cloud clean-up sentence shows the owner's approved replacement
+        // for its "Audio never leaves this PC." (AppShell.WithAudioSentence); and the clean-up line has the "Cloud clean-up:"
+        // caption above it (owner, 22/10/2026). Otherwise every approved line is shown byte for byte.
         var speechSends = Shell.SpeechSendsAudio;
         _speechSummary.Text = SpeechSummary(Shell) ?? "";
         _speechSummary.IsVisible = _speechSummary.Text.Length > 0;
@@ -226,10 +230,10 @@ internal sealed class PrivacyPage : SettingsPage
             : CleanupPage.OfflineOnlyIsWhyNothingIsSent(Shell) ? CloudPolicy.OfflineOnlyLine
             : Shell.NothingLeaves ? speechSends ? null : "Nothing leaves this PC: speech recognition and clean-up both run here."
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
-            : speechSends ? CleanupPage.StateLine(Shell)
-            : $"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. {CloudPolicy.StateLineWarning}";
+            : Shell.WithAudioSentence($"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. {CloudPolicy.StateLineWarning}");
         _summary.Text = cleanup ?? "";
         _summary.IsVisible = cleanup is not null;
+        _cleanupCaption.IsVisible = speechSends && cleanup is not null;
         Ui.SetQuietly(_offline, s.OfflineOnly);
         Ui.SetQuietly(_history, !s.Insert.ClipboardHistory);
         Ui.SetQuietly(_transcripts, s.LogTranscripts);

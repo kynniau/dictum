@@ -126,7 +126,7 @@ internal sealed class ModelsPage : SettingsPage
     private List<string> _cleanupOnPc = []; // the clean-up catalogue entries on this PC
     private (TextBlock Detail, string TradeOff)? _downloadingRow; // the row whose file downloads now: its percentage changes on every tick
 
-    // The Cloud speech card (Advanced view only), laid out as Settings > Clean-up's Cloud clean-up card: an off state with the
+    // The Cloud speech card (its setup in the Advanced view only; its on state in both), laid out as Settings > Clean-up's Cloud clean-up card: an off state with the
     // service, its fields, the key line and "Use cloud speech…", and an on state with the state line and the off switch.
     private readonly StackPanel _speechCloudOn = new() { Spacing = 10 };
     private readonly StackPanel _speechCloudOff = new() { Spacing = 10 };
@@ -139,6 +139,7 @@ internal sealed class ModelsPage : SettingsPage
     private readonly TextBlock _speechKey = Ui.Text("", "caption");
     private readonly Button _speechEnable;
     private readonly TextBlock _speechOffline = Ui.Text("", "caption");
+    private readonly Border _cloudSpeechCard; // Advanced: always; Simple: only while cloud speech is on (state line and off switch)
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -222,14 +223,14 @@ internal sealed class ModelsPage : SettingsPage
             _speechOffline]);
         _speechCloudOn.Children.AddRange([_speechCloudState, Ui.Row(8, Ui.Button(CloudSpeechOffLabel, "secondary", () => Run(() =>
             Say(Shell.DisableCloudSpeech() ?? CloudSpeechSwitchedOff))))]);
-        var cloudSpeech = Ui.Card(Ui.Stack(10, _speechCloudOn, _speechCloudOff), CloudSpeechTitle);
+        _cloudSpeechCard = Ui.Card(Ui.Stack(10, _speechCloudOn, _speechCloudOff), CloudSpeechTitle);
         _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff, languageSimple];
-        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, cloudSpeech, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
+        _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
         Compose(
             Ui.Stack(6, _view, Ui.Text(SimpleView.SwitchHelp, "caption")),
             _download,
             Ui.Card(Ui.Stack(10, speechIntro, explainer, _simpleSpeech, _speech, chooseFile, decoding), "Speech model"),
-            cloudSpeech,
+            _cloudSpeechCard,
             Ui.Card(Ui.Stack(10,
                 languageSimple,
                 languageAdvanced,
@@ -403,8 +404,12 @@ internal sealed class ModelsPage : SettingsPage
     private void RedrawCloudSpeech(AppSettings s)
     {
         var on = Shell.CloudSpeechOn;
+        // The Simple view shows the card only while cloud speech is on, and then only its state line and off switch (owner,
+        // 22/10/2026): the setup fields (service, address, model, key line) stay Advanced-only.
+        var simple = s.Ui.IsSimple;
+        _cloudSpeechCard.IsVisible = on || !simple;
         _speechCloudOn.IsVisible = on;
-        _speechCloudOff.IsVisible = !on;
+        _speechCloudOff.IsVisible = !on && !simple;
         _speechCloudState.Text = on ? Shell.SpeechStatusLine : "";
         _speechCloudPending.Text = !on && s.Speech.Provider != SpeechSettings.Local ? Shell.SpeechStatusLine : "";
         _speechCloudPending.IsVisible = _speechCloudPending.Text.Length > 0;

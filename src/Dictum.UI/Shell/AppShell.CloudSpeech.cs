@@ -31,7 +31,23 @@ public sealed partial class AppShell
     /// <summary>PROPOSED: switching on was refused because offline only is on (clean-up's sentence, for speech).</summary>
     internal const string SpeechOfflineRefused = "offline_only is on, so cloud speech is refused. Switch offline only off in Settings > Privacy first.";
 
-    /// <summary>PROPOSED (spec §4): the tray panel's "Speech model" value while cloud speech sends each recording.</summary>
+    /// <summary>The approved sentence that cloud speech makes untrue, in the Clean-up card's introduction and Privacy's cloud clean-up sentence.</summary>
+    internal const string AudioNeverLeavesSentence = "Audio never leaves this PC.";
+
+    /// <summary>
+    /// APPROVED 22/10/2026 (owner, 16:27 AEDT), verbatim: do not reword. Takes the place of <see cref="AudioNeverLeavesSentence"/>
+    /// in those two places only while cloud speech sends each recording; the approved originals stay byte for byte otherwise.
+    /// </summary>
+    internal const string AudioByDefaultSentence = "Audio never leaves this PC by default, though advanced users can add their own cloud speech and clean-up services in settings.";
+
+    /// <summary>An approved line with <see cref="AudioNeverLeavesSentence"/>, as shown now: unchanged, or with the owner's replacement while cloud speech sends audio.</summary>
+    internal string WithAudioSentence(string approved) =>
+        _speech.SendsAudio ? approved.Replace(AudioNeverLeavesSentence, AudioByDefaultSentence, StringComparison.Ordinal) : approved;
+
+    /// <summary>APPROVED 22/10/2026 (owner, 16:22-16:31 AEDT, the lens's wording): the caption above Privacy's clean-up summary while cloud speech sends audio.</summary>
+    internal const string CloudCleanupCaption = "Cloud clean-up:";
+
+    /// <summary>PROPOSED (spec §4): the tray panel's speech line while cloud speech sends each recording (the footer, since the owner's 16:22-16:31 decisions).</summary>
     internal static string SpeechTrayLine(string host) => $"Cloud speech · audio leaves this PC ({host})";
 
     /// <summary>PROPOSED (spec §4): Settings > Privacy's summary while cloud speech sends each recording.</summary>
@@ -79,8 +95,9 @@ public sealed partial class AppShell
     public bool CloudSpeechOn => _settings.Speech.Provider == SpeechSettings.OpenAiCompatible && SpeechPolicy.HasConsent(_settings.Speech);
 
     /// <summary>
-    /// PROPOSED (spec §4; this composition, 22/10/2026): the tray panel's "Speech model" value while cloud speech sends each
-    /// recording, with the failed line under it after a fallback, else null.
+    /// PROPOSED (spec §4; this composition, 22/10/2026): the tray panel's speech line, in its footer (owner, 16:22-16:31 AEDT: once,
+    /// where "Nothing leaves this PC" sits when off), while cloud speech sends each recording, with the failed line under it after a
+    /// fallback, else null.
     /// </summary>
     internal string? SpeechTrayValue => _speech is { SendsAudio: true, Host: { } host }
         ? _speech.LastFailure is null ? SpeechTrayLine(host) : $"{SpeechTrayLine(host)}\n{_speech.Status}"

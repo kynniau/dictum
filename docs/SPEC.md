@@ -1450,30 +1450,37 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
   model hears the same samples; the log names the reason (status and host, never audio, text or key); the status says the
   last request failed until the next success. Esc pastes nothing. A settings reload cancels a request under way. So does
   quitting.
-- **Windows (UI lane, 22/10/2026).** Every string below except the consent text and its two buttons is PROPOSED, awaiting
-  the owner; the full list is in DECISIONS, "Cloud speech, UI".
-  - *Consent step*: Settings > Models (Advanced view only) > **Cloud speech** card: Service (OpenAI, Azure OpenAI, Groq,
-    Custom server), Server address (shown for Azure OpenAI and a custom server only), Model (the Azure deployment name;
-    no preset fills one in), the key line for the service the address names, then **Use cloud speech…**. It opens a second
-    dialog, apart from clean-up's, with `SpeechPolicy.ConsentText` (approved) and the buttons "Send my voice to {host}" /
-    "Keep speech on this PC" (the default). Only agreeing writes the speech entry of `consent.json`; then `speech.provider`,
-    `speech.base_url` and `speech.model` are written. Declining writes nothing. Offline only and a plain `http://` address
-    are refused before the dialog. When settings.json cannot be written, the speech consent just recorded is withdrawn again.
+- **Windows (UI lane, 22/10/2026).** APPROVED: the consent text and its two buttons, the replacement sentence and the "Cloud
+  clean-up:" caption below. Every other string is PROPOSED, awaiting the owner; the full list is in DECISIONS, "Cloud speech, UI".
+  - *Consent step*: Settings > Models > **Cloud speech** card (its setup in the Advanced view only): Service (OpenAI, Azure
+    OpenAI, Groq, Custom server), Server address (shown for Azure OpenAI and a custom server only), Model (the Azure
+    deployment name; no preset fills one in), the key line for the service the address names, then **Use cloud speech…**.
+    It opens a second dialog, apart from clean-up's, with `SpeechPolicy.ConsentText` and the buttons "Send my voice to {host}"
+    / "Keep speech on this PC" (the default). The consent text's last paragraph, as revised and approved 22/10/2026 16:31
+    AEDT: "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode
+    refuses any service that is not on this PC; your speech model on this PC is used again." (offline only still allows a
+    speech server on this PC, loopback https, as for clean-up). Only agreeing writes the speech entry of `consent.json`; then
+    `speech.provider`, `speech.base_url` and `speech.model` are written. Declining writes nothing. Offline only and a plain
+    `http://` address are refused before the dialog. When settings.json cannot be written, the speech consent just recorded
+    is withdrawn again.
   - *Switch cloud speech off*: withdraws the speech entry only (a clean-up consent stays) and writes `speech.provider` =
     `local`. It holds in memory first (no service, no consent, whatever the files say) until both files keep it, retried at
-    every reload and at quit, as clean-up's switch-off does.
+    every reload and at quit, as clean-up's switch-off does. While cloud speech is on, the Simple view shows the card's state
+    line and this switch too (owner, 22/10/2026); with it off, Simple shows nothing of the card.
   - *State lines*, all read from the speech step in use (`CloudSpeech.Status`, `SendsAudio`, `LastFailure`): the card's line
-    (on, failed and fallen back, waiting for the key, offline only, nothing sent); the tray panel's Speech model value
-    "Cloud speech · audio leaves this PC ({host})", which also takes the footer's place of "Nothing leaves this PC" (that row
-    is hidden, never reworded, while audio leaves and clean-up sends nothing); Settings > Privacy's speech line above the
-    clean-up summary; About's "Speech: cloud, {host} ({model}); {local model} on this PC is the fallback."; the load log line
-    with the consent's date; the pill's "Hearing… (cloud)" while a recording is with the service and "Heard on this PC (cloud
-    speech failed)" in place of "Pasted" after a fallback. After a failed request every surface shows the failed line until
-    the next success.
-  - *Approved sentences made untrue by cloud speech* are hidden or replaced, never reworded: Privacy's default "Nothing
-    leaves this PC: speech recognition and clean-up both run here." gives way to the speech line; Privacy's cloud clean-up
-    sentence (it says "Audio never leaves this PC.") gives way to the Clean-up card's own on line; the Clean-up card's
-    introduction (it ends "Audio never leaves this PC.") is hidden. Each comes back unchanged when cloud speech is off.
+    (on, failed and fallen back, waiting for the key, offline only, nothing sent); the tray panel's footer line "Cloud speech ·
+    audio leaves this PC ({host})", shown once, where "Nothing leaves this PC" sits when off (that row is hidden, never
+    reworded, while audio leaves and clean-up sends nothing); the Speech model picker keeps the model's name; Settings >
+    Privacy's speech line above the clean-up summary, which then has the caption "Cloud clean-up:"; About's "Speech: cloud,
+    {host} ({model}); {local model} on this PC is the fallback."; the header, tooltip and support emails' "cloud speech"
+    token; the load log line with the consent's date; the pill's "Hearing… (cloud)" while a recording is with the service and
+    "Heard on this PC (cloud speech failed)" in place of "Pasted" after a fallback. After a failed request every surface shows
+    the failed line until the next success.
+  - *Approved sentences made untrue by cloud speech*, never reworded: Privacy's default "Nothing leaves this PC: speech
+    recognition and clean-up both run here." gives way to the speech line. In the Clean-up card's introduction and Privacy's
+    cloud clean-up sentence, "Audio never leaves this PC." gives way to the owner's approved replacement (22/10/2026, 16:27
+    AEDT): "Audio never leaves this PC by default, though advanced users can add their own cloud speech and clean-up services
+    in settings." Each original comes back byte for byte when cloud speech is off.
 
 ## 29. See how it works: live stages in Settings (amendment, 22/10/2026)
 
