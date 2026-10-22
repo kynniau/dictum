@@ -411,8 +411,8 @@ public class HelpPageTests
     /// <summary>
     /// The cloud answer, walked through as it says on a scratch profile: every label it names is on Settings > Clean-up, the tray
     /// panel or the consent dialog; Open the settings folder opens the folder Dictum reads .env from; a .env.txt there is not read
-    /// (for Anthropic today the card stays in its off state, since EffectiveSettings uses the local model without a key; the lane
-    /// fix/anthropic-missing-key-line makes it show the waiting line and owns that assertion); the line the help gives, saved as .env, is read; the consent dialog carries the warning the help
+    /// (the card shows the approved "On, but waiting for your ANTHROPIC_API_KEY" line, as the help's troubleshooting paragraph says);
+    /// the line the help gives, saved as .env, is read; the consent dialog carries the warning the help
     /// quotes; after Allow the card and the tray panel say what the help says; Switch cloud clean-up off puts the tidying back on
     /// this PC; and the key never reaches settings.json or the screen. Nothing reaches the network: no dictation is made.
     /// </summary>
@@ -484,14 +484,15 @@ public class HelpPageTests
             Assert.Contains("Nothing is sent until you agree.", text);
             Assert.True(CloudPolicy.NothingLeaves(shell.Settings.Llm, usesModel: true));
 
-            // Allowed with the key saved under the wrong name (.env.txt): the card does not start with "On:" (for Anthropic it stays as
-            // it was, EffectiveSettings using the local model without a key), and nothing is sent.
+            // Allowed with the key saved under the wrong name (.env.txt): the card is on but waiting, with the approved waiting line the
+            // help's troubleshooting paragraph names ("On, but waiting for your …"), never "On:"; and nothing is sent (PR #52).
             File.WriteAllText(Path.Combine(scratch.Paths.ConfigDir, ".env.txt"), SecretStore.AnthropicKey + "=your-key-here");
             dialogs.Answers.Enqueue(0); // Allow
             Click(window, "Use cloud clean-up…");
             var withoutKey = CleanUpPage();
             Assert.DoesNotContain(withoutKey, l => l.StartsWith("On:", StringComparison.Ordinal));
-            Assert.Contains("Use cloud clean-up…", withoutKey);
+            Assert.Contains(CloudPolicy.WaitingForKeyLine(SecretStore.AnthropicKey), withoutKey);
+            Assert.Contains("Switch cloud clean-up off", withoutKey);
             Assert.True(shell.NothingLeaves);
             Assert.Contains("If the card says \"On, but waiting for your …\", Dictum cannot find your key.", answer);
 
