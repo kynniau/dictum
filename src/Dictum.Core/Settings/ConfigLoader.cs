@@ -40,8 +40,9 @@ public static class ConfigLoader
         {
             return new ConfigLoadResult(previous, secrets, file, $"{BrokenOnReload} ({FirstWarning(file)})") { KeptPrevious = true };
         }
-        // Consent to cloud clean-up comes only from consent.json, which only the in-app dialog writes (SPEC §22).
-        var loaded = CloudConsentFile.Apply(file.Usable ? file.Settings : new AppSettings { OfflineOnly = true }, CloudConsentFile.Read(paths.ConsentFile));
+        // Consent to cloud clean-up and to cloud speech comes only from consent.json, which only the in-app dialogs write (SPEC §22).
+        var consents = CloudConsentFile.ReadAll(paths.ConsentFile);
+        var loaded = CloudConsentFile.Apply(file.Usable ? file.Settings : new AppSettings { OfflineOnly = true }, consents.Cleanup, consents.Speech);
         var repaired = EffectiveSettings.HandsFree(EffectiveSettings.Cleanup(loaded, secrets.Get(SecretStore.AnthropicKey) is not null, () => gpuRuntime(loaded), warn), warn);
         var settings = SettingsFile.WithCleanupOverride(repaired, cleanupOverride);
         if ((settings.Models.Folder ?? settings.Whisper.ModelsDir) is { } chosen && paths.IsBundled(chosen))
