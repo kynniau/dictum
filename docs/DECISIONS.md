@@ -5548,3 +5548,8 @@ unless marked:
 - `NSMicrophoneUsageDescription` APPROVED by the owner (23/10/2026, "yes" to the sentence as written in M2). The handover
   and the packaging test's comment say so. The Right Option default hotkey (decision d) is the one Mac string still
   PROPOSED.
+- Right Option as the Mac default hotkey APPROVED by the owner (23/10/2026), with this rider from the owner: the default is
+  exactly why users must test and assign their key at install and first use. The Welcome flow already does that on both
+  platforms: step 4 "Your hotkey" (`HotkeyStep`, the capture box listening from the moment the step appears, "Use this
+  hotkey" / skip) and step 6, a first dictation into a box in the window through the real path. No Mac string is PROPOSED
+  any more.
