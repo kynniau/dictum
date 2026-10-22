@@ -254,6 +254,8 @@ public sealed class PlainWordsTests
         Assert.Contains("It is off by default. It asks for express consent in its own dialog", changed);
         Assert.Contains("Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default", changed);
         Assert.Contains("| Dictum 1.3.0 prepared (version bump; listing text and What's new approved 22/10/2026; tester notes PROPOSED).", store); // the certification-record row (release lane, 23/10/2026); the tester notes above stay PROPOSED
+        Assert.Contains("Dictum 1.3.0 tagged (v1.3.0 on b8b072d, 02:21 AEDT)", store); // the release record (docs lane, 23/10/2026)
+        Assert.Contains("Dictum-1.3.0-store.msix built from b8b072d: 240,138,818 bytes", store);
         Assert.Contains("APPROVED by the owner 22/10/2026 14:33 AEDT", store); // the 1.2.1 approvals are untouched
     }
 
