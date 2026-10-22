@@ -164,7 +164,7 @@ public static class HelpText
         "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\" even mid-sentence. Dictum checks its answer against what you said; if the check fails, or the model is too slow or not ready, it uses the rule-based tidy instead.",
         "Off pastes what was heard; only your own corrections, snippets and the profanity filter (if on) still apply.",
         "Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.",
-        "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here.",
+        "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here unless you also turn on cloud speech.",
         "To watch clean-up work on your own words, open Settings > " + HowItWorksText.PageTitle + " and record a short dictation.",
     ];
 
