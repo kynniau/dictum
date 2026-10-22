@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 and updated 22/10/2026 for 1.2.0 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 22/10/2026 for 1.2.1 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.2.0, so the package is 1.2.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026 and to 1.2.0 on 22/10/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.2.1, so the package is 1.2.1.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026 and to 1.2.1 on 22/10/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -147,6 +147,14 @@ Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
 ```
 
+### What's new in this version (1.2.1)
+
+PROPOSED (22/10/2026), awaiting the owner. Not approved: do not paste it into Partner Center until the owner approves it. Paste it in "What's new in this version" on the 1.2.1 submission.
+
+```text
+Clearer wording while you dictate: the pill says "Recording · let go to finish", and the tray says "No microphone" or "No clean-up" when that is the case. Settings > Storage can now change where model files are kept. A new "See how it works" page shows what happens to one dictation, step by step, and pastes nothing. Help explains how to turn on cloud clean-up, and a cloud clean-up waiting for its key now says so.
+```
+
 ### What's new in this version (1.2.0)
 
 APPROVED by the owner 22/10/2026. Paste it in "What's new in this version" on the 1.2.0 submission.
@@ -253,7 +261,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.2.0 (set 22/10/2026; 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.2.1 (set 22/10/2026; 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -307,15 +315,15 @@ SPEC §2, §3 and §20; README "Permissions on Windows".
 
 ### Notes for certification
 
-Update the date line when you submit. Microsoft asks for the date, no-account status, and steps to
+PROPOSED (22/10/2026), awaiting the owner: the "Notes written" line and the CHANGED paragraph in the block below are written for 1.2.1 and are not approved until the owner approves them (the 1.2.0 paragraph they replace was approved 22/10/2026). Update the date line when you submit. Microsoft asks for the date, no-account status, and steps to
 reach anything not obvious. The "no download is needed" lines (Decision 16, 17/10/2026) hold only for a package built
 after the app change that reads the bundled model from `<program folder>\models` has merged together with the
 model-folder change (PR #11): without it the package carries the file but the first run still asks for a download.
 
 ```text
-Notes written 22/10/2026 for Dictum 1.2.0.
+Notes written 22/10/2026 for Dictum 1.2.1.
 
-CHANGED SINCE THE LAST SUBMISSION: Dictum 1.2.0 adds a Welcome window on first run (a hotkey check, a microphone test and a choice of where model files are kept), a Simple view that names speech models by plain tiers (Standard, More accurate, Most accurate) with an Advanced view that shows model names, a clean-up Off option that pastes what was heard, a Help page in Settings, and Send feedback and Email support buttons that open the user's own mail program (Dictum itself sends nothing). No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads.
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.2.1 changes wording and adds one page. The hold-to-talk pill now says "Recording · let go to finish"; the tray panel says "No microphone" in place of "Ready" when no microphone is listed, and "No clean-up" in its header when clean-up is Off; the Simple view no longer shows the Light | Full choice (the Advanced view still does). Settings > Storage can now change the model folder (Change… and Use default) and says that a slower drive makes the speech model slower to load and to switch, with a warning for network folders. Settings has a new page, "See how it works": record one dictation and watch the five steps it goes through; it pastes nothing. Settings > Help has a new question, "How do I turn on cloud clean-up?" (cloud clean-up stays optional and off by default). With Anthropic chosen as the cloud clean-up provider, consent given and no ANTHROPIC_API_KEY set, Settings now shows "On, but waiting for your ANTHROPIC_API_KEY: nothing is sent until you add it to .env." instead of quietly using the local model. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads.
 
 No account or sign-in is needed. Dictum runs in the notification area (system tray); click its icon to open the panel.
 
@@ -434,8 +442,9 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 22/10/2026 | Dictum 1.2.0 prepared (version bump, tester notes, listing text); all new wording is PROPOSED until the owner approves it. |
 | 22/10/2026 | 1.2.0 submitted (Submission 3, id 1152921505702194758) at about 09:00 AEDT; package Dictum-1.2.0-store.msix 240,077,036 bytes, SHA-256 7AF77EA8D5E695D4DA974E3CD4F0198BFB71575543F2702F96994B79B76A100F, v1.2.0.0 x64, validated with only the runFullTrust warning; 1.1.2 package removed on save; not marked mandatory; certification notes and What's new as in this file (owner approved 22/10/2026). |
 | 22/10/2026 | The owner approved every PROPOSED 1.2 string as a block (DECISIONS, "Owner approvals (22/10/2026)"). 1.2.1 (not yet built or submitted) changes the hold pill to "Recording · let go to finish"; screenshot 1 needs retaking with it. |
+| 22/10/2026 | Dictum 1.2.1 prepared (version bump, tester notes, listing text); wording PROPOSED until the owner approves it; Store screenshot 1 to be retaken with the new hold pill. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
-for 1.1.0, 1.1.1, 1.1.2 or 1.2.0 (no packaged run on a clean PC yet).
+for 1.1.0, 1.1.1, 1.1.2, 1.2.0 or 1.2.1 (no packaged run on a clean PC yet).
