@@ -4881,3 +4881,47 @@ whisper.gpu = auto log line still says "the Vulkan loader, vulkan-1.dll, does no
 it); true as stated, but Windows wording. Also `WhisperEngine.LoadedRuntime` and `LocalLlmEngine.Backend` say "CPU" on a
 Mac while Metal is in use inside that runtime; the ggml_metal log lines carry the fact. Both are candidates for a wording
 pass with approved copy, not changed here.
+
+**Lane findings (23/10/2026, each Verified on this Mac unless marked):**
+
+- *Tests on macOS.* `dotnet test --project tests/Dictum.Tests -c Release` on the merged head: 2015 total, 0 failed, 1831
+  succeeded, 184 skipped (the Windows-only ones skip through `TestEnv.WindowsOnly(reason)`; 54 methods gated, 13 converted
+  to OS-neutral paths through `TestPaths.Native`). Three real cross-platform defects came out of it, each fixed at its root:
+  (1) `SettingsFile.WriteAtomic` replaced a read-only settings.json or consent.json on macOS (a rename over a read-only file
+  is allowed there, refused on Windows), so the "could not be saved" paths of the off switches never ran; off Windows a
+  read-only target is now refused before the .tmp is written. (2) `Path.GetPathRoot` is "/" for every path on macOS, so free
+  space, `ModelDownloads.PendingBytes` and `DiskSpace.IsNetwork` treated every folder as the startup disk; `DiskSpace.VolumeRoot`
+  returns the deepest mount point there (text match, `// simplification:` in the file). (3) The Welcome window's free-space
+  line read " has 41.0 GB free" on a Mac; a root with no name now uses `OnboardingText.StartupDisk`, PROPOSED: "The startup
+  disk" (on screen: "The startup disk has 41.0 GB free"; another disk keeps its mount path, "/Volumes/Backup has 41.0 GB
+  free"). Open: the theme names Segoe UI only (src/Dictum.UI/Theme/Controls.axaml), so macOS draws a fallback font and the
+  longest tray-panel header line trims at 308 px; `Polish2Tests.The_panel_header_is_one_whole_line` is gated on macOS and a
+  Mac font choice is for the owner.
+- *Audio.* `AudioQueueCapture` asks the queue for 16 kHz mono float and reads back the format it records; a one-second
+  capture on this Mac returned 1,013 ms of audio, and `kAudioDevicePropertyDeviceIsRunningSomewhere` went 1 while recording
+  and 0 after Stop. Stopwatch and `mach_absolute_time` are the same clock here (Stopwatch.Frequency 1e9, timebase 125/3), so
+  the first-frame figure is on the key-down clock. Finding: the first about 460 ms of every recording arrive as exact zeros
+  on this Mac's only microphone (a USB camera microphone, 48 kHz), whether or not the queue converts, and the first start
+  after launch took 5.1 s (later starts 78-150 ms). Cause unknown (device or system); other devices not tried. The pure
+  parts (device resolution, format fallback, host-time conversion) are pinned in MacAudioTests; the real capture runs under
+  DICTUM_AUDIO_TESTS=1.
+- *Input.* The SDK's CGEvent.h says taps "may only receive key up and down events if … the caller is enabled for assistive
+  device access", and that only root may tap at kCGHIDEventTap: the taps sit at kCGSessionEventTap and need Accessibility
+  (handover §1's "Input Monitoring" was wrong for active taps); posting still goes to kCGHIDEventTap. Reading the legacy
+  `NSStringPboardType` from the pasteboard returns data but writing it back is refused, so an early Restore cleared the
+  clipboard (the owner's clipboard text was lost during the lane's gated test, 23/10/2026); the snapshot now keeps
+  public.utf8-plain-text, public.rtf and public.html only, builds the new item before clearing, and leaves a refused type
+  out. Fn maps to no key (the parser refuses it; its wording is approved copy). PrintScreen, ScrollLock, Pause and F21-F24
+  have no Mac key (a test pins that set). Two `// simplification:` comments: Caps Lock reports a press and release together
+  on every event (retire once hardware shows what macOS sends), and typed text goes 20 UTF-16 units per event (Recalled
+  limit; retire once a hardware test shows bigger chunks arrive whole). The input lane also found that C `BOOL` is one byte
+  and the shared interop's default four-byte bool marshalling could read undefined register bits on arm64: every bool return
+  now crosses as I1. Not verified without Accessibility: tap installation, swallowing, Cmd-V and typing arriving; the two
+  end-to-end tests are written and skip until the test host is trusted.
+- *Packaging.* codesign treats every file under Contents/MacOS as nested code (signing the executable fails with "code object
+  is not signed at all" while a managed .dll is unsigned), so `scripts/publish-mac.sh` signs every file there, the
+  executable last, then the bundle, never `--deep` (`man codesign` on macOS 27.2: deprecated for signing as of macOS 13.0).
+  The bundled model is fetched and verified by the published app itself (`--download-model base.en` with HOME in a scratch
+  folder), so the pinned commit, size and SHA-256 stay in Core's catalogue only. `macos-15` runners are Arm64 (actions/
+  runner-images README); `secrets` is not available in `if:`, so the job carries two booleans in `env`. The icon is built at
+  publish time from site/dictum.svg (ten iconset PNGs, `iconutil`), not committed.
