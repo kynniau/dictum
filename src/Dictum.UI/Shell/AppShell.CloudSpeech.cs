@@ -19,16 +19,16 @@ public sealed partial class AppShell
     private bool _speechWithdrawn; // Switch cloud speech off (or "Send my voice" undone), until consent.json and settings.json both keep it, or the consent step records a new agreement
     private (string? Consent, string? Settings) _speechOffNotSaved; // why the last try could not change consent.json or save settings.json (SaveSpeechOff)
 
-    // PROPOSED 22/10/2026 (cloud speech, UI lane), awaiting the product owner. The consent text and its two buttons are
+    // APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (owner, as a block): the strings around the consent step. The consent text and its two buttons are
     // APPROVED and live in SpeechPolicy; these are the strings around them.
 
-    /// <summary>PROPOSED: the speech consent dialog's title.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: the speech consent dialog's title.</summary>
     internal const string SpeechConsentTitle = "Send your voice to a cloud service?";
 
-    /// <summary>PROPOSED: the consent step was declined; nothing was recorded.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: the consent step was declined; nothing was recorded.</summary>
     internal const string SpeechNotSwitchedOn = "Cloud speech was not switched on; nothing is sent.";
 
-    /// <summary>PROPOSED: switching on was refused because offline only is on (clean-up's sentence, for speech).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: switching on was refused because offline only is on (clean-up's sentence, for speech).</summary>
     internal const string SpeechOfflineRefused = "offline_only is on, so cloud speech is refused. Switch offline only off in Settings > Privacy first.";
 
     /// <summary>The approved sentence that cloud speech makes untrue, in the Clean-up card's introduction and Privacy's cloud clean-up sentence.</summary>
@@ -47,21 +47,21 @@ public sealed partial class AppShell
     /// <summary>APPROVED 22/10/2026 (owner, 16:22-16:31 AEDT, the lens's wording): the caption above Privacy's clean-up summary while cloud speech sends audio.</summary>
     internal const string CloudCleanupCaption = "Cloud clean-up:";
 
-    /// <summary>PROPOSED (spec §4): the tray panel's speech line while cloud speech sends each recording (the footer, since the owner's 16:22-16:31 decisions).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4): the tray panel's speech line while cloud speech sends each recording (the footer, since the owner's 16:22-16:31 decisions).</summary>
     internal static string SpeechTrayLine(string host) => $"Cloud speech · audio leaves this PC ({host})";
 
-    /// <summary>PROPOSED (spec §4): Settings > Privacy's summary while cloud speech sends each recording.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4): Settings > Privacy's summary while cloud speech sends each recording.</summary>
     internal static string SpeechPrivacyLine(string host) =>
         $"Your voice goes to {host} for speech recognition. Advanced option: your audio leaves this PC. Dictum does not validate or certify how that service handles it.";
 
-    /// <summary>PROPOSED (spec §4): Settings > About's speech line while cloud speech sends each recording.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4): Settings > About's speech line while cloud speech sends each recording.</summary>
     internal static string SpeechAboutLine(string host, string model, string localModel) => $"Speech: cloud, {host} ({model}); {localModel} on this PC is the fallback.";
 
-    /// <summary>PROPOSED (spec §4): the pill while a recording is with the cloud speech service, in place of "Transcribing…".</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4): the pill while a recording is with the cloud speech service, in place of "Transcribing…".</summary>
     internal const string HearingCloudPill = "Hearing… (cloud)";
 
     /// <summary>
-    /// PROPOSED: what Switch cloud speech off says when a file could not be changed, mirroring clean-up's approved
+    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: what Switch cloud speech off says when a file could not be changed, mirroring clean-up's approved
     /// <see cref="OffNotSaved"/> sentences with "cloud speech" and "your speech consent".
     /// </summary>
     internal static string SpeechOffNotSaved(string? consent, string? settings) => (consent, settings) switch
@@ -73,7 +73,7 @@ public sealed partial class AppShell
     };
 
     /// <summary>
-    /// PROPOSED (lens on PR #54, 22/10/2026): the token after the speech runtime in the tray panel's header, the icon's tooltip and
+    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (lens on PR #54): the token after the speech runtime in the tray panel's header, the icon's tooltip and
     /// the support emails' models line while cloud speech sends each recording ("base.en · Vulkan · cloud speech · …"). No host:
     /// a company's own address could be private, as the feedback email's clean-up fact leaves it out.
     /// </summary>
@@ -95,7 +95,7 @@ public sealed partial class AppShell
     public bool CloudSpeechOn => _settings.Speech.Provider == SpeechSettings.OpenAiCompatible && SpeechPolicy.HasConsent(_settings.Speech);
 
     /// <summary>
-    /// PROPOSED (spec §4; this composition, 22/10/2026): the tray panel's speech line, in its footer (owner, 16:22-16:31 AEDT: once,
+    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4, this composition): the tray panel's speech line, in its footer (owner, 16:22-16:31 AEDT: once,
     /// where "Nothing leaves this PC" sits when off), while cloud speech sends each recording, with the failed line under it after a
     /// fallback, else null.
     /// </summary>
@@ -104,7 +104,7 @@ public sealed partial class AppShell
         : null;
 
     /// <summary>
-    /// PROPOSED (spec §4; this composition, 22/10/2026). Settings > About's speech line: the cloud line while it sends each recording, the speech step's line after a fallback or
+    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4, this composition). Settings > About's speech line: the cloud line while it sends each recording, the speech step's line after a fallback or
     /// while cloud speech is set but sends nothing, and null for the default (the speech model on this PC, which the models line names).
     /// </summary>
     internal string? SpeechAboutValue => _speech switch
@@ -169,7 +169,7 @@ public sealed partial class AppShell
         return ModelCoordinator.WriteFailed;
     }
 
-    /// <summary>PROPOSED: switching on was asked without an address or a model (the page asks for both first).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: switching on was asked without an address or a model (the page asks for both first).</summary>
     internal const string SpeechAddressMissing = "Type the service's https:// address and the model (for Azure OpenAI, the deployment name).";
 
     /// <summary>

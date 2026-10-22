@@ -240,7 +240,7 @@ internal sealed class PrivacyPage : SettingsPage
     }
 
     /// <summary>
-    /// The speech line at the top of "What leaves this PC": while cloud speech sends each recording, the PROPOSED privacy line
+    /// The speech line at the top of "What leaves this PC": while cloud speech sends each recording, the approved privacy line
     /// (with the failed line under it after a fallback, until the next success); while it is switched on but sends nothing, the
     /// speech step's own line (waiting for the key, offline only, nothing sent); null for the default.
     /// </summary>

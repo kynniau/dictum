@@ -67,34 +67,34 @@ internal sealed class ModelsPage : SettingsPage
     /// <summary>The line under the folder when models would load from the network (a UNC path or a mapped network drive), else null.</summary>
     internal static string? FolderWarning(string folder) => DiskSpace.IsNetwork(folder) ? NetworkWarning : null;
 
-    // PROPOSED 22/10/2026 (cloud speech, UI lane), awaiting the product owner: the Cloud speech card's own words. The consent
+    // APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (owner, as a block): the Cloud speech card's own words. The consent
     // text and its buttons (SpeechPolicy, APPROVED) and the state lines (SpeechStatus, AppShell.CloudSpeech) are not here.
-    internal const string CloudSpeechTitle = "Cloud speech"; // PROPOSED
-    internal const string UseCloudSpeechLabel = "Use cloud speech…"; // PROPOSED
-    internal const string CloudSpeechOffLabel = "Switch cloud speech off"; // PROPOSED
+    internal const string CloudSpeechTitle = "Cloud speech"; // APPROVED 22/10/2026 17:22 AEDT
+    internal const string UseCloudSpeechLabel = "Use cloud speech…"; // APPROVED 22/10/2026 17:22 AEDT
+    internal const string CloudSpeechOffLabel = "Switch cloud speech off"; // APPROVED 22/10/2026 17:22 AEDT
 
-    /// <summary>PROPOSED: the card's introduction while cloud speech is off.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: the card's introduction while cloud speech is off.</summary>
     internal const string CloudSpeechIntro =
         "Optional, for a slow PC or one without a GPU. A cloud service turns each recording into text instead of the speech model on this PC, but the recording of every dictation, your voice, then goes to that service. The speech model on this PC stays as the fallback.";
 
-    /// <summary>PROPOSED: the hint under the server address (Azure OpenAI and a custom server).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: the hint under the server address (Azure OpenAI and a custom server).</summary>
     internal const string CloudSpeechAddressHint = "Dictum adds /audio/transcriptions. Cloud speech needs an https:// address, also for a server on this PC.";
 
-    /// <summary>PROPOSED: the line while offline only refuses switching on.</summary>
-    internal const string CloudSpeechOfflineNote = "Offline only is on (Privacy), so cloud speech cannot be switched on."; // PROPOSED
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: the line while offline only refuses switching on.</summary>
+    internal const string CloudSpeechOfflineNote = "Offline only is on (Privacy), so cloud speech cannot be switched on."; // APPROVED 22/10/2026 17:22 AEDT
 
-    /// <summary>PROPOSED: switching on saved and the service is in use; otherwise the page says the card's own state line.</summary>
-    internal const string CloudSpeechSwitchedOn = "Cloud speech is on."; // PROPOSED
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: switching on saved and the service is in use; otherwise the page says the card's own state line.</summary>
+    internal const string CloudSpeechSwitchedOn = "Cloud speech is on."; // APPROVED 22/10/2026 17:22 AEDT
 
-    /// <summary>PROPOSED: Switch cloud speech off, saved.</summary>
-    internal const string CloudSpeechSwitchedOff = "Cloud speech is off; the speech model on this PC hears your dictations again."; // PROPOSED
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: Switch cloud speech off, saved.</summary>
+    internal const string CloudSpeechSwitchedOff = "Cloud speech is off; the speech model on this PC hears your dictations again."; // APPROVED 22/10/2026 17:22 AEDT
 
-    /// <summary>PROPOSED: where a preset's address carries the customer's own name (Azure OpenAI), or a custom server's, the field's placeholder.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: where a preset's address carries the customer's own name (Azure OpenAI), or a custom server's, the field's placeholder.</summary>
     internal static string CloudSpeechAddressWatermark(CloudPreset preset) =>
-        preset.HostSuffix is not null ? "https://your-resource.openai.azure.com/openai/v1" : "https://your-server.example.com/v1"; // PROPOSED
+        preset.HostSuffix is not null ? "https://your-resource.openai.azure.com/openai/v1" : "https://your-server.example.com/v1"; // APPROVED 22/10/2026 17:22 AEDT
 
-    /// <summary>PROPOSED: the key line, clean-up's sentences for the speech service the address names.</summary>
-    internal static string CloudSpeechKeyLine(CloudPreset service) => service.KeyRequired // PROPOSED
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: the key line, clean-up's sentences for the speech service the address names.</summary>
+    internal static string CloudSpeechKeyLine(CloudPreset service) => service.KeyRequired // APPROVED 22/10/2026 17:22 AEDT
         ? $"The key goes in .env in the settings folder: {service.KeyVariable}=your {service.Name} API key. Without it nothing is sent."
         : $"If the server needs a key, it goes in .env in the settings folder: {service.KeyVariable}=your key.";
 

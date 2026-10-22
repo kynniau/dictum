@@ -37,7 +37,7 @@ public static class SpeechPolicy
         return CloudPolicy.PlainHttpRefusal("speech.base_url", s.BaseUrl) ?? LoopbackHttpRefusal(CloudPresets.HostOf(u));
     }
 
-    /// <summary>PROPOSED (22/10/2026): the refusal of a plain http:// speech.base_url on this PC; also the settings loader's warning.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword. The refusal of a plain http:// speech.base_url on this PC; also the settings loader's warning.</summary>
     public static string LoopbackHttpRefusal(string host) =>
         $"speech.base_url {host} uses http://, but cloud speech needs an https:// address, also on this PC, because its consent step says the connection is encrypted";
 
@@ -65,28 +65,28 @@ public static class SpeechPolicy
 
 /// <summary>
 /// The speech step's state for Settings, About and the self-test (<see cref="CloudSpeech.Status"/>), as
-/// <see cref="TranscriptCleaner.OffStatus"/> is for clean-up. Every line is PROPOSED (22/10/2026), awaiting the product owner;
+/// <see cref="TranscriptCleaner.OffStatus"/> is for clean-up. Every line is APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword;
 /// the waiting-for-key and offline-only lines reuse clean-up's approved lines, which name no text or audio.
 /// </summary>
 public static class SpeechStatus
 {
-    /// <summary>PROPOSED: speech.provider = local, the default.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: speech.provider = local, the default.</summary>
     public const string Local = "on this PC: your speech model hears every dictation (nothing leaves it)";
 
-    /// <summary>PROPOSED (spec §4, the Settings > Models line while on).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §4): the Settings > Models line while on.</summary>
     public static string On(string host, string model) =>
         $"On: your voice goes to {host} (model {model}) to be turned into text. Advanced option: your audio leaves this PC. Dictum does not validate or certify how that service handles it.";
 
-    /// <summary>PROPOSED (spec §2): the last request failed and the speech model on this PC heard that dictation; shown until the next success.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §2): the last request failed and the speech model on this PC heard that dictation; shown until the next success.</summary>
     public static string Failed(string reason) => $"On, but the last request failed ({reason}); the local model heard this dictation";
 
-    /// <summary>PROPOSED: openai-compatible is set but the speech consent step has not recorded this host.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: openai-compatible is set but the speech consent step has not recorded this host.</summary>
     public const string NotAgreed = "On, but not agreed to yet: nothing is sent until you agree to it in Settings > Models; your speech model on this PC hears every dictation.";
 
-    /// <summary>PROPOSED (spec §2: v1 refuses cloud speech while whisper.translate is on).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §2): v1 refuses cloud speech while whisper.translate is on.</summary>
     public const string TranslateRefused = "On, but translate is on and cloud speech does not translate: nothing is sent; your speech model on this PC hears every dictation.";
 
-    /// <summary>PROPOSED: nothing is sent for a reason no other line names (an address refused as insecure, speech.base_url or speech.model not set).</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword: nothing is sent for a reason no other line names (an address refused as insecure, speech.base_url or speech.model not set).</summary>
     public static string NothingSent(string reason) => $"On, but nothing is sent ({reason}): your speech model on this PC hears every dictation.";
 
     /// <summary>The key the service needs is not set: clean-up's approved line, word for word.</summary>
@@ -95,6 +95,6 @@ public static class SpeechStatus
     /// <summary>offline_only refuses it: clean-up's approved line, word for word.</summary>
     public const string OfflineOnly = CloudPolicy.OfflineOnlyLine;
 
-    /// <summary>PROPOSED (spec §2), for the UI lane's pill after a failed request: the speech model on this PC heard the dictation.</summary>
+    /// <summary>APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec §2), for the UI lane's pill after a failed request: the speech model on this PC heard the dictation.</summary>
     public const string FallbackPill = "Heard on this PC (cloud speech failed)";
 }

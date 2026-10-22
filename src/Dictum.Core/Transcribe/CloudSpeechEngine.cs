@@ -114,6 +114,7 @@ public sealed class CloudSpeechEngine : ITranscriber
             }
         }
         _lastFailure = reason;
+        // The per-failure log line (spec "Cloud speech" §4): APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
         _log.Warn($"Cloud speech via {Host} not used, the local model heard this dictation instead: {reason}.");
         var local = await _local(cancellationToken).ConfigureAwait(false);
         return carried is null

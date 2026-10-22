@@ -107,7 +107,7 @@ public sealed class CloudSpeech
     }
 
     /// <summary>
-    /// PROPOSED (spec "Cloud speech" §4, 22/10/2026; UI lane): the log line when cloud speech is on at a load, "Cloud speech on:
+    /// APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (spec "Cloud speech" §4; UI lane): the log line when cloud speech is on at a load, "Cloud speech on:
     /// audio goes to {host} ({model}); consent recorded {date}; {local model} is the fallback." The date is the consent record's,
     /// on this PC's clock, as yyyy-MM-dd.
     /// </summary>

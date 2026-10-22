@@ -68,7 +68,7 @@ public static class SupportMail
             $"Dictum {Fact(setup.Version)}",
             Fact(setup.System),
             $"Speech model: {Fact(setup.SpeechModel)} on {Fact(setup.SpeechRuntime)}",
-            .. setup.CloudSpeech is { } cloud ? [$"Speech: {Fact(cloud)}"] : Array.Empty<string>(), // PROPOSED label (cloud speech, 22/10/2026)
+            .. setup.CloudSpeech is { } cloud ? [$"Speech: {Fact(cloud)}"] : Array.Empty<string>(), // label APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (cloud speech)
             $"Clean-up: {Fact(setup.Cleanup)}",
         ];
         var body = FeedbackIntro + "\r\n" + string.Join("\r\n", lines);
