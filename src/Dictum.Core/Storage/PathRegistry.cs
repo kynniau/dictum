@@ -68,7 +68,7 @@ public static class PathRegistry
         {
             new(paths.SettingsFile, DataCategory.Settings, "settings"),
             new(paths.SettingsFile + ".tmp", DataCategory.Settings, "settings being saved"),
-            new(paths.ConsentFile, DataCategory.Settings, "consent to cloud clean-up and cloud speech"), // PROPOSED label (22/10/2026)
+            new(paths.ConsentFile, DataCategory.Settings, "consent to cloud clean-up and cloud speech"), // APPROVED label 22/10/2026 (proposed 22/10/2026)
             new(paths.ConsentFile + ".tmp", DataCategory.Settings, "consent being saved"),
             new(paths.DictionaryFile, DataCategory.PersonalFiles, "personal dictionary"),
             new(paths.CorrectionsFile, DataCategory.PersonalFiles, "corrections"),

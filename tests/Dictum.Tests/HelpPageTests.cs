@@ -331,7 +331,7 @@ public class HelpPageTests
     private const string ApprovedTrayLine = "Cloud clean-up on · text leaves this PC";
 
     /// <summary>
-    /// "How do I turn on cloud clean-up?" (PROPOSED, 22/10/2026) quotes the approved copy word for word, uses only the placeholder
+    /// "How do I turn on cloud clean-up?" (APPROVED 22/10/2026; proposed 22/10/2026) quotes the approved copy word for word, uses only the placeholder
     /// key, and names every key variable that .env.example lists, so the help cannot drift from the file it tells people to write.
     /// </summary>
     [Fact]

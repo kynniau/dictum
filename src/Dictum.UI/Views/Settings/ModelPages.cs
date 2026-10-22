@@ -408,7 +408,7 @@ internal sealed class StoragePage : SettingsPage
     internal const string LookupIntro = "Dictum looks for a model in these folders, in this order:";
     internal const string NoModels = "No model files yet.";
 
-    // PROPOSED 22/10/2026 copy (Decision "Storage page can change the model folder"): the model folder's two actions, the same
+    // APPROVED 22/10/2026 copy (proposed 22/10/2026; Decision "Storage page can change the model folder"): the model folder's two actions, the same
     // handlers as Settings > Models (ModelFolderActions), its note repeated (ModelsPage.FolderNote) and one sentence on drive speed.
     internal const string ChangeLabel = "Change…";
     internal const string ChangeName = "Change the model folder";

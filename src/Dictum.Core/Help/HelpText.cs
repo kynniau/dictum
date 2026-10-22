@@ -100,14 +100,14 @@ public static class HelpText
     /// <summary>APPROVED verbatim for Help, site and Store (owner, 21/10/2026 22:18 AEDT): do not reword.</summary>
     public const string FreeLaterNote = "The base product stays free to keep on your PC; optional paid extras may come later.";
 
-    /// <summary>PROPOSED (22/10/2026): the step-by-step answer for the optional cloud clean-up.</summary>
+    /// <summary>APPROVED 22/10/2026 (proposed 22/10/2026): the step-by-step answer for the optional cloud clean-up.</summary>
     public const string CloudQuestion = "How do I turn on cloud clean-up?";
 
     /// <summary>The host the consent dialog names for Anthropic, so the warning below is quoted exactly as that dialog shows it.</summary>
     public static readonly string CloudExampleHost = CloudPolicy.CloudHost(new LlmSettings { Provider = LlmSettings.Anthropic })!;
 
     /// <summary>
-    /// PROPOSED (22/10/2026, lens fixes on 2b20b0f), awaiting the product owner's review: do not reword. The approved warning, the
+    /// APPROVED 22/10/2026 (proposed 22/10/2026, lens fixes on 2b20b0f): do not reword. The approved warning, the
     /// waiting-for-key line and the tray line (<see cref="CloudPolicy.TrayLine"/>) are quoted word for word from the app's own copy;
     /// the variable names are SecretStore's. Steps 2 to 4 and 7 to 15 are one action each, in the cloud-cleanup demo's caption order.
     /// </summary>
@@ -207,7 +207,7 @@ public static class HelpText
             "If you add the largest, most accurate ones, they can take up several GB (gigabytes).",
             "To keep them on another drive, choose Browse… beside Model folder in Settings > Models. Settings > Storage lists every model with its size, and you can delete the ones you do not need there.",
         ]),
-        // PROPOSED (22/10/2026), awaiting the product owner's review: do not reword. The quoted lines are APPROVED copy taken from
+        // APPROVED 22/10/2026 (proposed 22/10/2026): do not reword. The quoted lines are APPROVED copy taken from
         // CloudPolicy (never reworded here) and the tray panel's line, pinned against the app by HelpPageTests.
         new(CloudQuestion, CloudAnswer),
         new("How do I remove Dictum completely?",
