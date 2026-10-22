@@ -26,8 +26,12 @@ internal sealed record CalibrationHost(
     Action<string, Action, Action<bool>> DownloadSpeechModel,
     Action<IReadOnlyList<string>> AddDictionaryTerms,
     Action<IReadOnlyList<CorrectionRule>> AddCorrections,
-    Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null)
+    Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null,
+    Func<bool>? MovingFiles = null)
 {
+    /// <summary>Why calibration cannot run now (model files are moving: <see cref="App.ModelCoordinator.MovingRefusal"/>), or null.</summary>
+    public string? Refusal() => MovingFiles?.Invoke() == true ? App.ModelCoordinator.MovingRefusal : null;
+
     /// <summary>Catalogue models on this PC: the file each name resolves to through the tray app's lookup (<see cref="FindSpeechModel"/>).</summary>
     public IReadOnlyList<SpeechCandidate> InstalledModels() =>
         [.. ModelCatalog.Entries
@@ -45,10 +49,13 @@ internal sealed record CalibrationHost(
     /// </summary>
     public CalibrationEngine CreateEngine()
     {
+        // No model loads while the model files move (re-lens on PR #61): it would open a file in the folder being emptied.
+        if (Refusal() is { } refused) throw new InvalidOperationException(refused);
         var s = Settings();
         var load = LoadSpeech ?? ((path, whisper, decode) => WhisperEngine.Load(path, whisper.Threads, whisper.Gpu, Log, decode));
         return new CalibrationEngine((path, decode) =>
         {
+            if (Refusal() is { } moving) throw new InvalidOperationException(moving); // a run that began before the move
             Integrity.Verify(path);
             return load(path, s.Whisper, decode);
         }, Log, () => WhisperEngine.VulkanActive, s.LogTranscripts);

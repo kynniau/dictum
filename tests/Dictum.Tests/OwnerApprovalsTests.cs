@@ -176,6 +176,8 @@ public class OwnerApprovalsTests
         Assert.Equal("Change…", StoragePage.ChangeLabel);
         Assert.Equal("Change the model folder", StoragePage.ChangeName);
         Assert.Equal("A slower drive makes the speech model slower to load and to switch.", StoragePage.SlowerDriveNote);
+        // APPROVED 22/10/2026 22:42 AEDT: the model folder note, on Models and Storage (one constant), second sentence reworded for move-on-change.
+        Assert.Equal("Dictum looks here first and downloads go here. Changing it asks before moving any files.", ModelsPage.FolderNote);
         using var scratch = new Scratch();
         var consent = PathRegistry.Locations(scratch.Paths, new AppSettings()).Single(l => l.Path == scratch.Paths.ConsentFile && !l.Path.EndsWith(".tmp", StringComparison.Ordinal));
         Assert.Equal("consent to cloud clean-up and cloud speech", consent.Description);
@@ -421,5 +423,117 @@ public class OwnerApprovalsTests
             questions.Skip(questions.IndexOf("Why did it type the wrong words?")).Take(3)); // together, after the question about wrong words
         Assert.Contains(HelpText.Questions, q => q.Question == "What is clean-up?" && ReferenceEquals(q.Answer, HelpText.CleanupAnswer));
         Assert.Contains(HelpText.Questions, q => q.Question == "How can I see what Dictum does with my words?" && ReferenceEquals(q.Answer, HelpText.SeeHowAnswer));
+    }
+
+    /// <summary>
+    /// APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: pin of the Help strings for the own-instructions box and the Create the
+    /// key file… button, word for word. The sentences are the own-instructions lane's (PR #60), except the cloud answer's second paragraph and the
+    /// own-instructions answer's second paragraph and last clause, which are the lens's wording (22/10/2026). Approved by the owner as part of the 1.3 block (22/10/2026 22:52 AEDT).
+    /// </summary>
+    [Fact]
+    public void The_approved_own_instructions_and_key_file_help_strings_are_pinned()
+    {
+        Assert.Equal("To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
+            HelpText.CloudAnswer[4]);
+        Assert.Equal("If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.", HelpText.CloudAnswer[5]);
+        Assert.StartsWith("1. Open Settings > Clean-up.", HelpText.CloudAnswer[6]); // the sixteen steps follow, unchanged
+        Assert.Equal("Can I give the clean-up my own instructions?", HelpText.OwnInstructionsQuestion);
+        Assert.Equal(
+        [
+            "In the Advanced view, Settings > Clean-up has a box for your own instructions, such as \"use short sentences\" or \"write product names in capitals\". Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. With cloud clean-up on, your instructions go to that service with each dictation, as part of Dictum's clean-up instructions.",
+            "Dictum still checks every reply against what you said. A reply that drops or changes your words, translates or summarises them, answers you instead of tidying, or adds a sign-off you did not say is usually rejected, and the rule-based tidy is pasted instead. The check cannot catch everything, so read what Dictum typed.",
+        ], HelpText.OwnInstructionsAnswer);
+        Assert.Contains(HelpText.Questions, q => q.Question == "Can I give the clean-up my own instructions?" && ReferenceEquals(q.Answer, HelpText.OwnInstructionsAnswer));
+    }
+
+    // ---- 1.3, your own instructions and Create the key file: APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026), as a block ----
+    // Sections A and B of .demo-preview/approve-1.3-block.md. Pinned word for word, independently of the app's constants.
+    // Reworded only on the owner's written replacement, and then these literals change with the strings in the same commit.
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the card, its lines and the Simple-view line.</summary>
+    [Fact]
+    public void The_own_instructions_card_words_are_pinned()
+    {
+        Assert.Equal("Your own instructions", OwnInstructionsCard.Label);
+        Assert.Equal("Added to Dictum's clean-up instructions for the AI and cloud clean-up. Dictum still checks every reply against what you said.", OwnInstructionsCard.Hint);
+        Assert.Equal("That is the limit: Dictum uses up to 2,000 characters of your own instructions.", OwnInstructionsCard.LimitLine);
+        Assert.Equal("With cloud clean-up on, these instructions go to llm.example.net with each dictation.", OwnInstructionsCard.CloudLine("llm.example.net"));
+        Assert.Equal("Your own clean-up instructions are in use (Advanced view).", OwnInstructionsCard.SimpleLine);
+    }
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the two marker lines around the user's text in the prompt, and the validator reason.</summary>
+    [Fact]
+    public void The_own_instructions_prompt_lines_and_the_validator_reason_are_pinned()
+    {
+        Assert.Equal("The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply.",
+            Dictum.Llm.CleanupPrompt.OwnInstructionsStart);
+        Assert.Equal("End of the user's instructions.", Dictum.Llm.CleanupPrompt.OwnInstructionsEnd);
+        Assert.Equal("reply ends with a sentence the speaker did not say",
+            Dictum.Llm.CleanupValidator.Validate("move the meeting to thursday and tell the team", "Move the meeting to Thursday and tell the team. Kind regards.").Rejection);
+    }
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the log lines that give a length, never the text, and the settings-file warnings.</summary>
+    [Fact]
+    public void The_own_instructions_log_lines_and_warnings_are_pinned()
+    {
+        Assert.Equal("(3 characters, not logged)", SettingsFile.LogValue("llm.instructions", System.Text.Json.Nodes.JsonValue.Create("abc")));
+        var log = new RecordingLog();
+        Dictum.Llm.TranscriptCleaner.Create(new LlmSettings { Provider = LlmSettings.Local, Instructions = "abc" }, offlineOnly: false, SecretStore.Empty, new HttpClient(new CountingHandler()), log);
+        Assert.Contains("Clean-up instructions: Dictum's, with your own added (3 characters; their text is not logged).", log.All);
+        Assert.Equal("Setting \"llm.instructions\" is 2001 characters long; only the first 2000 are used.",
+            Assert.Single(SettingsLoader.Parse(JsonSerializer.Serialize(new { llm = new { instructions = new string('a', 2001) } })).Warnings));
+        Assert.Equal("Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used.",
+            Assert.Single(SettingsLoader.Parse("""{ "llm": { "instructions": 5 } }""").Warnings));
+    }
+
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT pin: the button, its two status lines, the key file's header and its log lines.</summary>
+    [Fact]
+    public Task The_key_file_words_are_pinned() => UiSession.Run(() =>
+    {
+        Assert.Equal("Create the key file…", KeyFileButton.Label);
+        Assert.Equal("Your key file already exists; it has been opened.", AppShell.KeyFileExists);
+        Assert.Equal("Your key file has been created and opened: put your key in place of your-key-here after GEMINI_API_KEY=, then save it.", AppShell.KeyFileCreated("GEMINI_API_KEY"));
+        Assert.Equal("# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself.\n" +
+                     "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log.\n", KeyFile.Header);
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" } }""");
+        var log = new RecordingLog();
+        var (shell, _, _) = scratch.Shell(log: log);
+        shell.CreateKeyFile("GEMINI_API_KEY");
+        shell.CreateKeyFile("GEMINI_API_KEY");
+        Assert.Contains("Key file created with a placeholder line for GEMINI_API_KEY (no key written).", log.All);
+        Assert.Contains("Key file already exists: opened as it is, not changed.", log.All);
+        shell.Dispose();
+    });
+
+    // ---- Moving the model files (1.3 block, section C): APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026), as a block ----
+
+    /// <summary>
+    /// APPROVED 22/10/2026 22:52 AEDT pin: the move question, its buttons (Leave the default), the refusals, the progress line,
+    /// every result-line form built by a function ("Moved {k} of {n}." when Quit stopped the move included), and the four reasons,
+    /// word for word.
+    /// </summary>
+    [Fact]
+    public void The_model_move_strings_are_pinned()
+    {
+        Assert.Equal("Move your model files?", ModelFolderActions.MoveTitle);
+        Assert.Equal(@"Your model files are in C:\a. Move them to D:\b so Dictum finds them there? 2 files, 1.0 GB. Dictum copies each file, checks it, then removes the original.",
+            ModelFolderActions.MoveQuestion(@"C:\a", @"D:\b", 2, 1_000_000_000));
+        Assert.Equal("Move the files", ModelFolderActions.MoveLabel);
+        Assert.Equal("Leave them where they are", ModelFolderActions.LeaveLabel);
+        Assert.Equal("A download is running; wait for it to finish, then change the folder again to move the files.", ModelFolderActions.DownloadRunning);
+        Assert.Equal("One of these folders is inside the other, so Dictum does not move the files. Choose a folder outside the current one.", ModelFolderActions.NestedRefused);
+        Assert.Equal("Model files are being moved; try again when it finishes.", Dictum.App.ModelCoordinator.MovingRefusal);
+        Assert.Equal("Moving small.en (1 of 3)…", ModelFolderActions.Moving("small.en", 1, 3));
+        Assert.Equal("unfinished small.en download", ModelMover.DisplayName("ggml-small.en.bin.part"));
+        Assert.Equal(@"Moved 3 files to D:\b.", ModelFolderActions.Moved(3, @"D:\b"));
+        Assert.Equal(@"Moved 1 of 3; small.en could not be moved: why. The rest stay in C:\a.", ModelFolderActions.MovedSome(1, 3, "small.en", "why", @"C:\a"));
+        Assert.Equal(" 2 other files could not be moved either; the log says why.", ModelFolderActions.MoreProblems(2));
+        Assert.Equal("Moved 1 of 3.", ModelFolderActions.MovedStopped(1, 3));
+        Assert.Equal(@" The model folder is still C:\a, because the model in use did not move; the files that did are in D:\b; choose that folder again to use them.",
+            ModelFolderActions.FolderKept(@"C:\a", @"D:\b", someMoved: true));
+        Assert.Equal("a different file of that name is already in the new folder", ModelMover.AlreadyThere);
+        Assert.Equal("the copy is not the same size as the original, so the copy was deleted", ModelMover.CopySizeDiffers);
+        Assert.Equal("the copy did not match the catalogue, so the copy was deleted", ModelMover.CopyDoesNotMatch);
+        Assert.Equal("it was copied, but the original could not be removed", ModelMover.OriginalKept);
     }
 }

@@ -295,6 +295,44 @@ System prompt (ship as the default; overridable by `llm.prompt_file`):
 The user turn is the raw transcript only. Never put the API key or any settings in the
 prompt.
 
+Your own instructions (amendment, 22/10/2026, release 1.3; strings APPROVED 22/10/2026 22:52 AEDT): `llm.instructions` (string or null, default
+null; multi-line allowed; at most 2,000 characters, `LlmSettings.InstructionsMaxLength`) holds the user's own clean-up
+instructions, typed in a box on Settings → Clean-up in the Advanced view. When it is set they are added to the system
+prompt in their own section, after the base prompt and before the grammar-assist sentence and the dictionary line: the line
+`CleanupPrompt.OwnInstructionsStart`, the text as typed, then `CleanupPrompt.OwnInstructionsEnd`, once. The base prompt is
+the built-in one, or `llm.prompt_file` when that is set: **if both are set, the file replaces the built-in prompt and the
+instructions are still added after it.** They go to the local model and to cloud clean-up alike (for cloud clean-up they are
+part of the text sent, under the clean-up consent already given); never to `none` (the rule-based tidy) or `off`. The
+validator checks every reply whatever the instructions say: a reply that adds a line, a bracketed remark or a closing
+sentence, summarises, translates or answers is rejected and the rule-based tidy is typed.
+
+Final-sentence rule (owner decision, 22/10/2026 20:55 AEDT; reworked after the lens on 5e9c227 and the re-lens on c796dc8;
+reason text APPROVED 22/10/2026 22:52 AEDT): a short sentence added at the end on the same line as the dictation ("… before lunch. Thanks for
+reading.") had passed every rule. `CleanupValidator` now rejects it as "reply ends with a sentence the speaker did not say":
+in a reply of two sentences or more, the last sentence's words of three letters or more that are not function words,
+fillers or spoken commands (`ValidatorText.IsCorrectionWord`), leaving out words with a digit (the number rule's), must be
+at least half said, the share the final-line rule uses. A word is said when the dictation has it: as spelt; by its stem
+("won't" → "will", "can't" → "can", "shan't" → "shall", any other "-n't" without it, else the part before the apostrophe,
+"I'd" → "i"); with accents folded ("café", "résumé", "Zoë"); within one edit of a dictated counted word when both have
+five letters or more ("cancelled", "Catherine"); the same against two or three dictated words joined, or four single
+letters ("email", "alright", "tomorrow" from "to morrow", "ATO", "ASIC"); or, for a word of a dictionary term only,
+sounding like a dictated counted word (`ValidatorText.SoundsLike`: "kinney" → "Kynni", "zero" → "Xero", "dictim" →
+"Dictum"). Sound keys are used for nothing else: short keys collide ("bye" with "be", "good" with "go"), and the re-lens
+found 14 of 50 sign-offs passing that way. It runs after the dictionary-term and hands-free repeat rules, so their reasons
+stand. Ceiling: a last sentence made of words said in that dictation passes ("Done." after "the report is done"), so does
+one with no counted word ("Ta."), and a short last sentence a grammar fix rewrites into other words is rejected ("i asked
+him he go" → "I asked him. He went.", pinned; a false rejection costs polish only). `FinalSentenceRuleTests` pins the
+re-lens's whole corpus (84 honest tidies, 50 sign-offs on five dictations, the first lens's 27 closing sentences) with the
+result each gets. The echo rule reads the prompt without the user's own text inside their section
+(`CleanupPrompt.WithoutOwnText`), so a reply may repeat words of the instructions that the dictation has too; every copy
+of either marker line in the typed text (any case, curly apostrophes read as straight, nested copies included) is taken
+out before the text is wrapped. In the Simple view, which hides the box, the Clean-up page says "Your own clean-up
+instructions are in use (Advanced view)." while `llm.instructions` is set (APPROVED 22/10/2026 22:52 AEDT).
+Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
+feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
+first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is
+`OwnInstructionsCard`, placed in `CleanupPage` between the Grammar and Cloud clean-up cards; it is saved when focus leaves it and when the page is left or the window closes (`CleanupPage.Leave`).
+
 Providers (`llm.provider`):
 
 - `local` (default): llama.cpp in-process via LLamaSharp; `llm.model` is a cleanup
@@ -308,6 +346,17 @@ Secrets precedence (standard dotenv behaviour): a real process/machine environme
 variable wins; `.env` only fills in variables that are not already set. This lets a
 staff machine or Azure VM be configured with a machine-level `ANTHROPIC_API_KEY` and no
 `.env` file at all.
+
+Create the key file (amendment, 22/10/2026, release 1.3; strings APPROVED 22/10/2026 22:52 AEDT): a "Create the key file…" button beside "Open
+the settings folder" on the Cloud clean-up card writes the config folder's `.env` (`AppPaths.EnvFile`, %APPDATA%\Dictum\.env
+on Windows) with a two-line header in `.env.example`'s comment style and one line, `<VARIABLE>=your-key-here`, for the
+variable the card's key line names for the service and address chosen (Anthropic's own entry: `ANTHROPIC_API_KEY`; a
+preset or custom address: `CloudPresets.ForAddress`). It then opens the file with `IPlatform.Open`, as the folder button
+does (at the real path in a packaged build). A `.env` that already exists is never changed (the create fails rather than
+overwrite) and is opened as it is. A service that takes no key (Ollama on this PC) gets no file, only the card's own "needs
+no key" line. The placeholder `your-key-here` (`SecretStore.Placeholder`) counts as not set, as a blank value does, so no
+dictation is sent with it and the pages keep their waiting-for-key line until a real key is saved over it. The button is
+`KeyFileButton`, beside "Open the settings folder" on the Cloud clean-up card.
 
 ## 6. Text insertion
 
@@ -831,7 +880,7 @@ Users must be able to remove what the app has put on disk, from inside the app.
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
   model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
   also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
-  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
+  Models' Browse… and Use default (`ModelFolderActions`), with the note (APPROVED 22/10/2026 22:42 AEDT: "Dictum looks here first and downloads go here. Changing it asks before moving any files."), the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
   drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
   and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
@@ -1207,7 +1256,31 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   deleted or chosen (a chosen folder that is it, or inside it, is ignored, and Settings refuses it with a sentence). A
   download is refused, before it is asked and again where it starts, when its drive would keep under 200 MB (decimal); a
   kept `.part` needs only the rest; when the free space cannot be read the download goes ahead, as the 2 GB warning does.
-- **Changing the folder moves no files.**
+- **Changing the folder moves no files** unless the user says so (amended 22/10/2026 for 1.3, move-on-change; APPROVED 22/10/2026 22:52 AEDT,
+  the 1.3 block; wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models, Change… on Storage and Use default
+  on both go through one handler (`ModelFolderActions`) and behave alike (owner decision 22/10/2026 21:45 AEDT: Use default
+  moves the files back to the per-user folder). When the folder in use holds model files Dictum
+  knows (catalogue files and their `.part` downloads, in that folder itself), it asks once: **Move the files** or **Leave them
+  where they are** (the earlier behaviour, and the default button; closing the question changes nothing). A new folder that is the same folder by another path (a junction, a mapped
+  drive, a packaged app's redirected folder; a probe file written there appears in the old one) gets no question: the folder
+  is written and nothing moves. Moving is refused while a download runs and when one folder is inside the other. Otherwise,
+  while the move runs, downloads, preset downloads, Storage's Delete, Delete all app data, Remove Dictum completely and
+  calibration are refused ("Model files are being moved; try again when it finishes.") and no
+  model loads; both models are released (a load under way is waited for), then each file is copied to the new folder as
+  `<name>.move`, checked (size; for a finished catalogue file the SHA-256 pinned in the catalogue; a `.part` is not
+  hashed), renamed into place, and only then is the original deleted and its verified record moved to the copy. A file of
+  the same name already in the new folder counts as moved when it has the same contents (the pinned SHA-256, or byte for
+  byte where there is none) and is skipped otherwise; an original is never deleted when it and that file may be one file
+  on disk (an exclusive open of the original blocks the open of the other path). A file that fails keeps its original (its copy is deleted) and the move goes on;
+  files already moved stay moved. The models in use move last, as one unit: no original of theirs is deleted until all have
+  arrived, and if one fails or the move is stopped, the copies this move made of them are deleted and every original kept.
+  Then `models.folder` is written, after `whisper.model` or `llm.model` is rewritten when it named a moved file by its full
+  path (that key first: a path to the new copy is valid whichever folder is in force), unless a model in use stayed behind or the move was stopped (the folder is then unchanged and the line says so), and
+  the settings reload. The page's status line shows each file, by its catalogue
+  name, as it moves and the result. Quit during a move stops it (the file being copied stops, its original kept; a file
+  already checked finishes), the line is only "Moved {k} of {n}.", and Dictum then quits without changing the folder. The note under the folder on Models and
+  Storage reads (APPROVED 22/10/2026 22:42 AEDT): "Dictum looks here first and downloads go here. Changing it asks before
+  moving any files."
 - **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
@@ -1215,7 +1288,7 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
-  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
+  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and that changing it asks before moving any files (amended 22/10/2026), and a
   one-line warning when the folder is on a network share: a UNC path, read from the text alone, or a mapped network
   drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
   ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled
@@ -1311,8 +1384,8 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
 
 - **Settings → Help**, the last page in the Settings list, and a **Help** button in the tray panel that opens it.
 - **Content**: "How Dictum works" (hold the key, speak, let go; a speech model on this PC turns the voice into text; the
-  tidy; the paste; nothing is sent unless cloud clean-up is turned on; why a speech model hears some people better than
-  others, and what to do about it), then thirteen questions and answers (the last, added 21/10/2026, carries the approved name line). All of it comes from
+  tidy; the paste; nothing is sent unless cloud clean-up or cloud speech is turned on; why a speech model hears some people better than
+  others, and what to do about it), then sixteen questions and answers (counted in `HelpText.Questions` on 23/10/2026 at a1546e3 (main 4a4072a plus PR #62's question); the last, added 21/10/2026, carries the approved name line). All of it comes from
   `src/Dictum.Core/Help/HelpText.cs`. That copy is PROPOSED, and its full text is in docs/DECISIONS.md (21/10/2026).
   Amended 22/10/2026 (1.2 polish): the page opens with "Questions on this page", one link per question (the questions
   themselves, from `HelpText.Questions`), each a tab stop; pressing one moves keyboard focus to its answer, which scrolls
@@ -1320,7 +1393,8 @@ with pictures, is on https://dictum.kynni.au/help, built outside the app. A shor
   the top of the view (`HelpPage.JumpGap`); an answer the page cannot scroll that far (the last ones) shows whole.
   APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): two more questions after "Why did it type the wrong words?", "What is
   clean-up?" and "How can I see what Dictum does with my words?" (`HelpText.CleanupQuestion`, `SeeHowQuestion`), which make fifteen;
-  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers").
+  the site's help guide carries the same two answers (DECISIONS, "Clean-up explainers"). APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: a sixteenth
+  question, "Can I give the clean-up my own instructions?", after "How do I turn on cloud clean-up?", and a Create the key file… paragraph at the head of that answer (§31).
 - **Network**: none from the page. **Open the full guide** passes https://dictum.kynni.au/help to `IPlatform.Open`.
   **Email support** passes the same prefilled `mailto:` link as Settings → About → **Report a problem** (the version and
   the models filled in), and **Send feedback or suggest a feature** passes its own (below). The browser or mail app does
@@ -1565,3 +1639,35 @@ Every new user-facing string is APPROVED 22/10/2026 (DECISIONS, "Owner approvals
 - **Store listing**: one added sentence at the end of PRIVATE BY DESIGN (`docs/STORE.md`).
 - **Landing page**: "Free for life" became "Free to keep on your PC" (APPROVED 22/10/2026 17:42 AEDT).
 - **Pins**: `PlainWordsTests`, `OwnerApprovalsTests.The_plain_words_short_version_is_pinned`, `SiteStoreFirstTests` (anchors and the GitHub line on the new page).
+
+
+## 31. Cloud speech: public copy (amendment, 22/10/2026, APPROVED 22/10/2026 22:52 AEDT)
+
+Cloud speech (§28) sends the recording of each dictation to a service the user chooses, so every public surface that says where the
+voice goes says "unless you turn on cloud speech" (or "by default"). Wording and the old sentences: docs/DECISIONS.md, "Public copy for
+cloud speech and the 1.3 features".
+
+- **Release gate.** No page of the site (`index.html`, `help.html`, `privacy.html`, `plain-words.html`) says the voice "never leaves" the PC
+  without an "unless" in the same sentence, or that it "stays" on or here without "unless" or "by default"
+  (`SiteStoreFirstTests.No_page_says_the_voice_never_leaves_the_PC_without_an_unless`).
+- **Privacy policy sections** (`site/privacy.html`), in order: The short version; What we collect; What Dictum uses on your PC (Microphone, Your words,
+  Keyboard, Clipboard, Calibration recordings); What Dictum keeps on your PC, and where; When Dictum connects to the internet (Model downloads; Cloud clean-up:
+  api.anthropic.com; OpenAI-compatible service; **Cloud speech (off by default)**, new: api.openai.com, {resource}.openai.azure.com, api.groq.com and a custom
+  https:// address, what is sent (the recording as a WAV file, the personal dictionary words as a hint, in hands-free the closing words of the part before) and that Dictum cannot validate or
+  certify how the service handles the voice; This website; Offline only, which now refuses cloud speech to a service that is not on the PC; What any connection reveals); If you install from the
+  Microsoft Store; This website; Deleting everything; Changes to this policy; Contact. The "Last updated" date is set at tag time.
+- **Help questions** (§26): sixteen. APPROVED 22/10/2026 22:52 AEDT: "Can I give the clean-up my own instructions?" (`HelpText.OwnInstructionsQuestion`) after "How do I turn on cloud clean-up?",
+  and that answer opens with the Create the key file… button, keeping the sixteen Notepad steps as the fallback. Both depend on the own-instructions box and the key file button (PR #60, merged at 672f85b into main 4a4072a). Settings > Storage's offer to move model files is PR #61 (head 1730818 when this was written, open; it offers the move from Change…, Browse… and Use default). Merge order: #60 (done), #61, then the copy PR (#62). §26 reads "sixteen questions" (counted in `HelpText.Questions`) and "unless cloud clean-up or cloud speech is turned on" since main 4a4072a was merged into the copy branch.
+- **Store** (`docs/STORE.md`) and **Mac handover** (`docs/MAC-HANDOVER.md`): see DECISIONS. The Mac beta is Apple Silicon only (owner, 22/10/2026).
+
+## 32. Dialogs opened by a click (amendment, 23/10/2026, fix lane, release 1.3.0)
+
+Every question window (`IShellDialogs.Ask`, `TypeToConfirm` and the model prompts, through `Modal.Run`) opened by a click on a
+button of a Dictum window is that window's modal dialog: owned by it, centred on it, and the window is disabled until the
+dialog closes, then gets its focus back. Avalonia raises a button's Click inside its pointer-released handler, before the
+window releases the mouse capture, and the dialog's nested frame runs inside that Click: a dialog shown on its own got no mouse
+input until it closed (keyboard and UI Automation still worked). A second click on the opener while its dialog is up opens no
+second dialog and answers as Cancel. With no click behind it (first run, a question from the tray or another thread), or when
+the opener is the tray panel (it closes itself when it loses focus, which would close its dialog), the dialog is shown on its
+own, centred on the screen, as before. No text changed. Root cause, probe and pins: DECISIONS.md, "Dialogs: the opener's mouse
+capture".

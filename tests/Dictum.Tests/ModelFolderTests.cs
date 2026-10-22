@@ -372,7 +372,7 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Equal("Browse for a model folder", AutomationProperties.GetName(browse)); // labelled for a screen reader
         Assert.True(browse.Focusable && browse.IsTabStop && field.IsTabStop); // and reached with Tab
         Assert.False(useDefault.IsEnabled); // nothing is chosen yet
-        Assert.Contains("Dictum looks here first and downloads go here. Changing it does not move any files.", Texts(window));
+        Assert.Contains("Dictum looks here first and downloads go here. Changing it asks before moving any files.", Texts(window));
 
         dialogs.Folder = chosen;
         Click(browse);
@@ -383,11 +383,19 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Equal(chosen, field.Path);
         Assert.True(useDefault.IsEnabled);
         Assert.True(File.Exists(inChosen)); // nothing moved
+        Assert.Empty(dialogs.Asked); // the default folder held no model files: no question (1.3 move-on-change)
 
+        // 1.3 (owner decision 22/10/2026 21:45 AEDT): Use default offers the move too while the chosen folder holds models.
+        Click(useDefault); // the question closed: nothing changes
+        Assert.Equal(ModelFolderActions.MoveTitle, Assert.Single(dialogs.Asked).Title);
+        Assert.Equal(chosen, shell.Settings.Models.Folder);
+        dialogs.Answers.Enqueue(1); // Leave them where they are
         Click(useDefault);
+        Assert.Equal(2, dialogs.Asked.Count);
         Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
         Assert.Null(shell.Settings.Models.Folder);
         Assert.Equal(scratch.Paths.DefaultModelsDir, field.Path);
+        Assert.True(File.Exists(inChosen)); // left where it was
 
         dialogs.Folder = scratch.Paths.BundledModelsDir;
         Click(browse);
@@ -397,6 +405,15 @@ public sealed class ModelFolderTests : IDisposable
         dialogs.Folder = null; // the chooser cancelled: nothing changes
         Click(browse);
         Assert.Null(shell.Settings.Models.Folder);
+
+        var empty = Path.Combine(scratch.Root.FullName, "empty models"); // a chosen folder with no model files: Use default asks nothing
+        Directory.CreateDirectory(empty);
+        dialogs.Folder = empty;
+        Click(browse);
+        Assert.Equal(empty, shell.Settings.Models.Folder);
+        Click(useDefault);
+        Assert.Null(shell.Settings.Models.Folder);
+        Assert.Equal(2, dialogs.Asked.Count); // no question for either change
         window.Close();
         shell.Dispose();
     });

@@ -6,15 +6,38 @@ Read this whole file before doing anything. It is the brief; Claude's memory doe
 Provenance marks: **Verified** means checked on 19/10/2026 against the named source. **Recalled** means from training,
 unverified: treat it as a lead and check it against Apple's or the package's documentation before relying on it.
 
+## 0. Owner decisions of 22/10/2026 (these win over anything below that says otherwise)
+
+Recorded 22/10/2026 by the public-copy lane from the owner's decisions of that day (memory note dictum-mac-beta; not re-asked).
+
+- **Developer ID signed and notarised GitHub pre-release.** The owner joined the Apple Developer Program on 22/10/2026 and chose, at 22:05 AEDT,
+  a Developer ID signed and notarised GitHub pre-release as the beta, so a first open is not blocked by Gatekeeper (Recalled: macOS still asks once to confirm an app downloaded from the internet; the Mac lane records the exact prompt). This replaces the 19/10/2026
+  decision (ad-hoc signed, no Apple Developer Program membership). The Mac App Store is a later train, not part of the beta.
+- **Apple Silicon only (arm64) for the beta.** One zip: `Dictum-<version>-osx-arm64.zip`. Intel (osx-x64) is built **only if a
+  tester needs it**; until then no Intel publish, no second zip, no Intel test run.
+- **Timing.** The Mac build ships after 1.3 is live. The Mac session may start any time before that, on its own branch.
+- **Apple credentials.** The owner creates the Developer ID certificate and the notarisation credentials himself. The Mac session never handles
+  Apple credentials: it does not ask for, receive, store or commit a certificate, private key, password or notarisation key, and no such value
+  is ever in the repo. How the signing and notarisation steps receive them is settled with the owner in the PR.
+
+Lane note (public-copy lane, 22/10/2026; its inference, not an owner decision): the "retire when signed" simplifications in section 5
+(`Startup`: LaunchAgent login item against `SMAppService`; `CreateTray`'s `Notify`: the transient balloon against `UNUserNotificationCenter`)
+are to be re-evaluated by the Mac lane now that signing is available. Sections 1, 5 and 6 still describe ad-hoc signing and a Gatekeeper warning;
+where they differ from this section, this section wins and the Mac session rewrites them.
+
+Lane note (public-copy lane, same date; its inference, not an owner decision): Dictum 1.3 adds optional cloud speech (off by default; its own
+consent step). It is platform-neutral code, so it should reach the Mac build without Mac work. The Mac copy must not say that audio never leaves
+the Mac without saying "unless you turn on cloud speech" (the Windows public pages were brought into line the same day).
+
 ## 1. Goal
 
 A beta build of Dictum for macOS that Kyle's friends can download from a GitHub pre-release, open on their own Macs and
-use for dictation, without an Apple Developer Program membership (decision 19/10/2026: not paying the fee yet). The
-Windows app is the reference: the Mac app must behave the same wherever the platform allows. Targets: Apple Silicon and
-Intel (two zips) unless Kyle says every tester is on Apple Silicon.
+use for dictation, without an Apple Developer Program membership (decision 19/10/2026, superseded by section 0: the owner has since joined). The
+Windows app is the reference: the Mac app must behave the same wherever the platform allows. Target: Apple Silicon only
+(arm64, one zip) for the beta; Intel (a second zip) only if a tester needs it (owner decision 22/10/2026, section 0).
 
 What this means for the user, to be stated plainly in the release notes (all **Recalled**, verify before writing):
-- First open is blocked by Gatekeeper; the user opens it through System Settings > Privacy & Security > Open Anyway.
+- (Superseded by section 0: a Developer ID signed and notarised build should open without this; Recalled, not verified.) First open is blocked by Gatekeeper; the user opens it through System Settings > Privacy & Security > Open Anyway.
 - Three permission prompts: Microphone, Accessibility (to post Cmd-V) and Input Monitoring (the event tap).
 - Grants are tied to the app's signature; an ad-hoc signed app may be asked again after each update.
 
@@ -28,7 +51,7 @@ What this means for the user, to be stated plainly in the release notes (all **R
   (or `DICTUM_PRIVATE_DENYLIST`) so the commit guard checks it; otherwise the guard warns and skips.
 - **Hooks:** after cloning run `git config core.hooksPath "$(pwd)/.githooks"` (the hooks are bash; they run on macOS).
 - **No telemetry, ever.** No analytics, crash reporting or automatic update checks. Nothing in Dictum contacts a server
-  except the model download the user asks for and the cloud clean-up the user turns on.
+  except the model download the user asks for and the cloud clean-up or cloud speech the user turns on.
 - **Approved copy is never reworded:** CloudPolicy strings, the consent dialog, the state lines, the Store listing. New
   user-facing strings are marked PROPOSED in docs/DECISIONS.md for Kyle's post-hoc approval.
 - **Build ladder and review rubric** (Kyle's global CLAUDE.md, copy it to `~/.claude/CLAUDE.md` on the Mac): read first,
@@ -123,19 +146,20 @@ needs them to use CoreML, ship only the CPU path in the beta and record it.
 - Info.plist: `CFBundleIdentifier au.kynni.dictum`, `CFBundleName Dictum`, `CFBundleShortVersionString` from
   `Directory.Build.props` `<Version>`, `LSUIElement true` (menu-bar app, no Dock icon), `LSMinimumSystemVersion` (pick
   the lowest Avalonia 11.3 and .NET 10 support and record the source), `NSMicrophoneUsageDescription` (PROPOSED text:
-  "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac."), `NSHumanReadableCopyright`
+  "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac unless you turn on cloud speech." This
+  replaces the earlier proposal, which was untrue with cloud speech on), `NSHumanReadableCopyright`
   "© 2026 Kynni Pty Ltd".
-- Publish: `dotnet publish src/Dictum.Mac -c Release -r osx-arm64 --self-contained` and again for `osx-x64`; keep only the
+- Publish: `dotnet publish src/Dictum.Mac -c Release -r osx-arm64 --self-contained` (and again for `osx-x64` only if the owner asks for Intel); keep only the
   natives each RID needs (mirror the manifest/prune logic of `scripts/publish.ps1`; `pwsh` exists on GitHub's macOS
   runners, so a `-Mac` path in the existing script is acceptable; a bash script is also acceptable; one or the other, not
   both).
-- Sign ad-hoc: `codesign --force --deep --sign - Dictum.app` (**Recalled**; Apple Silicon refuses unsigned arm64 code,
+- (Superseded by section 0: Developer ID signing and notarisation, with credentials the owner holds.) Sign ad-hoc: `codesign --force --deep --sign - Dictum.app` (**Recalled**; Apple Silicon refuses unsigned arm64 code,
   ad-hoc needs no account). Verify with `codesign --verify --deep --strict` and `spctl` (expect Gatekeeper rejection:
   that is the documented beta limitation, not a failure).
 - Zip with `ditto -c -k --keepParent Dictum.app Dictum-<version>-osx-arm64.zip` (**Recalled**: preserves bundle
   attributes; a plain zip can break the bundle).
-- CI: add a `macos-latest` job to `.github/workflows/ci.yml` that builds, tests, publishes both RIDs, signs, zips and
-  uploads artifacts; on a `v*` tag attach both zips and their SHA-256 lines to the same GitHub Release the Windows job
+- CI: add a `macos-latest` job to `.github/workflows/ci.yml` that builds, tests, publishes osx-arm64 (osx-x64 only if Intel is asked for), signs, zips and
+  uploads artifacts; on a `v*` tag attach the zip and its SHA-256 line to the same GitHub Release the Windows job
   creates (the release step already uses `gh release upload --clobber`: do not create a second release). Mark Mac builds
   as beta in the release notes preamble.
 - Model download in CI: reuse the pinned commit, size and SHA-256 that `scripts/download-model.ps1` holds for base.en;
@@ -155,7 +179,8 @@ needs them to use CoreML, ship only the CPU path in the beta and record it.
    cancelled silently (this is the behaviour the 19/10/2026 Store fix pinned; it lives in Core and must hold on Mac).
 8. Login item on and off; quit and relaunch; single instance (open the app twice: the second launch shows the first).
 9. Remove Dictum completely.
-10. Repeat 1 to 3 on an Intel Mac if one is available; otherwise say so in the PR.
+10. No Intel run is needed: Intel is not built for the beta unless a tester needs it (owner decision 22/10/2026, section 0). If Intel is
+    added later, repeat 1 to 3 on an Intel Mac or say in the PR that none was available.
 
 Every test leaves evidence in the PR: the log lines (never recordings), the permission wording, screenshots of prompts.
 

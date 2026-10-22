@@ -261,9 +261,10 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
 - **The cloud clean-up demo never agrees, and never holds a real key.** It types the placeholder `your-key-here`, saves it
   as `.env` in the folder Open the settings folder opens, then stops at the consent dialog and clicks Cancel. So the "On: …"
   state line and the tray panel's "Cloud clean-up on · text leaves this PC" are described in a caption, not shown. Agreeing
-  was not recorded on purpose: with the placeholder saved, Dictum would take it for a key (`EnvFile` reads any value) and
-  show cloud clean-up as on, for a key that cannot work. `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`
-  checks the On: line and the tray line headlessly instead.
+  was not recorded on purpose. Since 1.3 (PR #60) the placeholder `your-key-here` counts as not set
+  (`SecretStore.Placeholder`), so agreeing with it saved would show the waiting line ("On, but waiting for your
+  ANTHROPIC_API_KEY …"), not "On: …". `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built` checks that waiting
+  line with the placeholder, and the On: line and the tray line with a stand-in key, headlessly.
 - **Start cannot find Notepad in the sandbox.** Start's search said "No results found for 'Notepad'", and the sandbox has
   no `C:\Windows\System32\notepad.exe` ("The system cannot find the file specified", observed 22/10/2026). So the cloud
   clean-up demo borrows this PC's classic Notepad (`environment.notepad`, staged read-only with its en-US resources, used

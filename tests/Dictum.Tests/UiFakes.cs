@@ -205,10 +205,14 @@ internal sealed class ScriptedDialogs : IShellDialogs
     /// <summary>The button labels of each <see cref="Ask"/>, in order, so a test can pin a label the help names.</summary>
     public List<IReadOnlyList<string>> AskedChoices { get; } = [];
 
+    /// <summary>The index of each <see cref="Ask"/>'s default button (Enter), or -1 for none.</summary>
+    public List<int> AskedDefault { get; } = [];
+
     public int Ask(string title, string text, params DialogChoice[] choices)
     {
         Asked.Add((title, text));
         AskedChoices.Add(choices.Select(c => c.Label).ToList());
+        AskedDefault.Add(Array.FindIndex(choices, c => c.IsDefault));
         return Answers.Count > 0 ? Answers.Dequeue() : -1;
     }
 

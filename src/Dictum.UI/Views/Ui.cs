@@ -30,13 +30,16 @@ internal static class Ui
 
     public static TextBlock Overline(string text) => Text(text.ToUpperInvariant(), "overline");
 
-    /// <summary>A button of class primary, secondary, danger, quiet or link. A failing action is reported, never fatal.</summary>
+    /// <summary>
+    /// A button of class primary, secondary, danger, quiet or link. A failing action is reported, never fatal. A dialog the
+    /// action opens is owned by this button's window (<see cref="Modal.Run"/>).
+    /// </summary>
     public static Button Button(string label, string cls, Action click, Action<Exception>? failed = null, string? name = null)
     {
         var button = new Button { Content = label };
         button.Classes.Add(cls);
         if (name is not null) AutomationProperties.SetName(button, name);
-        button.Click += (_, _) =>
+        button.Click += (_, _) => Modal.From(TopLevel.GetTopLevel(button) as Window, () =>
         {
             try
             {
@@ -46,7 +49,7 @@ internal static class Ui
             {
                 failed(ex);
             }
-        };
+        });
         return button;
     }
 

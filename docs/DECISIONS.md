@@ -4816,6 +4816,456 @@ The owner approved the plain-words statement (`.demo-preview/terms-disclaimer.md
 12. **Privacy policy route, APPROVED 22/10/2026 20:47 AEDT:** `site/privacy.html`, "This website" list, now reads "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates…", the rest of the sentence unchanged; the README network table has a matching row. The policy's "Last updated" date is not changed here: it is set to the 1.3 release date at tag time (the C-Copy lane owns that).
 13. **Mechanical (lens on a95dd5e):** the `// simplification:` comment is in `WelcomeStep`; the landing-page pin counts exactly four case-sensitive "Free to keep on your PC" (mutation: the at-a-glance item changed to another phrase, observed failing, restored); README's About row and Welcome step 1 describe the card and the short version.
 
+## Clean-up: your own instructions and Create the key file (22/10/2026, branch feat/own-instructions, release 1.3)
+
+Two owner requests for Settings > Clean-up, built from main 04287d6. Every new string is PROPOSED; none is approved yet.
+
+1. **Your own instructions.** New key `llm.instructions` (string or null, default null, multi-line, at most 2,000 characters:
+   `LlmSettings.InstructionsMaxLength`). `CleanupPrompt.Build` adds them after the base prompt (built-in or `llm.prompt_file`)
+   and before the grammar-assist sentence and the dictionary line, once, between `OwnInstructionsStart` and `OwnInstructionsEnd`.
+   With `llm.prompt_file` set too, the file replaces the built-in prompt and the instructions are still added. The local model
+   and cloud clean-up get them; `none` and `off` never do. Every reply is still checked by the validator, which gained one rule on the owner's decision (item 4).
+   - *Private text.* `ModelCoordinator.TryWrite` logged every written value as JSON, so the box would have put the text in the
+     log ("Set from the app: llm.instructions = …"). It now logs `SettingsFile.LogValue`, which gives the length for a key in
+     `SettingsFile.PrivateKeys`. The loader's generic warning quotes up to 57 characters of a bad value, so the key has its own
+     reader (`ObjectReader.PrivateText`), whose warnings give a length only. The clean-up's load line gives the length. The
+     feedback email, the state lines and See how it works carry no prompt text (pinned).
+   - *Validator gap, found by this lane, then closed on the owner's decision (22/10/2026 20:55 AEDT): see item 4.* A short
+     sentence added on the same line as the dictation passed every rule. Probed 22/10/2026 with "um so i think we should uh
+     move the meeting to thursday and tell the whole team before lunch": "… before lunch. Thanks for reading.", "… before
+     lunch. Kind regards." and "… before lunch. Please call me if you have any questions." were all accepted.
+   - *Page placement (done after PR #59 merged; see item 5).* The Clean-up page is `CleanupPage` in `src/Dictum.UI/Views/Settings/OtherPages.cs`, which
+     PR #59 owned until it merged. The box is `OwnInstructionsCard` and the button `KeyFileButton` (both in `CleanupOwnInstructions.cs`).
+     Before PR #59 merged, the wiring was only tried in this worktree and then removed.
+2. **Create the key file.** `KeyFile.CreateIfMissing` writes `AppPaths.EnvFile` with `KeyFile.Header` and
+   `<VARIABLE>=your-key-here` (the variable must be one of `SecretStore.KeyNames`). It opens with `FileMode.CreateNew` after an
+   exists check, so an existing `.env` is never changed. `AppShell.CreateKeyFile` then opens the file through `OpenPath` at
+   its real path. `KeyFileButton.VariableFor` picks the variable the card's key line names (Anthropic's entry:
+   `ANTHROPIC_API_KEY`; otherwise `CloudPresets.ForAddress`). A service with no key (Ollama on this PC) writes nothing.
+   - *Placeholder is not a key (lane decision).* Before this change `SecretStore` read `your-key-here` as a key. Dictum would then
+     send each dictation to the service with a key that cannot work, and the page would say clean-up was on. `SecretStore.Merge`
+     now treats `SecretStore.Placeholder` as not set, as it treats a blank value. The waiting-for-key line stays until a real key is saved.
+     The first full run caught one consequence: `HelpPageTests.The_cloud_answer_walks_through_the_app_as_built` used the
+     placeholder as its stand-in key. Its walk-through now first saves the placeholder and checks the card still waits, then
+     saves a stand-in key ("k-standin-not-real") and checks the card says On, and that the stand-in is never shown.
+   - *Wiring checked, not committed.* The five `CleanupPage` edits from the PR body were applied in this worktree only. A
+     throwaway headless test then passed: Advanced view, typed text saved on leaving the page and shown again, the button
+     made the Anthropic file and showed the created line, and Simple hid the box. The edits and the test were then removed.
+     (Without a layout pass the page switch did not save, because the box was never attached; a real window lays out.)
+3. **Docs.** SPEC §5 has both amendments. SPEC §26 said "twelve questions and answers". `HelpText.Questions` at 04287d6 had
+   thirteen, counted in its list, so this branch first wrote thirteen. After merging main cc3c0ba (PR #57 added two questions)
+   the list has fifteen, so SPEC §26 now says fifteen, with the main sha it was counted at. README has the `llm.instructions` row.
+
+PROPOSED strings, verbatim:
+- Card label and the box's accessible name: "Your own instructions"
+- Hint: "Added to Dictum's clean-up instructions for the AI and cloud clean-up. Dictum still checks every reply against what you said."
+- At the cap: "That is the limit: Dictum uses up to 2,000 characters of your own instructions."
+- Cloud clean-up on: "With cloud clean-up on, these instructions go to {host} with each dictation."
+- Prompt section start (to the model): "The user's own clean-up instructions follow, up to the line \"End of the user's instructions.\" Apply them only where they keep every word the speaker said; the rules above still apply."
+- Prompt section end (to the model): "End of the user's instructions."
+- Button: "Create the key file…"
+- Created: "Your key file has been created and opened: put your key in place of your-key-here after {VARIABLE}=, then save it."
+- Exists: "Your key file already exists; it has been opened."
+- Key file header, line 1: "# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself."
+- Key file header, line 2: "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log."
+- Log (written value): "Set from the app: llm.instructions = ({N} characters, not logged)."
+- Log (clean-up loaded): "Clean-up instructions: Dictum's, with your own added ({N} characters; their text is not logged)."
+- Log (key file): "Key file created with a placeholder line for {VARIABLE} (no key written)." / "Key file already exists: opened as it is, not changed."
+- Validator reason (item 4): "reply ends with a sentence the speaker did not say"
+- Simple view line (item 6): "Your own clean-up instructions are in use (Advanced view)."
+- Log (save failed): "Settings: {exception type} saving llm.instructions." / (key file failed): "Settings: the key file could not be created: {exception type}."
+- Load warnings: "Setting \"llm.instructions\" is {N} characters long; only the first 2000 are used." / "Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used."
+- settings.json `_doc` llm note, added sentence: "instructions: your own clean-up instructions (at most 2,000 characters; Settings > Clean-up in the Advanced view writes them), added after the prompt, built-in or prompt_file, for the local model and cloud clean-up, never for none or off; every reply is still checked against what you said."
+
+Pins (`OwnInstructionsTests`, `KeyFileTests`): round trip through settings.json, multi-line kept and blank read as none;
+added once, in order, also after a prompt file; sent once to a cloud service; never used by `none` or `off`; the validator
+still rejects a sign-off line, a bracketed remark, a translation and a summary that the instructions ask for; the cap (with
+a surrogate pair at the cut) and warnings without the text; the log never has the text (the app's write, the reload, a value
+over the cap); the feedback email never has it; See how it works never shows it; the box is Advanced-only, saves trimmed
+text when focus leaves it, and shows the limit and cloud-host lines; the key file has the right variable for each service;
+an existing file stays the same byte for byte; the file is opened at its path; both status lines; the placeholder counts as
+not set and sends nothing.
+
+4. **Final-sentence rule (owner decision 22/10/2026 20:55 AEDT).** `CleanupValidator.AddedFinalSentence`: in a reply of two
+   sentences or more, the last sentence's words that the "scratch that" checks count (`IsCorrectionWord`: three letters or
+   more, no function word, filler or spoken command) must be at least half said (how a word counts as said was reworked twice: items 6 and 7),
+   the share the final-line rule uses. It runs after the dictionary-term and hands-free repeat rules: placed inside the
+   final-line checks it first took the reason of `DictionaryInsertionValidatorTests` ("Push it to GitHub. GitHub.", still
+   rejected, but with the new reason), so it moved and every existing reason stands. PROPOSED reason: "reply ends with a
+   sentence the speaker did not say". Ceiling (`// simplification:` at the rule): a last sentence of words said earlier in
+   another order passes; a short last sentence a grammar fix rewrites into other words is rejected (polish lost only).
+   Pins: the three probed replies are rejected with that reason; the four earlier cases are still rejected with their own
+   reasons; three replies ending with the speaker's own last sentence, tidied (fillers out, "their" fixed to "there",
+   "scratch that" and "new line" followed), are used. The validator, cleaner, rules, dictionary, hands-free, LLM, calibration
+   and See how it works test classes all pass (421 total, 0 failed, 2 skipped). README's rule list and SPEC §5 updated.
+
+Mutations (each observed failing, 22/10/2026, then restored):
+- Validator pin: `CleanAsync` used the model's reply without `CleanupValidator.Validate`. All four cases of
+  `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing.
+- Log pin: `TryWrite` logged `v.Value?.ToJsonString()` again. `The_log_gets_their_length_and_never_their_text` observed
+  failing on `DoesNotContain(Marker)` ("zebracorn-7316" found).
+- No-overwrite pin: `KeyFile.CreateIfMissing` without its exists check and with `FileMode.Create`.
+  `An_existing_file_is_left_byte_for_byte_and_opened` observed failing on the byte comparison.
+- Placeholder: `Merge` without `v != Placeholder`. `The_placeholder_counts_as_not_set_so_nothing_is_sent_with_it` observed
+  failing ("your-key-here" returned as the key).
+- Final-sentence rule: the rule's call disabled (`false &&`). The three same-line cases of
+  `The_validator_still_rejects_what_the_instructions_ask_to_add_or_change` observed failing; the other four still passed.
+
+Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. OwnInstructionsTests, KeyFileTests, CloudWarningAndPresetsTests, CleanupOffTests, FixBatchSettingsTests, PublicCopyNeutralityTests and HelpPageTests: 166 total, 0 failed, 0 skipped. Full suite, first run: 1951 total, 1 failed (`HelpPageTests.The_cloud_answer_walks_through_the_app_as_built`, the placeholder stand-in, fixed as above), 23 skipped. Full suite after the fix: 1951 total, 1928 passed, 0 failed, 23 skipped.
+Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incremental`, 0 warnings, 0 errors; the named classes plus HelpPageTests and OwnerApprovalsTests 192 total, 0 failed; full suite 1957 total, 1934 passed, 0 failed, 23 skipped. Gates with the final-sentence rule (item 4): Release build with `--no-incremental`, 0 warnings, 0 errors; the same classes 198 total, 0 failed, 0 skipped; full suite 1963 total, 1940 passed, 0 failed, 23 skipped.
+
+5. **Clean-up page wiring (after PR #59 merged; main 28c3e65 merged as 8e2f205).** `CleanupPage` (OtherPages.cs) gains:
+   the `_own` field and its construction; `_own.Card` between the Grammar and Cloud clean-up cards; `_own.Redraw(s)` in
+   `Redraw`; `KeyFileButton.Create(…)` beside "Open the settings folder" (variable from `KeyFileButton.VariableFor(Preset,
+   Address(Preset))`, the card's own key line for a service with no key); and a `Leave` override that saves the box, so
+   text is kept when another page is chosen or the window closes, besides focus loss. Every other card is unchanged.
+   Pins (`CleanupPageOwnInstructionsTests`): the Advanced view shows the box in place and saves it on leaving the page and
+   on closing the window; the Simple view hides it (and a switch to Advanced shows it); the button sits in the folder
+   button's row, creates the Anthropic key file and shows the created line; an existing `.env` is opened and not changed.
+   Mutation: `OwnInstructionsCard.Redraw` showing the card in both views; `The_Simple_view_hides_the_box` observed failing,
+   then restored. Gates: Release build with `--no-incremental`, 0 warnings, 0 errors; OwnInstructionsTests, KeyFileTests,
+   CleanupPageOwnInstructionsTests, CleanupOffTests, CloudOffTakesEffectTests, CloudWarningAndPresetsTests, HelpPageTests,
+   OwnerApprovalsTests and PublicCopyNeutralityTests 230 total, 0 failed, 0 skipped; full suite 1982 total, 1959 passed,
+   0 failed, 23 skipped.
+
+6. **Lens on 5e9c227: Needs changes, no blocker; fixed (22/10/2026).**
+   1. *"… day." sign-offs passed.* `SoundsLike` matched "day" against function words ("to", "the" share its sound key). The
+      rule now sound-matches only against dictated words that are themselves counted (`IsCorrectionWord`).
+   2. *Honest tidies rejected.* The lens's trial fix is in: words with a digit are left to the number rule; an apostrophe word
+      is said when the part before the apostrophe was; a word that sounds like two or three dictated words joined is said
+      (the sound-key routes were replaced in item 7).
+      `FinalSentenceRuleTests` pins the lens's corpus (its harness `final-fix.fsx`): 36 honest tidies accepted (four of its 40
+      are left out: three rejected by older rules on main too, and "i asked him he go" → "I asked him. He went.", pinned as
+      the one recorded exception), and 25 closing sentences rejected ("Have a great day.", "Have a nice day.", "Good day.",
+      "Kind regards.", "Thanks.", "Talk soon.", "Take care." and the rest). Two of the lens's 27 pass and are not pinned:
+      "Team meeting Thursday." (all its words were said, the recorded ceiling) and "Thanks, team.".
+   3. *Echo rule and the user's own words.* The five-word echo check now reads `CleanupPrompt.WithoutOwnText(prompt)`: the
+      marker lines stay, the user's text between them is left out, so an honest reply that repeats words of the instructions
+      the dictation has too is used ("Write the company name as Kynni Pty Ltd." with "please write the company name as kinney
+      pty ltd in the letter").
+   4. *Markers.* `CleanupPrompt.OwnInstructions` takes typed copies of both marker lines out before wrapping, and text that is
+      only markers adds no section. The clean-up's load line is logged only when the section is in the prompt.
+   5. *Docs.* DEMOS.md (the placeholder no longer counts as a key), item 1 here, SPEC §5 (the widened rule, the echo
+      change, the Simple line), README "Secrets" (the button and the placeholder rule).
+   6. *PROPOSED list.* The two save-failure log lines and the Simple line are added above.
+   7. *Accessibility.* The limit line is a polite live region (`AutomationProperties.SetLiveSetting`), pinned.
+   8. *Pins.* The translate and summarise cases now pin their exact reasons: "reply shares too few words with the dictation
+      (0/14)" and "reply has 0.12x the dictation's words (minimum 0.4x)"; the whole theory compares reasons exactly.
+   9. *Simple view (orchestrator decision).* `OwnInstructionsCard.View` holds the card and one line, "Your own clean-up
+      instructions are in use (Advanced view).", shown in the Simple view while `llm.instructions` is set; the page places
+      `View`. Pinned shown and hidden.
+
+   Mutations (each observed failing, then restored):
+   - Item 1: sound-matching against every dictated word again. "A9 have a great day", "A17 good day" and "A21 have a nice
+     day" observed failing.
+   - Item 2: the digit, apostrophe and joined-words allowances removed. "11 ordinal digits alone", "12 ordinal 1st alone",
+     "13 contraction alone", "19 initialism", "28 tomorrow split", "33 alright" and "37 ordinal 2nd" observed failing.
+   - Item 3: the echo check reading the whole prompt. `A_reply_may_repeat_words_of_the_users_own_instructions_that_were_dictated`
+     observed failing.
+   - Item 4: the text wrapped as typed. `Typed_marker_lines_cannot_step_outside_the_section` observed failing.
+   - Item 9: the Simple line never shown. `The_Simple_view_says_when_your_own_instructions_are_in_use` observed failing.
+
+   Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. The validator, cleaner, rules, dictionary, hands-free,
+   LLM, amendment, Batch 2, personal-text, See how it works and calibration classes with OwnInstructionsTests,
+   FinalSentenceRuleTests, KeyFileTests, CleanupPageOwnInstructionsTests, CleanupOffTests, CloudWarningAndPresetsTests,
+   HelpPageTests, OwnerApprovalsTests and PublicCopyNeutralityTests: 644 total, 642 passed, 0 failed, 2 skipped. Full suite:
+   2048 total, 2025 passed, 0 failed, 23 skipped.
+
+7. **Re-lens on c796dc8: Needs changes; fixed (22/10/2026).** The lens's trial validator (lens60b/trial) is applied as written,
+   with one addition (item 3 below).
+   1. *Sound-key collisions (compliance).* 14 of 50 sign-offs passed on the lens's five dictations ("Bye.", "Take care.",
+      "Today.", "Sure thing.", "Thanks again.", "Good luck." twice, "Happy to discuss.", "Hope all is well.", "Hope this
+      helps.", "Hope you are well.", "All good.", "Chat soon.", "Have a good one."). Now:
+      - joined and counted words match only exactly, or when both have five letters or more and are one edit apart;
+      - accents are folded;
+      - `SoundsLike` is used only for a reply word that belongs to a dictionary term (the rule now receives `DictionaryTerms`).
+   2. *"-n't" contractions.* A stem map: "won't" → "will", "can't" → "can", "shan't" → "shall", any other "-n't" without it,
+      else the part before the apostrophe.
+   3. *Four letters.* Joins also take four single-letter words ("a s i c" → "ASIC"). This is the one result that differs from
+      the trial's table.
+   4. *Markers.* `CleanupPrompt.OwnText` removes every copy of either marker line, again and again until none is left, in any
+      case, with curly apostrophes read as straight (`ValidatorText.MapQuotes`, one character for one).
+   5. *Apostrophe stem* pinned on its own ("i will call you i would like that" → "… I'd like that.").
+   6. *Docs.* SPEC §5's rule paragraph is rewritten for the new matching; items 4 and 6 here point to this item; the PR body
+      count says fifteen (`HelpText.Questions` at 28c3e65).
+   - *Pins.* `FinalSentenceRuleTests` now pins the re-lens's whole corpus with the result each case gets:
+     - 84 honest tidies: 79 accepted; four rejected by older rules (main rejects them too); and the recorded ceiling "16".
+     - 50 sign-offs on five dictations: 13 recorded passes, 11 rejected first by an older rule, and every other one rejected
+       by this rule.
+     - The first lens's 27 closing sentences.
+     - The 14 collisions, the six "-n't" cases, "ASIC", and twelve honest respellings ("ATO", "email", "tomorrow",
+       "alright", "cancelled", "Catherine", "café", "résumé", "Zoë", "kinney" → "Kynni", "zero" → "Xero", "dictim" →
+       "Dictum").
+     - The lens's harness had "café", "résumé" and "Zoë" double-encoded; they are written correctly here and pass.
+   - Mutations (each observed failing, then restored):
+     - Item 1: SoundsLike in place of the one-edit rule for joined and counted words. All 14 cases of
+       `A_sound_key_collision_does_not_let_a_sign_off_through` observed failing.
+     - Item 2: the "-n't" stem lines removed. `A_contraction_with_nt_is_said_by_its_stem` observed failing on "won't". The
+       other five still pass by other routes ("shouldn" is one edit from "should"; "isnot" joined is one edit from "isn't").
+     - Item 3: the four-letter join removed. `Four_spelt_out_letters_are_said_as_their_initialism` observed failing.
+     - Item 4: a single exact, unmapped pass. All three cases of `Nested_curly_and_capitalised_markers_are_taken_out`
+       observed failing.
+     - Item 5: the apostrophe stem removed (the word kept whole). `An_apostrophe_word_is_said_when_the_part_before_it_was`
+       observed failing.
+   - Gates:
+     - Release build with `--no-incremental`: 0 warnings, 0 errors.
+     - The lens's 23 classes: 870 total, 869 passed, 0 failed, 1 skipped. "Llm" is run as the four classes of `LlmTests.cs`:
+       TranscriptCleanerTests, CleanupValidatorTests, ProviderParsingTests and SecretRedactorTests.
+     - Full suite: 2384 total, 2361 passed, 0 failed, 23 skipped.
+
+8. **Owner approval, 22/10/2026 22:52 AEDT.** The owner approved the 1.3 block. Sections A and B of
+   `.demo-preview/approve-1.3-block.md` cover every PROPOSED string of this PR, and no string changed. Each marker now reads
+   "APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword":
+   - the card label and hint; the limit, cloud and Simple-view lines;
+   - the validator reason; the two prompt marker lines;
+   - the log lines and the loader warnings;
+   - the button, its two status lines, the key-file header lines and the key-file log lines.
+
+   Strings that had no marker of their own (the validator reason, the log lines, the warnings) get a comment line above
+   them. The change to `src` is comments only, counted in the PR body. `OwnerApprovalsTests` gains an approved block that
+   pins each string word for word, independently of the app's constants. The two save-failure log lines are approved but not
+   pinned, because only an exception reaches them. SPEC §5's four PROPOSED marks for these strings now say APPROVED.
+
+## Public copy for cloud speech and the 1.3 features (22/10/2026, branch copy/cloud-speech-public, APPROVED 22/10/2026 22:52 AEDT except the tester-notes CHANGED paragraph)
+
+Lane C-Copy of the cloud speech work, on origin/main 28c3e65 (cloud speech Core PR #48 and UI PR #54 merged; the own-instructions
+lane PR #60 was not; it has since merged at 672f85b into main 4a4072a). Every sentence below was proposed on 22/10/2026 and **APPROVED by the owner as the 1.3 block (22/10/2026 22:52 AEDT; item 11)**, except the 1.3.0 tester-notes CHANGED paragraph, which stays PROPOSED until the Store submission; none is a counsel-owned or "approved ... as written" string.
+Where an approved sentence is touched, the old one is quoted beside the new one. `privacy.html`'s "Last updated" date is not changed
+(it is set at tag time). Nothing in `OtherPages.cs`, `ModelPages.cs`, `CloudPolicy.cs`, `SpeechPolicy.cs`, `Settings/*.cs` or
+`src/Dictum.Core/Storage/*` was edited.
+
+1. **Why.** Cloud speech sends each recording to a service the user chooses, but four public surfaces still said the voice never
+   leaves the PC: the landing page, the web guide, the privacy policy and the Store text. The release gate: no unqualified "voice never
+   leaves" claim on any public surface.
+2. **Old -> new, `site/index.html`** (the design brief's section 5 table, plus the rows marked *beyond the table*):
+   - hero: "Your voice never leaves your PC." -> "Your voice stays on your PC unless you turn on cloud speech."
+   - og description: "nothing leaves your PC unless you turn on cloud clean-up." -> "nothing leaves your PC unless you turn on cloud clean-up or cloud speech."
+   - *beyond the table* meta description: "and nothing you say leaves your computer unless you turn on cloud clean-up." -> "and nothing you say leaves your computer unless you turn on cloud clean-up or cloud speech."
+   - at-a-glance list: "Your voice stays on your PC." -> "Your voice stays on your PC by default."
+   - card heading: "Your voice stays on your PC" -> "Your voice stays on your PC by default"
+   - both SVG badges: "Your voice stays on your PC" -> "Your voice stays on your PC" / "by default" on two lines. The text does not fit the one-line
+     badge at 15 px bold (about 38 characters against 248 px of room in the wide graphic; this is an estimate: no browser measured it), so the
+     wide badge is 72 px high like the Free badge beside it, and the narrow graphic is 20 px taller (viewBox 360x760 -> 360x780) with the two
+     badges below it moved down by 20.
+   - *beyond the table* card paragraph: "Cloud clean-up only if you turn it on." -> "Cloud clean-up and cloud speech only if you turn them on."
+   - FAQ "Does it learn my voice?" (the table's ":332"): "your voice never leaves your PC" -> "your voice stays on your PC unless you turn on cloud speech"
+   - hosts list under "Nothing leaves your PC, by default" (heading unchanged): new card, h3 "api.openai.com, {resource}.openai.azure.com, api.groq.com" with
+     the "Off by default" tag, "Cloud speech (off by default): the recording of each dictation goes to the service you chose, OpenAI, Azure OpenAI, Groq or a server you name,
+     with your own key, behind its own consent step. Your dictionary words go with it as a hint. Dictum does not validate or certify how that service handles your voice."
+   - dictum.kynni.au card (the brief): "Only when you open the privacy policy or the full guide from Settings, ..." -> "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, ..."
+     (the privacy page's approved sentence; `UpdateCheckTests` now pins the card to it).
+   - *beyond the table* comparison table, Dictum, "Where your speech is processed": "On your PC" -> "On your PC by default"; note: "Dictum's optional cloud clean-up is off by default and comes with a warning." ->
+     "Dictum's optional cloud clean-up and cloud speech are off by default and come with a warning."
+3. **Old -> new, `site/help.html`** (the table's ":358", ":359", ":611", found by text):
+   - section 7: "Dictum turns your voice into text on this PC, then throws the recording away. Your voice never leaves this PC." -> "... then throws the recording away. Your voice stays on this PC unless you turn on cloud speech, an advanced option that is off by default."
+   - ":359" "your voice still stays here": already qualified by the owner (17:22 AEDT), unchanged.
+   - FAQ "Does it learn my voice?": "your voice never leaves this PC" -> "your voice stays on this PC unless you turn on cloud speech"
+   - *beyond the table* FAQ "What is cloud clean-up? Is it safe?": "Your voice still stays on this PC." -> "Your voice still stays on this PC unless you also turn on cloud speech." (the owner's qualifier, 17:22 AEDT, applied to the one answer it missed)
+   - *beyond the table* FAQ "Does Dictum need the internet?": "That means three things:" + a fourth item "cloud speech, if you turn it on." (the third now ends ";"), and "stops all three" -> "stops all four".
+   - Cloud section (twin of the Help change, item 6): two paragraphs before the sixteen steps.
+   - New FAQ "Can I give the clean-up my own instructions?" (twin of the Help question, item 6).
+4. **Old -> new, `site/privacy.html`** (the brief's list; "We never receive your audio or your text." is unchanged, Kynni never does):
+   - short version: "Your speech is turned into text on your PC, and the text is tidied on your PC." -> "Your speech is turned into text on your PC, unless you turn on cloud speech, and the text is tidied on your PC."
+   - short version: "... to send text to a cloud clean-up service or a server you choose." -> "... to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose."
+   - Microphone: "It is never written to disk, except the calibration recordings you make on purpose (below)." -> the same, then "With cloud speech on, the recording is sent to the service you chose and then discarded here."
+   - *beyond the table* `.env` bullet: "an API key, only if you add one for cloud clean-up." -> "an API key, only if you add one for cloud clean-up or cloud speech."
+   - new h3 "Cloud speech (off by default)" before "This website": "Only if you switch on cloud speech in Settings > Models, agree to the service in its own consent step and add your own API key. After each dictation (each part, in hands-free) Dictum then
+     sends that dictation's recording, as a WAV file, to the service you chose, together with the words in your personal dictionary as a hint and, in hands-free, the closing words of the part before.
+     The service is OpenAI (api.openai.com), Azure OpenAI ({resource}.openai.azure.com, your own resource), Groq (api.groq.com) or a custom https:// address you enter. That service handles your voice under its own terms.
+     This is an advanced option: Dictum cannot validate or certify how that service stores, protects or uses your voice. Check its terms before dictating anything sensitive."
+   - Offline only: "downloads, cloud clean-up and servers that aren't on your PC are all refused. A clean-up server running on your own PC still works." -> "downloads, cloud clean-up, cloud speech and servers that aren't on your PC are all refused. A clean-up or speech server running on your own PC still works." (offline_only allows an https server on this PC for speech, as for clean-up: `SpeechPolicy.OfflineRefusal`)
+   - Connection list: "Hugging Face, Anthropic, OpenAI, Google Gemini and any server you name ... Model downloads and requests to Anthropic, OpenAI and Google Gemini use HTTPS." -> "Hugging Face, Anthropic, OpenAI, Azure OpenAI, Groq, Google Gemini and any server you name ... requests to Anthropic, OpenAI, Azure OpenAI, Groq and Google Gemini use HTTPS." (cloud speech accepts only https://, also on this PC)
+5. **README, Store, Mac handover.**
+   - README: new row in the Privacy network table ("After each dictation (each part in hands-free), only if you switch cloud speech on in Settings > Models, agree to the host in its own consent step, and a key is set where the service needs one |
+     the host in `speech.base_url` (...): that dictation's audio as WAV, your dictionary terms as a hint, and in hands-free the carried words"); the consent description "(every dictation's text, never the audio, with the clean-up instructions and your dictionary words)" ->
+     "(every dictation's text, "not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it", together with Dictum's clean-up instructions, which include the words in your personal dictionary)" (the consent's own wording, `CloudPolicy.ConsentText`);
+     `offline_only` paragraph gains "It refuses cloud speech to any service that is not on this machine too, and the speech model on this PC hears the dictation."; the Audio bullet gains "With cloud speech on, it is also sent to the service you chose (see the table above), then discarded here.";
+     and the `speech.provider` row's "Settings does not have its consent step yet, so in this build nothing in Dictum records that consent." (untrue since PR #54) -> "The consent step is in Settings > Models (Advanced view), under Cloud speech."
+     The `speech.*` rows, the key variables and the `offline_only` row already named cloud speech (Core lane) and are unchanged. The validator rule list is unchanged (it was written before PR #60 merged; #60 added no bullet for its final-sentence rule there, and this lane does not own that list).
+   - Store (`docs/STORE.md`): the description sentence and the AI paragraph sentence (the brief's `:104`, `:107`), the age-rating answer, the properties-page answer, certification row 5 (privacy policy lists the cloud speech hosts) and row 13 (the speech consent dialog satisfies 10.5.2 for audio),
+     an APPROVED (22:52) "What's new in this version (1.3.0)" block above 1.2.1's, and a certification-notes block that stays PROPOSED until the Store submission (Notes written line, CHANGED paragraph, cloud paragraph). The certification-record row "1.3.0 prepared" is not added: it is the release lane's.
+     The description's first sentence ("Speech recognition and clean-up run on your PC.") and the first product feature are unchanged: both describe the default, and the sentence after names the option.
+   - `docs/MAC-HANDOVER.md`: new section 0 records the owner's 22/10/2026 decisions (GitHub beta first, ad-hoc signed, no Apple fee; Apple Silicon (arm64) only; Intel only if a tester needs it; ships after 1.3 is live), and the lines that said Intel too are brought into line (section 1 target, publish, CI, test plan item 10). The no-telemetry line names cloud speech and the proposed `NSMicrophoneUsageDescription` gains "unless you turn on cloud speech".
+6. **Help (`HelpText.cs`), APPROVED 22/10/2026 22:52 AEDT.** The own-instructions lane's sentences (PR #60), placed:
+   - cloud answer, after "To get a key, ...": "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is." (verbatim, including its "…." ), then
+     "If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way." (this lane's). The sixteen steps are unchanged and not renumbered.
+   - new question "Can I give the clean-up my own instructions?" after "How do I turn on cloud clean-up?": paragraph 1 "In the Advanced view, Settings > Clean-up has a box for your own instructions, such as "use short sentences" or "write product names in capitals". Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies." (as first proposed; "as part of Dictum's clean-up instructions." in item 10)
+     (the lane's three sentences, verbatim); paragraph 2 as first proposed: "Dictum still checks every reply against what you said, so instructions to translate, summarise, answer or add a line are not followed. A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead." (replaced in item 10).
+   - The site's help page carries both word for word (pinned). Questions: fifteen -> sixteen.
+   - **These Help strings describe features that are not on main.** The box and the button exist only in PR #60 (wired into `CleanupPage` at 5e9c227; merged at 672f85b into main 4a4072a, so the controls and the Help now agree on main). Merge order: #60 (done), then #61, then this PR. (The wording of the second paragraph and the cloud sentence was replaced in the lens round, item 10.)
+7. **Sweep** (the brief's grep over site, docs, README.md, src and tests, plus "never sends it anywhere" and "turned into text on your PC"): every remaining hit is a sentence already qualified, a code comment, or history. The PR body lists them one by one. The release gate holds for the four site pages by `SiteStoreFirstTests.No_page_says_the_voice_never_leaves_the_PC_without_an_unless`.
+8. **Not done, for the owner.** (a) *Closed in the lens round, item 10:* `README.md` line 4, the Help's "First, your voice is turned into text on this PC" (and its site twin), the Store description's first sentence and first feature were unqualified in themselves; they are qualified now (lens, and the owner's six qualifiers of 22:05 AEDT). (b) `site/privacy.html` does not list `consent.json` among the files Dictum keeps in `%APPDATA%\Dictum`, and did not before this lane (cloud clean-up has written it since 16/10/2026). (c) "Settings > Storage offers to move model files" is in the brief's 1.3 list but was not in `src` at 28c3e65 (only the change-folder button of PR #51, which "does not move any files"). It is PR #61 (head 1730818 when this was written, open), which offers the move from Change…, Browse… and Use default (owner, 21:45 AEDT); the Store What's new sentence for it stays conditional on that merge. (d) Settings > Models' own sentences (`ModelPages.cs`, `SimpleView.cs`) are the UI lane's and the owner's (DECISIONS, Cloud speech UI, item 20/23).
+9. **Pins.** `SiteStoreFirstTests` (the sweep across the four pages; every new or replaced sentence on its page; the old sentences absent), `HelpPageTests` (the key file button leads the cloud answer and the sixteen steps stay; the own-instructions answer; the site twin), `PlainWordsTests` (README, Store and Mac handover sentences), `OwnerApprovalsTests` (a PROPOSED block for the new Help strings), `UpdateCheckTests` (the landing page's dictum.kynni.au card and the privacy short-version bullet follow the new sentences). The question count pin is 16.
+   **Mutation, observed failing (22/10/2026):** "Your voice never leaves this PC." put back in `site/help.html`, section 7, in place of the new sentence: `No_page_says_the_voice_never_leaves_the_PC_without_an_unless(help.html)`, `The_old_unqualified_sentences_are_gone(help.html)` and `The_cloud_speech_sentences_are_on_the_page(help.html)` failed; restored.
+10. **Lens round on e4e17f1 (Needs changes, no blocker) and the owner's decisions of 22/10/2026 22:05 AEDT.** Old to new, verbatim:
+    - *Own-instructions answer, paragraph 2 (PROPOSED, the lens's wording; the code contradicted the first one):* "Dictum still checks every reply against what you said, so instructions to translate, summarise, answer or add a line are not followed. A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead." -> "Dictum still checks every reply against what you said. A reply that drops or changes your words, translates or summarises them, answers you instead of tidying, or adds a sign-off you did not say is usually rejected, and the rule-based tidy is pasted instead. The check cannot catch everything, so read what Dictum typed."
+    - *Same answer, paragraph 1, last words (the instructions go in the system prompt, not the dictation text):* "...as part of the text it tidies." -> "...as part of Dictum's clean-up instructions."
+    - *Store description, AI paragraph (the inserted sentence made "If its answer fails Dictum's checks" read as being about cloud speech):* removed from after "...answer or summarise anything." and placed after "...and you can switch AI clean-up off completely.": "With cloud speech on (off by default), the recording goes to the speech service you chose instead of whisper.cpp; if that request fails, whisper.cpp on your PC hears it." (it replaces "With cloud speech on, off by default, the recording goes to the service you chose.")
+    - *privacy.html, cloud speech:* "...agree to the service in its own consent step and add your own API key." -> "...agree to the service in its own consent step and, for OpenAI, Azure OpenAI or Groq, add your own API key (a server you name may need none)." *index.html card:* "with your own key, behind its own consent step" -> "with your own key where the service needs one, behind its own consent step". (A custom server's key is optional: `SPEECH_API_KEY`.)
+    - *Stale dependency notes:* PR #60 was wired into Settings > Clean-up at 5e9c227 and merged at 672f85b into main 4a4072a; PR #61 (head 1730818 when this was written, open) offers the move from Change…, Browse… and Use default (owner, 21:45 AEDT) and is pending; the Store What's new and certification notes, item 6, item 8(c), `HelpText.cs`'s comments and SPEC §31 now name the shas. Merge order: #60, #61, #62; when main is merged into this branch, SPEC §26 must read "sixteen questions" and "unless cloud clean-up or cloud speech is turned on".
+    - *README:* line 4 "your speech is transcribed **on this PC** with whisper.cpp" -> "...**on this PC by default** with whisper.cpp"; the tray panel line "(\"Nothing leaves this PC\", or that clean-up uses a server on this PC or sends text off it)" gains the cloud speech footer "Cloud speech · audio leaves this PC ({host})"; the offline-only paragraph's "Nothing leaves this PC" now also says offline_only still allows a speech server on this PC, which Dictum cannot see into.
+    - *Sweep test:* the pattern "turned into text on (this|your( own)?) PC" is added, with the same "unless" or "by default" requirement. **Mutation, observed failing (22/10/2026):** `site/privacy.html`'s short version put back to "Your speech is turned into text on your PC, and the text is tidied on your PC." made the sweep fail for privacy.html (and the pin and old-sentence tests); restored.
+    - *Mac handover:* the inference about cloud speech reaching the Mac build moved below the owner's list and labelled the lane's note.
+    - **Owner, 22:05 AEDT, six qualifiers, each "APPROVED 22/10/2026 22:05 AEDT (qualifier added)":**
+      1. Help "Where does my voice go?": "Nowhere. Dictum turns your voice into text on this PC..." -> "Nowhere, by default. Dictum turns your voice into text on this PC..." (app and `site/help.html`).
+      2. Help and guide "How Dictum works": "First, your voice is turned into text on this PC by a speech model." -> "First, your voice is turned into text on this PC (unless you turn on cloud speech) by a speech model."
+      3. `site/plain-words.html`: "Your voice is turned into text on your own PC. The text is tidied on your own PC." -> "Your voice is turned into text on your own PC unless you turn on cloud speech. The text is tidied on your own PC." (`PlainWordsText` holds only the short version and has no such sentence.)
+      4. `site/index.html` hero list: "Runs on your PC" -> "Runs on your PC by default".
+      5. `site/index.html`: "Dictum does the work on your own computer, for free." -> "Dictum does the work on your own computer by default, for free."
+      6. `docs/STORE.md`: the feature "Speech recognition runs on your PC with whisper.cpp and works offline" -> "Speech recognition runs on your PC by default with whisper.cpp and works offline"; PRIVATE BY DESIGN's first sentence "Speech recognition and clean-up run on your PC." -> "Speech recognition and clean-up run on your PC by default." The heading AI THAT RUNS ON YOUR PC stays.
+    - **Owner, 22:05 AEDT, Mac:** the owner joined the Apple Developer Program on 22/10/2026 and chose a Developer ID signed and notarised GitHub pre-release as the beta (no Gatekeeper warning), Apple Silicon only, the Mac App Store a later train. `docs/MAC-HANDOVER.md` section 0 now says so (it replaces "ad-hoc signed, no Apple Developer Program"), adds that the owner creates the certificate and notarisation credentials himself and the Mac session never handles Apple credentials, and adds the lane note that the "retire when signed" simplifications (`Startup`: LaunchAgent against `SMAppService`; `CreateTray`'s `Notify`: transient balloon against `UNUserNotificationCenter`) are to be re-evaluated by the Mac lane. Sections 1 and 6 carry "superseded by section 0" marks on the ad-hoc and Gatekeeper lines; the Mac session rewrites them. The Intel lines are as before.
+    - **Pins:** `HelpPageTests` and `OwnerApprovalsTests` (the new second paragraph, "usually rejected", the ending, no "are not followed"); `HelpPageTests.The_two_22_05_qualifiers_are_in_the_app_and_on_the_site`; `PlainWordsTests` (Store feature and opening sentence, the plain-words bullet, the Mac section 0 wording); `SiteStoreFirstTests` (the index and plain-words sentences, the privacy and index card sentences).
+11. **Owner approval of the 1.3 block (22/10/2026 22:52 AEDT), markers only.** The owner approved every sentence this entry proposes for the landing page, the help page, the privacy policy, the README, the Store listing and the 1.3.0 What's new, the two Help paragraphs and the new Help question, and the Mac handover section (section D of the approval list). Each marker now reads "APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword" (source comments in `HelpText.cs`, HTML comments in `site/index.html`, `site/privacy.html` and `site/help.html`, the Store notes, the SPEC and these headings). No text changed. **Still PROPOSED:** the 1.3.0 tester-notes CHANGED paragraph (and the notes block around it, `docs/STORE.md`), which goes with the Store submission. The pin for the new Help strings moved from a PROPOSED block to an approved block in `OwnerApprovalsTests` (`The_approved_own_instructions_and_key_file_help_strings_are_pinned`). This PR merges last, after #60 and #61; main is not merged into it yet, and SPEC §26 then becomes "sixteen questions ... unless cloud clean-up or cloud speech is turned on".
+
+12. **Re-lens on a1546e3 (23/10/2026): one marker withdrawn, small fixes.**
+    - **`site/privacy.html`, the "Cloud speech (off by default)" paragraph: marker changed to "PROPOSED 23/10/2026: shipped text differs from the owner-approved summary by the sentences quoted here; owner confirmation pending".** The owner approved the 1.3 block (22:52 AEDT) from a summary (`.demo-preview/approve-1.3-block.md`, section D, privacy policy) that gave the paragraph's last sentences as: "...or a custom https:// address you type. Dictum cannot validate or certify how that service stores, protects or uses your voice." The page ships: "...or a custom `https://` address you enter. That service handles your voice under its own terms. This is an advanced option: Dictum cannot validate or certify how that service stores, protects or uses your voice. Check its terms before dictating anything sensitive." So the exact differences are (a) "you type" in the summary, "you enter" on the page; (b) the sentence "That service handles your voice under its own terms." is on the page only; (c) "This is an advanced option: " opens the next sentence on the page only; (d) the sentence "Check its terms before dictating anything sensitive." is on the page only. The page text is kept (it matches the cloud clean-up paragraphs and is the more protective); the owner is to be asked. Every other 22:52 marker stands. The page's text is unchanged by this item.
+    - `docs/SPEC.md`, `docs/STORE.md` and item 10 above: PR #61 is named by its head when this was written (1730818, open), not by the earlier sha; the status stays pending.
+    - `README.md` line 158: "your voice becomes text on this PC" is now "...on this PC unless you turn on cloud speech".
+    - `docs/MAC-HANDOVER.md`: "so a first open shows no Gatekeeper warning" is now "so a first open is not blocked by Gatekeeper (Recalled: macOS still asks once to confirm an app downloaded from the internet; the Mac lane records the exact prompt)", and the claim in section 1 that a Developer ID signed and notarised build opens without the Open Anyway step is marked Recalled, not verified.
+    - `docs/SPEC.md` §26: the question count is dated "23/10/2026 at a1546e3 (main 4a4072a plus PR #62's question)".
+
+## Release 1.3.0 prepared (23/10/2026)
+
+Branch `release/1.3.0` from origin/main cd48645. No tag is created and nothing is built, published, deployed or submitted: the tag, the publish and the site deploy wait for the orchestrator, after this PR merges.
+
+1. **Edits.** `Directory.Build.props`: `<Version>` 1.2.1 to 1.3.0 (package 1.3.0.0). `docs/STORE.md`: the version references in the header line, section 1 and section 6, a certification-record row, and "1.3.0" added to the packaged-self-test sentence. `site/version.json`: version 1.3.0, published 2026-10-23, notes the APPROVED 1.3.0 "What's new" paragraph from STORE.md verbatim. `site/privacy.html`: "Last updated" 23/10/2026, because the policy promised an update before a version changes what it sends and cloud speech ships in 1.3.0. `README.md` is unchanged (as in the 1.2.1 release PR).
+2. **In 1.3.0 (merged):** PR #54, cloud speech: the consent step and the Settings > Models choice and state lines. PR #57, Help questions and site pages explaining what clean-up is. PR #58, the first-run demo step 16 caption (approved wording). PR #59, "Dictum in plain words": the site page, the Welcome line, the Store sentence and the About card. PR #60, Settings > Clean-up: the box for your own instructions and the Create the key file button. PR #62, the public copy for cloud speech and the 1.3 features.
+3. **Pending:** PR #61 (Settings > Storage offers to move model files when the folder changes; open at head 1730818 when this was written). The Store "What's new" paragraph says "Settings > Storage offers to move your model files when you change their folder." If PR #61 does not land in 1.3.0, that sentence must be removed from the paragraph before submission (and from `site/version.json` `notes`, which carries the same paragraph), and the certification-record row's mention of PR #61 corrected.
+4. **Still PROPOSED:** the 1.3.0 tester notes ("Notes written" line, CHANGED paragraph and cloud paragraph, in "Notes for certification: PROPOSED for 1.3.0"); the owner approves them with the submission. Also awaiting owner confirmation: the `site/privacy.html` "Cloud speech (off by default)" paragraph, whose shipped text carries two sentences beyond the owner-approved summary (marker withdrawn to PROPOSED in PR #62).
+5. **Approved and unchanged:** the 1.3.0 "What's new" paragraph (APPROVED 22/10/2026 22:52 AEDT) is not reworded; `site/version.json` carries it as is.
+6. **Not done here:** tag, installer, MSIX, GitHub release, site deploy and Store submission, and the packaged self-test (not run for 1.3.0). Store screenshot 1 is still to be retaken with the 1.2.1 hold pill.
+
+## Move the model files when the folder changes (22/10/2026, branch feat/move-on-change, for 1.3)
+
+Owner approval 22/10/2026: when the model folder changes, Dictum offers to move the existing model files. Design brief: `.demo-preview/design-storage.md` sections A-C. **Every new string below was proposed 22/10/2026 and is now APPROVED (the 1.3 block, 22/10/2026 22:52 AEDT; the folder note at 22:42 AEDT, item 12), except as noted: the Quit sentence of item 13.8 is PROPOSED for 1.3.1 and does not ship (item 14); no approved string was changed without the owner.** The folder note was then "Dictum looks here first and downloads go here. Changing it does not move any files.", true for "Leave them where they are"; item 12 rewords it.
+
+1. **Where it hooks in.** The shared handler `ModelFolderActions` (moved out of `ModelPages.cs` into its own file), which both Settings > Models **Browse…** and Settings > Storage **Change…** call. **Use default** offers the same question and the same move, back to the per-user folder (item 10; at first it offered none, which was put to the owner). The Welcome step's "Model files" (which calls `ModelCoordinator.SetModelsFolder` directly) is unchanged. `ModelCoordinator` is not edited.
+2. **The offer.** Shown only when the folder in use holds model files Dictum knows: catalogue speech and clean-up files and their `.part` downloads, in that folder itself (`ModelMover.Known`). Not for the same folder, not when the folder in use is the bundled one. Closing the question changes nothing.
+3. **The move** (`src/Dictum.Core/Storage/ModelMover.cs`). Per file, in name order: copy to `<new>\<name>.move`; check the copy's size against the original; for a finished catalogue file hash the copy and compare it with the catalogue's pinned SHA-256 (`ModelIntegrity.Expected`); rename to the final name; `integrity.Remember(new)`; only then delete the original and `integrity.Forget(old)`. A `.part` is copied and renamed with no hash (it has nothing to be checked against; the downloader checks it when it resumes). A file of the same name already in the new folder is not overwritten. The first file that fails stops the move: its copy is deleted, its original kept. A failed delete of the original after a verified copy leaves both copies and is reported.
+   - `// simplification:` **no rollback of already-moved files.** Ceiling: after a failure the models are split across two folders, and those left in a chosen folder Dictum no longer looks in read "Not downloaded" until that folder is chosen again. Retire when: a report of a split folder that confused someone, or the archive folder (design brief D) adds a second folder the lookup searches anyway.
+   - Same-drive moves still copy (no rename shortcut), and there is no free-space pre-check: a full drive fails the copy, which deletes the partial copy and keeps the original. Both are ceilings, not built (brief B.5 and B.7).
+   - The startup clean-up of stray `.move` files and a registry pattern for them (brief B, "Interrupted move") are not built: a `.move` is left only if Dictum ends mid-copy; it is never loaded (not a catalogue name) and the next attempt overwrites it.
+4. **Order of the flow** (`ModelFolderActions.ChangeAsync`): the existing refusals (bundled folder, device path); the offer; on **Move the files**, refuse while a download is running (`ModelCoordinator.IsDownloading`: the downloader holds its `.part` open with `FileShare.None`) and when one folder is inside the other; release both engines; move; write `models.folder` with `SetModelsFolder(folder, reloadAfter: false)`; reload. The folder is written **after** the move because every settings.json write fires the settings watcher's reload (500 ms debounce), which would load a model from the old folder mid-move. If the write fails, the result line adds the approved `ModelCoordinator.WriteFailed`. The page's status line (live, polite) shows each file and then the result; a progress report still queued at the end is dropped so it never overwrites the result. A second folder change while a move runs is ignored (`AppShell.MovingModels`).
+5. **The release seam.** New `ModelManager.ReleaseAsync()` and `LocalLlmManager.ReleaseAsync()`: take the last load task (`_tail`), call the existing `Unload()` (bumps the generation and disposes the loaded engine), then await that task, so a load still under way finishes and, being stale, disposes its engine. `LocalLlmEngine.Dispose` disposes the context and `LLamaWeights`. New `AppShell.ReleaseModelsAsync()` (new partial file `AppShell.ModelMove.cs`, outside the lane's named files, so no existing shell file was edited) awaits both. Verified 22/10/2026 by running a scratch program against LLamaSharp 0.27.0: `new ModelParams(path).UseMemorymap` defaults to `True`, and `LocalLlmEngine.Load` does not set it, so the clean-up model is memory-mapped. The lens on f5ec71c measured what blocks the move (its result, relayed by the orchestrator; not re-run by this lane): the block comes from the engine's open file handle, not from the mapping, and copying is always allowed, so an engine left unreleased can only leave two copies (the original's delete refused), never zero. The pins use a fake engine that holds its file open with `FileShare.Read` until disposed, which is that case.
+6. **PROPOSED strings, verbatim** (`ModelFolderActions`, `ModelMover`):
+   - Title "Move your model files?"; body "Your model files are in {old}. Move them to {new} so Dictum finds them there? {n} files, {size}. Dictum copies each file, checks it, then removes the original." ("1 file" for one); buttons "Move the files" (default) / "Leave them where they are".
+   - "A download is running; wait for it to finish, then change the folder again to move the files."
+   - "One of these folders is inside the other, so Dictum does not move the files. Choose a folder outside the current one." (new; the brief named the refusal but gave no wording)
+   - Progress "Moving {name} ({i} of {n})…"; results "Moved {n} files to {new}." and "Moved {k} of {n}; {name} could not be moved: {reason}. The rest stay in {old}."
+   - Reasons after "could not be moved: ": "a file of that name is already in the new folder"; "the copy is not the same size as the original, so the copy was deleted"; "the copy did not match the catalogue, so the copy was deleted"; otherwise the system's own message.
+7. **Pins** (`tests/Dictum.Tests/ModelMoveTests.cs`, 16 tests with item 10, temp folders only): `Known` lists catalogue files and `.part` files in the folder itself, not `.move`, other files or subfolders; copy-check-rename-delete order (a hasher that records, for each file, whether the original still exists and whether the final name exists yet: both "original there, final not there"); a fake hash failing on the second of three files leaves its original byte for byte, deletes its copy, keeps the first moved and leaves the third untouched, and the verified record holds only the moved copy; `.part` moved with a hasher that throws if called; no overwrite of a same-name file; `Nested`; both `ReleaseAsync` seams (the held file cannot be moved while loaded and can after release; the clean-up one also waits for a load under way); no offer when the old folder holds no model files; the offer's exact text and buttons, Leave writes the folder and moves nothing, closing changes nothing; end to end through the shell and Storage's Change… (engines released, files moved, folder written, the model loaded from the new folder, which is first in the lookup); refusal while a download runs (`GateHandler`; folder and files unchanged, download still running); nested refusal.
+8. **Mutations, each observed failing on 22/10/2026, then restored:** delete-before-verify (the original deleted before the hash): the order pin observed failing. The download refusal removed: `Moving_is_refused_while_a_download_runs` observed failing. The hash check removed: the order pin observed failing (the third file was then processed). Also: the `ReleaseModelsAsync` call removed: the end-to-end pin observed failing ("Moved 1 of 2; ggml-tiny.en.bin could not be moved"); `LocalLlmManager.ReleaseAsync` without its wait: the clean-up seam pin observed failing.
+9. **Gates** (22/10/2026): Release build with `--no-incremental`, 0 warnings, 0 errors. ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests, ModelMoveTests and PublicCopyNeutralityTests: 137 total, 0 failed, 2 skipped. Full suite once: 1941 total, 0 failed, 23 skipped. After merging origin/main 28c3e65 (merge 0618c98, DECISIONS tails kept, main's first): the same gates 137 total, 0 failed, 2 skipped; full suite 1956 total, 0 failed, 23 skipped.
+10. **Use default offers the move too (owner decision, 22/10/2026 21:45 AEDT):** "all three ways of changing the folder behave alike". `ModelFolderActions.UseDefaultFolder` now goes through `ChangeFolderAsync(shell, null, …)`: the same question, the same refusals and the same move, into `AppPaths.DefaultModelsDir`; models.folder is then cleared (`SetModelsFolder(null)`). No new string. Pins: `ModelFolderTests.Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` now expects the question when the chosen folder holds a model (closing it changes nothing; Leave clears the folder and the file stays) and none when the chosen folder holds no model files; new `ModelMoveTests.Use_default_offers_the_move_and_moves_the_files_back_to_the_default_folder` (Storage's Use default, Move the files: the file arrives in the default folder, models.folder is cleared, the model loads from there). Mutation: Use default writing the folder without the offer: both pins observed failing (22/10/2026), then restored. Gates on this head: Release build `--no-incremental` 0 warnings, 0 errors; the gate classes above 138 total, 0 failed, 2 skipped; full suite 1957 total, 0 failed, 23 skipped.
+11. **Lens on f5ec71c (Needs changes; no blocker). This item supersedes items 3 and 4 where they differ.** The approved note (`ModelsPage.FolderNote`, lens item 4) is with the owner and is not edited here.
+    1. *Order pinned.* New pins: a rename that fails (the hasher puts a file under the final name after the existence check) keeps the original byte for byte, leaves no `.move` and reports the system's reason; a copy of the wrong size (a copy seam, `copier`, writes three bytes) is deleted and its original kept.
+    2. *Name clash and the model in use.* A file of the same name in the new folder counts as moved when it is the same file (same size and, for a finished catalogue file, the pinned SHA-256): the original is deleted and the verified record moves. Otherwise that file is skipped. Any file that fails is skipped and **the move goes on** (it no longer stops at the first failure). The models in use (`AppShell.ModelFilesInUse`, read before the release) move last (brief B.7). The folder is **not** written when a model in use stayed behind, or when the move was stopped. The line then ends with `FolderKept`. This pins the lens's reproduction: the chosen folder holds base.en and tiny.en (in use), the default folder already holds the same base.en, Use default; now "Moved 2 files", the folder is cleared and the model loads from the default folder.
+    3. *One move flag, in `ModelCoordinator`* (`MovingFiles`, replacing `AppShell.MovingModels`). While it is set:
+       - `StartDownload`, `ApplyWithDownloads` and `AppShell.DeleteModelAsync` refuse with `MovingRefusal`.
+       - `Ensure` and `EnsureCleanup` load nothing until the reload after the move.
+       - Pinned: S2 (a download asked for mid-move sends no request and writes no `.part`; Delete mid-move is refused and the file stays) and S3 (a reload mid-move loads no model; afterwards the model loads from the new folder).
+       - Not guarded: "Delete all app data" mid-move.
+    4. *Minor items.*
+       - An original that cannot be removed after its checked copy is in place counts as moved, with the reason `OriginalKept`.
+       - System messages lose their closing full stop.
+       - Progress and result lines use catalogue names (`ModelMover.DisplayName`).
+       - **"Leave them where they are" is the default button** (orchestrator decision: Enter must not start a multi-GB move). Pinned through a new `ScriptedDialogs.AskedDefault`.
+    5. *Quit mid-move (built).*
+       - `AppShell.Quit` defers while a move runs (`MoveCancel`). It cancels the move's token and quits when the move has ended, with no reload and no folder written.
+       - Cancellation takes effect between files and inside a copy or hash. The file being copied stops: its copy is deleted and its original kept. A file whose copy was checked finishes its rename and delete.
+       - Only Quit cancels; there is no Cancel button.
+       - A shutdown that calls `Dispose` directly (not through Quit) is not deferred.
+       - Pinned at both levels.
+    6. *`PathRegistry.IsInside` and drive roots.* "D:\Models" was not inside "D:\": a separator was added to a root that already ends with one. Fixed (a separator is added only when missing, and a path is never inside itself) and pinned, including `Nested` across a root.
+    7. *Mutations, each observed failing on 22/10/2026, then restored (full `--no-incremental` rebuild each):*
+       - Delete original before rename: `A_rename_that_fails_keeps_the_original_and_leaves_no_copy` observed failing (and `An_original_that_cannot_be_removed…`).
+       - `.move` clean-up skipped on the size branch: `A_copy_of_the_wrong_size_is_deleted_and_the_original_kept` observed failing.
+       - `.move` clean-up skipped in the IO catch: `A_rename_that_fails…` observed failing.
+       - Folder written although the model in use stayed behind: `The_folder_is_not_changed_when_the_model_in_use_stays_behind` observed failing (and the quit pin).
+       - In-use-last ordering removed: `The_models_in_use_move_last` observed failing.
+       - Download guard removed: `Downloads_and_deletions_are_refused_while_files_move` observed failing.
+       - `Ensure` guard removed: `A_reload_while_files_move_loads_no_model` observed failing.
+       - Delete guard removed: `Downloads_and_deletions_are_refused_while_files_move` observed failing.
+       - `IsInside` fix reverted: `A_folder_is_inside_its_drive_root` and both root cases of `Nested_folders_are_one_inside_the_other` observed failing.
+       - Re-run on the new code: hash check removed, delete before verify, release removed and Use default skipping the offer, each observed failing.
+    8. *New PROPOSED strings:*
+       - "Model files are being moved; try again when it finishes."
+       - "it was copied, but the original could not be removed"
+       - "a different file of that name is already in the new folder" (replaces "a file of that name is already in the new folder")
+       - " 1 other file could not be moved either; the log says why." / " {m} other files could not be moved either; the log says why."
+       - " The model folder is still {old}, because the model in use did not move; the files that did are in {new}; choose that folder again to use them." (or, with nothing moved, only its first clause)
+       - "Moved {k} of {n}." (stopped with no problem: only on quit)
+       - "unfinished {name} download" (a `.part`'s name in the lines)
+    9. *Gates:* Release build `--no-incremental` 0 warnings, 0 errors; ModelMoveTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests and PublicCopyNeutralityTests 152 total, 0 failed, 2 skipped; full suite once 1971 total, 0 failed, 23 skipped.
+12. **Model folder note reworded, APPROVED 22/10/2026 22:42 AEDT (owner).** `ModelsPage.FolderNote`, shown on Models and on Storage (one constant), now reads "Dictum looks here first and downloads go here. Changing it asks before moving any files." (was "…Changing it does not move any files."; the second sentence became untrue once the move was offered). Marker "APPROVED 22/10/2026 22:42 AEDT (second sentence reworded for move-on-change; proposed 22/10/2026)". Pins: the literal in `ModelFolderTests.Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` updated; a byte pin added to `OwnerApprovalsTests.The_storage_page_strings_are_pinned` (it held no literal of the note before). SPEC §17 and §24 updated. Mutation: "files." changed to "files!": `The_storage_page_strings_are_pinned` and `Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` observed failing, then restored. Gates: Release build `--no-incremental` 0 warnings, 0 errors; ModelFolderTests, ModelMoveTests, OwnerApprovalsTests and PublicCopyNeutralityTests 90 total, 0 failed, 0 skipped (the full suite was not rerun for this one-string change).
+13. **Re-lens on 8001fa1/ea6303b (Block; fixed on top of 1730818 and the main merge 6a6c3b8, 23/10/2026). Supersedes items 3, 4 and 11.2 where they differ.**
+    1. *Two paths to one folder (blocker).* A junction, subst or mapped drive, a share, or a packaged app's redirected folder can name the folder in use under another path. Each file then looked "already there", matched itself, and the original (the only copy) was deleted.
+       - (a) `ModelMover.SameFolder` writes a uniquely named probe file in the new folder and looks for it in the old one. If it is found, no question is asked, the folder is written, and nothing moves.
+       - (b) The mover never deletes an original that may be the target itself. `SameFileOnDisk` is managed only, because `PlatformTests` (`ArchitectureTests.Shared_code_declares_no_native_call`) forbids a native call in Dictum.Core. The lens suggested a Win32 file-ID comparison; a first version used `GetFileInformationByHandle` and the full suite failed on that rule. The check opens the original for itself alone, then opens the target. A refused open means "may be one file" (or something else holds the target), so the original is kept and the line reports it; both opening means two files. A file of the same name that may be the original counts as in place and its original is kept.
+       - Pinned with a real junction (`mklink /J`, no administrator rights; the tests skip if the host cannot make one; on this PC they ran).
+    2. *The models in use as one unit (blocker).* They move last. Each is copied, checked and renamed, but no original of theirs is deleted until all have arrived. If one fails or the move is stopped, the copies this move made of them are deleted (a file that was already there stays) and every original is kept.
+    3. *A model chosen by its full path* (`whisper.model` / `llm.model`, "Choose model file…") that moved is rewritten to its new path in the same settings write as `models.folder` (`SetModelsFolder(..., alsoWrite)`), written **before** `models.folder` (corrected by item 14.3; first written after it).
+    4. *No pinned hash means byte for byte.* A file of the same name and size counts as the same only when its bytes match: a `.part`, or a catalogue entry without a SHA-256. Otherwise it is skipped with "a different file of that name is already in the new folder".
+    5. *Guards pinned one by one*:
+       - `EnsureCleanup`
+       - `ApplyWithDownloads`
+       - Browse's and Use default's busy checks
+       - a stopped move never writing the folder
+       - the original's verified record forgotten
+       - the default copy stopping when cancelled
+       - the check before each file
+    6. *Delete all app data* and *Remove Dictum completely* refuse with `MovingRefusal` while files move. Remove Dictum completely says it in a notice titled "Remove Dictum completely".
+    7. *Calibration* loads no model while files move. `CalibrationHost.Refusal()` gives `MovingRefusal`, the results view shows it instead of running, and `CreateEngine` (and each load inside a run already under way) throws it.
+    8. *Quit wording.* This round added " The model folder is still {old}, because the move was stopped." (PROPOSED 23/10/2026) for a move stopped by Quit; item 14.1 removed it before 1.3.0, so it does not ship. The PR body is corrected to match: "a different file of that name…", the singular " 1 other file…", the short `FolderKept` form, and failures no longer stopping the move.
+    9. *Mutations, each observed failing on 23/10/2026, full `--no-incremental` rebuild each, then restored:*
+       - 1a, probe removed: `Choosing_another_path_to_the_same_folder_moves_nothing` observed failing.
+       - 1b, file identity always "different": `The_mover_never_deletes_an_original_that_is_the_target_itself` observed failing.
+       - 2, models in use not treated as a unit: `When_one_model_in_use_fails_no_model_in_use_leaves` and `Quit_while_the_models_in_use_move_keeps_every_original` observed failing (and `The_models_in_use_move_last`).
+       - 2, their copies not rolled back: the same two observed failing.
+       - 3, full path not rewritten: `A_model_chosen_by_its_path_follows_the_move` observed failing.
+       - 4, size-only sameness: `Equal_size_but_other_bytes_is_not_the_same_file` observed failing.
+       - 5, `EnsureCleanup` guard removed: `EnsureCleanup_loads_nothing_while_files_move` observed failing.
+       - 5, `ApplyWithDownloads` guard removed: `ApplyWithDownloads_is_refused_while_files_move_before_anything_is_asked` observed failing.
+       - 5, Browse busy check removed: `Browse_opens_no_chooser_while_files_move` observed failing.
+       - 5, Use default busy check removed: `Use_default_changes_nothing_while_files_move` observed failing.
+       - 5, `result.Cancelled ||` removed from `kept`: `A_stopped_move_never_changes_the_folder` observed failing.
+       - 5, `integrity.Forget` removed: `Moving_a_file_forgets_the_originals_verified_record` observed failing.
+       - 5, default copy ignoring the token: `The_default_copy_stops_when_cancelled` observed failing.
+       - 5, check before each file removed: `No_file_starts_after_a_cancel` observed failing.
+       - 6, Delete all app data guard removed: `Delete_all_app_data_is_refused_while_files_move` observed failing.
+       - 6, Remove Dictum completely guard removed: `Remove_Dictum_completely_is_refused_while_files_move` observed failing.
+       - 7, calibration guard removed: `Calibration_loads_no_model_while_files_move` observed failing.
+    10. *Files.* New `tests/Dictum.Tests/ModelMoveSafetyTests.cs`, so `ModelMoveTests.cs` stays under 1,000 lines; its helpers became `internal` for that.
+    11. *Gates on the merged head 6ae49cb (this item plus origin/main cd48645), 23/10/2026:*
+        - Release build `--no-incremental`: 0 warnings, 0 errors.
+        - Gate classes (ModelMoveTests, ModelMoveSafetyTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests, FixBatchCalibrationTests, PublicCopyNeutralityTests, OwnerApprovalsTests): 221 total, 0 failed, 2 skipped. The filter `~CalibrationTests` matched FixBatchCalibrationTests; no class has that name.
+        - Full suite: 2495 total, 0 failed, 23 skipped.
+14. **Round-3 lens on 6ae49cb/ffab59b (Needs changes, minors only; no data loss found under junction, subst, admin-share, hard-link, symlink and mmap attacks). Fixed on top of ffab59b, 23/10/2026.**
+    1. *Nothing unapproved ships in 1.3.0.* The PROPOSED Quit sentence " The model folder is still {old}, because the move was stopped." is removed. When Quit stops a move the line is only the approved "Moved {k} of {n}." (now `ModelFolderActions.MovedStopped`, pinned in OwnerApprovalsTests), with no folder sentence. The fuller sentence stays PROPOSED for 1.3.1.
+    2. *A kept original is said.* When a same-content file is already in the new folder and the original cannot be opened for itself alone, the original is kept. It is now reported with the approved "it was copied, but the original could not be removed" (it still counts as moved); before, it was kept silently. Pinned: `A_kept_original_beside_a_same_file_is_reported`.
+    3. *Write order.* `SetModelsFolder` writes `alsoWrite` (a moved model's full path) **before** `models.folder`. The keys are written one by one, so a failure after the first leaves the setting naming the new copy, which exists, never the deleted original. Pinned through the "Set from the app" log line's key order in `A_model_chosen_by_its_path_follows_the_move`.
+    4. *Calibration guards tested.* `A_calibration_run_already_under_way_loads_no_model_once_files_move` turns the flag on after `CreateEngine`: the next load is refused, the loader is never called, and the run says the refusal. `The_calibration_window_refuses_to_run_while_files_move` clicks Run test. The window's check now comes first, before the recordings and models are checked, so it is reachable.
+    5. *Docs.* The PR body now says items 1 to 14, its strings heading says APPROVED, and its gate class names are corrected. Item 13 has its gate results (13.11). This entry's opening line now reads "all APPROVED except as noted". Item 13.3 and SPEC §24 give the write order; item 13.8 and SPEC give the Quit line.
+    6. *Mutations, each observed failing on 23/10/2026, full `--no-incremental` rebuild each, then restored:*
+       - 2, kept original returned silently: `A_kept_original_beside_a_same_file_is_reported` observed failing.
+       - 3, `alsoWrite` written after `models.folder`: `A_model_chosen_by_its_path_follows_the_move` observed failing.
+       - 4, per-load calibration guard removed: `A_calibration_run_already_under_way_loads_no_model_once_files_move` observed failing.
+       - 4, the results view's guard removed: `The_calibration_window_refuses_to_run_while_files_move` observed failing.
+    7. *Gates:*
+       - Release build `--no-incremental`: 0 warnings, 0 errors.
+       - ModelMoveTests, ModelMoveSafetyTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests, FixBatchCalibrationTests, CalibrationEngineTests, PublicCopyNeutralityTests, OwnerApprovalsTests and ArchitectureTests (each by exact class name): 230 total, 0 failed, 2 skipped.
+       - Full suite once: 2498 total, 0 failed, 23 skipped.
+
+## Dialogs: the opener's mouse capture (23/10/2026, branch fix/dialog-mouse-capture, release 1.3.0)
+
+1. **Defect (probe, 23/10/2026, read-only).** A question opened by a mouse click on a Settings button (both cloud consent dialogs, delete model, delete data, Remove Dictum completely, the download questions) could not be clicked: mouse input kept going to Settings until the dialog closed, while keyboard and UI Automation worked. Root cause: `Ui.Button` runs its action from Avalonia's `Click`, which is raised inside the button's `OnPointerReleased`, before the window releases the Win32 mouse capture; `Modal.Run` then showed the dialog on its own (`Show()` + `Activate()`, `CenterScreen`) and ran a nested `PushFrame` inside that `Click`, so the capture was released only once the dialog had closed. Evidence: a scratch Avalonia 11.3.22 app on real Win32, clicked with `WM_LBUTTONDOWN`/`WM_LBUTTONUP` sent to the opener, read `GetCapture()` inside the nested frame: the opener with `Show()` + `Activate()`; 0 with `ShowDialog(owner)`; 0 with `ReleaseCapture()` before `Show()`.
+2. **Fix (chosen: ShowDialog with the opener as owner).** `Ui.Button` runs its action through `Modal.From(window, action)`, which records the window whose button is being clicked for the length of the action. `Modal.Run` shows the dialog with `ShowDialog(opener)` and `WindowStartupLocation.CenterOwner` when that window is visible; Avalonia disables the owner (which releases the capture), keeps the dialog above it and activates the owner again when it closes, so focus returns to the button. The `Closed` to frame-exit path is unchanged. With no click behind it (first run, the Welcome window's own frame, a question from the tray or from another thread), the dialog is shown on its own, centred on the screen, as before. `Run` clears the recorded opener while its frame runs, so a job the dispatcher runs inside the frame (a prompt from another thread) is never owned by it, and restores it afterwards for a second question from the same click (the two warnings of Remove Dictum completely). The tray panel is never an owner: it closes itself on `Deactivated`, and Avalonia closes owned windows with their owner, which would answer the question as Cancel. A second click on an opener whose dialog is up (the disabled owner stops the mouse; this stops any other way in) activates the open dialog and answers Cancel. No user-visible string changed. Files: `src/Dictum.UI/Views/Modal.cs`, `src/Dictum.UI/Views/Ui.cs`; `Dictum.UI.csproj` gains `InternalsVisibleTo Dictum.UiProbe` for the Win32 pin.
+3. **Owner lookup, deviation from the brief.** The brief proposed the Settings window when open, else the active window among the desktop lifetime's `Windows`. The opener of the click is used instead: it is exactly the window that holds the capture (Settings only when the click was in Settings; a Settings window open behind a clicked window would not have released that window's capture), and it works on the headless platform, where `ApplicationLifetime` is null and `IsActive` stays false after `Activate()` (measured in a scratch headless test this lane), so the headless pins can run the real path.
+4. **Alternative considered, not taken:** `IWindowFlags.ReleaseMouseCapture()` in `Dictum.Windows` (`ReleaseCapture`), called before `Show()`. It also releases the capture (probe), but leaves the opener enabled, so a second click could open a second dialog, and the dialog would stay unowned and centred on the screen. `ShowDialog(owner)` caused no regression in the existing pins, so the brief's preferred fix stands.
+5. **Pins.** `DialogOwnerTests` (new): (a) `The_cloud_consent_opened_from_Settings_is_its_modal_dialog_and_one_at_a_time`: the real `ShellDialogs` and nested frame on the headless platform; "Use cloud clean-up…" in Settings opens the consent owned by Settings, `CenterOwner`; a second click while it is up opens no second window; Escape closes it unanswered and nothing is written. (b) `Enter_and_the_buttons_answer_the_consent_as_before`: Enter answers Cancel (the default) and writes nothing; "Allow cloud clean-up" records consent.json and the provider. (c) `A_question_with_no_click_behind_it_or_from_the_tray_panel_is_shown_on_its_own`: unowned and `CenterScreen`. (d) `Dialog_opened_by_a_click_gets_the_mouse_on_Win32` (gated by `DICTUM_UI_TESTS=1`, as `PillFocusTests`): runs `Dictum.UiProbe --dialog-capture` (`tests/Dictum.UiProbe/Program.Dialogs.cs`), which clicks a `Ui.Button` with `WM_LBUTTONDOWN`/`WM_LBUTTONUP` for three openers (ordinary, Topmost, closed while its dialog is up) and checks inside the frame: `GetCapture()` is not the opener, the dialog's Win32 owner is the opener, the opener is disabled, the dialog is the window at its own centre (above a Topmost opener too), a second click opens no second dialog; then OK clicked with mouse messages answers 0, the opener is enabled again and focus is back on the button; closing the opener closes its dialog and Ask returns -1. Run on this host: all PASS.
+6. **Mutations, observed failing (23/10/2026), each restored.** (M1) `Modal.Run`'s owner forced to null (the dialog shown on its own, as before the fix): (a) failed (two windows) and (d) failed with "FAIL ordinary opener: inside the dialog's frame the opener no longer holds the mouse capture (GetCapture 0x13E12BC, opener 0x13E12BC)", the same for the Topmost and closed openers, and "Ask returned -1 (0, the OK clicked)": OK clicked with mouse messages did nothing, the reported symptom. (M2) the tray panel exclusion removed: (c) failed (owner FlyoutWindow, CenterOwner). (M3) the second-click guard removed: (a) failed (two windows).
+7. **Not verified.** The installed Dictum.exe was not run (tray mode is never run on this host); the fix is proven on Avalonia's real Win32 backend through the probe, not in the app's own Settings window. Whether UI Automation's Invoke reaches a button of a disabled window was not tested; the guard covers it either way. A download question raised by a choice in a combo box (the tray panel's model lists) is not a `Ui.Button` click, so it keeps the earlier behaviour; it was not probed. Focus returning to the button is checked in the probe, not on a Settings page that redraws after its action.
+8. **Gates, on de892f5 (this branch with origin/main 1960a5a, PR #61, merged in; the commit after it changes only this file).** Release build `--no-incremental`: 0 warnings, 0 errors. `DialogOwnerTests` and `DialogTests` with `DICTUM_UI_TESTS=1`: 8 total, 8 passed (the Win32 pin ran). Full suite once (without `DICTUM_UI_TESTS`): 2502 total, 0 failed, 24 skipped. PR #61's move question (Change…, Browse…, Use default in Settings) is asked from a `Ui.Button` too, so it is now owned by Settings like the others.
 ## Dictum for macOS (22-23/10/2026, branch feature/mac-platform)
 
 Built on Kyle's Mac (Apple Silicon, macOS 27.2) from docs/MAC-HANDOVER.md, with the owner's decisions of 22/10/2026 that

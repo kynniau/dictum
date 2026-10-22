@@ -57,6 +57,16 @@ public sealed class ModelCoordinator(
     private string? _firstRunCleanupDownload;
     private string? _languageProblemShown; // the last WhisperLanguages.Problem ballooned, so a reload does not repeat it
 
+    /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (lens on PR #61). A download, a preset's downloads or a model deletion asked for while model files move.</summary>
+    public const string MovingRefusal = "Model files are being moved; try again when it finishes.";
+
+    /// <summary>
+    /// True while the model files move to another folder (Settings > Models and Storage, ModelFolderActions): downloads and
+    /// <see cref="ApplyWithDownloads"/> are refused (<see cref="MovingRefusal"/>), and <see cref="Ensure"/> and
+    /// <see cref="EnsureCleanup"/> load nothing, so no engine opens a file mid-move; the reload after the move loads the models.
+    /// </summary>
+    public bool MovingFiles { get; set; }
+
     /// <summary>True while a model download runs or waits its turn (the tray panel then shows "Cancel download").</summary>
     public bool IsDownloading => _downloads.IsDownloading;
 
@@ -366,6 +376,7 @@ public sealed class ModelCoordinator(
     /// </summary>
     public void Ensure(string? previousPath, bool startup)
     {
+        if (MovingFiles) return; // the reload after the move loads it
         var path = ModelPath;
         var changed = previousPath is null || path != previousPath;
         if (!changed && models.ModelPath == path && !models.LoadFailed) // same model, already loading or loaded
@@ -404,6 +415,7 @@ public sealed class ModelCoordinator(
     /// <summary>Loads the local cleanup model when that provider is on; otherwise releases it. Never prompts.</summary>
     public void EnsureCleanup()
     {
+        if (MovingFiles) return; // the reload after the move loads it
         var s = settings();
         if (s.Llm.Provider != LlmSettings.Local)
         {
@@ -682,10 +694,14 @@ public sealed class ModelCoordinator(
     /// False for the onboarding (1.2), which runs before the settings are first loaded: writing alone, so nothing reloads or
     /// loads a model mid-way; a file that cannot be written is then returned (<see cref="WriteFailed"/>) instead of ballooned.
     /// </param>
-    public string? SetModelsFolder(string? folder, bool reloadAfter = true)
+    /// <param name="alsoWrite">Keys written first, in the same write (moving the model files: a model chosen by its full path, now in the new folder).</param>
+    public string? SetModelsFolder(string? folder, bool reloadAfter = true, IReadOnlyList<(string Key, JsonNode? Value)>? alsoWrite = null)
     {
         if (folder is not null && FolderRefusal(folder) is { } refused) return refused;
-        var values = new List<(string, JsonNode?)> { ("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))) };
+        // alsoWrite first (round-3 lens): the keys are written one by one, and a full path to a moved model's new copy is valid
+        // whichever folder is in force, so if models.folder then fails, nothing names a file that is gone.
+        var values = new List<(string, JsonNode?)>(alsoWrite ?? []);
+        values.Add(("models.folder", folder is null ? null : JsonValue.Create(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)))));
         if (settings().Whisper.ModelsDir is not null) values.Add(("whisper.models_dir", null));
         if (reloadAfter) Write([.. values]);
         else if (!TryWrite(out _, reloadAfter: false, [.. values])) return WriteFailed;
@@ -730,7 +746,7 @@ public sealed class ModelCoordinator(
         {
             if (!SettingsFile.SetValue(paths.SettingsFile, key, value?.DeepClone(), out failure)) return false;
         }
-        log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {v.Value?.ToJsonString() ?? "null"}"))}.");
+        log.Info($"Set from the app: {string.Join(", ", values.Select(v => $"{v.Key} = {SettingsFile.LogValue(v.Key, v.Value)}"))}.");
         // A written model choice is the latest of its kind: a download still on its way no longer switches to its own model.
         if (values.Any(v => v.Key == "whisper.model")) _speechChoice = $"written {++_choices}";
         if (values.Any(v => v.Key is "llm.provider" or "llm.model")) _cleanupChoice = $"written {++_choices}";
@@ -751,6 +767,12 @@ public sealed class ModelCoordinator(
     public void ApplyWithDownloads(string note, IReadOnlyList<(DownloadSpec Spec, string Destination)> missing, (string Key, JsonNode? Value)[] values, Action? then = null,
         Action<bool>? finished = null)
     {
+        if (MovingFiles)
+        {
+            balloon(MovingRefusal, true);
+            finished?.Invoke(false);
+            return;
+        }
         string? speechToken = null, cleanupToken = null; // set once the download is agreed: this preset is then the latest choice of each kind it sets
         bool Stale() => speechToken is not null && _speechChoice != speechToken || cleanupToken is not null && _cleanupChoice != cleanupToken;
         void Finish()
@@ -835,6 +857,12 @@ public sealed class ModelCoordinator(
 
     private void StartDownload(DownloadSpec spec, string destination, Action onSuccess, Action? onFailure = null)
     {
+        if (MovingFiles) // it would land in the folder being emptied
+        {
+            balloon(MovingRefusal, true);
+            onFailure?.Invoke();
+            return;
+        }
         if (RefuseOffline(spec.FileName))
         {
             onFailure?.Invoke();

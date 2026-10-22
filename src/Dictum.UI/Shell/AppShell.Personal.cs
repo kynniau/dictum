@@ -11,7 +11,8 @@ public sealed partial class AppShell
         values => Models.Write(values),
         DownloadSpeechModel: (name, then, finished) => Personal.DownloadForCalibration(name, then, finished),
         AddDictionaryTerms: Personal.AddDictionaryTerms,
-        AddCorrections: Personal.AddCorrections);
+        AddCorrections: Personal.AddCorrections,
+        MovingFiles: () => Models.MovingFiles);
 
     /// <summary>Fix last dictation → Copy: the clipboard, kept out of clipboard history unless insert.clipboard_history is on.</summary>
     public void CopyText(string text) => Platform.Clipboard.SetText(text, keepOutOfHistory: !_settings.Insert.ClipboardHistory);
