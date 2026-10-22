@@ -120,12 +120,22 @@ public sealed class SecretStore
         }
     }
 
-    /// <summary>A blank KEY= line is "not set" (as an empty environment variable is), so it never hides a lower-precedence value.</summary>
+    /// <summary>
+    /// The value "Create the key file…" writes after each variable (<see cref="KeyFile"/>) until the user pastes a key over it. It is
+    /// "not set", as a blank value is: the service is not asked with it, so no dictation goes out with a key that cannot work, and the
+    /// pages keep saying they wait for the key.
+    /// </summary>
+    public const string Placeholder = "your-key-here";
+
+    /// <summary>
+    /// A blank KEY= line, or one still holding <see cref="Placeholder"/>, is "not set" (as an empty environment variable is), so it
+    /// never hides a lower-precedence value.
+    /// </summary>
     private void Merge(Dictionary<string, string> values, string source)
     {
         foreach (var (k, v) in values)
         {
-            if (v.Length > 0) _values[k] = (v, source);
+            if (v.Length > 0 && v != Placeholder) _values[k] = (v, source);
         }
     }
 

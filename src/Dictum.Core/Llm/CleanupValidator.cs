@@ -25,7 +25,7 @@ public sealed record ValidationContext(string? SystemPrompt, IReadOnlyCollection
 /// Spec rules: empty; word count outside 0.4×–1.6× of the input (8+ words, spoken commands and hesitations not counted);
 /// starts with commentary; contains the system prompt's own wording; contains a chat-template token. Beyond the spec:
 /// framing and labels the speaker did not say (whole words, curly quotes mapped), a script the dictation did not use, a
-/// final line or bracket the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
+/// final line, bracket or sentence the speaker did not say, a dictionary term the speaker did not say, the dictated "?" lost, too
 /// few shared words, a negation or a number dropped or changed, a kept word dropped (profanity), dropped content (overall
 /// and per sentence), "scratch that" handled both ways round: the correction must be in the reply and the retracted
 /// words must not, and, for a hands-free part, words repeated from the part typed before it.
@@ -95,7 +95,8 @@ public static partial class CleanupValidator
 
         if (Framing(rawLower, text, textLower) is { } framing) return (null, framing);
 
-        var promptShingles = context?.SystemPrompt is { } sent ? Shingles(sent) : [];
+        // The user's own instructions are not Dictum's wording: a reply may repeat words they share with the dictation (lens on 5e9c227).
+        var promptShingles = context?.SystemPrompt is { } sent ? Shingles(CleanupPrompt.WithoutOwnText(sent)) : [];
         if (Shingles(text).Where(s => FixedPromptShingles.Value.Contains(s) || promptShingles.Contains(s)).Except(Shingles(raw)).Any())
             return (null, "reply repeats five or more words of the system prompt");
 
@@ -112,6 +113,8 @@ public static partial class CleanupValidator
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
         if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
             return (null, "reply repeats words already typed before this part");
+        // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the reason below.
+        if (AddedFinalSentence(textLower, rawSet, rawWords, context?.DictionaryTerms)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -163,6 +166,75 @@ public static partial class CleanupValidator
             if (lines.Contains(example) && Comparable(Words(example)).Any(w => !rawSet.Contains(w))) return "reply contains a line from the built-in examples";
         }
         return null;
+    }
+
+    /// <summary>
+    /// A closing sentence the speaker did not say, on the same line as the rest (owner decision 22/10/2026 20:55 AEDT): probed
+    /// that day, "… before lunch. Thanks for reading.", "… Kind regards." and "… Please call me if you have any questions."
+    /// passed every other rule. Only a reply of two sentences or more is read, and only the words of its last sentence that
+    /// the "scratch that" checks count (<see cref="ValidatorText.IsCorrectionWord"/>: three letters or more, no function word,
+    /// filler or spoken command), so a grammar fix's "will", "there" or "the" never counts; a word with a digit is left to the
+    /// number rule ("The 21st."). Such a word is said when the dictation has it: as spelt; by its stem ("they're" for "they",
+    /// "won't" for "will", "can't" for "can", "shan't" for "shall", any other "-n't" without it); with its accents folded
+    /// ("café" for "cafe"); within one edit of a dictated counted word when both have five letters or more ("cancelled" for
+    /// "canceled", "Catherine" for "katherine"); the same against two or three dictated words joined, or four single letters
+    /// ("alright", "email", "tomorrow" from "to morrow", "ATO", "ASIC"); or, for a word of a dictionary term only, sounding
+    /// like a dictated counted word (<see cref="ValidatorText.SoundsLike"/>: "kinney" respelt "Kynni", "zero" as "Xero").
+    /// Sound keys are not used otherwise: short keys collide ("day" with "to", "bye" with "be"), and the re-lens on c796dc8
+    /// found 14 of 50 sign-offs passing that way. Rejected when fewer than half of the words were said, the share the
+    /// final-line rule uses.
+    /// </summary>
+    // simplification: words, not an alignment with the dictation's last sentence. Ceiling: a last sentence whose words were
+    // all said earlier in the dictation, in another order, passes; and a short last sentence that a grammar fix rewrites into
+    // other words is rejected (the tidy is typed: a false rejection costs polish only), pinned: "i asked him he go" → "I asked
+    // him. He went." Trigger to retire: either observed in the log or a typed reply.
+    // A word's stem for the rule above: "won't", "can't" and "shan't" mapped (as NegatorCounts spells "won't" and "can't"), any other "-n't" without it, else the part before the apostrophe.
+    private static string Stem(string w) => w switch
+    {
+        "won't" => "will", "can't" => "can", "shan't" => "shall",
+        _ when w.EndsWith("n't", StringComparison.Ordinal) => w[..^3],
+        _ => w.Split('\x27')[0],
+    };
+
+    // Equal, or both five letters or more and one edit apart ("alright"/"allright", "cancelled"/"canceled").
+    private static bool Near(string a, string b)
+    {
+        if (a == b) return true;
+        if (a.Length < 5 || b.Length < 5 || Math.Abs(a.Length - b.Length) > 1) return false;
+        int i = 0, j = 0, edits = 0;
+        while (i < a.Length && j < b.Length)
+        {
+            if (a[i] == b[j]) { i++; j++; continue; }
+            if (++edits > 1) return false;
+            if (a.Length > b.Length) i++; else if (b.Length > a.Length) j++; else { i++; j++; }
+        }
+        return edits + (a.Length - i) + (b.Length - j) <= 1;
+    }
+
+    // The word with its accents taken off ("café" → "cafe").
+    private static string Folded(string w) =>
+        new(w.Normalize(System.Text.NormalizationForm.FormD).Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+
+    private static bool AddedFinalSentence(string textLower, HashSet<string> rawSet, List<string> rawWords, IReadOnlyCollection<string>? terms)
+    {
+        var sentences = SentenceEnd().Split(textLower).Select(s => s.Trim()).Where(s => Words(s).Count > 0).ToList();
+        if (sentences.Count < 2) return false;
+        var words = Comparable(Words(sentences[^1])).Where(w => IsCorrectionWord(w) && !w.Any(char.IsDigit)).ToList();
+        if (words.Count == 0) return false;
+        var joined = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < rawWords.Count; i++)
+        {
+            for (var n = 2; n <= 3 && i + n <= rawWords.Count; n++) joined.Add(string.Concat(rawWords.Skip(i).Take(n)));
+            // Four letters spelt out ("a s i c" for ASIC): only single letters join that far.
+            if (i + 4 <= rawWords.Count && rawWords.Skip(i).Take(4).All(w => w.Length == 1)) joined.Add(string.Concat(rawWords.Skip(i).Take(4)));
+        }
+        var soundable = rawSet.Where(IsCorrectionWord).ToList();
+        var termWords = (terms ?? []).SelectMany(t => Words(MapQuotes(t).ToLowerInvariant())).ToHashSet(StringComparer.Ordinal);
+        var folded = rawSet.Select(Folded).ToHashSet(StringComparer.Ordinal);
+        var said = words.Count(w => rawSet.Contains(w) || rawSet.Contains(Stem(w)) || folded.Contains(Folded(w))
+            || joined.Any(j => Near(j, w)) || soundable.Any(r => Near(r, w))
+            || termWords.Contains(w) && soundable.Any(r => SoundsLike(r, w)));
+        return said * 2 < words.Count;
     }
 
     /// <summary>
