@@ -176,6 +176,8 @@ public class OwnerApprovalsTests
         Assert.Equal("Change…", StoragePage.ChangeLabel);
         Assert.Equal("Change the model folder", StoragePage.ChangeName);
         Assert.Equal("A slower drive makes the speech model slower to load and to switch.", StoragePage.SlowerDriveNote);
+        // APPROVED 22/10/2026 22:42 AEDT: the model folder note, on Models and Storage (one constant), second sentence reworded for move-on-change.
+        Assert.Equal("Dictum looks here first and downloads go here. Changing it asks before moving any files.", ModelsPage.FolderNote);
         using var scratch = new Scratch();
         var consent = PathRegistry.Locations(scratch.Paths, new AppSettings()).Single(l => l.Path == scratch.Paths.ConsentFile && !l.Path.EndsWith(".tmp", StringComparison.Ordinal));
         Assert.Equal("consent to cloud clean-up and cloud speech", consent.Description);
@@ -503,4 +505,35 @@ public class OwnerApprovalsTests
         shell.Dispose();
     });
 
+    // ---- Moving the model files (1.3 block, section C): APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026), as a block ----
+
+    /// <summary>
+    /// APPROVED 22/10/2026 22:52 AEDT pin: the move question, its buttons (Leave the default), the refusals, the progress line,
+    /// every result-line form built by a function ("Moved {k} of {n}." when Quit stopped the move included), and the four reasons,
+    /// word for word.
+    /// </summary>
+    [Fact]
+    public void The_model_move_strings_are_pinned()
+    {
+        Assert.Equal("Move your model files?", ModelFolderActions.MoveTitle);
+        Assert.Equal(@"Your model files are in C:\a. Move them to D:\b so Dictum finds them there? 2 files, 1.0 GB. Dictum copies each file, checks it, then removes the original.",
+            ModelFolderActions.MoveQuestion(@"C:\a", @"D:\b", 2, 1_000_000_000));
+        Assert.Equal("Move the files", ModelFolderActions.MoveLabel);
+        Assert.Equal("Leave them where they are", ModelFolderActions.LeaveLabel);
+        Assert.Equal("A download is running; wait for it to finish, then change the folder again to move the files.", ModelFolderActions.DownloadRunning);
+        Assert.Equal("One of these folders is inside the other, so Dictum does not move the files. Choose a folder outside the current one.", ModelFolderActions.NestedRefused);
+        Assert.Equal("Model files are being moved; try again when it finishes.", Dictum.App.ModelCoordinator.MovingRefusal);
+        Assert.Equal("Moving small.en (1 of 3)…", ModelFolderActions.Moving("small.en", 1, 3));
+        Assert.Equal("unfinished small.en download", ModelMover.DisplayName("ggml-small.en.bin.part"));
+        Assert.Equal(@"Moved 3 files to D:\b.", ModelFolderActions.Moved(3, @"D:\b"));
+        Assert.Equal(@"Moved 1 of 3; small.en could not be moved: why. The rest stay in C:\a.", ModelFolderActions.MovedSome(1, 3, "small.en", "why", @"C:\a"));
+        Assert.Equal(" 2 other files could not be moved either; the log says why.", ModelFolderActions.MoreProblems(2));
+        Assert.Equal("Moved 1 of 3.", ModelFolderActions.MovedStopped(1, 3));
+        Assert.Equal(@" The model folder is still C:\a, because the model in use did not move; the files that did are in D:\b; choose that folder again to use them.",
+            ModelFolderActions.FolderKept(@"C:\a", @"D:\b", someMoved: true));
+        Assert.Equal("a different file of that name is already in the new folder", ModelMover.AlreadyThere);
+        Assert.Equal("the copy is not the same size as the original, so the copy was deleted", ModelMover.CopySizeDiffers);
+        Assert.Equal("the copy did not match the catalogue, so the copy was deleted", ModelMover.CopyDoesNotMatch);
+        Assert.Equal("it was copied, but the original could not be removed", ModelMover.OriginalKept);
+    }
 }

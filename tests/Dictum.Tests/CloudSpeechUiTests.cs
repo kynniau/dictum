@@ -364,6 +364,7 @@ public sealed class CloudSpeechUiTests
     [Fact]
     public Task A_switch_off_that_cannot_be_saved_holds_for_the_session() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         using var scratch = new Scratch(Settings(SpeechAt()));
         SpeechConsent(scratch);
         var (shell, _, _) = Shell(scratch);
@@ -738,6 +739,7 @@ public sealed class CloudSpeechUiTests
     [Fact]
     public Task A_consent_that_cannot_be_withdrawn_again_stays_unused_until_it_is() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         using var scratch = new Scratch(Settings());
         FileStream? held = null;
         var log = new HookLog(message =>
@@ -846,6 +848,7 @@ public sealed class CloudSpeechUiTests
     [Fact]
     public Task A_switch_off_with_both_files_blocked_is_saved_at_quit() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         using var scratch = new Scratch(Settings(SpeechAt()));
         SpeechConsent(scratch);
         var (shell, _, _) = Shell(scratch);

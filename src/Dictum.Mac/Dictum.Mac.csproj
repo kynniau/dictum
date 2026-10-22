@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dictum on macOS (SPEC §21): the IPlatform implementation and the entry point, the Dictum executable inside
+       Dictum.app/Contents/MacOS. The only project that may call a macOS API (plain C APIs and Objective-C messaging
+       through P/Invoke, all under Interop/), reference Avalonia's native macOS backend or a native runtime package.
+       Plain net10.0, not net10.0-macos: that TFM brings the Xamarin-style bindings and a workload this app does not use.
+       Apple Silicon only for the beta (docs/DECISIONS.md, Dictum for macOS, 22/10/2026); x64 is a RID away. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>osx-arm64</RuntimeIdentifiers>
+    <SupportedOSPlatform>macos</SupportedOSPlatform>
+    <!-- Dictum.Mac, not Dictum: the tests load this assembly beside Dictum.Windows's, which is named Dictum. The bundle
+         script renames the apphost to Contents/MacOS/Dictum (the host finds its Dictum.Mac.dll by the name built into it). -->
+    <AssemblyName>Dictum.Mac</AssemblyName>
+    <RootNamespace>Dictum.Mac</RootNamespace>
+    <StartupObject>Dictum.Mac.Program</StartupObject>
+    <Description>System-wide voice dictation.</Description>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dictum.Tests" />
+    <Using Include="Dictum.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dictum.Core\Dictum.Core.csproj" />
+    <ProjectReference Include="..\Dictum.UI\Dictum.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Avalonia's macOS backend and renderer only (Avalonia.Desktop would also bring the Win32 and X11 backends). -->
+    <PackageReference Include="Avalonia.Native" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.22" />
+    <!-- Native whisper.cpp and llama.cpp runtimes for macOS. The arm64 builds of both carry ggml's Metal backend
+         (libggml-metal*.dylib, checked in the packages 22/10/2026), so the "CPU" runtime uses the GPU on Apple Silicon. -->
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+  </ItemGroup>
+
+</Project>

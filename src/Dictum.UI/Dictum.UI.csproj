@@ -19,6 +19,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Dictum.Tests" />
     <InternalsVisibleTo Include="Dictum" />
+    <InternalsVisibleTo Include="Dictum.Mac" />
+    <InternalsVisibleTo Include="Dictum.UiProbe" /> <!-- the real-Win32 dialog check drives Ui.Button and Modal -->
   </ItemGroup>
 
   <ItemGroup>

@@ -48,6 +48,7 @@ public class SettingsRepairTests
     [InlineData(@"D:\models\mine.gguf", @"D:\models\mine.gguf")]
     public void A_local_model_that_is_not_a_cleanup_model_uses_the_recommendation(string model, string expected)
     {
+        (model, expected) = (TestPaths.Native(model), TestPaths.Native(expected));
         var settings = new AppSettings { Llm = new LlmSettings { Provider = "local", Model = model } };
         Assert.Equal(expected, EffectiveSettings.Cleanup(settings, false, () => true, _ => { }).Llm.Model);
     }

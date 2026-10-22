@@ -9,7 +9,7 @@ namespace Dictum.Tests;
 
 /// <summary>
 /// The dialog windows the shell's questions open (headless): their buttons give the answers the shell expects. The
-/// nested modal frame itself (Modal.Run) needs a real desktop and is not exercised here.
+/// nested modal frame itself (Modal.Run) and who owns the dialog are pinned in DialogOwnerTests.
 /// </summary>
 public class DialogTests
 {

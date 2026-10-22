@@ -28,6 +28,7 @@ public sealed partial class AppShell
     /// </summary>
     public async Task<string> DeleteModelAsync(StoredModel model)
     {
+        if (Models.MovingFiles) return ModelCoordinator.MovingRefusal; // the file may be the one being copied (lens on PR #61)
         var inUse = ModelsInUse().Any(p => p is not null && PathRegistry.SamePath(p, model.Partial ? model.Path[..^5] : model.Path));
         string? released = null; // the copy in use that is deleted after its model is released: the reload then finds the next copy
         if (inUse && NextCopy(model) is { } next)
@@ -145,6 +146,7 @@ public sealed partial class AppShell
     /// </summary>
     public string DeleteData(RemovalScope scope)
     {
+        if (Models.MovingFiles) return ModelCoordinator.MovingRefusal; // it would delete the folders being copied (re-lens on PR #61)
         var plan = RemovalPlan.Build(Paths, _settings, scope);
         var files = plan.Items.Count(i => !i.IsFolder);
         if (files == 0) return "There is nothing to delete.";
@@ -189,6 +191,11 @@ public sealed partial class AppShell
     /// </summary>
     public bool RemoveEverything()
     {
+        if (Models.MovingFiles) // it would delete the folders being copied (re-lens on PR #61)
+        {
+            Dialogs.Tell("Remove Dictum completely", ModelCoordinator.MovingRefusal);
+            return false;
+        }
         // Packaged, the migration only copied: Dictate's folders are the user's, not this package's, and are never listed or deleted.
         var plan = RemovalPlan.Build(Paths, _settings, RemovalScope.Everything, Platform.Removal.PlatformLocations(),
             Platform.Package.IsPackaged ? null : Platform.LegacyFolders());

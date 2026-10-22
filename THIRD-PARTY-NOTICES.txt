@@ -118,6 +118,43 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
+Package: Microsoft.NETCore.App.Runtime.osx-arm64 10.0.13
+Ships as: the .NET runtime itself for the macOS build, beside the executable in Dictum.app/Contents/MacOS (the managed
+    System.*.dll assemblies and the native libcoreclr, libclrjit and their companions); Dictum.Mac.deps.json lists them.
+    The version is the one this build restored: a later build may carry a later 10.0.x.
+Licence: MIT (nuspec licence expression); the package's own LICENSE.TXT file is reproduced below.
+Copyright (nuspec): © Microsoft Corporation. All rights reserved.
+Authors (nuspec): Microsoft
+Project (nuspec): https://dot.net/
+Repository (nuspec): https://github.com/dotnet/dotnet
+See also: Annex A, the notices this package carries for the material inside it.
+
+--- LICENSE.TXT (from the package) ---
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
 Package: Microsoft.Windows.SDK.NET.Ref 10.0.19041.57
 Ships as: Microsoft.Windows.SDK.NET.dll (the Windows SDK projection for .NET, file version 10.0.19041.55) and
     WinRT.Runtime.dll (the C#/WinRT runtime, file version 2.2.0.48161). Dictum calls one Windows API through them,
@@ -640,6 +677,37 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
+Package: Avalonia.Native 11.3.22
+Ships as: Avalonia.Native.dll and libAvaloniaNative.dylib (the macOS build, Dictum.app/Contents/MacOS; not in any Windows package)
+Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
+    identifier is given below.
+Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Authors (nuspec): Avalonia Team
+Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
+Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/
+
+MIT License
+
+Copyright 2013-2026 © The AvaloniaUI Project
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
 Package: Avalonia.Skia 11.3.22
 Ships as: Avalonia.Skia.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
@@ -844,6 +912,37 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
+Package: SkiaSharp.NativeAssets.macOS 2.88.9
+Ships as: libSkiaSharp.dylib (the macOS build, Dictum.app/Contents/MacOS; not in any Windows package)
+Licence: MIT (nuspec licence expression); the package's own LICENSE.txt file is reproduced below.
+Copyright (nuspec): © Microsoft Corporation. All rights reserved.
+Authors (nuspec): Microsoft
+Project (nuspec): https://go.microsoft.com/fwlink/?linkid=868515
+Repository (nuspec): https://github.com/mono/SkiaSharp
+See also: Annex B, the notices this package carries for the material inside it.
+
+--- LICENSE.txt (from the package) ---
+
+Copyright (c) 2015-2016 Xamarin, Inc.
+Copyright (c) 2017-2018 Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+------------------------------------------------------------------------------
 Package: HarfBuzzSharp 8.3.1.1
 Ships as: HarfBuzzSharp.dll
 Licence: MIT (nuspec licence expression); the package's own LICENSE.txt file is reproduced below.
@@ -913,6 +1012,37 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Managed libraries that the packages above depend on.
 
+------------------------------------------------------------------------------
+Package: HarfBuzzSharp.NativeAssets.macOS 8.3.1.1
+Ships as: libHarfBuzzSharp.dylib (the macOS build, Dictum.app/Contents/MacOS; not in any Windows package)
+Licence: MIT (nuspec licence expression); the package's own LICENSE.txt file is reproduced below.
+Copyright (nuspec): © Microsoft Corporation. All rights reserved.
+Authors (nuspec): Microsoft
+Project (nuspec): https://go.microsoft.com/fwlink/?linkid=868515
+Repository (nuspec): https://go.microsoft.com/fwlink/?linkid=868515
+See also: Annex B, the notices this package carries for the material inside it.
+
+--- LICENSE.txt (from the package) ---
+
+Copyright (c) 2015-2016 Xamarin, Inc.
+Copyright (c) 2017-2018 Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 Package: CommunityToolkit.HighPerformance 8.4.2
 Ships as: CommunityToolkit.HighPerformance.dll

@@ -162,23 +162,23 @@ public class SettingsTests
     [Fact]
     public void Absolute_model_path_is_used_as_is_and_traversal_is_rejected()
     {
-        Assert.Equal(@"D:\x\my-model.bin", ModelCatalog.ResolvePath(@"D:\x\my-model.bin", @"C:\models"));
+        Assert.Equal(TestPaths.Native(@"D:\x\my-model.bin"), ModelCatalog.ResolvePath(TestPaths.Native(@"D:\x\my-model.bin"), TestPaths.Native(@"C:\models")));
         Assert.False(ModelCatalog.IsValidModelSetting("../evil"));
         Assert.False(ModelCatalog.IsValidModelSetting(@"relative\path.bin"));
-        Assert.Equal("my-model", ModelCatalog.DisplayName(@"D:\x\ggml-my-model.bin"));
+        Assert.Equal("my-model", ModelCatalog.DisplayName(TestPaths.Native(@"D:\x\ggml-my-model.bin")));
     }
 
     [Fact]
     public void Models_dir_setting_and_environment_override()
     {
-        var paths = new AppPaths(@"C:\cfg", @"C:\local", @"C:\exe");
+        var paths = new AppPaths(TestPaths.Native(@"C:\cfg"), TestPaths.Native(@"C:\local"), TestPaths.Native(@"C:\exe"));
         var settings = new AppSettings { Whisper = new WhisperSettings { Model = "small.en" } };
-        Assert.Equal(@"C:\local\models\ggml-small.en.bin", SettingsFile.EffectiveModelPath(settings, paths, _ => null));
+        Assert.Equal(TestPaths.Native(@"C:\local\models\ggml-small.en.bin"), SettingsFile.EffectiveModelPath(settings, paths, _ => null));
 
-        var custom = settings with { Whisper = settings.Whisper with { ModelsDir = @"E:\m" } };
-        Assert.Equal(@"E:\m\ggml-small.en.bin", SettingsFile.EffectiveModelPath(custom, paths, _ => null));
+        var custom = settings with { Whisper = settings.Whisper with { ModelsDir = TestPaths.Native(@"E:\m") } };
+        Assert.Equal(TestPaths.Native(@"E:\m\ggml-small.en.bin"), SettingsFile.EffectiveModelPath(custom, paths, _ => null));
 
-        Assert.Equal(@"F:\override.bin", SettingsFile.EffectiveModelPath(settings, paths, k => k == "DICTUM_MODEL_PATH" ? @"""F:\override.bin""" : null));
+        Assert.Equal(TestPaths.Native(@"F:\override.bin"), SettingsFile.EffectiveModelPath(settings, paths, k => k == "DICTUM_MODEL_PATH" ? $"\"{TestPaths.Native(@"F:\override.bin")}\"" : null));
     }
 
     [Fact]
@@ -232,17 +232,18 @@ public class SettingsTests
     [Fact]
     public void Launch_override_beats_environment_and_settings()
     {
-        var paths = new AppPaths(@"C:\cfg", @"C:\local", @"C:\exe");
+        var paths = new AppPaths(TestPaths.Native(@"C:\cfg"), TestPaths.Native(@"C:\local"), TestPaths.Native(@"C:\exe"));
         var settings = new AppSettings { Whisper = new WhisperSettings { Model = "small.en" } };
-        string? Env(string k) => k == "DICTUM_MODEL_PATH" ? @"F:\env.bin" : null;
-        Assert.Equal(@"C:\local\models\ggml-tiny.en.bin", SettingsFile.EffectiveModelPath(settings, paths, Env, "tiny.en"));
-        Assert.Equal(@"G:\x.bin", SettingsFile.EffectiveModelPath(settings, paths, Env, @"G:\x.bin"));
-        Assert.Equal(@"F:\env.bin", SettingsFile.EffectiveModelPath(settings, paths, Env, null));
+        string? Env(string k) => k == "DICTUM_MODEL_PATH" ? TestPaths.Native(@"F:\env.bin") : null;
+        Assert.Equal(TestPaths.Native(@"C:\local\models\ggml-tiny.en.bin"), SettingsFile.EffectiveModelPath(settings, paths, Env, "tiny.en"));
+        Assert.Equal(TestPaths.Native(@"G:\x.bin"), SettingsFile.EffectiveModelPath(settings, paths, Env, TestPaths.Native(@"G:\x.bin")));
+        Assert.Equal(TestPaths.Native(@"F:\env.bin"), SettingsFile.EffectiveModelPath(settings, paths, Env, null));
     }
 
     [Fact]
     public void Scripts_use_the_app_models_folder()
     {
+        TestEnv.WindowsOnly("Checks the Windows PowerShell scripts against the Windows models-folder layout (%LOCALAPPDATA%\\Dictum\\models).");
         // Regression: install.ps1 -ModelsFrom once copied into "%LOCALAPPDATA%\Dictummodels" (a lost backslash),
         // found by the scratch-profile install on 15/10/2026.
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

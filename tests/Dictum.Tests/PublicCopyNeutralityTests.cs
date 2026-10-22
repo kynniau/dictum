@@ -20,6 +20,13 @@ public class PublicCopyNeutralityTests
         "ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "dan" + "da",
     ];
 
+    /// <summary>
+    /// Exact identifiers (case-sensitive, matched as exact substrings) that happen to contain one of the words across a letter boundary and are
+    /// Apple's own API names, not copy: they are cut out of a file's text before the sweep. The bare word still fails
+    /// (pinned below); a new identifier is added here on purpose, never by widening the match to word boundaries.
+    /// </summary>
+    internal static readonly string[] AllowedIdentifiers = ["CGEventSourceButtonState", "EventSourceButtonState"];
+
     private static readonly string[] BinaryExtensions = [".png", ".ico", ".jpg", ".jpeg", ".gif", ".dll", ".exe", ".bin", ".zip", ".msix", ".pdb", ".woff", ".woff2", ".mp4"];
 
     /// <summary>The one file that holds Whisper's own language table, as git prints its path.</summary>
@@ -30,7 +37,7 @@ public class PublicCopyNeutralityTests
 
     private static readonly string? GitPath = (Environment.GetEnvironmentVariable("PATH") ?? "")
         .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-        .Select(folder => Path.Combine(folder.Trim('"'), "git.exe")).FirstOrDefault(File.Exists);
+        .Select(folder => Path.Combine(folder.Trim('"'), OperatingSystem.IsWindows() ? "git.exe" : "git")).FirstOrDefault(File.Exists);
 
     /// <summary>Runs git in <paramref name="folder"/> with no user or system configuration and returns its standard output.</summary>
     private static string Git(string folder, params string[] args)
@@ -80,7 +87,9 @@ public class PublicCopyNeutralityTests
 
     internal static List<string> Offences(string relativePath, string text)
     {
-        var found = Words.Where(w => Scanned(relativePath, text).Contains(w, StringComparison.OrdinalIgnoreCase)).ToList();
+        var scanned = Scanned(relativePath, text);
+        foreach (var identifier in AllowedIdentifiers) scanned = scanned.Replace(identifier, "", StringComparison.Ordinal);
+        var found = Words.Where(w => scanned.Contains(w, StringComparison.OrdinalIgnoreCase)).ToList();
         if (!relativePath.StartsWith("tests/", StringComparison.Ordinal) && text.Any(c => c is >= '\u0900' and <= '\u097F')) found.Add(ScriptRule);
         return found;
     }
@@ -172,6 +181,10 @@ public class PublicCopyNeutralityTests
         Assert.Equal([ScriptRule], Offences("src/Dictum.Core/X.cs", "'" + (char)0x097F + "'"));
         Assert.Empty(Offences("tests/Dictum.Tests/X.cs", "end mark " + (char)0x0964)); // a test fixture may use the script
         Assert.Empty(Offences("docs/SPEC.md", "next to the block: " + (char)0x08FF + (char)0x0980)); // only U+0900-U+097F
+        Assert.Empty(Offences("src/Dictum.Mac/Input/KeyState.cs", "CG.CGEventSourceButtonState(source, button) // EventSourceButtonState")); // Apple's identifiers, whole
+        Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", "ceb" + "u")); // the bare word still fails
+        Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", AllowedIdentifiers[0].ToLowerInvariant())); // and the identifier in another case is not the identifier
+        Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", AllowedIdentifiers[0][7..])); // a piece of it is not either (the identifier without its CGEvent prefix)
         string[] regionWords = ["ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "ceb" + "u", "dan" + "da"];
         Assert.All(regionWords, word => Assert.Contains(word, Words)); // the region words stay on the list
 

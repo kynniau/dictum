@@ -38,7 +38,7 @@ Windows app is the reference: the Mac app must behave the same wherever the plat
 
 What this means for the user, to be stated plainly in the release notes (all **Recalled**, verify before writing):
 - (Superseded by section 0: a Developer ID signed and notarised build should open without this; Recalled, not verified.) First open is blocked by Gatekeeper; the user opens it through System Settings > Privacy & Security > Open Anyway.
-- Three permission prompts: Microphone, Accessibility (to post Cmd-V) and Input Monitoring (the event tap).
+- Two permission prompts: Microphone and Accessibility (the event taps and the posted Cmd-V; active taps need no Input Monitoring grant: DECISIONS, decision c, 22/10/2026).
 - Grants are tied to the app's signature; an ad-hoc signed app may be asked again after each update.
 
 ## 2. Ground rules on the Mac (same as every Dictum lane)
@@ -114,7 +114,7 @@ exactly as Windows keeps them under `Interop/`.
 | `ResolvePaths` | config and local both under `~/Library/Application Support/Dictum` (`config/`? no: settings.json, .env, consent.json at the top; `models/`, `logs/`, `recordings/` beside them, same names as Windows). Not `~/Library/Caches` for models: the system may purge Caches. **Recalled** purge behaviour. | one folder, visible in Finder, survives updates |
 | `LegacyFolders` | paths that do not exist (there was never a Mac Dictate) | README |
 | `Package` | not packaged: `IsPackaged` false, `RealPath` identity, `OtherInstall` null | no App Store build |
-| `CreateHotkeyListener` / `CreateKeyMonitor` | one `CGEventTap` (CoreGraphics C API) on its own thread with a run loop; a listen-only tap for the monitor; an active tap for the hotkey when the matcher suppresses the key, otherwise listen-only. Map `kCGKeyboardEventKeycode` to the Windows VK codes with one table (unit-tested); mouse buttons from `otherMouseDown/Up`, `rightMouseDown/Up` to the same mouse VKs. Re-enable the tap on `kCGEventTapDisabledByTimeout`. **Recalled** API names. | mirrors WH_KEYBOARD_LL; permission: Input Monitoring, and Accessibility for an active tap |
+| `CreateHotkeyListener` / `CreateKeyMonitor` | one `CGEventTap` (CoreGraphics C API) on its own thread with a run loop; a listen-only tap for the monitor; an active tap for the hotkey when the matcher suppresses the key, otherwise listen-only. Map `kCGKeyboardEventKeycode` to the Windows VK codes with one table (unit-tested); mouse buttons from `otherMouseDown/Up`, `rightMouseDown/Up` to the same mouse VKs. Re-enable the tap on `kCGEventTapDisabledByTimeout`. **Recalled** API names. | mirrors WH_KEYBOARD_LL; permission: Accessibility (both taps are active taps, decision c: no Input Monitoring prompt) |
 | `IsKeyDown` | `CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, keycode)` with the reverse VK table. **Recalled.** | |
 | `CreateInputSender` | post Cmd-V with `CGEventCreateKeyboardEvent` + `CGEventPost(kCGHIDEventTap)`; Unicode typing with `CGEventKeyboardSetUnicodeString` in chunks. **Recalled.** | mirrors SendInput |
 | `Clipboard` | `NSPasteboard` through a small Objective-C messaging helper (`objc_msgSend`, `objc_getClass`, `sel_registerName` from `/usr/lib/libobjc.A.dylib`); snapshot/restore every type the general pasteboard holds; mark Dictum's own item with `org.nspasteboard.ConcealedType` and `org.nspasteboard.TransientType` so clipboard managers skip it. **Recalled** type names (the nspasteboard.org convention). | Avalonia's clipboard cannot set the opt-out types |
@@ -146,7 +146,7 @@ needs them to use CoreML, ship only the CPU path in the beta and record it.
 - Info.plist: `CFBundleIdentifier au.kynni.dictum`, `CFBundleName Dictum`, `CFBundleShortVersionString` from
   `Directory.Build.props` `<Version>`, `LSUIElement true` (menu-bar app, no Dock icon), `LSMinimumSystemVersion` (pick
   the lowest Avalonia 11.3 and .NET 10 support and record the source), `NSMicrophoneUsageDescription` (PROPOSED text:
-  "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac unless you turn on cloud speech." This
+  "Dictum uses the microphone only while it is recording (from your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud speech." (lens on PR #67, 23/10/2026: the hotkey-only wording was untrue for hands-free recording and the microphone test.) This
   replaces the earlier proposal, which was untrue with cloud speech on), `NSHumanReadableCopyright`
   "© 2026 Kynni Pty Ltd".
 - Publish: `dotnet publish src/Dictum.Mac -c Release -r osx-arm64 --self-contained` (and again for `osx-x64` only if the owner asks for Intel); keep only the
@@ -168,7 +168,7 @@ needs them to use CoreML, ship only the CPU path in the beta and record it.
 ## 7. Test plan on the Mac (real hardware; nothing here can be verified on CI)
 
 1. Build, sign, open from Finder; note every Gatekeeper and permission prompt and the exact wording, for the release notes.
-2. Grant Microphone, Input Monitoring, Accessibility; relaunch if macOS requires it (record whether it does).
+2. Grant Microphone and Accessibility (no Input Monitoring prompt: decision c); relaunch if macOS requires it (record whether it does).
 3. Hold the hotkey in TextEdit, speak, release: text appears at the caret; the pill shows and never takes focus.
 4. Hands-free: double-tap, speak two sentences with a pause, text arrives in parts; Esc stops and keeps what was typed.
 5. Default hotkey: a Mac keyboard has no Right Ctrl; choose a default for Mac (PROPOSED: Right Option) and make the first-run

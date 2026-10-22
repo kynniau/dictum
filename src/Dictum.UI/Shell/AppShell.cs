@@ -265,6 +265,7 @@ public sealed partial class AppShell : IDisposable
     /// <summary>Tray panel → Quit (and --exit-after): the same shutdown either way.</summary>
     public void Quit()
     {
+        if (DeferQuitForMove()) return; // model files are moving: quit once the move has stopped (AppShell.ModelMove)
         if (_lifetime is not null) _lifetime.Shutdown();
         else Dispose();
     }

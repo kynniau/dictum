@@ -10,6 +10,8 @@
     <Copyright>© 2026 Kynni Pty Ltd</Copyright>
     <!-- English UI only: keep the framework's localised resource folders out of the build and publish output. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Dictum.Windows and the tests target net10.0-windows; on macOS the SDK refuses that (NETSDK1100) unless told the build is cross-targeting. -->
+    <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>

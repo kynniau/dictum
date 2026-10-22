@@ -1,40 +1,63 @@
-# Dictum.Mac (empty slot)
+# Dictum.Mac
 
-The macOS platform is not built yet (SPEC §21: Windows ships first). This folder holds no project on purpose: when it is
-built, `Dictum.Mac` implements `Dictum.Platform.IPlatform` (src/Dictum.Core/Platform/IPlatform.cs) and is the macOS
-entry point, exactly as `src/Dictum.Windows` is on Windows. `Dictum.Core` and `Dictum.UI` need no change: a test
-(`ArchitectureTests`) fails if either references a platform assembly or declares a native call.
+The macOS platform (SPEC §21): `MacPlatform` implements `Dictum.Platform.IPlatform` and `Program` is the entry point, the
+executable inside `Dictum.app/Contents/MacOS` (built by `scripts/publish-mac.sh`), exactly as `src/Dictum.Windows` is on
+Windows. `Dictum.Core` and `Dictum.UI` needed four small changes for the Mac (docs/DECISIONS.md, "Dictum for macOS",
+22-23/10/2026); a test (`ArchitectureTests`) still fails if either references a platform assembly or declares a native call.
 
-Provenance of the macOS names below: the ones SPEC §21 names (CGEventTap, AVAudioEngine, NSPasteboard with Cmd-V,
-NSStatusItem, SMAppService, NSPanel) come from the spec. Everything marked *(recalled)* is from memory, not checked
-against Apple's documentation, and must be verified before it is used.
+Plain `net10.0`, RID `osx-arm64`, assembly `Dictum.Mac` (the tests load it beside Dictum.Windows's `Dictum`; the bundle
+script renames the apphost to `Dictum`). Every native declaration is under `Interop/`: `ObjC.cs` (the Objective-C runtime:
+classes, selectors, `objc_msgSend` per signature, C#-implemented classes, autorelease pools), `CoreFoundation.cs` (CF types
+and run loops) and one file per framework beside them. Apple Silicon only for the beta: on arm64 every message goes through
+`objc_msgSend`; an x64 build would need the `_stret` variant for large struct returns.
 
-Permissions the app will need: Microphone, Accessibility (to post Cmd-V) and Input Monitoring (for the event tap)
-(SPEC §21).
+Permissions the app needs: Microphone (Core Audio prompts for it; `NSMicrophoneUsageDescription` is in
+packaging/mac/Info.plist) and Accessibility (the event taps and the posted Cmd-V; the SDK's CGEvent.h: taps "may only
+receive key up and down events if … the caller is enabled for assistive device access"). Both taps are active taps, so
+Input Monitoring is not asked for (owner decision c, 22/10/2026).
 
-| IPlatform member | Windows (Dictum.Windows) | macOS counterpart |
+| IPlatform member | Windows (Dictum.Windows) | macOS (this project) |
 |---|---|---|
 | `Name` | "Windows" | "macOS" |
-| `ResolvePaths(configOverride)` | `%APPDATA%\Dictum`, `%LOCALAPPDATA%\Dictum` | `~/Library/Application Support/Dictum` for both, or a separate caches folder for models *(recalled)* |
-| `LegacyFolders()` | `%APPDATA%\Dictate`, `%LOCALAPPDATA%\Dictate` | none: there was no macOS Dictate (return folders that do not exist) |
-| `Package` (`IPackageInfo`) | `GetCurrentPackageFullName`; MSIX redirection | App Store sandbox container detection *(recalled: the sandbox redirects to `~/Library/Containers/<bundle id>`)*; `OtherInstall()` checks for the other build |
-| `CreateHotkeyListener(matcher, post, log)` | WH_KEYBOARD_LL hook on its own thread, plus a WH_MOUSE_LL hook on the same thread while `matcher.Spec.UsesMouse` (mouse buttons arrive as VK_RBUTTON…VK_XBUTTON2) | CGEventTap on its own run loop thread; key codes mapped to the virtual-key codes `HotkeyParser` uses; mouse button events (`otherMouseDown` etc.) mapped to the same mouse virtual keys when the spec uses the mouse |
-| `CreateKeyMonitor(onKey, log)` | the same hooks, passing every key and mouse button (never the left one) | a listen-only CGEventTap for keys and non-left buttons |
-| `IsKeyDown(vk)` | `GetAsyncKeyState` | `CGEventSourceKeyState` *(recalled)* |
-| `CreateInputSender(log)` (`IInputSender`) | SendInput (Ctrl+V, Unicode typing) | CGEvent keyboard events posting Cmd-V *(recalled: `CGEventCreateKeyboardEvent`, `CGEventPost`)* |
-| `Clipboard` (`IClipboard`) | raw Win32 clipboard with the history opt-out formats | NSPasteboard; the history opt-out has a macOS convention *(recalled: `org.nspasteboard.TransientType` / `ConcealedType`)* |
-| `CreateCapture(log)` (`IAudioCapture`) | WASAPI through NAudio | AVAudioEngine input node, resampled to 16 kHz mono by `CaptureBuffer` |
-| `ListCaptureDevices()` | WASAPI capture endpoints | AVCaptureDevice / Core Audio device list *(recalled)* |
-| `Startup` (`IStartupRegistration`) | HKCU Run key, or the package's StartupTask | SMAppService (login item) |
-| `AcquireSingleInstance(wait)` (`IInstanceLock`) | named mutex `Local\Dictum.SingleInstance` and an "already running" event | a lock file plus a distributed notification, or `NSRunningApplication` *(recalled)* |
-| `WindowFlags` (`IWindowFlags`) | WS_EX_NOACTIVATE / TRANSPARENT / LAYERED / TOOLWINDOW / TOPMOST through Avalonia's style callback; `GetForegroundWindow`; SPI_GETCLIENTAREAANIMATION | NSPanel non-activating style, `ignoresMouseEvents`, a floating window level; the frontmost application; Reduce Motion *(recalled: `accessibilityDisplayShouldReduceMotion`)* |
-| `CreateTray(activated, log)` (`ITrayHost`) | Shell_NotifyIcon with NOTIFYICON_VERSION_4 | NSStatusItem; notifications through UserNotifications *(recalled)* |
-| `Open(target)` | ShellExecute | NSWorkspace open *(recalled)* |
-| `Removal` (`IRemovalSteps`) | Start menu shortcut, Run key, a detached PowerShell step deleting only the files the program folder's manifest.txt lists; the earlier build's leftovers after a migration | the login item, and the app bundle moved to the Trash after exit *(recalled)*; App Store builds are removed by the user |
-| `PlayCue(cue)` | `PlaySound` from memory | NSSound *(recalled)* |
-| `EarlierBuildRunning()` | the earlier build's mutex `Local\Dictate.SingleInstance` exists | always false: there was no earlier macOS build |
+| `ResolvePaths(configOverride)` | `%APPDATA%\Dictum`, `%LOCALAPPDATA%\Dictum` | both `~/Library/Application Support/Dictum` (from `HOME`): settings.json, consent.json and .env at the top, models/, logs/, calibration/ beside them |
+| `LegacyFolders()` | `%APPDATA%\Dictate`, `%LOCALAPPDATA%\Dictate` | `~/Library/Application Support/Dictate`, which never exists (there was no Mac build of the earlier app) |
+| `Package` (`IPackageInfo`) | `GetCurrentPackageFullName`; MSIX redirection | `MacPackageInfo`: never packaged, paths as they are, no other install (the App Store train comes later) |
+| `CreateHotkeyListener(matcher, post, log)` | WH_KEYBOARD_LL hook on its own thread, plus WH_MOUSE_LL while the spec uses the mouse | `EventTapHotkey`: an active CGEventTap at kCGSessionEventTap on its own CFRunLoop thread; `KeyCodeMap` turns kVK_* codes into the Windows virtual keys the matcher uses; modifiers come from flagsChanged with left/right state; mouse buttons when the spec uses them; re-enabled after a timeout; swallows only what the matcher says |
+| `CreateKeyMonitor(onKey, log)` | the same hooks, passing every key and mouse button (never the left one) | `EventTapKeyMonitor`: the same tap, passing every event through |
+| `IsKeyDown(vk)` | `GetAsyncKeyState` | `KeyState`: `CGEventSourceKeyState` / `CGEventSourceButtonState` through the reverse map |
+| `CreateInputSender(log)` (`IInputSender`) | SendInput (Ctrl+V, Unicode typing) | `CGEventSender`: Cmd-V and Unicode typing (20 UTF-16 units per event) from a private event source, posted to kCGHIDEventTap, each event carrying Dictum's marker so the taps ignore it; Accessibility checked first |
+| `Clipboard` (`IClipboard`) | raw Win32 clipboard with the history opt-out formats | `Pasteboard`: NSPasteboard; the snapshot keeps public.utf8-plain-text, public.rtf and public.html; a dictation is written with `org.nspasteboard.ConcealedType` and `org.nspasteboard.TransientType` (nspasteboard.org) and `org.nspasteboard.source` |
+| `CreateCapture(log)` (`IAudioCapture`) | WASAPI through NAudio | `AudioQueueCapture`: Core Audio's AudioQueue (C API, an `UnmanagedCallersOnly` callback), 16 kHz mono float asked for and the recorded format read back; `CaptureBuffer` meters, resamples if needed and cuts hands-free parts |
+| `ListCaptureDevices()` | WASAPI capture endpoints | `CaptureDevices`: AudioObject properties (devices with input streams, name, UID, default); `Resolve` by UID, then name, then default |
+| `Startup` (`IStartupRegistration`) | HKCU Run key, or the package's StartupTask | `LoginItem`: SMAppService's main-app service (register / unregister / status); needs the installed Dictum.app |
+| `AcquireSingleInstance(wait)` (`IInstanceLock`) | named mutex `Local\Dictum.SingleInstance` and an "already running" event | `SingleInstance`: a lock file (FileShare.None) and a Unix domain socket under the app folder, pure .NET |
+| `WindowFlags` (`IWindowFlags`) | WS_EX_NOACTIVATE / TRANSPARENT / LAYERED / TOOLWINDOW / TOPMOST; `GetForegroundWindow`; SPI_GETCLIENTAREAANIMATION | `WindowFlags`: the NSWindow behind Avalonia's handle (level, ignores mouse events, collection behaviour); the frontmost app's process id stands for the foreground window; `CGWindowListCopyWindowInfo` for its bounds; `accessibilityDisplayShouldReduceMotion` |
+| `CreateTray(activated, log)` (`ITrayHost`) | Shell_NotifyIcon with NOTIFYICON_VERSION_4 | `TrayHost`: Avalonia's `TrayIcon` (an NSStatusItem under Avalonia.Native) drawn from `TrayIconArt`; the click point from `NSEvent.mouseLocation`; notices through UNUserNotificationCenter inside the bundle, the log outside it |
+| `Open(target)` | ShellExecute | `open` (a URL, a folder, a file; `open -t` for a file with no handler) |
+| `Removal` (`IRemovalSteps`) | Start menu shortcut, Run key, a detached PowerShell step deleting only the files manifest.txt lists | `RemovalSteps`: the login item, then a detached `sh` step that moves Dictum.app to the Trash after exit (paths through the environment, never the script's text); refuses anything that is not the verified bundle |
+| `PlayCue(cue)` | `PlaySound` from memory | `SoundCues`: NSSound from the same two tones (`Dictum.Audio.CueTones`, shared with Windows) |
+| `EarlierBuildRunning()` | the earlier build's mutex exists | always false |
 
-Avalonia: the macOS app project references `Avalonia.Native` (Avalonia's macOS backend) instead of `Avalonia.Win32`
-*(package name recalled; verify on nuget.org at the same version as the rest, 11.3.22)*. Whisper.net ships a CoreML
-runtime for macOS (SPEC §21, verified 15/10/2026); a LLamaSharp Metal backend package was not found, so the clean-up
-model's GPU use on a Mac is unverified and CPU is assumed until measured.
+Avalonia: this project references `Avalonia.Native` and `Avalonia.Skia`; `Program.cs` calls `.UseAvaloniaNative().UseSkia()`.
+Whisper and llama: `Whisper.net.Runtime` and `LLamaSharp.Backend.Cpu`, whose arm64 builds carry ggml's Metal backend
+(`libggml-metal*.dylib`), so the "CPU" runtime uses the GPU on Apple Silicon; no Core ML (it needs a separate encoder file
+per model that the catalogue does not carry). `Program.Main` sets `HotkeyNames.Dialect` to Mac (Right Option is the default
+hotkey; Alt and Win read Option and Command) and tells `WhisperEngine` there is no Vulkan loader.
+
+Build and run from source: `dotnet build Dictum.sln -c Release` then `dotnet run --project src/Dictum.Mac -- --selftest`
+(from a build tree the login item and notifications are off, as the table says); the bundle: `scripts/publish-mac.sh`.
+Tests: `tests/Dictum.Tests/Mac*Tests.cs` (pure parts everywhere; the ones that need the Mac, Accessibility or the microphone
+skip with a reason unless `DICTUM_UI_TESTS=1` / `DICTUM_AUDIO_TESTS=1`).
+
+Installing a build (the words below are PROPOSED for the public README and release notes, kept here until the owner approves
+them; the public README says nothing about the Mac until the beta ships): the beta is for Apple Silicon Macs on macOS 15 or
+later. Download `Dictum-<version>-osx-arm64.zip`, check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it
+and move `Dictum.app` to Applications. A build signed with the owner's Developer ID certificate and notarised opens normally;
+an ad-hoc build is refused by Gatekeeper until allowed in System Settings > Privacy & Security. The app lives in the menu bar
+(no Dock icon). On first use macOS asks for Microphone access and for Accessibility access (to see the hotkey and to paste
+into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech
+model is inside the app. Building it: install the .NET 10 SDK (`curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s --
+--channel 10.0`, then put its folder on `PATH`), `dotnet build Dictum.sln -c Release`, then `scripts/publish-mac.sh`; it
+writes `dist/Dictum.app`, `dist/Dictum-<version>-osx-arm64.zip` and `dist/SHA256SUMS-mac.txt` (`DICTUM_MAC_DIST` chooses the
+folder). The script reads two names from the environment, `DICTUM_MAC_SIGN_IDENTITY` and `DICTUM_MAC_NOTARY_PROFILE`, and
+never a certificate, key or password.

@@ -13,6 +13,7 @@
     <InternalsVisibleTo Include="Dictum.Tests" />
     <InternalsVisibleTo Include="Dictum.UI" />
     <InternalsVisibleTo Include="Dictum" />
+    <InternalsVisibleTo Include="Dictum.Mac" />
   </ItemGroup>
 
   <ItemGroup>

@@ -132,12 +132,16 @@ internal sealed class FolderStep : OnboardingStep
         _useSuggested.IsVisible = Flow.ChosenFolder is not null;
     }
 
-    /// <summary>"C: has 41.0 GB free", or null when the free space cannot be read (a share that does not say).</summary>
-    internal static string? FreeLine(string folder, Func<string, long?>? freeBytes = null)
+    /// <summary>
+    /// "C: has 41.0 GB free", or null when the free space cannot be read (a share that does not say). The volume is named by its
+    /// root (<see cref="DiskSpace.VolumeRoot"/>); a root with no name, the "/" of the startup disk, by <see cref="OnboardingText.StartupDisk"/>.
+    /// </summary>
+    internal static string? FreeLine(string folder, Func<string, long?>? freeBytes = null, Func<string, string?>? volumeRoot = null)
     {
         if ((freeBytes ?? DiskSpace.FreeBytes)(folder) is not long free) return null;
-        var root = Path.GetPathRoot(Path.GetFullPath(folder)) ?? folder;
-        return OnboardingText.FreeSpace(root.Length > 3 ? Path.TrimEndingDirectorySeparator(root) : root.TrimEnd('\\', '/'), free);
+        var root = (volumeRoot ?? DiskSpace.VolumeRoot)(folder) ?? folder;
+        var drive = root.Length > 3 ? Path.TrimEndingDirectorySeparator(root) : root.TrimEnd('\\', '/');
+        return OnboardingText.FreeSpace(drive.Length > 0 ? drive : OnboardingText.StartupDisk, free);
     }
 
     public override bool Primary()

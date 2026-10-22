@@ -70,6 +70,7 @@ public partial class CloudOffTakesEffectTests
     [InlineData("consent.json held open", true)]
     public Task Saving_the_switch_off_is_tried_again_at_a_reload_and_at_quit_until_both_files_keep_it(string mode, bool atQuit) => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // Lens on f69457d (finding 1): the switch-off was kept in memory only, and nothing tried the files again. Both read-only,
         // read-only cleared, About > Reload: consent.json was still there and settings.json still named the host, so the next start
         // sent again. consent.json alone read-only: settings.json was saved, but the consent stayed on file, so a later hand edit
@@ -123,6 +124,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task Clearing_read_only_on_settings_json_is_enough_and_the_reloads_then_stop_while_consent_json_is_held_open() => UiSession.RunAsync(async () =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // The folder watcher reloads on consent.json and on a change of attributes (AppRules.ReloadsOn, NotifyFilters.Attributes),
         // so clearing read-only on settings.json alone lets a reload save the switch-off there. A save fires one more reload, which
         // finds the files saved and writes nothing: the reloads stop, also while another program holds consent.json open (since the
@@ -294,6 +296,7 @@ public partial class CloudOffTakesEffectTests
     [Fact]
     public Task Remove_Dictum_completely_leaves_no_settings_json_for_offline_only_held_this_session() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // The quit tries to save what the session holds, but after Remove Dictum completely nothing is kept. dictionary.txt held
         // open keeps the settings folder, where a settings.json written at quit would be left behind.
         using var scratch = new Scratch("""{ "hotkey": "F24" """); // not valid JSON: offline only cannot be saved

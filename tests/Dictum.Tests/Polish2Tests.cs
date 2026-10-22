@@ -76,6 +76,7 @@ public class Polish2Tests
     [MemberData(nameof(HeaderLines))]
     public Task The_panel_header_is_one_whole_line(string line) => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly("Measures the header in Segoe UI, a Windows font; elsewhere a fallback font with other metrics is drawn.");
         using var scratch = new Scratch("""{ "ui": { "view": "simple" }, "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }""");
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: false);

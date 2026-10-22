@@ -449,10 +449,10 @@ public class PolishTests
     [Fact]
     public void The_folder_chooser_starts_at_the_nearest_folder_that_exists()
     {
-        var there = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { @"C:\Users\x\AppData\Local\Dictum", @"C:\Users\x\AppData\Local", @"C:\" };
-        Assert.Equal(@"C:\Users\x\AppData\Local\Dictum", ShellDialogs.StartFolder(@"C:\Users\x\AppData\Local\Dictum\models", there.Contains));
-        Assert.Equal(@"C:\Users\x\AppData\Local\Dictum", ShellDialogs.StartFolder(@"C:\Users\x\AppData\Local\Dictum", there.Contains));
-        Assert.Null(ShellDialogs.StartFolder(@"Q:\nowhere\models", there.Contains));
+        var there = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TestPaths.Native(@"C:\Users\x\AppData\Local\Dictum"), TestPaths.Native(@"C:\Users\x\AppData\Local"), TestPaths.Native(@"C:\") };
+        Assert.Equal(TestPaths.Native(@"C:\Users\x\AppData\Local\Dictum"), ShellDialogs.StartFolder(TestPaths.Native(@"C:\Users\x\AppData\Local\Dictum\models"), there.Contains));
+        Assert.Equal(TestPaths.Native(@"C:\Users\x\AppData\Local\Dictum"), ShellDialogs.StartFolder(TestPaths.Native(@"C:\Users\x\AppData\Local\Dictum"), there.Contains));
+        Assert.Null(ShellDialogs.StartFolder(TestPaths.Native(@"Q:\nowhere\models"), there.Contains));
     }
 
     // ---- 14. Help: the questions first ----

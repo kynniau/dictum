@@ -35,10 +35,10 @@ public class ModePresetTests
     public void Settings_match_a_preset_or_custom()
     {
         Assert.Equal(ModePreset.Light, ModePresets.Match(With("base.en", "none"), gpuRuntime: true));
-        Assert.Equal(ModePreset.Light, ModePresets.Match(With(@"C:\models\ggml-base.en.bin", "none", "anything"), gpuRuntime: false));
+        Assert.Equal(ModePreset.Light, ModePresets.Match(With(TestPaths.Native(@"C:\models\ggml-base.en.bin"), "none", "anything"), gpuRuntime: false));
         Assert.Equal(ModePreset.Full, ModePresets.Match(With("small.en", "local"), gpuRuntime: false));
         Assert.Equal(ModePreset.Custom, ModePresets.Match(With("small.en", "local"), gpuRuntime: true)); // Full on a GPU is large-v3-turbo
-        Assert.Equal(ModePreset.Full, ModePresets.Match(With("large-v3-turbo", "local", @"D:\m\qwen2.5-1.5b-instruct-q4_k_m.gguf", beam: 5), gpuRuntime: true));
+        Assert.Equal(ModePreset.Full, ModePresets.Match(With("large-v3-turbo", "local", TestPaths.Native(@"D:\m\qwen2.5-1.5b-instruct-q4_k_m.gguf"), beam: 5), gpuRuntime: true));
         Assert.Equal(ModePreset.Custom, ModePresets.Match(With("large-v3-turbo", "local", "qwen2.5-0.5b"), gpuRuntime: true));
         Assert.Equal(ModePreset.Custom, ModePresets.Match(new AppSettings(), gpuRuntime: true)); // medium.en + local
     }

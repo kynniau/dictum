@@ -171,6 +171,7 @@ public sealed class FixBatchDownloadTests : IDisposable
     [Fact]
     public void Install_copies_models_where_the_app_looks_keeps_the_exe_env_and_leaves_settings_writable()
     {
+        TestEnv.WindowsOnly("Runs install.ps1 in Windows PowerShell against a Dictum.exe layout.");
         var scratch = _dir.CreateSubdirectory("install").FullName;
         var source = MinimalBuild(Path.Combine(scratch, "source"));
         var share = Directory.CreateDirectory(Path.Combine(scratch, "share")).FullName;
@@ -195,6 +196,7 @@ public sealed class FixBatchDownloadTests : IDisposable
     [Fact]
     public void Uninstall_in_a_non_interactive_session_removes_the_program_and_keeps_user_data()
     {
+        TestEnv.WindowsOnly("Runs uninstall.ps1 in Windows PowerShell.");
         var scratch = _dir.CreateSubdirectory("uninstall").FullName;
         var installDir = Directory.CreateDirectory(Path.Combine(scratch, "local", "Programs", "Dictum")).FullName;
         File.WriteAllBytes(Path.Combine(installDir, "Dictum.exe"), [0x4D, 0x5A]); // a stand-in: the script only checks that it is there

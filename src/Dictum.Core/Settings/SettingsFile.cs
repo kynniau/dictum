@@ -215,6 +215,10 @@ public static class SettingsFile
     /// </summary>
     internal static void WriteAtomic(string path, string content)
     {
+        // Windows refuses to move over a read-only file; a rename elsewhere replaces it regardless, which would overwrite a
+        // file the user made read-only and drop that protection. Refused the same way there, before the .tmp is written.
+        if (!OperatingSystem.IsWindows() && File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0)
+            throw new UnauthorizedAccessException($"Access to the path '{Path.GetFullPath(path)}' is denied.");
         var temp = path + ".tmp";
         try
         {

@@ -51,6 +51,12 @@ internal static class OnboardingText
     public const string ChooseOther = "Choose another drive or folder…";
     public const string UseSuggested = "Use the suggested folder";
 
+    /// <summary>
+    /// PROPOSED 23/10/2026 (not yet approved): the free-space line's name for the startup disk, whose root ("/") has no name to
+    /// show; without it the line read " has 41.0 GB free".
+    /// </summary>
+    public const string StartupDisk = "The startup disk";
+
     /// <summary>"C: has 41.0 GB free" (the size as every other size in Dictum, ModelCatalog.FormatSize).</summary>
     public static string FreeSpace(string drive, long bytes) => $"{drive} has {ModelCatalog.FormatSize(bytes)} free";
 

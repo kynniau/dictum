@@ -256,6 +256,7 @@ public class MouseHotkeyTests
     [Fact]
     public void The_mouse_hook_is_installed_only_for_a_hotkey_that_names_a_mouse_button()
     {
+        TestEnv.WindowsOnly("Installs Win32 low-level keyboard and mouse hooks (SetWindowsHookEx) on a hook thread.");
         var mouseLog = new LineLog();
         using (var mouse = new InputHook(new HotkeyMatcher(HotkeyParser.Parse("Mouse5"), suppress: true), _ => { }, mouseLog))
         {
@@ -352,6 +353,7 @@ public class MouseHotkeyTests
     [InlineData(false)] // a mouse button is swallowed whatever suppress_hotkey says
     public void The_mouse_hook_callback_swallows_the_hotkey_button_and_passes_the_others(bool suppress)
     {
+        TestEnv.WindowsOnly("Calls the Win32 hook callbacks, which pass other input on through CallNextHookEx (user32).");
         var events = new List<HookEvent>();
         using var hook = new InputHook(new HotkeyMatcher(HotkeyParser.Parse("Mouse5"), suppress), events.Add, NullLog.Instance);
         Assert.Equal((nint)1, Call(hook.MouseProc, Native.WM_XBUTTONDOWN, ButtonData(Native.XBUTTON2)));
@@ -369,6 +371,7 @@ public class MouseHotkeyTests
     [Fact]
     public void The_keyboard_hook_callback_swallows_the_hotkey_when_told_and_passes_other_keys()
     {
+        TestEnv.WindowsOnly("Calls the Win32 hook callbacks, which pass other input on through CallNextHookEx (user32).");
         const int f24 = Vk.F1 + 23, a = 'A';
         static Native.KBDLLHOOKSTRUCT Key(int vk) => new() { vkCode = (uint)vk, time = 1000 };
 
@@ -391,6 +394,7 @@ public class MouseHotkeyTests
     [Fact]
     public void Hook_thread_sees_an_injected_side_button_press()
     {
+        TestEnv.WindowsOnly("Installs a Win32 low-level hook on a hook thread and injects input with SendInput.");
         Assert.SkipUnless(TestEnv.Get("UI_TESTS") == "1", "Set DICTUM_UI_TESTS=1 (injects a Mouse4 click system-wide; swallowed by the hook, so nothing under the pointer sees it).");
 
         var events = new BlockingCollection<HookEvent>();

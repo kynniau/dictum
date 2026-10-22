@@ -5134,3 +5134,387 @@ Branch `release/1.3.0` from origin/main cd48645. No tag is created and nothing i
 4. **Still PROPOSED:** the 1.3.0 tester notes ("Notes written" line, CHANGED paragraph and cloud paragraph, in "Notes for certification: PROPOSED for 1.3.0"); the owner approves them with the submission. Also awaiting owner confirmation: the `site/privacy.html` "Cloud speech (off by default)" paragraph, whose shipped text carries two sentences beyond the owner-approved summary (marker withdrawn to PROPOSED in PR #62).
 5. **Approved and unchanged:** the 1.3.0 "What's new" paragraph (APPROVED 22/10/2026 22:52 AEDT) is not reworded; `site/version.json` carries it as is.
 6. **Not done here:** tag, installer, MSIX, GitHub release, site deploy and Store submission, and the packaged self-test (not run for 1.3.0). Store screenshot 1 is still to be retaken with the 1.2.1 hold pill.
+
+## Move the model files when the folder changes (22/10/2026, branch feat/move-on-change, for 1.3)
+
+Owner approval 22/10/2026: when the model folder changes, Dictum offers to move the existing model files. Design brief: `.demo-preview/design-storage.md` sections A-C. **Every new string below was proposed 22/10/2026 and is now APPROVED (the 1.3 block, 22/10/2026 22:52 AEDT; the folder note at 22:42 AEDT, item 12), except as noted: the Quit sentence of item 13.8 is PROPOSED for 1.3.1 and does not ship (item 14); no approved string was changed without the owner.** The folder note was then "Dictum looks here first and downloads go here. Changing it does not move any files.", true for "Leave them where they are"; item 12 rewords it.
+
+1. **Where it hooks in.** The shared handler `ModelFolderActions` (moved out of `ModelPages.cs` into its own file), which both Settings > Models **Browse…** and Settings > Storage **Change…** call. **Use default** offers the same question and the same move, back to the per-user folder (item 10; at first it offered none, which was put to the owner). The Welcome step's "Model files" (which calls `ModelCoordinator.SetModelsFolder` directly) is unchanged. `ModelCoordinator` is not edited.
+2. **The offer.** Shown only when the folder in use holds model files Dictum knows: catalogue speech and clean-up files and their `.part` downloads, in that folder itself (`ModelMover.Known`). Not for the same folder, not when the folder in use is the bundled one. Closing the question changes nothing.
+3. **The move** (`src/Dictum.Core/Storage/ModelMover.cs`). Per file, in name order: copy to `<new>\<name>.move`; check the copy's size against the original; for a finished catalogue file hash the copy and compare it with the catalogue's pinned SHA-256 (`ModelIntegrity.Expected`); rename to the final name; `integrity.Remember(new)`; only then delete the original and `integrity.Forget(old)`. A `.part` is copied and renamed with no hash (it has nothing to be checked against; the downloader checks it when it resumes). A file of the same name already in the new folder is not overwritten. The first file that fails stops the move: its copy is deleted, its original kept. A failed delete of the original after a verified copy leaves both copies and is reported.
+   - `// simplification:` **no rollback of already-moved files.** Ceiling: after a failure the models are split across two folders, and those left in a chosen folder Dictum no longer looks in read "Not downloaded" until that folder is chosen again. Retire when: a report of a split folder that confused someone, or the archive folder (design brief D) adds a second folder the lookup searches anyway.
+   - Same-drive moves still copy (no rename shortcut), and there is no free-space pre-check: a full drive fails the copy, which deletes the partial copy and keeps the original. Both are ceilings, not built (brief B.5 and B.7).
+   - The startup clean-up of stray `.move` files and a registry pattern for them (brief B, "Interrupted move") are not built: a `.move` is left only if Dictum ends mid-copy; it is never loaded (not a catalogue name) and the next attempt overwrites it.
+4. **Order of the flow** (`ModelFolderActions.ChangeAsync`): the existing refusals (bundled folder, device path); the offer; on **Move the files**, refuse while a download is running (`ModelCoordinator.IsDownloading`: the downloader holds its `.part` open with `FileShare.None`) and when one folder is inside the other; release both engines; move; write `models.folder` with `SetModelsFolder(folder, reloadAfter: false)`; reload. The folder is written **after** the move because every settings.json write fires the settings watcher's reload (500 ms debounce), which would load a model from the old folder mid-move. If the write fails, the result line adds the approved `ModelCoordinator.WriteFailed`. The page's status line (live, polite) shows each file and then the result; a progress report still queued at the end is dropped so it never overwrites the result. A second folder change while a move runs is ignored (`AppShell.MovingModels`).
+5. **The release seam.** New `ModelManager.ReleaseAsync()` and `LocalLlmManager.ReleaseAsync()`: take the last load task (`_tail`), call the existing `Unload()` (bumps the generation and disposes the loaded engine), then await that task, so a load still under way finishes and, being stale, disposes its engine. `LocalLlmEngine.Dispose` disposes the context and `LLamaWeights`. New `AppShell.ReleaseModelsAsync()` (new partial file `AppShell.ModelMove.cs`, outside the lane's named files, so no existing shell file was edited) awaits both. Verified 22/10/2026 by running a scratch program against LLamaSharp 0.27.0: `new ModelParams(path).UseMemorymap` defaults to `True`, and `LocalLlmEngine.Load` does not set it, so the clean-up model is memory-mapped. The lens on f5ec71c measured what blocks the move (its result, relayed by the orchestrator; not re-run by this lane): the block comes from the engine's open file handle, not from the mapping, and copying is always allowed, so an engine left unreleased can only leave two copies (the original's delete refused), never zero. The pins use a fake engine that holds its file open with `FileShare.Read` until disposed, which is that case.
+6. **PROPOSED strings, verbatim** (`ModelFolderActions`, `ModelMover`):
+   - Title "Move your model files?"; body "Your model files are in {old}. Move them to {new} so Dictum finds them there? {n} files, {size}. Dictum copies each file, checks it, then removes the original." ("1 file" for one); buttons "Move the files" (default) / "Leave them where they are".
+   - "A download is running; wait for it to finish, then change the folder again to move the files."
+   - "One of these folders is inside the other, so Dictum does not move the files. Choose a folder outside the current one." (new; the brief named the refusal but gave no wording)
+   - Progress "Moving {name} ({i} of {n})…"; results "Moved {n} files to {new}." and "Moved {k} of {n}; {name} could not be moved: {reason}. The rest stay in {old}."
+   - Reasons after "could not be moved: ": "a file of that name is already in the new folder"; "the copy is not the same size as the original, so the copy was deleted"; "the copy did not match the catalogue, so the copy was deleted"; otherwise the system's own message.
+7. **Pins** (`tests/Dictum.Tests/ModelMoveTests.cs`, 16 tests with item 10, temp folders only): `Known` lists catalogue files and `.part` files in the folder itself, not `.move`, other files or subfolders; copy-check-rename-delete order (a hasher that records, for each file, whether the original still exists and whether the final name exists yet: both "original there, final not there"); a fake hash failing on the second of three files leaves its original byte for byte, deletes its copy, keeps the first moved and leaves the third untouched, and the verified record holds only the moved copy; `.part` moved with a hasher that throws if called; no overwrite of a same-name file; `Nested`; both `ReleaseAsync` seams (the held file cannot be moved while loaded and can after release; the clean-up one also waits for a load under way); no offer when the old folder holds no model files; the offer's exact text and buttons, Leave writes the folder and moves nothing, closing changes nothing; end to end through the shell and Storage's Change… (engines released, files moved, folder written, the model loaded from the new folder, which is first in the lookup); refusal while a download runs (`GateHandler`; folder and files unchanged, download still running); nested refusal.
+8. **Mutations, each observed failing on 22/10/2026, then restored:** delete-before-verify (the original deleted before the hash): the order pin observed failing. The download refusal removed: `Moving_is_refused_while_a_download_runs` observed failing. The hash check removed: the order pin observed failing (the third file was then processed). Also: the `ReleaseModelsAsync` call removed: the end-to-end pin observed failing ("Moved 1 of 2; ggml-tiny.en.bin could not be moved"); `LocalLlmManager.ReleaseAsync` without its wait: the clean-up seam pin observed failing.
+9. **Gates** (22/10/2026): Release build with `--no-incremental`, 0 warnings, 0 errors. ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests, ModelMoveTests and PublicCopyNeutralityTests: 137 total, 0 failed, 2 skipped. Full suite once: 1941 total, 0 failed, 23 skipped. After merging origin/main 28c3e65 (merge 0618c98, DECISIONS tails kept, main's first): the same gates 137 total, 0 failed, 2 skipped; full suite 1956 total, 0 failed, 23 skipped.
+10. **Use default offers the move too (owner decision, 22/10/2026 21:45 AEDT):** "all three ways of changing the folder behave alike". `ModelFolderActions.UseDefaultFolder` now goes through `ChangeFolderAsync(shell, null, …)`: the same question, the same refusals and the same move, into `AppPaths.DefaultModelsDir`; models.folder is then cleared (`SetModelsFolder(null)`). No new string. Pins: `ModelFolderTests.Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` now expects the question when the chosen folder holds a model (closing it changes nothing; Leave clears the folder and the file stays) and none when the chosen folder holds no model files; new `ModelMoveTests.Use_default_offers_the_move_and_moves_the_files_back_to_the_default_folder` (Storage's Use default, Move the files: the file arrives in the default folder, models.folder is cleared, the model loads from there). Mutation: Use default writing the folder without the offer: both pins observed failing (22/10/2026), then restored. Gates on this head: Release build `--no-incremental` 0 warnings, 0 errors; the gate classes above 138 total, 0 failed, 2 skipped; full suite 1957 total, 0 failed, 23 skipped.
+11. **Lens on f5ec71c (Needs changes; no blocker). This item supersedes items 3 and 4 where they differ.** The approved note (`ModelsPage.FolderNote`, lens item 4) is with the owner and is not edited here.
+    1. *Order pinned.* New pins: a rename that fails (the hasher puts a file under the final name after the existence check) keeps the original byte for byte, leaves no `.move` and reports the system's reason; a copy of the wrong size (a copy seam, `copier`, writes three bytes) is deleted and its original kept.
+    2. *Name clash and the model in use.* A file of the same name in the new folder counts as moved when it is the same file (same size and, for a finished catalogue file, the pinned SHA-256): the original is deleted and the verified record moves. Otherwise that file is skipped. Any file that fails is skipped and **the move goes on** (it no longer stops at the first failure). The models in use (`AppShell.ModelFilesInUse`, read before the release) move last (brief B.7). The folder is **not** written when a model in use stayed behind, or when the move was stopped. The line then ends with `FolderKept`. This pins the lens's reproduction: the chosen folder holds base.en and tiny.en (in use), the default folder already holds the same base.en, Use default; now "Moved 2 files", the folder is cleared and the model loads from the default folder.
+    3. *One move flag, in `ModelCoordinator`* (`MovingFiles`, replacing `AppShell.MovingModels`). While it is set:
+       - `StartDownload`, `ApplyWithDownloads` and `AppShell.DeleteModelAsync` refuse with `MovingRefusal`.
+       - `Ensure` and `EnsureCleanup` load nothing until the reload after the move.
+       - Pinned: S2 (a download asked for mid-move sends no request and writes no `.part`; Delete mid-move is refused and the file stays) and S3 (a reload mid-move loads no model; afterwards the model loads from the new folder).
+       - Not guarded: "Delete all app data" mid-move.
+    4. *Minor items.*
+       - An original that cannot be removed after its checked copy is in place counts as moved, with the reason `OriginalKept`.
+       - System messages lose their closing full stop.
+       - Progress and result lines use catalogue names (`ModelMover.DisplayName`).
+       - **"Leave them where they are" is the default button** (orchestrator decision: Enter must not start a multi-GB move). Pinned through a new `ScriptedDialogs.AskedDefault`.
+    5. *Quit mid-move (built).*
+       - `AppShell.Quit` defers while a move runs (`MoveCancel`). It cancels the move's token and quits when the move has ended, with no reload and no folder written.
+       - Cancellation takes effect between files and inside a copy or hash. The file being copied stops: its copy is deleted and its original kept. A file whose copy was checked finishes its rename and delete.
+       - Only Quit cancels; there is no Cancel button.
+       - A shutdown that calls `Dispose` directly (not through Quit) is not deferred.
+       - Pinned at both levels.
+    6. *`PathRegistry.IsInside` and drive roots.* "D:\Models" was not inside "D:\": a separator was added to a root that already ends with one. Fixed (a separator is added only when missing, and a path is never inside itself) and pinned, including `Nested` across a root.
+    7. *Mutations, each observed failing on 22/10/2026, then restored (full `--no-incremental` rebuild each):*
+       - Delete original before rename: `A_rename_that_fails_keeps_the_original_and_leaves_no_copy` observed failing (and `An_original_that_cannot_be_removed…`).
+       - `.move` clean-up skipped on the size branch: `A_copy_of_the_wrong_size_is_deleted_and_the_original_kept` observed failing.
+       - `.move` clean-up skipped in the IO catch: `A_rename_that_fails…` observed failing.
+       - Folder written although the model in use stayed behind: `The_folder_is_not_changed_when_the_model_in_use_stays_behind` observed failing (and the quit pin).
+       - In-use-last ordering removed: `The_models_in_use_move_last` observed failing.
+       - Download guard removed: `Downloads_and_deletions_are_refused_while_files_move` observed failing.
+       - `Ensure` guard removed: `A_reload_while_files_move_loads_no_model` observed failing.
+       - Delete guard removed: `Downloads_and_deletions_are_refused_while_files_move` observed failing.
+       - `IsInside` fix reverted: `A_folder_is_inside_its_drive_root` and both root cases of `Nested_folders_are_one_inside_the_other` observed failing.
+       - Re-run on the new code: hash check removed, delete before verify, release removed and Use default skipping the offer, each observed failing.
+    8. *New PROPOSED strings:*
+       - "Model files are being moved; try again when it finishes."
+       - "it was copied, but the original could not be removed"
+       - "a different file of that name is already in the new folder" (replaces "a file of that name is already in the new folder")
+       - " 1 other file could not be moved either; the log says why." / " {m} other files could not be moved either; the log says why."
+       - " The model folder is still {old}, because the model in use did not move; the files that did are in {new}; choose that folder again to use them." (or, with nothing moved, only its first clause)
+       - "Moved {k} of {n}." (stopped with no problem: only on quit)
+       - "unfinished {name} download" (a `.part`'s name in the lines)
+    9. *Gates:* Release build `--no-incremental` 0 warnings, 0 errors; ModelMoveTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests and PublicCopyNeutralityTests 152 total, 0 failed, 2 skipped; full suite once 1971 total, 0 failed, 23 skipped.
+12. **Model folder note reworded, APPROVED 22/10/2026 22:42 AEDT (owner).** `ModelsPage.FolderNote`, shown on Models and on Storage (one constant), now reads "Dictum looks here first and downloads go here. Changing it asks before moving any files." (was "…Changing it does not move any files."; the second sentence became untrue once the move was offered). Marker "APPROVED 22/10/2026 22:42 AEDT (second sentence reworded for move-on-change; proposed 22/10/2026)". Pins: the literal in `ModelFolderTests.Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` updated; a byte pin added to `OwnerApprovalsTests.The_storage_page_strings_are_pinned` (it held no literal of the note before). SPEC §17 and §24 updated. Mutation: "files." changed to "files!": `The_storage_page_strings_are_pinned` and `Browse_writes_models_folder_and_reloads_and_Use_default_clears_it` observed failing, then restored. Gates: Release build `--no-incremental` 0 warnings, 0 errors; ModelFolderTests, ModelMoveTests, OwnerApprovalsTests and PublicCopyNeutralityTests 90 total, 0 failed, 0 skipped (the full suite was not rerun for this one-string change).
+13. **Re-lens on 8001fa1/ea6303b (Block; fixed on top of 1730818 and the main merge 6a6c3b8, 23/10/2026). Supersedes items 3, 4 and 11.2 where they differ.**
+    1. *Two paths to one folder (blocker).* A junction, subst or mapped drive, a share, or a packaged app's redirected folder can name the folder in use under another path. Each file then looked "already there", matched itself, and the original (the only copy) was deleted.
+       - (a) `ModelMover.SameFolder` writes a uniquely named probe file in the new folder and looks for it in the old one. If it is found, no question is asked, the folder is written, and nothing moves.
+       - (b) The mover never deletes an original that may be the target itself. `SameFileOnDisk` is managed only, because `PlatformTests` (`ArchitectureTests.Shared_code_declares_no_native_call`) forbids a native call in Dictum.Core. The lens suggested a Win32 file-ID comparison; a first version used `GetFileInformationByHandle` and the full suite failed on that rule. The check opens the original for itself alone, then opens the target. A refused open means "may be one file" (or something else holds the target), so the original is kept and the line reports it; both opening means two files. A file of the same name that may be the original counts as in place and its original is kept.
+       - Pinned with a real junction (`mklink /J`, no administrator rights; the tests skip if the host cannot make one; on this PC they ran).
+    2. *The models in use as one unit (blocker).* They move last. Each is copied, checked and renamed, but no original of theirs is deleted until all have arrived. If one fails or the move is stopped, the copies this move made of them are deleted (a file that was already there stays) and every original is kept.
+    3. *A model chosen by its full path* (`whisper.model` / `llm.model`, "Choose model file…") that moved is rewritten to its new path in the same settings write as `models.folder` (`SetModelsFolder(..., alsoWrite)`), written **before** `models.folder` (corrected by item 14.3; first written after it).
+    4. *No pinned hash means byte for byte.* A file of the same name and size counts as the same only when its bytes match: a `.part`, or a catalogue entry without a SHA-256. Otherwise it is skipped with "a different file of that name is already in the new folder".
+    5. *Guards pinned one by one*:
+       - `EnsureCleanup`
+       - `ApplyWithDownloads`
+       - Browse's and Use default's busy checks
+       - a stopped move never writing the folder
+       - the original's verified record forgotten
+       - the default copy stopping when cancelled
+       - the check before each file
+    6. *Delete all app data* and *Remove Dictum completely* refuse with `MovingRefusal` while files move. Remove Dictum completely says it in a notice titled "Remove Dictum completely".
+    7. *Calibration* loads no model while files move. `CalibrationHost.Refusal()` gives `MovingRefusal`, the results view shows it instead of running, and `CreateEngine` (and each load inside a run already under way) throws it.
+    8. *Quit wording.* This round added " The model folder is still {old}, because the move was stopped." (PROPOSED 23/10/2026) for a move stopped by Quit; item 14.1 removed it before 1.3.0, so it does not ship. The PR body is corrected to match: "a different file of that name…", the singular " 1 other file…", the short `FolderKept` form, and failures no longer stopping the move.
+    9. *Mutations, each observed failing on 23/10/2026, full `--no-incremental` rebuild each, then restored:*
+       - 1a, probe removed: `Choosing_another_path_to_the_same_folder_moves_nothing` observed failing.
+       - 1b, file identity always "different": `The_mover_never_deletes_an_original_that_is_the_target_itself` observed failing.
+       - 2, models in use not treated as a unit: `When_one_model_in_use_fails_no_model_in_use_leaves` and `Quit_while_the_models_in_use_move_keeps_every_original` observed failing (and `The_models_in_use_move_last`).
+       - 2, their copies not rolled back: the same two observed failing.
+       - 3, full path not rewritten: `A_model_chosen_by_its_path_follows_the_move` observed failing.
+       - 4, size-only sameness: `Equal_size_but_other_bytes_is_not_the_same_file` observed failing.
+       - 5, `EnsureCleanup` guard removed: `EnsureCleanup_loads_nothing_while_files_move` observed failing.
+       - 5, `ApplyWithDownloads` guard removed: `ApplyWithDownloads_is_refused_while_files_move_before_anything_is_asked` observed failing.
+       - 5, Browse busy check removed: `Browse_opens_no_chooser_while_files_move` observed failing.
+       - 5, Use default busy check removed: `Use_default_changes_nothing_while_files_move` observed failing.
+       - 5, `result.Cancelled ||` removed from `kept`: `A_stopped_move_never_changes_the_folder` observed failing.
+       - 5, `integrity.Forget` removed: `Moving_a_file_forgets_the_originals_verified_record` observed failing.
+       - 5, default copy ignoring the token: `The_default_copy_stops_when_cancelled` observed failing.
+       - 5, check before each file removed: `No_file_starts_after_a_cancel` observed failing.
+       - 6, Delete all app data guard removed: `Delete_all_app_data_is_refused_while_files_move` observed failing.
+       - 6, Remove Dictum completely guard removed: `Remove_Dictum_completely_is_refused_while_files_move` observed failing.
+       - 7, calibration guard removed: `Calibration_loads_no_model_while_files_move` observed failing.
+    10. *Files.* New `tests/Dictum.Tests/ModelMoveSafetyTests.cs`, so `ModelMoveTests.cs` stays under 1,000 lines; its helpers became `internal` for that.
+    11. *Gates on the merged head 6ae49cb (this item plus origin/main cd48645), 23/10/2026:*
+        - Release build `--no-incremental`: 0 warnings, 0 errors.
+        - Gate classes (ModelMoveTests, ModelMoveSafetyTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests, FixBatchCalibrationTests, PublicCopyNeutralityTests, OwnerApprovalsTests): 221 total, 0 failed, 2 skipped. The filter `~CalibrationTests` matched FixBatchCalibrationTests; no class has that name.
+        - Full suite: 2495 total, 0 failed, 23 skipped.
+14. **Round-3 lens on 6ae49cb/ffab59b (Needs changes, minors only; no data loss found under junction, subst, admin-share, hard-link, symlink and mmap attacks). Fixed on top of ffab59b, 23/10/2026.**
+    1. *Nothing unapproved ships in 1.3.0.* The PROPOSED Quit sentence " The model folder is still {old}, because the move was stopped." is removed. When Quit stops a move the line is only the approved "Moved {k} of {n}." (now `ModelFolderActions.MovedStopped`, pinned in OwnerApprovalsTests), with no folder sentence. The fuller sentence stays PROPOSED for 1.3.1.
+    2. *A kept original is said.* When a same-content file is already in the new folder and the original cannot be opened for itself alone, the original is kept. It is now reported with the approved "it was copied, but the original could not be removed" (it still counts as moved); before, it was kept silently. Pinned: `A_kept_original_beside_a_same_file_is_reported`.
+    3. *Write order.* `SetModelsFolder` writes `alsoWrite` (a moved model's full path) **before** `models.folder`. The keys are written one by one, so a failure after the first leaves the setting naming the new copy, which exists, never the deleted original. Pinned through the "Set from the app" log line's key order in `A_model_chosen_by_its_path_follows_the_move`.
+    4. *Calibration guards tested.* `A_calibration_run_already_under_way_loads_no_model_once_files_move` turns the flag on after `CreateEngine`: the next load is refused, the loader is never called, and the run says the refusal. `The_calibration_window_refuses_to_run_while_files_move` clicks Run test. The window's check now comes first, before the recordings and models are checked, so it is reachable.
+    5. *Docs.* The PR body now says items 1 to 14, its strings heading says APPROVED, and its gate class names are corrected. Item 13 has its gate results (13.11). This entry's opening line now reads "all APPROVED except as noted". Item 13.3 and SPEC §24 give the write order; item 13.8 and SPEC give the Quit line.
+    6. *Mutations, each observed failing on 23/10/2026, full `--no-incremental` rebuild each, then restored:*
+       - 2, kept original returned silently: `A_kept_original_beside_a_same_file_is_reported` observed failing.
+       - 3, `alsoWrite` written after `models.folder`: `A_model_chosen_by_its_path_follows_the_move` observed failing.
+       - 4, per-load calibration guard removed: `A_calibration_run_already_under_way_loads_no_model_once_files_move` observed failing.
+       - 4, the results view's guard removed: `The_calibration_window_refuses_to_run_while_files_move` observed failing.
+    7. *Gates:*
+       - Release build `--no-incremental`: 0 warnings, 0 errors.
+       - ModelMoveTests, ModelMoveSafetyTests, ModelFolderTests, ModelFolderSafetyTests, OfflineAndDownloadTests, ModelIntegrityTests, FixBatchDownloadTests, FixBatchCalibrationTests, CalibrationEngineTests, PublicCopyNeutralityTests, OwnerApprovalsTests and ArchitectureTests (each by exact class name): 230 total, 0 failed, 2 skipped.
+       - Full suite once: 2498 total, 0 failed, 23 skipped.
+
+## Dialogs: the opener's mouse capture (23/10/2026, branch fix/dialog-mouse-capture, release 1.3.0)
+
+1. **Defect (probe, 23/10/2026, read-only).** A question opened by a mouse click on a Settings button (both cloud consent dialogs, delete model, delete data, Remove Dictum completely, the download questions) could not be clicked: mouse input kept going to Settings until the dialog closed, while keyboard and UI Automation worked. Root cause: `Ui.Button` runs its action from Avalonia's `Click`, which is raised inside the button's `OnPointerReleased`, before the window releases the Win32 mouse capture; `Modal.Run` then showed the dialog on its own (`Show()` + `Activate()`, `CenterScreen`) and ran a nested `PushFrame` inside that `Click`, so the capture was released only once the dialog had closed. Evidence: a scratch Avalonia 11.3.22 app on real Win32, clicked with `WM_LBUTTONDOWN`/`WM_LBUTTONUP` sent to the opener, read `GetCapture()` inside the nested frame: the opener with `Show()` + `Activate()`; 0 with `ShowDialog(owner)`; 0 with `ReleaseCapture()` before `Show()`.
+2. **Fix (chosen: ShowDialog with the opener as owner).** `Ui.Button` runs its action through `Modal.From(window, action)`, which records the window whose button is being clicked for the length of the action. `Modal.Run` shows the dialog with `ShowDialog(opener)` and `WindowStartupLocation.CenterOwner` when that window is visible; Avalonia disables the owner (which releases the capture), keeps the dialog above it and activates the owner again when it closes, so focus returns to the button. The `Closed` to frame-exit path is unchanged. With no click behind it (first run, the Welcome window's own frame, a question from the tray or from another thread), the dialog is shown on its own, centred on the screen, as before. `Run` clears the recorded opener while its frame runs, so a job the dispatcher runs inside the frame (a prompt from another thread) is never owned by it, and restores it afterwards for a second question from the same click (the two warnings of Remove Dictum completely). The tray panel is never an owner: it closes itself on `Deactivated`, and Avalonia closes owned windows with their owner, which would answer the question as Cancel. A second click on an opener whose dialog is up (the disabled owner stops the mouse; this stops any other way in) activates the open dialog and answers Cancel. No user-visible string changed. Files: `src/Dictum.UI/Views/Modal.cs`, `src/Dictum.UI/Views/Ui.cs`; `Dictum.UI.csproj` gains `InternalsVisibleTo Dictum.UiProbe` for the Win32 pin.
+3. **Owner lookup, deviation from the brief.** The brief proposed the Settings window when open, else the active window among the desktop lifetime's `Windows`. The opener of the click is used instead: it is exactly the window that holds the capture (Settings only when the click was in Settings; a Settings window open behind a clicked window would not have released that window's capture), and it works on the headless platform, where `ApplicationLifetime` is null and `IsActive` stays false after `Activate()` (measured in a scratch headless test this lane), so the headless pins can run the real path.
+4. **Alternative considered, not taken:** `IWindowFlags.ReleaseMouseCapture()` in `Dictum.Windows` (`ReleaseCapture`), called before `Show()`. It also releases the capture (probe), but leaves the opener enabled, so a second click could open a second dialog, and the dialog would stay unowned and centred on the screen. `ShowDialog(owner)` caused no regression in the existing pins, so the brief's preferred fix stands.
+5. **Pins.** `DialogOwnerTests` (new): (a) `The_cloud_consent_opened_from_Settings_is_its_modal_dialog_and_one_at_a_time`: the real `ShellDialogs` and nested frame on the headless platform; "Use cloud clean-up…" in Settings opens the consent owned by Settings, `CenterOwner`; a second click while it is up opens no second window; Escape closes it unanswered and nothing is written. (b) `Enter_and_the_buttons_answer_the_consent_as_before`: Enter answers Cancel (the default) and writes nothing; "Allow cloud clean-up" records consent.json and the provider. (c) `A_question_with_no_click_behind_it_or_from_the_tray_panel_is_shown_on_its_own`: unowned and `CenterScreen`. (d) `Dialog_opened_by_a_click_gets_the_mouse_on_Win32` (gated by `DICTUM_UI_TESTS=1`, as `PillFocusTests`): runs `Dictum.UiProbe --dialog-capture` (`tests/Dictum.UiProbe/Program.Dialogs.cs`), which clicks a `Ui.Button` with `WM_LBUTTONDOWN`/`WM_LBUTTONUP` for three openers (ordinary, Topmost, closed while its dialog is up) and checks inside the frame: `GetCapture()` is not the opener, the dialog's Win32 owner is the opener, the opener is disabled, the dialog is the window at its own centre (above a Topmost opener too), a second click opens no second dialog; then OK clicked with mouse messages answers 0, the opener is enabled again and focus is back on the button; closing the opener closes its dialog and Ask returns -1. Run on this host: all PASS.
+6. **Mutations, observed failing (23/10/2026), each restored.** (M1) `Modal.Run`'s owner forced to null (the dialog shown on its own, as before the fix): (a) failed (two windows) and (d) failed with "FAIL ordinary opener: inside the dialog's frame the opener no longer holds the mouse capture (GetCapture 0x13E12BC, opener 0x13E12BC)", the same for the Topmost and closed openers, and "Ask returned -1 (0, the OK clicked)": OK clicked with mouse messages did nothing, the reported symptom. (M2) the tray panel exclusion removed: (c) failed (owner FlyoutWindow, CenterOwner). (M3) the second-click guard removed: (a) failed (two windows).
+7. **Not verified.** The installed Dictum.exe was not run (tray mode is never run on this host); the fix is proven on Avalonia's real Win32 backend through the probe, not in the app's own Settings window. Whether UI Automation's Invoke reaches a button of a disabled window was not tested; the guard covers it either way. A download question raised by a choice in a combo box (the tray panel's model lists) is not a `Ui.Button` click, so it keeps the earlier behaviour; it was not probed. Focus returning to the button is checked in the probe, not on a Settings page that redraws after its action.
+8. **Gates, on de892f5 (this branch with origin/main 1960a5a, PR #61, merged in; the commit after it changes only this file).** Release build `--no-incremental`: 0 warnings, 0 errors. `DialogOwnerTests` and `DialogTests` with `DICTUM_UI_TESTS=1`: 8 total, 8 passed (the Win32 pin ran). Full suite once (without `DICTUM_UI_TESTS`): 2502 total, 0 failed, 24 skipped. PR #61's move question (Change…, Browse…, Use default in Settings) is asked from a `Ui.Button` too, so it is now owned by Settings like the others.
+
+## 1.3.0 released; 1.3.1 backlog (23/10/2026)
+
+1. **Released.** v1.3.0 was tagged on b8b072d at 02:21 AEDT; the workflow published the GitHub release (run 39803808616); dictum.kynni.au was deployed at 02:33 AEDT with version.json 1.3.0. The Store package and the sizes are in STORE.md, section 11. SPEC.md needed no change (no version line called 1.3.0 "prepared").
+2. **PR #65 lens minors (1.3.1).**
+   - Pins for `Modal.Run`'s opener clear (line ~68) and restore (~75). Scratch tests exist at `C:\Users\Kynni\AppData\Local\Temp\claude\E--Dictation-tool\bcfca6f1-7a8d-40ba-8c95-d1b0dbd7c70f\scratchpad\LensScratchTests.cs`: copy them into `DialogOwnerTests` in 1.3.1, not now.
+   - `Modal.Wait` frames should clear and restore the opener like `Run`.
+   - SPEC §32 wording: "opens no second dialog; that second request is answered as Cancel and the open dialog is brought forward".
+3. **PR #61 not-built list (1.3.1).**
+   - Free-space pre-check.
+   - Rename on the same drive.
+   - Start-up clean-up of stray `.move` files.
+   - The fuller Quit sentence " The model folder is still {old}, because the move was stopped." (PROPOSED).
+4. **PR #60 lens notes.**
+   - The ceiling of the final-sentence rule: a closing made of dictated words passes.
+   - Two log lines are approved but not pinned (the save-failure paths).
+5. **PR #62 lens.**
+   - The privacy "Cloud speech (off by default)" paragraph's two extra sentences await the owner's confirmation.
+   - The README validator list is complete.
+6. **Demos.**
+   - PR #64 captions are PROPOSED.
+   - help.html section 8 figcaption "stops at the consent step without agreeing" is to be reworded on the owner's approval.
+   - The consent-dialog click defect was real and was fixed in PR #65 (demo lane finding).
+7. **Owner-only items outstanding.**
+   - Store upload of 1.3.0.
+   - Store screenshot 1.
+   - flyout.png.
+   - The tester paragraph.
+   - Counsel review of the consents and the privacy policy.
+## Dictum for macOS (22-23/10/2026, branch feature/mac-platform)
+
+Built on Kyle's Mac (Apple Silicon, macOS 27.2) from docs/MAC-HANDOVER.md, with the owner's decisions of 22/10/2026 that
+override the handover: an Apple Developer Program membership exists, so the beta is a Developer ID signed and notarised
+GitHub pre-release (no Gatekeeper warning), Apple Silicon only (Intel only if a tester needs it), the Mac App Store as a
+later train. The owner creates the signing certificate and the notarisation credentials himself; nothing in the repo or
+the build sessions ever holds them. The release waits until Dictum 1.3 is live on Windows. Provenance marks as in the
+handover: **Verified** means read this session against the named source; **Recalled** is unverified.
+
+**Owner approvals (APPROVED as a block at 23:59 AEDT 22/10/2026, relayed by the Windows orchestrator session):**
+
+- a. Login item through `SMAppService` (ServiceManagement, macOS 13+), not the handover's LaunchAgent plist: the entry
+  survives a moved bundle and appears under System Settings > General > Login Items. The handover's "retire when signed"
+  simplification is retired before it was built. **Verified** 22/10/2026 on developer.apple.com (SMAppService: macOS
+  13.0+; `register()` returns kSMErrorAlreadyRegistered when already registered and kSMErrorLaunchDeniedByUser when the
+  user denied it).
+- b. Notifications through `UNUserNotificationCenter`, guarded: outside an app bundle (a build tree, `dotnet run`) the
+  centre has no bundle identifier, so the title and text go to the log instead. The handover's transient-panel
+  simplification is not built.
+- c. Permissions: both event taps are active taps (kCGEventTapOptionDefault), so the beta asks for Accessibility and
+  Microphone only, not Input Monitoring as a third prompt. To be confirmed on hardware in the test plan (§7).
+- d. Default hotkey on a Mac: Right Option (settings token `RightAlt`); on screen the Alt key reads "Option" and the Win key
+  "Command" (`HotkeyNames.Dialect`, set by Dictum.Mac's entry point; parser tokens unchanged, so settings.json, logs and
+  --selftest keep `RightAlt`, `Win`). Strings "Option" and "Command" APPROVED 23:59 AEDT 22/10/2026.
+- e. `LSMinimumSystemVersion` 15.0: .NET 10 supports macOS 15 and later, Arm64 and x64 (**Verified** 22/10/2026,
+  github.com/dotnet/core release-notes/10.0/supported-os.md); Avalonia 11 lists macOS 10.14 and later (**Verified**
+  v11.docs.avaloniaui.net, Supported Platforms).
+- f. Speech and clean-up runtimes: `Whisper.net.Runtime` 1.9.1 and `LLamaSharp.Backend.Cpu` 0.27.0 only. Both ship ggml's
+  Metal backend for arm64 (**Verified** 22/10/2026 in the restored packages: `build/macos-arm64/libggml-metal-whisper.dylib`
+  and `LLamaSharpRuntimes/osx-arm64/native/libggml-metal.dylib`), so the "CPU" runtime uses the GPU on Apple Silicon; the
+  log keeps every `ggml_metal` line at info so the truth is in the log. `Whisper.net.Runtime.CoreML` is not referenced:
+  Core ML needs a separate encoder file per model (`ggml-<model>-encoder.mlmodelc`, **Verified** whisper.cpp README) that
+  the catalogue does not carry. The handover's "no Metal-capable backend" lead was wrong: it is inside the CPU package.
+- g. Bundle identifier `au.kynni.dictum`; Developer ID signing with the hardened runtime and these entitlements:
+  `com.apple.security.cs.allow-jit`, `com.apple.security.cs.allow-unsigned-executable-memory`,
+  `com.apple.security.cs.allow-dyld-environment-variables`, `com.apple.security.cs.disable-library-validation` (the .NET
+  host's defaults, **Verified** 22/10/2026 learn.microsoft.com "macOS Catalina notarization", dated 23/04/2026) plus
+  `com.apple.security.device.audio-input` (**Verified** developer.apple.com Hardened Runtime).
+- h. The publish and bundle script is bash (`scripts/publish-mac.sh`): this Mac has no pwsh; the handover allows either.
+
+**Where the Mac keeps things.** Both roots are `~/Library/Application Support/Dictum` (settings.json, consent.json, .env at
+the top; models/, logs/, calibration/ beside them), from `HOME` so a scratch profile can be tested as the Windows build
+tests with APPDATA. Not `~/Library/Caches` (the handover's reason, that the system may purge Caches, stays Recalled and was
+not relied on: one visible folder was reason enough). The owner's own install points `models.folder` at
+a folder on an external volume through Settings > Storage; no code knows that path.
+
+**Project shape.** `src/Dictum.Mac` is plain `net10.0` with `RuntimeIdentifiers` osx-arm64 (not `net10.0-macos`, which
+brings a workload and bindings this app does not use); assembly name `Dictum.Mac`, because the tests load it beside
+Dictum.Windows, whose assembly is `Dictum`; the bundle script renames the apphost to `Contents/MacOS/Dictum` (the host finds
+its .dll by the name built into it). The solution builds on macOS: `Directory.Build.props` sets `EnableWindowsTargeting`
+off Windows (the SDK otherwise refuses net10.0-windows with NETSDK1100, **Verified** by the first build here), and the x64
+`PlatformTarget` of Dictum.Windows and the tests applies on Windows only (an x64-marked assembly cannot load into the arm64
+test host: "The assembly architecture is not compatible", **Verified** 22/10/2026). The handover's "the tests are
+platform-neutral by design" was wrong: tests/Dictum.Tests targets net10.0-windows and used Dictum.Windows types in 18
+files; it now also references Dictum.Mac, and the Windows-only tests skip on macOS with a reason (lane report below).
+
+**Core changes for the Mac** (src/Dictum.Core): `HotkeyNames.Dialect` and `DefaultHotkey` (decision d); `AppSettings.Hotkey`
+defaults to `HotkeyNames.DefaultHotkey`; `LocalLlmEngine.LoadedLibraryPath` accepts `libllama.dylib`; both engines keep
+`ggml_metal` lines at info. Pinned in tests/Dictum.Tests/MacCoreTests.cs.
+
+**Known wording left for the orchestrator:** with `WhisperEngine.VulkanLoaderPresent` returning false on a Mac, the
+whisper.gpu = auto log line still says "the Vulkan loader, vulkan-1.dll, does not load on this PC" (NoVulkanCrashTests pins
+it); true as stated, but Windows wording. Also `WhisperEngine.LoadedRuntime` and `LocalLlmEngine.Backend` say "CPU" on a
+Mac while Metal is in use inside that runtime; the ggml_metal log lines carry the fact. Both are candidates for a wording
+pass with approved copy, not changed here.
+
+**Lane findings (23/10/2026, each Verified on this Mac unless marked):**
+
+- *Tests on macOS.* `dotnet test --project tests/Dictum.Tests -c Release` on the merged head: 2015 total, 0 failed, 1831
+  succeeded, 184 skipped (the Windows-only ones skip through `TestEnv.WindowsOnly(reason)`; 54 methods gated, 13 converted
+  to OS-neutral paths through `TestPaths.Native`). Three real cross-platform defects came out of it, each fixed at its root:
+  (1) `SettingsFile.WriteAtomic` replaced a read-only settings.json or consent.json on macOS (a rename over a read-only file
+  is allowed there, refused on Windows), so the "could not be saved" paths of the off switches never ran; off Windows a
+  read-only target is now refused before the .tmp is written. (2) `Path.GetPathRoot` is "/" for every path on macOS, so free
+  space, `ModelDownloads.PendingBytes` and `DiskSpace.IsNetwork` treated every folder as the startup disk; `DiskSpace.VolumeRoot`
+  returns the deepest mount point there (text match, `// simplification:` in the file). (3) The Welcome window's free-space
+  line read " has 41.0 GB free" on a Mac; a root with no name now uses `OnboardingText.StartupDisk`, PROPOSED: "The startup
+  disk" (on screen: "The startup disk has 41.0 GB free"; another disk keeps its mount path, "/Volumes/Backup has 41.0 GB
+  free"). Open: the theme names Segoe UI only (src/Dictum.UI/Theme/Controls.axaml), so macOS draws a fallback font and the
+  longest tray-panel header line trims at 308 px; `Polish2Tests.The_panel_header_is_one_whole_line` is gated on macOS and a
+  Mac font choice is for the owner.
+- *Audio.* `AudioQueueCapture` asks the queue for 16 kHz mono float and reads back the format it records; a one-second
+  capture on this Mac returned 1,013 ms of audio, and `kAudioDevicePropertyDeviceIsRunningSomewhere` went 1 while recording
+  and 0 after Stop. Stopwatch and `mach_absolute_time` are the same clock here (Stopwatch.Frequency 1e9, timebase 125/3), so
+  the first-frame figure is on the key-down clock. Finding: the first about 460 ms of every recording arrive as exact zeros
+  on this Mac's only microphone (a USB camera microphone, 48 kHz), whether or not the queue converts, and the first start
+  after launch took 5.1 s (later starts 78-150 ms). Cause unknown (device or system); other devices not tried. The pure
+  parts (device resolution, format fallback, host-time conversion) are pinned in MacAudioTests; the real capture runs under
+  DICTUM_AUDIO_TESTS=1.
+- *Input.* The SDK's CGEvent.h says taps "may only receive key up and down events if … the caller is enabled for assistive
+  device access", and that only root may tap at kCGHIDEventTap: the taps sit at kCGSessionEventTap and need Accessibility
+  (handover §1's "Input Monitoring" was wrong for active taps); posting still goes to kCGHIDEventTap. Reading the legacy
+  `NSStringPboardType` from the pasteboard returns data but writing it back is refused, so an early Restore cleared the
+  clipboard (the owner's clipboard text was lost during the lane's gated test, 23/10/2026); the snapshot now keeps
+  public.utf8-plain-text, public.rtf and public.html only, builds the new item before clearing, and leaves a refused type
+  out. Fn maps to no key (the parser refuses it; its wording is approved copy). PrintScreen, ScrollLock, Pause and F21-F24
+  have no Mac key (a test pins that set). Two `// simplification:` comments: Caps Lock reports a press and release together
+  on every event (retire once hardware shows what macOS sends), and typed text goes 20 UTF-16 units per event (Recalled
+  limit; retire once a hardware test shows bigger chunks arrive whole). The input lane also found that C `BOOL` is one byte
+  and the shared interop's default four-byte bool marshalling could read undefined register bits on arm64: every bool return
+  now crosses as I1. Not verified without Accessibility: tap installation, swallowing, Cmd-V and typing arriving; the two
+  end-to-end tests are written and skip until the test host is trusted.
+- *Packaging.* codesign treats every file under Contents/MacOS as nested code (signing the executable fails with "code object
+  is not signed at all" while a managed .dll is unsigned), so `scripts/publish-mac.sh` signs every file there, the
+  executable last, then the bundle, never `--deep` (`man codesign` on macOS 27.2: deprecated for signing as of macOS 13.0).
+  The bundled model is fetched and verified by the published app itself (`--download-model base.en` with HOME in a scratch
+  folder), so the pinned commit, size and SHA-256 stay in Core's catalogue only. `macos-15` runners are Arm64 (actions/
+  runner-images README); `secrets` is not available in `if:`, so the job carries two booleans in `env`. The icon is built at
+  publish time from site/dictum.svg (ten iconset PNGs, `iconutil`), not committed.
+- *Shell.* Decision reversed on evidence: Avalonia.Native 11.3.22 never raises `TrayIcon.Clicked` (its `trayicon.mm` sets no
+  target or action on the NSStatusItem and `avn.idl`'s `IAvnTrayIcon` has no click callback, **Verified** in the Avalonia
+  source for the tag), so `TrayHost` creates its own NSStatusItem with a target class defined through `ObjC.DefineClass`
+  and `sendActionOn:` left or right mouse-up; Avalonia only encodes `TrayIconArt`'s output as PNG. Kept: the click point from
+  `NSEvent.mouseLocation`, colour icons, creation on the UI thread. Avalonia.Native's screen "pixels" are points with
+  scaling 1 and a top-left origin flipped against the primary display (`Screens.mm`, `main.mm` `ConvertPointY`), so `Move`
+  applies no backing scale and `ForegroundBounds` (CGWindowList, top-left points) needs no conversion. Overlays sit at window
+  level 25 (`NSStatusWindowLevel` = `kCGStatusWindowLevel`, NSWindow.h and CGWindowLevel.h). `TryGetPlatformHandle()` gives
+  descriptor "NSWindow" with the NSWindow pointer (`MacOSTopLevelHandle`, TopLevelImpl.cs). SMAppService registers even a
+  bare executable outside a bundle (a scratch apphost went NotFound → Enabled → NotRegistered), so the bundle-only guard
+  stays a policy, not a necessity; that scratch run left a disabled "exp" record in `sfltool dumpbtm` on the owner's Mac.
+  `AppShell.RemoveEverything` passes `Paths.ExeDir` (Contents/MacOS), so `RemovalSteps` accepts either that or the bundle
+  path when it belongs to the running bundle, refuses anything else, and refuses a path under `/AppTranslocation/` (an
+  unsigned app opened from Downloads runs from a read-only translocated copy). A notification delegate implementing
+  `willPresentNotification:` is needed or macOS suppresses banners while Dictum is frontmost. FileShare.None on Unix is now
+  **Verified** (a second open throws IOException). The tone synthesis moved to Core as `Dictum.Audio.CueTones` (byte-identical;
+  Windows calls it). `// simplification:` in `SingleInstance.ListenForOtherLaunches`: a Unix socket path is limited to 104
+  bytes on macOS (Recalled), so a home path over about 50 characters makes the bind fail and a second launch time out after
+  30 s; retire by binding in a shorter per-user folder when a tester hits it. Approved Windows wording still shown on a Mac
+  and not reworded here: "notification area (system tray)", "Windows did not let Dictum switch back…", "everything Dictum
+  has put on this PC" (AppShell).
+
+**Merge of main at 1.3.0 (b8b072d, PRs #54-#65) into this branch, 23/10/2026 02:38 AEDT, at the Windows orchestrator's
+request before the PR.** Conflicts: this file (both appended sections kept, main's first) and `Dictum.UI.csproj` (the
+`InternalsVisibleTo` lines for Dictum.Mac and Dictum.UiProbe both kept). Mac consequences, each Verified on this Mac
+unless marked:
+- Main's model-move tests (PR #61) failed ten ways on the Mac, all test-side: three make a directory junction with
+  `cmd.exe /c mklink /J` (the helper now returns false off Windows and its callers skip, as they already did when mklink
+  fails); five pin `ModelMover.Nested` / `PathRegistry.IsInside` with drive-letter paths (now through `TestPaths.Native`,
+  so `D:\` is `/D` there and the same containment is checked); two pin that a loaded model file cannot be moved (a Windows
+  sharing rule: `TestEnv.WindowsOnly(TestEnv.HeldOpen)`, the gate the tests lane used for the same rule). The mover's own
+  code is platform-neutral: `ModelMover.SameFileOnDisk` relies on FileShare.None, which .NET implements on Unix with an
+  advisory lock (the lane's earlier finding), and `ModelMoveSafetyTests` pass unchanged on the Mac. Suite after the merge:
+  2599 total, 0 failed, 2407 passed, 192 skipped.
+- The dialog-ownership fix (PR #65, `Modal.Run` shows a dialog with `ShowDialog(owner)` from the clicked window and
+  disables the owner) is designed for the Mac too: Avalonia.Native's `WindowImpl.SetEnabled(false)` calls
+  `MouseDevice.PlatformCaptureLost()` because "macOS doesn't have the concept of mouse capture … release the mouse capture
+  when the owner window is disabled. This behavior matches win32" (Avalonia source, branch release/11.3.22,
+  src/Avalonia.Native/WindowImpl.cs, read 23/10/2026), and `SetParent` hands the owner to the native window. From the tray
+  panel (`FlyoutWindow`) and at first run the dialog is still shown on its own, as before. **Not verified** on the Mac: that
+  the first click on a dialog opened from a Settings button lands (the real-backend check, `Dictum.UiProbe`, is a Windows
+  executable, net10.0-windows, referencing Dictum.Windows); it is in the PR's owner steps (Settings > Storage > Use default).
+- `scripts/publish-mac.sh` reads `DICTUM_MAC_DIST` (default `dist/`), added so the merged head could be built and signed
+  while the earlier bundle's notarisation was still waiting on Apple in `dist/` (submitted 00:26 AEDT, still "In Progress"
+  at 02:39; Apple's developer status feed listed the Developer ID Notary Service with no events at 02:34).
+- Nothing else on main touches a platform seam: the cloud speech UI, own clean-up instructions, Help questions, plain-words
+  page and the key file are Core/UI code the Mac build takes as is (the key file, `KeyFile.cs`, is a plain .NET
+  create-new write of `.env` in the config folder).
+- `NSMicrophoneUsageDescription` now reads "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac
+  unless you turn on cloud speech." (PROPOSED), the wording main's handover §0 replaced the earlier proposal with, because
+  the earlier sentence is untrue once cloud speech (1.3) is on. Pinned in MacPackagingTests.
+
+**Launching the signed bundle on this Mac (23/10/2026 02:44-02:56 AEDT), each Verified here:**
+- `Dictum.app/Contents/MacOS/Dictum --selftest` runs from the signed bundle (hardened runtime, Developer ID): speech runtime,
+  profanity list, calibration script and the microphone list all [OK]; the result was FAIL only because the owner's
+  settings name medium.en, which is not downloaded here.
+- The first three tray-mode launches (through `open` and from a terminal, Developer ID and ad-hoc alike, bundled and not)
+  died two seconds after "Dictum 1.3.0 starting": an unhandled `InvalidOperationException`, "Avalonia.Native was not able to
+  start the RenderTimer. Native error code is: -6661". Cause: the display was asleep (`system_profiler SPDisplaysDataType`:
+  "Display Asleep: Yes"); a Swift probe showed `CGGetActiveDisplayList` returning 0 displays and
+  `CVDisplayLinkCreateWithActiveCGDisplays` returning -6661 (kCVReturnInvalidArgument) while
+  `CVDisplayLinkCreateWithCGDisplay(CGMainDisplayID())` succeeded; Avalonia 11.3.22 creates its timer with the former
+  (`native/Avalonia.Native/src/OSX/PlatformRenderTimer.mm` line 24, read through the GitHub API). With the display woken
+  (`caffeinate -u`) the probe passed and the same bundle ran. So Dictum cannot start while every display is asleep (a
+  launch at login or a relaunch over a remote session with the screen off): not a defect in this branch, and not caught
+  anywhere; a tester who sees that crash report (SIGABRT, "RenderTimer", -6661) should check the display. Candidate for a
+  guard in `Program.Main` (wait for an active display, or log a plain message) if a tester hits it.
+- With the display awake the signed bundle (272.0 MiB; `codesign --verify --deep --strict`: valid on disk, satisfies its
+  Designated Requirement; `spctl --assess`: rejected, "source=Unnotarized Developer ID", as expected before notarisation)
+  started Avalonia on its native backend and showed one window, 720 x 528 points at layer 0 (`CGWindowListCopyWindowInfo`
+  for the process): the Welcome to Dictum window (`OnboardingWindow.WindowWidth` = 720), both with the owner's settings (its
+  first-run questions are unanswered on this Mac) and with a scratch `--config`. `--exit-after` did not quit it because
+  `AppShell.Start` runs the Welcome flow before `ScheduleDiagnosticExit`, as on Windows; the windows were closed with
+  SIGTERM after 30 s, so nothing past the Welcome window (menu-bar icon, taps, panel) was exercised: those stay in the
+  owner's test plan.
+- `screencapture` is refused for this session ("could not create image from display": no Screen Recording permission), so
+  no screenshot; the window list above is the evidence.
+
+**Lens round on PR #67 (Windows orchestrator, 23/10/2026 ~03:05 AEDT, verdict Block), fixed on this branch the same night:**
+- B1, release wiring: the Windows `release` job needs `build` alone and downloads its two artifacts by name
+  (`dictum-win-x64-zip`, `dictum-release-files`), never every artifact of the run, so no Mac zip reaches a Windows release
+  and a Mac job failure cannot block one. The Mac zip ships only through a new `release-mac` job on a `mac-v<version>` tag
+  (`tags: ['v*', 'mac-v*']`), as a GitHub pre-release with its own notes file, `packaging/release-notes-mac.md` (the
+  PROPOSED paragraph moved there from the Windows preamble). Pinned in MacPackagingTests.
+- B2, public README: both Mac sections removed (the beta is not announced until the owner approves the copy and it ships);
+  the text lives in src/Dictum.Mac/README.md, marked PROPOSED. Pinned ("macOS (beta)" absent from README.md).
+- B3.1, neutrality sweep: `CGEventSourceButtonState` carries one of the words across a letter boundary. The test now cuts an
+  exact-identifier allow-list (`CGEventSourceButtonState`, `EventSourceButtonState`) out of a file's text before the sweep,
+  never widening the match to word boundaries; pins: the identifier passes, the bare word, the identifier in lower case and
+  a piece of it still fail. M1 with it: the test looks for `git` off Windows, so the sweep now runs on the Mac (it had
+  always skipped here, which is why the branch's "0 failed" hid this).
+- B3.2, `MacShellTests.A_translocated_copy_is_never_moved`: the fake bundle joins its subfolder with "/" on every OS, since
+  `RemovalSteps` looks for "/AppTranslocation/" as macOS writes it.
+- M2, microphone text: `NSMicrophoneUsageDescription` is now "Dictum uses the microphone only while it is recording (from
+  your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud
+  speech." (PROPOSED; the hotkey-only sentence was untrue for hands-free recording and the microphone test). Handover line
+  changed to match.
+- M3, entitlements experiment (Verified on this Mac): a bundle signed with `allow-jit`, `allow-unsigned-executable-memory`
+  and `device.audio-input` only, without `allow-dyld-environment-variables` and `disable-library-validation`, ran
+  `--selftest` (PASS: whisper runtime loaded, base.en SHA-256 verified), transcribed a 4.09 s synthesised wav through
+  base.en on Metal in 707 ms (the sentence came back exact), and started the tray app (the Welcome window on screen for
+  30 s). The two entitlements are dropped. Not exercised: the clean-up model load (qwen2.5-1.5b is not on this Mac and the
+  owner's model folder does not exist yet; its dylibs load the way whisper's do, all signed by the same team) and a
+  dictation through the taps (needs Accessibility). If a tester's clean-up load fails with a library-validation error in
+  the crash report, restore `disable-library-validation` and record the error here.
+- M4, `SingleInstance.ListenForOtherLaunches`: a bind failure (SocketException, ArgumentOutOfRangeException, IOException,
+  UnauthorizedAccessException) is a logged warning and a no-op handle, never an exception out of `AppShell.Start`; the
+  simplification comment says so. Pinned by a test with a 120-character socket folder; observed failing with the catch
+  filter disabled (ArgumentOutOfRangeException from UnixDomainSocketEndPoint), then restored.
+- M5, `HotkeyNames`: pure overloads `Display(hotkey, dialect)`, `Display(spec, dialect)`, `Key(name, dialect)` and
+  `DefaultHotkeyFor(dialect)`; MacCoreTests use them and no test sets the global `Dialect` any more (the collection
+  attribute is gone with it).
+- m1, this file no longer names the owner's volume path; m2, `.DS_Store` untracked (and, since the follow-up PR after the merge, listed in .gitignore; the lens found it was not); m3, the
+  network-audit pin compares repo-relative paths; m4, the handover's two "Input Monitoring" lines now follow decision c.
