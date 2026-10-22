@@ -831,8 +831,8 @@ Users must be able to remove what the app has put on disk, from inside the app.
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
   model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
   also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
-  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves and PROPOSED: "A slower
-  drive makes the speech model slower to load and run."; the settings, dictionary and log folders cannot be moved
+  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and PROPOSED: "A slower
+  drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
   and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
   the integrity record, and reports freed bytes; "Delete all app data" never touches

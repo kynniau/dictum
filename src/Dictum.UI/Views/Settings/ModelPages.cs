@@ -412,7 +412,7 @@ internal sealed class StoragePage : SettingsPage
     // handlers as Settings > Models (ModelFolderActions), its note repeated (ModelsPage.FolderNote) and one sentence on drive speed.
     internal const string ChangeLabel = "Change…";
     internal const string ChangeName = "Change the model folder";
-    internal const string SlowerDriveNote = "A slower drive makes the speech model slower to load and run.";
+    internal const string SlowerDriveNote = "A slower drive makes the speech model slower to load and to switch.";
 
     internal static string DownloadsGoTo(string folder) => $"Downloads go to: {folder}";
 
@@ -424,6 +424,7 @@ internal sealed class StoragePage : SettingsPage
     };
 
     private readonly TextBlock _folder = Ui.Text("", "caption");
+    private readonly TextBlock _folderWarning = Ui.Text("", "caption"); // Models' network-folder warning, the same approved words
     private readonly Button _useDefault;
     private readonly TextBlock _free = Ui.Text("", "caption");
     private readonly StackPanel _folders = new() { Spacing = 2 };
@@ -449,7 +450,7 @@ internal sealed class StoragePage : SettingsPage
         Grid.SetColumn(_useDefault, 2);
         folderRow.Children.AddRange([_folder, change, _useDefault]);
         Compose(
-            Ui.Card(Ui.Stack(8, folderRow, Ui.Text(ModelsPage.FolderNote, "caption"), Ui.Text(SlowerDriveNote, "caption"), _free, _folders, _models, _total), "Models"),
+            Ui.Card(Ui.Stack(8, folderRow, Ui.Text(ModelsPage.FolderNote, "caption"), Ui.Text(SlowerDriveNote, "caption"), _folderWarning, _free, _folders, _models, _total), "Models"),
             Ui.Card(Ui.Stack(10,
                 DataRow("Calibration recordings", _recordings, RemovalScope.CalibrationRecordings),
                 DataRow("Logs", _logs, RemovalScope.Logs),
@@ -476,6 +477,8 @@ internal sealed class StoragePage : SettingsPage
         var dir = Shell.ModelsDir;
         _folder.Text = DownloadsGoTo(Shell.RealPath(dir));
         _useDefault.IsEnabled = Shell.Paths.ChosenModelsDir(s) is not null; // as on Settings > Models: nothing to return to while none is chosen
+        _folderWarning.Text = ModelsPage.FolderWarning(dir) ?? "";
+        _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
         _free.Text = DiskSpace.FreeBytes(dir) is long free ? $"{ModelCatalog.FormatSize(free)} free on this drive." : "Free space on this drive could not be read.";
         _folders.Children.Clear();
         _folders.Children.Add(Ui.Text(LookupIntro, "caption"));
