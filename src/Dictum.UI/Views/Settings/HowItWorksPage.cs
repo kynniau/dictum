@@ -16,7 +16,7 @@ using Dictum.UI.Views.Onboarding;
 namespace Dictum.UI.Views.Settings;
 
 /// <summary>
-/// Settings → See how it works (SPEC §28): record one dictation (Record, or hold the dictation hotkey while this page is in
+/// Settings → See how it works (SPEC §29): record one dictation (Record, or hold the dictation hotkey while this page is in
 /// front) and watch its five stages fill in as the pipeline finishes each: the sound (a live meter, as the welcome window's
 /// microphone test), what the speech model heard, the rule-based tidy, the AI clean-up with the validator's verdict, and what
 /// would be pasted. The recording is a capture opened for this page only and kept in memory; it goes through the shell's own

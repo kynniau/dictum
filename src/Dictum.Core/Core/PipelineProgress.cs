@@ -19,7 +19,7 @@ public enum PipelineStep
 }
 
 /// <summary>
-/// One step's result (SPEC §28). Every figure is the pipeline's own: <see cref="Ms"/> is the very value the log line for
+/// One step's result (SPEC §29). Every figure is the pipeline's own: <see cref="Ms"/> is the very value the log line for
 /// that step carries, never a second clock.
 /// </summary>
 /// <param name="Text">The step's text: the raw transcript, the cleaned text, or the finished text; empty for Discarded.</param>

@@ -19,7 +19,7 @@ using Dictum.UI.Views.Settings;
 namespace Dictum.Tests;
 
 /// <summary>
-/// Settings > See how it works, the page (SPEC §28): it is in the Settings list (keyboard included), a recording made on it
+/// Settings > See how it works, the page (SPEC §29): it is in the Settings list (keyboard included), a recording made on it
 /// fills the five stages in order with the pipeline's own texts and timings, a rejected reply shows the validator's reason,
 /// nothing is pasted and no file is written, no microphone gives the one no-microphone sentence, the meter keeps the
 /// reduced-motion rate, and the dictation hotkey records here while the page is in front. Headless: nothing reaches the desktop.

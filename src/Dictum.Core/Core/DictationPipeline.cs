@@ -61,7 +61,7 @@ public sealed class DictationPipeline
         JourneyAsync(audio, token, showPill, insertedWords, part, report: null, paste: true);
 
     /// <summary>
-    /// Settings &gt; See how it works (SPEC §28): one whole recording takes this same journey, with the speech model, the
+    /// Settings &gt; See how it works (SPEC §29): one whole recording takes this same journey, with the speech model, the
     /// clean-up and the finishing step in use, and <paramref name="report"/> is told each step's result as it finishes, with
     /// the timings this pipeline logs for every dictation (no other clock). Nothing is pasted and "Fix last dictation" is not
     /// told: the text stops at what would be pasted. The log gets what a dictation's gets (the transcript only with

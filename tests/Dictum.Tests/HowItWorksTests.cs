@@ -8,7 +8,7 @@ using Dictum.Transcribe;
 namespace Dictum.Tests;
 
 /// <summary>
-/// Settings > See how it works, the pipeline half (SPEC §28): <see cref="DictationPipeline.DemonstrateAsync"/> takes the same
+/// Settings > See how it works, the pipeline half (SPEC §29): <see cref="DictationPipeline.DemonstrateAsync"/> takes the same
 /// journey as a dictation and reports each step, in order, with the pipeline's own texts and the very timings it logs; it
 /// pastes nothing, does not tell "Fix last dictation", and logs a transcript only with log_transcripts on. And
 /// <see cref="HowItWorksRun"/> reads those reports as the five stages, the validator's reason included.

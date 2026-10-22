@@ -4,7 +4,7 @@ using Dictum.Hotkey;
 
 namespace Dictum.UI.Shell;
 
-/// <summary>The one dictation pipeline, shared by the hotkey and Settings &gt; See how it works (SPEC §28).</summary>
+/// <summary>The one dictation pipeline, shared by the hotkey and Settings &gt; See how it works (SPEC §29).</summary>
 public sealed partial class AppShell
 {
     private DictationPipeline? _pipeline;
@@ -13,7 +13,7 @@ public sealed partial class AppShell
     /// The pipeline every dictation takes (the controller's), with the speech model, clean-up and finishing step in use. Built
     /// on first use, so the demonstration page has it in a shell that has not started (tests) as in the running app.
     /// </summary>
-    internal DictationPipeline Pipeline => _pipeline ??= new DictationPipeline(_models.GetAsync, () => _cleaner, InsertAsync, () => _settings, _log,
+    internal DictationPipeline Pipeline => _pipeline ??= new DictationPipeline(token => _speech.GetAsync(token), () => _cleaner, InsertAsync, () => _settings, _log,
         Personal.Finish, RememberPasted, names: () => Personal.Text.Dictionary.Terms);
 
     /// <summary>

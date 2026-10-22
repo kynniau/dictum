@@ -19,7 +19,7 @@ public sealed record StageView(string Title, string Description, StageState Stat
 }
 
 /// <summary>
-/// One demonstration on Settings &gt; See how it works (SPEC §28): what the recording and the pipeline have reported so far,
+/// One demonstration on Settings &gt; See how it works (SPEC §29): what the recording and the pipeline have reported so far,
 /// read as the five stages. It holds only what the pipeline reported (<see cref="PipelineProgress"/>) and the recording's
 /// length; nothing is timed or worked out here except the rule-based tidy shown beside an accepted AI reply, which is the
 /// tidy's own function (<see cref="DeterministicCleaner.Clean"/>), labelled as not used. Not thread-safe: the page feeds it

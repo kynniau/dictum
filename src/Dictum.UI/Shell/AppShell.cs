@@ -40,6 +40,10 @@ public sealed partial class AppShell : IDisposable
     private readonly Func<bool> _gpuMachine;
     private volatile AppSettings _settings = new();
     private volatile TranscriptCleaner _cleaner = TranscriptCleaner.RulesOnly("not configured yet");
+    private volatile CloudSpeech _speech; // the speech step: the local model, or cloud speech with the local model as its fallback
+
+    /// <summary>The speech step in use (tests: the reload and quit retire it).</summary>
+    internal CloudSpeech Speech => _speech;
     private IClassicDesktopStyleApplicationLifetime? _lifetime;
     private ITrayHost? _tray;
     private OverlayPresenter? _overlays;
@@ -65,9 +69,10 @@ public sealed partial class AppShell : IDisposable
     /// </param>
     /// <param name="updateHandler">The same for the Check for updates client; production uses its socket handler, which follows no redirect.</param>
     /// <param name="cleanupModels">Tests pass one that loads a fake engine; production builds the llama.cpp one.</param>
+    /// <param name="providerHandler">The same for the clean-up and cloud speech provider client, under its offline_only guard.</param>
     public AppShell(IPlatform platform, AppPaths paths, ILog log, SecretRedactor redactor, ShellOptions options, IShellDialogs? dialogs = null,
         IInstanceLock? instance = null, Func<bool>? gpuMachine = null, ModelManager? speechModels = null, HttpMessageHandler? downloadHandler = null,
-        HttpMessageHandler? updateHandler = null, LocalLlmManager? cleanupModels = null)
+        HttpMessageHandler? updateHandler = null, LocalLlmManager? cleanupModels = null, HttpMessageHandler? providerHandler = null)
     {
         Platform = platform;
         Paths = paths;
@@ -78,10 +83,11 @@ public sealed partial class AppShell : IDisposable
         _instance = instance;
         _gpuMachine = gpuMachine ?? (() => WhisperEngine.GpuMachine);
         Dialogs = dialogs ?? new ShellDialogs();
-        (_http, _downloadHttp, _updateHttp) = AppRules.CreateClients(() => _settings.OfflineOnly, downloadHandler, updateHandler);
+        (_http, _downloadHttp, _updateHttp) = AppRules.CreateClients(() => _settings.OfflineOnly, downloadHandler, updateHandler, providerHandler);
         Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, _settings));
         _llm = cleanupModels ?? new LocalLlmManager(log, Integrity);
         _models = speechModels ?? new ModelManager(log, Integrity);
+        _speech = CloudSpeech.Local(_models.GetAsync); // until the settings load builds the configured one (LoadConfiguration)
         Models = new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
             reload: () => Reload(userRequested: false), shutdown: Quit, refreshTooltip: StatusChanged,
             balloon: (text, warning) => Notify("Dictum", text, warning), integrity: Integrity, gpuMachine: gpuMachine);
@@ -285,6 +291,7 @@ public sealed partial class AppShell : IDisposable
         _hook?.Dispose();
         _fixHook?.Dispose();
         CloseWindows();
+        _speech.Retire(); // quitting: a cloud speech request under way stops, and none starts, before the models and the provider client go
         _controller?.Dispose();
         (_capture as IDisposable)?.Dispose();
         _tray?.Dispose(); // the icon goes at once; releasing the models below can wait for a warm-up still running

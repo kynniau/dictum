@@ -3,7 +3,7 @@ using Dictum.Calibration;
 namespace Dictum.Core;
 
 /// <summary>
-/// Every word on Settings &gt; See how it works (SPEC §28), the one source for its page title and its five stage labels. All
+/// Every word on Settings &gt; See how it works (SPEC §29), the one source for its page title and its five stage labels. All
 /// PROPOSED 22/10/2026, awaiting the product owner's approval: do not reword without it. The texts it frames (the speech
 /// model's words, the validator's reasons, the clean-up's status line, <see cref="NoSoundText"/>) are the app's own.
 /// </summary>
