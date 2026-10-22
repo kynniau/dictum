@@ -281,7 +281,7 @@ public sealed partial class AppShell
         {
             try
             {
-                CloudConsentFile.Delete(Paths.ConsentFile);
+                CloudConsentFile.WithdrawCleanup(Paths.ConsentFile); // a speech consent on file stays (lens F1, 22/10/2026)
                 _log.Info($"Consent to {host} withdrawn again: settings.json could not be written, so cloud clean-up was not switched on.");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

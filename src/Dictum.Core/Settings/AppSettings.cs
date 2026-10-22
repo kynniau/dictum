@@ -27,6 +27,7 @@ public sealed record AppSettings
     public double SilenceThreshold { get; init; } = 0.01;
     public AudioSettings Audio { get; init; } = new();
     public WhisperSettings Whisper { get; init; } = new();
+    public SpeechSettings Speech { get; init; } = new();
     public ModelsSettings Models { get; init; } = new();
     public LlmSettings Llm { get; init; } = new();
     public InsertSettings Insert { get; init; } = new();
@@ -74,6 +75,41 @@ public sealed record WhisperSettings
 
     /// <summary>0 = greedy decoding (the default); 1 or more = beam search with this many beams (SPEC §16.5).</summary>
     public int BeamSize { get; init; }
+}
+
+/// <summary>
+/// speech.* (cloud speech, Core lane, 22/10/2026): which engine turns a recording into text. whisper.* stays the local
+/// engine's, and the local model is always loaded as the fallback (<see cref="Transcribe.CloudSpeech"/>).
+/// </summary>
+public sealed record SpeechSettings
+{
+    public const string Local = "local";
+    public const string OpenAiCompatible = LlmSettings.OpenAiCompatible;
+
+    /// <summary>
+    /// simplification: 30 s is not a measured figure (no cloud speech round trip has been timed yet; docs/DECISIONS.md,
+    /// 22/10/2026). Retire it for a value from a measurement (the demo screen's timings) before cloud speech ships in a release.
+    /// </summary>
+    public const int DefaultTimeoutMs = 30000;
+
+    /// <summary>local (the default: the speech model on this PC) or openai-compatible (POST {base_url}/audio/transcriptions).</summary>
+    public string Provider { get; init; } = Local;
+
+    /// <summary>The service's address; Dictum appends /audio/transcriptions. Required for openai-compatible.</summary>
+    public string? BaseUrl { get; init; }
+
+    /// <summary>The service's model id (for Azure OpenAI, the deployment name). Required for openai-compatible.</summary>
+    public string? Model { get; init; }
+
+    /// <summary>The deadline for one request; past it the speech model on this PC hears that recording instead.</summary>
+    public int TimeoutMs { get; init; } = DefaultTimeoutMs;
+
+    /// <summary>
+    /// The host the user agreed, in Dictum's speech consent step, to send recordings to: cloud speech runs only while this names
+    /// the host it would send to. Null = no consent. Filled at load from consent.json's speech entry (<see cref="CloudConsentFile"/>),
+    /// never from settings.json.
+    /// </summary>
+    public string? Consent { get; init; }
 }
 
 /// <summary>models.folder (Decision 15, 17/10/2026): where both kinds of model are looked for first and downloaded to.</summary>

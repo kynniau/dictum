@@ -31,8 +31,9 @@ public sealed class OfflineGuardHandler(Func<bool> offlineOnly, HttpMessageHandl
     /// falls back to the rule-based tidy. The download client keeps following redirects (the CDN needs them) and is
     /// refused outright under offline_only.
     /// </summary>
-    public static HttpClient CreateClient(Func<bool> offlineOnly) =>
-        new(new OfflineGuardHandler(offlineOnly, new SocketsHttpHandler { AllowAutoRedirect = false, Proxy = LoopbackDirectProxy.Default }))
+    /// <param name="inner">Tests pass a fake server to stand in for the network under the guard; production uses the socket handler.</param>
+    public static HttpClient CreateClient(Func<bool> offlineOnly, HttpMessageHandler? inner = null) =>
+        new(new OfflineGuardHandler(offlineOnly, inner ?? new SocketsHttpHandler { AllowAutoRedirect = false, Proxy = LoopbackDirectProxy.Default }))
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
