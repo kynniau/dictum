@@ -1207,7 +1207,17 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   deleted or chosen (a chosen folder that is it, or inside it, is ignored, and Settings refuses it with a sentence). A
   download is refused, before it is asked and again where it starts, when its drive would keep under 200 MB (decimal); a
   kept `.part` needs only the rest; when the free space cannot be read the download goes ahead, as the 2 GB warning does.
-- **Changing the folder moves no files.**
+- **Changing the folder moves no files** unless the user says so (amended 22/10/2026 for 1.3, move-on-change; PROPOSED
+  wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models and Change… on Storage go through
+  one handler (`ModelFolderActions`); Use default offers no move. When the folder in use holds model files Dictum
+  knows (catalogue files and their `.part` downloads, in that folder itself), it asks once: **Move the files** or **Leave them
+  where they are** (the earlier behaviour; closing the question changes nothing). Moving is refused while a download runs
+  and when one folder is inside the other. Otherwise both models are released (a load under way is waited for), then each
+  file is copied to the new folder as `<name>.move`, checked (size; for a finished catalogue file the SHA-256 pinned in the
+  catalogue; a `.part` is not hashed), renamed into place, and only then is the original deleted and its verified record
+  moved to the copy. The first file that fails stops the move: its copy is deleted and its original kept; files already
+  moved stay moved. Then `models.folder` is written and the settings reload, so models load from the new folder. The page's
+  status line shows each file as it moves and the result.
 - **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
