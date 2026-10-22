@@ -323,7 +323,11 @@ internal sealed class AboutPage : SettingsPage
                         Say("Settings reloaded.");
                     })),
                     Ui.Button("Open settings file", "secondary", () => Say(Shell.OpenSettingsFile() ?? "")),
-                    Ui.Button("Open log folder", "secondary", () => Say(Shell.OpenPath(Shell.RealPath(Shell.Paths.LogsDir), folder: true) ?? "")))), "Files"));
+                    Ui.Button("Open log folder", "secondary", () => Say(Shell.OpenPath(Shell.RealPath(Shell.Paths.LogsDir), folder: true) ?? "")))), "Files"),
+            // "In plain words": APPROVED 22/10/2026 17:36 AEDT (PlainWordsText); the site page is the whole statement.
+            Ui.Card(Ui.Stack(10,
+                Ui.Stack(8, [.. PlainWordsText.Paragraphs.Select(p => Ui.Text(p))]),
+                Ui.Row(8, Ui.Button(PlainWordsText.OpenLabel, "secondary", () => Run(() => Shell.Platform.Open(PlainWordsText.Url))))), PlainWordsText.CardTitle));
     }
 
     protected override void Redraw()

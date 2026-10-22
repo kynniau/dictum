@@ -11,7 +11,7 @@ public sealed class SiteStoreFirstTests
 {
     private const string StoreUrl = "https://apps.microsoft.com/detail/9N0DG1DHTR57";
     private const string GitHubLine = """Source code and release files are on <a href="https://github.com/kynniau/dictum">GitHub</a>.""";
-    private static readonly string[] Pages = ["index.html", "help.html", "privacy.html"];
+    private static readonly string[] Pages = ["index.html", "help.html", "privacy.html", "plain-words.html"];
 
     /// <summary>A page of the site without its HTML comments.</summary>
     private static string VisibleHtml(string page) =>
@@ -55,6 +55,7 @@ public sealed class SiteStoreFirstTests
     [InlineData("index.html")]
     [InlineData("help.html")]
     [InlineData("privacy.html")]
+    [InlineData("plain-words.html")]
     public void Every_page_has_the_same_one_quiet_GitHub_line_in_its_footer(string page)
     {
         var html = VisibleHtml(page);
@@ -79,9 +80,9 @@ public sealed class SiteStoreFirstTests
     public void Every_same_site_anchor_lands_on_an_id_that_exists()
     {
         var ids = Pages.ToDictionary(p => p, p => Regex.Matches(VisibleHtml(p), "\\sid=\"([^\"]+)\"").Select(m => m.Groups[1].Value).ToHashSet());
-        var route = new Dictionary<string, string> { ["/"] = "index.html", ["/help"] = "help.html", ["/privacy"] = "privacy.html" };
+        var route = new Dictionary<string, string> { ["/"] = "index.html", ["/help"] = "help.html", ["/privacy"] = "privacy.html", ["/plain-words"] = "plain-words.html" };
         foreach (var page in Pages)
-            foreach (Match link in Regex.Matches(VisibleHtml(page), "href=\"(/[a-z]*)?#([^\"]+)\""))
+            foreach (Match link in Regex.Matches(VisibleHtml(page), "href=\"(/[a-z-]*)?#([^\"]+)\""))
             {
                 var target = link.Groups[1].Success && link.Groups[1].Value.Length > 0 ? route[link.Groups[1].Value] : page;
                 Assert.True(ids[target].Contains(link.Groups[2].Value), $"site/{page} links to {link.Value}, which site/{target} does not have");
