@@ -22,21 +22,33 @@ public static class HotkeyNames
     /// The hotkey a fresh settings.json gets: Right Ctrl on Windows; on a Mac, where most keyboards have no right-hand Control
     /// key, Right Option (token "RightAlt"; PROPOSED 22/10/2026, docs/DECISIONS.md "Dictum for macOS").
     /// </summary>
-    public static string DefaultHotkey => Dialect == KeyDialect.Mac ? "RightAlt" : "RightCtrl";
+    public static string DefaultHotkey => DefaultHotkeyFor(Dialect);
+
+    /// <summary>The default hotkey for a given keyboard (pure; the tests use it so no test touches <see cref="Dialect"/>).</summary>
+    public static string DefaultHotkeyFor(KeyDialect dialect) => dialect == KeyDialect.Mac ? "RightAlt" : "RightCtrl";
 
     /// <summary>A settings value shown to a person: each key's display name joined by "+"; a value the parser refuses is shown as it is.</summary>
-    public static string Display(string? hotkey) =>
-        HotkeyParser.TryParse(hotkey, out var spec, out _) ? Display(spec) : hotkey ?? "";
+    public static string Display(string? hotkey) => Display(hotkey, Dialect);
+
+    /// <summary>The same for a given keyboard (pure).</summary>
+    public static string Display(string? hotkey, KeyDialect dialect) =>
+        HotkeyParser.TryParse(hotkey, out var spec, out _) ? Display(spec, dialect) : hotkey ?? "";
 
     /// <summary>A parsed hotkey shown to a person.</summary>
-    public static string Display(HotkeySpec spec) => string.Join("+", spec.AllKeys.Select(k => Key(k.Name)));
+    public static string Display(HotkeySpec spec) => Display(spec, Dialect);
+
+    /// <summary>The same for a given keyboard (pure).</summary>
+    public static string Display(HotkeySpec spec, KeyDialect dialect) => string.Join("+", spec.AllKeys.Select(k => Key(k.Name, dialect)));
 
     /// <summary>
     /// One key name, split into words: a space before a capital that follows a small letter ("RightCtrl" to "Right Ctrl",
     /// "CapsLock" to "Caps Lock") and before the digits of a name longer than one letter ("Mouse4" to "Mouse 4",
     /// "Numpad5" to "Numpad 5"). "F9", "A", "`" and a raw code ("0x7B") stay as they are.
     /// </summary>
-    public static string Key(string name)
+    public static string Key(string name) => Key(name, Dialect);
+
+    /// <summary>The same for a given keyboard (pure).</summary>
+    public static string Key(string name, KeyDialect dialect)
     {
         if (name.StartsWith("0x", StringComparison.Ordinal)) return name;
         var text = new StringBuilder(name.Length + 4);
@@ -51,7 +63,7 @@ public static class HotkeyNames
             }
             text.Append(c);
         }
-        return Dialect == KeyDialect.Mac ? MacWords(text.ToString()) : text.ToString();
+        return dialect == KeyDialect.Mac ? MacWords(text.ToString()) : text.ToString();
     }
 
     /// <summary>The Mac keyboard's words for the two keys named differently there: Alt is Option, Win is Command.</summary>

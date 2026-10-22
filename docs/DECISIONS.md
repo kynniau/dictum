@@ -5339,7 +5339,7 @@ handover: **Verified** means read this session against the named source; **Recal
 the top; models/, logs/, calibration/ beside them), from `HOME` so a scratch profile can be tested as the Windows build
 tests with APPDATA. Not `~/Library/Caches` (the handover's reason, that the system may purge Caches, stays Recalled and was
 not relied on: one visible folder was reason enough). The owner's own install points `models.folder` at
-`/Volumes/CFC Mac SSD/Claude/Dictum/models` through Settings > Storage; no code knows that path.
+a folder on an external volume through Settings > Storage; no code knows that path.
 
 **Project shape.** `src/Dictum.Mac` is plain `net10.0` with `RuntimeIdentifiers` osx-arm64 (not `net10.0-macos`, which
 brings a workload and bindings this app does not use); assembly name `Dictum.Mac`, because the tests load it beside
@@ -5481,3 +5481,40 @@ unless marked:
   owner's test plan.
 - `screencapture` is refused for this session ("could not create image from display": no Screen Recording permission), so
   no screenshot; the window list above is the evidence.
+
+**Lens round on PR #67 (Windows orchestrator, 23/10/2026 ~03:05 AEDT, verdict Block), fixed on this branch the same night:**
+- B1, release wiring: the Windows `release` job needs `build` alone and downloads its two artifacts by name
+  (`dictum-win-x64-zip`, `dictum-release-files`), never every artifact of the run, so no Mac zip reaches a Windows release
+  and a Mac job failure cannot block one. The Mac zip ships only through a new `release-mac` job on a `mac-v<version>` tag
+  (`tags: ['v*', 'mac-v*']`), as a GitHub pre-release with its own notes file, `packaging/release-notes-mac.md` (the
+  PROPOSED paragraph moved there from the Windows preamble). Pinned in MacPackagingTests.
+- B2, public README: both Mac sections removed (the beta is not announced until the owner approves the copy and it ships);
+  the text lives in src/Dictum.Mac/README.md, marked PROPOSED. Pinned ("macOS (beta)" absent from README.md).
+- B3.1, neutrality sweep: `CGEventSourceButtonState` carries one of the words across a letter boundary. The test now cuts an
+  exact-identifier allow-list (`CGEventSourceButtonState`, `EventSourceButtonState`) out of a file's text before the sweep,
+  never widening the match to word boundaries; pins: the identifier passes, the bare word, the identifier in lower case and
+  a piece of it still fail. M1 with it: the test looks for `git` off Windows, so the sweep now runs on the Mac (it had
+  always skipped here, which is why the branch's "0 failed" hid this).
+- B3.2, `MacShellTests.A_translocated_copy_is_never_moved`: the fake bundle joins its subfolder with "/" on every OS, since
+  `RemovalSteps` looks for "/AppTranslocation/" as macOS writes it.
+- M2, microphone text: `NSMicrophoneUsageDescription` is now "Dictum uses the microphone only while it is recording (from
+  your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud
+  speech." (PROPOSED; the hotkey-only sentence was untrue for hands-free recording and the microphone test). Handover line
+  changed to match.
+- M3, entitlements experiment (Verified on this Mac): a bundle signed with `allow-jit`, `allow-unsigned-executable-memory`
+  and `device.audio-input` only, without `allow-dyld-environment-variables` and `disable-library-validation`, ran
+  `--selftest` (PASS: whisper runtime loaded, base.en SHA-256 verified), transcribed a 4.09 s synthesised wav through
+  base.en on Metal in 707 ms (the sentence came back exact), and started the tray app (the Welcome window on screen for
+  30 s). The two entitlements are dropped. Not exercised: the clean-up model load (qwen2.5-1.5b is not on this Mac and the
+  owner's model folder does not exist yet; its dylibs load the way whisper's do, all signed by the same team) and a
+  dictation through the taps (needs Accessibility). If a tester's clean-up load fails with a library-validation error in
+  the crash report, restore `disable-library-validation` and record the error here.
+- M4, `SingleInstance.ListenForOtherLaunches`: a bind failure (SocketException, ArgumentOutOfRangeException, IOException,
+  UnauthorizedAccessException) is a logged warning and a no-op handle, never an exception out of `AppShell.Start`; the
+  simplification comment says so. Pinned by a test with a 120-character socket folder; observed failing with the catch
+  filter disabled (ArgumentOutOfRangeException from UnixDomainSocketEndPoint), then restored.
+- M5, `HotkeyNames`: pure overloads `Display(hotkey, dialect)`, `Display(spec, dialect)`, `Key(name, dialect)` and
+  `DefaultHotkeyFor(dialect)`; MacCoreTests use them and no test sets the global `Dialect` any more (the collection
+  attribute is gone with it).
+- m1, this file no longer names the owner's volume path; m2, `.DS_Store` untracked (it was already in .gitignore); m3, the
+  network-audit pin compares repo-relative paths; m4, the handover's two "Input Monitoring" lines now follow decision c.

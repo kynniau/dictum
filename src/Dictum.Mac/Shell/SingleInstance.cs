@@ -23,12 +23,14 @@ internal sealed class SingleInstance : IInstanceLock
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(250);
     private readonly FileStream? _lock;
     private readonly string _socketFile;
+    private readonly ILog _log;
 
-    private SingleInstance(FileStream? lockStream, string socketFile, InstanceOutcome outcome)
+    private SingleInstance(FileStream? lockStream, string socketFile, InstanceOutcome outcome, ILog log)
     {
         _lock = lockStream;
         _socketFile = socketFile;
         Outcome = outcome;
+        _log = log;
     }
 
     public InstanceOutcome Outcome { get; }
@@ -38,16 +40,17 @@ internal sealed class SingleInstance : IInstanceLock
     /// other copy is still starting, or quitting: it stops listening first), tries both every 250 ms for up to
     /// <paramref name="wait"/>: a copy that finishes quitting hands the lock over, one that finishes starting is signalled.
     /// </summary>
-    public static SingleInstance Acquire(string lockFile, string socketFile, TimeSpan wait)
+    public static SingleInstance Acquire(string lockFile, string socketFile, TimeSpan wait, ILog? log = null)
     {
+        log ??= NullLog.Instance;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(lockFile))!);
         var waited = System.Diagnostics.Stopwatch.StartNew();
         while (true)
         {
-            if (TryLock(lockFile) is { } stream) return new SingleInstance(stream, socketFile, InstanceOutcome.Owned);
-            if (TrySignal(socketFile)) return new SingleInstance(null, socketFile, InstanceOutcome.SignalledRunningCopy);
+            if (TryLock(lockFile) is { } stream) return new SingleInstance(stream, socketFile, InstanceOutcome.Owned, log);
+            if (TrySignal(socketFile)) return new SingleInstance(null, socketFile, InstanceOutcome.SignalledRunningCopy, log);
             var left = wait - waited.Elapsed;
-            if (left <= TimeSpan.Zero) return new SingleInstance(null, socketFile, InstanceOutcome.TimedOut);
+            if (left <= TimeSpan.Zero) return new SingleInstance(null, socketFile, InstanceOutcome.TimedOut, log);
             Thread.Sleep(left < Poll ? left : Poll);
         }
     }
@@ -88,26 +91,36 @@ internal sealed class SingleInstance : IInstanceLock
     /// </summary>
     // simplification: a Unix socket path is limited to 104 bytes on macOS (sun_path); the socket lives beside settings in
     // ~/Library/Application Support/Dictum, about 50 bytes plus the home folder's length. With a home path over about 50
-    // characters the bind fails, nothing listens, and a second launch waits out its 30 s and exits (TimedOut, logged).
+    // characters the bind fails (ArgumentOutOfRangeException from UnixDomainSocketEndPoint, or a SocketException): it is
+    // logged as a warning and Dictum runs without a listener, so a second launch waits out its 30 s and exits (TimedOut,
+    // logged) instead of showing the running copy; the first launch never fails for it (lens on PR #67, 23/10/2026).
     // Retire when a tester's home path is that long: bind in a shorter per-user folder (confstr _CS_DARWIN_USER_TEMP_DIR).
     public IDisposable ListenForOtherLaunches(Action onSignal)
     {
         if (Outcome != InstanceOutcome.Owned) throw new InvalidOperationException("Only the copy that holds the lock listens for other launches.");
-        if (File.Exists(_socketFile)) File.Delete(_socketFile);
-        var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        Socket? listener = null;
         try
         {
+            if (File.Exists(_socketFile)) File.Delete(_socketFile);
+            listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             listener.Bind(new UnixDomainSocketEndPoint(_socketFile));
             listener.Listen(4);
         }
-        catch
+        catch (Exception ex) when (ex is SocketException or ArgumentOutOfRangeException or IOException or UnauthorizedAccessException)
         {
-            listener.Dispose();
-            throw;
+            listener?.Dispose();
+            _log.Warn($"Dictum cannot listen for a second launch ({ex.GetType().Name}: {ex.Message}; socket {_socketFile}). A second launch will wait 30 s and exit instead of showing this one.");
+            return new NoListener();
         }
         var stop = new Listener(listener, _socketFile);
         _ = Task.Run(() => stop.RunAsync(onSignal));
         return stop;
+    }
+
+    /// <summary>Nothing to stop: the socket could not be bound (logged).</summary>
+    private sealed class NoListener : IDisposable
+    {
+        public void Dispose() { }
     }
 
     /// <summary>

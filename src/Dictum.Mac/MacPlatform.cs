@@ -92,7 +92,7 @@ public sealed class MacPlatform : IPlatform, IDisposable
     public IInstanceLock AcquireSingleInstance(TimeSpan wait)
     {
         var folder = ResolvePaths(null).LocalDir;
-        return SingleInstance.Acquire(Path.Combine(folder, SingleInstance.LockFileName), Path.Combine(folder, SingleInstance.SocketFileName), wait);
+        return SingleInstance.Acquire(Path.Combine(folder, SingleInstance.LockFileName), Path.Combine(folder, SingleInstance.SocketFileName), wait, _log);
     }
 
     public IWindowFlags WindowFlags { get; } = new WindowFlags();

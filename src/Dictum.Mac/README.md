@@ -48,3 +48,16 @@ Build and run from source: `dotnet build Dictum.sln -c Release` then `dotnet run
 (from a build tree the login item and notifications are off, as the table says); the bundle: `scripts/publish-mac.sh`.
 Tests: `tests/Dictum.Tests/Mac*Tests.cs` (pure parts everywhere; the ones that need the Mac, Accessibility or the microphone
 skip with a reason unless `DICTUM_UI_TESTS=1` / `DICTUM_AUDIO_TESTS=1`).
+
+Installing a build (the words below are PROPOSED for the public README and release notes, kept here until the owner approves
+them; the public README says nothing about the Mac until the beta ships): the beta is for Apple Silicon Macs on macOS 15 or
+later. Download `Dictum-<version>-osx-arm64.zip`, check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it
+and move `Dictum.app` to Applications. A build signed with the owner's Developer ID certificate and notarised opens normally;
+an ad-hoc build is refused by Gatekeeper until allowed in System Settings > Privacy & Security. The app lives in the menu bar
+(no Dock icon). On first use macOS asks for Microphone access and for Accessibility access (to see the hotkey and to paste
+into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech
+model is inside the app. Building it: install the .NET 10 SDK (`curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s --
+--channel 10.0`, then put its folder on `PATH`), `dotnet build Dictum.sln -c Release`, then `scripts/publish-mac.sh`; it
+writes `dist/Dictum.app`, `dist/Dictum-<version>-osx-arm64.zip` and `dist/SHA256SUMS-mac.txt` (`DICTUM_MAC_DIST` chooses the
+folder). The script reads two names from the environment, `DICTUM_MAC_SIGN_IDENTITY` and `DICTUM_MAC_NOTARY_PROFILE`, and
+never a certificate, key or password.

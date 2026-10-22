@@ -6,25 +6,11 @@ namespace Dictum.Tests;
 
 /// <summary>
 /// The Core changes the macOS build needed (docs/DECISIONS.md "Dictum for macOS", 22/10/2026): the keys' words on a Mac
-/// keyboard, the Mac default hotkey, and the clean-up engine recognising its macOS library. Pure, run on every OS; the
-/// dialect is global, so each test restores it.
+/// keyboard, the Mac default hotkey, and the clean-up engine recognising its macOS library. Pure, run on every OS, through
+/// the overloads that take the dialect; <see cref="HotkeyNames.Dialect"/> itself is global and is only read here.
 /// </summary>
-[Collection("HotkeyDialect")]
 public sealed class MacCoreTests
 {
-    private static T WithDialect<T>(KeyDialect dialect, Func<T> read)
-    {
-        var before = HotkeyNames.Dialect;
-        HotkeyNames.Dialect = dialect;
-        try
-        {
-            return read();
-        }
-        finally
-        {
-            HotkeyNames.Dialect = before;
-        }
-    }
 
     [Theory]
     [InlineData("RightAlt", "Right Alt", "Right Option")]
@@ -34,30 +20,35 @@ public sealed class MacCoreTests
     [InlineData("Mouse4", "Mouse 4", "Mouse 4")]
     public void Keys_are_named_for_the_keyboard_in_front_of_the_user(string token, string windows, string mac)
     {
-        Assert.Equal(windows, WithDialect(KeyDialect.Windows, () => HotkeyNames.Display(token)));
-        Assert.Equal(mac, WithDialect(KeyDialect.Mac, () => HotkeyNames.Display(token)));
+        Assert.Equal(windows, HotkeyNames.Display(token, KeyDialect.Windows));
+        Assert.Equal(mac, HotkeyNames.Display(token, KeyDialect.Mac));
+        Assert.Equal(windows, HotkeyNames.Display(token)); // the global dialect is Windows in the tests
     }
 
     [Fact]
     public void The_dialect_never_changes_the_settings_token()
     {
-        var spec = WithDialect(KeyDialect.Mac, () => HotkeyParser.Parse("RightAlt"));
+        var spec = HotkeyParser.Parse("RightAlt");
         Assert.Equal("RightAlt", spec.Display); // the parser's own name, what settings.json holds
+        Assert.Equal("Right Option", HotkeyNames.Display(spec, KeyDialect.Mac)); // only the words shown change
     }
 
     [Fact]
     public void A_fresh_settings_file_gets_the_platforms_default_hotkey()
     {
-        Assert.Equal("RightCtrl", WithDialect(KeyDialect.Windows, () => new AppSettings().Hotkey));
-        Assert.Equal("RightAlt", WithDialect(KeyDialect.Mac, () => new AppSettings().Hotkey));
-        Assert.Equal("RightAlt", WithDialect(KeyDialect.Mac, () => SettingsLoader.Parse("{}").Settings.Hotkey));
-        Assert.True(HotkeyParser.TryParse(HotkeyNames.DefaultHotkey, out _, out _));
+        Assert.Equal("RightCtrl", HotkeyNames.DefaultHotkeyFor(KeyDialect.Windows));
+        Assert.Equal("RightAlt", HotkeyNames.DefaultHotkeyFor(KeyDialect.Mac));
+        Assert.Equal(HotkeyNames.DefaultHotkey, new AppSettings().Hotkey); // the default follows the platform's dialect
+        Assert.Equal(HotkeyNames.DefaultHotkey, SettingsLoader.Parse("{}").Settings.Hotkey);
+        Assert.True(HotkeyParser.TryParse(HotkeyNames.DefaultHotkeyFor(KeyDialect.Mac), out _, out _));
+        Assert.True(HotkeyParser.TryParse(HotkeyNames.DefaultHotkeyFor(KeyDialect.Windows), out _, out _));
     }
 
     [Fact]
     public void The_default_dialect_is_Windows_so_no_existing_string_moved()
     {
-        Assert.Equal(KeyDialect.Windows, WithDialect(KeyDialect.Windows, () => HotkeyNames.Dialect));
+        Assert.Equal(KeyDialect.Windows, HotkeyNames.Dialect); // nothing in the tests sets it
+        Assert.Equal("RightCtrl", HotkeyNames.DefaultHotkey);
     }
 
     [Theory]

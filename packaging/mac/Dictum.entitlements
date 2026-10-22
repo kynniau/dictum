@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Hardened-runtime entitlements for the signed bundle. The first four are the ones Microsoft lists for a .NET app
-     ("macOS Catalina notarization", Microsoft Learn); the microphone one is the hardened-runtime audio-input entitlement
-     (Apple, "Hardened Runtime"). Both documents read 22/10/2026. -->
+<!-- Hardened-runtime entitlements for the signed bundle. Microsoft lists four for a .NET app ("macOS Catalina
+     notarization", Microsoft Learn, read 22/10/2026); two of them, allow-dyld-environment-variables and
+     disable-library-validation, widen the injection surface of an app holding Accessibility and Microphone and were dropped
+     after the experiment of 23/10/2026 (docs/DECISIONS.md, lens round on PR #67): without them the signed bundle runs its
+     self-test, loads whisper (Metal) and transcribes, and starts the tray app, because every dylib in the bundle is signed by
+     the same team. The microphone one is the hardened-runtime audio-input entitlement (Apple, "Hardened Runtime"). -->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-	<true/>
-	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
-	<true/>
-	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>

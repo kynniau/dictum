@@ -1,14 +1,15 @@
 # Build, test and publish Dictum on every push and pull request; on a v* tag, also build the installer and the test
 # MSIX and attach them, with the zip, to a GitHub Release. No secrets: the release uses the workflow's own token and
 # the test MSIX is signed with a certificate made for that run (its private key never leaves the runner). The macOS job
-# (build-mac) signs and notarises only when the owner's five MAC_* secrets exist (see the comment on that job).
+# (build-mac) signs and notarises only when the owner's five MAC_* secrets exist (see the comment on that job); the Windows
+# release never waits for it or ships its zip. A mac-v* tag makes a separate GitHub pre-release from the Mac zip (release-mac).
 # Action versions are pinned to commit SHAs (resolved 16/10/2026); Dependabot (.github/dependabot.yml) updates them.
 name: CI
 
 on:
   push:
     branches: ['**']
-    tags: ['v*']
+    tags: ['v*', 'mac-v*']
   pull_request:
 
 permissions:
@@ -235,7 +236,7 @@ jobs:
   release:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, build-mac]
+    needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -246,10 +247,16 @@ jobs:
         with:
           persist-credentials: false
 
+      # The two Windows artifacts by name: never every artifact of the run, so the Mac zip (dictum-osx-arm64-zip) is not
+      # attached to a Windows release (lens on PR #67, 23/10/2026).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: dictum-win-x64-zip
           path: release
-          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dictum-release-files
+          path: release
 
       - name: Create the release with a fixed preamble and generated notes
         env:
@@ -262,6 +269,37 @@ jobs:
           else
             # The preamble states the Visual C++ runtime requirement and the bundled model; GitHub's generated notes follow it.
             gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "Dictum ${GITHUB_REF_NAME#v}" --notes-file packaging/release-notes-preamble.md --generate-notes --verify-tag
+          fi
+
+  release-mac:
+    # Dictum for macOS (beta): a GitHub PRE-release from the Mac zip alone, only on a mac-v<version> tag the owner pushes
+    # on purpose, with its own notes file (packaging/release-notes-mac.md). The Windows release above never includes it.
+    name: GitHub pre-release (macOS beta)
+    if: startsWith(github.ref, 'refs/tags/mac-v')
+    needs: [build-mac]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dictum-osx-arm64-zip
+          path: release
+
+      - name: Create the pre-release with the Mac notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l release
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --prerelease --title "Dictum for macOS ${GITHUB_REF_NAME#mac-v} (beta)" --notes-file packaging/release-notes-mac.md --verify-tag
           fi
 
   private-material:

@@ -109,7 +109,7 @@ public sealed class MacShellTests
         var steps = new RemovalSteps(NullLog.Instance, bundle, Path.Combine(bundle.Path, "Contents", "MacOS"), () => new FakeStartup());
         Assert.Equal(RemovalSteps.NotInstalledCopy, steps.ProgramFolderProblem()); // no Info.plist there at all
 
-        using var fake = new FakeBundle(AppBundle.Identifier, Path.Combine("AppTranslocation", "0123"));
+        using var fake = new FakeBundle(AppBundle.Identifier, "AppTranslocation/0123");
         Assert.Equal(RemovalSteps.Translocated, fake.Steps().ProgramFolderProblem());
     }
 
@@ -288,6 +288,35 @@ public sealed class MacShellTests
             }
             Assert.False(File.Exists(socketFile)); // the listener removes its socket when it stops
             Assert.False(SingleInstance.TrySignal(socketFile));
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// A socket path the system refuses (over 104 bytes on macOS: a long home path) never throws out of AppShell.Start: the
+    /// bind failure is a warning in the log, the lock is still held, and the returned handle disposes quietly (lens on PR #67).
+    /// Observed failing before the catch: ArgumentOutOfRangeException from UnixDomainSocketEndPoint left the first launch dead.
+    /// </summary>
+    [Fact]
+    public void A_socket_path_the_system_refuses_is_logged_and_the_launch_goes_on_without_a_listener()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix domain socket files; the class only runs on macOS.");
+        var root = Directory.CreateTempSubdirectory("dms-");
+        try
+        {
+            var deep = Path.Combine(root.FullName, new string('a', 120)); // well past sun_path's 104 bytes with the socket name
+            Directory.CreateDirectory(deep);
+            var log = new RecordingLog();
+            using var first = SingleInstance.Acquire(Path.Combine(root.FullName, SingleInstance.LockFileName), Path.Combine(deep, SingleInstance.SocketFileName), TimeSpan.Zero, log);
+            Assert.Equal(InstanceOutcome.Owned, first.Outcome);
+            using (var handle = first.ListenForOtherLaunches(() => { }))
+                Assert.NotNull(handle);
+            var warning = Assert.Single(log.Lines, l => l.Level == LogLevel.Warning);
+            Assert.Contains("cannot listen for a second launch", warning.Message);
+            Assert.Contains("wait 30 s", warning.Message);
         }
         finally
         {
@@ -507,7 +536,8 @@ public sealed class MacShellTests
         {
             _root = Directory.CreateTempSubdirectory("dms-");
             _identifier = identifier;
-            Bundle = Path.Combine(subfolder is null ? _root.FullName : Path.Combine(_root.FullName, subfolder), "Dictum.app");
+            // A subfolder is joined with "/" on every OS (Windows accepts it): RemovalSteps looks for "/AppTranslocation/" as macOS writes it.
+            Bundle = subfolder is null ? Path.Combine(_root.FullName, "Dictum.app") : $"{_root.FullName}/{subfolder}/Dictum.app";
             Trash = Path.Combine(_root.FullName, "Trash");
             Recreate();
         }

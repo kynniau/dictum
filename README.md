@@ -312,15 +312,6 @@ it (no packaged run has confirmed that yet: docs/STORE.md, section 10).
 and the licence notice of every other third-party component in the folder (a test fails when a shipped package is
 missing from it).
 
-#### macOS (beta)
-
-PROPOSED. Dictum for macOS is a beta for Apple Silicon Macs on macOS 15 or later. Download `Dictum-<version>-osx-arm64.zip`
-from the project's GitHub releases, check it against `SHA256SUMS-mac.txt` (`shasum -a 256 Dictum-<version>-osx-arm64.zip`),
-unzip it and move `Dictum.app` to Applications. A build signed with the owner's Developer ID certificate and notarised opens
-normally; an ad-hoc build is refused by Gatekeeper until you allow it in System Settings > Privacy & Security. The app lives in
-the menu bar (no Dock icon). On first use macOS asks for Microphone access and for Accessibility access (to see your hotkey and
-to paste into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app.
-
 Testing the self-signed MSIX package before the Store listing is live: see [docs/TESTING-MSIX.md](docs/TESTING-MSIX.md).
 
 ### Build from source
@@ -379,16 +370,6 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 6. CI: `.github/workflows/ci.yml` builds, runs the ungated tests and publishes the zip on every push and pull
    request (the publish downloads the base.en model, hash-checked, and fails the job on a mismatch); a tag `v<version>` matching `<Version>` also builds steps 4 and 5 and publishes a GitHub release with
    the zip, the installer, the test MSIX, its certificate and `SHA256SUMS.txt`.
-
-7. macOS (PROPOSED): on an Apple Silicon Mac, install the .NET 10 SDK with
-   `curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0` (then put the folder it installs into on
-   `PATH`), then `dotnet build Dictum.sln -c Release` and `scripts/publish-mac.sh`. It writes `dist/Dictum.app`,
-   `dist/Dictum-<version>-osx-arm64.zip` and `dist/SHA256SUMS-mac.txt`. The bundled base.en model comes from
-   `dist/model-cache`, else from huggingface.co through the app's own `--download-model` (size and SHA-256 checked against the
-   catalogue). Two environment variables, read by name only: `DICTUM_MAC_SIGN_IDENTITY` (a Developer ID Application identity
-   name; unset, the bundle is signed ad-hoc and is not fit for distribution) and `DICTUM_MAC_NOTARY_PROFILE` (a keychain
-   profile made once with `xcrun notarytool store-credentials`; set, the signed bundle is notarised and stapled). The script
-   never sees a certificate, key or password.
 
 ### First run
 

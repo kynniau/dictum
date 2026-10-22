@@ -35,7 +35,7 @@ public sealed class MacPackagingTests
         Assert.Equal("15.0", plist["LSMinimumSystemVersion"].Value); // .NET 10 supports macOS 15 and later
         Assert.Equal("public.app-category.productivity", plist["LSApplicationCategoryType"].Value);
         // PROPOSED (docs/MAC-HANDOVER.md §0, public-copy lane 22/10/2026): true with cloud speech (1.3) on as well.
-        Assert.Equal("Dictum listens only while you hold your hotkey, and keeps the audio on this Mac unless you turn on cloud speech.", plist["NSMicrophoneUsageDescription"].Value);
+        Assert.Equal("Dictum uses the microphone only while it is recording (from your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud speech.", plist["NSMicrophoneUsageDescription"].Value);
         Assert.Equal("© 2026 Kynni Pty Ltd", plist["NSHumanReadableCopyright"].Value);
         // The script fills both version keys from Directory.Build.props.
         Assert.Equal("@VERSION@", plist["CFBundleShortVersionString"].Value);
@@ -44,14 +44,15 @@ public sealed class MacPackagingTests
     }
 
     [Fact]
-    public void Entitlements_hold_exactly_the_five_hardened_runtime_keys()
+    public void Entitlements_hold_exactly_the_three_hardened_runtime_keys()
     {
+        // allow-dyld-environment-variables and disable-library-validation are deliberately absent (DECISIONS, lens round on
+        // PR #67, 23/10/2026: the signed bundle ran, transcribed and started its tray app without them).
         var plist = Plist(Repo("packaging", "mac", "Dictum.entitlements"));
         Assert.Equal(
             new[]
             {
-                "com.apple.security.cs.allow-dyld-environment-variables", "com.apple.security.cs.allow-jit",
-                "com.apple.security.cs.allow-unsigned-executable-memory", "com.apple.security.cs.disable-library-validation",
+                "com.apple.security.cs.allow-jit", "com.apple.security.cs.allow-unsigned-executable-memory",
                 "com.apple.security.device.audio-input",
             },
             plist.Keys.Order(StringComparer.Ordinal));
@@ -59,7 +60,7 @@ public sealed class MacPackagingTests
     }
 
     [Fact]
-    public void Workflow_has_a_mac_job_that_publishes_with_the_script_and_uploads_the_zip_and_the_release_waits_for_it()
+    public void Workflow_has_a_mac_job_that_publishes_with_the_script_and_uploads_the_zip_and_the_Windows_release_never_waits_for_it()
     {
         var yaml = File.ReadAllText(Repo(".github", "workflows", "ci.yml"));
         Assert.Matches(new Regex(@"^  build-mac:\r?$", RegexOptions.Multiline), yaml);
@@ -67,7 +68,19 @@ public sealed class MacPackagingTests
         Assert.Contains("./scripts/publish-mac.sh", yaml);
         Assert.Contains("name: dictum-osx-arm64-zip", yaml);
         Assert.Contains("dist/Dictum-*-osx-arm64.zip", yaml);
-        Assert.Matches(new Regex(@"needs: \[build, build-mac\]"), yaml);
+        // The Windows release never waits for the Mac job nor ships its zip (lens on PR #67, 23/10/2026): it needs build alone and
+        // downloads its two artifacts by name; the Mac zip goes out as a pre-release of its own on a mac-v* tag with its own notes.
+        Assert.DoesNotMatch(new Regex(@"needs: \[build, build-mac\]"), yaml);
+        Assert.DoesNotContain("merge-multiple", yaml);
+        Assert.Contains("name: dictum-release-files\n          path: release", yaml.Replace("\r\n", "\n"));
+        Assert.Matches(new Regex(@"^  release-mac:\r?$", RegexOptions.Multiline), yaml);
+        Assert.Contains("if: startsWith(github.ref, 'refs/tags/mac-v')", yaml);
+        Assert.Contains("tags: ['v*', 'mac-v*']", yaml);
+        Assert.Contains("--prerelease", yaml);
+        Assert.Contains("--notes-file packaging/release-notes-mac.md", yaml);
+        Assert.True(File.Exists(Repo("packaging", "release-notes-mac.md")));
+        Assert.DoesNotContain("macOS", File.ReadAllText(Repo("packaging", "release-notes-preamble.md")));
+        Assert.DoesNotContain("macOS (beta)", File.ReadAllText(Repo("README.md"))); // the public README says nothing about the beta until it ships
         // Secrets are not available in `if:`; the job env carries a boolean and the steps test that.
         Assert.DoesNotMatch(new Regex(@"^\s*if:.*secrets\.", RegexOptions.Multiline), yaml);
         foreach (var secret in new[] { "MAC_SIGN_CERT_P12_BASE64", "MAC_SIGN_CERT_PASSWORD", "MAC_NOTARY_KEY_ID", "MAC_NOTARY_ISSUER_ID", "MAC_NOTARY_KEY_P8_BASE64" })

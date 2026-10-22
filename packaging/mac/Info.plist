@@ -30,7 +30,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Dictum listens only while you hold your hotkey, and keeps the audio on this Mac unless you turn on cloud speech.</string>
+	<string>Dictum uses the microphone only while it is recording (from your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud speech.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Kynni Pty Ltd</string>
 </dict>
