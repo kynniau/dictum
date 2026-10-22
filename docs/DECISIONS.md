@@ -4692,4 +4692,4 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
     "(never the audio)" in clean-up's consent text when the clean-up and speech hosts are the same. Also recorded, owner
     option, no change: with both features on under offline only, Privacy can show the offline-only line twice with no caption (the speech
     step's line and the clean-up line; the caption shows only while audio is sent).
-21. **Gates after items 18 and 19.** GATE_TOTALS_5
+21. **Gates after items 18 and 19** (origin/main d838326 merged): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1916 total, 0 failed, 23 skipped, 0 errors.
