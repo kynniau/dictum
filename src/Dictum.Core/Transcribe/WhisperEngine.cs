@@ -194,6 +194,7 @@ public sealed partial class WhisperEngine : ISpeechEngine
         if (ParseDevice(text) is { } device) Devices[device.Index] = device.Integrated;
         // Device/backend lines are what tells the user whether the GPU is really used; keep them at info.
         var important = text.Contains("ggml_vulkan", StringComparison.Ordinal)
+            || text.Contains("ggml_metal", StringComparison.Ordinal) // macOS: the Metal backend inside the CPU runtime
             || text.Contains("Successfully loaded", StringComparison.Ordinal)
             || text.Contains("total size", StringComparison.Ordinal)
             || text.Contains("backends", StringComparison.Ordinal)

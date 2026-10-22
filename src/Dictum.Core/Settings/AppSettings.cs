@@ -13,7 +13,7 @@ public sealed record AppSettings
     public const int HandsFreeMaximumSeconds = 3600;
 
     public bool Enabled { get; init; } = true;
-    public string Hotkey { get; init; } = "RightCtrl";
+    public string Hotkey { get; init; } = Dictum.Hotkey.HotkeyNames.DefaultHotkey;
     public bool SuppressHotkey { get; init; } = true;
     public int TapMs { get; init; } = 300;
     public int DoubleTapMs { get; init; } = 400;

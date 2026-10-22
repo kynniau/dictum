@@ -25,6 +25,8 @@ public static class Program
     {
         // No Vulkan on a Mac: whisper.gpu = auto takes the CPU runtime order, whose arm64 build carries ggml's Metal backend.
         WhisperEngine.VulkanLoaderPresent = () => false;
+        // Before any settings are read: the default hotkey (Right Option) and the keys' names on screen (Option, Command).
+        Dictum.Hotkey.HotkeyNames.Dialect = Dictum.Hotkey.KeyDialect.Mac;
         var (options, error) = CliOptions.Parse(args);
         if (options is null)
         {

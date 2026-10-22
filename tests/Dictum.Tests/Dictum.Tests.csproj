@@ -22,6 +22,9 @@
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="System.Speech" Version="10.0.13" />
     <PackageReference Include="Avalonia.Headless" Version="11.3.22" />
+    <!-- The headless window tests shape text with HarfBuzz; on macOS its native library is not pulled in through the
+         net10.0-windows target's package graph (the Mac project's graph has it), so name it here for a Mac test host. -->
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.macOS" Version="8.3.1.1" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
   </ItemGroup>
 
   <ItemGroup>

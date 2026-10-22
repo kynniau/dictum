@@ -11,6 +11,19 @@ namespace Dictum.Hotkey;
 /// </summary>
 public static class HotkeyNames
 {
+    /// <summary>
+    /// Whose names the keys carry on screen: the parser's tokens are Windows names ("RightAlt", "Win"), and a Mac keyboard
+    /// prints Option and Command on those keys. The platform's entry point sets this once (Dictum.Mac: Program.Main); the
+    /// default keeps every Windows string as it was. The settings tokens never change with it.
+    /// </summary>
+    public static KeyDialect Dialect { get; set; } = KeyDialect.Windows;
+
+    /// <summary>
+    /// The hotkey a fresh settings.json gets: Right Ctrl on Windows; on a Mac, where most keyboards have no right-hand Control
+    /// key, Right Option (token "RightAlt"; PROPOSED 22/10/2026, docs/DECISIONS.md "Dictum for macOS").
+    /// </summary>
+    public static string DefaultHotkey => Dialect == KeyDialect.Mac ? "RightAlt" : "RightCtrl";
+
     /// <summary>A settings value shown to a person: each key's display name joined by "+"; a value the parser refuses is shown as it is.</summary>
     public static string Display(string? hotkey) =>
         HotkeyParser.TryParse(hotkey, out var spec, out _) ? Display(spec) : hotkey ?? "";
@@ -38,6 +51,17 @@ public static class HotkeyNames
             }
             text.Append(c);
         }
-        return text.ToString();
+        return Dialect == KeyDialect.Mac ? MacWords(text.ToString()) : text.ToString();
     }
+
+    /// <summary>The Mac keyboard's words for the two keys named differently there: Alt is Option, Win is Command.</summary>
+    private static string MacWords(string display) =>
+        string.Join(' ', display.Split(' ').Select(word => word switch { "Alt" => "Option", "Win" => "Command", _ => word }));
+}
+
+/// <summary>Which keyboard's words a key name is shown with (<see cref="HotkeyNames.Dialect"/>).</summary>
+public enum KeyDialect
+{
+    Windows,
+    Mac,
 }
