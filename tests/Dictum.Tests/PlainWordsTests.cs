@@ -194,4 +194,80 @@ public sealed class PlainWordsTests
         Assert.Contains("<p class=\"section-outro\">The base product stays free to keep on your PC; optional paid extras may come later.</p>", html);
         Assert.Contains("APPROVED by the owner 22/10/2026 17:42 AEDT", Site("index.html"));
     }
+
+    // ---- Cloud speech: README, Store and Mac handover (PROPOSED 22/10/2026 by the cloud speech copy lane; pending the owner) ----
+
+    private static string Repo(params string[] path) => File.ReadAllText(Path.Combine([FixBatchDownloadTests.RepoRoot(), .. path]));
+
+    /// <summary>Whitespace collapsed, so a sentence the file wraps across lines is found as one.</summary>
+    private static string Flat(string s) => Regex.Replace(s, @"\s+", " ");
+
+    /// <summary>README: the network table has a cloud speech row, and the consent sentence and the offline_only and audio lines are brought into line with cloud speech.</summary>
+    [Fact]
+    public void The_readme_says_what_cloud_speech_sends_and_when()
+    {
+        var readme = Repo("README.md");
+        var row = Assert.Single(readme.Split('\n'), l => l.StartsWith("| After each dictation (each part in hands-free), only if you switch cloud speech on in Settings > Models", StringComparison.Ordinal));
+        Assert.Contains("agree to the host in its own consent step, and a key is set where the service needs one | the host in `speech.base_url` (", row);
+        Assert.Contains("that dictation's audio as WAV, your dictionary terms as a hint, and in hands-free the carried words |", row);
+        var flat = Flat(readme);
+        Assert.Contains("A dialog says what is sent (every dictation's text, \"not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it\", together with Dictum's clean-up instructions, which include the words in your personal dictionary) and to which host", flat);
+        Assert.DoesNotContain("every dictation's text, never the audio", flat); // the consent's old parenthesis (the log line "never the audio or text" is about the failure reason and stays)
+        Assert.Contains("It refuses cloud speech to any service that is not on this machine too, and the speech model on this PC hears the dictation.", flat);
+        Assert.Contains("With cloud speech on, it is also sent to the service you chose (see the table above), then discarded here.", flat);
+        Assert.Contains("The consent step is in Settings > Models (Advanced view), under Cloud speech.", flat);
+        Assert.DoesNotContain("Settings does not have its consent step yet", flat);
+        Assert.Contains("**Nothing leaves the machine by default.**", readme); // the approved heading line is unchanged
+    }
+
+    /// <summary>Store: the listing text, the age-rating answer, the privacy-policy hosts note, row 13, and the 1.3.0 What's new and notes blocks, all marked PROPOSED and above/after the approved 1.2.1 ones.</summary>
+    [Fact]
+    public void The_store_text_names_cloud_speech_and_the_1_3_0_blocks_are_proposed()
+    {
+        var store = Repo("docs", "STORE.md");
+        var flat = Flat(store);
+        Assert.Contains("or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or your voice to a cloud speech service (OpenAI, Azure OpenAI or Groq) with your own API key, or to your own server, an advanced option; that service's own terms apply.", flat);
+        Assert.Contains("The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. With cloud speech on, off by default, the recording goes to the service you chose. If its answer fails", flat);
+        Assert.Contains("or cloud speech (their own OpenAI, Azure OpenAI or Groq key, or their own server), the audio of each dictation goes to that service.", flat);
+        Assert.Contains("it also lists the cloud speech hosts (api.openai.com, {resource}.openai.azure.com, api.groq.com and a custom address) under \"Cloud speech (off by default)\"", flat);
+        Assert.Contains("the cloud speech consent dialog (its own, apart from clean-up's", flat);
+        // The approved sentence and the line that opens the description are unchanged (see The_store_listing_carries_the_approved_sentence).
+        Assert.Contains("Speech recognition and clean-up run on your PC. There is no account", flat);
+
+        var now = store.IndexOf("### What's new in this version (1.3.0)", StringComparison.Ordinal);
+        var before = store.IndexOf("### What's new in this version (1.2.1)", StringComparison.Ordinal);
+        Assert.True(now > 0 && now < before, "the 1.3.0 block sits above the 1.2.1 one");
+        var block = store[now..before];
+        Assert.Contains("PROPOSED 22/10/2026", block);
+        Assert.Contains("Adds optional cloud speech: an advanced setting, off by default, that sends each recording to OpenAI, Azure OpenAI or Groq with your own API key, after a consent step of its own.", block);
+        Assert.Contains("your own clean-up instructions and a Create the key file button", Flat(block));
+        Assert.Contains("Settings > Storage offers to move your model files", block);
+        Assert.Contains("\"In plain words\"", block);
+        Assert.DoesNotContain("http", block); // the Store says no URLs in plain text
+
+        var notes = store.IndexOf("### Notes for certification: PROPOSED for 1.3.0", StringComparison.Ordinal);
+        Assert.True(notes > store.IndexOf("Notes written 22/10/2026 for Dictum 1.2.1.", StringComparison.Ordinal), "the 1.3.0 notes come after the approved 1.2.1 notes");
+        var changed = Flat(store[notes..store.IndexOf("## 8. What to expect from certification", notes, StringComparison.Ordinal)]);
+        Assert.Contains("CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.0 adds optional cloud speech.", changed);
+        Assert.Contains("It is off by default. It asks for express consent in its own dialog", changed);
+        Assert.Contains("Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default", changed);
+        Assert.DoesNotContain("1.3.0 prepared", store); // the certification-record row is the release lane's
+        Assert.Contains("APPROVED by the owner 22/10/2026 14:33 AEDT", store); // the 1.2.1 approvals are untouched
+    }
+
+    /// <summary>Mac handover: the owner's 22/10/2026 decisions are recorded, and the lines that said Intel too are brought into line.</summary>
+    [Fact]
+    public void The_mac_handover_records_the_owners_22_10_2026_decisions()
+    {
+        var mac = Repo("docs", "MAC-HANDOVER.md");
+        var flat = Flat(mac);
+        Assert.Contains("## 0. Owner decisions of 22/10/2026 (these win over anything below that says otherwise)", flat);
+        Assert.Contains("**GitHub beta first.** The Mac build is an ad-hoc signed GitHub pre-release. No Apple Developer Program membership and no fee", flat);
+        Assert.Contains("**Apple Silicon only (arm64) for the beta.** One zip:", flat);
+        Assert.Contains("Intel (osx-x64) is built **only if a tester needs it**", flat);
+        Assert.Contains("**Timing.** The Mac build ships after 1.3 is live.", flat);
+        Assert.DoesNotContain("Apple Silicon and Intel (two zips) unless Kyle says", flat);
+        Assert.DoesNotContain("publishes both RIDs", flat);
+        Assert.Contains("the cloud clean-up or cloud speech the user turns on", flat);
+    }
 }

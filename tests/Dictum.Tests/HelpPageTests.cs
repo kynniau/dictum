@@ -73,7 +73,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Contains(text, shown);
 
-        Assert.Equal(15, HelpText.Questions.Count); // the thirteen before, and the two clean-up questions (APPROVED 22/10/2026 19:20 AEDT)
+        Assert.Equal(16, HelpText.Questions.Count); // the thirteen before, the two clean-up questions (APPROVED 22/10/2026 19:20 AEDT) and the own-instructions question (PROPOSED 22/10/2026)
         var blocks = All<Border>(page).Where(b => b.Focusable).Select(AutomationProperties.GetName).ToList();
         foreach (var entry in HelpText.Questions)
             Assert.Contains(entry.Question, blocks); // each question is its own tab stop, named after it
@@ -422,6 +422,7 @@ public class HelpPageTests
     [Theory]
     [InlineData("faq-what-is-cleanup", "What is clean-up?")]
     [InlineData("faq-see-how", "How can I see what Dictum does with my words?")]
+    [InlineData("faq-own-instructions", "Can I give the clean-up my own instructions?")] // PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner)
     public void The_site_guide_carries_the_clean_up_answers_word_for_word(string id, string question)
     {
         static string Plain(string s) => Regex.Replace(Regex.Replace(s, "<[^>]+>", "").Replace("&gt;", ">").Replace("&amp;", "&").Replace("\"", ""), @"\s+", " ").Trim();
@@ -819,4 +820,53 @@ public class HelpPageTests
         window.Close();
         shell.Dispose();
     });
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): the Create the key file… button leads the cloud answer, and the
+    /// sixteen steps stay, unchanged and in order, as the fallback it names ("If the button does not work for you…"). The site's section
+    /// carries both new paragraphs before its list of sixteen steps. The paragraph is the own-instructions lane's (PR #60), verbatim.
+    /// </summary>
+    [Fact]
+    public void The_key_file_button_leads_the_cloud_answer_and_the_Notepad_steps_stay_as_the_fallback()
+    {
+        var answer = HelpText.CloudAnswer;
+        var button = answer.ToList().FindIndex(p => p.Contains("press Create the key file….", StringComparison.Ordinal));
+        var fallback = answer.ToList().FindIndex(p => p.StartsWith("If the button does not work for you,", StringComparison.Ordinal));
+        var stepOne = answer.ToList().FindIndex(p => p.StartsWith("1. Open Settings > Clean-up.", StringComparison.Ordinal));
+        var getKey = answer.ToList().FindIndex(p => p.StartsWith("To get a key,", StringComparison.Ordinal));
+        Assert.True(getKey >= 0 && getKey < button && button < fallback && fallback < stepOne, "order: get a key, the button, the fallback, then step 1");
+        Assert.Equal("To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.", answer[button]);
+        Assert.Equal("If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.", answer[fallback]);
+        for (var n = 1; n <= 16; n++) // none deleted, none renumbered
+            Assert.Single(answer, p => p.StartsWith($"{n}. ", StringComparison.Ordinal));
+        Assert.Contains("Type \\.env straight after it.", answer.Single(p => p.StartsWith("14. ", StringComparison.Ordinal)));
+
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        var section = html[html.IndexOf("<section id=\"cloud\"", StringComparison.Ordinal)..];
+        section = section[..section.IndexOf("</section>", StringComparison.Ordinal)];
+        var list = section.IndexOf("<ol id=\"cloud-steps\">", StringComparison.Ordinal);
+        Assert.True(section.IndexOf("press <b>Create the key file…</b>.", StringComparison.Ordinal) is var at && at > 0 && at < list, "the site names the button before its steps");
+        Assert.True(section.IndexOf("If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.", StringComparison.Ordinal) is var fb && fb > at && fb < list);
+        Assert.Equal(16, Regex.Matches(section[list..section.IndexOf("</ol>", list, StringComparison.Ordinal)], "<li>").Count);
+    }
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): "Can I give the clean-up my own instructions?" sits after the cloud
+    /// setup question, answers in two paragraphs that say what the box does, where it goes (and that cloud clean-up receives it) and that
+    /// every reply is still checked, a closing sentence the speaker did not say included, and names the labels PR #60 builds. It makes no
+    /// claim the rule-based tidy or Off use the box.
+    /// </summary>
+    [Fact]
+    public void The_own_instructions_answer_says_what_the_box_does_and_that_every_reply_is_still_checked()
+    {
+        var at = HelpText.Questions.ToList().FindIndex(q => q.Question == "Can I give the clean-up my own instructions?");
+        Assert.Equal(HelpText.CloudQuestion, HelpText.Questions[at - 1].Question);
+        Assert.Same(HelpText.OwnInstructionsAnswer, HelpText.Questions[at].Answer);
+        Assert.Equal(2, HelpText.OwnInstructionsAnswer.Count);
+        Assert.Contains("the rule-based tidy and Off do not use them", HelpText.OwnInstructionsAnswer[0]);
+        Assert.Contains("With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies.", HelpText.OwnInstructionsAnswer[0]);
+        Assert.Contains("Dictum still checks every reply against what you said", HelpText.OwnInstructionsAnswer[1]);
+        Assert.Contains("A reply that ends with a sentence you did not say is rejected", HelpText.OwnInstructionsAnswer[1]);
+        Assert.Equal(HelpText.NameQuestion, HelpText.Questions[^1].Question); // still the last question
+    }
 }

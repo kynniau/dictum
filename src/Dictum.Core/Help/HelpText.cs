@@ -120,6 +120,11 @@ public static class HelpText
         "Before Dictum sends text to a service off this PC, it shows a warning. For Anthropic, it says: \"" + CloudPolicy.ConsentWarning(CloudExampleHost) + "\"",
         "Dictum can use Anthropic, OpenAI, Google Gemini or your own server. For Anthropic, OpenAI and Google Gemini, you need your own account with that service and an API key.",
         "To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.",
+        // PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the first paragraph is the own-instructions lane's Help sentence for the
+        // Create the key file… button (PR #60), verbatim; the second keeps the Notepad steps below as the fallback and is this lane's. True only
+        // once the button is on Settings > Clean-up (PR #60 plus the CleanupPage wiring).
+        "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
+        "If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.",
         "1. Open Settings > Clean-up. Under Cloud clean-up, choose your service in the Service list: Anthropic (Claude), OpenAI, Google Gemini, Ollama on this PC, or Custom server (OpenAI-compatible) for your own server. " +
         "For your own server, also type its address in Server address and its model name in Model. The line under Model says which name its key needs.",
         "2. Click Open the settings folder. File Explorer opens Dictum's settings folder.",
@@ -147,6 +152,24 @@ public static class HelpText
         "Check the file's name, and the line in it.",
         "To turn it off, open Settings > Clean-up and click Switch cloud clean-up off. Your dictations are tidied on this PC again.",
         "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
+    ];
+
+    /// <summary>PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the question for the own-instructions box (PR #60).</summary>
+    public const string OwnInstructionsQuestion = "Can I give the clean-up my own instructions?";
+
+    /// <summary>
+    /// PROPOSED 22/10/2026 (C-Copy lane; pending the owner): every sentence is the own-instructions lane's Help sentence (PR #60), verbatim,
+    /// except the last, "A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead.", which is this
+    /// lane's, for the owner's closing-line rule. True only once the box is on Settings > Clean-up and the final-sentence rule
+    /// (CleanupValidator.AddedFinalSentence, PR #60 commit c03af46) is merged. The site's help page carries the same two paragraphs word for word (pinned).
+    /// </summary>
+    public static readonly IReadOnlyList<string> OwnInstructionsAnswer =
+    [
+        "In the Advanced view, Settings > Clean-up has a box for your own instructions, such as \"use short sentences\" or \"write product names in capitals\". " +
+        "Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. " +
+        "With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies.",
+        "Dictum still checks every reply against what you said, so instructions to translate, summarise, answer or add a line are not followed. " +
+        "A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead.",
     ];
 
     /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): do not reword. The question that explains clean-up to someone who has never heard the word.</summary>
@@ -249,6 +272,8 @@ public static class HelpText
         // APPROVED 22/10/2026 (proposed 22/10/2026): do not reword. The quoted lines are APPROVED copy taken from
         // CloudPolicy (never reworded here) and the tray panel's line, pinned against the app by HelpPageTests.
         new(CloudQuestion, CloudAnswer),
+        // PROPOSED 22/10/2026 (C-Copy lane; pending the owner): the own-instructions box (PR #60), next to the cloud clean-up setup it also applies to.
+        new(OwnInstructionsQuestion, OwnInstructionsAnswer),
         new("How do I remove Dictum completely?",
         [
             "Open Settings > Storage. At the bottom, choose Remove Dictum completely…",

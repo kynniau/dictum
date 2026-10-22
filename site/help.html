@@ -309,7 +309,7 @@
 
   <section id="privacy" aria-labelledby="privacy-title">
     <h2 id="privacy-title">7. Your privacy</h2>
-    <p>Dictum turns your voice into text on this PC, then throws the recording away. Your voice never leaves this PC.</p>
+    <p>Dictum turns your voice into text on this PC, then throws the recording away. Your voice stays on this PC unless you turn on cloud speech, an advanced option that is off by default.</p>
     <p>All of this happens on this PC. Nothing you say is sent anywhere unless you turn on cloud clean-up (Settings &gt; Clean-up) or cloud speech (Settings &gt; Models), and it is off unless you turn it on. If you turn it on, the text of each dictation and the words in your dictionary go to the service you chose; your voice still stays here unless you also turn on cloud speech.</p>
     <p>In the words of our privacy policy:</p>
     <blockquote class="card">
@@ -331,6 +331,8 @@
     <p>To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.</p>
 
     <h3>Save the key, then switch it on</h3>
+    <p>To add a key for cloud clean-up, choose the service in Settings &gt; Clean-up and press <b>Create the key file…</b>. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.</p>
+    <p>If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.</p>
     <ol id="cloud-steps">
       <li>Open Settings &gt; Clean-up. Under <b>Cloud clean-up</b>, choose your service in the <b>Service</b> list: <b>Anthropic (Claude)</b>, <b>OpenAI</b>, <b>Google Gemini</b>, <b>Ollama on this PC</b>, or <b>Custom server (OpenAI-compatible)</b> for your own server. For your own server, also type its address in <b>Server address</b> and its model name in <b>Model</b>. The line under <b>Model</b> says which name its key needs.</li>
       <li>Click <b>Open the settings folder</b>. File Explorer opens Dictum's settings folder.</li>
@@ -614,7 +616,7 @@
       <details id="faq-cloud">
         <summary>What is cloud clean-up? Is it safe?</summary>
         <div class="answer">
-          <p>Cloud clean-up is an advanced option. It is off unless you turn it on, in Settings &gt; Clean-up, after a consent step. While it is on, the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays on this PC.</p>
+          <p>Cloud clean-up is an advanced option. It is off unless you turn it on, in Settings &gt; Clean-up, after a consent step. While it is on, the text of each dictation, and the words in your dictionary, are sent to the service you chose. Your voice still stays on this PC unless you also turn on cloud speech.</p>
           <p>Dictum shows this warning while it is on:</p>
           <blockquote><p>Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.</p></blockquote>
           <p>Most people do not need it. <b>Tidy my words</b> runs on this PC.</p>
@@ -630,24 +632,33 @@
         </div>
       </details>
 
+      <details id="faq-own-instructions">
+        <summary>Can I give the clean-up my own instructions?</summary>
+        <div class="answer">
+          <p>In the Advanced view, Settings &gt; Clean-up has a box for your own instructions, such as "use short sentences" or "write product names in capitals". Dictum adds them to its own clean-up instructions for the AI clean-up on this PC and for cloud clean-up; the rule-based tidy and Off do not use them. With cloud clean-up on, your instructions go to that service with each dictation, as part of the text it tidies.</p>
+          <p>Dictum still checks every reply against what you said, so instructions to translate, summarise, answer or add a line are not followed. A reply that ends with a sentence you did not say is rejected, and the rule-based tidy is pasted instead.</p>
+        </div>
+      </details>
+
       <details id="faq-internet">
         <summary>Does Dictum need the internet?</summary>
         <div class="answer">
           <p>Not for English: the Standard English model comes with Dictum, so you can dictate in English with the internet off. For any other language, Dictum needs the internet once, to download a model that understands it.</p>
-          <p>Dictum goes online only when you ask it to. That means three things:</p>
+          <p>Dictum goes online only when you ask it to. That means four things:</p>
           <ul>
             <li>downloading a model you choose;</li>
             <li>checking for updates, in the direct-download version;</li>
-            <li>cloud clean-up, if you turn it on.</li>
+            <li>cloud clean-up, if you turn it on;</li>
+            <li>cloud speech, if you turn it on.</li>
           </ul>
-          <p><b>Offline only</b>, in Settings &gt; Privacy, stops all three.</p>
+          <p><b>Offline only</b>, in Settings &gt; Privacy, stops all four.</p>
         </div>
       </details>
 
       <details id="faq-learn">
         <summary>Does Dictum learn my voice?</summary>
         <div class="answer">
-          <p>No. Nothing is trained, and your voice never leaves this PC. Calibrate my voice measures which model hears you best, and can suggest words for your dictionary. It does not train or change the model.</p>
+          <p>No. Nothing is trained, and your voice stays on this PC unless you turn on cloud speech. Calibrate my voice measures which model hears you best, and can suggest words for your dictionary. It does not train or change the model.</p>
           <p>What Dictum does keep is yours, in plain text files you can read, edit or delete: a dictionary of your names and terms, and corrections such as <code>kinney =&gt; Kynni</code>.</p>
         </div>
       </details>

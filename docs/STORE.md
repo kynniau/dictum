@@ -46,7 +46,7 @@ requirements for MSIX apps" (Microsoft Learn, retrieved 15/10/2026).
 - **Category:** Productivity. Microsoft lists no subcategories for Productivity. Optional secondary
   category: none.
 - **Privacy policy:** answer **Yes** to "accesses, collects, or transmits personal information" (the
-  app uses the microphone and can send text to a cloud service the user turns on; Microsoft marks
+  app uses the microphone and can send text, or with cloud speech the recording, to a cloud service the user turns on; Microsoft marks
   this Yes anyway when the package declares capabilities that could allow it). URL:
   **https://dictum.kynni.au/privacy**
 - **Website:** https://dictum.kynni.au
@@ -101,10 +101,10 @@ Dictum turns your speech into text in any Windows app. Hold the right Ctrl key, 
 Dictum is ready to use as soon as it is installed: a small English speech model (base.en, about 148 MB) is included, so nothing is downloaded on first run. Larger, more accurate models are optional downloads from the model makers' official download page in Settings > Models. You also need a microphone. Dictum dictates in English; an optional multilingual model lets it listen in other languages.
 
 PRIVATE BY DESIGN
-Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or to your own server, an advanced option; that service's own terms apply. Turn on offline-only mode and it never connects to anything outside your PC. Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.
+Speech recognition and clean-up run on your PC. There is no account, no analytics, no telemetry and no crash reporting. Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or your voice to a cloud speech service (OpenAI, Azure OpenAI or Groq) with your own API key, or to your own server, an advanced option; that service's own terms apply. Turn on offline-only mode and it never connects to anything outside your PC. Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.
 
 AI THAT RUNS ON YOUR PC
-Dictum uses AI models: whisper.cpp to recognise speech and, if you add it in Settings > Models (a 1.1 GB download), a small generative language model (Qwen2.5 1.5B Instruct, run by llama.cpp) to tidy the result. Out of the box a rule-based tidy fixes punctuation and capitals and follows spoken commands such as "new paragraph"; the language model also removes filler words and smooths grammar. The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. If its answer fails Dictum's checks, a rule-based tidy is used instead, and you can switch AI clean-up off completely. To report a problem with text Dictum produced, email hello@kynni.com.au.
+Dictum uses AI models: whisper.cpp to recognise speech and, if you add it in Settings > Models (a 1.1 GB download), a small generative language model (Qwen2.5 1.5B Instruct, run by llama.cpp) to tidy the result. Out of the box a rule-based tidy fixes punctuation and capitals and follows spoken commands such as "new paragraph"; the language model also removes filler words and smooths grammar. The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything. With cloud speech on, off by default, the recording goes to the service you chose. If its answer fails Dictum's checks, a rule-based tidy is used instead, and you can switch AI clean-up off completely. To report a problem with text Dictum produced, email hello@kynni.com.au.
 
 HOW IT WORKS
 - Hold Right Ctrl, or a key you choose, speak, and release.
@@ -133,6 +133,8 @@ Free and open source under the MIT licence, by Kynni Pty Ltd.
 
 The last sentence of PRIVATE BY DESIGN ("Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.") is APPROVED by the owner 22/10/2026 17:36 AEDT (plain-words statement, section 3). Plain text, no URL. Paste the whole description again on the next submission.
 
+PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner), for the 1.3.0 listing update: in PRIVATE BY DESIGN the sentence "Dictum connects to the internet only to download a model you choose, or, if you switch it on, to send your text to a cloud clean-up service (Anthropic, OpenAI or Google Gemini) with your own API key, or to your own server, an advanced option;" gains "or your voice to a cloud speech service (OpenAI, Azure OpenAI or Groq) with your own API key," before "or to your own server", and in AI THAT RUNS ON YOUR PC the sentence "With cloud speech on, off by default, the recording goes to the service you chose." follows "The clean-up model sees only your words, never your audio, and is instructed not to add, answer or summarise anything." The opening sentence of PRIVATE BY DESIGN ("Speech recognition and clean-up run on your PC.") and the first product feature ("Speech recognition runs on your PC with whisper.cpp and works offline") are unchanged: both describe the default and the next sentence names the option. Whether a description-only change can be submitted without a new package is recalled, not verified: check the Partner Center flow.
+
 ### Product features (one per line, no bullets: the Store adds them)
 
 ```text
@@ -147,6 +149,14 @@ Offline-only mode: no connection to anything outside your PC
 Free: no subscription, no account, no ads, no analytics, no telemetry.
 Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
+```
+
+### What's new in this version (1.3.0)
+
+PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner). Paste it in "What's new in this version" on the 1.3.0 submission once approved, and keep only the sentences whose feature is in the build: the sentences on cloud speech, your own instructions and the key file depend on the cloud speech UI (merged) and the own-instructions lane (PR #60, not merged and not wired into Settings > Clean-up when this was written), and "Settings > Storage offers to move your model files" is a feature that is not on origin/main 28c3e65 (no such offer found in src).
+
+```text
+Adds optional cloud speech: an advanced setting, off by default, that sends each recording to OpenAI, Azure OpenAI or Groq with your own API key, after a consent step of its own. The speech model on this PC is still used by default and when a request fails. Settings > Clean-up has a box for your own clean-up instructions and a Create the key file button. Settings > Storage offers to move your model files when you change their folder. Help explains what clean-up is, and Settings > About has a new "In plain words" statement, also on the Dictum website.
 ```
 
 ### What's new in this version (1.2.1)
@@ -247,7 +257,8 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
 - Sharing the user's location: **No.** Digital purchases: **No.**
 - Personal information shared with third parties: **No by default.** Only if the user turns on cloud
   clean-up with their own Anthropic, OpenAI or Google Gemini key, or their own server, the text of each
-  dictation goes to that service.
+  dictation goes to that service. PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): or cloud speech
+  (their own OpenAI, Azure OpenAI or Groq key, or their own server), the audio of each dictation goes to that service.
 - Profanity: the app contains none. It can type swearing the user dictates, and the optional
   profanity filter (off by default) can mask it.
 - Expected result: the lowest, general-audience rating. That is an expectation, not a guarantee.
@@ -346,6 +357,18 @@ The package contains profanity.txt, a word list used only by the optional profan
 Support: hello@kynni.com.au
 ```
 
+### Notes for certification: PROPOSED for 1.3.0
+
+PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner). Not yet in the block above, which stays the approved 1.2.1 notes until the release lane runs. For 1.3.0, replace its "Notes written" line, its CHANGED paragraph and its cloud paragraph with these. The CHANGED paragraph names features that must be in the build: the cloud speech UI is merged; the own-instructions box and the Create the key file button are PR #60, not merged and not wired into Settings > Clean-up when this was written; "Settings > Storage offers to move model files" was not found on origin/main 28c3e65. Delete any sentence whose feature is not in the build.
+
+```text
+Notes written DD/MM/2026 for Dictum 1.3.0.
+
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.0 adds optional cloud speech. In Settings > Models, in the Advanced view, a new Cloud speech card lets the user send each recording to OpenAI, Azure OpenAI, Groq or a server of their own instead of using the speech model on this PC. It is off by default. It asks for express consent in its own dialog, which names the host and says the recording leaves the PC; it needs the user's own API key; offline only mode refuses it for any service that is not on the PC; and if a request fails, the speech model on this PC hears the dictation. Settings > Clean-up, in the Advanced view, has a new box for the user's own clean-up instructions and a Create the key file button that makes the .env file for a cloud clean-up key. Settings > Storage offers to move model files when the model folder changes. Settings > Help has new questions ("What is clean-up?", "How can I see what Dictum does with my words?" and "Can I give the clean-up my own instructions?"), and Settings > About and the Welcome window show a short "In plain words" statement. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads.
+
+Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
+```
+
 ## 8. What to expect from certification
 
 Source: "The app certification process for MSIX app" (Microsoft Learn, retrieved 15/10/2026).
@@ -369,7 +392,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 2 | Fails the Windows App Certification Kit | CF #2, certification process | Microsoft now calls the kit (WACK) "deprecated and no longer maintained" and certifies on submission ("Package a desktop or UWP app in Visual Studio", retrieved 16/10/2026), so a local run is optional. Not run here: no part of the kit is in the Microsoft.Windows.SDK.BuildTools package the scripts use (searched 16/10/2026). | Optional |
 | 3 | Crashes or hangs without a network connection | CF #4, Store Policies 10.4.2 | Offline is a degraded mode, never a failure (SPEC §1). base.en is in the package, so a first run with the network off asks no model question and starts ready; test that, and that with offline_only on a download asked for is refused with a message, and that with the network off (offline_only off) a download fails after its retries, with a message (amended 17/10/2026). | Test |
 | 4 | Testers cannot test it | CF #5, Store Policies 10.3 | No account. Section 7 notes give the dictation steps, that no download is needed (base.en is in the package) and the offline path. | Done |
-| 5 | Missing or inadequate privacy policy | CF #6, Store Policies 10.5.1 | /privacy lists what is accessed (microphone audio, text, clipboard, hotkey), where it is stored, every host and when, who receives what, user controls and deletion. Microsoft's FAQ also says to "include a privacy policy URL and display it in the app": add a Privacy link in About or Settings. | Page written; in-app link to do |
+| 5 | Missing or inadequate privacy policy | CF #6, Store Policies 10.5.1 | /privacy lists what is accessed (microphone audio, text, clipboard, hotkey), where it is stored, every host and when, who receives what, user controls and deletion. PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): for 1.3.0 it also lists the cloud speech hosts (api.openai.com, {resource}.openai.azure.com, api.groq.com and a custom address) under "Cloud speech (off by default)", before submission. Microsoft's FAQ also says to "include a privacy policy URL and display it in the app": add a Privacy link in About or Settings. | Page written; in-app link to do |
 | 6 | Description does not match the app | CF #7, Store Policies 10.1, 10.1.1 | The description states English only, microphone required, base.en included with the bigger models optional downloads, the administrator-window limit and the Fn key. Screenshots come from the real app. | Done; re-check against release |
 | 7 | Inaccurate age-rating answers | CF #8, Store Policies 11.11 | Section 5. | Done |
 | 8 | Accessibility declared without testing | CF #9, Product declarations | Leave the box unticked unless tested end to end. | Done |
@@ -377,7 +400,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 10 | Dynamic inclusion of code | Store Policies 10.2.2 | Models are data, checked by SHA-256; Dictum downloads no code. The Store build has no self-updater (SPEC §18.2). | Done |
 | 11 | Undisclosed dependency | Store Policies 10.2.4 | No longer a first-run download (amended 17/10/2026): base.en is in the package, and the description's second paragraph says so and that the larger models are optional downloads from the model makers' official download page (the listing never names Hugging Face). | Done |
 | 12 | Live generative AI not disclosed, or no way to report content | Store Policies 11.16, Product declarations | Tick the generative AI declaration and keep the description's AI paragraph. 11.16 also requires "a means for users to report inappropriate content to the developer": add "Report a problem" (a mail link to hello@kynni.com.au) in the app; the description's email line is a stopgap. | In-app action to do |
-| 13 | Personal information sent to a third party without opt-in consent | Store Policies 10.5.2 | Cloud clean-up is off by default, but today it is switched on by editing settings.json. 10.5.2 wants "express permission in the product user interface" after saying what is shared and with whom, plus a way to opt out later: add a consent prompt when the user picks Anthropic or a non-local server, and an off switch. | Risk: app change needed |
+| 13 | Personal information sent to a third party without opt-in consent | Store Policies 10.5.2 | Cloud clean-up is off by default, but today it is switched on by editing settings.json. 10.5.2 wants "express permission in the product user interface" after saying what is shared and with whom, plus a way to opt out later: add a consent prompt when the user picks Anthropic or a non-local server, and an off switch. PROPOSED 22/10/2026 (cloud speech copy lane; pending the owner): for audio, the cloud speech consent dialog (its own, apart from clean-up's: it names the host, says the recording is sent over the internet, and has Send my voice to {host} and Keep speech on this PC buttons) is what satisfies 10.5.2, with Switch cloud speech off in Settings > Models as the way out. | Risk: app change needed |
 | 14 | Personal information transmitted insecurely | Store Policies 10.5.4 | Hugging Face, Anthropic and the update check use HTTPS. A user-entered `http://` server that is not on the PC would carry transcripts unencrypted: refuse or warn for non-loopback `http://` addresses. | Risk: app change needed |
 | 15 | Cannot be cleanly uninstalled | Store Policies 10.2.7 | Uninstalling an MSIX removes the package and the AppData files Windows redirected for it (Microsoft Learn, "Understanding how packaged desktop apps run on Windows"). Settings → Storage → "Remove Dictum completely" deletes the data first. Files that already existed in the real AppData folder (for example from an earlier direct-download install) are modified in place and survive uninstall, which is one more reason the app warns when both builds are installed (SPEC §18.2). | Done in SPEC; verify in build |
 | 16 | Changes Windows settings without consent | Store Policies 10.2.8 | Launch at login only when the user ticks it; no default-app changes. | Verify manifest |
