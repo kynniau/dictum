@@ -210,11 +210,31 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   finish" (owner decision 3, 22/10/2026), so `dictation-stills` was re-rendered on branch `fix/1.2.1-copy`
   (`scripts\demo-stills.ps1 -Out <folder>`, headless, no sandbox) and `site/img/demos/dictation-stills.gif` replaced;
   the poster (the last slide, "Pasted 12 words") came out byte-identical and is unchanged. Whether a frame of any other demo shows the hold pill was not checked.
-- **Due for a retake on the 1.2.1 build (not re-recorded yet).** `change-model`, `help` and `test-setup`, with their
-  GIFs and posters in `site/img/demos/`, are 1.2.0 footage. Per the 1.2.1 lens (22/10/2026), they show the tray panel's
-  Light | Full switch and its Mode line, which the Simple view now hides (owner decision 5), and the state word "Ready"
-  beside "No microphone found", where 1.2.1 says "No microphone" (owner decision 4). Record them again from a 1.2.1
-  build; until then they show the 1.2.0 panel.
+- **Re-recorded for 1.2.1 (22/10/2026, branch `demos/1.2.1`).** `change-model`, `help`, `test-setup`, `first-run`,
+  `model-folder` and `cloud-cleanup` were recorded again, and their GIFs and posters in `site/img/demos/` replaced,
+  because each opens the tray panel on its way to Settings or a window, and the 1.2.0 panel showed the Light | Full
+  switch and Mode line (hidden in the Simple view since owner decision 5) and the state word "Ready" beside "No
+  microphone found" (1.2.1 says "No microphone", owner decision 4). `first-run` also needed its data file changed: its
+  `ready` step looked for the text "Ready", and now points at "No microphone" (caption below, PROPOSED). `install` is
+  retired from the site and was not recorded. They were recorded from the Setup built at afda8d9 (below); main has since
+  moved to 50952a0, whose source differences are comments and version only (`git diff afda8d9 50952a0 -- src` shows no
+  string a frame shows), so the footage matches it. One run each of `first-run` and `flyout` first stopped (`first-run` at step 7,
+  `flyout` in its prepare steps) with the welcome window still on its Speech model step after the Next click; the cause
+  was not established. Both were run again and completed (`flyout.json` was edited between its runs, for the pointer and tooltip, not for this).
+- **The tray panel still (`site/img/flyout.png`).** Not a demo's output: `flyout.json` records the panel in the Advanced
+  view (Settings > Models > Advanced, Settings closed, panel opened, pointer parked on the taskbar so no tooltip shows)
+  and `site/img/flyout.png` is that step's raw frame (`frames\raw\09-panel.png`) cropped to the panel with
+  `ffmpeg -vf crop=380:750:1180:90`. It is 380 x 750; `site/index.html` still says `width="440" height="700"` on the
+  image, which only reserves space (`.shot img` is `width: 100%; height: auto`). The sandbox has no microphone, so the
+  panel shows "No microphone", a red dot and the no-microphone sentence, and the mic row says "No microphone found";
+  the clean-up is the default, so the header reads "base.en · Vulkan · rules · Right Ctrl" and the picker "Rule-based
+  tidy". It does not show "No clean-up" (that needs clean-up set to Off). A panel with a working microphone has to be
+  captured on a real PC.
+- **Store screenshot 1 (the hold pill, edge glow on) cannot be recorded here.** With no microphone the controller ends
+  the session before the hold pill is shown (`DictationController.StartCapture`, "the rest of this batch (the hold
+  pill) belonged to the recording that never started"), and `key` presses for 80 ms, not a hold. `dictation-stills`
+  draws the pill with Dictum's own code but not the edge glow or a text document. It has to be captured on a PC with a
+  microphone.
 - **No network.** SmartScreen cannot reach Microsoft, so the install demo shows "SmartScreen can't be reached right
   now" (Run / Don't run) where a real download shows "Windows protected your PC" (More info, then Run anyway). The data
   file has optional steps for both; only the offline one has been seen in the sandbox.
@@ -249,8 +269,11 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   the same Save As dialog (Save as type, File name) is recalled, not verified.
 - **The help demo does not press Send feedback**: it opens the user's own mail program, and the sandbox has none. The
   demo shows the button and says what it does.
-- **The Setup's version is 1.1.2.** The 1.2 build (main at d47e7f9) still carries version 1.1.2, so the Setup file,
-  the SmartScreen dialog and Setup's title say 1.1.2 in these recordings.
+- **The Setup's version.** The 1.2 recordings of 21/10/2026 were made from a build that said 1.1.2. The 1.2.1 recordings
+  (22/10/2026) were made from `Dictum-Setup-1.2.0.exe` built at afda8d9 (`Dictum.exe` product version
+  `1.2.0+afda8d97e80375fa40ca9b83508a43847d7b596b`, SHA-256
+  `3FDF6EB7461896896AA9325C8191A1E0035CC2D0ADDFC650F01B71B5434E78A6`). Setup runs silently and none of these demos opens
+  About, so no frame shows a version string (checked by eye on the raw frames of the six demos).
 
 ## What each demo shows (1.2 build, 21/10/2026)
 
@@ -328,7 +351,7 @@ window, and first-run records it.
    13. Click Finish.
    14. Dictum now waits by the clock. Click the little up-arrow there. *(skipped when the icon is already on the taskbar)*
    15. Click the Dictum icon.
-   16. This is Dictum's panel. Ready means it is waiting for you.
+   16. This is Dictum's panel. The word beside the switch says how Dictum is. *(PROPOSED 22/10/2026; was "Ready means it is waiting for you.", which the 1.2.1 panel no longer says on a PC without a microphone)*
    17. This test PC has no microphone, so the panel says so here.
    18. Press Esc to close the panel.
 3. **Change the speech model** (`change-model.json`)

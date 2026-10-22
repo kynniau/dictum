@@ -123,8 +123,8 @@
     },
     {
       "id": "ready",
-      "caption": "This is Dictum's panel. Ready means it is waiting for you.",
-      "do": [ { "do": "point", "target": { "window": "^Dictum$", "type": "Text", "name": "Ready", "timeout": 60 } } ],
+      "caption": "This is Dictum's panel. The word beside the switch says how Dictum is.",
+      "do": [ { "do": "point", "target": { "window": "^Dictum$", "type": "Text", "name": "No microphone", "timeout": 60 } } ],
       "after": 3
     },
     {
