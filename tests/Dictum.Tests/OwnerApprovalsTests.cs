@@ -237,11 +237,11 @@ public class OwnerApprovalsTests
         Assert.Equal(
         [
             "Clean-up is the tidying Dictum does between hearing you and typing. When we speak, we say ums and ahs and repeat ourselves. Clean-up takes those out and tidies the punctuation and capitals before your words are typed.",
-            "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, takes out ums, ahs and doubled words such as \"the the\", and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own. It needs no download.",
-            "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\" even mid-sentence. Dictum checks its answer against what you said; if the check fails, or the model is too slow or not ready, it uses the rule-based tidy instead.",
+            "You choose it in Settings > Models. Tidy my words uses fixed rules: it fixes punctuation and capitals, takes out ums, ahs, doubled words such as \"the the\" and fillers such as \"you know\" set off by commas, and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own. It needs no download.",
+            "AI clean-up (Add AI clean-up) is an optional download that runs on this PC. It also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\" even mid-sentence. Dictum checks its answer against what you said; if the check fails, or the model is too slow, not ready or runs into an error, it uses the rule-based tidy instead.",
             "Off pastes what was heard; only your own corrections, snippets and the profanity filter (if on) still apply.",
             "Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.",
-            "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here unless you also turn on cloud speech.",
+            "Clean-up happens on this PC. The text of each dictation and the words in your dictionary go to another service only if you turn on cloud clean-up in Settings > Clean-up, and it is off unless you turn it on. Your voice still stays here unless you also turn on cloud speech. Cloud speech also sends the words in your dictionary, as a hint.",
             "To watch clean-up work on your own words, open Settings > See how it works and record a short dictation.",
         ], HelpText.CleanupAnswer);
         Assert.Equal("How can I see what Dictum does with my words?", HelpText.SeeHowQuestion);

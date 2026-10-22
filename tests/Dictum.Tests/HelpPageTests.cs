@@ -313,12 +313,18 @@ public class HelpPageTests
         var mentions = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
         Assert.Equal(4, mentions.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and (PROPOSED 22/10/2026) "What is clean-up?"
         Assert.Contains(HelpText.CloudAnswer[0], mentions);
-        Assert.All(mentions, t =>
+        // The PROPOSED clean-up paragraph begins with the phrase, so it is checked on its own, in its own case; the other three keep the original exact-case check.
+        var proposed = Assert.Single(HelpText.CleanupAnswer, p => p.Contains("turn on cloud clean-up", StringComparison.Ordinal));
+        Assert.Contains(proposed, mentions);
+        Assert.StartsWith("Clean-up happens on this PC. The text of each dictation", proposed, StringComparison.Ordinal);
+        Assert.All(mentions.Where(t => !string.Equals(t, proposed, StringComparison.Ordinal)), t =>
         {
-            Assert.Contains("the text of each dictation", t, StringComparison.OrdinalIgnoreCase); // "The text of each dictation" opens the PROPOSED clean-up paragraph
+            Assert.Contains("the text of each dictation", t);
             Assert.Contains("the words in your dictionary", t);
             Assert.Contains("Your voice still stays here", t, StringComparison.OrdinalIgnoreCase);
         });
+        Assert.Contains("the words in your dictionary", proposed);
+        Assert.Contains("Your voice still stays here unless you also turn on cloud speech.", proposed);
     }
 
     /// <summary>
@@ -346,6 +352,11 @@ public class HelpPageTests
         Assert.Equal("Keep this one. Keep.", DeterministicCleaner.Clean("Keep this one. Drop this bit. Scratch that. Keep."));
         Assert.Equal("First point.\nSecond point.",DeterministicCleaner.Clean("First point. New line. Second point."));
         Assert.Equal("We need a new line of credit.", DeterministicCleaner.Clean("We need a new line of credit.")); // inside a phrase it is left alone, so the answer says "a phrase of their own"
+        Assert.Equal("It's fine.", DeterministicCleaner.Clean("you know, it's fine.")); // "fillers such as \"you know\" set off by commas"
+        Assert.Equal("It was you know quite long.", DeterministicCleaner.Clean("it was you know quite long.")); // and only when set off by commas
+        // Cloud speech sends the dictionary too, as a hint: the approved speech consent says so, and paragraph 6 says the same.
+        Assert.Contains("together with the words in your personal dictionary as a hint", Dictum.Transcribe.SpeechPolicy.ConsentText("HOST", "VAR"));
+        Assert.Contains("Cloud speech also sends the words in your dictionary, as a hint.", text);
         // The model "also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\"": the prompt it is given asks for each.
         foreach (var asked in new[] { "you know", "false starts", "scratch that" })
             Assert.Contains(asked, CleanupPrompt.Default);
