@@ -4824,7 +4824,7 @@ Two owner requests for Settings > Clean-up, built from main 04287d6. Every new s
    `LlmSettings.InstructionsMaxLength`). `CleanupPrompt.Build` adds them after the base prompt (built-in or `llm.prompt_file`)
    and before the grammar-assist sentence and the dictionary line, once, between `OwnInstructionsStart` and `OwnInstructionsEnd`.
    With `llm.prompt_file` set too, the file replaces the built-in prompt and the instructions are still added. The local model
-   and cloud clean-up get them; `none` and `off` never do. The validator is unchanged and checks every reply.
+   and cloud clean-up get them; `none` and `off` never do. Every reply is still checked by the validator, which gained one rule on the owner's decision (item 4).
    - *Private text.* `ModelCoordinator.TryWrite` logged every written value as JSON, so the box would have put the text in the
      log ("Set from the app: llm.instructions = …"). It now logs `SettingsFile.LogValue`, which gives the length for a key in
      `SettingsFile.PrivateKeys`. The loader's generic warning quotes up to 57 characters of a bad value, so the key has its own
@@ -4872,6 +4872,8 @@ PROPOSED strings, verbatim:
 - Log (clean-up loaded): "Clean-up instructions: Dictum's, with your own added ({N} characters; their text is not logged)."
 - Log (key file): "Key file created with a placeholder line for {VARIABLE} (no key written)." / "Key file already exists: opened as it is, not changed."
 - Validator reason (item 4): "reply ends with a sentence the speaker did not say"
+- Simple view line (item 6): "Your own clean-up instructions are in use (Advanced view)."
+- Log (save failed): "Settings: {exception type} saving llm.instructions." / (key file failed): "Settings: the key file could not be created: {exception type}."
 - Load warnings: "Setting \"llm.instructions\" is {N} characters long; only the first 2000 are used." / "Setting \"llm.instructions\" has an invalid value: expected a string or null. It is not used."
 - settings.json `_doc` llm note, added sentence: "instructions: your own clean-up instructions (at most 2,000 characters; Settings > Clean-up in the Advanced view writes them), added after the prompt, built-in or prompt_file, for the local model and cloud clean-up, never for none or off; every reply is still checked against what you said."
 
@@ -4925,3 +4927,45 @@ Gates after merging main cc3c0ba (merge d33a8e6): Release build with `--no-incre
    CleanupPageOwnInstructionsTests, CleanupOffTests, CloudOffTakesEffectTests, CloudWarningAndPresetsTests, HelpPageTests,
    OwnerApprovalsTests and PublicCopyNeutralityTests 230 total, 0 failed, 0 skipped; full suite 1982 total, 1959 passed,
    0 failed, 23 skipped.
+
+6. **Lens on 5e9c227: Needs changes, no blocker; fixed (22/10/2026).**
+   1. *"… day." sign-offs passed.* `SoundsLike` matched "day" against function words ("to", "the" share its sound key). The
+      rule now sound-matches only against dictated words that are themselves counted (`IsCorrectionWord`).
+   2. *Honest tidies rejected.* The lens's trial fix is in: words with a digit are left to the number rule; an apostrophe word
+      is said when the part before the apostrophe was; a word that sounds like two or three dictated words joined is said.
+      `FinalSentenceRuleTests` pins the lens's corpus (its harness `final-fix.fsx`): 36 honest tidies accepted (four of its 40
+      are left out: three rejected by older rules on main too, and "i asked him he go" → "I asked him. He went.", pinned as
+      the one recorded exception), and 25 closing sentences rejected ("Have a great day.", "Have a nice day.", "Good day.",
+      "Kind regards.", "Thanks.", "Talk soon.", "Take care." and the rest). Two of the lens's 27 pass and are not pinned:
+      "Team meeting Thursday." (all its words were said, the recorded ceiling) and "Thanks, team.".
+   3. *Echo rule and the user's own words.* The five-word echo check now reads `CleanupPrompt.WithoutOwnText(prompt)`: the
+      marker lines stay, the user's text between them is left out, so an honest reply that repeats words of the instructions
+      the dictation has too is used ("Write the company name as Kynni Pty Ltd." with "please write the company name as kinney
+      pty ltd in the letter").
+   4. *Markers.* `CleanupPrompt.OwnInstructions` takes typed copies of both marker lines out before wrapping, and text that is
+      only markers adds no section. The clean-up's load line is logged only when the section is in the prompt.
+   5. *Docs.* DEMOS.md (the placeholder no longer counts as a key), item 1 here, SPEC §5 (the widened rule, the echo
+      change, the Simple line), README "Secrets" (the button and the placeholder rule).
+   6. *PROPOSED list.* The two save-failure log lines and the Simple line are added above.
+   7. *Accessibility.* The limit line is a polite live region (`AutomationProperties.SetLiveSetting`), pinned.
+   8. *Pins.* The translate and summarise cases now pin their exact reasons: "reply shares too few words with the dictation
+      (0/14)" and "reply has 0.12x the dictation's words (minimum 0.4x)"; the whole theory compares reasons exactly.
+   9. *Simple view (orchestrator decision).* `OwnInstructionsCard.View` holds the card and one line, "Your own clean-up
+      instructions are in use (Advanced view).", shown in the Simple view while `llm.instructions` is set; the page places
+      `View`. Pinned shown and hidden.
+
+   Mutations (each observed failing, then restored):
+   - Item 1: sound-matching against every dictated word again. "A9 have a great day", "A17 good day" and "A21 have a nice
+     day" observed failing.
+   - Item 2: the digit, apostrophe and joined-words allowances removed. "11 ordinal digits alone", "12 ordinal 1st alone",
+     "13 contraction alone", "19 initialism", "28 tomorrow split", "33 alright" and "37 ordinal 2nd" observed failing.
+   - Item 3: the echo check reading the whole prompt. `A_reply_may_repeat_words_of_the_users_own_instructions_that_were_dictated`
+     observed failing.
+   - Item 4: the text wrapped as typed. `Typed_marker_lines_cannot_step_outside_the_section` observed failing.
+   - Item 9: the Simple line never shown. `The_Simple_view_says_when_your_own_instructions_are_in_use` observed failing.
+
+   Gates: Release build with `--no-incremental`, 0 warnings, 0 errors. The validator, cleaner, rules, dictionary, hands-free,
+   LLM, amendment, Batch 2, personal-text, See how it works and calibration classes with OwnInstructionsTests,
+   FinalSentenceRuleTests, KeyFileTests, CleanupPageOwnInstructionsTests, CleanupOffTests, CloudWarningAndPresetsTests,
+   HelpPageTests, OwnerApprovalsTests and PublicCopyNeutralityTests: 644 total, 642 passed, 0 failed, 2 skipped. Full suite:
+   2048 total, 2025 passed, 0 failed, 23 skipped.

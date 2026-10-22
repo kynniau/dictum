@@ -51,8 +51,27 @@ public static class CleanupPrompt
     /// <summary>PROPOSED 22/10/2026 (1.3): the line after them.</summary>
     public const string OwnInstructionsEnd = "End of the user's instructions.";
 
-    /// <summary>The user's own instructions as their section of the prompt: the start line, the text as typed, the end line.</summary>
-    public static string OwnInstructions(string instructions) => OwnInstructionsStart + "\n" + instructions.Trim() + "\n" + OwnInstructionsEnd;
+    /// <summary>
+    /// The user's own instructions as their section of the prompt: the start line, the text as typed, the end line. A copy of
+    /// either marker line in the text is taken out first, so typed text cannot close the section early (lens on 5e9c227).
+    /// </summary>
+    public static string OwnInstructions(string instructions) => OwnInstructionsStart + "\n" + OwnText(instructions) + "\n" + OwnInstructionsEnd;
+
+    private static string OwnText(string instructions) =>
+        instructions.Replace(OwnInstructionsStart, "", StringComparison.Ordinal).Replace(OwnInstructionsEnd, "", StringComparison.Ordinal).Trim();
+
+    /// <summary>
+    /// <paramref name="prompt"/> without the user's own text inside their section (the marker lines stay): what the validator's
+    /// echo check reads, since a reply may repeat the user's words when the dictation has them too. Unchanged without a section.
+    /// </summary>
+    public static string WithoutOwnText(string prompt)
+    {
+        var start = prompt.IndexOf(OwnInstructionsStart + "\n", StringComparison.Ordinal);
+        if (start < 0) return prompt;
+        var from = start + OwnInstructionsStart.Length + 1;
+        var end = prompt.IndexOf("\n" + OwnInstructionsEnd, from, StringComparison.Ordinal);
+        return end < 0 ? prompt : prompt[..from] + prompt[(end + 1)..];
+    }
 
     /// <summary>
     /// The system prompt actually sent: the base prompt (built-in or llm.prompt_file), then the user's own instructions in
@@ -63,7 +82,7 @@ public static class CleanupPrompt
     public static string Build(string basePrompt, bool grammarAssist, string? dictionaryLine, string? instructions = null)
     {
         var prompt = basePrompt;
-        if (!string.IsNullOrWhiteSpace(instructions)) prompt += "\n" + OwnInstructions(instructions);
+        if (instructions is not null && OwnText(instructions).Length > 0) prompt += "\n" + OwnInstructions(instructions);
         if (grammarAssist) prompt += "\n" + GrammarAssist;
         if (!string.IsNullOrWhiteSpace(dictionaryLine)) prompt += "\n" + dictionaryLine;
         return prompt;

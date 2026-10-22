@@ -95,7 +95,8 @@ public static partial class CleanupValidator
 
         if (Framing(rawLower, text, textLower) is { } framing) return (null, framing);
 
-        var promptShingles = context?.SystemPrompt is { } sent ? Shingles(sent) : [];
+        // The user's own instructions are not Dictum's wording: a reply may repeat words they share with the dictation (lens on 5e9c227).
+        var promptShingles = context?.SystemPrompt is { } sent ? Shingles(CleanupPrompt.WithoutOwnText(sent)) : [];
         if (Shingles(text).Where(s => FixedPromptShingles.Value.Contains(s) || promptShingles.Contains(s)).Except(Shingles(raw)).Any())
             return (null, "reply repeats five or more words of the system prompt");
 
@@ -112,7 +113,7 @@ public static partial class CleanupValidator
             return (null, "reply adds a dictionary term the speaker did not say"); // never which term: names stay out of the log
         if (context?.Carried is { } carried && RepeatsCarried(rawLower, textLower, carried))
             return (null, "reply repeats words already typed before this part");
-        if (AddedFinalSentence(textLower, rawSet)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
+        if (AddedFinalSentence(textLower, rawSet, rawWords)) return (null, "reply ends with a sentence the speaker did not say"); // after the rules above, so their reasons stand
 
         if (!ValidatorText.Contains(NegatorCounts(textLower), NegatorCounts(retracted))) return (null, "reply drops a negation");
         if (!ValidatorText.Contains(NumberCounts(textLower), NumberCounts(retracted))) return (null, "reply drops or changes a number");
@@ -171,21 +172,28 @@ public static partial class CleanupValidator
     /// that day, "… before lunch. Thanks for reading.", "… Kind regards." and "… Please call me if you have any questions."
     /// passed every other rule. Only a reply of two sentences or more is read, and only the words of its last sentence that
     /// the "scratch that" checks count (<see cref="ValidatorText.IsCorrectionWord"/>: three letters or more, no function word,
-    /// filler or spoken command), so a grammar fix's "will", "there" or "the" never counts. Such a word is said when the
-    /// dictation has it, as spelt or as a word that sounds like it (<see cref="ValidatorText.SoundsLike"/>, so "their" fixed
-    /// to "there" or "kinney" respelt "Kynni" is still said). Rejected when fewer than half of them were said, the share the
-    /// final-line rule uses.
+    /// filler or spoken command), so a grammar fix's "will", "there" or "the" never counts; a word with a digit is left to the
+    /// number rule ("The 21st."). Such a word is said when the dictation has it as spelt; when the part before its apostrophe
+    /// was said ("they're" for "they are"); when it sounds like a dictated word that is itself counted
+    /// (<see cref="ValidatorText.SoundsLike"/>: "their" fixed to "there", "kinney" respelt "Kynni"; never a function word,
+    /// whose sound key "day" shares, lens on 5e9c227); or when it sounds like two or three dictated words joined ("alright"
+    /// for "all right", "ATO" for "a t o", "tomorrow" for "to morrow"). Rejected when fewer than half of them were said, the
+    /// share the final-line rule uses.
     /// </summary>
     // simplification: words, not an alignment with the dictation's last sentence. Ceiling: a last sentence whose words were
     // all said earlier in the dictation, in another order, passes; and a short last sentence that a grammar fix rewrites into
-    // other words is rejected (the tidy is typed: a false rejection costs polish only). Trigger to retire: either observed.
-    private static bool AddedFinalSentence(string textLower, HashSet<string> rawSet)
+    // other words is rejected (the tidy is typed: a false rejection costs polish only), pinned: "i asked him he go" → "I asked
+    // him. He went." Trigger to retire: either observed in the log or a typed reply.
+    private static bool AddedFinalSentence(string textLower, HashSet<string> rawSet, List<string> rawWords)
     {
         var sentences = SentenceEnd().Split(textLower).Select(s => s.Trim()).Where(s => Words(s).Count > 0).ToList();
         if (sentences.Count < 2) return false;
-        var words = Comparable(Words(sentences[^1])).Where(IsCorrectionWord).ToList();
+        var words = Comparable(Words(sentences[^1])).Where(w => IsCorrectionWord(w) && !w.Any(char.IsDigit)).ToList();
         if (words.Count == 0) return false;
-        var said = words.Count(w => rawSet.Contains(w) || rawSet.Any(r => SoundsLike(r, w)));
+        var joined = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < rawWords.Count; i++) for (var n = 2; n <= 3 && i + n <= rawWords.Count; n++) joined.Add(string.Concat(rawWords.Skip(i).Take(n)));
+        var soundable = rawSet.Where(IsCorrectionWord).ToList();
+        var said = words.Count(w => rawSet.Contains(w) || rawSet.Contains(w.Split('\x27')[0]) || joined.Any(j => SoundsLike(j, w)) || soundable.Any(r => SoundsLike(r, w)));
         return said * 2 < words.Count;
     }
 

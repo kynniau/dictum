@@ -72,7 +72,7 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Card(Ui.Stack(8, _profanity,
                 Ui.Text("Mask keeps the first letter (f***); Remove drops the word. The clean-up model keeps every word you said, swear words included: this setting is the only thing that changes them.", "caption")), "Profanity filter"),
             Ui.Card(Ui.Line("Grammar assist", _grammar, "For speakers whose first language is not English: also fixes articles, tenses, prepositions and word order, keeping every fact and name."), "Grammar"),
-            _own.Card,
+            _own.View,
             Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff), "Cloud clean-up"));
     }
 

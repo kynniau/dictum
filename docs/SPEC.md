@@ -306,14 +306,21 @@ part of the text sent, under the clean-up consent already given); never to `none
 validator checks every reply whatever the instructions say: a reply that adds a line, a bracketed remark or a closing
 sentence, summarises, translates or answers is rejected and the rule-based tidy is typed.
 
-Final-sentence rule (owner decision, 22/10/2026 20:55 AEDT; reason text PROPOSED): a short sentence added at the end on
-the same line as the dictation ("… before lunch. Thanks for reading.") had passed every rule. `CleanupValidator` now rejects
-it as "reply ends with a sentence the speaker did not say": in a reply of two sentences or more, the last sentence's words
-of three letters or more that are not function words, fillers or spoken commands (`ValidatorText.IsCorrectionWord`) must be
-at least half said, as spelt or sounding alike (`ValidatorText.SoundsLike`), the share the final-line rule uses. It runs
-after the dictionary-term and hands-free repeat rules, so their reasons stand. Ceiling: a last sentence made of words said
-earlier in another order passes, and a short last sentence a grammar fix rewrites into other words is rejected (a false
-rejection costs polish only).
+Final-sentence rule (owner decision, 22/10/2026 20:55 AEDT; widened after the lens on 5e9c227; reason text PROPOSED): a
+short sentence added at the end on the same line as the dictation ("… before lunch. Thanks for reading.") had passed every
+rule. `CleanupValidator` now rejects it as "reply ends with a sentence the speaker did not say": in a reply of two sentences
+or more, the last sentence's words of three letters or more that are not function words, fillers or spoken commands
+(`ValidatorText.IsCorrectionWord`), leaving out words with a digit (the number rule's), must be at least half said, the share
+the final-line rule uses. A word is said when the dictation has it as spelt; when the part before its apostrophe was said
+("they're"); when it sounds like (`ValidatorText.SoundsLike`) a dictated word that is itself counted, never a function word
+(whose sound key "day" shares); or when it sounds like two or three dictated words joined ("alright", "ATO", "tomorrow" from
+"to morrow"). It runs after the dictionary-term and hands-free repeat rules, so their reasons stand. Ceiling: a last
+sentence made of words said earlier in another order passes, and a short last sentence a grammar fix rewrites into other
+words is rejected ("i asked him he go" → "I asked him. He went.", pinned; a false rejection costs polish only). The echo
+rule reads the prompt without the user's own text inside their section (`CleanupPrompt.WithoutOwnText`), so a reply may
+repeat words of the instructions that the dictation has too; typed copies of the section's marker lines are taken out
+before the text is wrapped. In the Simple view, which hides the box, the Clean-up page says "Your own clean-up
+instructions are in use (Advanced view)." while `llm.instructions` is set (PROPOSED).
 Private text: the settings writer's log line, the load warnings and the clean-up's load line give its length only; the
 feedback email, the state lines, About and See how it works never show it. A longer value in settings.json is cut to its
 first 2,000 characters (never through a surrogate pair) with a warning that gives the length only. The box is

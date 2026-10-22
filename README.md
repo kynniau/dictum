@@ -824,6 +824,11 @@ keys that are not set. Dictum reads `%APPDATA%\Dictum\.env` and the `.env` besid
 wins between the two). So a staff machine or Azure VM can carry a machine-level `ANTHROPIC_API_KEY` and no `.env`
 at all. See `.env.example`.
 
+Settings > Clean-up has **Create the key file…** beside Open the settings folder: it writes `%APPDATA%\Dictum\.env` with
+a short header and the line for the service chosen, such as `ANTHROPIC_API_KEY=your-key-here`, and opens it. A `.env`
+that already exists is opened as it is, never changed. The placeholder `your-key-here` counts as not set, as an empty
+value does, so nothing is sent until a real key is saved in its place.
+
 | Key | Used by |
 |---|---|
 | `ANTHROPIC_API_KEY` | `llm.provider = "anthropic"`. Missing key → nothing is sent. Agreed to in the consent step, the rule-based tidy runs and Settings says it is waiting for the key; never agreed to (a first-build settings.json), the local cleanup model is used (logged), or the rule-based tidy if that model is not downloaded. |

@@ -25,6 +25,9 @@ internal sealed class OwnInstructionsCard
     /// <summary>PROPOSED 22/10/2026 (1.3): under the box while cloud clean-up is on (a host agreed to in the consent step).</summary>
     internal static string CloudLine(string host) => $"With cloud clean-up on, these instructions go to {host} with each dictation.";
 
+    /// <summary>PROPOSED 22/10/2026 (1.3, orchestrator decision after the lens on 5e9c227): the Simple view hides the box, so it says when instructions apply.</summary>
+    internal const string SimpleLine = "Your own clean-up instructions are in use (Advanced view).";
+
     private readonly AppShell _shell;
     private readonly Action<string> _say;
     private readonly TextBox _box = new()
@@ -37,6 +40,7 @@ internal sealed class OwnInstructionsCard
     };
     private readonly TextBlock _limit = Ui.Text(LimitLine, "caption");
     private readonly TextBlock _cloud = Ui.Text("", "caption");
+    private readonly TextBlock _simpleNote = Ui.Text(SimpleLine, "caption");
     private bool _drawing;
 
     /// <param name="say">The page's status line, for a save that failed.</param>
@@ -46,6 +50,7 @@ internal sealed class OwnInstructionsCard
         _say = say;
         AutomationProperties.SetName(_box, Label);
         AutomationProperties.SetHelpText(_box, Hint);
+        AutomationProperties.SetLiveSetting(_limit, AutomationLiveSetting.Polite); // said when it appears, as the calibration window's lines are
         _box.PropertyChanged += (_, e) =>
         {
             if (e.Property == TextBox.TextProperty) ShowLimit(); // on the property itself: a TextChanged handler did not update the line in the headless test
@@ -53,22 +58,32 @@ internal sealed class OwnInstructionsCard
         _box.LostFocus += (_, _) => Save();
         _box.DetachedFromVisualTree += (_, _) => Save(); // the page or the window closed with the box focused
         Card = Ui.Card(Ui.Stack(8, _box, Ui.Text(Hint, "hint"), _limit, _cloud), Label);
+        View = Ui.Stack(18, Card, _simpleNote);
+        _simpleNote.IsVisible = false;
         ShowLimit();
     }
 
-    /// <summary>The card to place on the page.</summary>
+    /// <summary>What the page places: the card (Advanced view) and the Simple view's line.</summary>
+    public StackPanel View { get; }
+
+    /// <summary>The card itself.</summary>
     public Border Card { get; }
 
     /// <summary>The box (for the page's tests).</summary>
     internal TextBox Box => _box;
 
-    /// <summary>From the settings last loaded: shown in the Advanced view only; the box is not rewritten while it is being typed in.</summary>
+    /// <summary>
+    /// From the settings last loaded: the card in the Advanced view only, and in the Simple view one line while instructions are set
+    /// (so none apply unseen); the box is not rewritten while it is being typed in.
+    /// </summary>
     public void Redraw(AppSettings s)
     {
         _drawing = true;
         try
         {
             Card.IsVisible = !s.Ui.IsSimple;
+            _simpleNote.IsVisible = s.Ui.IsSimple && s.Llm.Instructions is { Length: > 0 };
+            View.IsVisible = Card.IsVisible || _simpleNote.IsVisible; // no empty gap on the page
             if (!_box.IsFocused) _box.Text = s.Llm.Instructions ?? "";
             var host = CloudPolicy.CloudHost(s.Llm);
             _cloud.Text = host is not null && CloudPolicy.HasConsent(s.Llm) ? CloudLine(host) : "";

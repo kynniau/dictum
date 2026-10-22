@@ -79,6 +79,46 @@ public class CleanupPageOwnInstructionsTests
         shell.Dispose();
     });
 
+    /// <summary>
+    /// The Simple view hides the box, so it says when instructions apply (orchestrator decision after the lens on 5e9c227).
+    /// Mutation: OwnInstructionsCard.Redraw never showing the line makes this fail.
+    /// </summary>
+    [Fact]
+    public Task The_Simple_view_says_when_your_own_instructions_are_in_use() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "ui": { "view": "simple" }, "llm": { "instructions": "Prefer short sentences." } }""");
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = CleanupPage(shell);
+        Assert.Contains(OwnInstructionsCard.SimpleLine, Lines(window));
+        Assert.Equal("Your own clean-up instructions are in use (Advanced view).", OwnInstructionsCard.SimpleLine);
+        Assert.True(shell.Write(("llm.instructions", null)));
+        Assert.DoesNotContain(OwnInstructionsCard.SimpleLine, Lines(window)); // none set: no line
+        Assert.True(shell.Write(("llm.instructions", System.Text.Json.Nodes.JsonValue.Create("Prefer short sentences."))));
+        Assert.True(shell.Write(("ui.view", System.Text.Json.Nodes.JsonValue.Create("advanced"))));
+        Assert.DoesNotContain(OwnInstructionsCard.SimpleLine, Lines(window)); // Advanced: the box itself shows them
+        Assert.True(Box(window).IsEffectivelyVisible);
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task The_limit_line_is_a_polite_live_region() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Advanced);
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var window = CleanupPage(shell);
+        var limit = All<TextBlock>(window).Single(t => t.Text == OwnInstructionsCard.LimitLine);
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(limit));
+        Assert.False(limit.IsEffectivelyVisible);
+        Box(window).Text = new string('a', Dictum.Settings.LlmSettings.InstructionsMaxLength);
+        Assert.True(limit.IsEffectivelyVisible);
+        Box(window).Text = "";
+        window.Close();
+        shell.Dispose();
+    });
+
     [Fact]
     public Task The_button_beside_the_folder_button_creates_the_key_file_and_says_so() => UiSession.Run(() =>
     {
