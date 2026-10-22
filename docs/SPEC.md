@@ -1208,8 +1208,9 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   download is refused, before it is asked and again where it starts, when its drive would keep under 200 MB (decimal); a
   kept `.part` needs only the rest; when the free space cannot be read the download goes ahead, as the 2 GB warning does.
 - **Changing the folder moves no files** unless the user says so (amended 22/10/2026 for 1.3, move-on-change; PROPOSED
-  wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models and Change… on Storage go through
-  one handler (`ModelFolderActions`); Use default offers no move. When the folder in use holds model files Dictum
+  wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models, Change… on Storage and Use default
+  on both go through one handler (`ModelFolderActions`) and behave alike (owner decision 22/10/2026 21:45 AEDT: Use default
+  moves the files back to the per-user folder). When the folder in use holds model files Dictum
   knows (catalogue files and their `.part` downloads, in that folder itself), it asks once: **Move the files** or **Leave them
   where they are** (the earlier behaviour; closing the question changes nothing). Moving is refused while a download runs
   and when one folder is inside the other. Otherwise both models are released (a load under way is waited for), then each

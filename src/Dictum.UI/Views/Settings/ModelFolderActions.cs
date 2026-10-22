@@ -53,24 +53,21 @@ internal static class ModelFolderActions
     }
 
     /// <summary>
-    /// models.folder goes back to the per-user default folder. No move is offered: the owner's approval names Browse… and
-    /// Change… only, so Use default keeps the earlier behaviour (an owner decision whether it should offer the move too).
+    /// models.folder goes back to the per-user default folder, offering to move the files there as Browse… does (owner decision,
+    /// 22/10/2026 21:45 AEDT: all three ways of changing the folder behave alike).
     /// </summary>
-    internal static void UseDefaultFolder(AppShell shell, Action<string> say, Action? then = null)
-    {
-        if (!shell.MovingModels) say(shell.Models.SetModelsFolder(null) ?? "");
-        then?.Invoke();
-    }
+    internal static Task UseDefaultFolder(AppShell shell, Action<string> say, Action? then = null) =>
+        shell.MovingModels ? Task.CompletedTask : ChangeFolderAsync(shell, null, say, then);
 
     /// <summary>
-    /// Changes the model folder to <paramref name="folder"/> (Browse… and Change…). When the folder Dictum is leaving holds
+    /// Changes the model folder to <paramref name="folder"/> (null: the per-user default; Browse…, Change… and Use default). When the folder Dictum is leaving holds
     /// model files it knows (<see cref="ModelMover.Known"/>), asks first: "Leave them where they are" writes the folder as before;
     /// "Move the files" is refused while a download runs or when one folder is inside the other, otherwise releases both engines,
     /// moves the files (copy, check, rename, then delete the original), then writes the folder and reloads, so the models load
     /// from the new folder. Closing the question changes nothing. Runs synchronously up to the move, so a change with nothing
     /// to move is done when this returns.
     /// </summary>
-    internal static async Task ChangeFolderAsync(AppShell shell, string folder, Action<string> say, Action? then = null)
+    internal static async Task ChangeFolderAsync(AppShell shell, string? folder, Action<string> say, Action? then = null)
     {
         try
         {
@@ -87,15 +84,15 @@ internal static class ModelFolderActions
         }
     }
 
-    private static async Task ChangeAsync(AppShell shell, string folder, Action<string> say)
+    private static async Task ChangeAsync(AppShell shell, string? folder, Action<string> say)
     {
-        if (shell.Models.FolderRefusal(folder) is { } refused)
+        if (folder is not null && shell.Models.FolderRefusal(folder) is { } refused)
         {
             say(refused); // the bundled folder or a device path: as before, nothing is asked or written
             return;
         }
         var from = shell.ModelsDir;
-        var to = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        var to = folder is null ? shell.Paths.DefaultModelsDir : Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         var files = PathRegistry.SamePath(from, to) || shell.Paths.IsBundled(from) ? [] : ModelMover.Known(from);
         if (files.Count == 0)
         {

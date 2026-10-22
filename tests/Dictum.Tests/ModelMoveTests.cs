@@ -284,6 +284,42 @@ public sealed class ModelMoveTests : IDisposable
         return true;
     });
 
+    /// <summary>
+    /// Pin (owner decision 22/10/2026 21:45 AEDT): Settings > Storage > Use default asks the same question and moves the files
+    /// back to the per-user default folder; models.folder is cleared and the model loads from the default folder.
+    /// </summary>
+    [Fact]
+    public Task Use_default_offers_the_move_and_moves_the_files_back_to_the_default_folder() => UiSession.RunAsync(async () =>
+    {
+        using var scratch = new Scratch();
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", whisper = new { model = "tiny.en" }, llm = new { provider = "none" }, models = new { folder = chosen } }));
+        var inChosen = Create(chosen, "ggml-tiny.en.bin", TinyEnBytes);
+        var speech = SpeechModels();
+        var (shell, _, dialogs) = scratch.Shell(speech);
+        shell.MoveHasher = FakeHasher();
+        shell.Reload(userRequested: false);
+        Assert.True(await Eventually(() => shell.Models.ModelPath == inChosen && speech.IsReady));
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        dialogs.Answers.Enqueue(0);
+
+        Click(All<Button>(window).First(b => b.Content as string == ModelsPage.UseDefaultLabel));
+
+        var inDefault = Path.Combine(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin");
+        Assert.True(await Eventually(() => Texts(window).Contains($"Moved 1 file to {scratch.Paths.DefaultModelsDir}.", StringComparison.Ordinal)));
+        Assert.Equal(ModelFolderActions.MoveTitle, Assert.Single(dialogs.Asked).Title);
+        Assert.StartsWith($"Your model files are in {chosen}. Move them to {scratch.Paths.DefaultModelsDir} so Dictum finds them there? 1 file, ", dialogs.Asked[0].Text);
+        Assert.False(File.Exists(inChosen));
+        Assert.True(File.Exists(inDefault));
+        Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
+        Assert.Equal(inDefault, shell.Models.ModelPath);
+        window.Close();
+        shell.Dispose();
+        return true;
+    });
+
     /// <summary>Pin: "Move the files" while a download runs is refused, and nothing changes: the folder, the files, the download.</summary>
     [Fact]
     public Task Moving_is_refused_while_a_download_runs() => UiSession.RunAsync(async () =>
