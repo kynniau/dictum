@@ -767,8 +767,9 @@ public sealed class ModelCoordinator(
     /// <param name="agreed">
     /// Told true once the download goes ahead (agreed to, or already on its way, so not asked about again) and false when the
     /// question is declined; not told when the download is refused before the question, or when nothing needs downloading.
-    /// The calibration window changes its button and status line only on true (Mac beta, 23/10/2026: it said "Downloading…"
-    /// while the question was still open).
+    /// Called synchronously on the calling thread, before this returns (<paramref name="then"/> and <paramref name="finished"/>
+    /// may come later, from a download). The calibration window changes its button and status line only on true (Mac beta,
+    /// 23/10/2026: it said "Downloading…" while the question was still open).
     /// </param>
     public void ApplyWithDownloads(string note, IReadOnlyList<(DownloadSpec Spec, string Destination)> missing, (string Key, JsonNode? Value)[] values, Action? then = null,
         Action<bool>? finished = null, Action<bool>? agreed = null)

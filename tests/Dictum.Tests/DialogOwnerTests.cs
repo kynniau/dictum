@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Llm;
 using Dictum.Settings;
 using Dictum.UI.Shell;
@@ -327,6 +328,55 @@ public class DialogOwnerTests(ITestOutputHelper output)
         Assert.False(button.IsEnabled);
         Assert.Contains(DownloadingSmallEn, Texts(window));
         Assert.True(Eventually(() => Texts(window).Contains(SmallEnNotDownloaded)), "the failed download was never reported");
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>A download host that takes the request and answers nothing until the download is cancelled.</summary>
+    private sealed class HeldHandler : HttpMessageHandler
+    {
+        private int _requests;
+
+        public int Requests => Volatile.Read(ref _requests);
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _requests);
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new OperationCanceledException(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// "Download and include" for a model that is already downloading (started first by another caller of the same
+    /// coordinator path, a Mode preset say, and held by the fake host) asks nothing again and joins that download: the button
+    /// reads "Downloading…", disabled, the status line says so, and no second request is made. When that download is
+    /// cancelled, the window says the model was not downloaded.
+    /// </summary>
+    [Fact]
+    public Task Including_a_model_already_downloading_asks_nothing_and_shows_the_download() => UiSession.Run(() =>
+    {
+        using var opened = new Opened();
+        var server = new HeldHandler();
+        var (shell, window, scratch) = Calibration(server);
+        using var _ = scratch;
+
+        Inside(opened, q => Click(q, "Download"));
+        shell.Models.ApplyWithDownloads("Started elsewhere", [(ModelCatalog.Find("small.en")!.Download, ModelCatalog.ResolvePath("small.en", shell.ModelsDir))], []);
+        Assert.True(Eventually(() => server.Requests == 1), "the first download never reached the host");
+        Assert.Equal("Download and include", Named(window, IncludeSmallEn).Content); // the window was not told
+
+        Named(window, IncludeSmallEn).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Single(opened.Windows); // the first download's question only: none for the click
+        var button = Named(window, IncludeSmallEn);
+        Assert.Equal("Downloading…", button.Content);
+        Assert.False(button.IsEnabled);
+        Assert.Contains(DownloadingSmallEn, Texts(window));
+        Assert.Equal(1, server.Requests);
+
+        shell.Models.CancelDownload(DownloadCancelReason.CancelLink);
+        Assert.True(Eventually(() => Texts(window).Contains(SmallEnNotDownloaded)), "the cancelled download was never reported");
         window.Close();
         shell.Dispose();
     });

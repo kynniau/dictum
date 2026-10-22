@@ -14,8 +14,9 @@ namespace Dictum.Calibration;
 /// <param name="Write">Writes settings.json keys through the tray's writer (which reloads and hot-swaps the model).</param>
 /// <param name="DownloadSpeechModel">Asks, downloads through the app's downloader (refused under offline_only), then calls back, in
 /// this order: whether the download goes ahead (true once agreed, false when the question is declined; not called when it is
-/// refused before the question), then on arrival, then the last callback says whether it arrived (false when declined,
-/// refused, failed or cancelled).</param>
+/// refused before the question; called synchronously on the calling thread, before this returns), then on arrival, then the
+/// last callback says whether it arrived (false when declined, refused, failed or cancelled; these two may come later, from a
+/// download).</param>
 /// <param name="LoadSpeech">Tests load fakes; production loads whisper.cpp through <see cref="WhisperEngine.Load"/>.</param>
 internal sealed record CalibrationHost(
     AppPaths Paths,
