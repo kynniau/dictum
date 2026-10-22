@@ -262,18 +262,20 @@ public sealed class ModelMoveTests : IDisposable
     [InlineData(@"C:\models", @"D:\models", false)]
     [InlineData(@"D:\", @"D:\Models", true)] // a drive root (lens on PR #61)
     [InlineData(@"D:\Models", @"D:\", true)]
-    public void Nested_folders_are_one_inside_the_other(string from, string to, bool nested) => Assert.Equal(nested, ModelMover.Nested(from, to));
+    public void Nested_folders_are_one_inside_the_other(string from, string to, bool nested) =>
+        Assert.Equal(nested, ModelMover.Nested(TestPaths.Native(from), TestPaths.Native(to))); // /C/models etc. off Windows
 
     /// <summary>Pin (lens on PR #61): a folder is inside a drive root; a root is not inside itself.</summary>
     [Fact]
     public void A_folder_is_inside_its_drive_root()
     {
-        Assert.True(PathRegistry.IsInside(@"D:\Models", @"D:\"));
-        Assert.True(PathRegistry.IsInside(@"D:\Models\ggml-tiny.en.bin", @"D:\"));
-        Assert.False(PathRegistry.IsInside(@"D:\", @"D:\Models"));
-        Assert.False(PathRegistry.IsInside(@"D:\", @"D:\"));
-        Assert.False(PathRegistry.IsInside(@"D:\Models", @"D:\Models"));
-        Assert.False(PathRegistry.IsInside(@"D:\Models-new", @"D:\Models"));
+        static string N(string windowsPath) => TestPaths.Native(windowsPath); // D:\ is /D off Windows (not a root there, the same containment)
+        Assert.True(PathRegistry.IsInside(N(@"D:\Models"), N(@"D:\")));
+        Assert.True(PathRegistry.IsInside(N(@"D:\Models\ggml-tiny.en.bin"), N(@"D:\")));
+        Assert.False(PathRegistry.IsInside(N(@"D:\"), N(@"D:\Models")));
+        Assert.False(PathRegistry.IsInside(N(@"D:\"), N(@"D:\")));
+        Assert.False(PathRegistry.IsInside(N(@"D:\Models"), N(@"D:\Models")));
+        Assert.False(PathRegistry.IsInside(N(@"D:\Models-new"), N(@"D:\Models")));
     }
 
     // ---- The release seam ----
@@ -286,6 +288,7 @@ public sealed class ModelMoveTests : IDisposable
     [Fact]
     public async Task ReleaseAsync_closes_the_clean_up_models_file_and_waits_for_a_load_under_way()
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen); // the pin is the refused move while the file is held
         var path = Create(Path.Combine(_dir.FullName, "old"), "qwen2.5-1.5b-instruct-q4_k_m.gguf");
         var gate = new ManualResetEventSlim();
         var started = new ManualResetEventSlim();
@@ -321,6 +324,7 @@ public sealed class ModelMoveTests : IDisposable
     [Fact]
     public async Task ReleaseAsync_closes_the_speech_models_file()
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         var path = Create(Path.Combine(_dir.FullName, "old"), "ggml-tiny.en.bin");
         var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new HoldingSpeechEngine(p, d), gpuInUse: () => false);
         models.BeginLoad(path, new WhisperSettings { Gpu = "cpu" });

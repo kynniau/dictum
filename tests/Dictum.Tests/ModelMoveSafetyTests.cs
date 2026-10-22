@@ -25,6 +25,7 @@ public sealed class ModelMoveSafetyTests : IDisposable
     /// <summary>A directory junction at <paramref name="link"/> to <paramref name="target"/> (no administrator rights needed); false if it could not be made.</summary>
     private static bool Junction(string link, string target)
     {
+        if (!OperatingSystem.IsWindows()) return false; // mklink /J is cmd.exe's; every caller skips on false
         using var process = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"")
         {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,

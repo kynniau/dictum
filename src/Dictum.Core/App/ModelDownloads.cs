@@ -1,5 +1,6 @@
 using Dictum.Core;
 using Dictum.Settings;
+using Dictum.Storage;
 using Dictum.Transcribe;
 
 namespace Dictum.App;
@@ -103,11 +104,11 @@ internal sealed class ModelDownloads(HttpClient http, ILog log, Func<AppSettings
     /// <param name="exceptRunning">Leave the running download out: what would be pending if it were stopped (second lens, 19/10/2026).</param>
     public long PendingBytes(string folder, bool exceptRunning = false)
     {
-        var root = Path.GetPathRoot(Path.GetFullPath(folder));
+        var root = DiskSpace.VolumeRoot(folder);
         long pending = 0;
         foreach (var job in (_current is { } running && !exceptRunning ? [running] : Array.Empty<Job>()).Concat(_queue))
         {
-            if (job.Spec.Bytes is not long total || !string.Equals(Path.GetPathRoot(Path.GetFullPath(job.Destination)), root, StringComparison.OrdinalIgnoreCase)) continue;
+            if (job.Spec.Bytes is not long total || !string.Equals(DiskSpace.VolumeRoot(job.Destination), root, StringComparison.OrdinalIgnoreCase)) continue;
             var part = new FileInfo(job.Destination + ".part");
             pending += Math.Max(0, total - (part.Exists ? part.Length : 0));
         }

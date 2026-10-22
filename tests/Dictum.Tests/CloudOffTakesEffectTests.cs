@@ -288,6 +288,7 @@ public partial class CloudOffTakesEffectTests
     [InlineData("consent.json held open, settings.json read-only")]
     public Task Switching_cloud_clean_up_off_stops_sending_when_consent_json_cannot_be_deleted(string mode) => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         // Lens P1 on 31d01f3: the delete ran first and threw, so nothing else did. The clean-up in use stayed openai-compatible/m at
         // llm.example.com, the page said "On: the text of each dictation is sent to…" over "That did not work: …", and a later
         // reload re-applied the consent still on file. Since the lens on eaa3a04, read-only no longer stops the delete

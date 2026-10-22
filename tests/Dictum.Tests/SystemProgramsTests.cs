@@ -8,6 +8,7 @@ public sealed class SystemProgramsTests
     [Fact]
     public void The_Windows_folder_ignores_a_SystemRoot_variable_set_in_the_process()
     {
+        TestEnv.WindowsOnly("Finds Windows' own programs through the Windows system directory.");
         var expected = Path.GetDirectoryName(Environment.SystemDirectory);
         var original = Environment.GetEnvironmentVariable("SystemRoot");
         try

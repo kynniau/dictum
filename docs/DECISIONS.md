@@ -5295,3 +5295,226 @@ Owner approval 22/10/2026: when the model folder changes, Dictum offers to move 
    - flyout.png.
    - The tester paragraph.
    - Counsel review of the consents and the privacy policy.
+## Dictum for macOS (22-23/10/2026, branch feature/mac-platform)
+
+Built on Kyle's Mac (Apple Silicon, macOS 27.2) from docs/MAC-HANDOVER.md, with the owner's decisions of 22/10/2026 that
+override the handover: an Apple Developer Program membership exists, so the beta is a Developer ID signed and notarised
+GitHub pre-release (no Gatekeeper warning), Apple Silicon only (Intel only if a tester needs it), the Mac App Store as a
+later train. The owner creates the signing certificate and the notarisation credentials himself; nothing in the repo or
+the build sessions ever holds them. The release waits until Dictum 1.3 is live on Windows. Provenance marks as in the
+handover: **Verified** means read this session against the named source; **Recalled** is unverified.
+
+**Owner approvals (APPROVED as a block at 23:59 AEDT 22/10/2026, relayed by the Windows orchestrator session):**
+
+- a. Login item through `SMAppService` (ServiceManagement, macOS 13+), not the handover's LaunchAgent plist: the entry
+  survives a moved bundle and appears under System Settings > General > Login Items. The handover's "retire when signed"
+  simplification is retired before it was built. **Verified** 22/10/2026 on developer.apple.com (SMAppService: macOS
+  13.0+; `register()` returns kSMErrorAlreadyRegistered when already registered and kSMErrorLaunchDeniedByUser when the
+  user denied it).
+- b. Notifications through `UNUserNotificationCenter`, guarded: outside an app bundle (a build tree, `dotnet run`) the
+  centre has no bundle identifier, so the title and text go to the log instead. The handover's transient-panel
+  simplification is not built.
+- c. Permissions: both event taps are active taps (kCGEventTapOptionDefault), so the beta asks for Accessibility and
+  Microphone only, not Input Monitoring as a third prompt. To be confirmed on hardware in the test plan (§7).
+- d. Default hotkey on a Mac: Right Option (settings token `RightAlt`); on screen the Alt key reads "Option" and the Win key
+  "Command" (`HotkeyNames.Dialect`, set by Dictum.Mac's entry point; parser tokens unchanged, so settings.json, logs and
+  --selftest keep `RightAlt`, `Win`). Strings "Option" and "Command" APPROVED 23:59 AEDT 22/10/2026.
+- e. `LSMinimumSystemVersion` 15.0: .NET 10 supports macOS 15 and later, Arm64 and x64 (**Verified** 22/10/2026,
+  github.com/dotnet/core release-notes/10.0/supported-os.md); Avalonia 11 lists macOS 10.14 and later (**Verified**
+  v11.docs.avaloniaui.net, Supported Platforms).
+- f. Speech and clean-up runtimes: `Whisper.net.Runtime` 1.9.1 and `LLamaSharp.Backend.Cpu` 0.27.0 only. Both ship ggml's
+  Metal backend for arm64 (**Verified** 22/10/2026 in the restored packages: `build/macos-arm64/libggml-metal-whisper.dylib`
+  and `LLamaSharpRuntimes/osx-arm64/native/libggml-metal.dylib`), so the "CPU" runtime uses the GPU on Apple Silicon; the
+  log keeps every `ggml_metal` line at info so the truth is in the log. `Whisper.net.Runtime.CoreML` is not referenced:
+  Core ML needs a separate encoder file per model (`ggml-<model>-encoder.mlmodelc`, **Verified** whisper.cpp README) that
+  the catalogue does not carry. The handover's "no Metal-capable backend" lead was wrong: it is inside the CPU package.
+- g. Bundle identifier `au.kynni.dictum`; Developer ID signing with the hardened runtime and these entitlements:
+  `com.apple.security.cs.allow-jit`, `com.apple.security.cs.allow-unsigned-executable-memory`,
+  `com.apple.security.cs.allow-dyld-environment-variables`, `com.apple.security.cs.disable-library-validation` (the .NET
+  host's defaults, **Verified** 22/10/2026 learn.microsoft.com "macOS Catalina notarization", dated 23/04/2026) plus
+  `com.apple.security.device.audio-input` (**Verified** developer.apple.com Hardened Runtime).
+- h. The publish and bundle script is bash (`scripts/publish-mac.sh`): this Mac has no pwsh; the handover allows either.
+
+**Where the Mac keeps things.** Both roots are `~/Library/Application Support/Dictum` (settings.json, consent.json, .env at
+the top; models/, logs/, calibration/ beside them), from `HOME` so a scratch profile can be tested as the Windows build
+tests with APPDATA. Not `~/Library/Caches` (the handover's reason, that the system may purge Caches, stays Recalled and was
+not relied on: one visible folder was reason enough). The owner's own install points `models.folder` at
+a folder on an external volume through Settings > Storage; no code knows that path.
+
+**Project shape.** `src/Dictum.Mac` is plain `net10.0` with `RuntimeIdentifiers` osx-arm64 (not `net10.0-macos`, which
+brings a workload and bindings this app does not use); assembly name `Dictum.Mac`, because the tests load it beside
+Dictum.Windows, whose assembly is `Dictum`; the bundle script renames the apphost to `Contents/MacOS/Dictum` (the host finds
+its .dll by the name built into it). The solution builds on macOS: `Directory.Build.props` sets `EnableWindowsTargeting`
+off Windows (the SDK otherwise refuses net10.0-windows with NETSDK1100, **Verified** by the first build here), and the x64
+`PlatformTarget` of Dictum.Windows and the tests applies on Windows only (an x64-marked assembly cannot load into the arm64
+test host: "The assembly architecture is not compatible", **Verified** 22/10/2026). The handover's "the tests are
+platform-neutral by design" was wrong: tests/Dictum.Tests targets net10.0-windows and used Dictum.Windows types in 18
+files; it now also references Dictum.Mac, and the Windows-only tests skip on macOS with a reason (lane report below).
+
+**Core changes for the Mac** (src/Dictum.Core): `HotkeyNames.Dialect` and `DefaultHotkey` (decision d); `AppSettings.Hotkey`
+defaults to `HotkeyNames.DefaultHotkey`; `LocalLlmEngine.LoadedLibraryPath` accepts `libllama.dylib`; both engines keep
+`ggml_metal` lines at info. Pinned in tests/Dictum.Tests/MacCoreTests.cs.
+
+**Known wording left for the orchestrator:** with `WhisperEngine.VulkanLoaderPresent` returning false on a Mac, the
+whisper.gpu = auto log line still says "the Vulkan loader, vulkan-1.dll, does not load on this PC" (NoVulkanCrashTests pins
+it); true as stated, but Windows wording. Also `WhisperEngine.LoadedRuntime` and `LocalLlmEngine.Backend` say "CPU" on a
+Mac while Metal is in use inside that runtime; the ggml_metal log lines carry the fact. Both are candidates for a wording
+pass with approved copy, not changed here.
+
+**Lane findings (23/10/2026, each Verified on this Mac unless marked):**
+
+- *Tests on macOS.* `dotnet test --project tests/Dictum.Tests -c Release` on the merged head: 2015 total, 0 failed, 1831
+  succeeded, 184 skipped (the Windows-only ones skip through `TestEnv.WindowsOnly(reason)`; 54 methods gated, 13 converted
+  to OS-neutral paths through `TestPaths.Native`). Three real cross-platform defects came out of it, each fixed at its root:
+  (1) `SettingsFile.WriteAtomic` replaced a read-only settings.json or consent.json on macOS (a rename over a read-only file
+  is allowed there, refused on Windows), so the "could not be saved" paths of the off switches never ran; off Windows a
+  read-only target is now refused before the .tmp is written. (2) `Path.GetPathRoot` is "/" for every path on macOS, so free
+  space, `ModelDownloads.PendingBytes` and `DiskSpace.IsNetwork` treated every folder as the startup disk; `DiskSpace.VolumeRoot`
+  returns the deepest mount point there (text match, `// simplification:` in the file). (3) The Welcome window's free-space
+  line read " has 41.0 GB free" on a Mac; a root with no name now uses `OnboardingText.StartupDisk`, PROPOSED: "The startup
+  disk" (on screen: "The startup disk has 41.0 GB free"; another disk keeps its mount path, "/Volumes/Backup has 41.0 GB
+  free"). Open: the theme names Segoe UI only (src/Dictum.UI/Theme/Controls.axaml), so macOS draws a fallback font and the
+  longest tray-panel header line trims at 308 px; `Polish2Tests.The_panel_header_is_one_whole_line` is gated on macOS and a
+  Mac font choice is for the owner.
+- *Audio.* `AudioQueueCapture` asks the queue for 16 kHz mono float and reads back the format it records; a one-second
+  capture on this Mac returned 1,013 ms of audio, and `kAudioDevicePropertyDeviceIsRunningSomewhere` went 1 while recording
+  and 0 after Stop. Stopwatch and `mach_absolute_time` are the same clock here (Stopwatch.Frequency 1e9, timebase 125/3), so
+  the first-frame figure is on the key-down clock. Finding: the first about 460 ms of every recording arrive as exact zeros
+  on this Mac's only microphone (a USB camera microphone, 48 kHz), whether or not the queue converts, and the first start
+  after launch took 5.1 s (later starts 78-150 ms). Cause unknown (device or system); other devices not tried. The pure
+  parts (device resolution, format fallback, host-time conversion) are pinned in MacAudioTests; the real capture runs under
+  DICTUM_AUDIO_TESTS=1.
+- *Input.* The SDK's CGEvent.h says taps "may only receive key up and down events if … the caller is enabled for assistive
+  device access", and that only root may tap at kCGHIDEventTap: the taps sit at kCGSessionEventTap and need Accessibility
+  (handover §1's "Input Monitoring" was wrong for active taps); posting still goes to kCGHIDEventTap. Reading the legacy
+  `NSStringPboardType` from the pasteboard returns data but writing it back is refused, so an early Restore cleared the
+  clipboard (the owner's clipboard text was lost during the lane's gated test, 23/10/2026); the snapshot now keeps
+  public.utf8-plain-text, public.rtf and public.html only, builds the new item before clearing, and leaves a refused type
+  out. Fn maps to no key (the parser refuses it; its wording is approved copy). PrintScreen, ScrollLock, Pause and F21-F24
+  have no Mac key (a test pins that set). Two `// simplification:` comments: Caps Lock reports a press and release together
+  on every event (retire once hardware shows what macOS sends), and typed text goes 20 UTF-16 units per event (Recalled
+  limit; retire once a hardware test shows bigger chunks arrive whole). The input lane also found that C `BOOL` is one byte
+  and the shared interop's default four-byte bool marshalling could read undefined register bits on arm64: every bool return
+  now crosses as I1. Not verified without Accessibility: tap installation, swallowing, Cmd-V and typing arriving; the two
+  end-to-end tests are written and skip until the test host is trusted.
+- *Packaging.* codesign treats every file under Contents/MacOS as nested code (signing the executable fails with "code object
+  is not signed at all" while a managed .dll is unsigned), so `scripts/publish-mac.sh` signs every file there, the
+  executable last, then the bundle, never `--deep` (`man codesign` on macOS 27.2: deprecated for signing as of macOS 13.0).
+  The bundled model is fetched and verified by the published app itself (`--download-model base.en` with HOME in a scratch
+  folder), so the pinned commit, size and SHA-256 stay in Core's catalogue only. `macos-15` runners are Arm64 (actions/
+  runner-images README); `secrets` is not available in `if:`, so the job carries two booleans in `env`. The icon is built at
+  publish time from site/dictum.svg (ten iconset PNGs, `iconutil`), not committed.
+- *Shell.* Decision reversed on evidence: Avalonia.Native 11.3.22 never raises `TrayIcon.Clicked` (its `trayicon.mm` sets no
+  target or action on the NSStatusItem and `avn.idl`'s `IAvnTrayIcon` has no click callback, **Verified** in the Avalonia
+  source for the tag), so `TrayHost` creates its own NSStatusItem with a target class defined through `ObjC.DefineClass`
+  and `sendActionOn:` left or right mouse-up; Avalonia only encodes `TrayIconArt`'s output as PNG. Kept: the click point from
+  `NSEvent.mouseLocation`, colour icons, creation on the UI thread. Avalonia.Native's screen "pixels" are points with
+  scaling 1 and a top-left origin flipped against the primary display (`Screens.mm`, `main.mm` `ConvertPointY`), so `Move`
+  applies no backing scale and `ForegroundBounds` (CGWindowList, top-left points) needs no conversion. Overlays sit at window
+  level 25 (`NSStatusWindowLevel` = `kCGStatusWindowLevel`, NSWindow.h and CGWindowLevel.h). `TryGetPlatformHandle()` gives
+  descriptor "NSWindow" with the NSWindow pointer (`MacOSTopLevelHandle`, TopLevelImpl.cs). SMAppService registers even a
+  bare executable outside a bundle (a scratch apphost went NotFound → Enabled → NotRegistered), so the bundle-only guard
+  stays a policy, not a necessity; that scratch run left a disabled "exp" record in `sfltool dumpbtm` on the owner's Mac.
+  `AppShell.RemoveEverything` passes `Paths.ExeDir` (Contents/MacOS), so `RemovalSteps` accepts either that or the bundle
+  path when it belongs to the running bundle, refuses anything else, and refuses a path under `/AppTranslocation/` (an
+  unsigned app opened from Downloads runs from a read-only translocated copy). A notification delegate implementing
+  `willPresentNotification:` is needed or macOS suppresses banners while Dictum is frontmost. FileShare.None on Unix is now
+  **Verified** (a second open throws IOException). The tone synthesis moved to Core as `Dictum.Audio.CueTones` (byte-identical;
+  Windows calls it). `// simplification:` in `SingleInstance.ListenForOtherLaunches`: a Unix socket path is limited to 104
+  bytes on macOS (Recalled), so a home path over about 50 characters makes the bind fail and a second launch time out after
+  30 s; retire by binding in a shorter per-user folder when a tester hits it. Approved Windows wording still shown on a Mac
+  and not reworded here: "notification area (system tray)", "Windows did not let Dictum switch back…", "everything Dictum
+  has put on this PC" (AppShell).
+
+**Merge of main at 1.3.0 (b8b072d, PRs #54-#65) into this branch, 23/10/2026 02:38 AEDT, at the Windows orchestrator's
+request before the PR.** Conflicts: this file (both appended sections kept, main's first) and `Dictum.UI.csproj` (the
+`InternalsVisibleTo` lines for Dictum.Mac and Dictum.UiProbe both kept). Mac consequences, each Verified on this Mac
+unless marked:
+- Main's model-move tests (PR #61) failed ten ways on the Mac, all test-side: three make a directory junction with
+  `cmd.exe /c mklink /J` (the helper now returns false off Windows and its callers skip, as they already did when mklink
+  fails); five pin `ModelMover.Nested` / `PathRegistry.IsInside` with drive-letter paths (now through `TestPaths.Native`,
+  so `D:\` is `/D` there and the same containment is checked); two pin that a loaded model file cannot be moved (a Windows
+  sharing rule: `TestEnv.WindowsOnly(TestEnv.HeldOpen)`, the gate the tests lane used for the same rule). The mover's own
+  code is platform-neutral: `ModelMover.SameFileOnDisk` relies on FileShare.None, which .NET implements on Unix with an
+  advisory lock (the lane's earlier finding), and `ModelMoveSafetyTests` pass unchanged on the Mac. Suite after the merge:
+  2599 total, 0 failed, 2407 passed, 192 skipped.
+- The dialog-ownership fix (PR #65, `Modal.Run` shows a dialog with `ShowDialog(owner)` from the clicked window and
+  disables the owner) is designed for the Mac too: Avalonia.Native's `WindowImpl.SetEnabled(false)` calls
+  `MouseDevice.PlatformCaptureLost()` because "macOS doesn't have the concept of mouse capture … release the mouse capture
+  when the owner window is disabled. This behavior matches win32" (Avalonia source, branch release/11.3.22,
+  src/Avalonia.Native/WindowImpl.cs, read 23/10/2026), and `SetParent` hands the owner to the native window. From the tray
+  panel (`FlyoutWindow`) and at first run the dialog is still shown on its own, as before. **Not verified** on the Mac: that
+  the first click on a dialog opened from a Settings button lands (the real-backend check, `Dictum.UiProbe`, is a Windows
+  executable, net10.0-windows, referencing Dictum.Windows); it is in the PR's owner steps (Settings > Storage > Use default).
+- `scripts/publish-mac.sh` reads `DICTUM_MAC_DIST` (default `dist/`), added so the merged head could be built and signed
+  while the earlier bundle's notarisation was still waiting on Apple in `dist/` (submitted 00:26 AEDT, still "In Progress"
+  at 02:39; Apple's developer status feed listed the Developer ID Notary Service with no events at 02:34).
+- Nothing else on main touches a platform seam: the cloud speech UI, own clean-up instructions, Help questions, plain-words
+  page and the key file are Core/UI code the Mac build takes as is (the key file, `KeyFile.cs`, is a plain .NET
+  create-new write of `.env` in the config folder).
+- `NSMicrophoneUsageDescription` now reads "Dictum listens only while you hold your hotkey, and keeps the audio on this Mac
+  unless you turn on cloud speech." (PROPOSED), the wording main's handover §0 replaced the earlier proposal with, because
+  the earlier sentence is untrue once cloud speech (1.3) is on. Pinned in MacPackagingTests.
+
+**Launching the signed bundle on this Mac (23/10/2026 02:44-02:56 AEDT), each Verified here:**
+- `Dictum.app/Contents/MacOS/Dictum --selftest` runs from the signed bundle (hardened runtime, Developer ID): speech runtime,
+  profanity list, calibration script and the microphone list all [OK]; the result was FAIL only because the owner's
+  settings name medium.en, which is not downloaded here.
+- The first three tray-mode launches (through `open` and from a terminal, Developer ID and ad-hoc alike, bundled and not)
+  died two seconds after "Dictum 1.3.0 starting": an unhandled `InvalidOperationException`, "Avalonia.Native was not able to
+  start the RenderTimer. Native error code is: -6661". Cause: the display was asleep (`system_profiler SPDisplaysDataType`:
+  "Display Asleep: Yes"); a Swift probe showed `CGGetActiveDisplayList` returning 0 displays and
+  `CVDisplayLinkCreateWithActiveCGDisplays` returning -6661 (kCVReturnInvalidArgument) while
+  `CVDisplayLinkCreateWithCGDisplay(CGMainDisplayID())` succeeded; Avalonia 11.3.22 creates its timer with the former
+  (`native/Avalonia.Native/src/OSX/PlatformRenderTimer.mm` line 24, read through the GitHub API). With the display woken
+  (`caffeinate -u`) the probe passed and the same bundle ran. So Dictum cannot start while every display is asleep (a
+  launch at login or a relaunch over a remote session with the screen off): not a defect in this branch, and not caught
+  anywhere; a tester who sees that crash report (SIGABRT, "RenderTimer", -6661) should check the display. Candidate for a
+  guard in `Program.Main` (wait for an active display, or log a plain message) if a tester hits it.
+- With the display awake the signed bundle (272.0 MiB; `codesign --verify --deep --strict`: valid on disk, satisfies its
+  Designated Requirement; `spctl --assess`: rejected, "source=Unnotarized Developer ID", as expected before notarisation)
+  started Avalonia on its native backend and showed one window, 720 x 528 points at layer 0 (`CGWindowListCopyWindowInfo`
+  for the process): the Welcome to Dictum window (`OnboardingWindow.WindowWidth` = 720), both with the owner's settings (its
+  first-run questions are unanswered on this Mac) and with a scratch `--config`. `--exit-after` did not quit it because
+  `AppShell.Start` runs the Welcome flow before `ScheduleDiagnosticExit`, as on Windows; the windows were closed with
+  SIGTERM after 30 s, so nothing past the Welcome window (menu-bar icon, taps, panel) was exercised: those stay in the
+  owner's test plan.
+- `screencapture` is refused for this session ("could not create image from display": no Screen Recording permission), so
+  no screenshot; the window list above is the evidence.
+
+**Lens round on PR #67 (Windows orchestrator, 23/10/2026 ~03:05 AEDT, verdict Block), fixed on this branch the same night:**
+- B1, release wiring: the Windows `release` job needs `build` alone and downloads its two artifacts by name
+  (`dictum-win-x64-zip`, `dictum-release-files`), never every artifact of the run, so no Mac zip reaches a Windows release
+  and a Mac job failure cannot block one. The Mac zip ships only through a new `release-mac` job on a `mac-v<version>` tag
+  (`tags: ['v*', 'mac-v*']`), as a GitHub pre-release with its own notes file, `packaging/release-notes-mac.md` (the
+  PROPOSED paragraph moved there from the Windows preamble). Pinned in MacPackagingTests.
+- B2, public README: both Mac sections removed (the beta is not announced until the owner approves the copy and it ships);
+  the text lives in src/Dictum.Mac/README.md, marked PROPOSED. Pinned ("macOS (beta)" absent from README.md).
+- B3.1, neutrality sweep: `CGEventSourceButtonState` carries one of the words across a letter boundary. The test now cuts an
+  exact-identifier allow-list (`CGEventSourceButtonState`, `EventSourceButtonState`) out of a file's text before the sweep,
+  never widening the match to word boundaries; pins: the identifier passes, the bare word, the identifier in lower case and
+  a piece of it still fail. M1 with it: the test looks for `git` off Windows, so the sweep now runs on the Mac (it had
+  always skipped here, which is why the branch's "0 failed" hid this).
+- B3.2, `MacShellTests.A_translocated_copy_is_never_moved`: the fake bundle joins its subfolder with "/" on every OS, since
+  `RemovalSteps` looks for "/AppTranslocation/" as macOS writes it.
+- M2, microphone text: `NSMicrophoneUsageDescription` is now "Dictum uses the microphone only while it is recording (from
+  your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud
+  speech." (PROPOSED; the hotkey-only sentence was untrue for hands-free recording and the microphone test). Handover line
+  changed to match.
+- M3, entitlements experiment (Verified on this Mac): a bundle signed with `allow-jit`, `allow-unsigned-executable-memory`
+  and `device.audio-input` only, without `allow-dyld-environment-variables` and `disable-library-validation`, ran
+  `--selftest` (PASS: whisper runtime loaded, base.en SHA-256 verified), transcribed a 4.09 s synthesised wav through
+  base.en on Metal in 707 ms (the sentence came back exact), and started the tray app (the Welcome window on screen for
+  30 s). The two entitlements are dropped. Not exercised: the clean-up model load (qwen2.5-1.5b is not on this Mac and the
+  owner's model folder does not exist yet; its dylibs load the way whisper's do, all signed by the same team) and a
+  dictation through the taps (needs Accessibility). If a tester's clean-up load fails with a library-validation error in
+  the crash report, restore `disable-library-validation` and record the error here.
+- M4, `SingleInstance.ListenForOtherLaunches`: a bind failure (SocketException, ArgumentOutOfRangeException, IOException,
+  UnauthorizedAccessException) is a logged warning and a no-op handle, never an exception out of `AppShell.Start`; the
+  simplification comment says so. Pinned by a test with a 120-character socket folder; observed failing with the catch
+  filter disabled (ArgumentOutOfRangeException from UnixDomainSocketEndPoint), then restored.
+- M5, `HotkeyNames`: pure overloads `Display(hotkey, dialect)`, `Display(spec, dialect)`, `Key(name, dialect)` and
+  `DefaultHotkeyFor(dialect)`; MacCoreTests use them and no test sets the global `Dialect` any more (the collection
+  attribute is gone with it).
+- m1, this file no longer names the owner's volume path; m2, `.DS_Store` untracked (it was already in .gitignore); m3, the
+  network-audit pin compares repo-relative paths; m4, the handover's two "Input Monitoring" lines now follow decision c.

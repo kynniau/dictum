@@ -105,9 +105,10 @@ public sealed class LocalLlmEngine : ILocalLlmEngine
         var log = Volatile.Read(ref _nativeLog);
         var text = message.TrimEnd();
         if (LoadedLibraryPath(text) is { } path) Volatile.Write(ref _loadedLibrary, path);
-        var important = text.Contains("loaded", StringComparison.OrdinalIgnoreCase) && text.Contains(".dll", StringComparison.OrdinalIgnoreCase)
+        var important = text.Contains("loaded", StringComparison.OrdinalIgnoreCase) && (text.Contains(".dll", StringComparison.OrdinalIgnoreCase) || text.Contains(".dylib", StringComparison.OrdinalIgnoreCase))
             || text.Contains("offloaded", StringComparison.Ordinal)
             || text.Contains("ggml_vulkan: Found", StringComparison.Ordinal)
+            || text.Contains("ggml_metal", StringComparison.Ordinal) // macOS: whether the GPU (Metal) is in use
             || text.Contains("buffer size", StringComparison.Ordinal) && text.Contains("model", StringComparison.Ordinal);
         var ours = level == LLamaLogLevel.Error ? LogLevel.Warning : important ? LogLevel.Info : LogLevel.Debug;
         try
@@ -123,13 +124,13 @@ public sealed class LocalLlmEngine : ILocalLlmEngine
     /// <summary>The llama.dll path from LLamaSharp's "successfully loaded" log line, or null for other lines.</summary>
     internal static string? LoadedLibraryPath(string line)
     {
-        // LLamaSharp logs: Successfully loaded '<path>\llama.dll' (the path may contain spaces).
+        // LLamaSharp logs: Successfully loaded '<path>\llama.dll' (the path may contain spaces); on macOS the library is libllama.dylib.
         if (!line.StartsWith("Successfully loaded '", StringComparison.Ordinal)) return null;
         var start = line.IndexOf('\'') + 1;
         var end = line.IndexOf('\'', start);
         if (end <= start) return null;
         var path = line[start..end];
-        return path.EndsWith("llama.dll", StringComparison.OrdinalIgnoreCase) ? path : null;
+        return path.EndsWith("llama.dll", StringComparison.OrdinalIgnoreCase) || path.EndsWith("libllama.dylib", StringComparison.OrdinalIgnoreCase) ? path : null;
     }
 
     public static LocalLlmEngine Load(string path, string gpuSetting, ILog log)
