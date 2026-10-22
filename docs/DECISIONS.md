@@ -4339,6 +4339,102 @@ Owner report: "in 1.2 I can see where the folders and data is saved, but I have 
 8. **Gate.** Release `--no-incremental` build: 0 warnings, 0 errors. The suite excluding `Install_copies_models` (run locally; the public-copy sweep `PublicCopyNeutralityTests` is inside it): 1,799 total, 1,776 passed, 23 skipped, 0 failed, on 5dc3221 (before the lens fixes below). After them: `ModelFolderTests` and the sweep re-run on the fixing head, passing.
 9. **Lens fixes.** The sentence now reads "A slower drive makes the speech model slower to load and to switch." (PROPOSED; the earlier "and run" overclaimed, the model loads once). Storage also shows Models' approved network-folder warning (`ModelsPage.FolderWarning`) under the folder note when the folder is on a share (pinned by `Storage_warns_when_the_model_folder_is_on_a_network_share`; blanking the warning line fails it, observed 22/10/2026). Storage still calls `Draw()` after each action rather than resetting its redraw throttle: the settings reload redraws the page inside the throttle window and the old path stayed (observed under the lens), so the explicit redraw is needed.
 
+## See how it works, stages 1-5 (22/10/2026)
+
+Branch `feat/how-it-works` from origin/main 049b73a. Owner intent and the design are in SPEC §29; the brief was section B
+of the design note "four asks, designed and sized" (22/10/2026), stages 1-5 only. Compare mode is a later lane.
+
+1. **One pipeline, no second path.** The page does not build its own chain of engines (the brief's `DemoRun`). It calls
+   `DictationPipeline.DemonstrateAsync`, which shares `RunAsync`'s body (`JourneyAsync`) with a `paste: false` switch
+   and a progress callback. So the gate, the speech model, the clean-up (whatever is configured, cloud included when
+   consented and on) and the finishing step are the dictation's own. The shell builds the one pipeline lazily
+   (`AppShell.Pipeline`), and the controller and the page both use it.
+2. **No second timer.** The pipeline already reads one stopwatch twice: transcription and clean-up. The progress
+   reports carry exactly those values (the clean-up reading is now held in `cleanupMs` and used by the log line and the
+   report alike). A pin compares each reported time with the number in its log line. The rule-based tidy is not timed on
+   its own when a model is in use (it runs inside the clean-up, or not at all), and the finishing step is not timed, so
+   the page shows no time for them rather than inventing one.
+3. **Stage 3 beside an accepted reply** shows `DeterministicCleaner.Clean(raw)`, marked "Not used" and untimed. The
+   pipeline did not run it; it is the text a rejected reply would have got. This is the only text on the page not
+   reported by the pipeline, and it comes from the tidy's own function.
+4. **The rejected reply's text is not shown.** `CleanupResult` does not carry it, and adding it would change a record
+   seven test sites in four test files build by value (grep `new CleanupResult(` in tests/, 22/10/2026). The verdict shows the validator's or provider's own reason string, which is already plain
+   words ("reply drops a negation").
+5. **The hotkey records here** while the page is shown in the window in front, as calibration does
+   (`RedirectHotkey`). It is released on deactivation, on another page, and on close.
+6. **No Help link.** The orchestrator asked for the page to be reachable from Help, but Settings → Help is built in
+   `OtherPages.cs` and its copy is in `HelpText.cs`, both owned by other live lanes. That is left for the Help copy lane: one
+   button calling `SettingsWindow.ShowPage(HowItWorksText.PageTitle)`.
+7. **Duplicate kept on purpose.** Each stage's focusable block repeats Help's private `Readable` (`OtherPages.cs`). It is
+   marked `// simplification:` with its trigger: move `Readable` to `Ui` when that file is free.
+8. **"The sound never leaves this PC"** is true today (speech recognition is local only). If cloud speech recognition
+   (design section C) ships, `HowItWorksText.MemoryNote` must change with it.
+
+**PROPOSED copy (22/10/2026), awaiting the product owner's approval**, all in `src/Dictum.Core/Core/HowItWorksText.cs`:
+
+- Page title: "See how it works"
+- Intro: "Record one short dictation and watch what Dictum does with it, step by step. It uses your current settings: the same speech model and clean-up as the hotkey."
+- In-memory line: "This page pastes nothing. The recording is kept in memory only, never saved to disk, and the sound never leaves this PC."
+- Sends-text line: "Your clean-up sends text to another program ({status}), so this recording's words go there too, as a dictation's would."
+- Buttons: "Record" / "Stop"; screen-reader names "Record one dictation" / "Stop recording and show the steps"; beside them "or hold {hotkey}" (calibration's wording).
+- Status: "Recording: say a sentence or two, then press Stop."; "Stopped at 30 s, the longest this page records."; "A dictation is in progress: try again when it has finished."; "Cancelled: nothing was kept."; "Done. Record again to try another sentence."; "That did not work: {message}".
+- Stage titles and descriptions:
+  - "1. What Dictum hears": "Sound, not words: the bars show how loud your microphone is."
+  - "2. What the speech model heard": "The speech model on this PC turns the sound into words. This is its raw text."
+  - "3. Rule-based tidy": "Fixed rules remove hesitations such as "um", add capitals and a full stop, and follow spoken commands such as "new line"."
+  - "4. AI clean-up": "A language model polishes the words, then Dictum checks its reply and uses it only if it passes every check."
+  - "5. What would be pasted": "After your corrections, the profanity filter and snippets. A dictation pastes this; this page does not."
+- Stage states: "Waiting", "Working…", "Done", "Not used", "Not reached".
+- Figures: "Took {ms} ms"; "{seconds} s of sound".
+- Notes: "Dictum stops here ({reason}), as it would for a dictation."; "The rule-based tidy did not run: only spaces were tidied."; "No AI clean-up is in use, so this is the clean-up."; "Used, because the AI reply was not (step 4)."; "Not needed this time: the AI reply passed. Dictum uses this text when a reply does not."; "Not in use. Clean-up in use: {status}."; "Accepted: the reply passed every check, so Dictum used it."; "Not used: {reason}. Dictum used the rule-based tidy (step 3) instead."; "Not asked: {reason}. Dictum used the rule-based tidy (step 3) instead."; "A dictation would paste this. This page pasted nothing."; "Your corrections, the profanity filter or snippets changed the text."; "Nothing would be pasted: no text is left."
+- Reused, not new: `NoSoundText.SilentBalloon` (silent take), `NoSoundText.NoMicrophoneBalloon` (no microphone), the
+  pill's "Transcribing…" and "Polishing…" (`PillText`), each clean-up's status line, and the validator's reasons.
+
+**Lens fixes (22/10/2026), lens on 17ae8c3 (Needs changes):**
+
+1. The cloud line is pinned: shown for a clean-up that sends text, absent for local, rules and off.
+2. A dictation started elsewhere (hands-free or toggle) keeps its hotkey and Esc. While the page has no take of its own,
+   it hands them to the controller (`AppShell.ForwardHotkey`). Record's Busy line is pinned.
+3. Stop from the keyboard moves focus to step 2. Record is off while the steps run, so focus had gone nowhere.
+4. A pin keeps the finished text out of the "nothing pasted" log line when `log_transcripts` is off.
+5. README: "one whole recording" (hands-free parts are not demonstrated), and the Settings row says the recording is never saved.
+6. The capture's `Failed` event drops the take and says so, as calibration does. The take is also dropped when the window
+   goes behind another (its key-up would not come back). That second path has no pin: the headless platform does not deactivate a window.
+7. `AppShell.DemonstrateAsync` reads the lazy pipeline on the UI thread before `Task.Run`.
+8. Record is off until a speech model is ready. PROPOSED (new): "No speech model is ready yet, so Record is off. Settings > Models shows the model's state." While one loads, the welcome window's "Getting the speech model ready…" is reused.
+9. The 30 s limit path is pinned (it stops, runs, and keeps "Stopped at 30 s…").
+10. Each stage's text and verdict TextBlocks are polite live regions (a Border has no automation peer, so the text carries it).
+11. A missing space in `AppShell.cs` is fixed.
+
+**Re-lens fixes (22/10/2026), re-lens on aebd2fd:**
+
+1. **One decision per press (major).** Forwarding was decided per event. A press could be split: its key-down went to a
+   dictation, Esc was forwarded and cancelled it, and the key-up then reached the page (now idle) and was dropped. The
+   controller kept the key held and ignored the next real press as auto-repeat (`DictationStateMachine`). Now a press is the
+   page's only if the page saw its key-down with no dictation under way, or with its own take open. Any other press goes to
+   the controller whole, its key-up and Esc included. Pinned with that exact sequence: the next press dictates and pastes.
+2. The window-deactivated drop is pinned through `WindowDeactivated()`, which the Deactivated handler calls.
+3. Stop moves focus to step 2 only when Record's focus came from the keyboard (Tab or the arrows); after a click focus is left
+   alone. Both cases are pinned.
+4. Record turning on when the model finishes loading is pinned end to end through the shell's own events (ModelManager.Changed,
+   ModelStateChanged, StatusChanged, Changed, SettingsWindow's refresh, the page's Redraw), not `page.Refresh()`.
+
+**After cloud speech Core (PR #48, merged into this branch at 39fd139):**
+
+1. `AppShell.Pipeline` asks the speech step (`token => _speech.GetAsync(token)`), as #48's inline pipeline did, and the
+   controller and the page share it. Pinned: with cloud speech on, the demonstration is one request to the speech service a
+   dictation uses and shows that service's text. Pointing the pipeline back at the local model fails both this pin and
+   `CloudSpeechShellTests.A_dictation_through_the_shell_goes_to_cloud_speech`.
+2. "The sound never leaves this PC" is shown only while the model on this PC is the speech step. PROPOSED for cloud speech:
+   "This page pastes nothing. The recording is kept in memory only and never saved to disk. With cloud speech on, the sound is
+   sent to {host} to be turned into text." and, for step 2, "With cloud speech on, {host} turns the sound into words (the
+   speech model on this PC, if that fails). This is the raw text." Pinned.
+3. The `SpeechReady` gate is unchanged. Record gates on the local model, as the hotkey does (`hotkeyBlocked: !_models.IsReady`).
+   The local model stays loaded as cloud speech's fallback (`CloudSpeech` summary), so the page and the hotkey agree.
+   The page does not say when cloud speech fell back to the local model for a take, because `PipelineProgress` does not carry it.
+
+**Final re-lens on 7a40131 (one minor):** letting go of the hotkey (`Release()`: deactivation, another page, close) now also ends the page's press (`_ownPress = false`). Before, a take started with the hotkey and dropped by deactivation left the page owning that press, so a later hold dictation released after the page took the hotkey back had its release swallowed. Pinned with that sequence.
+
 ## Anthropic with no key shows the waiting line (22/10/2026, branch fix/anthropic-missing-key-line)
 
 Found by the cloud-setup-help lane: with Anthropic chosen in Settings > Clean-up, "Allow" pressed and no `ANTHROPIC_API_KEY`, Dictum used the local model with nothing on screen saying why, the card stayed in its off state ("Use cloud clean-up…", no off switch), and the page said "Cloud clean-up is on.". The OpenAI and Google Gemini presets already showed the approved waiting line on the card in the same case, but the page said "Cloud clean-up is on." above it too. Nothing was sent in either case.
