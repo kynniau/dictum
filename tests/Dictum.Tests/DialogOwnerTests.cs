@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -155,6 +156,203 @@ public class DialogOwnerTests(ITestOutputHelper output)
         Assert.Equal((null, WindowStartupLocation.CenterScreen), seen);
         Assert.Equal(2, opened.Windows.Count);
         if (flyout.IsVisible) flyout.Close();
+        shell.Dispose();
+    });
+
+    // ---- Calibration's "Download and include" (Mac beta, 23/10/2026: the question was seen behind the calibration window,
+    // which already said "Downloading…" while nothing had started) ----
+
+    private const string IncludeSmallEn = "Download small.en and include it in the test";
+    private const string DownloadingSmallEn = "Downloading small.en: progress shows in the tray panel. It joins the test when it arrives.";
+    private const string SmallEnNotDownloaded = "small.en was not downloaded, so it was not added to the test.";
+
+    private static Button Named(ILogical root, string name) => All<Button>(root).Single(b => AutomationProperties.GetName(b) == name);
+
+    private static List<string?> Texts(ILogical root) => [.. All<TextBlock>(root).Select(t => t.Text)];
+
+    /// <summary>Runs the UI thread's queued work until <paramref name="condition"/> holds.</summary>
+    private static bool Eventually(Func<bool> condition, int timeoutMs = 10_000)
+    {
+        var until = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (condition()) return true;
+            Thread.Sleep(10);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The calibration window over a shell with the real <see cref="ShellDialogs"/>, no speech model on this PC (every catalogue
+    /// model is offered as "Download and include"), and <paramref name="server"/> standing in for the download host.
+    /// </summary>
+    private static (AppShell Shell, CalibrationWindow Window, Scratch Scratch) Calibration(HttpMessageHandler server,
+        string settings = """{ "hotkey": "F24" }""")
+    {
+        var scratch = new Scratch(settings);
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
+        var shell = new AppShell(new FakePlatform(scratch.Paths), scratch.Paths, NullLog.Instance, new SecretRedactor(), new ShellOptions(), new ShellDialogs(),
+            gpuMachine: () => false, downloadHandler: server);
+        shell.Reload(userRequested: false);
+        var window = new CalibrationWindow(shell);
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return (shell, window, scratch);
+    }
+
+    /// <summary>
+    /// The download question that "Download and include" opens is the calibration window's modal dialog, centred on it: the
+    /// button is a <see cref="Ui.Button"/>, whose click names its window as the opener (<see cref="Modal.From"/>).
+    /// </summary>
+    [Fact]
+    public Task The_calibration_download_question_is_the_calibration_windows_modal_dialog() => UiSession.Run(() =>
+    {
+        using var opened = new Opened();
+        var server = new CountingHandler();
+        var (shell, window, scratch) = Calibration(server);
+        using var _ = scratch;
+
+        (WindowBase? Owner, WindowStartupLocation Where, bool Owns)? seen = null;
+        Inside(opened, q =>
+        {
+            seen = (q.Owner, q.WindowStartupLocation, window.OwnedWindows.Contains(q));
+            q.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        });
+        Named(window, IncludeSmallEn).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal("Dictum: Download a model", Assert.Single(opened.Windows).Title);
+        Assert.NotNull(seen);
+        Assert.Same(window, seen.Value.Owner);
+        Assert.True(seen.Value.Owns);
+        Assert.Equal(WindowStartupLocation.CenterOwner, seen.Value.Where);
+        Assert.Empty(window.OwnedWindows); // closed: the calibration window is no longer its owner
+        Assert.Equal(0, server.Requests);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// While the download question is open the calibration window still offers "Download and include" and says nothing new, and
+    /// Cancel leaves it so: no "Downloading…", no "was not downloaded", no request to the download host.
+    /// </summary>
+    [Fact]
+    public Task Declining_the_calibration_download_leaves_the_window_as_it_was_and_downloads_nothing() => UiSession.Run(() =>
+    {
+        using var opened = new Opened();
+        var server = new CountingHandler();
+        var (shell, window, scratch) = Calibration(server);
+        using var _ = scratch;
+        var before = Texts(window);
+
+        (object? Label, bool Enabled, List<string?> Texts)? whileAsked = null;
+        Inside(opened, q =>
+        {
+            var b = Named(window, IncludeSmallEn);
+            whileAsked = (b.Content, b.IsEnabled, Texts(window));
+            Click(q, "Cancel");
+        });
+        Named(window, IncludeSmallEn).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs(); // what the declined download posts back to the window
+
+        Assert.Equal(1, Assert.Single(opened.Windows).Choice); // Cancel
+        Assert.NotNull(whileAsked);
+        Assert.Equal("Download and include", whileAsked.Value.Label); // nothing has started while the question is up
+        Assert.True(whileAsked.Value.Enabled);
+        Assert.Equal(before, whileAsked.Value.Texts);
+        var button = Named(window, IncludeSmallEn);
+        Assert.Equal("Download and include", button.Content);
+        Assert.True(button.IsEnabled);
+        Assert.Equal(before, Texts(window)); // no "Downloading small.en…", no "was not downloaded"
+        Assert.Equal(0, server.Requests);
+        Assert.False(shell.Models.IsDownloading);
+        Assert.Equal(0, shell.Models.DownloadsEnded);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Download answers the question: the button then reads "Downloading…", disabled, the line under the results says where the
+    /// progress shows, and the download really starts (the fake host refuses it, and the window then says so, as before).
+    /// </summary>
+    [Fact]
+    public Task Agreeing_to_the_calibration_download_starts_it_and_says_so() => UiSession.Run(() =>
+    {
+        using var opened = new Opened();
+        var server = new CountingHandler(); // answers 403: the download starts and then fails, without the network
+        var (shell, window, scratch) = Calibration(server);
+        using var _ = scratch;
+
+        Inside(opened, q => Click(q, "Download"));
+        Named(window, IncludeSmallEn).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(0, Assert.Single(opened.Windows).Choice);
+        var button = Named(window, IncludeSmallEn);
+        Assert.Equal("Downloading…", button.Content);
+        Assert.False(button.IsEnabled);
+        Assert.Contains(DownloadingSmallEn, Texts(window));
+
+        // The download really started: the server refused it, and the window then says so and offers the button again.
+        Assert.True(Eventually(() => Texts(window).Contains(SmallEnNotDownloaded)), "the failed download was never reported");
+        Assert.Equal(1, server.Requests);
+        button = Named(window, IncludeSmallEn);
+        Assert.Equal("Download and include", button.Content);
+        Assert.True(button.IsEnabled);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// A list redrawn while the question is open (a test run that ends then redraws it) still shows the download once it is
+    /// agreed: the window redraws from the session instead of changing the button that was clicked, which is no longer shown.
+    /// </summary>
+    [Fact]
+    public Task A_list_redrawn_while_the_calibration_question_is_open_still_shows_the_download() => UiSession.Run(() =>
+    {
+        using var opened = new Opened();
+        var server = new CountingHandler();
+        var (shell, window, scratch) = Calibration(server);
+        using var _ = scratch;
+        var redraw = typeof(CalibrationWindow).GetMethod("RenderMissing", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        Inside(opened, q =>
+        {
+            redraw.Invoke(window, null); // what the end of a test run does (RunAsync's finally)
+            Click(q, "Download");
+        });
+        Named(window, IncludeSmallEn).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        var button = Named(window, IncludeSmallEn);
+        Assert.Equal("Downloading…", button.Content);
+        Assert.False(button.IsEnabled);
+        Assert.Contains(DownloadingSmallEn, Texts(window));
+        Assert.True(Eventually(() => Texts(window).Contains(SmallEnNotDownloaded)), "the failed download was never reported");
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// A download refused before the question (offline_only here; the coordinator's balloon says why) asks nothing and, as
+    /// before, says under the results that the model was not downloaded: only a declined question leaves the window as it was.
+    /// </summary>
+    [Fact]
+    public Task A_refused_calibration_download_asks_nothing_and_says_it_was_not_downloaded() => UiSession.Run(() =>
+    {
+        using var opened = new Opened();
+        var server = new CountingHandler();
+        var (shell, window, scratch) = Calibration(server, """{ "hotkey": "F24", "offline_only": true }""");
+        using var _ = scratch;
+
+        Named(window, IncludeSmallEn).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs(); // what the refused download posts back to the window
+
+        Assert.Empty(opened.Windows);
+        Assert.Contains(SmallEnNotDownloaded, Texts(window));
+        var button = Named(window, IncludeSmallEn);
+        Assert.Equal("Download and include", button.Content);
+        Assert.True(button.IsEnabled);
+        Assert.Equal(0, server.Requests);
+        window.Close();
         shell.Dispose();
     });
 

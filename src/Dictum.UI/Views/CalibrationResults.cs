@@ -128,18 +128,25 @@ internal sealed partial class CalibrationWindow
         foreach (var info in _host.MissingModels())
         {
             var name = info.Name;
-            Button? download = null;
-            download = Ui.Button(_session.IsDownloading(name) ? "Downloading…" : "Download and include", "secondary", () =>
+            var download = Ui.Button(_session.IsDownloading(name) ? "Downloading…" : "Download and include", "secondary", () =>
             {
-                // One click per model: a second click used to cancel the download in progress and lose its bytes.
-                _session.StartDownload(name);
-                download!.IsEnabled = false;
-                download.Content = "Downloading…";
-                _progress.Text = $"Downloading {name}: progress shows in the tray panel. It joins the test when it arrives.";
+                // The button and the line under the results change only once the download is agreed (Mac beta, 23/10/2026: they
+                // said "Downloading…" while the question was still open). A declined question changes nothing here; a refused
+                // download (offline_only, no space) still says it was not downloaded, beside the coordinator's balloon.
+                var declined = false;
                 _host.DownloadSpeechModel(name,
+                    goesAhead =>
+                    {
+                        declined = !goesAhead;
+                        if (declined) return;
+                        _session.StartDownload(name); // one click per model: a second click used to cancel the download in progress and lose its bytes
+                        RenderMissing(); // from the session, so a list redrawn while the question was open (a test run ended) is right too
+                        _progress.Text = $"Downloading {name}: progress shows in the tray panel. It joins the test when it arrives.";
+                    },
                     () => Dispatcher.UIThread.Post(() => _ = RunAsync(_session.ModelsToRun(_host.InstalledModels(), name, _recordings.ClipSet()))),
                     ok => Dispatcher.UIThread.Post(() =>
                     {
+                        if (declined) return;
                         _session.EndDownload(name);
                         RenderMissing();
                         if (!ok) _progress.Text = $"{name} was not downloaded, so it was not added to the test.";

@@ -764,8 +764,14 @@ public sealed class ModelCoordinator(
     /// </summary>
     /// <param name="note">The question's explanation: what the download is for and whether Dictum then switches to it.</param>
     /// <param name="finished">Told true when the values were applied, false when nothing will be (declined, refused, failed).</param>
+    /// <param name="agreed">
+    /// Told true once the download goes ahead (agreed to, or already on its way, so not asked about again) and false when the
+    /// question is declined; not told when the download is refused before the question, or when nothing needs downloading.
+    /// The calibration window changes its button and status line only on true (Mac beta, 23/10/2026: it said "Downloading…"
+    /// while the question was still open).
+    /// </param>
     public void ApplyWithDownloads(string note, IReadOnlyList<(DownloadSpec Spec, string Destination)> missing, (string Key, JsonNode? Value)[] values, Action? then = null,
-        Action<bool>? finished = null)
+        Action<bool>? finished = null, Action<bool>? agreed = null)
     {
         if (MovingFiles)
         {
@@ -817,6 +823,7 @@ public sealed class ModelCoordinator(
             var total = toFetch.Sum(m => m.Spec.Bytes ?? 0);
             if (!prompts.ConfirmDownload(names, ModelCatalog.FormatSize(total), WithSpaceWarning(note, total)))
             {
+                agreed?.Invoke(false);
                 finished?.Invoke(false);
                 return;
             }
@@ -827,6 +834,7 @@ public sealed class ModelCoordinator(
         }
         if (values.Any(v => v.Key == "whisper.model")) _speechChoice = speechToken = $"chosen {++_choices}";
         if (values.Any(v => v.Key is "llm.provider" or "llm.model")) _cleanupChoice = cleanupToken = $"chosen {++_choices}";
+        agreed?.Invoke(true);
         DownloadInTurn(missing, 0, $"preset {++_choices}", Stale, Finish, () => finished?.Invoke(false));
     }
 

@@ -133,10 +133,13 @@ public sealed class PersonalService(AppPaths paths, ILog log, Func<AppSettings> 
             [.. ModePresets.SettingsValues(values).Select(v => (v.Key, (JsonNode?)JsonValue.Create(v.Value)))]);
     }
 
-    /// <summary>Calibration's "Download and include": the model joins the test; the current model stays in use.</summary>
-    public void DownloadForCalibration(string name, Action then, Action<bool> finished)
+    /// <summary>
+    /// Calibration's "Download and include": the model joins the test; the current model stays in use. <paramref name="agreed"/>
+    /// is told whether the download goes ahead (<see cref="ModelCoordinator.ApplyWithDownloads"/>).
+    /// </summary>
+    public void DownloadForCalibration(string name, Action<bool> agreed, Action then, Action<bool> finished)
     {
         var info = ModelCatalog.Find(name)!;
-        models.ApplyWithDownloads(CalibrationDownload, [(info.Download, ModelCatalog.ResolvePath(name, paths.ModelsDir(settings())))], [], then, finished);
+        models.ApplyWithDownloads(CalibrationDownload, [(info.Download, ModelCatalog.ResolvePath(name, paths.ModelsDir(settings())))], [], then, finished, agreed);
     }
 }
