@@ -41,6 +41,7 @@ internal sealed class HowItWorksPage : SettingsPage
     private IDisposable? _hotkey;
     private Window? _window;
     private bool _noMicrophone;
+    private bool _speechReady = true;
     private bool _listFailureLogged;
     private long _meterShownAt;
     private float _meterPeak;
@@ -49,13 +50,14 @@ internal sealed class HowItWorksPage : SettingsPage
     {
         _record = Ui.Button(HowItWorksText.RecordLabel, "danger", Toggle, Failed, name: HowItWorksText.RecordName);
         _record.MinHeight = 44;
+        SpeechReady = () => Shell.SpeechReady;
         AutomationProperties.SetName(_meter, HowItWorksText.Stages[0].Title);
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         _status.IsVisible = false;
         _cards = [.. HowItWorksText.Stages.Select((_, i) => new StageCard(i == 0 ? _meter : null))];
         _tick = new DispatcherTimer(TimeSpan.FromMilliseconds(TickMs), DispatcherPriority.Background, (_, _) => Tick());
         _limit = new DispatcherTimer { Interval = CalibrationSession.TakeLimit };
-        _limit.Tick += (_, _) => Stop(limitReached: true);
+        _limit.Tick += (_, _) => TakeLimitReached();
         Compose(
             Ui.Card(Ui.Stack(10, Ui.Text(HowItWorksText.Intro), Ui.Text(HowItWorksText.MemoryNote, "caption"), _sendsText)),
             Ui.Card(Ui.Stack(10, Ui.Row(10, _record, _hold), _status)),
@@ -81,6 +83,12 @@ internal sealed class HowItWorksPage : SettingsPage
 
     internal string Status => _status.IsVisible ? _status.Text ?? "" : "";
 
+    /// <summary>A speech model is loaded (tests that put scripted engines in the shell's pipeline say so here).</summary>
+    internal Func<bool> SpeechReady { get; set; }
+
+    /// <summary>The cloud line above Record, or "" when the clean-up in use sends nothing (tests).</summary>
+    internal string SendsTextLine => _sendsText.IsVisible ? _sendsText.Text ?? "" : "";
+
     protected override void Redraw()
     {
         _hold.Text = HotkeyParser.TryParse(Shell.Settings.Hotkey, out var spec, out _) ? HowItWorksText.HoldHint(HotkeyNames.Display(spec)) : "";
@@ -88,6 +96,7 @@ internal sealed class HowItWorksPage : SettingsPage
         _sendsText.Text = cleaner.SendsText ? HowItWorksText.SendsText(cleaner.Status) : "";
         _sendsText.IsVisible = _sendsText.Text.Length > 0;
         CheckMicrophone();
+        CheckSpeech();
     }
 
     public override void Leave()
@@ -124,7 +133,12 @@ internal sealed class HowItWorksPage : SettingsPage
         CheckMicrophone(); // one plugged in meanwhile turns Record back on
     }
 
-    private void Deactivated(object? sender, EventArgs e) => Release();
+    /// <summary>The window went behind another: the hotkey dictates again, and a take under way here is dropped (its key-up would not come here).</summary>
+    private void Deactivated(object? sender, EventArgs e)
+    {
+        Release();
+        if (_capture is not null) Cancel(HowItWorksText.Cancelled);
+    }
 
     private void Grab() => _hotkey ??= Shell.RedirectHotkey(OnHotkey);
 
@@ -136,6 +150,11 @@ internal sealed class HowItWorksPage : SettingsPage
 
     internal void OnHotkey(HookEvent e)
     {
+        if (_capture is null && !Shell.DictationIdle)
+        {
+            Shell.ForwardHotkey(e); // a dictation started elsewhere (hands-free, toggle) keeps its key and its Esc
+            return;
+        }
         try
         {
             switch (e.Signal)
@@ -170,7 +189,7 @@ internal sealed class HowItWorksPage : SettingsPage
             Tell(HowItWorksText.Busy);
             return;
         }
-        if (!CheckMicrophone()) return; // the hotkey, which a disabled Record does not stop
+        if (!CheckMicrophone() || !CheckSpeech()) return; // the hotkey, which a disabled Record does not stop
         var capture = Shell.Platform.CreateCapture(Shell.Log);
         try
         {
@@ -182,6 +201,7 @@ internal sealed class HowItWorksPage : SettingsPage
             throw; // Failed says it: the no-microphone sentence for NoMicrophoneException
         }
         _capture = capture;
+        capture.Failed += CaptureFailed;
         _run = new HowItWorksRun();
         _run.StartRecording();
         _meterShownAt = Clock();
@@ -200,6 +220,7 @@ internal sealed class HowItWorksPage : SettingsPage
         _meter.Show(null);
         if (_capture is not { } capture) return null;
         _capture = null;
+        capture.Failed -= CaptureFailed;
         try
         {
             return capture.Stop();
@@ -210,8 +231,15 @@ internal sealed class HowItWorksPage : SettingsPage
         }
     }
 
+    /// <summary>The device failed mid-take (from the capture thread): said, and the take dropped, as calibration does.</summary>
+    private void CaptureFailed(Exception ex) => Dispatcher.UIThread.Post(() => Failed(ex));
+
+    /// <summary>The take reached calibration's limit: it stops and runs, with the limit said (the timer's; tests call it).</summary>
+    internal void TakeLimitReached() => Stop(limitReached: true);
+
     private void Stop(bool limitReached)
     {
+        var hadFocus = _record.IsFocused; // Record is off while the steps run: keyboard focus moves to them, not to nowhere
         if (CloseMicrophone() is not { } audio) return;
         _run.Recorded(audio.Duration);
         Tell(limitReached ? HowItWorksText.LimitReached : "");
@@ -219,6 +247,7 @@ internal sealed class HowItWorksPage : SettingsPage
         _cancel = new CancellationTokenSource();
         Running = RunAsync(audio, _cancel.Token);
         Render();
+        if (hadFocus) _cards[1].Focus();
     }
 
     /// <summary>Esc, or the page left mid-recording: the recording is dropped, nothing runs.</summary>
@@ -292,6 +321,20 @@ internal sealed class HowItWorksPage : SettingsPage
         return !none;
     }
 
+    /// <summary>
+    /// With no speech model ready, Record is off and the status says why: the welcome window's sentence while one loads, else
+    /// <see cref="HowItWorksText.NoSpeechModel"/>; it clears when one is ready. True when one is.
+    /// </summary>
+    private bool CheckSpeech()
+    {
+        var ready = SpeechReady();
+        if (!ready) Tell(Shell.SpeechLoading ? OnboardingText.TryLoading : HowItWorksText.NoSpeechModel);
+        else if (!_speechReady && (Status == OnboardingText.TryLoading || Status == HowItWorksText.NoSpeechModel)) Tell("");
+        _speechReady = ready;
+        Render();
+        return ready;
+    }
+
     private void Failed(Exception ex)
     {
         Shell.Log.Error($"See how it works: {ex.GetType().Name}: {ex.Message}");
@@ -313,7 +356,7 @@ internal sealed class HowItWorksPage : SettingsPage
         var recording = _capture is not null;
         _record.Content = recording ? HowItWorksText.StopLabel : HowItWorksText.RecordLabel;
         AutomationProperties.SetName(_record, recording ? HowItWorksText.StopName : HowItWorksText.RecordName);
-        _record.IsEnabled = recording || (!_noMicrophone && Running is not { IsCompleted: false }); // Stop always works; one run at a time
+        _record.IsEnabled = recording || (!_noMicrophone && _speechReady && Running is not { IsCompleted: false }); // Stop always works; one run at a time
         var stages = _run.Stages();
         for (var i = 0; i < _cards.Length; i++) _cards[i].Show(stages[i]);
     }
@@ -337,6 +380,9 @@ internal sealed class HowItWorksPage : SettingsPage
         public StageCard(Control? extra)
         {
             AutomationProperties.SetHeadingLevel(_title, 2);
+            // The stage's text and verdict are read out as they arrive (Border has no automation peer, so the TextBlocks carry it).
+            AutomationProperties.SetLiveSetting(_text, AutomationLiveSetting.Polite);
+            AutomationProperties.SetLiveSetting(_note, AutomationLiveSetting.Polite);
             _text.FontSize = 16;
             var body = Ui.Stack(6, Ui.Row(10, _title, _state), _description);
             if (extra is not null) body.Children.Add(extra);
@@ -365,6 +411,8 @@ internal sealed class HowItWorksPage : SettingsPage
         }
 
         public Border Root { get; }
+
+        public void Focus() => _block.Focus(NavigationMethod.Tab);
 
         public void Show(StageView view)
         {

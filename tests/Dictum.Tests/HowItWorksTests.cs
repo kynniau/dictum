@@ -77,6 +77,7 @@ public class HowItWorksTests
         Assert.DoesNotContain("Inserted", log.All);
         Assert.Equal(logTranscripts, log.All.Contains(raw));
         Assert.Equal(logTranscripts, log.All.Contains(reply));
+        Assert.Equal(logTranscripts, log.All.Contains("Fox")); // the finished text, in the "nothing pasted" line or anywhere, only with log_transcripts on
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using Dictum.Audio;
 using Dictum.Core;
+using Dictum.Hotkey;
 
 namespace Dictum.UI.Shell;
 
@@ -19,6 +20,15 @@ public sealed partial class AppShell
     /// Settings &gt; See how it works: runs one recording, held in memory, through <see cref="Pipeline"/> with nothing pasted
     /// (<see cref="DictationPipeline.DemonstrateAsync"/>), off the UI thread. The callbacks come on the pipeline's thread.
     /// </summary>
-    internal Task DemonstrateAsync(CapturedAudio audio, CancellationToken token, Action<PillView> pill, Action<PipelineProgress> report) =>
-        Task.Run(() => Pipeline.DemonstrateAsync(audio, token, pill, report), token);
+    internal Task DemonstrateAsync(CapturedAudio audio, CancellationToken token, Action<PillView> pill, Action<PipelineProgress> report)
+    {
+        var pipeline = Pipeline; // read on the UI thread, never the lazy field from a pool thread
+        return Task.Run(() => pipeline.DemonstrateAsync(audio, token, pill, report), token);
+    }
+
+    /// <summary>
+    /// A window holding the hotkey (<see cref="RedirectHotkey"/>) hands it back to the dictation already under way, so a
+    /// hands-free or toggle dictation started elsewhere can still be stopped, and its Esc still cancels it.
+    /// </summary>
+    internal void ForwardHotkey(HookEvent e) => _controller?.Post(e);
 }

@@ -37,11 +37,21 @@ public class HowItWorksPageTests
 
     private static List<string?> Texts(ILogical root) => [.. All<TextBlock>(root).Where(t => t.IsVisible).Select(t => t.Text)];
 
-    private static HowItWorksPage Open(SettingsWindow window)
+    /// <param name="speechReady">
+    /// True: the page takes a speech model as ready (an unstarted shell has none; the tests that use it put scripted engines in
+    /// the shell's pipeline). False: the shell's own state.
+    /// </param>
+    private static HowItWorksPage Open(SettingsWindow window, bool speechReady = true)
     {
         window.ShowPage(HowItWorksText.PageTitle);
         Dispatcher.UIThread.RunJobs();
-        return Assert.IsType<HowItWorksPage>(All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl));
+        var page = Assert.IsType<HowItWorksPage>(All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl));
+        if (speechReady)
+        {
+            page.SpeechReady = () => true;
+            page.Refresh();
+        }
+        return page;
     }
 
     private static bool Eventually(Func<bool> condition, int timeoutMs = 5000)
@@ -99,6 +109,8 @@ public class HowItWorksPageTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(HowItWorksText.PageTitle, nav.SelectedItem);
         var page = Assert.IsType<HowItWorksPage>(All<SettingsPage>(window).Single(p => p.IsVisible && p.Parent is ContentControl));
+        page.SpeechReady = () => true; // an unstarted shell has no speech model
+        page.Refresh();
 
         var shown = Texts(page);
         foreach (var text in new[] { HowItWorksText.PageTitle, HowItWorksText.Intro, HowItWorksText.MemoryNote, "or hold Right Ctrl" } // the hotkey in use (an unstarted shell: the default)
@@ -150,6 +162,8 @@ public class HowItWorksPageTests
         Assert.True(Eventually(() => page.Stages[3].Note == "Polishing…"));
         Assert.Equal(["Done", "Done", "Working…", "Working…", "Waiting"], page.Stages.Select(s => s.StateLabel));
         Assert.Contains("um so the invoice went out today", Texts(page));
+        // Each stage's text is a polite live region, read out as it arrives.
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(All<TextBlock>(page).Single(t => t.Text == "um so the invoice went out today")));
 
         polished.SetResult(new LlmReply("So the invoice went out today.", "end_turn"));
         Assert.True(Eventually(() => page.Running is { IsCompleted: true }));
@@ -212,7 +226,7 @@ public class HowItWorksPageTests
             Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
             var window = new SettingsWindow(shell);
             window.Show();
-            var page = Open(window);
+            var page = Open(window, speechReady: false); // the shell's own model state: loaded
             var before = Files(scratch);
             var captures = platform.Captures.Count;
 
@@ -324,6 +338,165 @@ public class HowItWorksPageTests
         shell.Dispose();
     });
 
+    private static readonly FieldInfo CleanerField = typeof(AppShell).GetField("_cleaner", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    [Fact]
+    public Task The_page_says_when_the_clean_up_sends_text_to_another_program_and_only_then() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        using var http = new HttpClient(); // the cleaners are built, never asked: nothing is sent
+        var secrets = SecretStore.FromContents(null, null, _ => null);
+        TranscriptCleaner Make(LlmSettings settings) => TranscriptCleaner.Create(settings, offlineOnly: false, secrets, http, NullLog.Instance);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = Open(window);
+
+        var server = Make(new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "http://127.0.0.1:9/v1", Model = "m" }); // a server on this PC: no key
+        Assert.True(server.SendsText);
+        CleanerField.SetValue(shell, server);
+        page.Refresh();
+        Assert.Equal(HowItWorksText.SendsText(server.Status), page.SendsTextLine);
+        Assert.Contains(HowItWorksText.SendsText(server.Status), Texts(page));
+
+        foreach (var quiet in new[] { Make(new LlmSettings { Provider = LlmSettings.Local }), Make(new LlmSettings { Provider = LlmSettings.NoProvider }), TranscriptCleaner.Off() })
+        {
+            Assert.False(quiet.SendsText);
+            CleanerField.SetValue(shell, quiet);
+            page.Refresh();
+            Assert.Equal("", page.SendsTextLine);
+            Assert.DoesNotContain(Texts(page), t => t?.StartsWith("Your clean-up sends text", StringComparison.Ordinal) == true);
+        }
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task A_dictation_started_elsewhere_keeps_its_hotkey_and_Record_says_busy() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""
+            { "hotkey": "F24", "whisper": { "model": "base.en" }, "pill": { "enabled": false }, "llm": { "provider": "none" } }
+            """);
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
+        File.WriteAllText(model, "");
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+        var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model));
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.True(Eventually(() => shell.SpeechReady), "the speech model did not load");
+            var key = platform.LastListener!;
+            var window = new SettingsWindow(shell);
+            window.Show();
+            window.Activate();
+            window.ShowPage("About");
+            Dispatcher.UIThread.RunJobs();
+
+            var t0 = Environment.TickCount64 + 60_000; // ahead of the controller's clock, so its tick expires nothing meanwhile
+            key.Post(new HookEvent(HotkeySignal.Down, t0)); // a dictation starts while another page is shown
+            Assert.True(Eventually(() => !shell.DictationIdle), "the dictation did not start");
+            var page = Open(window, speechReady: false);
+            Assert.True(Eventually(() => RedirectField.GetValue(shell) is not null), "the page did not take the hotkey");
+
+            Click(Record(page)); // Record while that dictation runs
+            Assert.False(page.IsRecording);
+            Assert.Equal(HowItWorksText.Busy, page.Status);
+
+            key.Post(new HookEvent(HotkeySignal.Up, t0 + 1_000)); // its key-up reaches the dictation, not the page
+            Assert.True(Eventually(() => shell.DictationIdle), "the dictation was not stopped by its own hotkey");
+            Assert.True(Eventually(() => platform.Desktop.Ops.Contains($"set-text:{DeterministicCleaner.Clean("fake-model.bin")} ")), "the dictation was not pasted");
+            Assert.False(page.IsRecording);
+            Assert.Null(page.Running); // the page ran nothing
+            window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    [Fact]
+    public Task Stop_from_the_keyboard_moves_focus_to_the_steps() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        UsePipeline(shell, new FakeTranscriber("hello there"), TranscriptCleaner.RulesOnly("rules"));
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = Open(window);
+        var record = Record(page);
+        record.Focus(NavigationMethod.Tab);
+        Click(record);
+        Click(record); // Stop: Record turns off while the steps run
+        var focused = TopLevel.GetTopLevel(window)!.FocusManager!.GetFocusedElement();
+        Assert.StartsWith(HowItWorksText.Stages[1].Title, AutomationProperties.GetName(AvaloniaObjectOf(focused)));
+        Assert.True(Eventually(() => page.Running is { IsCompleted: true }));
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task A_microphone_failure_drops_the_take_and_says_so() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, platform, _) = scratch.Shell();
+        var capture = new ScriptedCapture();
+        platform.CaptureFactory = () => capture;
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = Open(window);
+        Click(Record(page));
+        Assert.True(page.IsRecording);
+        capture.Fail(new InvalidOperationException("The device was unplugged.")); // the capture's Failed event, as WASAPI raises it
+        Assert.True(Eventually(() => !page.IsRecording));
+        Assert.Equal(HowItWorksText.Failed("The device was unplugged."), page.Status);
+        Assert.Null(page.Running); // nothing ran
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task The_take_limit_stops_the_take_runs_it_and_says_so() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        UsePipeline(shell, new FakeTranscriber("hello there"), TranscriptCleaner.RulesOnly("rules"));
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = Open(window);
+        Click(Record(page));
+        page.TakeLimitReached(); // what the 30 s timer calls
+        Assert.False(page.IsRecording);
+        Assert.Equal("Stopped at 30 s, the longest this page records.", page.Status);
+        Assert.True(Eventually(() => page.Running is { IsCompleted: true }));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(DeterministicCleaner.Clean("hello there"), page.Stages[4].Text);
+        Assert.Equal(HowItWorksText.LimitReached, page.Status); // the limit line stays, not "Done"
+        window.Close();
+        shell.Dispose();
+    });
+
+    [Fact]
+    public Task Record_is_off_until_a_speech_model_is_ready() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell(); // not started: no speech model, none loading
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = Open(window, speechReady: false);
+        Assert.False(Record(page).IsEnabled);
+        Assert.Equal(HowItWorksText.NoSpeechModel, page.Status);
+        page.OnHotkey(new HookEvent(HotkeySignal.Down, 0)); // nor does the hotkey record
+        Assert.False(page.IsRecording);
+
+        page.SpeechReady = () => true; // one has loaded
+        page.Refresh();
+        Assert.True(Record(page).IsEnabled);
+        Assert.Equal("", page.Status);
+        window.Close();
+        shell.Dispose();
+    });
+
     /// <summary>A microphone stand-in: a level while open, two seconds of "speech" at Stop, or a refusal at Start.</summary>
     private sealed class ScriptedCapture : IAudioCapture
     {
@@ -333,7 +506,6 @@ public class HowItWorksPageTests
 
         public float CurrentLevel => _open ? Level : 0f;
 
-        public event Action<Exception>? Failed { add { } remove { } }
 
         public void Start(string? deviceSetting, long keyDownStamp)
         {
@@ -345,6 +517,16 @@ public class HowItWorksPageTests
         {
             _open = false;
             return new CapturedAudio(new float[32000], 0.2f);
+        }
+
+        public void Fail(Exception ex) => FailedHandlers?.Invoke(ex);
+
+        private Action<Exception>? FailedHandlers;
+
+        event Action<Exception>? IAudioCapture.Failed
+        {
+            add => FailedHandlers += value;
+            remove => FailedHandlers -= value;
         }
     }
 }

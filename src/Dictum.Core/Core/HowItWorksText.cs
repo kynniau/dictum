@@ -49,6 +49,9 @@ public static class HowItWorksText
 
     public static string Failed(string message) => $"That did not work: {message}";
 
+    /// <summary>No speech model is ready and none is loading (one loading says the welcome window's "Getting the speech model ready…").</summary>
+    public const string NoSpeechModel = "No speech model is ready yet, so Record is off. Settings > Models shows the model's state.";
+
     /// <summary>The five stages, in order: title then one line on what the stage is.</summary>
     public static readonly IReadOnlyList<(string Title, string Description)> Stages =
     [
@@ -95,7 +98,7 @@ public static class HowItWorksText
     /// <summary>Every fixed sentence, for the pins (the ones built from a value are checked where they are shown).</summary>
     public static IEnumerable<string> FixedText() =>
     [
-        PageTitle, Intro, MemoryNote, RecordLabel, StopLabel, Recording, LimitReached, Busy, Cancelled, Done,
+        PageTitle, Intro, MemoryNote, RecordLabel, StopLabel, Recording, LimitReached, Busy, Cancelled, Done, NoSpeechModel,
         .. Stages.SelectMany(s => new[] { s.Title, s.Description }),
         Waiting, Working, StageDone, NotUsed, NotReached, TidyPlain, TidyIsAll, TidyUsed, TidyNotNeeded, Accepted, WouldPaste, Changed, NothingLeft,
     ];
