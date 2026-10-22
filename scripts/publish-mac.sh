@@ -7,11 +7,12 @@
 #                              which Apple Silicon needs to run arm64 code at all, but Gatekeeper rejects (beta limitation).
 #   DICTUM_MAC_NOTARY_PROFILE  a notarytool keychain profile name (made once with `xcrun notarytool store-credentials`).
 #                              Set: the signed bundle is submitted, stapled and re-zipped. Needs DICTUM_MAC_SIGN_IDENTITY.
+#   DICTUM_MAC_DIST            the output folder (default dist/), so a second build never clobbers one still being notarised.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
-dist="$root/dist"
+dist="${DICTUM_MAC_DIST:-$root/dist}"
 publish="$dist/mac-publish"
 app="$dist/Dictum.app"
 macos="$app/Contents/MacOS"

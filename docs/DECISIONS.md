@@ -5396,3 +5396,30 @@ pass with approved copy, not changed here.
   30 s; retire by binding in a shorter per-user folder when a tester hits it. Approved Windows wording still shown on a Mac
   and not reworded here: "notification area (system tray)", "Windows did not let Dictum switch back…", "everything Dictum
   has put on this PC" (AppShell).
+
+**Merge of main at 1.3.0 (b8b072d, PRs #54-#65) into this branch, 23/10/2026 02:38 AEDT, at the Windows orchestrator's
+request before the PR.** Conflicts: this file (both appended sections kept, main's first) and `Dictum.UI.csproj` (the
+`InternalsVisibleTo` lines for Dictum.Mac and Dictum.UiProbe both kept). Mac consequences, each Verified on this Mac
+unless marked:
+- Main's model-move tests (PR #61) failed ten ways on the Mac, all test-side: three make a directory junction with
+  `cmd.exe /c mklink /J` (the helper now returns false off Windows and its callers skip, as they already did when mklink
+  fails); five pin `ModelMover.Nested` / `PathRegistry.IsInside` with drive-letter paths (now through `TestPaths.Native`,
+  so `D:\` is `/D` there and the same containment is checked); two pin that a loaded model file cannot be moved (a Windows
+  sharing rule: `TestEnv.WindowsOnly(TestEnv.HeldOpen)`, the gate the tests lane used for the same rule). The mover's own
+  code is platform-neutral: `ModelMover.SameFileOnDisk` relies on FileShare.None, which .NET implements on Unix with an
+  advisory lock (the lane's earlier finding), and `ModelMoveSafetyTests` pass unchanged on the Mac. Suite after the merge:
+  2599 total, 0 failed, 2407 passed, 192 skipped.
+- The dialog-ownership fix (PR #65, `Modal.Run` shows a dialog with `ShowDialog(owner)` from the clicked window and
+  disables the owner) is designed for the Mac too: Avalonia.Native's `WindowImpl.SetEnabled(false)` calls
+  `MouseDevice.PlatformCaptureLost()` because "macOS doesn't have the concept of mouse capture … release the mouse capture
+  when the owner window is disabled. This behavior matches win32" (Avalonia source, branch release/11.3.22,
+  src/Avalonia.Native/WindowImpl.cs, read 23/10/2026), and `SetParent` hands the owner to the native window. From the tray
+  panel (`FlyoutWindow`) and at first run the dialog is still shown on its own, as before. **Not verified** on the Mac: that
+  the first click on a dialog opened from a Settings button lands (the real-backend check, `Dictum.UiProbe`, is a Windows
+  executable, net10.0-windows, referencing Dictum.Windows); it is in the PR's owner steps (Settings > Storage > Use default).
+- `scripts/publish-mac.sh` reads `DICTUM_MAC_DIST` (default `dist/`), added so the merged head could be built and signed
+  while the earlier bundle's notarisation was still waiting on Apple in `dist/` (submitted 00:26 AEDT, still "In Progress"
+  at 02:39; Apple's developer status feed listed the Developer ID Notary Service with no events at 02:34).
+- Nothing else on main touches a platform seam: the cloud speech UI, own clean-up instructions, Help questions, plain-words
+  page and the key file are Core/UI code the Mac build takes as is (the key file, `KeyFile.cs`, is a plain .NET
+  create-new write of `.env` in the config folder).
