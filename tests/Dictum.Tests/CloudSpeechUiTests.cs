@@ -54,6 +54,25 @@ public sealed class CloudSpeechUiTests
 
     private static bool ButtonShown(ILogical root, string label) => All<Button>(root).Any(b => b.IsEffectivelyVisible && b.Content as string == label);
 
+    // Approved by the product owner as written: Settings > Privacy's default summary and the Clean-up card's last sentence.
+    // Pinned byte for byte, independently of the app's copy.
+    private const string ApprovedPrivacyDefault = "Nothing leaves this PC: speech recognition and clean-up both run here.";
+    private const string ApprovedAudioSentence = "Audio never leaves this PC.";
+
+    /// <summary>Every visible line of a Settings page, drawn afresh from the settings and the steps in use.</summary>
+    private static IReadOnlyList<string> PageLines(AppShell shell, string page)
+    {
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage(page);
+        var lines = All<TextBlock>(window).Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
+        window.Close();
+        return lines;
+    }
+
+    /// <summary>The About box's runtime lines, one per line.</summary>
+    private static IReadOnlyList<string> AboutLines(AppShell shell) => [.. PageLines(shell, "About").SelectMany(t => t.Split('\n'))];
+
     private static void Click(ILogical root, string label) =>
         All<Button>(root).First(b => b.IsEffectivelyVisible && b.Content as string == label).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
@@ -165,6 +184,8 @@ public sealed class CloudSpeechUiTests
             flyout.ShowNear(null);
             Assert.True(Shown(flyout, ApprovedNothingLeaves));
             flyout.Close();
+            Assert.Contains(ApprovedPrivacyDefault, PageLines(shell, "Privacy"));
+            Assert.DoesNotContain(AboutLines(shell), l => l.StartsWith("Speech: cloud", StringComparison.Ordinal));
         }
         finally
         {
@@ -211,6 +232,12 @@ public sealed class CloudSpeechUiTests
             Assert.False(Shown(flyout, ApprovedNothingLeaves));
             flyout.Close();
 
+            var privacy = PageLines(shell, "Privacy");
+            Assert.Contains(AppShell.SpeechPrivacyLine(SpeechHost), privacy);
+            Assert.DoesNotContain(ApprovedPrivacyDefault, privacy); // untrue now: replaced, not reworded
+            Assert.Contains(AppShell.SpeechAboutLine(SpeechHost, "speech-model", shell.Models.CurrentName), AboutLines(shell));
+            Assert.DoesNotContain(PageLines(shell, "Clean-up"), l => l.Contains(ApprovedAudioSentence, StringComparison.Ordinal));
+
             var agreed = CloudConsentFile.ReadAll(scratch.Paths.ConsentFile).Speech!.AgreedAt;
             Assert.Contains(CloudSpeech.LoadLine(SpeechHost, "speech-model", agreed, shell.Models.CurrentName), log.All);
             Assert.Contains($"; consent recorded {agreed.ToLocalTime():yyyy-MM-dd}; ", log.All);
@@ -238,6 +265,11 @@ public sealed class CloudSpeechUiTests
         {
             shell.Reload(userRequested: false);
             Assert.True(shell.SpeechSendsAudio);
+            // Both on: the speech line, then the Clean-up card's own on line, never the approved clean-up sentence that says audio stays.
+            var both = PageLines(shell, "Privacy");
+            Assert.Contains(AppShell.SpeechPrivacyLine(SpeechHost), both);
+            Assert.Contains(both, l => l.StartsWith("On: the text of each dictation is sent to llm.example.com", StringComparison.Ordinal));
+            Assert.DoesNotContain(both, l => l.Contains(ApprovedAudioSentence, StringComparison.Ordinal));
             var window = Models(shell);
             Click(window, ModelsPage.CloudSpeechOffLabel);
 
@@ -261,6 +293,11 @@ public sealed class CloudSpeechUiTests
             Assert.True(Shown(flyout, ApprovedFlyoutCloud));
             flyout.Close();
             Assert.Null(shell.PillLabel(PillView.Transcribing));
+            // Back to the clean-up-only default: the approved Privacy sentence, byte for byte, and no speech line on About.
+            var privacy = PageLines(shell, "Privacy");
+            Assert.DoesNotContain(AppShell.SpeechPrivacyLine(SpeechHost), privacy);
+            Assert.Contains(privacy, l => l.StartsWith("The text of each dictation goes to llm.example.com", StringComparison.Ordinal) && l.Contains(" " + ApprovedAudioSentence + " ", StringComparison.Ordinal));
+            Assert.DoesNotContain(AboutLines(shell), l => l.StartsWith("Speech: ", StringComparison.Ordinal));
         }
         finally
         {
@@ -289,6 +326,10 @@ public sealed class CloudSpeechUiTests
             Assert.True(Shown(off, ApprovedNothingLeaves));
             Assert.False(Shown(off, AppShell.SpeechTrayLine(SpeechHost)));
             off.Close();
+            var privacy = PageLines(shell, "Privacy");
+            Assert.Contains(ApprovedPrivacyDefault, privacy);
+            Assert.DoesNotContain(AppShell.SpeechPrivacyLine(SpeechHost), privacy);
+            Assert.Contains(PageLines(shell, "Clean-up"), l => l.EndsWith(" " + ApprovedAudioSentence, StringComparison.Ordinal));
         }
         finally
         {
@@ -354,6 +395,11 @@ public sealed class CloudSpeechUiTests
                 Assert.False(Shown(flyout, AppShell.SpeechTrayLine("api.groq.com")));
                 flyout.Close();
                 Assert.Null(shell.PillLabel(PillView.Transcribing));
+                const string waiting = "On, but waiting for your GROQ_API_KEY: nothing is sent until you add it to .env.";
+                var privacy = PageLines(shell, "Privacy");
+                Assert.Contains(waiting, privacy);
+                Assert.Contains(ApprovedPrivacyDefault, privacy); // true: nothing is sent
+                Assert.Contains($"Speech: {waiting}", AboutLines(shell));
                 Assert.Equal(0, server.Count);
             }
             finally
@@ -375,8 +421,11 @@ public sealed class CloudSpeechUiTests
             shell.Reload(userRequested: false);
             Assert.False(shell.SpeechSendsAudio);
             var window = Models(shell);
-            Assert.True(Shown(window, "On, but offline only is on: nothing is sent until you switch offline only off."));
+            const string offline = "On, but offline only is on: nothing is sent until you switch offline only off.";
+            Assert.True(Shown(window, offline));
             window.Close();
+            Assert.Contains(offline, PageLines(shell, "Privacy"));
+            Assert.Contains($"Speech: {offline}", AboutLines(shell));
             Assert.Equal(AppShell.SpeechOfflineRefused,
                 shell.EnableCloudSpeech(new SpeechSettings { Provider = SpeechSettings.OpenAiCompatible, BaseUrl = "https://other.example.com/v1", Model = "m" }));
             Assert.Empty(dialogs.Questions);
@@ -448,6 +497,8 @@ public sealed class CloudSpeechUiTests
             flyout.ShowNear(null);
             Assert.True(Shown(flyout, $"{AppShell.SpeechTrayLine(SpeechHost)}\n{SpeechStatus.Failed(reason)}"));
             flyout.Close();
+            Assert.Contains($"{AppShell.SpeechPrivacyLine(SpeechHost)}\n{SpeechStatus.Failed(reason)}", PageLines(shell, "Privacy"));
+            Assert.Contains($"Speech: {SpeechStatus.Failed(reason)}.", AboutLines(shell));
         }
         finally
         {
@@ -506,8 +557,27 @@ public sealed class CloudSpeechUiTests
             window.ShowPage("Privacy");
             Assert.True(Shown(window, "Nothing leaves this PC: speech recognition and clean-up both run here."));
             window.ShowPage("Clean-up");
-            Assert.Contains(All<TextBlock>(window), t => t.IsEffectivelyVisible && t.Text?.EndsWith(" Audio never leaves this PC.", StringComparison.Ordinal) == true);
+            Assert.True(Shown(window, "Optional. A cloud model can tidy longer dictations well, but the text of every dictation then goes to that service. Audio never leaves this PC."));
             window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>Pin 7, cloud clean-up alone on: Settings > Privacy's approved clean-up sentence, byte for byte, with cloud speech off.</summary>
+    [Fact]
+    public Task The_approved_clean_up_privacy_sentence_is_unchanged_while_cloud_speech_is_off() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Settings(extra: """, "llm": { "provider": "openai-compatible", "base_url": "https://llm.example.com/v1", "model": "m" }"""));
+        CloudConsentFile.Write(scratch.Paths.ConsentFile, new CloudConsentRecord(LlmSettings.OpenAiCompatible, "llm.example.com", DateTimeOffset.UtcNow, "test"));
+        var (shell, _, _) = Shell(scratch);
+        try
+        {
+            shell.Reload(userRequested: false);
+            Assert.Contains("The text of each dictation goes to llm.example.com for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. " +
+                            "Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.", PageLines(shell, "Privacy"));
         }
         finally
         {

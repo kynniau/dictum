@@ -4447,3 +4447,91 @@ Found by the cloud-setup-help lane: with Anthropic chosen in Settings > Clean-up
 6. **Pins.** `CloudWarningAndPresetsTests.Switching_on_from_the_page_without_the_key_shows_the_waiting_line_and_never_says_on` (Anthropic and OpenAI, through the page's own button): the cleaner waits for the key and nothing leaves; straight after Allow the page shows the approved waiting line and not "Cloud clean-up is on."; the card shows the on state with its off switch and the waiting line; Privacy carries the waiting line; About names the rule-based tidy and the missing key; the tray panel shows "Nothing leaves this PC" with its lock and not the cloud line. `SettingsRepairTests.Anthropic_agreed_to_without_a_key_stays_anthropic_so_the_pages_can_say_it_waits_for_the_key` pins the repair's new boundary. `FixBatchSettingsTests.The_cleanup_repair_is_told_whether_the_key_is_present` pinned the old behaviour (consent and no key gave `local`); it now checks through `ConfigLoader` that the key's absence is the logged reason without a consent, that a key alone does not pass a missing consent, and that a consent keeps `anthropic` with and without the key.
 7. **Mutation (observed 22/10/2026).** Removing the consent condition from the repair fails the repair pin, the ConfigLoader pin and the Anthropic case of the page pin (the clean-up in use is the local model again). Restoring the fixed "Cloud clean-up is on." fails both cases of the page pin.
 8. **README** lines for `llm.provider` and `ANTHROPIC_API_KEY` now say what each case does.
+
+## Cloud speech, UI (22/10/2026, branch feat/cloud-speech-ui)
+
+Lane C-UI of the design brief's "Cloud speech" appendix (§2, §3, §4, §7 item 9, §8), on the Core half (PR #48). No README,
+site or Store copy changes: that is the C-Copy lane, gated on owner approval.
+
+1. **Cause.** The Core lane built the gate, the request and the fallback, but nothing in the app could record the speech
+   consent or switch cloud speech off, and the surfaces that say what leaves this PC did not know about audio: with cloud
+   speech on, the tray panel and Settings > Privacy would still have said "Nothing leaves this PC".
+2. **Consent step (`AppShell.EnableCloudSpeech`).** Mirrors clean-up's `EnableCloud`: a plain `http://` address and offline
+   only are refused before any dialog; then a second dialog, apart from clean-up's, with the approved `SpeechPolicy.ConsentText`
+   and buttons (`AgreeButton(host)` / `DeclineButton`, the default). Every address needs it, a server on this PC included.
+   Declining writes nothing. Agreeing writes the speech entry of consent.json (`CloudConsentFile.WriteSpeech`: provider, host,
+   time, app version), then speech.provider / base_url / model; when settings.json cannot be written, the speech entry is
+   withdrawn again, and if that fails too the switch-off below holds instead. A clean-up consent on file is never touched.
+3. **Switch cloud speech off (`DisableCloudSpeech`, `SpeechChoices`, `SaveSpeechOff`).** Mirrors `DisableCloud`: in memory
+   first (`_speechWithdrawn`: speech.provider local and no speech consent, whatever the files say), so the reload retires the
+   cloud engine; then `CloudConsentFile.WithdrawSpeech` (the clean-up entry stays; with none left the file goes) and
+   speech.provider = local. Until both files keep it, it holds and is retried at every reload and at quit. One flag, not
+   clean-up's two: every speech address needs the consent, so there is no server-on-this-PC case to keep apart.
+4. **Settings > Models (Advanced view only).** A "Cloud speech" card under "Speech model", laid out as Settings > Clean-up's
+   Cloud clean-up card, with the same automation names (Service, Server address, Model). The address line shows only for
+   Azure OpenAI (the customer's resource name) and a custom server; OpenAI and Groq use their preset address. No model is
+   filled in: `SpeechPresets` carries no model id (the Core lane's note: ids from a page summary are not put into code), so
+   the field's placeholder says what to type. The key line follows the address (`SpeechPresets.ForAddress`). The Simple view
+   hides the whole card.
+5. **Surfaces, all from the speech step in use** (`CloudSpeech.Status`, `SendsAudio`, `LastFailure`; the last two and `Model`
+   are new pass-throughs on `CloudSpeech`). The card's line is `SpeechStatus` (Core). The tray panel shows the Speech model value
+   under the pickers and, in the footer, the same line: it takes the place of the approved "Nothing leaves this PC" row while
+   clean-up sends nothing (that row is hidden, not reworded) and sits above the clean-up row otherwise. Privacy has a speech
+   line above the clean-up summary; About adds a speech line; the pill takes a label from the shell (`AppShell.PillLabel`).
+   After a failed request the card, tray, Privacy and About show `SpeechStatus.Failed` and the pill says
+   `SpeechStatus.FallbackPill` in place of "Pasted", until the next success. The load log line is now built by
+   `CloudSpeech.LoadLine` with the consent's date (consent.json is read for the date only) and the local model's name; the
+   per-failure line is the Core lane's, already the spec's wording.
+6. **Approved sentences made untrue by cloud speech: hidden or replaced, never reworded.** Privacy's default "Nothing leaves
+   this PC: speech recognition and clean-up both run here." gives way to the speech line. Privacy's cloud clean-up sentence
+   says "Audio never leaves this PC.", so with both on it gives way to the Clean-up card's own on line
+   (`CleanupPage.StateLine`, now internal, unchanged), which says the same about the text without the audio claim. The Clean-up
+   card's introduction ends "Audio never leaves this PC." and is one string, so it is hidden while cloud speech sends audio.
+   All three come back byte for byte when cloud speech is off. **Owner decisions pending:** a replacement for the Clean-up
+   introduction (the spec's §5 proposes "Audio never leaves this PC unless cloud speech is on.") and for the Privacy clean-up
+   sentence when both are on. Left as is and not edited (C-Copy territory): `HelpText` says "your voice still stays here" in
+   three places (the cloud clean-up answers), untrue while cloud speech is on; Privacy's offline-only hint names downloads
+   and cloud clean-up but not cloud speech (still true: "No network at all").
+7. **PROPOSED strings** (each marked `PROPOSED` at its source):
+   - Consent dialog title: "Send your voice to a cloud service?"
+   - Declined: "Cloud speech was not switched on; nothing is sent."
+   - Offline refusal: "offline_only is on, so cloud speech is refused. Switch offline only off in Settings > Privacy first."
+   - Missing fields: "Type the service's https:// address and the model (for Azure OpenAI, the deployment name)."
+   - Card: title "Cloud speech"; buttons "Use cloud speech…" and "Switch cloud speech off"; introduction "Optional, for a slow
+     PC or one without a GPU. A cloud service turns each recording into text instead of the speech model on this PC, but the
+     recording of every dictation, your voice, then goes to that service. The speech model on this PC stays as the
+     fallback."; address hint "Dictum adds /audio/transcriptions. Cloud speech needs an https:// address, also for a server
+     on this PC."; address placeholders "https://your-resource.openai.azure.com/openai/v1" (Azure OpenAI) and
+     "https://your-server.example.com/v1"; key lines (clean-up's sentences) "The key goes in .env in the settings folder:
+     {VAR}=your {service} API key. Without it nothing is sent." and "If the server needs a key, it goes in .env in the settings
+     folder: {VAR}=your key."; offline note "Offline only is on (Privacy), so cloud speech cannot be switched on."; "Cloud
+     speech is on."; "Cloud speech is off; the speech model on this PC hears your dictations again."
+   - Card state lines: the Core lane's `SpeechStatus` (On, Failed, NotAgreed, TranslateRefused, NothingSent; WaitingForKey and
+     OfflineOnly are clean-up's approved lines).
+   - Tray panel Speech model value and footer: "Cloud speech · audio leaves this PC ({host})", with the Failed line under it after a fallback.
+   - Privacy: "Your voice goes to {host} for speech recognition. Advanced option: your audio leaves this PC. Dictum does not
+     validate or certify how that service handles it." (with the Failed line under it after a fallback; the speech step's own
+     line while cloud speech is on but sends nothing).
+   - About: "Speech: cloud, {host} ({model}); {local model} on this PC is the fallback." ("Speech: {status}." after a
+     fallback or while it sends nothing).
+   - Load log: "Cloud speech on: audio goes to {host} ({model}); consent recorded {yyyy-MM-dd}; {local model} is the fallback."
+   - Pill: "Hearing… (cloud)"; after a fallback, the Core lane's "Heard on this PC (cloud speech failed)".
+   - Switch-off not saved (mirrors clean-up's approved `OffNotSaved`): "Cloud speech is off, but consent.json could not be
+     changed ({reason}). Nothing is sent. Dictum tries again at the next reload and when it quits; until it is changed, your
+     speech consent stays on file."; "Cloud speech is off for this session, but settings.json could not be saved ({reason}).
+     Nothing is sent. Dictum tries again at the next reload and when it quits."; and the both-files sentence ending "the
+     next start turns cloud speech back on, unless settings.json cannot be read, in which case Dictum starts offline."
+8. **Pins** (`CloudSpeechUiTests`, headless): (1) declining records nothing, writes nothing, sends nothing, with the approved
+   text and buttons and decline as the default; settings.json alone never switches it on; (2) agreeing writes only the speech
+   entry and the card, tray (value and footer), Privacy, About, load log and pill show the on state, "Nothing leaves this PC"
+   gone; (3) Switch cloud speech off withdraws only the speech entry (clean-up consent and cloud clean-up untouched), surfaces
+   back to the default, "Nothing leaves this PC" back when clean-up is local; a switch-off that cannot be saved holds; (4)
+   waiting-for-key and offline-only lines on the card, Privacy and About, and switching on refused under offline only; (5) a
+   dictation whose request fails is heard on this PC, the log names the reason, the card, tray, Privacy, About and pill show
+   the fallback; (6) the Simple view hides the card; (7) the approved default sentences byte for byte against literal copies.
+9. **Mutations (observed 22/10/2026).** Pin 1 observed failing with the consent gate removed (the dialog's answer ignored:
+   consent.json was written). Pin 3 observed failing with the speech withdrawal removed (the speech consent stayed on file),
+   and observed failing with the withdrawal replaced by deleting consent.json (the clean-up consent went too). Pin 7 observed
+   failing with the Privacy default sentence changed by one word. Pin 2 observed failing with the approved default shown
+   while cloud speech sends audio.
+10. **Gates.** Release build with `--no-incremental`: 0 warnings, 0 errors. Full suite (xunit.v3, Release): 1897 total, 0 failed, 23 skipped (the existing environment-gated skips), 0 errors.
