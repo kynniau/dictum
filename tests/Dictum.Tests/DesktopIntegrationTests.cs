@@ -40,6 +40,7 @@ public class DesktopIntegrationTests(ITestOutputHelper output)
     [Fact]
     public void Hook_thread_sees_injected_hotkey_presses()
     {
+        TestEnv.WindowsOnly("Installs a Win32 low-level hook on a hook thread and injects input with SendInput.");
         Assert.SkipUnless(TestEnv.Get("UI_TESTS") == "1", "Set DICTUM_UI_TESTS=1 (injects F24 system-wide).");
         Assert.Equal(40, Marshal.SizeOf<KeyInput>());
 

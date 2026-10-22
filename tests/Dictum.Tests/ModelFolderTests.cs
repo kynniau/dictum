@@ -85,6 +85,8 @@ public sealed class ModelFolderTests : IDisposable
     [InlineData("""{ "models": { "folder": "D:\\m", "foldr": "x" } }""", @"D:\m", 1)] // an unknown key in the section
     public void Models_folder_is_an_absolute_folder_or_empty_and_anything_else_falls_back_with_a_warning(string json, string? folder, int warnings)
     {
+        Assert.SkipWhen(!OperatingSystem.IsWindows() && folder is not null && folder.StartsWith(@"\\", StringComparison.Ordinal), TestPaths.WindowsForm);
+        if (folder is not null) (json, folder) = (TestPaths.InJson(json, folder), TestPaths.Native(folder));
         var load = SettingsLoader.Parse(json);
         Assert.Equal(folder, load.Settings.Models.Folder);
         Assert.Equal(warnings, load.Warnings.Count);
@@ -107,14 +109,15 @@ public sealed class ModelFolderTests : IDisposable
     [Fact]
     public void Whisper_models_dir_is_still_read_as_the_earlier_name_and_models_folder_wins_over_it()
     {
-        var earlier = SettingsLoader.Parse("""{ "whisper": { "models_dir": "E:\\m" } }""");
+        static string Json(string json) => TestPaths.InJson(TestPaths.InJson(TestPaths.InJson(json, @"E:\m"), @"F:\n"), @"f:\N");
+        var earlier = SettingsLoader.Parse(Json("""{ "whisper": { "models_dir": "E:\\m" } }"""));
         Assert.Empty(earlier.Warnings);
-        Assert.Equal(@"E:\m", _paths.ModelsDir(earlier.Settings));
+        Assert.Equal(TestPaths.Native(@"E:\m"), _paths.ModelsDir(earlier.Settings));
 
-        var both = SettingsLoader.Parse("""{ "whisper": { "models_dir": "E:\\m" }, "models": { "folder": "F:\\n" } }""");
-        Assert.Equal(@"F:\n", _paths.ModelsDir(both.Settings));
+        var both = SettingsLoader.Parse(Json("""{ "whisper": { "models_dir": "E:\\m" }, "models": { "folder": "F:\\n" } }"""));
+        Assert.Equal(TestPaths.Native(@"F:\n"), _paths.ModelsDir(both.Settings));
         Assert.Equal("Setting \"whisper.models_dir\" is ignored: \"models.folder\" chooses the models folder.", Assert.Single(both.Warnings));
-        Assert.Empty(SettingsLoader.Parse("""{ "whisper": { "models_dir": "F:\\n" }, "models": { "folder": "f:\\N" } }""").Warnings); // the same folder
+        Assert.Empty(SettingsLoader.Parse(Json("""{ "whisper": { "models_dir": "F:\\n" }, "models": { "folder": "f:\\N" } }""")).Warnings); // the same folder
     }
 
     // ---- The lookup ----
@@ -460,6 +463,7 @@ public sealed class ModelFolderTests : IDisposable
     [Fact]
     public Task Storage_warns_when_the_model_folder_is_on_a_network_share() => UiSession.Run(() =>
     {
+        TestEnv.WindowsOnly(TestPaths.WindowsForm);
         using var scratch = new Scratch();
         var share = @"\\fileserver\dictum\models";
         File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", models = new { folder = share } }));

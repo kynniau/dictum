@@ -101,6 +101,7 @@ public sealed class FixBatchLifecycleTests : IDisposable
     [Fact]
     public void A_second_launch_signals_the_running_copy()
     {
+        TestEnv.WindowsOnly("Uses the Windows single-instance lock: a named mutex and a named event (named events exist only on Windows).");
         var (mutex, signal) = (Unique(), Unique());
         using var other = new OtherCopy(mutex, signal);
         var instance = SingleInstance.Acquire(mutex, signal, TimeSpan.FromSeconds(5));
@@ -116,6 +117,7 @@ public sealed class FixBatchLifecycleTests : IDisposable
     [Fact]
     public void A_launch_takes_over_from_a_copy_that_is_quitting()
     {
+        TestEnv.WindowsOnly("Uses the Windows single-instance lock: a named mutex and a named event (named events exist only on Windows).");
         var (mutex, signal) = (Unique(), Unique());
         using var other = new OtherCopy(mutex, eventName: null); // quitting: its event is already closed
         _ = Task.Delay(300, Ct).ContinueWith(_ => other.LetGo(), TaskScheduler.Default);
@@ -133,6 +135,7 @@ public sealed class FixBatchLifecycleTests : IDisposable
     [Fact]
     public void An_abandoned_lock_counts_as_taken()
     {
+        TestEnv.WindowsOnly("Uses the Windows single-instance lock: a named mutex and a named event (named events exist only on Windows).");
         var (mutex, signal) = (Unique(), Unique());
         using var other = new OtherCopy(mutex, eventName: null, abandon: true); // the old copy ended without letting go
         var instance = SingleInstance.Acquire(mutex, signal, TimeSpan.FromSeconds(5));
@@ -147,6 +150,7 @@ public sealed class FixBatchLifecycleTests : IDisposable
     [Fact]
     public void A_copy_that_never_lets_go_is_waited_for_a_bounded_time()
     {
+        TestEnv.WindowsOnly("Uses the Windows single-instance lock: a named mutex and a named event (named events exist only on Windows).");
         var (mutex, signal) = (Unique(), Unique());
         using var other = new OtherCopy(mutex, eventName: null);
         var sw = Stopwatch.StartNew();

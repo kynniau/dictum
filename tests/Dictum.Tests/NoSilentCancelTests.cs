@@ -11,6 +11,7 @@ using Dictum.App;
 using Dictum.Core;
 using Dictum.Llm;
 using Dictum.Settings;
+using Dictum.Storage;
 using Dictum.Transcribe;
 using Dictum.UI.Views;
 using Dictum.UI.Views.Settings;
@@ -551,7 +552,9 @@ public sealed class NoSilentCancelTests : IDisposable
         File.WriteAllBytes(queued + ".part", new byte[100]);
         downloads.Start(new DownloadSpec(new Uri("https://dictate-test.invalid/next.bin"), "next.bin", 500, null), queued, () => { });
         var root = Path.GetPathRoot(Path.GetFullPath(_paths.DefaultModelsDir))!;
-        var otherDrive = (char.ToUpperInvariant(root[0]) == 'Q' ? "R" : "Q") + @":\models\far.bin"; // never started: nothing touches that drive
+        var otherDrive = OperatingSystem.IsWindows()
+            ? (char.ToUpperInvariant(root[0]) == 'Q' ? "R" : "Q") + @":\models\far.bin" // never started: nothing touches that drive
+            : Path.Combine(DriveInfo.GetDrives().Select(d => d.Name).First(v => v != DiskSpace.VolumeRoot(_paths.DefaultModelsDir)), "models", "far.bin"); // another mount point
         downloads.Start(new DownloadSpec(new Uri("https://dictate-test.invalid/far.bin"), "far.bin", 7000, null), otherDrive, () => { });
 
         Assert.Equal(700 + 400, downloads.PendingBytes(_paths.DefaultModelsDir));

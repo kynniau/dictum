@@ -75,7 +75,33 @@ internal static class TestEnv
 {
     public static string? Get(string name) => Value("DICTUM_" + name) ?? Value("DICTATE_" + name);
 
+    /// <summary>Skips a test that needs a Windows-only mechanism (named in <paramref name="reason"/>); a no-op on Windows.</summary>
+    public static void WindowsOnly(string reason) => Assert.SkipUnless(OperatingSystem.IsWindows(), reason);
+
+    /// <summary>Why a test that holds a file open to make it undeletable runs only on Windows.</summary>
+    public const string HeldOpen = "Holds a file open so it cannot be deleted, a Windows sharing rule; elsewhere an open file can still be deleted.";
+
     private static string? Value(string variable) => Environment.GetEnvironmentVariable(variable) is { Length: > 0 } value ? value : null;
+}
+
+/// <summary>
+/// Absolute paths for tests of platform-neutral logic written with Windows paths. On Windows every path is returned exactly as
+/// written, so those tests run as before; elsewhere a drive-letter path (X:\a\b) becomes the absolute path /X/a/b, so the logic
+/// under test sees an absolute path there too.
+/// </summary>
+internal static class TestPaths
+{
+    /// <summary>Why a case that needs a share (\\server\share) or a device path (\\?\...) runs only on Windows.</summary>
+    public const string WindowsForm = "Uses a \\\\server\\share or \\\\?\\ device path, path forms only Windows has.";
+
+    public static string Native(string windowsPath) =>
+        OperatingSystem.IsWindows() || windowsPath.Length < 3 || windowsPath[1] != ':' || windowsPath[2] != '\\'
+            ? windowsPath
+            : "/" + windowsPath[0] + windowsPath[2..].Replace('\\', '/');
+
+    /// <summary><paramref name="json"/> with <paramref name="windowsPath"/>, as a JSON string escapes it, made <see cref="Native(string)"/>.</summary>
+    public static string InJson(string json, string windowsPath) =>
+        json.Replace(windowsPath.Replace("\\", "\\\\"), Native(windowsPath).Replace("\\", "\\\\"), StringComparison.Ordinal);
 }
 
 /// <summary>The HKCU Run key in memory: launch at login and the removal steps read and write this instead of the registry.</summary>

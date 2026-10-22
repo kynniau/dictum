@@ -281,7 +281,7 @@ public sealed class FixBatchModelTests : IDisposable
         llm.BeginLoad(path, "auto");
         Assert.Equal("qwen2.5-1.5b", Make(llm: llm).CurrentCleanupName); // the tray ticks the entry with this name
         Assert.Equal("qwen2.5-1.5b", CleanupCatalog.DisplayName(path));
-        Assert.Equal("my-own-model", CleanupCatalog.DisplayName(@"D:\Models\my-own-model.gguf"));
+        Assert.Equal("my-own-model", CleanupCatalog.DisplayName(TestPaths.Native(@"D:\Models\my-own-model.gguf")));
     }
 
     [Fact]

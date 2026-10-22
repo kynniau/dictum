@@ -47,6 +47,7 @@ public class ArchitectureTests
     [Fact]
     public void The_windows_platform_is_the_seam_and_names_its_mechanisms()
     {
+        TestEnv.WindowsOnly("Constructs the Windows platform, which calls Win32 and reads the HKCU Run key.");
         using var platform = new WindowsPlatform(NullLog.Instance, AppContext.BaseDirectory);
         Assert.Equal("Windows", platform.Name);
         Assert.False(platform.Package.IsPackaged); // a test run is never packaged
@@ -93,6 +94,7 @@ public class PackagingTests
     [Fact]
     public void The_program_folder_is_removed_only_when_it_is_an_installed_Dictum()
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var install = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "Programs", "Dictum")).FullName;
         Assert.Contains("does not hold Dictum.exe", RemovalSteps.Refusal(install, packaged: false));

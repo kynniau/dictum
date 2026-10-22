@@ -172,8 +172,8 @@ public class CliOptionsTests
     {
         var a = CliOptions.Parse(["--model", "base.en"]).Options!;
         Assert.Equal((CliMode.Tray, "base.en"), (a.Mode, a.Model));
-        var b = CliOptions.Parse(["--selftest", "--model", @"D:\m\ggml-x.bin"]).Options!;
-        Assert.Equal((CliMode.SelfTest, @"D:\m\ggml-x.bin"), (b.Mode, b.Model));
+        var b = CliOptions.Parse(["--selftest", "--model", TestPaths.Native(@"D:\m\ggml-x.bin")]).Options!;
+        Assert.Equal((CliMode.SelfTest, TestPaths.Native(@"D:\m\ggml-x.bin")), (b.Mode, b.Model));
         var c = CliOptions.Parse(["--download-model", "tiny.en", "--config", @"C:\c"]).Options!;
         Assert.Equal((CliMode.DownloadModel, "tiny.en", @"C:\c"), (c.Mode, c.DownloadName, c.ConfigDir));
     }

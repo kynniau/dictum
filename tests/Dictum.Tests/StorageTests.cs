@@ -151,6 +151,19 @@ public class StorageTests
         Assert.Null(DiskSpace.DownloadWarning(@"C:\models", 1_600_000_000, _ => 4_000_000_000));
         Assert.Null(DiskSpace.DownloadWarning(@"C:\models", 1_600_000_000, _ => null)); // unknown free space: no false alarm
     }
+
+    /// <summary>
+    /// Pin: a folder's volume is the one it lies on, on every system: its drive root on Windows, the deepest mount point elsewhere,
+    /// where every root is "/" (the free-space line, the space checks and the pending downloads all read it).
+    /// </summary>
+    [Fact]
+    public void A_folder_lies_on_the_volume_whose_root_holds_it()
+    {
+        var volumes = DriveInfo.GetDrives().Select(d => d.Name).ToList();
+        Assert.NotEmpty(volumes);
+        foreach (var volume in volumes)
+            Assert.Equal(volume, DiskSpace.VolumeRoot(Path.Combine(volume, "dictum-volume-test", "models")));
+    }
 }
 
 /// <summary>SPEC §21: the one-time move from the earlier build's folders (named Dictate) to Dictum's.</summary>
@@ -233,6 +246,7 @@ public class LegacyMigrationTests
     [Fact]
     public void A_file_held_open_is_reported_and_left_for_the_next_start()
     {
+        TestEnv.WindowsOnly(TestEnv.HeldOpen);
         using var scratch = new Scratch();
         var (paths, legacy) = Layout(scratch);
         Seed(legacy);

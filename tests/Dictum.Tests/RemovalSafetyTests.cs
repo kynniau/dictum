@@ -29,6 +29,7 @@ public class RemovalSafetyTests
     [InlineData("Dictum’; New-Item -ItemType File -Path {0}; ‘x")]
     public void A_folder_name_with_typographic_quotes_or_semicolons_is_only_ever_data(string name)
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var marker = $"dictum-injected-{Guid.NewGuid():N}.txt";
         var (folder, shipped, foreign) = RestructureFixTests.PortableCopy(scratch, name: string.Format(name, marker));
@@ -41,6 +42,7 @@ public class RemovalSafetyTests
     [Fact]
     public void A_junction_in_Dictates_leftovers_is_removed_as_a_link_and_its_target_kept()
     {
+        TestEnv.WindowsOnly("Makes NTFS junctions with cmd's mklink /J.");
         using var scratch = new Scratch();
         var elsewhere = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "other-drive")).FullName;
         var precious = Path.Combine(elsewhere, "precious.bin");
@@ -61,6 +63,7 @@ public class RemovalSafetyTests
     [Fact]
     public void A_Dictate_folder_that_is_itself_a_junction_is_unlinked_not_emptied()
     {
+        TestEnv.WindowsOnly("Makes NTFS junctions with cmd's mklink /J.");
         using var scratch = new Scratch();
         var elsewhere = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "other-drive")).FullName;
         var precious = Path.Combine(elsewhere, "precious.bin");
@@ -80,6 +83,7 @@ public class RemovalSafetyTests
     [Fact]
     public void The_detached_step_never_deletes_through_a_junction()
     {
+        TestEnv.WindowsOnly("Makes NTFS junctions with cmd's mklink /J.");
         using var scratch = new Scratch();
         var (folder, _, _) = RestructureFixTests.PortableCopy(scratch);
         var elsewhere = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "other-drive")).FullName;
@@ -95,6 +99,7 @@ public class RemovalSafetyTests
     [Fact]
     public void Removing_the_earlier_build_unlinks_junctions_and_never_empties_their_targets()
     {
+        TestEnv.WindowsOnly("Makes NTFS junctions with cmd's mklink /J.");
         using var scratch = new Scratch();
         var (roaming, local) = (Path.Combine(scratch.Root.FullName, "roaming"), Path.Combine(scratch.Root.FullName, "local"));
         var elsewhere = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "other-drive")).FullName;
@@ -175,6 +180,7 @@ public class RemovalSafetyTests
     [Fact]
     public void The_tray_idle_icon_is_the_apps_own_icon()
     {
+        TestEnv.WindowsOnly("Loads Dictum.ico as a Win32 icon (user32 LoadImage and DestroyIcon).");
         Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "Dictum.ico")), "Dictum.ico is not beside the program");
         var icon = TrayHost.AppIcon(32);
         Assert.NotEqual(0, icon);

@@ -11,12 +11,34 @@ public static class DiskSpace
     /// <summary>SPEC §17: warn before any download that would leave under 2 GB (decimal, as every size Dictum shows) free.</summary>
     public const long WarnBelowBytes = 2_000_000_000;
 
+    /// <summary>
+    /// The root of the volume holding <paramref name="path"/> (which need not exist yet): on Windows its drive or share root, as
+    /// <see cref="Path.GetPathRoot(string?)"/> gives it; elsewhere every path's root is "/", so it is the deepest mount point the
+    /// path lies under ("/Volumes/Backup" for a folder on that disk). Null when the path has no root.
+    /// </summary>
+    // simplification: mount points are matched by their text (ordinal), not through links. Ceiling: a folder reached through a
+    // symbolic link to another volume counts as on the volume its text names. Trigger to retire: a report of a free-space line or
+    // a refusal naming the wrong disk; then resolve the path's links first (PathRegistry.FinalPath).
+    public static string? VolumeRoot(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (OperatingSystem.IsWindows()) return Path.GetPathRoot(full);
+        var best = Path.GetPathRoot(full);
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            var mount = drive.Name;
+            var inside = full == mount || full.StartsWith(Path.TrimEndingDirectorySeparator(mount) + "/", StringComparison.Ordinal);
+            if (inside && (best is null || mount.Length > best.Length)) best = mount;
+        }
+        return best;
+    }
+
     /// <summary>Bytes free to this user on the drive holding <paramref name="folder"/> (which need not exist yet), or null when unknown.</summary>
     public static long? FreeBytes(string folder)
     {
         try
         {
-            var root = Path.GetPathRoot(Path.GetFullPath(folder));
+            var root = VolumeRoot(folder);
             return string.IsNullOrEmpty(root) ? null : new DriveInfo(root).AvailableFreeSpace;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -60,7 +82,7 @@ public static class DiskSpace
         }
         try
         {
-            return Path.GetPathRoot(Path.GetFullPath(path)) is { Length: > 0 } root && new DriveInfo(root).DriveType == DriveType.Network;
+            return VolumeRoot(OperatingSystem.IsWindows() ? path : folder) is { Length: > 0 } root && new DriveInfo(root).DriveType == DriveType.Network;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {

@@ -50,6 +50,7 @@ public class RestructureFixTests
     [Fact]
     public void Removing_the_program_deletes_only_the_files_its_manifest_lists()
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var (folder, shipped, foreign) = PortableCopy(scratch);
         File.WriteAllBytes(Path.Combine(folder, "Dictum.dll"), new byte[999]); // changed since it shipped: not ours to delete any more
@@ -67,6 +68,7 @@ public class RestructureFixTests
     [Fact]
     public void A_program_folder_holding_only_shipped_files_goes_entirely()
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var (folder, _, foreign) = PortableCopy(scratch);
         foreach (var file in foreign) File.Delete(file);
@@ -78,6 +80,7 @@ public class RestructureFixTests
     [Fact]
     public void A_program_folder_without_a_manifest_is_left_untouched_and_the_user_is_told()
     {
+        TestEnv.WindowsOnly("Runs the detached removal step in Windows PowerShell.");
         using var scratch = new Scratch();
         var (folder, shipped, foreign) = PortableCopy(scratch, manifest: false);
         Assert.Contains("no manifest.txt", RemovalSteps.Refusal(folder, packaged: false));
@@ -88,6 +91,7 @@ public class RestructureFixTests
     [Fact]
     public void The_first_warning_lists_the_exact_program_files_and_never_the_users()
     {
+        TestEnv.WindowsOnly("Plans the Windows program-folder removal: Dictum.exe layouts, the HKCU Run key and Windows absolute paths.");
         using var scratch = new Scratch();
         var (folder, shipped, foreign) = PortableCopy(scratch);
         var steps = new RemovalSteps(new FakeRunKey(), folder, Path.Combine(folder, "Dictum.exe"), false, scratch.Root.FullName, scratch.Root.FullName, NullLog.Instance);
@@ -160,6 +164,7 @@ public class RestructureFixTests
     [Fact]
     public void The_earlier_build_is_removed_only_from_where_install_ps1_put_it()
     {
+        TestEnv.WindowsOnly("Plans the Windows program-folder removal: Dictum.exe layouts, the HKCU Run key and Windows absolute paths.");
         using var scratch = new Scratch();
         var (roaming, local) = (Path.Combine(scratch.Root.FullName, "roaming"), Path.Combine(scratch.Root.FullName, "local"));
         var install = Directory.CreateDirectory(Path.Combine(local, "Programs", "Dictate")).FullName;
