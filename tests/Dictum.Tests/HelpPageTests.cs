@@ -73,7 +73,7 @@ public class HelpPageTests
         foreach (var text in HelpText.AllText())
             Assert.Contains(text, shown);
 
-        Assert.Equal(13, HelpText.Questions.Count);
+        Assert.Equal(15, HelpText.Questions.Count); // the thirteen before, and the two clean-up questions (APPROVED 22/10/2026 19:20 AEDT)
         var blocks = All<Border>(page).Where(b => b.Focusable).Select(AutomationProperties.GetName).ToList();
         foreach (var entry in HelpText.Questions)
             Assert.Contains(entry.Question, blocks); // each question is its own tab stop, named after it
@@ -311,18 +311,132 @@ public class HelpPageTests
         // The question "How do I turn on cloud clean-up?" is a heading, not a paragraph: its answer's first paragraph says it.
         var questions = HelpText.Questions.Select(q => q.Question).ToHashSet(StringComparer.Ordinal);
         var mentions = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("turn on cloud clean-up", StringComparison.Ordinal)).ToList();
-        Assert.Equal(3, mentions.Count); // "How Dictum works", "Where does my voice go?" and "How do I turn on cloud clean-up?"
+        Assert.Equal(4, mentions.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and (APPROVED 22/10/2026 19:20 AEDT) "What is clean-up?"
         Assert.Contains(HelpText.CloudAnswer[0], mentions);
-        Assert.All(mentions, t =>
+        // The clean-up paragraph begins with the phrase, so it is checked on its own, in its own case; the other three keep the original exact-case check.
+        var proposed = Assert.Single(HelpText.CleanupAnswer, p => p.Contains("turn on cloud clean-up", StringComparison.Ordinal));
+        Assert.Contains(proposed, mentions);
+        Assert.StartsWith("Clean-up happens on this PC. The text of each dictation", proposed, StringComparison.Ordinal);
+        Assert.All(mentions.Where(t => !string.Equals(t, proposed, StringComparison.Ordinal)), t =>
         {
             Assert.Contains("the text of each dictation", t);
             Assert.Contains("the words in your dictionary", t);
             Assert.Contains("Your voice still stays here", t, StringComparison.OrdinalIgnoreCase);
         });
+        Assert.Contains("the words in your dictionary", proposed);
+        Assert.Contains("Your voice still stays here unless you also turn on cloud speech.", proposed);
     }
 
     /// <summary>
-    /// Pin (owner, 22/10/2026 17:22 AEDT; mutation-checked): the three answers that say the voice stays on this PC carry the approved
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): "What is clean-up?" names the choices as the Simple view and Settings > Models do,
+    /// and every claim it makes about what clean-up does is checked against the code that does it: the rule-based tidy removes ums, ahs,
+    /// a doubled "the the", and follows a "scratch that" or "new line" said as a phrase of its own; the model's prompt asks for "you know", false starts and "scratch that";
+    /// and the gate is the language setting (Detect automatically gives spacing only; Translate to English on gives the full tidy).
+    /// </summary>
+    [Fact]
+    public void The_clean_up_answer_names_the_choices_and_its_claims_hold()
+    {
+        var answer = Assert.Single(HelpText.Questions, q => q.Question == HelpText.CleanupQuestion).Answer;
+        var text = string.Join("\n", answer);
+        Assert.Contains(Dictum.Settings.SimpleView.TidyLabel, text);
+        Assert.Contains(ModelsPage.AddCleanupLabel, text);
+        Assert.Contains(Dictum.Settings.SimpleView.OffLabel + " pastes what was heard", text);
+        Assert.Contains("Settings > Models", text);
+        Assert.Contains("Settings > Clean-up", text);
+        Assert.Contains("Settings > " + Dictum.Core.HowItWorksText.PageTitle, text);
+        Assert.EndsWith("Only your own corrections, snippets and the profanity filter (if on) still apply.", Dictum.Settings.SimpleView.OffSubLine); // Off's second sentence is the app's own
+        Assert.Contains("; only your own corrections, snippets and the profanity filter (if on) still apply.", text);
+
+        // "Takes out ums, ahs and doubled words such as \"the the\", and follows \"scratch that\" and \"new line\" when they are said as a phrase of their own."
+        Assert.Equal("So the report is ready.", DeterministicCleaner.Clean("um so the the report is ready uh"));
+        Assert.Equal("Keep this one. Keep.", DeterministicCleaner.Clean("Keep this one. Drop this bit. Scratch that. Keep."));
+        Assert.Equal("First point.\nSecond point.",DeterministicCleaner.Clean("First point. New line. Second point."));
+        Assert.Equal("We need a new line of credit.", DeterministicCleaner.Clean("We need a new line of credit.")); // inside a phrase it is left alone, so the answer says "a phrase of their own"
+        Assert.Equal("It's fine.", DeterministicCleaner.Clean("you know, it's fine.")); // "fillers such as \"you know\" set off by commas"
+        Assert.Equal("It was you know quite long.", DeterministicCleaner.Clean("it was you know quite long.")); // and only when set off by commas
+        // Cloud speech sends the dictionary too, as a hint: the approved speech consent says so, and paragraph 6 says the same.
+        Assert.Contains("together with the words in your personal dictionary as a hint", Dictum.Transcribe.SpeechPolicy.ConsentText("HOST", "VAR"));
+        Assert.Contains("Cloud speech also sends the words in your dictionary, as a hint.", text);
+        // The model "also takes out \"you know\" and false starts anywhere in a sentence, and follows \"scratch that\"": the prompt it is given asks for each.
+        foreach (var asked in new[] { "you know", "false starts", "scratch that" })
+            Assert.Contains(asked, CleanupPrompt.Default);
+        // The language sentence is the approved one in "How Dictum works", and the gate is the language SETTING, not what was spoken.
+        Assert.Contains("Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.", HelpText.HowItWorks.Single(p => p.StartsWith("Tidy my words, in Settings", StringComparison.Ordinal)));
+        Assert.Contains("Unless the spoken language is set to English (or Translate to English is on), only the spacing is tidied.", answer);
+        Assert.True(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("en", translate: false));
+        Assert.False(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("auto", translate: false)); // Detect automatically: spacing only, even for English
+        Assert.False(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("es", translate: false));
+        Assert.True(Dictum.Transcribe.WhisperLanguages.OutputIsEnglish("es", translate: true)); // Translate to English on: tidied in full
+        Assert.True(TranscriptCleaner.Plain("not English").IsPlain);
+    }
+
+    /// <summary>
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): "How can I see what Dictum does with my words?" names the page, its two buttons
+    /// and its five stages as <see cref="Dictum.Core.HowItWorksText"/> does, and says it pastes nothing and saves nothing.
+    /// </summary>
+    [Fact]
+    public void The_see_how_it_works_answer_names_the_page_buttons_and_five_steps()
+    {
+        var answer = Assert.Single(HelpText.Questions, q => q.Question == HelpText.SeeHowQuestion).Answer;
+        var text = string.Join("\n", answer);
+        Assert.Contains("Open Settings > " + Dictum.Core.HowItWorksText.PageTitle, text);
+        Assert.Contains("press " + Dictum.Core.HowItWorksText.RecordLabel, text);
+        Assert.Contains("press " + Dictum.Core.HowItWorksText.StopLabel, text);
+        Assert.Equal(5, Dictum.Core.HowItWorksText.Stages.Count);
+        var at = 0;
+        foreach (var (title, _) in Dictum.Core.HowItWorksText.Stages) // each stage, by its title without the number, in the page's order
+        {
+            var name = Regex.Replace(title, @"^\d+\. ", "");
+            var found = text.IndexOf(name, at, StringComparison.OrdinalIgnoreCase);
+            Assert.True(found >= 0, $"the answer does not name step \"{name}\" in order");
+            at = found + name.Length;
+        }
+        Assert.Contains("It pastes nothing, and the recording is never saved to disk.", text);
+        Assert.StartsWith("This page pastes nothing.", Dictum.Core.HowItWorksText.MemoryNote); // the page says the same
+        Assert.StartsWith("This page pastes nothing.", Dictum.Core.HowItWorksText.CloudSpeechNote("HOST"));
+        Assert.Contains("never saved to disk", Dictum.Core.HowItWorksText.MemoryNote);
+        Assert.Contains("never saved to disk", Dictum.Core.HowItWorksText.CloudSpeechNote("HOST"));
+    }
+
+    /// <summary>APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): "Questions on this page" lists both new questions as links, one after the other, after the one about wrong words.</summary>
+    [Fact]
+    public Task The_index_lists_the_two_clean_up_questions() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, _) = scratch.Shell();
+        var window = new SettingsWindow(shell);
+        window.Show();
+        var page = OpenHelp(window);
+        var links = All<Button>(page).Where(b => b.Classes.Contains("link") && b.Content is TextBlock).Select(b => ((TextBlock)b.Content!).Text).ToList();
+        var at = links.IndexOf("Why did it type the wrong words?");
+        Assert.True(at >= 0, "the list has no \"Why did it type the wrong words?\"");
+        Assert.Equal(["What is clean-up?", "How can I see what Dictum does with my words?"], links.Skip(at + 1).Take(2));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// APPROVED 22/10/2026 19:20 AEDT (proposed 22/10/2026): the website guide's questions "What is clean-up?" and "How can I see what Dictum does
+    /// with my words?" carry the in-app answers word for word, paragraph for paragraph (markup, and quotation marks, aside).
+    /// </summary>
+    [Theory]
+    [InlineData("faq-what-is-cleanup", "What is clean-up?")]
+    [InlineData("faq-see-how", "How can I see what Dictum does with my words?")]
+    public void The_site_guide_carries_the_clean_up_answers_word_for_word(string id, string question)
+    {
+        static string Plain(string s) => Regex.Replace(Regex.Replace(s, "<[^>]+>", "").Replace("&gt;", ">").Replace("&amp;", "&").Replace("\"", ""), @"\s+", " ").Trim();
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        var start = html.IndexOf($"<details id=\"{id}\">", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"site/help.html has no #{id}");
+        var block = html[start..html.IndexOf("</details>", start, StringComparison.Ordinal)];
+        Assert.Equal(question, Plain(Regex.Match(block, "<summary>(.*?)</summary>", RegexOptions.Singleline).Groups[1].Value));
+        var site = Regex.Matches(block, "<p>(.*?)</p>", RegexOptions.Singleline).Select(m => Plain(m.Groups[1].Value)).ToList();
+        var app = HelpText.Questions.Single(q => q.Question == question).Answer.Select(Plain).ToList();
+        Assert.Equal(app, site);
+    }
+
+    /// <summary>
+    /// Pin (owner, 22/10/2026 17:22 AEDT; mutation-checked): the four answers that say the voice stays on this PC carry the approved
     /// qualifier "unless you also turn on cloud speech", in the app and on the site, and no answer says it without the qualifier.
     /// </summary>
     [Fact]
@@ -331,14 +445,15 @@ public class HelpPageTests
         const string qualified = "still stays here unless you also turn on cloud speech.";
         var questions = HelpText.Questions.Select(q => q.Question).ToHashSet(StringComparer.Ordinal);
         var answers = HelpText.AllText().Where(t => !questions.Contains(t) && t.Contains("still stays here", StringComparison.OrdinalIgnoreCase)).ToList();
-        Assert.Equal(3, answers.Count); // "How Dictum works", "Where does my voice go?" and "How do I turn on cloud clean-up?"
+        Assert.Equal(4, answers.Count); // "How Dictum works", "Where does my voice go?", "How do I turn on cloud clean-up?" and "What is clean-up?"
         Assert.All(answers, t => Assert.Contains(qualified, t, StringComparison.OrdinalIgnoreCase));
         Assert.Contains("; your voice still stays here unless you also turn on cloud speech.", HelpText.HowItWorks.First(t => t.Contains("still stays here", StringComparison.Ordinal)));
         Assert.Contains("to be tidied; your voice still stays here unless you also turn on cloud speech. Most people", HelpText.CloudAnswer[0]);
         Assert.Contains(" Your voice still stays here unless you also turn on cloud speech.", HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[^1]);
+        Assert.Contains(" Your voice still stays here unless you also turn on cloud speech. Cloud speech also sends the words in your dictionary, as a hint.", HelpText.CleanupAnswer.Single(p => p.Contains("still stays here", StringComparison.Ordinal))); // "What is clean-up?", paragraph 6
         var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
-        Assert.Equal(4, Regex.Matches(html, Regex.Escape(qualified), RegexOptions.IgnoreCase).Count); // the cloud answer is on the page twice
-        Assert.Equal(4, Regex.Matches(html, "still stays here", RegexOptions.IgnoreCase).Count); // none without it
+        Assert.Equal(5, Regex.Matches(html, Regex.Escape(qualified), RegexOptions.IgnoreCase).Count); // the cloud answer is on the page twice, "What is clean-up?" once
+        Assert.Equal(5, Regex.Matches(html, "still stays here", RegexOptions.IgnoreCase).Count); // none without it
 
         // Owner, 22/10/2026 ~17:45 AEDT: "Where does my voice go?"'s first paragraph, in the app and on the site, byte for byte.
         const string first = "Nowhere. Dictum turns your voice into text on this PC, then throws the recording away. It never saves your voice to a file and never sends it anywhere unless you turn on cloud speech.";
