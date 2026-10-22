@@ -149,7 +149,7 @@ Delete models, recordings and logs from Settings, or remove everything at once
 
 ### What's new in this version (1.2.1)
 
-PROPOSED (22/10/2026), awaiting the owner. Not approved: do not paste it into Partner Center until the owner approves it. Paste it in "What's new in this version" on the 1.2.1 submission.
+APPROVED by the owner 22/10/2026 14:33 AEDT (proposed 22/10/2026). Paste it in "What's new in this version" on the 1.2.1 submission.
 
 ```text
 Clearer wording while you dictate: the pill says "Recording · let go to finish", and the tray says "No microphone" or "No clean-up" when that is the case. Settings > Storage can now change where model files are kept. A new "See how it works" page shows what happens to one dictation, step by step, and pastes nothing. Help explains how to turn on cloud clean-up, and a cloud clean-up waiting for its key now says so.
@@ -315,7 +315,7 @@ SPEC §2, §3 and §20; README "Permissions on Windows".
 
 ### Notes for certification
 
-PROPOSED (22/10/2026), awaiting the owner: the "Notes written" line and the CHANGED paragraph in the block below are written for 1.2.1 and are not approved until the owner approves them (the 1.2.0 paragraph they replace was approved 22/10/2026). Update the date line when you submit. Microsoft asks for the date, no-account status, and steps to
+APPROVED by the owner 22/10/2026 14:33 AEDT (proposed 22/10/2026): the "Notes written" line and the CHANGED paragraph in the block below are written for 1.2.1 (the 1.2.0 paragraph they replace was approved 22/10/2026). Update the date line when you submit. Microsoft asks for the date, no-account status, and steps to
 reach anything not obvious. The "no download is needed" lines (Decision 16, 17/10/2026) hold only for a package built
 after the app change that reads the bundled model from `<program folder>\models` has merged together with the
 model-folder change (PR #11): without it the package carries the file but the first run still asks for a download.
@@ -443,6 +443,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 22/10/2026 | 1.2.0 submitted (Submission 3, id 1152921505702194758) at about 09:00 AEDT; package Dictum-1.2.0-store.msix 240,077,036 bytes, SHA-256 7AF77EA8D5E695D4DA974E3CD4F0198BFB71575543F2702F96994B79B76A100F, v1.2.0.0 x64, validated with only the runFullTrust warning; 1.1.2 package removed on save; not marked mandatory; certification notes and What's new as in this file (owner approved 22/10/2026). |
 | 22/10/2026 | The owner approved every PROPOSED 1.2 string as a block (DECISIONS, "Owner approvals (22/10/2026)"). 1.2.1 (not yet built or submitted) changes the hold pill to "Recording · let go to finish"; screenshot 1 needs retaking with it. |
 | 22/10/2026 | Dictum 1.2.1 prepared (version bump, tester notes, listing text); wording PROPOSED until the owner approves it; Store screenshot 1 to be retaken with the new hold pill. |
+| 22/10/2026 | The owner approved the 1.2.1 "What's new" paragraph and the 1.2.1 certification-notes lines ("Notes written" and CHANGED) as written, at 14:33 AEDT (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)"). Store screenshot 1 is still to be retaken with the new hold pill. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The

@@ -4458,3 +4458,31 @@ Branch `release/1.2.1` from origin/main afda8d9. All new wording below is PROPOS
 4. **Not new in 1.2.1, so left out of the notes:** hotkeys shown by their key names (`HotkeyNames.Display`) and Help's "Questions on this page" index. Both are already in the v1.2.0 tag (commit f6c0950, "1.2 polish").
 5. **Not user-visible, so not in the Store notes:** deterministic test fixes (PRs #42, #43, #44, #50), the TimeProvider seam, and the cloud speech engine (PR #48, Core only), which has no screen yet and is not named in any public note.
 6. **PROPOSED, awaiting the owner:** the 1.2.1 "What's new" paragraph and the 1.2.1 CHANGED paragraph of the certification notes. Store screenshot 1 is to be retaken with the new hold pill. No tag, installer, MSIX, site deploy or Store submission is made until the owner approves the wording.
+
+## Owner approvals (22/10/2026, the 1.2.1 block)
+
+Recorded on branch `docs/approvals-1.2.1` from origin/main 8869d11. Markers only: no string, caption or paragraph changed a character.
+The earlier entries are left as written; this entry supersedes their "PROPOSED" and "awaiting the product owner" notes for exactly the
+items listed in 1 to 4 below, and for nothing else.
+
+1. **Section 1, Settings > Help: "How do I turn on cloud clean-up?"** (approved 14:25 AEDT). `HelpText.CloudQuestion`, `HelpText.CloudAnswer`
+   and the comment where the question joins the list (`src/Dictum.Core/Help/HelpText.cs`) now read APPROVED 22/10/2026. The site's help
+   section (`site/help.html`, #cloud) and the cloud-cleanup demo data (`scripts/demos/cloud-cleanup.json`) carried no PROPOSED marker, so
+   they are unchanged; `docs/DEMOS.md` gets a line saying demo 7's captions are APPROVED (the marker on the other demos' captions is untouched).
+2. **Section 2, Settings > Storage** (14:25 AEDT). The **Change…** button (`StoragePage.ChangeLabel`), its accessible name "Change the model
+   folder" (`ChangeName`) and "A slower drive makes the speech model slower to load and to switch." (`SlowerDriveNote`), in
+   `src/Dictum.UI/Views/Settings/ModelPages.cs`; and the consent.json label "consent to cloud clean-up and cloud speech"
+   (`PathRegistry.Locations`, `src/Dictum.Core/Storage/PathRegistry.cs`).
+3. **Section 3, Settings > See how it works** (14:25 AEDT). Every string in `HowItWorksText` (`src/Dictum.Core/Core/HowItWorksText.cs`), its
+   one marker covering the page title, intro, memory notes (both cloud speech variants), buttons and names, status lines (including "No speech
+   model is ready yet…"), stages, states, figures and notes. `HowItWorksPage.cs`, `AppShell.HowItWorks.cs` and `HowItWorksRun.cs` carried no
+   PROPOSED marker. SPEC §29 and the README line about the page now say APPROVED. The page still has no Help link; that is a follow-up.
+4. **The two `docs/STORE.md` 1.2.1 paragraphs** (a later message, 14:33 AEDT). The "What's new in this version (1.2.1)" paragraph, and the
+   certification notes' "Notes written 22/10/2026 for Dictum 1.2.1." line with its CHANGED SINCE THE LAST SUBMISSION paragraph, are APPROVED as
+   written, marked the way the 1.2.0 block is. A history row records it. Item 6 of "Release 1.2.1 prepared" (above) is superseded by this.
+5. **Pins.** `OwnerApprovalsTests` gains three tests pinning sections 1 to 3 word for word, independently of the app's constants (the Help
+   question and its first and last paragraphs; Storage's three strings and the consent label; the See how it works strings).
+6. **Still PROPOSED (not approved, markers untouched).** Section 4 of the owner's list: the cloud speech engine lines in
+   `src/Dictum.Core/Transcribe/SpeechPolicy.cs` (`SpeechStatus.*`, the plain-http refusal, the log lines), the `speech` note in the default
+   settings.json, `SettingsLoader.SpeechBaseUrlProblem`'s wording, and `CloudSpeechTests`' note on them. Also anything on other branches
+   (for example the cloud speech UI PR). The consent text and its two buttons were already APPROVED (10:50 decision).

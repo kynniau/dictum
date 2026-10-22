@@ -174,7 +174,7 @@ negation"), and the text a dictation would paste. Each timed step shows the time
 your current settings: the same speech model and clean-up as your dictations. The page pastes nothing and keeps the
 recording in memory only; it is never saved to disk. If your clean-up sends text to a cloud service, this text goes
 there too, and the page says so. With cloud speech on, the sound goes to the speech service, as a dictation's does, and the
-page says that instead of "the sound never leaves this PC". The page's words are PROPOSED (docs/DECISIONS.md, 22/10/2026).
+page says that instead of "the sound never leaves this PC". The page's words are APPROVED 22/10/2026 (docs/DECISIONS.md).
 
 ### Feedback and feature requests
 
