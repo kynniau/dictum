@@ -55,7 +55,7 @@ public class Polish2Tests
         foreach (var key in keys)
         {
             foreach (var speech in new[] { SimpleView.StandardLabel, SimpleView.MoreAccurateLabel, SimpleView.MostAccurateLabel })
-            foreach (var cleanup in new[] { SimpleView.TidyLabel, SimpleView.AiCleanupLabel, SimpleView.OffLabel })
+            foreach (var cleanup in new[] { SimpleView.TidyLabel, SimpleView.AiCleanupLabel, SimpleView.OffHeaderLabel })
                 data.Add($"{speech} · {cleanup} · {key}");
             foreach (var gpu in new[] { false, true })
             {
@@ -84,7 +84,7 @@ public class Polish2Tests
         flyout.ShowNear(null);
         Assert.Equal(FlyoutWindow.PanelWidth + 28, flyout.Width); // the panel's width, with its shadow's margin
         var models = All<TextBlock>(flyout).Single(t => t.Text == status.Models);
-        All<TextBlock>(flyout).Single(t => t.Text == status.State).Text = "Downloading"; // the longest state word
+        All<TextBlock>(flyout).Single(t => t.Text == status.State).Text = NoSoundText.NoMicrophoneState; // the longest state word ("No microphone", owner decision 4)
         models.Text = line;
         Layout(flyout);
         var lines = models.TextLayout.TextLines;
@@ -125,7 +125,7 @@ public class Polish2Tests
         flyout.ShowNear(null);
         Assert.Equal(FlyoutWindow.PanelWidth + 28, flyout.Width);
         var models = All<TextBlock>(flyout).Single(t => t.Text == status.Models);
-        All<TextBlock>(flyout).Single(t => t.Text == status.State).Text = "Downloading"; // the longest state word
+        All<TextBlock>(flyout).Single(t => t.Text == status.State).Text = NoSoundText.NoMicrophoneState; // the longest state word ("No microphone", owner decision 4)
         models.Text = line;
         ToolTip.SetTip(models, line); // what the panel does with every line it shows (FlyoutWindow's refresh)
         Layout(flyout);

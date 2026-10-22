@@ -382,6 +382,7 @@ public sealed partial class AppShell
         var cleanup = _settings.Llm.Provider switch
         {
             LlmSettings.NoProvider => "rule-based tidy",
+            LlmSettings.Off => "no clean-up", // as the header says it (owner decision 6), not "off" from the cloud arm
             // The same order as the header's clean-up label: loaded or loading, else failed, else not downloaded (rules until it is).
             LlmSettings.Local => _llm.Ready is not null || _llm.IsLoading ? $"{Models.CurrentCleanupName} on this PC"
                 : _llm.LastError is not null ? "rule-based tidy (the clean-up model could not be loaded)"
