@@ -5579,12 +5579,17 @@ flow); the bottom is a read-only map of the folders Dictum does not let anyone m
 itself, so it cannot be stored in a setting; the logs and recordings folder; the program). Two defects on that page, both in
 shared UI code, so Windows had the first as well:
 
-- The "Models, logs, calibration recordings" row always printed Dictum's own data folder, which is wrong for the models once a
-  folder is chosen (the Models card already lists every model folder in lookup order). The row is now `StoragePage.DataFolderRow`
-  = "Logs, calibration recordings". Pinned in ModelFolderTests (observed failing with the old label, then restored).
+- The "Models, logs, calibration recordings" row always printed Dictum's own data folder. That is right while no model folder
+  is chosen (downloads land in that folder's models subfolder, the lookup order's default folder) and wrong once a model
+  folder is chosen (the Models card already lists every model folder in lookup order). The lens on this PR caught that the
+  first fix dropped the models from the row in both states; the owner decided (07:18 AEDT, through the lens): the row follows
+  the state. `StoragePage.DataFolderRow(modelFolderChosen)`: no model folder chosen, "Models, logs, calibration recordings"
+  (the existing words, byte for byte); a model folder chosen, "Logs, calibration recordings" (PROPOSED). The Open button's
+  accessible name follows the row. One ModelFolderTests test per state, each observed failing on the reverted behaviour
+  (the state-blind label put back), then restored.
 - "Remove everything" said "the Start menu shortcut and the launch-at-login entry" on a Mac. The sentence now takes the
   platform's own words from a new `IRemovalSteps.StartupItemsPhrase`: Windows "the Start menu shortcut and the launch-at-login
-  entry" (unchanged on Windows, pinned in PlatformTests), macOS "the login item" (PROPOSED, pinned in MacShellTests). The page
+  entry" (unchanged on Windows: PlatformTests pins the whole sentence byte for byte), macOS "the login item" (PROPOSED, pinned in MacShellTests). The page
   pin was observed failing with the Windows literal put back, then restored.
 - Not in this change, left for a Mac help pass: `HelpText` "How do I remove Dictum completely?" still says "its Start menu
   shortcut and its start-with-Windows entry" and the Microsoft Store sentence on a Mac; HelpText is plain constants with no

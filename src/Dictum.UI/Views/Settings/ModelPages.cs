@@ -575,9 +575,13 @@ internal sealed class StoragePage : SettingsPage
 
     // First beta finding (owner, 23/10/2026): the Storage page's folder map said "Models, logs, calibration recordings" for Dictum's own
     // data folder even when the models live in a chosen folder, which the Models card above already lists; and "Remove everything"
-    // named the Start menu on a Mac. The data folder's row names only what is always there, and the sentence takes the platform's
-    // own words for what it removes (IRemovalSteps.StartupItemsPhrase).
-    internal const string DataFolderRow = "Logs, calibration recordings";
+    // named the Start menu on a Mac. The owner's decision (23/10/2026, through the lens on PR #71): the row follows the state. While no
+    // model folder is chosen it keeps its words (downloads land in that folder's models subfolder); once one is chosen the models leave
+    // the row. The Open button's accessible name ("Open the folder for …") follows the row. The sentence takes the platform's own words
+    // for what it removes (IRemovalSteps.StartupItemsPhrase).
+    internal static string DataFolderRow(bool modelFolderChosen) => modelFolderChosen
+        ? "Logs, calibration recordings" // PROPOSED 23/10/2026
+        : "Models, logs, calibration recordings";
 
     internal static string RemoveEverythingText(string startupItems) =>
         $"Deletes every model, recording, log, setting, your dictionary, corrections and .env keys, {startupItems}, then the program itself. " +
@@ -677,7 +681,7 @@ internal sealed class StoragePage : SettingsPage
 
         _places.Children.Clear();
         _places.Children.Add(Place("Settings, dictionary, corrections, .env", Shell.Paths.ConfigDir));
-        _places.Children.Add(Place(DataFolderRow, Shell.Paths.LocalDir));
+        _places.Children.Add(Place(DataFolderRow(Shell.Paths.ChosenModelsDir(s) is not null), Shell.Paths.LocalDir));
         _places.Children.Add(Place("Program", Shell.Paths.ExeDir));
         if (Shell.Platform.Package.IsPackaged)
             _places.Children.Add(Ui.Text("This copy is installed from a package, so Windows keeps its files in the package's own folder: the paths above are the real ones.", "caption"));
