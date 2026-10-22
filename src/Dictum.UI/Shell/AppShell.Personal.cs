@@ -9,7 +9,7 @@ public sealed partial class AppShell
     /// <summary>What the calibration window needs from the running app; every write goes through the app's own paths.</summary>
     internal CalibrationHost CreateCalibrationHost() => new(Paths, () => _settings, () => Personal.Text, Integrity, _log, Models.Find,
         values => Models.Write(values),
-        DownloadSpeechModel: (name, then, finished) => Personal.DownloadForCalibration(name, then, finished),
+        DownloadSpeechModel: (name, agreed, then, finished) => Personal.DownloadForCalibration(name, agreed, then, finished),
         AddDictionaryTerms: Personal.AddDictionaryTerms,
         AddCorrections: Personal.AddCorrections,
         MovingFiles: () => Models.MovingFiles);
