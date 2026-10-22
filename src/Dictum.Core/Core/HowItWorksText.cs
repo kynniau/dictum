@@ -54,7 +54,7 @@ public static class HowItWorksText
     [
         ("1. What Dictum hears", "Sound, not words: the bars show how loud your microphone is."),
         ("2. What the speech model heard", "The speech model on this PC turns the sound into words. This is its raw text."),
-        ("3. Rule-based tidy", "Fixed rules remove fillers, add capitals and a full stop, and follow spoken commands such as \"new line\"."),
+        ("3. Rule-based tidy", "Fixed rules remove hesitations such as \"um\", add capitals and a full stop, and follow spoken commands such as \"new line\"."),
         ("4. AI clean-up", "A language model polishes the words, then Dictum checks its reply and uses it only if it passes every check."),
         ("5. What would be pasted", "After your corrections, the profanity filter and snippets. A dictation pastes this; this page does not."),
     ];

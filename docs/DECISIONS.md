@@ -4148,3 +4148,54 @@ Branch `release/1.2.0` from origin/main cd46812. All new wording below is PROPOS
    - **Landing page wording.** The landing page's "No account, no cloud, no telemetry" and its meta and og descriptions now name opt-in cloud clean-up.
    - **FAQ styles.** These now apply only to the FAQ's own items, so the demo player inside an answer is not styled as one.
    - **Demo players.** Each is named "Demo: <title>", and the poster alt text says "a still from the demo".
+
+## See how it works, stages 1-5 (22/10/2026)
+
+Branch `feat/how-it-works` from origin/main 049b73a. Owner intent and the design are in SPEC §28; the brief was section B
+of the design note "four asks, designed and sized" (22/10/2026), stages 1-5 only. Compare mode is a later lane.
+
+1. **One pipeline, no second path.** The page does not build its own chain of engines (the brief's `DemoRun`). It calls
+   `DictationPipeline.DemonstrateAsync`, which shares `RunAsync`'s body (`JourneyAsync`) with a `paste: false` switch
+   and a progress callback. So the gate, the speech model, the clean-up (whatever is configured, cloud included when
+   consented and on) and the finishing step are the dictation's own. The shell builds the one pipeline lazily
+   (`AppShell.Pipeline`), and the controller and the page both use it.
+2. **No second timer.** The pipeline already reads one stopwatch twice: transcription and clean-up. The progress
+   reports carry exactly those values (the clean-up reading is now held in `cleanupMs` and used by the log line and the
+   report alike). A pin compares each reported time with the number in its log line. The rule-based tidy is not timed on
+   its own when a model is in use (it runs inside the clean-up, or not at all), and the finishing step is not timed, so
+   the page shows no time for them rather than inventing one.
+3. **Stage 3 beside an accepted reply** shows `DeterministicCleaner.Clean(raw)`, marked "Not used" and untimed. The
+   pipeline did not run it; it is the text a rejected reply would have got. This is the only text on the page not
+   reported by the pipeline, and it comes from the tidy's own function.
+4. **The rejected reply's text is not shown.** `CleanupResult` does not carry it, and adding it would change a record
+   seven test sites in four test files build by value (grep `new CleanupResult(` in tests/, 22/10/2026). The verdict shows the validator's or provider's own reason string, which is already plain
+   words ("reply drops a negation").
+5. **The hotkey records here** while the page is shown in the window in front, as calibration does
+   (`RedirectHotkey`). It is released on deactivation, on another page, and on close.
+6. **No Help link.** The orchestrator asked for the page to be reachable from Help, but Settings → Help is built in
+   `OtherPages.cs` and its copy is in `HelpText.cs`, both owned by other live lanes. That is left for the Help copy lane: one
+   button calling `SettingsWindow.ShowPage(HowItWorksText.PageTitle)`.
+7. **Duplicate kept on purpose.** Each stage's focusable block repeats Help's private `Readable` (`OtherPages.cs`). It is
+   marked `// simplification:` with its trigger: move `Readable` to `Ui` when that file is free.
+8. **"The sound never leaves this PC"** is true today (speech recognition is local only). If cloud speech recognition
+   (design section C) ships, `HowItWorksText.MemoryNote` must change with it.
+
+**PROPOSED copy (22/10/2026), awaiting the product owner's approval**, all in `src/Dictum.Core/Core/HowItWorksText.cs`:
+
+- Page title: "See how it works"
+- Intro: "Record one short dictation and watch what Dictum does with it, step by step. It uses your current settings: the same speech model and clean-up as the hotkey."
+- In-memory line: "This page pastes nothing. The recording is kept in memory only, never saved to disk, and the sound never leaves this PC."
+- Sends-text line: "Your clean-up sends text to another program ({status}), so this recording's words go there too, as a dictation's would."
+- Buttons: "Record" / "Stop"; screen-reader names "Record one dictation" / "Stop recording and show the steps"; beside them "or hold {hotkey}" (calibration's wording).
+- Status: "Recording: say a sentence or two, then press Stop."; "Stopped at 30 s, the longest this page records."; "A dictation is in progress: try again when it has finished."; "Cancelled: nothing was kept."; "Done. Record again to try another sentence."; "That did not work: {message}".
+- Stage titles and descriptions:
+  - "1. What Dictum hears": "Sound, not words: the bars show how loud your microphone is."
+  - "2. What the speech model heard": "The speech model on this PC turns the sound into words. This is its raw text."
+  - "3. Rule-based tidy": "Fixed rules remove hesitations such as "um", add capitals and a full stop, and follow spoken commands such as "new line"."
+  - "4. AI clean-up": "A language model polishes the words, then Dictum checks its reply and uses it only if it passes every check."
+  - "5. What would be pasted": "After your corrections, the profanity filter and snippets. A dictation pastes this; this page does not."
+- Stage states: "Waiting", "Working…", "Done", "Not used", "Not reached".
+- Figures: "Took {ms} ms"; "{seconds} s of sound".
+- Notes: "Dictum stops here ({reason}), as it would for a dictation."; "The rule-based tidy did not run: only spaces were tidied."; "No AI clean-up is in use, so this is the clean-up."; "Used, because the AI reply was not (step 4)."; "Not needed this time: the AI reply passed. Dictum uses this text when a reply does not."; "Not in use. Clean-up in use: {status}."; "Accepted: the reply passed every check, so Dictum used it."; "Not used: {reason}. Dictum used the rule-based tidy (step 3) instead."; "Not asked: {reason}. Dictum used the rule-based tidy (step 3) instead."; "A dictation would paste this. This page pasted nothing."; "Your corrections, the profanity filter or snippets changed the text."; "Nothing would be pasted: no text is left."
+- Reused, not new: `NoSoundText.SilentBalloon` (silent take), `NoSoundText.NoMicrophoneBalloon` (no microphone), the
+  pill's "Transcribing…" and "Polishing…" (`PillText`), each clean-up's status line, and the validator's reasons.
