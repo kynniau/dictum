@@ -880,7 +880,7 @@ Users must be able to remove what the app has put on disk, from inside the app.
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
   model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
   also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
-  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
+  Models' Browse… and Use default (`ModelFolderActions`), with the note (APPROVED 22/10/2026 22:42 AEDT: "Dictum looks here first and downloads go here. Changing it asks before moving any files."), the network-folder warning when it applies, and APPROVED 22/10/2026: "A slower
   drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
   and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
@@ -1256,7 +1256,31 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   deleted or chosen (a chosen folder that is it, or inside it, is ignored, and Settings refuses it with a sentence). A
   download is refused, before it is asked and again where it starts, when its drive would keep under 200 MB (decimal); a
   kept `.part` needs only the rest; when the free space cannot be read the download goes ahead, as the 2 GB warning does.
-- **Changing the folder moves no files.**
+- **Changing the folder moves no files** unless the user says so (amended 22/10/2026 for 1.3, move-on-change; APPROVED 22/10/2026 22:52 AEDT,
+  the 1.3 block; wording in DECISIONS "Move the model files when the folder changes"). Browse… on Models, Change… on Storage and Use default
+  on both go through one handler (`ModelFolderActions`) and behave alike (owner decision 22/10/2026 21:45 AEDT: Use default
+  moves the files back to the per-user folder). When the folder in use holds model files Dictum
+  knows (catalogue files and their `.part` downloads, in that folder itself), it asks once: **Move the files** or **Leave them
+  where they are** (the earlier behaviour, and the default button; closing the question changes nothing). A new folder that is the same folder by another path (a junction, a mapped
+  drive, a packaged app's redirected folder; a probe file written there appears in the old one) gets no question: the folder
+  is written and nothing moves. Moving is refused while a download runs and when one folder is inside the other. Otherwise,
+  while the move runs, downloads, preset downloads, Storage's Delete, Delete all app data, Remove Dictum completely and
+  calibration are refused ("Model files are being moved; try again when it finishes.") and no
+  model loads; both models are released (a load under way is waited for), then each file is copied to the new folder as
+  `<name>.move`, checked (size; for a finished catalogue file the SHA-256 pinned in the catalogue; a `.part` is not
+  hashed), renamed into place, and only then is the original deleted and its verified record moved to the copy. A file of
+  the same name already in the new folder counts as moved when it has the same contents (the pinned SHA-256, or byte for
+  byte where there is none) and is skipped otherwise; an original is never deleted when it and that file may be one file
+  on disk (an exclusive open of the original blocks the open of the other path). A file that fails keeps its original (its copy is deleted) and the move goes on;
+  files already moved stay moved. The models in use move last, as one unit: no original of theirs is deleted until all have
+  arrived, and if one fails or the move is stopped, the copies this move made of them are deleted and every original kept.
+  Then `models.folder` is written, after `whisper.model` or `llm.model` is rewritten when it named a moved file by its full
+  path (that key first: a path to the new copy is valid whichever folder is in force), unless a model in use stayed behind or the move was stopped (the folder is then unchanged and the line says so), and
+  the settings reload. The page's status line shows each file, by its catalogue
+  name, as it moves and the result. Quit during a move stops it (the file being copied stops, its original kept; a file
+  already checked finishes), the line is only "Moved {k} of {n}.", and Dictum then quits without changing the folder. The note under the folder on Models and
+  Storage reads (APPROVED 22/10/2026 22:42 AEDT): "Dictum looks here first and downloads go here. Changing it asks before
+  moving any files."
 - **First run (§10, §20):** when base.en is found in the lookup order, no model question is asked: the choices
   settings.json leaves open get `whisper.model` = `base.en` and `llm.provider` = `none`, what the pickers write for
   base.en and "No AI cleanup (rule-based tidy)". A seeded file that names `llm.provider` keeps it: `local` with no
@@ -1264,7 +1288,7 @@ must run on small machines (Decision 16). These amend §9, §10, §17 and §20; 
   downloaded; using the rule-based tidy" notice shows). The hotkey check still follows (amended 21/10/2026, §27: as a step of the Welcome to Dictum window). Without base.en the pickers run
   as before. `llm.provider`'s own default when the key is absent stays `local`.
 - **Settings window:** Models gains the **Model folder** card (the folder in use in a read-only field, **Browse…** with the
-  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and nothing moves, and a
+  system's folder chooser through Avalonia, **Use default**, a note that downloads go there and that changing it asks before moving any files (amended 22/10/2026), and a
   one-line warning when the folder is on a network share: a UNC path, read from the text alone, or a mapped network
   drive), **Add AI clean-up (1.1 GB download)** while the rule-based tidy is in use (the clean-up catalogue's own
   ask-then-download path for the recommended model), and "Included" as the state of a speech model used from the bundled
