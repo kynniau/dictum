@@ -5571,6 +5571,33 @@ unless marked:
   job for the tag fails by design (no MAC_* secrets); the pre-release was created by hand with the approved notes. Still
   open from the Mac checklist, none a blocker: login item, removal, the owned dialogs, the clean-up model load without
   `disable-library-validation` (first tester with that model will show it).
+
+**First beta finding, Settings > Storage (owner, 23/10/2026 ~06:58 AEDT, branch fix/storage-page-copy):** the owner asked why
+the page shows the model folder with Change… and Use default at the top, then "Where Dictum keeps things" below with no
+Change. The two panels are different things: the top is the one folder a user can move (models, with the 1.3 move-on-change
+flow); the bottom is a read-only map of the folders Dictum does not let anyone move (the config folder holds settings.json
+itself, so it cannot be stored in a setting; the logs and recordings folder; the program). Two defects on that page, both in
+shared UI code, so Windows had the first as well:
+
+- The "Models, logs, calibration recordings" row always printed Dictum's own data folder. That is right while no model folder
+  is chosen (downloads land in that folder's models subfolder, the lookup order's default folder) and redundant once a model
+  folder is chosen (the Models card lists every model folder, Dictum's own models subfolder included, in lookup order). The
+  state is read from the lookup order's first entry, not the raw setting: choosing the default folder's own path in the
+  chooser writes models.folder but LookupOrder drops it, and the row keeps the models (re-lens on PR #71; third test,
+  observed failing against the raw-setting predicate). Rarer edge, left as is: a folder chosen inside Dictum's own data
+  folder (that folder itself, say) is a Chosen entry, so the row drops the models although they are still under it. The lens on this PR caught that the
+  first fix dropped the models from the row in both states; the owner decided (07:18 AEDT, through the lens): the row follows
+  the state. `StoragePage.DataFolderRow(modelFolderChosen)`: no model folder chosen, "Models, logs, calibration recordings"
+  (the existing words, byte for byte); a model folder chosen, "Logs, calibration recordings" (PROPOSED). The Open button's
+  accessible name follows the row. One ModelFolderTests test per state, each observed failing on the reverted behaviour
+  (the state-blind label put back), then restored.
+- "Remove everything" said "the Start menu shortcut and the launch-at-login entry" on a Mac. The sentence now takes the
+  platform's own words from a new `IRemovalSteps.StartupItemsPhrase`: Windows "the Start menu shortcut and the launch-at-login
+  entry" (unchanged on Windows: PlatformTests pins the whole sentence byte for byte), macOS "the login item" (PROPOSED, pinned in MacShellTests). The page
+  pin was observed failing with the Windows literal put back, then restored.
+- Not in this change, left for a Mac help pass: `HelpText` "How do I remove Dictum completely?" still says "its Start menu
+  shortcut and its start-with-Windows entry" and the Microsoft Store sentence on a Mac; HelpText is plain constants with no
+  platform code by design, so that is a copy decision for the owner (PROPOSED Mac wording to follow), not a one-liner.
 - Dictum for Mac (beta) announcement APPROVED by the owner (23/10/2026 07:10 AEDT), sections A, B and C of the proposed block as
   one block, built word for word in `site/index.html` (meta description, hero eyebrow, second hero button, hero note, the new
   "Dictum for Mac, in beta" section, the "Runs on" table row, the roadmap item moved up to Done, three "What you need" items,
