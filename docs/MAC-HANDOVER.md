@@ -145,7 +145,7 @@ needs them to use CoreML, ship only the CPU path in the beta and record it.
   there (check, record the source; if they do, add the Mac case in the platform layer, not in Core).
 - Info.plist: `CFBundleIdentifier au.kynni.dictum`, `CFBundleName Dictum`, `CFBundleShortVersionString` from
   `Directory.Build.props` `<Version>`, `LSUIElement true` (menu-bar app, no Dock icon), `LSMinimumSystemVersion` (pick
-  the lowest Avalonia 11.3 and .NET 10 support and record the source), `NSMicrophoneUsageDescription` (PROPOSED text:
+  the lowest Avalonia 11.3 and .NET 10 support and record the source), `NSMicrophoneUsageDescription` (APPROVED by the owner 23/10/2026:
   "Dictum uses the microphone only while it is recording (from your hotkey until the recording stops) and for the microphone test. The audio stays on this Mac unless you turn on cloud speech." (lens on PR #67, 23/10/2026: the hotkey-only wording was untrue for hands-free recording and the microphone test.) This
   replaces the earlier proposal, which was untrue with cloud speech on), `NSHumanReadableCopyright`
   "© 2026 Kynni Pty Ltd".

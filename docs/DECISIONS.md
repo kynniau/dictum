@@ -5545,3 +5545,6 @@ unless marked:
   both and the packaging test now pins it absent (observed failing against the labelled file before the file changed).
   Still PROPOSED, not covered by that approval: the `NSMicrophoneUsageDescription` sentence (M2 above) and the Right Option
   default hotkey (decision d). The public README stays silent about the Mac until the beta ships.
+- `NSMicrophoneUsageDescription` APPROVED by the owner (23/10/2026, "yes" to the sentence as written in M2). The handover
+  and the packaging test's comment say so. The Right Option default hotkey (decision d) is the one Mac string still
+  PROPOSED.
