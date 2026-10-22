@@ -139,8 +139,8 @@ internal sealed class ModelsPage : SettingsPage
         _download = Ui.Stack(4, _downloadText, _progress, Ui.Button("Cancel download", "link", () => Shell.Models.CancelDownload(DownloadCancelReason.CancelLink)));
         // The recommended clean-up model, through the catalogue's own path (asked first, then downloaded and switched to).
         _addCleanup = Ui.Button("", "primary", () => Run(() => Shell.Models.SelectCleanup(CleanupCatalog.Recommend(Shell.GpuMachine).Model)));
-        _useDefault = Ui.Button(UseDefaultLabel, "secondary", () => Run(() => Say(Shell.Models.SetModelsFolder(null) ?? "")), name: "Use the default model folder");
-        var browse = Ui.Button(BrowseLabel, "secondary", () => Run(BrowseFolder), name: "Browse for a model folder");
+        _useDefault = Ui.Button(UseDefaultLabel, "secondary", () => Run(() => ModelFolderActions.UseDefaultFolder(Shell, Say)), name: ModelFolderActions.UseDefaultName);
+        var browse = Ui.Button(BrowseLabel, "secondary", () => Run(() => ModelFolderActions.BrowseFolder(Shell, Say)), name: "Browse for a model folder");
         var folderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 8 };
         Grid.SetColumn(browse, 1);
         Grid.SetColumn(_useDefault, 2);
@@ -176,13 +176,6 @@ internal sealed class ModelsPage : SettingsPage
                 cleanupButtons, cloudNote), "Clean-up model"),
             Ui.Card(Ui.Stack(8, folderRow, Ui.Text(FolderNote, "caption"), _folderWarning), FolderLabel),
             Ui.Button("Storage: model sizes, free space and Delete", "link", () => _window.ShowPage("Storage")));
-    }
-
-    /// <summary>Model folder → Browse…: the system's folder chooser, then models.folder is written and the settings reload.</summary>
-    private void BrowseFolder()
-    {
-        if (Shell.Dialogs.ChooseFolder(Shell.ModelsDir) is not { } folder) return;
-        Say(Shell.Models.SetModelsFolder(folder) ?? "");
     }
 
     protected override void Redraw()
@@ -415,6 +408,12 @@ internal sealed class StoragePage : SettingsPage
     internal const string LookupIntro = "Dictum looks for a model in these folders, in this order:";
     internal const string NoModels = "No model files yet.";
 
+    // PROPOSED 22/10/2026 copy (Decision "Storage page can change the model folder"): the model folder's two actions, the same
+    // handlers as Settings > Models (ModelFolderActions), its note repeated (ModelsPage.FolderNote) and one sentence on drive speed.
+    internal const string ChangeLabel = "Change…";
+    internal const string ChangeName = "Change the model folder";
+    internal const string SlowerDriveNote = "A slower drive makes the speech model slower to load and to switch.";
+
     internal static string DownloadsGoTo(string folder) => $"Downloads go to: {folder}";
 
     internal static string FolderName(ModelFolderKind kind) => kind switch
@@ -425,6 +424,8 @@ internal sealed class StoragePage : SettingsPage
     };
 
     private readonly TextBlock _folder = Ui.Text("", "caption");
+    private readonly TextBlock _folderWarning = Ui.Text("", "caption"); // Models' network-folder warning, the same approved words
+    private readonly Button _useDefault;
     private readonly TextBlock _free = Ui.Text("", "caption");
     private readonly StackPanel _folders = new() { Spacing = 2 };
     private readonly StackPanel _models = new() { Spacing = 8 };
@@ -439,8 +440,17 @@ internal sealed class StoragePage : SettingsPage
     public StoragePage(AppShell shell) : base(shell, "Storage")
     {
         _including.IsCheckedChanged += (_, _) => Draw();
+        // The model folder's row: where downloads go, with the two actions of Settings > Models. Only this folder can be moved:
+        // the settings, dictionary and log folders get no button.
+        _folder.VerticalAlignment = VerticalAlignment.Center;
+        var change = Ui.Button(ChangeLabel, "secondary", () => Run(() => { ModelFolderActions.BrowseFolder(Shell, Say); Draw(); }), name: ChangeName);
+        _useDefault = Ui.Button(ModelsPage.UseDefaultLabel, "secondary", () => Run(() => { ModelFolderActions.UseDefaultFolder(Shell, Say); Draw(); }), name: ModelFolderActions.UseDefaultName);
+        var folderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 8 };
+        Grid.SetColumn(change, 1);
+        Grid.SetColumn(_useDefault, 2);
+        folderRow.Children.AddRange([_folder, change, _useDefault]);
         Compose(
-            Ui.Card(Ui.Stack(8, _folder, _free, _folders, _models, _total), "Models"),
+            Ui.Card(Ui.Stack(8, folderRow, Ui.Text(ModelsPage.FolderNote, "caption"), Ui.Text(SlowerDriveNote, "caption"), _folderWarning, _free, _folders, _models, _total), "Models"),
             Ui.Card(Ui.Stack(10,
                 DataRow("Calibration recordings", _recordings, RemovalScope.CalibrationRecordings),
                 DataRow("Logs", _logs, RemovalScope.Logs),
@@ -466,6 +476,9 @@ internal sealed class StoragePage : SettingsPage
         var s = Shell.Settings;
         var dir = Shell.ModelsDir;
         _folder.Text = DownloadsGoTo(Shell.RealPath(dir));
+        _useDefault.IsEnabled = Shell.Paths.ChosenModelsDir(s) is not null; // as on Settings > Models: nothing to return to while none is chosen
+        _folderWarning.Text = ModelsPage.FolderWarning(dir) ?? "";
+        _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
         _free.Text = DiskSpace.FreeBytes(dir) is long free ? $"{ModelCatalog.FormatSize(free)} free on this drive." : "Free space on this drive could not be read.";
         _folders.Children.Clear();
         _folders.Children.Add(Ui.Text(LookupIntro, "caption"));
@@ -551,4 +564,25 @@ internal sealed class StoragePage : SettingsPage
         }
         Draw();
     }
+}
+
+/// <summary>
+/// The model folder's two actions, shared by Settings > Models (Browse…, Use default) and Settings > Storage (Change…, Use default):
+/// one chooser seam and one write, so the two pages cannot drift apart. Both write models.folder through
+/// <see cref="ModelCoordinator.SetModelsFolder"/>, which refuses the bundled folder and reloads the settings.
+/// </summary>
+internal static class ModelFolderActions
+{
+    /// <summary>The accessible name of "Use default" on both pages.</summary>
+    internal const string UseDefaultName = "Use the default model folder";
+
+    /// <summary>The system's folder chooser (opened in the folder in use), then models.folder is written; cancelling changes nothing.</summary>
+    internal static void BrowseFolder(AppShell shell, Action<string> say)
+    {
+        if (shell.Dialogs.ChooseFolder(shell.ModelsDir) is not { } folder) return;
+        say(shell.Models.SetModelsFolder(folder) ?? "");
+    }
+
+    /// <summary>models.folder goes back to the per-user default folder.</summary>
+    internal static void UseDefaultFolder(AppShell shell, Action<string> say) => say(shell.Models.SetModelsFolder(null) ?? "");
 }

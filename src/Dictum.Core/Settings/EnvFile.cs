@@ -77,8 +77,17 @@ public sealed class SecretStore
     /// <summary>Sent only to an OpenAI-compatible server at an address that is not a preset's own (a custom server).</summary>
     public const string LlmKey = "LLM_API_KEY";
 
+    /// <summary>Cloud speech: sent only to an Azure OpenAI resource (a host ending .openai.azure.com); see SpeechPresets.</summary>
+    public const string AzureOpenAiKey = "AZURE_OPENAI_API_KEY";
+
+    /// <summary>Cloud speech: sent only to Groq's server (api.groq.com); see SpeechPresets.</summary>
+    public const string GroqKey = "GROQ_API_KEY";
+
+    /// <summary>Cloud speech: sent only to a speech service at an address that is not a speech preset's own (a custom server).</summary>
+    public const string SpeechKey = "SPEECH_API_KEY";
+
     /// <summary>Every key Dictum reads: each is registered with the log redactor and listed (present or absent) by the self-test.</summary>
-    public static IReadOnlyList<string> KeyNames { get; } = [AnthropicKey, OpenAiKey, GeminiKey, LlmKey];
+    public static IReadOnlyList<string> KeyNames { get; } = [AnthropicKey, OpenAiKey, GeminiKey, LlmKey, AzureOpenAiKey, GroqKey, SpeechKey];
 
     private readonly Dictionary<string, (string Value, string Source)> _values = new(StringComparer.Ordinal);
     private readonly Func<string, string?> _environment;

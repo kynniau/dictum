@@ -324,17 +324,19 @@ internal sealed class Scratch : IDisposable
     /// <param name="updateHandler">The same for the Check for updates client.</param>
     /// <param name="log">Where the shell logs (a <see cref="RecordingLog"/>, say); nowhere by default.</param>
     /// <param name="cleanupModels">A clean-up model manager with a fake loader; else the real one.</param>
+    /// <param name="providerHandler">A fake server under the clean-up and cloud speech provider client's real offline_only guard; the network otherwise.</param>
     /// <param name="gpuMachine">What the shell takes the machine for (WhisperEngine.GpuMachine): a CPU-only PC by default.</param>
     public (AppShell Shell, FakePlatform Platform, ScriptedDialogs Dialogs) Shell(Dictum.Transcribe.ModelManager? speechModels = null, ShellOptions? options = null,
         HttpMessageHandler? downloadHandler = null, HttpMessageHandler? updateHandler = null, ILog? log = null, Dictum.Llm.LocalLlmManager? cleanupModels = null,
-        bool? gpuMachine = false, Func<string, ILog, string>? runtimeProbe = null)
+        bool? gpuMachine = false, Func<string, ILog, string>? runtimeProbe = null, HttpMessageHandler? providerHandler = null)
     {
         var platform = new FakePlatform(Paths);
         var dialogs = new ScriptedDialogs();
         // gpuMachine null: the app's own path, which probes the whisper runtime (runtimeProbe stands in for it, so nothing native loads).
         var shell = new AppShell(platform, Paths, log ?? NullLog.Instance, new SecretRedactor(), options ?? new ShellOptions(), dialogs,
             gpuMachine: gpuMachine is { } gpu ? () => gpu : null,
-            speechModels: speechModels, downloadHandler: downloadHandler, updateHandler: updateHandler, cleanupModels: cleanupModels);
+            speechModels: speechModels, downloadHandler: downloadHandler, updateHandler: updateHandler, cleanupModels: cleanupModels,
+            providerHandler: providerHandler);
         if (runtimeProbe is not null) shell.Models.TestRuntimeProbe = runtimeProbe;
         return (shell, platform, dialogs);
     }

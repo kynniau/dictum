@@ -50,11 +50,30 @@ public static class CloudPolicy
     {
         if (s.Provider is not (LlmSettings.Anthropic or LlmSettings.OpenAiCompatible) || s.BaseUrl is not { } url
             || !Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttp) return null;
-        if (!u.IsLoopback) return $"llm.base_url {u.Host} uses http://, which would send dictations unencrypted; only a server on this PC may use http://";
+        if (PlainHttpRefusal("llm.base_url", url) is { } refused) return refused;
         return s.Provider == LlmSettings.Anthropic
             ? $"llm.base_url {u.Host} uses http://, but Anthropic clean-up needs an https:// address, because its consent step says the connection is encrypted"
             : null;
     }
+
+    /// <summary>The host of <paramref name="url"/> when a request there would leave this PC; null for this PC (loopback) or no absolute URL.</summary>
+    public static string? OffThisPc(string? url) => Uri.TryCreate(url, UriKind.Absolute, out var u) && !u.IsLoopback ? u.Host : null;
+
+    /// <summary>
+    /// offline_only's rule for a service at an address (clean-up's openai-compatible provider, cloud speech): any host off this
+    /// PC is refused, a server on this PC is allowed. Null when it may run. One rule and one wording for both callers.
+    /// </summary>
+    public static string? OfflineRefusal(string service, string? url, bool offlineOnly) =>
+        offlineOnly && OffThisPc(url) is { } host ? $"offline_only is on: {service} at {host} is refused (only a server on this machine is allowed)" : null;
+
+    /// <summary>
+    /// A plain http:// address off this PC would carry the dictation unencrypted over the network: the refusal naming
+    /// <paramref name="key"/>, or null (https://, or a server on this PC). Clean-up's and cloud speech's one rule.
+    /// </summary>
+    public static string? PlainHttpRefusal(string key, string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttp && !u.IsLoopback
+            ? $"{key} {u.Host} uses http://, which would send dictations unencrypted; only a server on this PC may use http://"
+            : null;
 
     /// <summary>What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2), then the warning paragraph.</summary>
     public static string ConsentText(LlmSettings s, string host) =>

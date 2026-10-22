@@ -1,7 +1,6 @@
 using Dictum.Audio;
 using Dictum.Personal;
 using Dictum.Settings;
-using NAudio.Wave;
 
 namespace Dictum.Calibration;
 
@@ -28,20 +27,16 @@ public sealed class CalibrationRecordings(string directory, IReadOnlyList<string
     public string ManifestFile => System.IO.Path.Combine(Directory, "takes.txt");
 
     /// <summary>
-    /// Writes the recording as 16 kHz mono 16-bit PCM (NAudio's WaveFileWriter), replacing an earlier take, and notes the
+    /// Writes the recording as 16 kHz mono 16-bit PCM (<see cref="Wav.Encode"/>), replacing an earlier take, and notes the
     /// sentence it was recorded for. A failed write leaves no partial recording behind.
     /// </summary>
     public void Save(int index, CapturedAudio audio)
     {
         System.IO.Directory.CreateDirectory(Directory);
         var temp = PathFor(index) + ".tmp";
-        var samples = audio.Samples.Select(s => Math.Clamp(s, -1f, 1f)).ToArray(); // a resampler overshoot must not wrap round in 16-bit
         try
         {
-            using (var writer = new WaveFileWriter(temp, new WaveFormat(MonoResampler.WhisperRate, 16, 1)))
-            {
-                writer.WriteSamples(samples, 0, samples.Length);
-            }
+            File.WriteAllBytes(temp, Wav.Encode(audio.Samples));
             File.Move(temp, PathFor(index), overwrite: true);
         }
         catch

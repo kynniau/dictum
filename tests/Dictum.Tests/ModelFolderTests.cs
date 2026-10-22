@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Dictum.App;
@@ -395,6 +396,93 @@ public sealed class ModelFolderTests : IDisposable
         Assert.Null(shell.Settings.Models.Folder);
         window.Close();
         shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin (22/10/2026, owner report "no option to change this location"): Settings > Storage shows Change… and Use default beside
+    /// the model folder, which run the same handlers as Models' Browse… and Use default (the same chooser seam, the same
+    /// models.folder write); the note, the drive-speed sentence and the accessible names are there; the folders that cannot be
+    /// moved (settings, dictionary, log) get no such button.
+    /// </summary>
+    [Fact]
+    public Task Storage_changes_the_model_folder_with_the_same_handlers_as_Models() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "models_dir": null } }""");
+        var chosen = Path.Combine(scratch.Root.FullName, "D-drive models");
+        Directory.CreateDirectory(chosen);
+        var (shell, _, dialogs) = scratch.Shell(new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false));
+        shell.Reload(userRequested: false);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        var change = ButtonNamed(window, StoragePage.ChangeLabel);
+        var useDefault = ButtonNamed(window, ModelsPage.UseDefaultLabel);
+        Assert.Equal("Change…", StoragePage.ChangeLabel);
+        Assert.Equal(StoragePage.ChangeName, AutomationProperties.GetName(change)); // labelled for a screen reader
+        Assert.Equal(ModelFolderActions.UseDefaultName, AutomationProperties.GetName(useDefault));
+        Assert.Single(All<Button>(window), b => b.Content as string == StoragePage.ChangeLabel); // the model folder only: no button on the settings, dictionary or log folders
+        Assert.Same(change.Parent, All<TextBlock>(window).Single(t => t.Text is { } s && s.StartsWith("Downloads go to: ", StringComparison.Ordinal)).Parent); // in the model folder's own row
+        Assert.Contains(ModelsPage.FolderNote, Texts(window));
+        Assert.Equal("A slower drive makes the speech model slower to load and to switch.", StoragePage.SlowerDriveNote);
+        Assert.Contains(StoragePage.SlowerDriveNote, Texts(window));
+        Assert.Contains($"Downloads go to: {scratch.Paths.DefaultModelsDir}", Texts(window));
+        Assert.False(useDefault.IsEnabled); // nothing is chosen yet, as on Models
+        Assert.True(change.Focusable && change.IsTabStop); // reached with Tab
+
+        dialogs.Folder = chosen;
+        Click(change);
+        Assert.Equal([scratch.Paths.DefaultModelsDir], dialogs.FolderChooserOpenedIn); // the shared chooser seam, in the folder in use
+        Assert.Equal(chosen, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder); // models.folder written
+        Assert.Equal(chosen, shell.Settings.Models.Folder); // and reloaded
+        Assert.Contains($"Downloads go to: {chosen}", Texts(window)); // and the page shows it at once
+        Assert.True(useDefault.IsEnabled);
+        Assert.True(useDefault.Focusable && useDefault.IsTabStop);
+        Assert.Same(useDefault, KeyboardNavigationHandler.GetNext(change, NavigationDirection.Next)); // Tab runs Change… then Use default
+
+        Click(useDefault);
+        Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
+        Assert.Contains($"Downloads go to: {scratch.Paths.DefaultModelsDir}", Texts(window));
+        Assert.False(useDefault.IsEnabled);
+
+        dialogs.Folder = scratch.Paths.BundledModelsDir; // the bundled folder is refused, with the reason said on the page
+        Click(change);
+        Assert.Contains(ModelCoordinator.BundledFolderRefused, Texts(window));
+        Assert.Null(SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Models.Folder);
+
+        dialogs.Folder = null; // the chooser cancelled: nothing changes
+        Click(change);
+        Assert.Null(shell.Settings.Models.Folder);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin (lens on 74623b7): Storage shows Models' network-folder warning under the note when the model folder is on a share, and not otherwise.</summary>
+    [Fact]
+    public Task Storage_warns_when_the_model_folder_is_on_a_network_share() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        var share = @"\\fileserver\dictum\models";
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { hotkey = "F24", models = new { folder = share } }));
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Assert.Equal(share, shell.Settings.Models.Folder);
+        var window = new SettingsWindow(shell);
+        window.Show();
+        window.ShowPage("Storage");
+        Assert.Contains(ModelsPage.NetworkWarning, Texts(window));
+        Assert.Contains($"Downloads go to: {share}", Texts(window));
+        window.Close();
+
+        using var local = new Scratch();
+        var (shell2, _, _) = local.Shell();
+        shell2.Reload(userRequested: false);
+        var window2 = new SettingsWindow(shell2);
+        window2.Show();
+        window2.ShowPage("Storage");
+        Assert.DoesNotContain(ModelsPage.NetworkWarning, Texts(window2));
+        window2.Close();
+        shell.Dispose();
+        shell2.Dispose();
     });
 
     [Fact]

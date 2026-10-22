@@ -829,7 +829,11 @@ Users must be able to remove what the app has put on disk, from inside the app.
   "Delete all app data" leaves a chosen folder outside the user's profile alone, and a
   deletion that fails says "in use or not permitted". After the re-lens (§24): that switch
   is offered only to a model the tray app's lookup loads, and a downloaded copy of the
-  model in use can be deleted when the same model is next in the lookup.
+  model in use can be deleted when the same model is next in the lookup. Amended 22/10/2026: Storage
+  also changes the model folder: **Change…** and **Use default** beside "Downloads go to", the same handlers as
+  Models' Browse… and Use default (`ModelFolderActions`), with the note that nothing moves, the network-folder warning when it applies, and PROPOSED: "A slower
+  drive makes the speech model slower to load and to switch."; the settings, dictionary and log folders cannot be moved
+  and have no button.
 - Tests: deletion refuses paths outside the models dir, refuses the active model, cleans
   the integrity record, and reports freed bytes; "Delete all app data" never touches
   `.env` or the program folder.
@@ -893,7 +897,7 @@ and adapts, with one code path and a test for each:
 - Launch at login: StartupTask API when packaged, HKCU Run key when not. The tray toggle
   reflects whichever applies.
 - Paths: packaged writes are redirected by Windows to the package's LocalCache; the
-  Settings → Storage page shows the real on-disk path so users can find models.
+  Settings → Storage page shows the real on-disk path so users can find models, and changes the model folder (§17).
 - "Remove Dictum completely": when packaged, it deletes the data it owns and then opens
   Settings → Apps for the package uninstall (a package cannot delete itself); the
   two-warning flow and the path-registry test still apply.
@@ -1417,3 +1421,32 @@ counted) and moved inside it, so on that screen the body scrolls, under a scroll
 never sit under the taskbar. The placement is one pure function (`OnboardingWindow.Fit`).
 
 Every new user-facing string is PROPOSED (DECISIONS, 21/10/2026), awaiting the product owner's approval.
+
+## 28. Cloud speech, Core (amendment, 22/10/2026)
+
+Owner decision 22/10/2026: cloud speech is approved behind its own express consent; the speech model on this PC stays the
+default and is always loaded as the fallback. This section is the Core half (settings, consent record, gate, request,
+fallback); the windows and the public copy follow in later lanes. Decisions and hand-offs: DECISIONS, "Cloud speech, Core".
+
+- **Settings.** `speech.provider` = `local` (default) | `openai-compatible`; `speech.base_url` (required for
+  openai-compatible; `https://` only, a server on this PC included); `speech.model` (required; the Azure OpenAI deployment name);
+  `speech.timeout_ms` (1000-120000, default 30000, not yet measured). Keys: `OPENAI_API_KEY` to `api.openai.com`,
+  `AZURE_OPENAI_API_KEY` to hosts ending `.openai.azure.com`, `GROQ_API_KEY` to `api.groq.com` (each required there),
+  `SPEECH_API_KEY` to any other address (optional). A preset's key goes to its own host only; that host on another port
+  gets no key, and a final "." in the address is the same host. Azure OpenAI gets its key in an `api-key` header, the others
+  as `Authorization: Bearer`. Switching cloud clean-up off withdraws only the clean-up consent.
+- **Consent.** `consent.json` holds a `cleanup` entry and a `speech` entry. Only the speech consent step writes the speech
+  entry; settings.json cannot. The earlier single-record file is a clean-up consent and never a speech consent. Cloud
+  speech runs only while the speech entry names the exact host in `speech.base_url`, a server on this PC included.
+- **Refusals** (the local model hears every recording, with a logged reason and a status): base_url or model unset;
+  `offline_only` with a host off this PC (clean-up's rule); any plain `http://` address, on this PC too; no speech consent for this host;
+  `whisper.translate` on (v1: the transcriptions endpoint does not translate); the key the address needs missing.
+- **Request.** One multipart POST per recording, and per part in hands-free, to `{base_url}/audio/transcriptions`:
+  `file` (16 kHz mono 16-bit WAV, built in memory, never written to disk), `model`, `language` (from `whisper.language`;
+  none for `auto`), `prompt` (the dictionary terms whisper gets, then a part's carried words), `response_format=json`. The
+  The path is joined as a path, so a query in `speech.base_url` stays after it. The
+  reply's `text` is tidied as whisper's own output is. The client is the offline-guarded provider client.
+- **Failure.** An HTTP error, the deadline, an empty or unreadable reply, the offline guard or a settings reload: the local
+  model hears the same samples; the log names the reason (status and host, never audio, text or key); the status says the
+  last request failed until the next success. Esc pastes nothing. A settings reload cancels a request under way. So does
+  quitting.
