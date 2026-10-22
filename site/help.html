@@ -59,61 +59,14 @@
 
   <section id="get" aria-labelledby="get-title">
     <h2 id="get-title">1. Get Dictum</h2>
-    <p>Dictum works on Windows 10 and Windows 11 PCs. There are two ways to get it. Choose one.</p>
-
-    <h3>The Microsoft Store (easiest)</h3>
-    <ol>
-      <li>Click <a href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get Dictum from the Microsoft Store</a>.</li>
-      <li>Follow the Store’s steps to install it.</li>
-    </ol>
-    <p>The Store keeps Dictum up to date for you.</p>
-
-    <h3>The direct download</h3>
+    <p>Dictum works on Windows 10 and Windows 11 PCs. Get it free from the Microsoft Store.</p>
     <ol id="install-steps">
-      <li>Click <a href="https://github.com/kynniau/dictum/releases/latest">Download for Windows</a>. The Dictum download page opens.</li>
-      <li>Click the file whose name starts with <b>Dictum-Setup</b>. It downloads to your PC.</li>
-      <li>Open your Downloads folder. Double-click <b>Dictum-Setup</b>.</li>
-      <li>If Windows says “Windows protected your PC”, see <a href="#smartscreen">the box below</a>.</li>
-      <li>If Windows says SmartScreen can't be reached (this can happen without the internet), click <b>Run</b>.</li>
-      <li>Setup may say your PC needs the Microsoft Visual C++ Redistributable. This is a free part from Microsoft that Dictum needs to work. If you see that message, click <b>Yes</b>.</li>
-      <li>Your web browser downloads a file called <b>vc_redist.x64.exe</b>. Open it and install it. This needs an administrator account.</li>
-      <li>Go back to Dictum’s Setup.</li>
-      <li>Setup offers a desktop shortcut, and starting Dictum when Windows starts. Both are off unless you tick them. Click <b>Next</b>.</li>
-      <li>Click <b>Install</b>.</li>
-      <li>If you see <b>Launch Dictum</b>, leave it ticked.</li>
-      <li>Click <b>Finish</b>. Dictum starts.</li>
+      <li>Click <a href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get Dictum from the Microsoft Store</a>. Or open the Microsoft Store app on your PC, search for <b>Dictum</b>, and choose the one by Kynni.</li>
+      <li>Follow the Store’s steps to install it.</li>
+      <li>To start Dictum, click Start, type <b>Dictum</b>, and press Enter.</li>
     </ol>
-
-    <figure class="demo-figure">
-      <details class="demo-play">
-        <summary>
-          <img class="demo-poster" src="img/demos/install-poster.png" width="1600" height="1116" loading="lazy" alt="Install Dictum: a still from the demo.">
-          <span class="demo-play-label"><span class="demo-when-closed">Play</span><span class="demo-when-open">Stop</span></span>
-        </summary>
-        <img class="demo-gif" src="img/demos/install.gif" width="800" height="558" loading="lazy" alt="Install Dictum, step by step, as a moving picture.">
-      </details>
-      <figcaption>Install Dictum. A moving picture with no sound: each step is written on it. The demo shows the main steps; the written steps are complete.</figcaption>
-    </figure>
-
-    <div class="card callout" id="smartscreen">
-      <h3>“Windows protected your PC”: is this safe?</h3>
-      <p>This is expected. Click <b>More info</b>, then <b>Run anyway</b>.</p>
-      <p>For the direct download, Windows shows this message for programs that are not code-signed yet. Code-signed means the file carries a digital signature: a seal that says who made it. Dictum’s installer does not have one yet, so Windows SmartScreen (the part of Windows that checks downloads) does not recognise it.</p>
-      <p>The Microsoft Store version does not show this message, because Microsoft signs Store apps.</p>
-      <p>Only carry on if you downloaded the file from <a href="https://github.com/kynniau/dictum/releases/latest">github.com/kynniau/dictum</a>.</p>
-      <ol>
-        <li>Click <b>More info</b>.</li>
-        <li>Click <b>Run anyway</b>.</li>
-      </ol>
-      <p>If Microsoft Edge held the download back:</p>
-      <ol>
-        <li>Select <b>…</b> (More actions) next to the file.</li>
-        <li>Select <b>Keep</b>.</li>
-        <li>Select <b>Show more</b>.</li>
-        <li>Select <b>Keep anyway</b>.</li>
-      </ol>
-      <p>On a work PC, your IT team may have turned these options off. Ask them, or <a href="https://apps.microsoft.com/detail/9N0DG1DHTR57">get Dictum from the Microsoft Store</a> instead.</p>
-    </div>
+    <p>The Store installs everything Dictum needs, and keeps Dictum up to date for you.</p>
+    <p>On a work PC, the Microsoft Store may be turned off. If it is, ask whoever looks after your computers.</p>
   </section>
 
   <section id="first-run" aria-labelledby="first-run-title">
@@ -631,7 +584,7 @@
             <li>Open Settings &gt; About.</li>
             <li>Click <b>Check for updates</b>. Dictum checks only when you click it.</li>
             <li>If a newer version is out, click <b>Open the download page</b>.</li>
-            <li>Download and run the new Setup, as in <a href="#get">section 1</a>. Your settings and models are kept.</li>
+            <li>Install the newer version from that page. Your settings and models are kept.</li>
           </ol>
         </div>
       </details>
@@ -722,13 +675,13 @@
       <span>Dictum by <a href="https://www.kynni.com.au">Kynni</a></span>
     </p>
     <ul class="footer-links">
-      <li><a href="https://github.com/kynniau/dictum">Source on GitHub</a></li>
       <li><a href="/privacy">Privacy policy</a></li>
       <li><a href="/help" aria-current="page">Help guide</a></li>
       <li><a href="mailto:hello@kynni.com.au">hello@kynni.com.au</a></li>
     </ul>
   </div>
   <div class="wrap">
+    <p class="legal">Source code and release files are on <a href="https://github.com/kynniau/dictum">GitHub</a>.</p>
     <p class="legal">© 2026 Kynni Pty Ltd. Dictum is free software under the MIT licence.</p>
   </div>
 </footer>

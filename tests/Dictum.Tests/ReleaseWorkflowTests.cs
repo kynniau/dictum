@@ -66,10 +66,22 @@ public sealed class ReleaseWorkflowTests
     }
 
     [Fact]
-    public void The_README_the_site_and_the_preamble_all_state_the_same_runtime_floor()
+    public void The_README_and_the_preamble_state_the_same_runtime_floor()
     {
         Assert.Contains($"Microsoft Visual C++ Redistributable (x64), version {Floor} or later", Squash(File.ReadAllText(Repo("README.md"))));
-        Assert.Contains($"Microsoft Visual C++ Redistributable (x64) {Floor} or later", Squash(File.ReadAllText(Repo("site", "index.html"))));
         Assert.Contains($"version {Floor} or later", Squash(Preamble));
+    }
+
+    [Fact]
+    public void The_site_names_no_runtime_because_the_Store_installs_it()
+    {
+        // Site: Store-first (docs/DECISIONS.md, 22/10/2026). The Store installs the VCLibs framework the package declares,
+        // so the site's "What you need" list no longer carries the direct download's runtime requirement.
+        foreach (var page in new[] { "index.html", "help.html", "privacy.html" })
+        {
+            var html = File.ReadAllText(Repo("site", page));
+            Assert.DoesNotContain("Visual C++", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("vc_redist", html, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
