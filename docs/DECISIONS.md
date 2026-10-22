@@ -5553,3 +5553,21 @@ unless marked:
   platforms: step 4 "Your hotkey" (`HotkeyStep`, the capture box listening from the moment the step appears, "Use this
   hotkey" / skip) and step 6, a first dictation into a box in the window through the real path. No Mac string is PROPOSED
   any more.
+- Gatekeeper test on the draft pre-release (23/10/2026 06:49 AEDT, the owner's hands, Verified by the agent afterwards): the
+  owner downloaded `Dictum-1.3.0-osx-arm64.zip` from the `mac-v1.3.0` draft with Safari, unzipped it in Downloads and opened
+  it. It went straight to the menu bar with no dialog at all: no Gatekeeper warning, and no Welcome window or permission
+  prompt because the settings, consent and the Microphone and Accessibility grants from the morning's bundle carried over
+  (same bundle identifier and signing identity). Checked afterwards: `~/Downloads/Dictum.app` carries the Safari quarantine
+  attribute; `spctl -a -vv -t exec` says "accepted, source=Notarized Developer ID"; the running process was that copy,
+  under `/private/var/folders/.../AppTranslocation/.../Dictum.app`, which is macOS running a quarantined app from a
+  read-only image because it was opened from Downloads rather than Applications. That is the case
+  `MacShellTests.A_translocated_copy_is_never_moved` covers; the release notes' "move Dictum.app to Applications" is what a
+  tester should do before turning on launch at login, since the translocated path is not stable.
+- Dictum for macOS 1.3.0 (beta) PUBLISHED as a GitHub pre-release, tag `mac-v1.3.0` on main eec9c2e, by the Windows
+  orchestrator at 06:52 AEDT 23/10/2026 on the owner's "yes, tell them to publish" (06:53 AEDT in the Mac session; the
+  owner also answered in the Windows session). Verified by the agent at 06:53 from the public download URL, unauthenticated:
+  `Dictum-1.3.0-osx-arm64.zip` 186,316,219 bytes, `shasum -a 256 -c SHA256SUMS-mac.txt` OK (SHA-256
+  5d8ac4bc9ef79979619d1f6ae81d010ce62939c1429a0bc99a08f42bbf86703f, the owner's locally notarised zip). The CI `release-mac`
+  job for the tag fails by design (no MAC_* secrets); the pre-release was created by hand with the approved notes. Still
+  open from the Mac checklist, none a blocker: login item, removal, the owned dialogs, the clean-up model load without
+  `disable-library-validation` (first tester with that model will show it).
