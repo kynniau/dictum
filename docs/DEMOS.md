@@ -223,13 +223,14 @@ For 1.2, a new or renamed control needs only its data file changed: the scripts 
   was not established. Both were run again and completed (`flyout.json` was edited between its runs, for the pointer and tooltip, not for this).
 - **The tray panel still (`site/img/flyout.png`).** Not a demo's output: `flyout.json` records the panel in the Advanced
   view (Settings > Models > Advanced, Settings closed, panel opened, pointer parked on the taskbar so no tooltip shows)
-  and `site/img/flyout.png` is that step's raw frame (`frames\raw\09-panel.png`) cropped to the panel with
-  `ffmpeg -vf crop=380:750:1180:90`. It is 380 x 750; `site/index.html` still says `width="440" height="700"` on the
-  image, which only reserves space (`.shot img` is `width: 100%; height: auto`). The sandbox has no microphone, so the
+  and the still would be that step's raw frame (`frames\raw\09-panel.png`) cropped to the panel with
+  `ffmpeg -vf crop=380:750:1180:90` (380 x 750; `site/index.html` says `width="440" height="700"` on the image, which only
+  reserves space, as `.shot img` is `width: 100%; height: auto`). The sandbox has no microphone, so the
   panel shows "No microphone", a red dot and the no-microphone sentence, and the mic row says "No microphone found";
   the clean-up is the default, so the header reads "base.en · Vulkan · rules · Right Ctrl" and the picker "Rule-based
   tidy". It does not show "No clean-up" (that needs clean-up set to Off). A panel with a working microphone has to be
-  captured on a real PC.
+  captured on a real PC. For that reason this still was not published: `site/img/flyout.png` stays as it was on main,
+  and the owner captures a new one on a PC with a microphone.
 - **Store screenshot 1 (the hold pill, edge glow on) cannot be recorded here.** With no microphone the controller ends
   the session before the hold pill is shown (`DictationController.StartCapture`, "the rest of this batch (the hold
   pill) belonged to the recording that never started"), and `key` presses for 80 ms, not a hold. `dictation-stills`
