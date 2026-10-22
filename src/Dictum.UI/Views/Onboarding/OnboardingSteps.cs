@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Dictum.App;
 using Dictum.Audio;
 using Dictum.Core;
+using Dictum.Help;
 using Dictum.Hotkey;
 using Dictum.Settings;
 using Dictum.Storage;
@@ -70,11 +71,14 @@ internal abstract class OnboardingStep : UserControl
     protected static TextBlock Line(string text, string cls = "body") => Ui.Text(text, cls);
 }
 
-/// <summary>Step 1: how Dictum works, in one paragraph.</summary>
+/// <summary>Step 1: how Dictum works, then the plain-words short version (APPROVED 22/10/2026 17:36 AEDT), as plain text with no control and no gate.</summary>
 internal sealed class WelcomeStep : OnboardingStep
 {
+    // simplification: the four short-version paragraphs sit in a 4 px-spaced group so this step fits the default window without scrolling (290 of 294 px).
+    // Ceiling: 4 px of slack. Trigger that retires it: a font or text-size change, or Every_step_fits_the_default_window_without_scrolling failing on Welcome.
+    // Fix then: raise OnboardingWindow.WindowHeight, or move the short version to its own step.
     public WelcomeStep(OnboardingFlow flow) : base(flow, OnboardingText.WelcomeName, OnboardingText.WelcomeHeading) =>
-        Content = Ui.Stack(14, Line(OnboardingText.WelcomeText), Line(OnboardingText.WelcomeNext));
+        Content = Ui.Stack(14, Line(OnboardingText.WelcomeText), Ui.Stack(4, [.. PlainWordsText.Paragraphs.Select(p => Line(p))]), Line(OnboardingText.WelcomeNext));
 
     public override bool AllowsBack => false;
 }

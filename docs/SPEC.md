@@ -1591,3 +1591,12 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
 - **Pins**: `HowItWorksTests` (pipeline and stages), `HowItWorksPageTests` (the page, headless).
 
 Every new user-facing string is APPROVED 22/10/2026 (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)").
+
+## 30. Dictum in plain words (amendment, 22/10/2026, APPROVED 22/10/2026 17:36 AEDT)
+
+- **Site page** `/plain-words` (`site/plain-words.html`): the owner-approved statement (what Dictum is, how it protects you, what we cannot take responsibility for), in the privacy page's layout. Linked from the footer of the landing page, the guide, the privacy policy and itself. It prints no file path and names no language, country, region or team.
+- **Short version** (`PlainWordsText`, `src/Dictum.Core/Help/PlainWordsText.cs`): shown under the approved first paragraph of the Welcome window's first step, as plain text. No button, no checkbox, no gate: Esc or closing still keeps the defaults. Settings > About ends with a card "In plain words" with the same four paragraphs and a button "Open in your browser" that opens `PlainWordsText.Url`.
+- **Acceptance**: none on first run. The two cloud consents are the only places data leaves the PC, and both gate it.
+- **Store listing**: one added sentence at the end of PRIVATE BY DESIGN (`docs/STORE.md`).
+- **Landing page**: "Free for life" became "Free to keep on your PC" (APPROVED 22/10/2026 17:42 AEDT).
+- **Pins**: `PlainWordsTests`, `OwnerApprovalsTests.The_plain_words_short_version_is_pinned`, `SiteStoreFirstTests` (anchors and the GitHub line on the new page).

@@ -143,7 +143,7 @@ an edit made in the file is picked up within a second and shows in the window.
 | Microphone | The device and a five-second test with a level meter (nothing is recorded or kept). |
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
-| About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
+| About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder, and an **In plain words** card with the short version of the plain-words statement and a button that opens it on the site (https://dictum.kynni.au/plain-words). |
 | See how it works | Record one dictation and watch each step: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up and whether its reply was used, and what would be pasted. Nothing is pasted, and the recording is never saved. See "See how it works". |
 | Help | **How Dictum works** and **Questions and answers** in plain words, readable with no internet; **Open the full guide** (https://dictum.kynni.au/help, in your browser) and **Email support** and **Send feedback or suggest a feature** (each a new email to hello@kynni.com.au in your own mail app). See "Help" and "Feedback and feature requests". |
 
@@ -379,7 +379,8 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
    defaults below, and the settings file is always left valid. Each step writes its own setting when you
    finish it, and only when you changed something:
    1. **How Dictum works**: hold your hotkey, speak, let go, and the words appear where you were typing; everything
-      happens on this PC.
+      happens on this PC. Under it is the short version of "Dictum in plain words" (free, no spyware, open source and
+      provided as is, nothing leaves the PC unless you switch on a cloud option); it asks for no click or acceptance.
    2. **Where to keep the model files**: the suggested folder (`%LOCALAPPDATA%\Dictum\models`) with its drive's free
       space ("C: has 41.0 GB free"), and **Choose another drive or folder…** for a PC that is short of space on C:. It
       follows Settings > Models > Model folder's rules: the folder of the models that come with Dictum is refused, and so
@@ -1097,6 +1098,7 @@ network connection only in these cases, and only to these hosts:
 |---|---|
 | Only when you ask for a model download (the Welcome to Dictum window's speech step, a choice only when base.en is not on the PC; the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
 | Only when you click **Check for updates** in Settings > About (the direct download; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
+| Only when you open the privacy policy, Dictum in plain words (`/plain-words`) or the full guide from Settings (About, Privacy, Help) | `dictum.kynni.au`: the page opens in your own browser; Dictum itself makes no request. |
 | After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms and, in hands-free, up to 10 words of what you said in the last part: taken before corrections, the profanity filter and snippets, so never their text), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
 | After each dictation, only if you set up an `openai-compatible` server (one off this PC also needs the consent step and `https://`) | the host in `llm.base_url` (the same text). With `localhost`, Dictum's request stays on this PC; what that server does with it is up to the server. |
 
