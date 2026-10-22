@@ -20,6 +20,17 @@ public sealed class SiteStoreFirstTests
         Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page)), "<!--.*?-->", "", RegexOptions.Singleline);
 
     [Fact]
+    public void The_two_Next_items_follow_the_Done_items_in_the_approved_order()
+    {
+        var html = VisibleHtml("index.html");
+        var lastDone = html.LastIndexOf("status-done", StringComparison.Ordinal);
+        var first = html.IndexOf("<span class=\"status status-next\">Next</span><div><h3>Models on another drive</h3>", StringComparison.Ordinal);
+        var second = html.IndexOf("<span class=\"status status-next\">Next</span><div><h3>Add a word by hotkey</h3>", StringComparison.Ordinal);
+        Assert.True(lastDone >= 0 && first > lastDone && second > first, "the Next items must follow every Done item: Models on another drive, then Add a word by hotkey");
+        Assert.Equal(2, Regex.Matches(html, "status-next").Count);
+    }
+
+    [Fact]
     public void Every_button_on_the_landing_page_is_the_Microsoft_Store_or_the_Mac_beta_and_the_first_is_the_Store_in_the_hero()
     {
         var html = VisibleHtml("index.html");
@@ -27,7 +38,13 @@ public sealed class SiteStoreFirstTests
         Assert.NotEmpty(buttons);
         Assert.All(buttons, b => Assert.Contains(b.Groups[1].Value, new[] { StoreUrl, MacUrl }));
         Assert.Equal(StoreUrl, buttons[0].Groups[1].Value);
-        Assert.Contains(buttons, b => b.Groups[1].Value == MacUrl);
+        Assert.Equal(3, buttons.Count(b => b.Groups[1].Value == MacUrl)); // hero, the Mac section, the closing band
+        Assert.Equal(2, buttons.Count(b => b.Groups[1].Value == StoreUrl)); // hero, the closing band
+        string Slice(string open) { var a = html.IndexOf(open, StringComparison.Ordinal); Assert.True(a >= 0, $"index.html has no {open}"); return html[a..html.IndexOf("</section>", a, StringComparison.Ordinal)]; }
+        Assert.Equal(1, Regex.Matches(Slice("<section class=\"hero\""), Regex.Escape(MacUrl)).Count);
+        Assert.Equal(1, Regex.Matches(Slice("<section class=\"section\" id=\"mac\""), Regex.Escape(MacUrl)).Count);
+        Assert.Equal(1, Regex.Matches(Slice("<section class=\"section cta-band\""), Regex.Escape(MacUrl)).Count);
+        Assert.Equal(1, Regex.Matches(Slice("<section class=\"section cta-band\""), Regex.Escape(StoreUrl)).Count);
         var heroStart = html.IndexOf("<section class=\"hero\"", StringComparison.Ordinal);
         Assert.True(heroStart >= 0, "index.html has no hero section");
         var heroEnd = html.IndexOf("</section>", heroStart, StringComparison.Ordinal);
@@ -39,7 +56,16 @@ public sealed class SiteStoreFirstTests
     [InlineData("index.html", "Free dictation for Windows PCs · Now on Mac (beta)")]
     [InlineData("index.html", "Free for Windows 10 and 11 (x64); the Microsoft Store installs it and keeps it up to date. Free for Apple Silicon Macs on macOS 15 or later, as a beta you download from GitHub.")]
     [InlineData("index.html", "Dictum for Mac, in beta The same Dictum, built for Apple Silicon Macs (M1 or later) on macOS 15 or later.")]
+    [InlineData("index.html", "It lives in your menu bar: hold the right Option key, talk, let go, and your words are typed into the app you are in.")]
+    [InlineData("index.html", "The speech model comes inside the app, so nothing is downloaded to get started, and your voice stays on your Mac unless you turn on cloud speech.")]
+    [InlineData("index.html", "It is a beta: signed and notarised with our Apple Developer ID, so it opens like any other Mac app, but it has had fewer hours on fewer Macs than the Windows version.")]
+    [InlineData("index.html", "Unzip it, move Dictum to Applications and open it.")]
+    [InlineData("index.html", "macOS asks for Microphone access and for Accessibility access (to see your hotkey and to paste into other apps).")]
+    [InlineData("index.html", "Intel Macs are not supported.")]
+    [InlineData("index.html", "Found something? Tell us from Settings > Help.")]
     [InlineData("index.html", "Check the download against SHA256SUMS-mac.txt from the same page.")]
+    [InlineData("index.html", "Next Models on another drive Keep the big model files on a second drive or a shared folder, for shared desktops with little disk.")] // owner, 23/10/2026 07:47 AEDT
+    [InlineData("index.html", "Next Add a word by hotkey Say a name once, fix its spelling, and Dictum gets it right from then on.")] // owner, 23/10/2026 07:47 AEDT
     [InlineData("index.html", "Windows 10 and 11. Apple Silicon Macs (beta).")]
     [InlineData("index.html", "Done Mac version (beta) The same app, built for Apple Silicon Macs. In beta while it earns its stripes.")]
     [InlineData("index.html", "Windows 10 or 11, 64-bit, or an Apple Silicon Mac on macOS 15 or later (beta).")]
