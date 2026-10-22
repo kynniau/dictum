@@ -4,9 +4,10 @@ Short captioned walkthrough videos of Dictum, recorded unattended on a clean Win
 narration, for people who have never used it. Every caption names one thing to do. Pipeline written 21/10/2026 on
 main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build on main at d47e7f9 (both polish rounds), below.
 
-All caption copy below is **PROPOSED**, for the product owner to approve.
+All caption copy below is **PROPOSED**, for the product owner to approve, except the demos 7 to 9 captions marked APPROVED 23/10/2026 06:12 AEDT below.
 Owner approval, 22/10/2026 14:25 AEDT: the captions of demo 7, **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`), are **APPROVED** (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)"). The marker on the other demos' captions is unchanged by that entry.
 Owner approval, 22/10/2026 17:30 AEDT: step 16 of demo 1, **Start Dictum for the first time** (`first-run.json`, step id `ready`), is **APPROVED** with the wording "This is Dictum's panel. The word beside the switch says what Dictum is doing."; the other first-run captions stay PROPOSED.
+Owner approval, 23/10/2026 06:12 AEDT: every caption proposed on PR #64 is **APPROVED**, as written below with no change: demo 7 (`cloud-cleanup.json`) steps 8, 9, 10, 14 and 15, demo 8 (`own-instructions.json`) steps 4 to 12 and demo 9 (`cloud-speech.json`) steps 4 to 12, with the two new demos' titles; and the `site/help.html` section 8 figcaption for the cloud clean-up demo now says it "agrees with the placeholder key, so the card says it is waiting for the key and nothing is sent" (it said it stopped at the consent step without agreeing).
 
 ## What it makes
 
@@ -402,7 +403,7 @@ window, and first-run records it.
    8. Click another question: Why did it type the wrong words?
    9. Its answer lists what to try.
    10. To tell us something, use Send feedback. It opens an email you can check, then send.
-7. **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`; the captions APPROVED 22/10/2026 14:25 AEDT are unchanged where the step is the same; the new and changed ones, marked below, are **PROPOSED**, 23/10/2026)
+7. **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`; the captions APPROVED 22/10/2026 14:25 AEDT are unchanged where the step is the same; the new and changed ones, marked below, are **APPROVED 23/10/2026 06:12 AEDT**)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
    3. Click Settings.
@@ -410,15 +411,15 @@ window, and first-run records it.
    5. Under Cloud clean-up, open the Service list.
    6. Choose your service. This demo chooses Anthropic.
    7. This line says the name your key needs: ANTHROPIC_API_KEY.
-   8. **PROPOSED, new** (replaces "Click Open the settings folder."): Click Create the key file. Dictum makes it for you and opens it.
-   9. **PROPOSED, new** (replaces the 1.2.1 steps 9 to 12: Ctrl+L, Ctrl+C, Open Notepad, the typed line): The key file opens in Notepad. Put your own key in place of your-key-here.
-   10. **PROPOSED, new** (replaces the 1.2.1 Save as steps 13 to 21): After you add your key, press Ctrl+S to save. This demo keeps the placeholder.
+   8. **APPROVED 23/10/2026 06:12 AEDT, new** (replaces "Click Open the settings folder."): Click Create the key file. Dictum makes it for you and opens it.
+   9. **APPROVED 23/10/2026 06:12 AEDT, new** (replaces the 1.2.1 steps 9 to 12: Ctrl+L, Ctrl+C, Open Notepad, the typed line): The key file opens in Notepad. Put your own key in place of your-key-here.
+   10. **APPROVED 23/10/2026 06:12 AEDT, new** (replaces the 1.2.1 Save as steps 13 to 21): After you add your key, press Ctrl+S to save. This demo keeps the placeholder.
    11. Close Notepad.
    12. Click Use cloud clean-up.
    13. Dictum says what it will send, and to whom, with a warning. Read it all.
-   14. **PROPOSED, changed** (was "Click Allow cloud clean-up only if you agree. This demo does not."): Click Allow cloud clean-up only if you agree. This demo agrees, with no real key.
-   15. **PROPOSED, changed** (was 1.2.1 step 28, "This demo clicks Cancel, so cloud clean-up stays off.", and step 29, "After Allow, this card would start with On: and name the service."): There is no real key yet, so the card says it is waiting for it. Nothing is sent.
-8. **Give clean-up your own instructions** (`own-instructions.json`, new; every caption and the title **PROPOSED**)
+   14. **APPROVED 23/10/2026 06:12 AEDT, changed** (was "Click Allow cloud clean-up only if you agree. This demo does not."): Click Allow cloud clean-up only if you agree. This demo agrees, with no real key.
+   15. **APPROVED 23/10/2026 06:12 AEDT, changed** (was 1.2.1 step 28, "This demo clicks Cancel, so cloud clean-up stays off.", and step 29, "After Allow, this card would start with On: and name the service."): There is no real key yet, so the card says it is waiting for it. Nothing is sent.
+8. **Give clean-up your own instructions** (`own-instructions.json`, new; every caption and the title **APPROVED 23/10/2026 06:12 AEDT**)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
    3. Click Settings.
@@ -431,7 +432,7 @@ window, and first-run records it.
    10. To go back to the Simple view, click Simple.
    11. Click Clean-up again.
    12. In the Simple view, one line says your own instructions are in use.
-9. **Cloud speech (optional)** (`cloud-speech.json`, new; every caption and the title **PROPOSED**)
+9. **Cloud speech (optional)** (`cloud-speech.json`, new; every caption and the title **APPROVED 23/10/2026 06:12 AEDT**)
    1. Click the little up-arrow near the clock, at the bottom right of the screen. *(skipped when the icon is already on the taskbar)*
    2. Click the Dictum icon.
    3. Click Settings.
