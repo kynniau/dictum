@@ -225,9 +225,9 @@ public class OwnerApprovalsTests
     }
 
     // ---- Cloud speech UI block (22/10/2026 17:22 AEDT): the owner's list for PR #54, sections 1 to 3 ----
-    // Pinned word for word, independently of the app's constants, one test per surface. Still PROPOSED and so not pinned here:
-    // SpeechPolicy.LoopbackHttpRefusal, About's fallback form "Speech: {status}.", and the last clause of the both-files
-    // switch-off sentence. The consent text and buttons, the replacement sentence and the "Cloud clean-up:" caption have their
+    // Pinned word for word, independently of the app's constants, one test per surface. The three approved at 18:46 AEDT
+    // (SpeechPolicy.LoopbackHttpRefusal, About's fallback form "Speech: {status}.", the both-files switch-off sentence whole)
+    // are pinned here too. The consent text and buttons, the replacement sentence and the "Cloud clean-up:" caption have their
     // own byte pins (CloudSpeechTests, CloudSpeechUiTests); the SpeechStatus lines are pinned in CloudSpeechTests.
 
     /// <summary>Pin (cloud speech UI block): the consent step's title and what switching on can say.</summary>
@@ -269,8 +269,8 @@ public class OwnerApprovalsTests
             AppShell.SpeechOffNotSaved("C", null));
         Assert.Equal("Cloud speech is off for this session, but settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits.",
             AppShell.SpeechOffNotSaved(null, "S"));
-        // Both files: the approved part; its last clause is still PROPOSED and not pinned here.
-        Assert.StartsWith("Cloud speech is off for this session, but consent.json could not be changed (C) and settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits",
+        // Both files, whole (its last clause APPROVED 22/10/2026 18:46 AEDT).
+        Assert.Equal("Cloud speech is off for this session, but consent.json could not be changed (C) and settings.json could not be saved (S). Nothing is sent. Dictum tries again at the next reload and when it quits; if both are still unchanged then, the next start turns cloud speech back on, unless settings.json cannot be read, in which case Dictum starts offline.",
             AppShell.SpeechOffNotSaved("C", "S"));
     }
 
@@ -317,5 +317,29 @@ public class OwnerApprovalsTests
             CloudSpeech.LoadLine("speech.example.com", "m", at, "base.en"));
         Assert.Equal("expected an absolute https:// URL such as \"https://api.openai.com/v1\"; cloud speech needs https://, also for a server on this PC, because its consent step says the connection is encrypted",
             SettingsLoader.SpeechBaseUrlProblem("http://localhost:8080/v1"));
+        // APPROVED 22/10/2026 18:46 AEDT: the refusal of a plain http:// address on this PC (the speech step's status and log).
+        Assert.Equal("speech.base_url localhost uses http://, but cloud speech needs an https:// address, also on this PC, because its consent step says the connection is encrypted",
+            SpeechPolicy.LoopbackHttpRefusal("localhost"));
     }
+
+    /// <summary>
+    /// Pin (cloud speech UI block, 18:46 AEDT): About's fallback form "Speech: {status}.", here while cloud speech is agreed to and
+    /// offline only refuses it (the status is clean-up's approved offline line, word for word).
+    /// </summary>
+    [Fact]
+    public Task Cloud_speech_about_fallback_form_is_pinned() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "offline_only": true, "speech": { "provider": "openai-compatible", "base_url": "https://speech.example.com/v1", "model": "m" } }""");
+        CloudConsentFile.WriteSpeech(scratch.Paths.ConsentFile, new CloudConsentRecord(SpeechSettings.OpenAiCompatible, "speech.example.com", DateTimeOffset.UtcNow, "test"));
+        var (shell, _, _) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            Assert.Equal("Speech: On, but offline only is on: nothing is sent until you switch offline only off.", shell.SpeechAboutValue);
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
 }

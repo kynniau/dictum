@@ -345,6 +345,12 @@ public class HelpPageTests
         Assert.Equal(first, HelpText.Questions.Single(q => q.Question == "Where does my voice go?").Answer[0]);
         Assert.Contains($"<p>{first}</p>", html);
         Assert.DoesNotContain("never sends it anywhere.", html);
+
+        // Owner, 22/10/2026 18:41 AEDT: "How Dictum works" names cloud speech beside cloud clean-up, in the app and on the site.
+        const string nothing = "Nothing you say is sent anywhere unless you turn on cloud clean-up or cloud speech in Settings";
+        Assert.Contains(nothing, HelpText.HowItWorks.Single(t => t.Contains("Nothing you say is sent anywhere", StringComparison.Ordinal)));
+        Assert.Contains(nothing, html);
+        Assert.DoesNotContain("unless you turn on cloud clean-up in Settings", html);
     }
 
     // Approved by the product owner on 16/10/2026 as written; pinned here word for word, independently of the app's copy

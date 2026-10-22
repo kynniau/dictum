@@ -75,16 +75,27 @@ public static class CloudPolicy
             ? $"{key} {u.Host} uses http://, which would send dictations unencrypted; only a server on this PC may use http://"
             : null;
 
-    /// <summary>What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2), then the warning paragraph.</summary>
+    /// <summary>
+    /// What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2), then the warning paragraph, then the
+    /// responsibility paragraph (<see cref="ConsentResponsibility"/>). The parenthesis "(the audio only if you also turn on cloud
+    /// speech)" is APPROVED 22/10/2026 18:41 AEDT (clause revised on the owner's instruction; counsel review pending): do not
+    /// reword; it was "(never the audio)", untrue when cloud speech sends to the same host.
+    /// </summary>
     public static string ConsentText(LlmSettings s, string host) =>
-        $"With cloud clean-up on, every dictation's text (never the audio) is sent to {host}" +
+        $"With cloud clean-up on, every dictation's text (the audio only if you also turn on cloud speech) is sent to {host}" +
         (s.Provider == LlmSettings.Anthropic ? " (Anthropic)" : "") +
         " together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
         (s.Provider == LlmSettings.Anthropic
             ? "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives."
             : KeySentence(CloudPresets.ForAddress(s.BaseUrl)) + " Whoever runs that server receives the text; its own terms apply.") +
-        "\n\n" + ConsentWarning(host) + "\n\n" +
+        "\n\n" + ConsentWarning(host) + "\n\n" + ConsentResponsibility + "\n\n" +
         "Nothing is sent until you agree. You can switch it off at any time in Settings > Clean-up, and offline only mode refuses it.";
+
+    /// <summary>
+    /// The consent dialog's paragraph after the warning, a new paragraph. APPROVED 22/10/2026 16:35 AEDT (clause revised on the
+    /// owner's instruction; counsel review pending): do not reword.
+    /// </summary>
+    public const string ConsentResponsibility = "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.";
 
     /// <summary>Which key goes with the text to an OpenAI-compatible service: the preset's own variable at its server, LLM_API_KEY elsewhere.</summary>
     private static string KeySentence(CloudPreset service) => service switch

@@ -67,6 +67,22 @@ internal sealed class ModelsPage : SettingsPage
     /// <summary>The line under the folder when models would load from the network (a UNC path or a mapped network drive), else null.</summary>
     internal static string? FolderWarning(string folder) => DiskSpace.IsNetwork(folder) ? NetworkWarning : null;
 
+    /// <summary>The Advanced Speech model card's introduction (approved copy): shown byte for byte unless cloud speech sends audio.</summary>
+    internal const string SpeechIntro = "Turns your voice into words, on this PC. Bigger is more accurate and slower.";
+
+    /// <summary>Its first sentence, untrue while cloud speech sends each recording.</summary>
+    internal const string SpeechIntroOnThisPc = "Turns your voice into words, on this PC.";
+
+    /// <summary>
+    /// APPROVED 22/10/2026 18:41 AEDT (owner): do not reword. The introduction's first sentence while cloud speech sends each
+    /// recording to <paramref name="host"/>.
+    /// </summary>
+    internal static string SpeechIntroCloudSentence(string host) => $"Turns your voice into words; with cloud speech on, {host} does this and the model here is the fallback.";
+
+    /// <summary>The introduction as shown: unchanged, or with <see cref="SpeechIntroCloudSentence"/> in place of its first sentence while cloud speech sends audio.</summary>
+    internal static string SpeechIntroFor(string? cloudHost) =>
+        cloudHost is null ? SpeechIntro : SpeechIntro.Replace(SpeechIntroOnThisPc, SpeechIntroCloudSentence(cloudHost), StringComparison.Ordinal);
+
     // APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword (owner, as a block): the Cloud speech card's own words. The consent
     // text and its buttons (SpeechPolicy, APPROVED) and the state lines (SpeechStatus, AppShell.CloudSpeech) are not here.
     internal const string CloudSpeechTitle = "Cloud speech"; // APPROVED 22/10/2026 17:22 AEDT
@@ -140,6 +156,8 @@ internal sealed class ModelsPage : SettingsPage
     private readonly Button _speechEnable;
     private readonly TextBlock _speechOffline = Ui.Text("", "caption");
     private readonly Border _cloudSpeechCard; // Advanced: always; Simple: only while cloud speech is on (state line and off switch)
+    private readonly TextBlock _speechIntro = Ui.Text(SpeechIntro); // Advanced Speech model card: SpeechIntroFor
+    private readonly TextBlock _explainerText = Ui.Text(SimpleView.Explainer); // Simple speech card: SimpleView.ExplainerFor
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -195,8 +213,8 @@ internal sealed class ModelsPage : SettingsPage
         // ui.view (1.2): Simple | Advanced, written through the settings writer like every other key; the reload redraws the page.
         _view = new Segments([SimpleView.SimpleLabel, SimpleView.AdvancedLabel], -1, i => Write(("ui.view", Json(UiSettings.Views[i]))), ViewName);
         // The Simple view's own controls, and the Advanced ones it hides; the language, the folder and Storage are in both.
-        var speechIntro = Ui.Text("Turns your voice into words, on this PC. Bigger is more accurate and slower.");
-        var explainer = Ui.Stack(8, Ui.Text(SimpleView.Explainer), Ui.Row(8, Ui.Button(CalibrateLabel, "secondary", () => Run(Shell.OpenCalibration))));
+        var speechIntro = _speechIntro;
+        var explainer = Ui.Stack(8, _explainerText, Ui.Row(8, Ui.Button(CalibrateLabel, "secondary", () => Run(Shell.OpenCalibration))));
         var chooseFile = Ui.Row(8, Ui.Button("Choose model file…", "secondary", () => Run(Shell.Models.ChooseFile)));
         var decoding = Ui.Line("Decoding", _decoding, "Beam search tries several readings of each phrase.");
         var cleanupButtons = Ui.Row(8,
@@ -270,6 +288,10 @@ internal sealed class ModelsPage : SettingsPage
         _folderWarning.Text = FolderWarning(folder) ?? "";
         _folderWarning.IsVisible = _folderWarning.Text.Length > 0;
         RedrawCloudSpeech(s);
+        // The owner's replacements (22/10/2026 18:41 AEDT) for "…on this PC" while cloud speech sends audio; the approved originals otherwise.
+        var cloudHost = Shell.SpeechSendsAudio ? Shell.Speech.Host : null;
+        _speechIntro.Text = SpeechIntroFor(cloudHost);
+        _explainerText.Text = SimpleView.ExplainerFor(cloudHost);
 
         // Every catalogue model is looked up again only after a settings load, a download that ended or a deletion, or when the
         // page is shown again (Leave), never on a download's progress ticks: each lookup reads up to three folders, on the UI

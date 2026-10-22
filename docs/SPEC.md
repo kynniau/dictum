@@ -1452,9 +1452,9 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
   quitting.
 - **Windows (UI lane, 22/10/2026).** APPROVED: the consent text and its two buttons (10:50, clause revised 16:31 AEDT), the
   replacement sentence (16:27), the "Cloud clean-up:" caption, and every other string as a block (owner, 22/10/2026 17:22
-  AEDT; the full list is in DECISIONS, "Cloud speech, UI"), except three that are still PROPOSED: the plain-http refusal on
-  this PC (`SpeechPolicy.LoopbackHttpRefusal`), About's fallback form "Speech: {status}.", and the last clause of the both-files
-  switch-off sentence. The in-app and site Help answers that say "your voice still stays here" now add "unless you also turn
+  AEDT; the full list is in DECISIONS, "Cloud speech, UI"); the plain-http refusal on this PC (`SpeechPolicy.LoopbackHttpRefusal`),
+  About's fallback form "Speech: {status}." and the both-files switch-off sentence whole followed at 18:46 AEDT. The in-app and
+  site Help answers that say "your voice still stays here" now add "unless you also turn
   on cloud speech" (owner, 17:22 AEDT), and "Where does my voice go?" says it "never sends it anywhere unless you turn on
   cloud speech" (owner, 17:45 AEDT).
   - *Consent step*: Settings > Models > **Cloud speech** card (its setup in the Advanced view only): Service (OpenAI, Azure
@@ -1486,6 +1486,14 @@ fallback); the windows and the public copy follow in later lanes. Decisions and 
     cloud clean-up sentence, "Audio never leaves this PC." gives way to the owner's approved replacement (22/10/2026, 16:27
     AEDT): "Audio never leaves this PC by default, though advanced users can add their own cloud speech and clean-up services
     in settings." Each original comes back byte for byte when cloud speech is off.
+    Owner wording, 22/10/2026 18:41 AEDT, the same way: the Advanced Speech model card's "Turns your voice into words, on this
+    PC." gives way to "Turns your voice into words; with cloud speech on, {host} does this and the model here is the fallback.",
+    and the Simple view's "Dictum turns your voice into text on this PC." to "Dictum sends your voice to {host} to be turned into
+    text while cloud speech is on." Permanent changes (18:41): Help's "Nothing you say is sent anywhere unless you turn on
+    cloud clean-up" now adds "or cloud speech" (app and site), and the cloud clean-up consent (SPEC §22) says "every dictation's
+    text (the audio only if you also turn on cloud speech)" where it said "(never the audio)", with a new paragraph after its
+    warning (16:35): "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent
+    there." Both consent changes were made on the owner's instruction; counsel review is pending.
 
 ## 29. See how it works: live stages in Settings (amendment, 22/10/2026)
 

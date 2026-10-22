@@ -38,7 +38,7 @@ public static class SpeechPolicy
     }
 
     /// <summary>
-    /// PROPOSED (22/10/2026), pending the owner: not in the 17:22 AEDT approved list (re-lens on PR #54). The refusal of a plain
+    /// APPROVED 22/10/2026 18:46 AEDT (proposed 22/10/2026): do not reword (it was not in the 17:22 list). The refusal of a plain
     /// http:// speech.base_url on this PC, in the speech step's "nothing sent" status and its log line (<see cref="InsecureEndpoint"/>).
     /// The settings loader's own warning is <c>SettingsLoader.SpeechBaseUrlProblem</c>, not this.
     /// </summary>

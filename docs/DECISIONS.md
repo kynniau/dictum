@@ -4693,3 +4693,47 @@ site or Store copy changes: that is the C-Copy lane, gated on owner approval.
     option, no change: with both features on under offline only, Privacy can show the offline-only line twice with no caption (the speech
     step's line and the clean-up line; the caption shows only while audio is sent).
 21. **Gates after items 18 and 19** (origin/main d838326 merged): Release build with `--no-incremental`, 0 warnings, 0 errors; full suite 1916 total, 0 failed, 23 skipped, 0 errors.
+22. **The three strings left PROPOSED in item 18, approved (owner, 22/10/2026 18:46 AEDT), markers only.**
+    `SpeechPolicy.LoopbackHttpRefusal`, About's fallback form "Speech: {status}." and the both-files switch-off sentence
+    whole now read "APPROVED 22/10/2026 18:46 AEDT (proposed 22/10/2026): do not reword". No wording changed. They are in the
+    `OwnerApprovalsTests` cloud speech UI block: the refusal and the both-files sentence as literal `Assert.Equal`s, and the
+    fallback form through a shell agreed to under offline only. Nothing on this PR is PROPOSED any more.
+23. **Owner wording for the remaining untrue sentences (22/10/2026 18:41 AEDT).**
+    1. *Settings > Models, Advanced Speech model card.* While cloud speech sends audio, "Turns your voice into words, on this
+       PC." gives way to "Turns your voice into words; with cloud speech on, {host} does this and the model here is the
+       fallback." (`ModelsPage.SpeechIntroFor`); the rest of the line is unchanged. The approved original shows otherwise.
+    2. *Settings > Models, Simple explainer.* While cloud speech sends audio, "Dictum turns your voice into text on this PC."
+       gives way to "Dictum sends your voice to {host} to be turned into text while cloud speech is on."
+       (`SimpleView.ExplainerFor`); the rest is unchanged.
+    3. *Help, "How Dictum works" (app and site), permanent.* "Nothing you say is sent anywhere unless you turn on cloud
+       clean-up" now reads "…unless you turn on cloud clean-up or cloud speech"; nothing else changed. Marker "APPROVED
+       22/10/2026 18:41 AEDT (qualifier added; proposed 21/10/2026)". **For the owner:** the sentence goes on "in Settings >
+       Clean-up", so it now places cloud speech in Settings > Clean-up, but cloud speech is in Settings > Models. I applied
+       the wording as approved and did not reword it.
+    4. *Cloud clean-up consent (`CloudPolicy.ConsentText`, SPEC §22), on the owner's instruction, counsel review pending.* The
+       parenthesis "(never the audio)" is now "(the audio only if you also turn on cloud speech)"; every other character is
+       unchanged. Marker "APPROVED 22/10/2026 18:41 AEDT (clause revised on the owner's instruction; counsel review pending):
+       do not reword".
+    5. *Same consent, new paragraph (owner, 16:35 AEDT).* After `ConsentWarning` and before "Nothing is sent until you agree":
+       "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there."
+       (`CloudPolicy.ConsentResponsibility`). Same marker with 16:35.
+    - *Quoted copies of the consent.* The Help answer, `site/help.html` and `scripts/demos/cloud-cleanup.json` quote only the
+      warning paragraph (`ConsentWarning`), which did not change, so none of them needed an edit. Updated pins:
+      `CloudWarningAndPresetsTests` (the warning-paragraph pin now expects the new paragraph after it; the key-sentence pin
+      likewise; a new whole-text byte pin for Anthropic and a custom host) and `ShellTests` (it checked "never the audio").
+      Not edited (C-Copy): `README.md` describes the consent as sending "the dictation's text, never the audio". The recorded
+      demo images (`site/img/demos/cloud-cleanup.gif` and its poster) may show the old dialog wording; they were not
+      re-recorded.
+    - *Pins.* `CloudSpeechUiTests.The_models_page_on_this_PC_sentences_follow_cloud_speech` (Advanced and Simple, both
+      states, byte for byte); the Help pin gains the "or cloud speech" sentence (app and site); the consent byte pins above.
+    - *Mutations (observed 22/10/2026), one character each, restored afterwards.*
+      - Advanced replacement ("fallback." to "fallback!") and Simple replacement ("is on." to "is on!"): the models-page pin
+        observed failing in both views.
+      - Help "cloud speech" to "cloud-speech": the Help qualifier pin observed failing.
+      - Consent parenthesis "speech)" to "speech.)": the consent byte pin observed failing.
+      - Responsibility paragraph "there." to "there!": the consent byte pin and the warning-paragraph pin observed failing.
+      - Original Advanced introduction ("slower." to "slower!") and original Simple explainer ("best." to "best!"): the
+        models-page pin observed failing in both views.
+      - The three 18:46 strings, each changed by one character ("encrypted" to "encrypted!", "Speech: " to "Speech - ",
+        "offline." to "offline!"): the log-and-loader pin, the About fallback pin and the off-not-saved pin observed failing.
+24. **Gates after items 22 and 23.** GATE_TOTALS_6

@@ -19,7 +19,7 @@ public class ShellTests
         Assert.Contains("not switched on", shell.EnableCloud(anthropic));
         Assert.Equal("Send dictations to a cloud service?", dialogs.Asked.Single().Title);
         Assert.Contains("api.anthropic.com", dialogs.Asked.Single().Text);
-        Assert.Contains("never the audio", dialogs.Asked.Single().Text);
+        Assert.Contains("(the audio only if you also turn on cloud speech)", dialogs.Asked.Single().Text); // owner, 22/10/2026 18:41 AEDT
         Assert.Equal(LlmSettings.Local, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Llm.Provider);
 
         dialogs.Answers.Enqueue(0); // Allow

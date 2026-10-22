@@ -40,8 +40,21 @@ public static class SimpleView
     public const string AdvancedLabel = "Advanced";
     public const string SwitchHelp = "Simple shows what each choice means. Advanced shows every model and its details.";
 
+    /// <summary>The explainer's first sentence, which is untrue while cloud speech sends each recording.</summary>
+    public const string ExplainerOnThisPc = "Dictum turns your voice into text on this PC.";
+
     /// <summary>
-    /// The explainer at the top of the Simple speech card. The brief's wording named "Settings > Test my setup", which does not
+    /// APPROVED 22/10/2026 18:41 AEDT (owner): do not reword. The explainer's first sentence while cloud speech sends each
+    /// recording to <paramref name="host"/>; the approved original (<see cref="ExplainerOnThisPc"/>) shows otherwise.
+    /// </summary>
+    public static string ExplainerCloudSentence(string host) => $"Dictum sends your voice to {host} to be turned into text while cloud speech is on.";
+
+    /// <summary>The explainer as shown: unchanged, or with <see cref="ExplainerCloudSentence"/> in place of its first sentence while cloud speech sends audio.</summary>
+    public static string ExplainerFor(string? cloudHost) =>
+        cloudHost is null ? Explainer : Explainer.Replace(ExplainerOnThisPc, ExplainerCloudSentence(cloudHost), StringComparison.Ordinal);
+
+    /// <summary>
+    /// The explainer at the top of the Simple speech card. The brief's wording named "Settings > Test my setup", whichdoes not
     /// exist in this build; the existing calibration test ("Calibrate my voice", the button under this text) is named instead.
     /// </summary>
     public const string Explainer = "Dictum turns your voice into text on this PC. The speech model does the listening. Standard works for most people. " +
