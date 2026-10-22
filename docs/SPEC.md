@@ -1422,7 +1422,11 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
   (`SettingsWindow`'s page list). The arrow keys reach it in the list like every other page.
 - **Recording**: **Record** / **Stop**, or hold the dictation hotkey while the page is shown in the window in front (as
   calibration: `AppShell.RedirectHotkey`, released when the window loses focus or another page is shown; Esc drops the
-  take). One take at a time, stopped at calibration's 30 s take limit (`CalibrationSession.TakeLimit`). The capture is
+  take). A dictation already under way when the page takes the hotkey (hands-free or toggle, started elsewhere) keeps it:
+  while the page has no take of its own, the hotkey and Esc are handed to the controller (`AppShell.ForwardHotkey`), and
+  Record says "A dictation is in progress". Record is off until a speech model is ready (the welcome window's "Getting the
+  speech model ready…" while one loads, else `HowItWorksText.NoSpeechModel`). A take is dropped, with the reason, when the
+  microphone fails (`IAudioCapture.Failed`) or the window goes behind another. One take at a time, stopped at calibration's 30 s take limit (`CalibrationSession.TakeLimit`). The capture is
   opened for this page only and its audio stays a `CapturedAudio` in memory: nothing is written to disk.
 - **The run**: the take goes through the shell's own `DictationPipeline` (`AppShell.Pipeline`, the controller's) via
   `DictationPipeline.DemonstrateAsync`: the same gate, speech model, clean-up (local, rules, off or a consented cloud
@@ -1450,7 +1454,8 @@ clean-up model, so users can watch what Dictum is doing." Stages 1-5 only; the c
 - **Timings**: only the pipeline's two stopwatch readings (transcription; clean-up), the same values its log lines carry.
   No other clock is added.
 - **Accessibility**: every control named; each stage is a tab stop named with all it shows, with a ring only for keyboard
-  focus; the status line under Record is a polite live region; the page title is heading level 1, each stage title level 2.
+  focus; the status line under Record and each stage's text and verdict are polite live regions; Stop from the keyboard
+  moves focus to step 2 (Record is off while the steps run); the page title is heading level 1, each stage title level 2.
 - **Not in this lane**: a link from Settings → Help (Help's page and copy belong to other lanes); compare mode.
 - **Pins**: `HowItWorksTests` (pipeline and stages), `HowItWorksPageTests` (the page, headless).
 

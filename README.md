@@ -145,7 +145,7 @@ an edit made in the file is picked up within a second and shows in the window.
 | Clean-up | What tidies the text now, the profanity filter, grammar assist, and cloud clean-up behind its consent step (see "Optional cloud polish"). |
 | Privacy | What leaves the PC, Offline only, clipboard history, transcripts in the log. |
 | About | Version, runtime and models, **Check for updates** (the direct download only; see "Privacy"), **Report a problem**, GitHub issues, the privacy policy, Reload settings, Open settings file, Open log folder. |
-| See how it works | Record one dictation and watch each step: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up and whether its reply was used, and what would be pasted. Nothing is pasted or saved. See "See how it works". |
+| See how it works | Record one dictation and watch each step: what Dictum hears, what the speech model heard, the rule-based tidy, the AI clean-up and whether its reply was used, and what would be pasted. Nothing is pasted, and the recording is never saved. See "See how it works". |
 | Help | **How Dictum works** and **Questions and answers** in plain words, readable with no internet; **Open the full guide** (https://dictum.kynni.au/help, in your browser) and **Email support** and **Send feedback or suggest a feature** (each a new email to hello@kynni.com.au in your own mail app). See "Help" and "Feedback and feature requests". |
 
 The windows follow Windows' light or dark setting.
@@ -167,12 +167,12 @@ The Help page's words are PROPOSED (docs/DECISIONS.md, 21/10/2026) and live in `
 
 ### See how it works
 
-Settings > **See how it works** shows what Dictum does with one dictation. Press **Record** (or hold your hotkey while
+Settings > **See how it works** shows what Dictum does with one whole recording. Press **Record** (or hold your hotkey while
 the page is in front), say a sentence or two, and press **Stop**. Five boxes fill in as each step finishes: the
 microphone's level (Dictum starts with sound, not words), the raw text the speech model heard, the rule-based tidy, the
 AI clean-up with whether Dictum accepted its reply and, if not, the check it failed (for example "reply drops a
 negation"), and the text a dictation would paste. Each timed step shows the time Dictum's log records for it. It uses
-your current settings, so it shows exactly what your dictations go through. The page pastes nothing and keeps the
+your current settings: the same speech model and clean-up as your dictations. The page pastes nothing and keeps the
 recording in memory only; it is never saved to disk. If your clean-up sends text to a cloud service, this text goes
 there too, and the page says so. The page's words are PROPOSED (docs/DECISIONS.md, 22/10/2026).
 

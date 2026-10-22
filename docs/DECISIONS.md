@@ -4236,3 +4236,19 @@ of the design note "four asks, designed and sized" (22/10/2026), stages 1-5 only
 - Notes: "Dictum stops here ({reason}), as it would for a dictation."; "The rule-based tidy did not run: only spaces were tidied."; "No AI clean-up is in use, so this is the clean-up."; "Used, because the AI reply was not (step 4)."; "Not needed this time: the AI reply passed. Dictum uses this text when a reply does not."; "Not in use. Clean-up in use: {status}."; "Accepted: the reply passed every check, so Dictum used it."; "Not used: {reason}. Dictum used the rule-based tidy (step 3) instead."; "Not asked: {reason}. Dictum used the rule-based tidy (step 3) instead."; "A dictation would paste this. This page pasted nothing."; "Your corrections, the profanity filter or snippets changed the text."; "Nothing would be pasted: no text is left."
 - Reused, not new: `NoSoundText.SilentBalloon` (silent take), `NoSoundText.NoMicrophoneBalloon` (no microphone), the
   pill's "Transcribing…" and "Polishing…" (`PillText`), each clean-up's status line, and the validator's reasons.
+
+**Lens fixes (22/10/2026), lens on 17ae8c3 (Needs changes):**
+
+1. The cloud line is pinned: shown for a clean-up that sends text, absent for local, rules and off.
+2. A dictation started elsewhere (hands-free or toggle) keeps its hotkey and Esc. While the page has no take of its own,
+   it hands them to the controller (`AppShell.ForwardHotkey`). Record's Busy line is pinned.
+3. Stop from the keyboard moves focus to step 2. Record is off while the steps run, so focus had gone nowhere.
+4. A pin keeps the finished text out of the "nothing pasted" log line when `log_transcripts` is off.
+5. README: "one whole recording" (hands-free parts are not demonstrated), and the Settings row says the recording is never saved.
+6. The capture's `Failed` event drops the take and says so, as calibration does. The take is also dropped when the window
+   goes behind another (its key-up would not come back). That second path has no pin: the headless platform does not deactivate a window.
+7. `AppShell.DemonstrateAsync` reads the lazy pipeline on the UI thread before `Task.Run`.
+8. Record is off until a speech model is ready. PROPOSED (new): "No speech model is ready yet, so Record is off. Settings > Models shows the model's state." While one loads, the welcome window's "Getting the speech model ready…" is reused.
+9. The 30 s limit path is pinned (it stops, runs, and keeps "Stopped at 30 s…").
+10. Each stage's text and verdict TextBlocks are polite live regions (a Border has no automation peer, so the text carries it).
+11. A missing space in `AppShell.cs` is fixed.
