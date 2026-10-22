@@ -4226,3 +4226,16 @@ this entry supersedes their "PROPOSED" and "awaiting the product owner" notes wh
    up in `git show v1.1.2:<file>`); they are flipped too, because the brief names `NoSoundText.cs` and `ModelPrompts.cs`, whose markers date from before v1.1.2. No
    string's wording changed. docs/STORE.md and the README change only where a sentence now read wrong. The PROPOSED notes
    in docs/SPEC.md, docs/DEMOS.md and docs/MAC-HANDOVER.md, and in earlier entries of this file, are left as written.
+
+## Storage page can change the model folder (22/10/2026, branch fix/storage-change-folder)
+
+Owner report: "in 1.2 I can see where the folders and data is saved, but I have no option to change this location."
+
+1. **Cause.** Settings > Storage listed the model folders read-only. The change lived only on Settings > Models ("Model folder": Browse…, Use default), so a user who read the folder on Storage had nowhere to change it there.
+2. **Fix.** Storage's "Downloads go to" row gets two buttons, **Change…** and **Use default**, and the page repeats the Models note and adds one sentence under it. They call the same code as Models: `ModelFolderActions.BrowseFolder` (the `IShellDialogs.ChooseFolder` seam, then `ModelCoordinator.SetModelsFolder`, which writes `models.folder`, refuses the bundled folder and reloads) and `ModelFolderActions.UseDefaultFolder`. `ModelsPage`'s private `BrowseFolder` and its inline "use default" lambda are gone: `BrowseFolder` is defined once. Storage redraws at once after either action (its once-a-second throttle would otherwise have kept the old path). Use default is disabled while no folder is chosen, as on Models.
+3. **Not moved, by design.** The settings, dictionary and log folders get no button; the "Where Dictum keeps things" rows keep only Open.
+4. **PROPOSED strings** (for the product owner): button **Change…** (accessible name "Change the model folder"); the sentence **"A slower drive makes the speech model slower to load and run."** The note "Dictum looks here first and downloads go here. Changing it does not move any files." is the approved Models wording, repeated. The second button reuses Models' existing label **Use default** (accessible name "Use the default model folder", now one constant for both pages) rather than a second wording ("Use the default" was the brief's proposal).
+5. **Pin.** `ModelFolderTests.Storage_changes_the_model_folder_with_the_same_handlers_as_Models`: Change… and Use default sit in the "Downloads go to" row with their accessible names and Tab stops; one Change… on the page; the note and sentence show; Change… opens the shared chooser in the folder in use, writes `models.folder`, reloads and shows the new path at once; Use default clears it; the bundled folder is refused with its reason; a cancelled chooser changes nothing.
+6. **Mutation.** Removing Change… from Storage's folder row fails the pin (observed failing, 22/10/2026).
+7. **Help** names only Models' Browse… (HelpText) and is unchanged; no Help label changed or was added.
+8. **Gate.** Release `--no-incremental` build: 0 warnings, 0 errors. Suite (`FullyQualifiedName!~Install_copies_models`, which CI runs; the public-copy sweep `PublicCopyNeutralityTests` is inside it): 1,799 total, 1,776 passed, 23 skipped, 0 failed.
