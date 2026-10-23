@@ -153,7 +153,13 @@ public sealed partial class AppShell : IDisposable
     /// <summary>Raised on the UI thread whenever anything the tray panel or Settings show may have changed.</summary>
     public event Action? Changed;
 
-    /// <summary>Builds the tray app. Returns false when the user chose Quit in the first-run picker.</summary>
+    /// <summary>The account whose acceptance of the Terms of Use counts (<see cref="AppRules.Account"/>).</summary>
+    internal static string Account => AppRules.Account;
+
+    /// <summary>
+    /// Builds the tray app. Returns false when the user chose Quit in the first-run picker, or closed the Welcome window before
+    /// its Continue (the Terms of Use not accepted).
+    /// </summary>
     public bool Start(IClassicDesktopStyleApplicationLifetime? lifetime)
     {
         _lifetime = lifetime;
@@ -163,16 +169,32 @@ public sealed partial class AppShell : IDisposable
         if (AppRules.Onboards(file, modelOverride: _options.ModelOverride is not null || SettingsFile.ModelPathOverride(Environment.GetEnvironmentVariable) is not null))
         {
             // The Welcome to Dictum window (1.2): steps 1-5 write their answers as each is completed; anything left open when it
-            // closes keeps today's defaults, so the settings load below always finds the speech choice answered.
+            // closes keeps today's defaults, so the settings load below always finds the speech choice answered. Closed before
+            // the first step's Continue, it wrote nothing and Dictum quits (legal block, 23/10/2026).
             onboarding = new OnboardingFlow(this, file, askCleanup);
             Dialogs.Onboard(onboarding);
             onboarding.SkipRest();
+            if (!onboarding.TermsAccepted) return QuitWithoutTerms();
         }
-        else if ((askSpeech || askCleanup) && !Models.FirstRun(askSpeech, askCleanup, file.Settings, keepProvider: file.NamesCleanupProvider))
+        else
         {
-            _log.Info("First-run picker: user chose Quit.");
-            Quit();
-            return false;
+            OnboardingFlow? terms = null;
+            if (AppRules.AsksTerms(file, Account))
+            {
+                // The first-run answers are there (an upgrade, a seeded settings.json, a model override) but no acceptance of
+                // the Terms of Use by this account: the Welcome window's first step alone, whose Continue ends it.
+                terms = new OnboardingFlow(this, file, askCleanup: false, termsOnly: true);
+                Dialogs.Onboard(terms);
+                terms.SkipRest();
+                if (!terms.TermsAccepted) return QuitWithoutTerms();
+            }
+            if ((askSpeech || askCleanup) && !Models.FirstRun(askSpeech, askCleanup, file.Settings, keepProvider: file.NamesCleanupProvider))
+            {
+                _log.Info("First-run picker: user chose Quit.");
+                Quit();
+                return false;
+            }
+            terms?.RecordTerms(); // a model override with no settings.json yet: the first run has just written it
         }
         LoadConfiguration(isReload: false);
 
@@ -196,6 +218,14 @@ public sealed partial class AppShell : IDisposable
         StatusChanged();
         onboarding?.BeginTryIt(); // the hotkey listens and the model loads: the window's Try it step can use them
         return true;
+    }
+
+    /// <summary>The Welcome window closed before Continue: the Terms of Use were not accepted, so Dictum does not start.</summary>
+    private bool QuitWithoutTerms()
+    {
+        _log.Info("Welcome window closed before Continue: the Terms of Use were not accepted, so Dictum quits.");
+        Quit();
+        return false;
     }
 
     private string? _speechErrorShown;

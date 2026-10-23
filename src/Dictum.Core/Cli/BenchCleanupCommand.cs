@@ -29,6 +29,7 @@ public static class BenchCleanupCommand
         }
         var config = CliCommands.LoadConfig(paths, log, redactor);
         if (CliCommands.Unreadable(config, paths)) return 1;
+        if (CliCommands.RefusedWithoutTerms(paths, log, "--bench-cleanup")) return 1;
         var settings = config.Settings;
         var personal = CliCommands.LoadPersonal(paths, log);
         var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings));

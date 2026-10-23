@@ -99,7 +99,7 @@ public class AmendmentTests
             var (options, error) = CliOptions.Parse(["--transcribe", wav, "--model", model!, "--no-llm"]);
             Assert.Null(error);
             Assert.Equal(1, await CliCommands.TranscribeAsync(options!, scratch.Paths, NullLog.Instance, new SecretRedactor()));
-            File.WriteAllText(scratch.Paths.SettingsFile, "{ }"); // readable: the same command transcribes
+            File.WriteAllText(scratch.Paths.SettingsFile, TestTerms.Json); // readable, the Terms accepted: the same command transcribes
             Assert.Equal(0, await CliCommands.TranscribeAsync(options!, scratch.Paths, NullLog.Instance, new SecretRedactor()));
         }
         finally

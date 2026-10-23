@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -8,6 +9,8 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Dictum.Help;
+using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views.Onboarding;
 
@@ -16,16 +19,20 @@ namespace Dictum.UI.Views.Onboarding;
 /// dots, the step's body (scrolling when it does not fit), and Back with the step's own buttons. Steps 1-5 run before the
 /// settings are first loaded (<see cref="RunFirstSteps"/> returns when they are done or the window closes); Try it follows once
 /// the shell has loaded them and the hotkey listens (<see cref="OnboardingFlow.BeginTryIt"/>). Esc or closing the window skips
-/// whatever is left with today's defaults (<see cref="OnboardingFlow.SkipRest"/>). The text is larger than Dictum's other
-/// windows (17 px body). Its client area (720 × 500 DIP since 1.2 polish, 22/10/2026, was 640 × 420) holds every step's body
-/// as built without scrolling (the hotkey step's "Hold to test" and "Stop listening" sat under the buttons at 420); on opening
-/// it is clamped to the screen's work area (<see cref="Fit"/>), and on a screen too small for it (1366 × 768 at 150 %) the body
-/// scrolls under a scroll bar that stays visible, with Back and the step's buttons always in view.
+/// whatever is left with today's defaults (<see cref="OnboardingFlow.SkipRest"/>); before the first step's Continue, Dictum quits
+/// instead (the Terms of Use not accepted). The text is larger than Dictum's other windows (17 px body). Its client area (720 ×
+/// 560 DIP since the legal block, 23/10/2026; 720 × 500 since 1.2 polish, 22/10/2026; 640 × 420 before) holds every step's
+/// body as built without scrolling (the hotkey step's "Hold to test" and "Stop listening" sat under the buttons at 420; at 500
+/// the first step, with the Terms of Use notice and the longer approved short version, measured 315 of 278); on opening it is
+/// clamped to the screen's work area (<see cref="Fit"/>), and on a screen too small for it (1366 × 768 at 150 %, and since 560
+/// probably at 125 % too: inferred from the recalled 48 DIP taskbar and 32 DIP caption, not measured) the body scrolls under a scroll bar that stays visible, with Back and the step's buttons always in view. On the
+/// first step the Terms of Use notice sits beside Continue in that same row, so it never scrolls away from the button; with
+/// <see cref="OnboardingFlow.TermsOnly"/> the window is that step alone, without the step line.
 /// </summary>
 internal sealed class OnboardingWindow : Window
 {
     public const double WindowWidth = 720;
-    public const double WindowHeight = 500;
+    public const double WindowHeight = 560;
 
     private readonly OnboardingFlow _flow;
     private readonly List<OnboardingStep> _steps = [];
@@ -37,6 +44,7 @@ internal sealed class OnboardingWindow : Window
     private readonly Button _back;
     private readonly Button _secondary;
     private readonly Button _primary;
+    private readonly StackPanel _terms;
     private int _index = -1;
 
     public OnboardingWindow(OnboardingFlow flow)
@@ -51,11 +59,14 @@ internal sealed class OnboardingWindow : Window
         LargeText();
 
         _steps.Add(new WelcomeStep(flow));
-        if (flow.AsksFolder) _steps.Add(new FolderStep(flow));
-        _steps.Add(new SpeechStep(flow));
-        _steps.Add(new HotkeyStep(flow));
-        _steps.Add(new MicrophoneStep(flow));
-        _steps.Add(new TryItStep(flow));
+        if (!flow.TermsOnly)
+        {
+            if (flow.AsksFolder) _steps.Add(new FolderStep(flow));
+            _steps.Add(new SpeechStep(flow));
+            _steps.Add(new HotkeyStep(flow));
+            _steps.Add(new MicrophoneStep(flow));
+            _steps.Add(new TryItStep(flow));
+        }
         foreach (var step in _steps) step.ButtonsChanged += ShowButtons;
 
         _back = Ui.Button(OnboardingText.Back, "secondary", Back);
@@ -63,16 +74,25 @@ internal sealed class OnboardingWindow : Window
         _primary = Ui.Button("", "primary", PressPrimary);
         _primary.IsDefault = true;
         AutomationProperties.SetLiveSetting(_stepLine, AutomationLiveSetting.Polite);
+        // The Terms of Use notice (APPROVED by the owner 23/10/2026 09:50 AEDT, legal block: TermsText): the acceptance sentence
+        // beside Continue and the privacy sentence below it, each with its link opened through the platform, as Settings opens pages.
+        _terms = Ui.Stack(2,
+            TermsLine(TermsText.Acceptance, TermsText.AcceptanceLink, () => flow.Shell.Platform.Open(TermsText.Url)),
+            TermsLine(TermsText.PrivacyLine, TermsText.PrivacyLink, () => flow.Shell.Platform.Open(AppShell.PrivacyUrl)));
+        _terms.VerticalAlignment = VerticalAlignment.Center;
+        _terms.Margin = new Thickness(0, 0, 12, 0);
 
         // The bar stays visible whenever the body scrolls (only on a small screen): an auto-hiding one hid that there was more.
         _scroll = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto, AllowAutoHide = false };
         var header = Ui.Row(12, new MarkIcon(30), Ui.Text(OnboardingText.Title, "title"));
         var progress = Ui.Row(12, _dots, _stepLine);
+        progress.IsVisible = !flow.TermsOnly; // one step: no "Step 1 of 1"
         var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
         right.Children.AddRange([_secondary, _primary]);
-        var nav = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
-        Grid.SetColumn(right, 1);
-        nav.Children.AddRange([_back, right]);
+        var nav = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
+        Grid.SetColumn(_terms, 1);
+        Grid.SetColumn(right, 2);
+        nav.Children.AddRange([_back, _terms, right]);
         var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"), RowSpacing = 12 };
         Control[] rows = [header, progress, _heading, _scroll, nav];
         for (var i = 0; i < rows.Length; i++)
@@ -182,7 +202,43 @@ internal sealed class OnboardingWindow : Window
             Close();
             return;
         }
+        if (_index == _steps.Count - 1)
+        {
+            _flow.FinishFirstSteps(); // the Terms of Use step alone (OnboardingFlow.TermsOnly): its Continue ends the window
+            Close();
+            return;
+        }
         Advance();
+    }
+
+    /// <summary>The Terms of Use notice beside Continue: its two sentences, each with its link (tests).</summary>
+    internal StackPanel TermsNotice => _terms;
+
+    /// <summary>
+    /// One sentence of the notice: the text before <paramref name="link"/>, the link (a link button that opens a page through
+    /// the platform), and the text after it, side by side, each centred on the row. Not a control inside the text's own run
+    /// (InlineUIContainer): rendered headless on 23/10/2026, that sat the link about 5 px above the line and, with the body's
+    /// fixed line height, clipped the text under it. The link takes the body text size, so it reads as part of the sentence;
+    /// on a window too narrow for the sentence the link moves to the next row. The whole sentence is the row's accessible name
+    /// (lens on PR #76): its parts alone read as fragments. The row is exposed to UI Automation as a group in the content view;
+    /// a panel is otherwise left out of the automation tree, name and all.
+    /// </summary>
+    private static WrapPanel TermsLine(string sentence, string link, Action open)
+    {
+        var at = sentence.IndexOf(link, StringComparison.Ordinal);
+        var button = Ui.Button(link, "link", open);
+        button.FontSize = BodySize;
+        var line = new WrapPanel();
+        foreach (var part in new Control[] { Ui.Text(sentence[..at]), button, Ui.Text(sentence[(at + link.Length)..]) })
+        {
+            part.VerticalAlignment = VerticalAlignment.Center;
+            line.Children.Add(part);
+        }
+        AutomationProperties.SetName(line, sentence);
+        // A WrapPanel gets Avalonia's NoneAutomationPeer, so without these two the name never reaches UI Automation (re-lens on 5f878a6).
+        AutomationProperties.SetAccessibilityView(line, AccessibilityView.Content);
+        AutomationProperties.SetControlTypeOverride(line, AutomationControlType.Group);
+        return line;
     }
 
     internal void PressSecondary()
@@ -249,6 +305,9 @@ internal sealed class OnboardingWindow : Window
         _secondary.Content = step.SecondaryLabel ?? "";
         _secondary.IsVisible = step.SecondaryVisible;
         _back.IsVisible = step.AllowsBack && _index > 0;
+        _terms.IsVisible = step is WelcomeStep;
+        // A screen reader says the acceptance sentence with the Continue button (lens on PR #76), as About's Check for updates says its line.
+        AutomationProperties.SetHelpText(_primary, step is WelcomeStep ? TermsText.Acceptance : null);
     }
 
     /// <summary>This window's body text size (the theme's is <see cref="ThemeBodySize"/>).</summary>

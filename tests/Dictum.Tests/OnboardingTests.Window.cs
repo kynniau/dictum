@@ -148,7 +148,7 @@ public sealed partial class OnboardingTests
         // 1366 × 768 at 150 % is 911 × 512 DIP; less the Windows 11 taskbar (recalled: 48 DIP) the work area is 464 DIP, and
         // the whole window is the client plus a caption (recalled: about 32 DIP). Both figures are recalled, not measured; a check
         // on a real 150 % desktop is still outstanding.
-        // Since 1.2 polish (22/10/2026) the default client (720 × 500) is taller than that work area: Fit cuts it to the work area
+        // Since 1.2 polish (22/10/2026) the default client (720 × 500, 720 × 560 since the legal block) is taller than that work area: Fit cuts it to the work area
         // less the caption, as opening the window on that screen does, and the body scrolls, the buttons staying in the window.
         Assert.True(OnboardingWindow.WindowWidth <= 911, $"{OnboardingWindow.WindowWidth} > 911");
         var laptop = OnboardingWindow.Fit(OnboardingWindow.WindowHeight, CaptionDip, new PixelRect(0, 0, 1366, 768 - 72), 1.5, window.Position);

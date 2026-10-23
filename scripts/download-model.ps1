@@ -58,7 +58,6 @@ $speech = [ordered]@{
 $cleanupModels = [ordered]@{
     "qwen2.5-0.5b" = @("Qwen/Qwen2.5-0.5B-Instruct-GGUF", "qwen2.5-0.5b-instruct-q4_k_m.gguf", 491400032, "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db", $false, "9217f5db79a29953eb74d5343926648285ec7e67")
     "qwen2.5-1.5b" = @("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q4_k_m.gguf", 1117320736, "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e", $false, "91cad51170dc346986eccefdc2dd33a9da36ead9")
-    "qwen2.5-3b"   = @("Qwen/Qwen2.5-3B-Instruct-GGUF", "qwen2.5-3b-instruct-q4_k_m.gguf", 2104932768, "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d", $false, "7dabda4d13d513e3e842b20f0d435c732f172cbe")
     "smollm2-1.7b" = @("HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF", "smollm2-1.7b-instruct-q4_k_m.gguf", 1055609536, "decd2598bc2c8ed08c19adc3c8fdd461ee19ed5708679d1c54ef54a5a30d4f33", $false, "2d4a76a30b4af41ecd395c35725ac11688d4cfe4")
     "gemma-3-1b"   = @("google/gemma-3-1b-it-qat-q4_0-gguf", "gemma-3-1b-it-q4_0.gguf", 1003541152, $null, $true, "d1be121d36172a4b0b964657e2ee859d61138593")
     "gemma-3-4b"   = @("google/gemma-3-4b-it-qat-q4_0-gguf", "gemma-3-4b-it-q4_0.gguf", 3155051328, $null, $true, "15f73f5eee9c28f53afefef5723e29680c2fc78a")
@@ -69,7 +68,6 @@ if ($Cleanup) {
     if (-not $cleanupModels.Contains($Cleanup)) { throw "Unknown cleanup model '$Cleanup'. Choose one of: $($cleanupModels.Keys -join ', ')." }
     $entry = $cleanupModels[$Cleanup]
     $repo = $entry[0]; $file = $entry[1]; $size = $entry[2]; $hash = $entry[3]; $gated = $entry[4]; $revision = $entry[5]
-    if ($Cleanup -eq "qwen2.5-3b") { Write-Warning "qwen2.5-3b is under the Qwen Research License: non-commercial use only." }
     if ($gated -and -not $Token) {
         try { $Token = [System.Net.NetworkCredential]::new("", (Read-Host "Hugging Face token for $repo (typing is hidden)" -AsSecureString)).Password }
         catch { $Token = $null }   # a non-interactive session cannot ask

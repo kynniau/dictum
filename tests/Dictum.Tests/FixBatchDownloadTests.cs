@@ -126,6 +126,7 @@ public sealed class FixBatchDownloadTests : IDisposable
         var paths = new AppPaths(_dir.CreateSubdirectory("cfg-bench").FullName, Path.Combine(_dir.FullName, "local-bench"), _dir.FullName);
         var wav = Path.Combine(_dir.FullName, "not-audio.wav");
         File.WriteAllText(wav, "this is not a RIFF file");
+        File.WriteAllText(paths.SettingsFile, TestTerms.Json); // the Terms accepted: the command reaches the WAV
         var (options, _) = CliOptions.Parse(["--bench-cleanup", wav]);
         Assert.Equal(1, await BenchCleanupCommand.RunAsync(options!, paths, NullLog.Instance, new SecretRedactor())); // it used to crash
     }

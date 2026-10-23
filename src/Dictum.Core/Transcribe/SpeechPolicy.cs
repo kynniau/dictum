@@ -47,14 +47,15 @@ public static class SpeechPolicy
 
     /// <summary>
     /// The speech consent step's text (spec "Cloud speech" §3), with {host} and {VAR} (<paramref name="keyVariable"/>) filled in.
-    /// APPROVED 22/10/2026 (clause revised 16:31 AEDT): do not reword. The product owner approved the appendix text verbatim
-    /// (22/10/2026, 10:50 AEDT), then approved one clause of the last paragraph (16:31 AEDT): "offline only mode refuses it"
-    /// became "offline only mode refuses any service that is not on this PC", because offline only still allows a speech server
-    /// on this PC (loopback https), as it does for clean-up. Only the owner's written replacement may change it. Pinned byte for
-    /// byte in CloudSpeechTests and CloudSpeechUiTests.
+    /// APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword. The legal block (section C row O8) added the
+    /// hands-free sentence after "…as a hint."; the rest is as approved before: the appendix text verbatim (22/10/2026, 10:50 AEDT)
+    /// with one clause of the last paragraph approved at 16:31 AEDT ("offline only mode refuses it" became "offline only mode
+    /// refuses any service that is not on this PC", because offline only still allows a speech server on this PC (loopback
+    /// https), as it does for clean-up). Only the owner's written replacement may change it. Pinned byte for byte in
+    /// CloudSpeechTests and CloudSpeechUiTests.
     /// </summary>
     public static string ConsentText(string host, string keyVariable) =>
-        $"With cloud speech on, the recording of every dictation, your voice, is sent over the internet to {host} to be turned into text, together with the words in your personal dictionary as a hint. It uses your own API key ({keyVariable})." +
+        $"With cloud speech on, the recording of every dictation, your voice, is sent over the internet to {host} to be turned into text, together with the words in your personal dictionary as a hint. In hands-free mode, the closing words of what you said just before go with it. It uses your own API key ({keyVariable})." +
         "\n\n" +
         $"Dictum encrypts the connection (HTTPS) but cannot see, check or certify what {host} keeps, for how long, how it protects it, or who else can listen to it. By switching cloud speech on you accept responsibility for the security and privacy of the speech sent there. Check that service's terms yourself, and do not dictate confidential, personal or client information with cloud speech on unless you have." +
         "\n\n" +

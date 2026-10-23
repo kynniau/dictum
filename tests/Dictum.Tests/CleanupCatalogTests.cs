@@ -14,7 +14,6 @@ public class CleanupCatalogTests
         {
             ["qwen2.5-0.5b"] = ("Qwen", 491_400_032, "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db", true, false),
             ["qwen2.5-1.5b"] = ("Qwen", 1_117_320_736, "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e", true, false),
-            ["qwen2.5-3b"] = ("Qwen", 2_104_932_768, "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d", false, false),
             ["smollm2-1.7b"] = ("HuggingFaceTB", 1_055_609_536, "decd2598bc2c8ed08c19adc3c8fdd461ee19ed5708679d1c54ef54a5a30d4f33", true, false),
             ["gemma-3-1b"] = ("Google", 1_003_541_152, null, true, true),
             ["gemma-3-4b"] = ("Google", 3_155_051_328, null, true, true),
@@ -28,9 +27,33 @@ public class CleanupCatalogTests
             Assert.Equal(e.RequiresLogin, e.Download.RequiresLogin);
             Assert.StartsWith("https://", e.LicenceUrl);
         }
-        Assert.Equal(" · non-commercial licence", CleanupCatalog.Find("qwen2.5-3b")!.Marker);
-        Assert.Equal("qwen2.5-3b · 2.1 GB · not downloaded · non-commercial licence", CleanupCatalog.Find("qwen2.5-3b")!.ItemText(false));
-        Assert.Equal("gemma-3-1b · 1.0 GB · not downloaded · requires a Hugging Face login · size-checked only", CleanupCatalog.Find("gemma-3-1b")!.ItemText(false));
+        Assert.Equal("gemma-3-1b · 1.0 GB · not downloaded · requires a Hugging Face login · size-checked only · Gemma Terms of Use apply (ai.google.dev/gemma/terms)", CleanupCatalog.Find("gemma-3-1b")!.ItemText(false));
+        Assert.Equal("qwen2.5-1.5b · 1.1 GB · not downloaded", CleanupCatalog.Find("qwen2.5-1.5b")!.ItemText(false)); // an open-source licence adds nothing
+    }
+
+    /// <summary>
+    /// Pin (legal block, owner 23/10/2026 09:50 AEDT, section D item 9): no catalogue entry is under a non-commercial licence
+    /// (qwen2.5-3b, under the Qwen Research License, was removed, here and in download-model.ps1), so Dictum may be used at work
+    /// with any model it lists (Terms section 2); and the two Gemma entries name Google's Gemma Terms of Use wherever they are
+    /// listed (PROPOSED 23/10/2026: "Gemma Terms of Use apply (ai.google.dev/gemma/terms)"), the others nothing.
+    /// </summary>
+    [Fact]
+    public void No_catalogue_entry_is_non_commercial_and_the_Gemma_entries_name_their_terms()
+    {
+        Assert.All(CleanupCatalog.Entries, e => Assert.True(e.CommercialUse, $"{e.Name} is under a non-commercial licence ({e.Licence})"));
+        Assert.All(CleanupCatalog.Entries, e => Assert.DoesNotContain("non-commercial", e.Licence, StringComparison.OrdinalIgnoreCase));
+        Assert.All(CleanupCatalog.Entries, e => Assert.DoesNotContain("Research", e.Licence, StringComparison.OrdinalIgnoreCase));
+        Assert.Null(CleanupCatalog.Find("qwen2.5-3b"));
+        Assert.Equal(["gemma-3-1b", "gemma-3-4b"], CleanupCatalog.Entries.Where(e => e.LicenceNote is not null).Select(e => e.Name));
+        Assert.All(CleanupCatalog.Entries.Where(e => e.LicenceNote is not null), e =>
+        {
+            Assert.Equal("Gemma Terms of Use apply (ai.google.dev/gemma/terms)", e.LicenceNote);
+            Assert.EndsWith(" · Gemma Terms of Use apply (ai.google.dev/gemma/terms)", e.Marker);
+            Assert.Equal("https://ai.google.dev/gemma/terms", e.LicenceUrl);
+        });
+        var script = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "scripts", "download-model.ps1"));
+        Assert.DoesNotContain("qwen2.5-3b", script);
+        Assert.DoesNotContain("Research License", script);
     }
 
     [Theory]

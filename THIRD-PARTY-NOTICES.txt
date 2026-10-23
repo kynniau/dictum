@@ -10,7 +10,9 @@ How to read it. Each package entry begins with a "Package: <id> <version>" line,
 that folder ("Ships as"), its licence, and the licence text. Where a package carries its own licence file, that file
 is reproduced unchanged. Where a package names only a licence identifier (MIT), the standard text for that identifier
 follows, with the copyright line exactly as the package's .nuspec gives it; where the .nuspec gives none, the entry
-says so. "(nuspec)" marks a value quoted from the package's .nuspec. The versions are those this build restored.
+says so. "(nuspec)" marks a value quoted from the package's .nuspec. "Copyright (upstream licence)" gives, beside it,
+the copyright line of the LICENSE file in the project's own source repository, read 23/10/2026: Avalonia at tag 11.3.22,
+LLamaSharp at v0.27.0, NAudio at v3.1.0, and llama.cpp on its master branch. The versions are those this build restored.
 Annexes A to C reproduce, unchanged except for line endings, the notices that Microsoft's and the .NET Foundation's
 packages carry for the material inside them.
 
@@ -355,6 +357,7 @@ Ships as: LLamaSharp.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): MIT, SciSharp STACK 2026
+Copyright (upstream licence): Copyright (c) 2025 SciSharp STACK
 Authors (nuspec): Rinne, Martin Evans, jlsantiago and all the other contributors in
     https://github.com/SciSharp/LLamaSharp/graphs/contributors.
 Repository (nuspec): https://github.com/SciSharp/LLamaSharp
@@ -390,6 +393,7 @@ Ships as: runtimes\win-x64\native\avx\: ggml-base.dll, ggml-cpu.dll, ggml.dll, l
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2023 The llama.cpp Authors. All rights reserved.
+Copyright (upstream licence): Copyright (c) 2023-2026 The ggml authors
 Authors (nuspec): llama.cpp Authors
 Project (nuspec): https://github.com/SciSharp/LLamaSharp
 
@@ -422,6 +426,7 @@ Ships as: no files itself: a meta-package that brings in LLamaSharp.Backend.Vulk
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2023 The llama.cpp Authors. All rights reserved.
+Copyright (upstream licence): Copyright (c) 2023-2026 The ggml authors
 Authors (nuspec): llama.cpp Authors
 Project (nuspec): https://github.com/SciSharp/LLamaSharp
 
@@ -453,6 +458,7 @@ Ships as: runtimes\win-x64\native\vulkan\: ggml-base.dll, ggml-vulkan.dll, ggml.
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2023 The llama.cpp Authors. All rights reserved.
+Copyright (upstream licence): Copyright (c) 2023-2026 The ggml authors
 Authors (nuspec): llama.cpp Authors
 Project (nuspec): https://github.com/SciSharp/LLamaSharp
 
@@ -511,6 +517,7 @@ Ships as: NAudio.Core.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): © Mark Heath 2026
+Copyright (upstream licence): Copyright 2008-2026 Mark Heath
 Authors (nuspec): Mark Heath
 Project (nuspec): https://naudio.github.io/NAudio/
 Repository (nuspec): https://github.com/naudio/NAudio
@@ -543,6 +550,7 @@ Ships as: NAudio.Wasapi.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): © Mark Heath 2026
+Copyright (upstream licence): Copyright 2008-2026 Mark Heath
 Authors (nuspec): Mark Heath
 Project (nuspec): https://naudio.github.io/NAudio/
 Repository (nuspec): https://github.com/naudio/NAudio
@@ -586,6 +594,7 @@ Ships as: Avalonia.Base.dll, Avalonia.Controls.dll, Avalonia.DesignerSupport.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Copyright (upstream licence): Copyright (c) AvaloniaUI OÜ
 Authors (nuspec): Avalonia Team
 Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
 Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/
@@ -618,6 +627,7 @@ Ships as: Avalonia.Themes.Fluent.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Copyright (upstream licence): Copyright (c) AvaloniaUI OÜ
 Authors (nuspec): Avalonia Team
 Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
 Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/
@@ -650,6 +660,7 @@ Ships as: Avalonia.Win32.Automation.dll, Avalonia.Win32.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Copyright (upstream licence): Copyright (c) AvaloniaUI OÜ
 Authors (nuspec): Avalonia Team
 Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
 Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/
@@ -682,6 +693,7 @@ Ships as: Avalonia.Native.dll and libAvaloniaNative.dylib (the macOS build, Dict
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Copyright (upstream licence): Copyright (c) AvaloniaUI OÜ
 Authors (nuspec): Avalonia Team
 Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
 Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/
@@ -713,6 +725,7 @@ Ships as: Avalonia.Skia.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Copyright (upstream licence): Copyright (c) AvaloniaUI OÜ
 Authors (nuspec): Avalonia Team
 Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
 Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/
@@ -745,6 +758,7 @@ Ships as: Avalonia.Remote.Protocol.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): Copyright 2013-2026 © The AvaloniaUI Project
+Copyright (upstream licence): Copyright (c) AvaloniaUI OÜ
 Authors (nuspec): Avalonia Team
 Project (nuspec): https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link
 Repository (nuspec): https://github.com/AvaloniaUI/Avalonia/

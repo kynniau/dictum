@@ -43,6 +43,20 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
     /// <summary>The ten calibration sentences shipped beside the executable.</summary>
     public string CalibrationScriptFile => Path.Combine(ExeDir, "calibration-sentences.txt");
 
+    /// <summary>
+    /// THIRD-PARTY-NOTICES.txt as shipped: beside Dictum.exe on Windows (scripts\publish.ps1), in Dictum.app's Contents/Resources,
+    /// next to Contents/MacOS, on a Mac (scripts/publish-mac.sh). The Windows place when neither is there (a build tree).
+    /// </summary>
+    public string ThirdPartyNoticesFile
+    {
+        get
+        {
+            var beside = Path.Combine(ExeDir, Help.TermsText.NoticesFile);
+            var resources = Path.GetFullPath(Path.Combine(ExeDir, "..", "Resources", Help.TermsText.NoticesFile));
+            return !File.Exists(beside) && File.Exists(resources) ? resources : beside;
+        }
+    }
+
     /// <summary>The user's calibration recordings, kept so the test can be re-run when a model is added.</summary>
     public string CalibrationDir => Path.Combine(LocalDir, "calibration");
 

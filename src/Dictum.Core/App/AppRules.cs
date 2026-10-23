@@ -31,6 +31,21 @@ public static class AppRules
     public static bool Onboards(SettingsLoadResult file, bool modelOverride) => FirstRunQuestions(file).AskSpeech && !modelOverride;
 
     /// <summary>
+    /// The Terms of Use step (legal block, owner 23/10/2026 09:50 AEDT, section D item 2): shown at every start until
+    /// settings.json records that <paramref name="account"/> accepted the version in force (terms.accepted =
+    /// <see cref="Help.TermsText.Version"/> and terms.accepted_by = the account name). So a new install, an upgrade from a
+    /// version without Terms, an administrator's seeded file (whose record names another account, or none) and a launch with a
+    /// model override all ask; a file that cannot be read asks too, because what it records is unknown. With
+    /// <see cref="Onboards"/> the step is the Welcome window's first; without it, the window shows that step alone.
+    /// </summary>
+    public static bool AsksTerms(SettingsLoadResult file, string account) =>
+        !(file.Usable && file.Settings.Terms.Accepted == Help.TermsText.Version
+          && string.Equals(file.Settings.Terms.AcceptedBy, account, StringComparison.Ordinal));
+
+    /// <summary>The account whose acceptance of the Terms of Use counts (terms.accepted_by): the user name Dictum runs as.</summary>
+    public static string Account => Environment.UserName;
+
+    /// <summary>
     /// The onboarding's model-folder step: only while settings.json names no model folder (models.folder, or its earlier name
     /// whisper.models_dir), so an admin's seeded folder, or one chosen before a crash, is not asked about again.
     /// </summary>
