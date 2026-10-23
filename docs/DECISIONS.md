@@ -6252,15 +6252,14 @@ Each changed place carries `APPROVED by the owner 23/10/2026 13:20 AEDT (legal s
    | `site/help.html`, first-run Welcome step | Click Next. | Click Continue. |
    | `site/privacy.html` section 3, `settings.json` item | `settings.json`: your settings. | `settings.json`: your settings, and which version of the Terms of Use you accepted, with the account name (your Windows or macOS user name) that accepted it. |
    | `scripts/demos/install.json`, step after the licence step | Setup opens. Click Next. | Setup moves on. Click Next. |
-   | `site/plain-words.html`, "What we cannot take responsibility for", first paragraph | Dictum is free and we give it to you as it is. We say it in plain words: we have built it with care, | Dictum is free and we give it to you as it is. We have built it with care, |
+   | `site/plain-words.html`, "What we cannot take responsibility for", first paragraph | Dictum is free and we give it to you as it is. We say it in plain words: we have built it with care, | Dictum is free. We have built it with care, |
 
    - The `STORE.md` PROPOSED note under the 1.2.1 notes block became an APPROVED note; row 17's appended sentence is flipped.
    - The first-run Welcome caption and the install licence caption were already the approved text; `docs/DEMOS.md` marks both
      (and "Setup moves on. Click Next.") APPROVED and records the approval at the top.
-   - **Not applied literally: the plain-words tidy.** The owner's document says the paragraph then "starts 'Dictum is free. We have
-     built it with care, …'", but the live paragraph starts "Dictum is free and we give it to you as it is." (the open point "as it is
-     remains", `Legal block, app side`, item 15). Only the five words "We say it in plain words: " were dropped, with "we" capitalised
-     as in the quoted result. "and we give it to you as it is" is untouched: removing it is a further change nobody has approved.
+   - **Plain-words tidy, completed on the coordinator's instruction (owner's section 4 text).** The paragraph must start "Dictum is free. We have
+     built it with care, …", so "and we give it to you as it is" went too (the open point "as it is remains", `Legal block, app side`,
+     item 15, is closed). It first landed with only the five words dropped; the second commit finishes it. Marker 13:20.
 3. **Section 5 (13:50).** `OnboardingText.WelcomeText`, last sentence: "Everything happens on this PC." becomes "Everything happens
    on this PC unless you turn on a cloud option." No test held the old sentence literally (they read the constant).
 4. **Contact lines (13:51).** `site/terms.html` and `packaging/TERMS.txt` section 16: "Kynni Pty Ltd, Australia. Email …" becomes
