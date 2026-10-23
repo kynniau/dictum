@@ -155,7 +155,7 @@ Delete models, recordings and logs from Settings, or remove everything at once
 
 ### What's new in this version (1.3.1)
 
-PROPOSED 23/10/2026 (release-prep lane), not approved by the owner. Paste it in "What's new in this version" on the 1.3.1 submission once approved. It names no other platform (the first submission failed on Store Policies 10.1.5, "promotes another platform") and carries no URL (the Store says no URLs in plain text).
+APPROVED by the owner 23/10/2026 15:53 AEDT: do not reword. Paste it in "What's new in this version" on the 1.3.1 submission. It names no other platform (the first submission failed on Store Policies 10.1.5, "promotes another platform") and carries no URL (the Store says no URLs in plain text).
 
 ```text
 Dictum now shows its Terms of Use the first time it starts, and you press Continue to accept them; Settings > About has buttons for the Terms of use and the Third-party notices. The cloud clean-up and cloud speech consent dialogs now say what hands-free mode sends with each part, and the Offline only description now names Check for updates and cloud speech. Settings > Storage names its folders more precisely, and Calibration says Downloading only once you have agreed to the download. Qwen2.5-3B is no longer offered as a clean-up model, because its licence allows non-commercial use only: if you chose it, Dictum uses the recommended clean-up model instead, and its 2.1 GB file stays in your models folder for you to delete.
@@ -381,9 +381,9 @@ CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.0 adds optional cloud speech. In S
 Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
 ```
 
-### Notes for certification: PROPOSED for 1.3.1
+### Notes for certification: APPROVED for 1.3.1
 
-PROPOSED 23/10/2026 (release-prep lane), not approved by the owner. Paste the block below in place of the 1.3.0 block when submitting 1.3.1, once approved. It names no other platform. The Partner Center "Additional license terms" step for this submission is go-live step 5a in section 10.
+APPROVED by the owner 23/10/2026 15:53 AEDT: do not reword. Paste the block below in place of the 1.3.0 block when submitting 1.3.1. It names no other platform. The Partner Center "Additional license terms" step for this submission is go-live step 5a in section 10.
 
 ```text
 Notes written 23/10/2026 for Dictum 1.3.1.
@@ -499,7 +499,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 23/10/2026 | Dictum 1.3.0 tagged (v1.3.0 on b8b072d, 02:21 AEDT); GitHub release published by the workflow (run 39803808616: Setup 184,697,595 bytes, zip 237,203,246 bytes, test msix 240,149,267 bytes); dictum.kynni.au deployed at 02:33 AEDT with version.json 1.3.0. |
 | 23/10/2026 | Store package Dictum-1.3.0-store.msix built from b8b072d: 240,138,818 bytes, SHA-256 C9F759E471802A99AEB22C18B46BD073DEC79FD7FFC9AFEB931EC5BE346210C2, manifest 1.3.0.0, unsigned (the Store signs); staged for the owner's upload. Tester notes CHANGED paragraph still PROPOSED. Store screenshot 1 and the landing-page panel are still to be captured by the owner on a PC with a microphone. |
 | 23/10/2026 | Dictum 1.3.0 (Submission 4) passed certification and is live in the Store (about 08:30 AEDT, as reported to this lane by the orchestrator's Partner Center check that day; this lane could not read Partner Center and did not re-check it). |
-| 23/10/2026 | Dictum 1.3.1 prepared (version bump, GitHub release notes, tester notes and What's new); all new wording is PROPOSED until the owner approves it. Contents: the Terms of Use acceptance on first start (upgrades included), the Store licence field, About's Terms of use and Third-party notices buttons, Storage naming its folders more precisely, Calibration's Downloading wording, Qwen2.5-3B removed from the catalogue, the Offline only description, the cloud consent dialogs saying what hands-free mode sends, the command-line Terms gate, the installer licence page, the rewritten Privacy Policy and the Terms page. "Additional license terms" is still to be set in Partner Center at submission. |
+| 23/10/2026 | Dictum 1.3.1 prepared (version bump, GitHub release notes, tester notes and What's new); the What's new and tester notes were approved by the owner 23/10/2026 15:53 AEDT. Contents: the Terms of Use acceptance on first start (upgrades included), the Store licence field, About's Terms of use and Third-party notices buttons, Storage naming its folders more precisely, Calibration's Downloading wording, Qwen2.5-3B removed from the catalogue, the Offline only description, the cloud consent dialogs saying what hands-free mode sends, the command-line Terms gate, the installer licence page, the rewritten Privacy Policy and the Terms page. "Additional license terms" is still to be set in Partner Center at submission. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
