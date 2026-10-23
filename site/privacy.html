@@ -87,6 +87,7 @@
     <div class="card">
       <h3>Windows, settings folder (<code>%APPDATA%\Dictum</code>)</h3>
       <ul>
+        <!-- PROPOSED 23/10/2026: "settings.json: your settings, and which version of the Terms of Use you accepted, with the account name (your Windows or macOS user name) that accepted it." -->
         <li><code>settings.json</code>: your settings.</li>
         <li><code>consent.json</code>: which cloud service you agreed to, its address, the time and the Dictum version. Dictum writes it only when you agree in a consent step. Switching an option off removes its agreement, and the file is deleted when none is left; if Dictum cannot change it then, it tells you and tries again.</li>
         <li><code>dictionary.txt</code>, <code>corrections.txt</code> and <code>snippets.txt</code>: your names, terms, fixes and snippets, if you add any.</li>
@@ -127,8 +128,9 @@
     <h3>Cloud clean-up: <code>api.anthropic.com</code> (off by default)</h3>
     <p>Only if you set the clean-up provider to Anthropic, add your own API key and agree in the consent step. After each dictation, Dictum then sends Anthropic, with your key, the text of that dictation. With it go Dictum’s clean-up instructions (including any instructions of your own), your dictionary terms and, in hands-free mode, up to ten words of what you said just before. Anthropic handles that data under its own terms and privacy policy. If you also set a custom address for this provider, the same data and your Anthropic key go to that address instead. This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.</p>
 
+    <!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword (this heading and its paragraph; the marker sits above the heading because CloudWarningAndPresetsTests reads the paragraph straight after it; O9, "your PC" to "your computer" twice) -->
     <h3>OpenAI-compatible service (off by default)</h3>
-    <p>Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it. This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.</p>
+    <p>Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your computer, for example Ollama at localhost, nothing leaves your computer unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it. This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.</p>
     <!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword (the sentence added after the pinned OpenAI-compatible paragraph) -->
     <p>In hands-free mode, up to ten words of what you said just before go with each dictation’s text.</p>
 
@@ -149,8 +151,8 @@
     <p>We checked these pages on that date; we do not keep checking them. Read the current page of the service you choose.</p>
 
     <h3>This website: <code>dictum.kynni.au</code></h3>
-    <!-- APPROVED 22/10/2026 20:47 AEDT (plain-words route added) -->
-    <p>Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.</p>
+    <!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword (O10; replaces the 22/10/2026 20:47 AEDT sentence) -->
+    <p>Only when you open the privacy policy, the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct download for Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by the Store.</p>
 
     <h3>Offline only</h3>
     <p>With Offline only turned on in Settings &gt; Privacy, Dictum never connects to anything outside your computer. Downloads, Check for updates, cloud clean-up, cloud speech and servers that are not on your computer are all refused. A clean-up or speech server running on your own computer still works. You can copy model files in instead of downloading them.</p>
