@@ -297,7 +297,7 @@ Dictate: see "Moving from Dictate".
    self-contained: no .NET install is needed.
 4. **Mac (beta): `Dictum-<version>-osx-arm64.zip`** from the same releases, for Apple Silicon Macs on macOS 15 or later. Check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it and move `Dictum.app` to Applications. It is signed and notarised, so it opens normally. Dictum lives in the menu bar; on first use macOS asks for Microphone access and for Accessibility access (to see the hotkey and to paste into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app. Intel Macs are not supported.
 
-<!-- PROPOSED 23/10/2026 (legal block): the Terms of Use line (its words are in neither section C nor section D of the block) -->
+<!-- APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword (the Terms of Use line) -->
 Dictum's Terms of Use: https://dictum.kynni.au/terms (shown on first start).
 
 **The direct download needs the Microsoft Visual C++ Redistributable (x64), version 14.51 or later**, unless its
@@ -1119,11 +1119,13 @@ the word you said survives, to be masked or left as it is.
 clipboard features can share text Dictum pastes (Privacy Policy, section 2). Dictum opens a network connection only in
 these cases, and only to these hosts:
 
+<!-- APPROVED by the owner 23/10/2026 13:57 AEDT (legal strings block 2): do not reword (the two dictum.kynni.au rows below: the Mac beta beside the direct download, and the Terms of Use among the pages that open) -->
+
 | When | Host |
 |---|---|
 | Only when you ask for a model download (the Welcome to Dictum window's speech step, a choice only when base.en is not on the PC; the tray panel's Speech model, Clean-up or Mode, Settings > Models, calibration's Download and include, missing-model prompt, `--download-model`, `--download-cleanup-model`, `install.ps1 -Model`, `scripts\download-model.ps1`) | `huggingface.co`, which redirects to its CDN (observed `us.aws.cdn.hf.co` on 15/10/2026; the CDN host can vary by region). The download names the file; nothing about you or your dictation is sent. Only `download-model.ps1` can send something more: your Hugging Face token, and only for a gated model. |
-| Only when you click **Check for updates** in Settings > About (the direct download; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
-| Only when you open the privacy policy, Dictum in plain words (`/plain-words`) or the full guide from Settings (About, Privacy, Help) | `dictum.kynni.au`: the page opens in your own browser; Dictum itself makes no request. |
+| Only when you click **Check for updates** in Settings > About (the direct download for Windows and the Mac beta; the Store build has no such button, because the Store updates it) | `dictum.kynni.au`: one HTTPS GET of `/version.json` (the latest version number and its release notes), with no query string and no header of Dictum's own, so nothing about you or your dictation is sent. It goes through its own client, built like the model-download one (the `offline_only` guard, TLS 1.2), follows no redirect, does not retry, and gives up after 10 seconds. If a newer version is out, **Open the download page** opens https://github.com/kynniau/dictum/releases/latest in your browser. |
+| Only when you open the privacy policy, Dictum in plain words (`/plain-words`), the Terms of Use (from the Welcome window or Settings > About) or the full guide from Settings (About, Privacy, Help) | `dictum.kynni.au`: the page opens in your own browser; Dictum itself makes no request. |
 | After each dictation, only if you switch cloud clean-up on in Settings > Clean-up, agree to the host in the consent step, and a key is set | `api.anthropic.com` (the raw transcript and the system prompt, which includes your dictionary terms and, in hands-free, up to 10 words of what you said in the last part: taken before corrections, the profanity filter and snippets, so never their text), or the host in `llm.base_url` if you set one. The `ANTHROPIC_BASE_URL` environment variable is deliberately ignored, so a variable set for other tools cannot redirect transcripts or the key. |
 | After each dictation (each part in hands-free), only if you switch cloud speech on in Settings > Models, agree to the host in its own consent step, and a key is set where the service needs one | the host in `speech.base_url` (`api.openai.com`, an Azure OpenAI resource at `*.openai.azure.com`, `api.groq.com` or your own `https://` server): that dictation's audio as WAV, your dictionary terms as a hint, and in hands-free the carried words |
 | After each dictation, only if you set up an `openai-compatible` server (one off this PC also needs the consent step and `https://`) | the host in `llm.base_url` (the same text). With `localhost`, Dictum's request stays on this PC; what that server does with it is up to the server. |
@@ -1312,7 +1314,7 @@ warns, and that file has no size or hash to be checked against. A value is never
 
 `--transcribe` and `--bench-cleanup` are ways of using Dictum, so they run only once the account they run as has accepted
 the Terms of Use in the app (`terms.accepted` and `terms.accepted_by` in settings.json, see "First run"). Before that they
-print "Start Dictum once and press Continue to accept its Terms of Use." (PROPOSED 23/10/2026) and exit 1. `--selftest`,
+print "Start Dictum once and press Continue to accept its Terms of Use." (APPROVED by the owner 23/10/2026 13:20 AEDT, legal strings block 2: do not reword) and exit 1. `--selftest`,
 `--download-model`, `--download-cleanup-model` and `--print-models-dir` are for administrators and build checks and are not
 gated.
 

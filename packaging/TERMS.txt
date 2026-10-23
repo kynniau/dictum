@@ -144,4 +144,4 @@ Dictum for Mac beta. The Mac beta is signed with our Apple Developer ID and nota
 
 16. Contact
 
-Kynni Pty Ltd, Australia. Email hello@kynni.com.au. Dictum's source code and release files are at github.com/kynniau/dictum.
+Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia. Email hello@kynni.com.au. Dictum's source code and release files are at github.com/kynniau/dictum.

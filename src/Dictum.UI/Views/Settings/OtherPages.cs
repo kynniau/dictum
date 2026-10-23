@@ -206,7 +206,7 @@ internal sealed class PrivacyPage : SettingsPage
     private readonly ToggleSwitch _history;
     private readonly ToggleSwitch _transcripts;
 
-    /// <summary>The Offline only switch's description. PROPOSED 23/10/2026 (legal block, section D item 4).</summary>
+    /// <summary>The Offline only switch's description. APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword.</summary>
     internal const string OfflineOnlyDescription =
         "No network at all: downloads, Check for updates, cloud clean-up and cloud speech are refused; a server on this PC still works.";
 
@@ -222,7 +222,7 @@ internal sealed class PrivacyPage : SettingsPage
             Ui.Card(Ui.Stack(8, _speechSummary, Ui.Stack(2, _cleanupCaption, _summary),
                 Ui.Text($"Models download from {ModelCatalog.DownloadHost} only when you choose one, and each file's size and SHA-256 are checked before use.", "caption")), "What leaves this PC"),
             Ui.Card(Ui.Stack(4,
-                // PROPOSED 23/10/2026 (legal block, section D item 4): names Check for updates and cloud speech, and the server on this PC.
+                // APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword (names Check for updates and cloud speech, and the server on this PC).
                 Ui.Line("Offline only", _offline, OfflineOnlyDescription),
                 Ui.Line("Keep dictations out of clipboard history", _history, "Windows clipboard history (Win+V) and cloud clipboard sync."),
                 Ui.Line("Write dictated text to the log", _transcripts, "Off by default. For troubleshooting; the log stays on this PC.")), "Settings"),
@@ -326,7 +326,7 @@ internal sealed class AboutPage : SettingsPage
             Ui.Card(Ui.Stack(10,
                 Ui.Text("Report a problem opens an email to " + AppShell.SupportEmail + " in your own mail app, with the version and models filled in. " +
                         "Dictum sends nothing itself and never attaches what you dictated."),
-                // Terms of use and Third-party notices (legal block, 23/10/2026; PROPOSED labels, TermsText): five buttons wrap on a narrow window.
+                // Terms of use and Third-party notices (legal block; labels in TermsText, APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword): five buttons wrap on a narrow window.
                 new WrapPanel
                 {
                     ItemSpacing = 8,

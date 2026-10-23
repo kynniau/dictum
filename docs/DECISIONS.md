@@ -6226,3 +6226,72 @@ so this one PR applies them. Approved strings change only where the brief said; 
    last recorded run was 2698 total, 2657 passed; the two extra tests are the consistency test and the `plain-words.html` footer row
    (inferred from the test names, not measured on a main checkout).
    - **Not run:** a Release build, the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests.
+
+## Legal strings block 2: approved labels, captions, contact details (23/10/2026 14:11 AEDT, branch legal/strings)
+
+The owner approved sections 1 to 4 of the legal strings basis document at 13:20 AEDT on 23/10/2026, chose option (a) of its
+section 5 at 13:50, supplied the contact facts at 13:51 (Kynni Pty Ltd, ACN 700 150 956, Suite 402, 88 Phillip Street,
+Parramatta NSW 2150) and approved applying the O9 and O10 wording to three more surfaces at 13:57. This one PR applies all of it.
+Each changed place carries `APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword` (13:50, 13:51 or
+13:57 where the approval was then); JSON carries no markers, so this entry records the two demo captions.
+
+1. **Flipped to APPROVED, text unchanged (13:20).** Settings > About buttons "Terms of use" and "Third-party notices"
+   (`TermsText.AboutTermsLabel`, `NoticesLabel`); the Offline only description "No network at all: downloads, Check for updates,
+   cloud clean-up and cloud speech are refused; a server on this PC still works." (`OtherPages.OfflineOnlyDescription`); the Gemma
+   note "Gemma Terms of Use apply (ai.google.dev/gemma/terms)" (`CleanupCatalog.GemmaNote`; `ModelCoordinator.SelectCleanup` reads it
+   through `LicenceNote` and carries no marker of its own); the CLI line "Start Dictum once and press Continue to accept its Terms of
+   Use." (`CliCommands.TermsNotAccepted`, and the README sentence that quotes it); README's "Dictum's Terms of Use: https://dictum.kynni.au/terms
+   (shown on first start)."; TRADEMARKS.md's last line "See the Terms of Use at https://dictum.kynni.au/terms."; both meta
+   descriptions (privacy.html, terms.html; not pinned, as briefed).
+2. **Changed (13:20).**
+
+   | Where | Old | New |
+   |---|---|---|
+   | `OnboardingText.WelcomeNext` | The next few steps take a minute or two. Press Next to begin. | The next few steps take a minute or two. Press Continue to begin. |
+   | `docs/STORE.md`, TO DICTATE opening | on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then | on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then |
+   | `site/help.html`, first-run Welcome step | Click Next. | Click Continue. |
+   | `site/privacy.html` section 3, `settings.json` item | `settings.json`: your settings. | `settings.json`: your settings, and which version of the Terms of Use you accepted, with the account name (your Windows or macOS user name) that accepted it. |
+   | `scripts/demos/install.json`, step after the licence step | Setup opens. Click Next. | Setup moves on. Click Next. |
+   | `site/plain-words.html`, "What we cannot take responsibility for", first paragraph | Dictum is free and we give it to you as it is. We say it in plain words: we have built it with care, | Dictum is free and we give it to you as it is. We have built it with care, |
+
+   - The `STORE.md` PROPOSED note under the 1.2.1 notes block became an APPROVED note; row 17's appended sentence is flipped.
+   - The first-run Welcome caption and the install licence caption were already the approved text; `docs/DEMOS.md` marks both
+     (and "Setup moves on. Click Next.") APPROVED and records the approval at the top.
+   - **Not applied literally: the plain-words tidy.** The owner's document says the paragraph then "starts 'Dictum is free. We have
+     built it with care, …'", but the live paragraph starts "Dictum is free and we give it to you as it is." (the open point "as it is
+     remains", `Legal block, app side`, item 15). Only the five words "We say it in plain words: " were dropped, with "we" capitalised
+     as in the quoted result. "and we give it to you as it is" is untouched: removing it is a further change nobody has approved.
+3. **Section 5 (13:50).** `OnboardingText.WelcomeText`, last sentence: "Everything happens on this PC." becomes "Everything happens
+   on this PC unless you turn on a cloud option." No test held the old sentence literally (they read the constant).
+4. **Contact lines (13:51).** `site/terms.html` and `packaging/TERMS.txt` section 16: "Kynni Pty Ltd, Australia. Email …" becomes
+   "Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia. Email …" (rest unchanged;
+   `TermsTextConsistencyTests` ties the two copies). `site/privacy.html` section 12: "Kynni Pty Ltd, Australia, www.kynni.com.au"
+   becomes "Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia, www.kynni.com.au". The
+   mailto and GitHub links are as they were. The Terms stay "Version 1, last updated 23/10/2026" (same day; inferred that no
+   version bump is wanted for a contact detail; say if the owner wants one).
+5. **O9 and O10 on the landing page and the README (13:57).**
+   - `site/index.html`, "A server you name" card: "your PC" becomes "your computer" twice, so the clause equals the policy's
+     (`CloudWarningAndPresetsTests.ApprovedLocalServerClause` now equals `ApprovedPolicyLocalServerClause`, asserted).
+   - `site/index.html`, `dictum.kynni.au` card: now the policy's O10 sentence word for word ("Only when you open the privacy policy,
+     the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct download for
+     Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by the
+     Store."). `UpdateCheckTests` pins it equal to `PrivacySiteSentence`; the test is `The_landing_page_card_for_dictum_kynni_au_says_the_same`
+     again; the `SiteStoreFirstTests` sentence pin carries the new sentence.
+   - **The direct-download gate flagged index.html** (the new sentence contains the exempted phrase), so
+     `SiteStoreFirstTests.No_page_explains_the_direct_download_or_the_warning` now exempts exactly one use on `index.html` as well
+     as exactly four on `privacy.html`; a second use on the landing page still fails.
+   - `README.md` network table: the Check for updates row now says "(the direct download for Windows and the Mac beta; …)" and the
+     privacy-policy row "Only when you open the privacy policy, Dictum in plain words (`/plain-words`), the Terms of Use (from the
+     Welcome window or Settings > About) or the full guide from Settings (About, Privacy, Help)"; its pinned start is unchanged.
+6. **New pins** (`OwnerApprovalsTests`, one per surface): the two Welcome lines, the README and TRADEMARKS lines, the STORE
+   TO DICTATE opening, the help page step, the privacy `settings.json` item, the two contact sections, the demo captions and the
+   two README rows. Changed pins: `PlainWordsTests` (the paragraph and a count of the 13:20 marker), `TermsAcceptanceTests`
+   (section 16 of TERMS.txt), `CloudWarningAndPresetsTests`, `UpdateCheckTests`, `SiteStoreFirstTests` (above).
+7. **Still PROPOSED (unchanged here).** The Mac copy block and everything else marked PROPOSED on main.
+8. **What it might break, and how to verify.** Copy, comments and test pins; the only program-code changes are two string
+   constants (`WelcomeNext`, `WelcomeText`). A person who read the old Welcome step sees "Continue" and the cloud qualifier;
+   the landing page now mentions the Terms of Use, and it is not deployed until the gated release. Verify: `dotnet test Dictum.sln`
+   and `git diff --word-diff`.
+9. **Gates.** `dotnet test Dictum.sln` (Debug, 14:11 to 14:20 AEDT, on the final tree): 2708 total, 2667 passed, 0 failed, 41 skipped (the previous entry recorded 2700, 2659, 0, 41 on main; the eight extra are the new `OwnerApprovalsTests` facts). `PublicCopyNeutralityTests`: 3 of 3 passed.
+   - **Mutation checks (observed failing, 23/10/2026, 14:11, each file restored byte for byte and compared):** with every changed string put back to its old text at once (Welcome lines, README lines and rows, TRADEMARKS line, STORE TO DICTATE opening, help step, privacy `settings.json` item, the three contact sections, install caption, plain-words words, both index.html cards), 27 tests failed (the 8 new facts, `PlainWordsTests` whole-page, `TermsAcceptanceTests` section 16, `CloudWarningAndPresetsTests` server clause, `UpdateCheckTests` card, `SiteStoreFirstTests` sentence pin and the direct-download gate, which counts exactly one use on index.html). `TermsTextConsistencyTests` did not fail because both Terms copies were reverted together; it was not mutated one-sided in this PR.
+   - **Not run:** a Release build, the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests. Settings > About and the Welcome window were not looked at on screen.
