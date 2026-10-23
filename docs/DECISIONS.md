@@ -6294,3 +6294,68 @@ Each changed place carries `APPROVED by the owner 23/10/2026 13:20 AEDT (legal s
 9. **Gates.** `dotnet test Dictum.sln` (Debug, 14:11 to 14:20 AEDT, on the final tree): 2708 total, 2667 passed, 0 failed, 41 skipped (the previous entry recorded 2700, 2659, 0, 41 on main; the eight extra are the new `OwnerApprovalsTests` facts). `PublicCopyNeutralityTests`: 3 of 3 passed.
    - **Mutation checks (observed failing, 23/10/2026, 14:11, each file restored byte for byte and compared):** with every changed string put back to its old text at once (Welcome lines, README lines and rows, TRADEMARKS line, STORE TO DICTATE opening, help step, privacy `settings.json` item, the three contact sections, install caption, plain-words words, both index.html cards), 27 tests failed (the 8 new facts, `PlainWordsTests` whole-page, `TermsAcceptanceTests` section 16, `CloudWarningAndPresetsTests` server clause, `UpdateCheckTests` card, `SiteStoreFirstTests` sentence pin and the direct-download gate, which counts exactly one use on index.html). `TermsTextConsistencyTests` did not fail because both Terms copies were reverted together; it was not mutated one-sided in this PR.
    - **Not run:** a Release build, the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests. Settings > About and the Welcome window were not looked at on screen.
+
+## Mac copy block: Mac words on the platform seam, Windows strings unchanged (23/10/2026 15:06 AEDT, branch mac/copy-block)
+
+The owner approved at 14:06 AEDT on 23/10/2026 the Mac copy block (written 14:02 AEDT from the Mac session's findings in the demo
+guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built as one change.
+
+1. **The rule (APPROVED).** Where an approved Windows string says "this PC", "your PC", "Windows", "Start menu" or "Win+V", the Mac
+   build shows the same sentence with the Mac word in that place. Nothing else in the sentence changes. The Windows build is untouched.
+2. **The rows (each APPROVED by the owner 23/10/2026 14:06 AEDT, marked in the code "(Mac copy block, row N): do not reword").**
+
+   | # | Surface | Windows (unchanged) | Mac | Where |
+   |---|---|---|---|---|
+   | 1 | Settings > Storage, folder row once a model folder is chosen | "Logs, calibration recordings" | the same words (PR #71's PROPOSED string, approved as is) | `StoragePage.DataFolderRow` (ModelPages.cs) |
+   | 2 | Settings > Storage, Remove everything | "…the Start menu shortcut and the launch-at-login entry, then the program itself." | "…the login item, then the program itself." | `IRemovalSteps.StartupItemsPhrase` (Mac RemovalSteps.cs; PR #71's PROPOSED string) |
+   | 3 | Welcome step 1 | "Everything happens on this PC unless you turn on a cloud option." | "…on this Mac…" | `OnboardingText.WelcomeText(words)` |
+   | 4 | Welcome step 2 | "Dictum keeps its speech models on this PC." | "…on this Mac." | `OnboardingText.FolderText(words)`, `FolderTextNotIncluded(words)` |
+   | 5 | Welcome hotkey step, intro | "…the box shows exactly what Windows receives." | "…what macOS receives." | `HotkeyCheck.Intro(words)` (Dialogs.cs) |
+   | 6 | Hotkey capture box | "Windows received: Right Option up" | "macOS received: Right Option up" | `HotkeyCaptureBox.Received(words, key)` |
+   | 7 | Welcome hotkey step, Remote Desktop caption | "On a Mac over Remote Desktop use the right Option key (Right Alt) or right Command (Right Win)." | not shown | `PlatformWords.ShowsRemoteDesktopNote` (OnboardingSteps.cs `HotkeyStep`) |
+   | 8 | Menu-bar panel footer | "Nothing leaves this PC" | "Nothing leaves this Mac" | `FlyoutWindow.NothingLeavesLine(words)` |
+   | 9 | Settings > Privacy, default line | "Nothing leaves this PC: speech recognition and clean-up both run here." | "Nothing leaves this Mac: …" | `PrivacyPage.NothingLeavesLine(words)` (OtherPages.cs) |
+   | 10 | Settings > Privacy, clipboard caption | "Windows clipboard history (Win+V) and cloud clipboard sync." | "Clipboard managers that follow the concealed-item convention, and Universal Clipboard to your other devices." | `PlatformWords.ClipboardHistoryCaption` |
+   | 11 | Calibration window, intro | "…in Dictum's folder on this PC (Settings > Storage lists it)…" | "…on this Mac…" | `CalibrationWindow.RecordingsNote(words)` |
+   | 12 | Settings > Help, "How do I remove Dictum completely?" | the Windows paragraph, unchanged | "It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys and its login item, then closes and moves Dictum.app to the Trash, unless its first warning says it cannot." | `PlatformWords.RemoveAnswer`, `HelpText.QuestionsFor(words)` |
+
+   Not in this block (the owner's file, section 3): the site help page (one text for both platforms, keeps "PC") and the Mac App
+   Store listing.
+3. **The seam.** One record, `Dictum.Platform.PlatformWords(ThisDevice, OsName, ClipboardHistoryCaption, RemoveAnswer,
+   ShowsRemoteDesktopNote)`, handed out by a new `IPlatform.Words`: `WindowsPlatform` returns `PlatformWords.Windows`,
+   `MacPlatform` returns `PlatformWords.Mac` (both in Dictum.Core, plain strings, no platform code; ArchitectureTests still pass).
+   The Windows values are the approved Windows words byte for byte. The call sites compose their sentence from the words; none
+   branches on the operating system. Two answers cannot be made by swapping a word (rows 10 and 12), so the record holds the whole
+   sentence; row 2's phrase already lived on `IRemovalSteps`. Row 7 hides the caption (`IsVisible`) rather than removing it, so the
+   Windows step is laid out as before. `HelpText.Questions` stays the Windows list (HelpPageTests and the site twin read it);
+   `QuestionsFor(words)` swaps only the remove answer's last paragraph and keeps every other entry as the same object. The test
+   fake (`FakePlatform.Words`) defaults to the Windows words, so every existing window test sees what it saw before.
+4. **Pins** (`MacCopyBlockTests`, 17 tests): one per row, each a theory over both word sets where the row is on a window, asserting
+   the composed string and the window built on the fake platform with those words (the onboarding window, the capture box, the
+   panel, Settings > Privacy and Help, the calibration window); rows 1 and 2 as plain facts (row 2 through the real
+   `WindowsPlatform` and `MacPlatform` removal steps, so it runs on Windows, where MacShellTests' "the login item" pin is skipped);
+   and one that each platform hands out its own words. Existing pins changed only to call the composed form with
+   `PlatformWords.Windows` (OnboardingTests, OwnerApprovalsTests, PlainWordsTests, TermsAcceptanceTests, PolishTests); the
+   PROPOSED notes on rows 1 and 2 in ModelFolderTests and MacShellTests now say APPROVED.
+5. **Mutation checks (observed failing, 23/10/2026 between 14:55 and 15:05 AEDT, source restored with `git checkout` after each).**
+   Mac side, each call site put back to its pre-change literal: rows 1 (the row's word changed), 2, 3, 5, 6, 8, 9, 11 and 12 at
+   once, then rows 4, 7 and 10 on their own; every `(mac: True)` case and the row 1 and 2 facts failed (17 run, 9 failed, then 3).
+   Windows side, the Windows words changed: ThisDevice, OsName, the caption, the remove answer and the note flag at once (18 of 280
+   failed, among them OwnerApprovalsTests, CloudSpeechUiTests, CleanupOffTests, UiWindowTests, PolishTests, OnboardingTests and
+   every `(mac: False)` case), then the caption, the note flag and FolderText alone (5 of 73 failed: rows 4, 7 and 10), then the
+   Windows startup phrase (row 2 failed).
+6. **Left open, not applied (outside the twelve rows; owner decision):** Settings > General shows the same Remote Desktop caption
+   under the hotkey box (GeneralPages.cs, `HotkeyCheck.MacNote`), still shown on a Mac. Other Mac-visible "this PC" / "Windows"
+   strings this change did not touch, seen while working (not an exhaustive sweep): the Welcome speech step's "A model that is not
+   on this PC yet…" (`OnboardingText.SpeechChoice`), the calibration results hint "…per 10 s of speech on this PC…", Settings >
+   Privacy's card titles "What leaves this PC" and "Kept on this PC", its "the log stays on this PC" caption and the Offline only
+   description ("a server on this PC"), the panel's "Clean-up via a server on this PC", `CloudPolicy.TrayLine` ("text leaves this
+   PC"), `SpeechPolicy.DeclineButton` ("Keep speech on this PC"), and Help's "your Windows build" (FeedbackNote) and "on this PC"
+   (How Dictum works).
+7. **What it might break, and how to verify.** Windows: nothing visible; every Windows string is pinned byte for byte. The Mac
+   build shows the twelve surfaces in Mac words; nothing here ran on a Mac. Verify: `dotnet test Dictum.sln`; on the Mac, open the
+   twelve surfaces listed in the PR.
+8. **Gates.** `dotnet test Dictum.sln` (Debug, 15:07 to 15:15 AEDT, on the final tree): 2725 total, 2684 passed, 0 failed, 41
+   skipped (the previous entry recorded 2708, 2667, 0, 41 on main; the 17 new tests are MacCopyBlockTests). PublicCopyNeutralityTests
+   3 of 3 passed. **Not run:** a Release build, the installed app, tray mode, a Mac, and the 41 gated tests (MacShellTests' 11
+   among them, skipped off a Mac).
