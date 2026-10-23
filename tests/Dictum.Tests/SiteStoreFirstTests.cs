@@ -93,13 +93,24 @@ public sealed class SiteStoreFirstTests
     [InlineData("img/demos/install")]
     public void No_page_explains_the_direct_download_or_the_warning(string phrase)
     {
-        // One exemption, for exactly one phrase: the privacy policy's name for that build, "the direct download for Windows" (legal block,
-        // APPROVED by the owner 23/10/2026 09:50 AEDT), names the build and explains nothing, but contains "Download for Windows" case-blind.
-        // It is removed whole before the scan, so a "Download for Windows" button or any other use still fails. Mutations (observed failing,
-        // 23/10/2026): "Download for Windows." added to site/terms.html; and, with this exemption removed, site/privacy.html fails.
+        // One exemption, on privacy.html only and for exactly three uses of one phrase: the policy's "in the direct download for Windows and in the
+        // Mac beta" (legal block, APPROVED by the owner 23/10/2026 09:50 AEDT; once with a capital "In", starting section 5) names the build and
+        // explains nothing, but contains "Download for Windows" case-blind. Those three are removed before the scan, so a fourth use, the phrase on
+        // any other page, or a "Download for Windows" button still fails. Mutations (observed failing, 23/10/2026): "Download for Windows." added to
+        // site/terms.html; "Prefer the direct download for Windows? It is on GitHub" added to site/index.html; "Get the direct download for Windows
+        // from our GitHub releases." added to site/help.html; a fourth use added to site/privacy.html; and, with this exemption removed,
+        // site/privacy.html fails.
+        var policyName = new Regex("[Ii]n the direct download for Windows and in the Mac beta");
         foreach (var page in Pages)
-            Assert.False(VisibleHtml(page).Replace("direct download for Windows", "", StringComparison.Ordinal).Contains(phrase, StringComparison.OrdinalIgnoreCase),
-                $"site/{page} still says \"{phrase}\"");
+        {
+            var html = VisibleHtml(page);
+            if (page == "privacy.html")
+            {
+                Assert.Equal(3, policyName.Matches(html).Count);
+                html = policyName.Replace(html, "");
+            }
+            Assert.False(html.Contains(phrase, StringComparison.OrdinalIgnoreCase), $"site/{page} still says \"{phrase}\"");
+        }
     }
 
     [Theory]
@@ -244,6 +255,7 @@ public sealed class SiteStoreFirstTests
         Assert.Single(Regex.Matches(html, Regex.Escape(lead)));
         var list = html[start..html.IndexOf("</ul>", start, StringComparison.Ordinal)];
         Assert.Contains($"<li>{bullet}</li>", list, StringComparison.Ordinal); // the bullets hold no character HTML escapes
+        Assert.Single(Regex.Matches(html, Regex.Escape($"<li>{bullet}</li>"))); // a copy of it in the not-liable list fails
     }
 
     /// <summary>The replaced lines are gone from the page that had them (each quoted in the PR body and DECISIONS).</summary>
@@ -284,8 +296,7 @@ public sealed class SiteStoreFirstTests
     public void No_page_names_a_word_public_copy_may_not_name(string page)
     {
         var text = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page));
-        foreach (var word in PublicCopyNeutralityTests.Words)
-            Assert.False(text.Contains(word, StringComparison.OrdinalIgnoreCase), $"site/{page} names \"{word}\"");
+        Assert.Empty(PublicCopyNeutralityTests.Offences($"site/{page}", text)); // the sweep's own rule, not a copy of it
     }
 
     [Fact]

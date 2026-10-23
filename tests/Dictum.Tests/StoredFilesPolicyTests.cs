@@ -69,4 +69,23 @@ public sealed class StoredFilesPolicyTests
             Assert.True(policy.Contains(written, StringComparison.Ordinal), $"site/privacy.html does not name {name}, which Dictum stores");
         }
     }
+
+    /// <summary>
+    /// The other way round: every file name the policy's storage section writes as code (a .json, .txt or .env name with a stem) is one the
+    /// registry stores, so the policy cannot list a file Dictum does not keep. Mutation (observed failing, 23/10/2026): a fake
+    /// <c>history.json</c> item added to the section.
+    /// </summary>
+    [Fact]
+    public void Every_file_the_privacy_policy_lists_is_one_Dictum_stores()
+    {
+        var policy = Regex.Replace(File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "privacy.html")), "<!--.*?-->", "", RegexOptions.Singleline);
+        const string open = "<section aria-labelledby=\"where\">";
+        var start = policy.IndexOf(open, StringComparison.Ordinal);
+        Assert.True(start >= 0, "site/privacy.html has no storage section");
+        var section = policy[start..policy.IndexOf("</section>", start, StringComparison.Ordinal)];
+        var listed = Regex.Matches(section, @"<code>([\w.-]+\.(json|txt|env))</code>").Select(m => m.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("settings.json", listed); // the scan really reads the list
+        var stored = FromRegistry().Select(n => n.Split('/')[^1]).ToHashSet(StringComparer.Ordinal);
+        Assert.Empty(listed.Where(name => !stored.Contains(name)).Order(StringComparer.Ordinal));
+    }
 }
