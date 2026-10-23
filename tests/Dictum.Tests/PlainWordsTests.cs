@@ -129,7 +129,7 @@ public sealed class PlainWordsTests
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         var texts = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
-        var at = texts.IndexOf(OnboardingText.WelcomeText);
+        var at = texts.IndexOf(OnboardingText.WelcomeText(Dictum.Platform.PlatformWords.Windows));
         Assert.True(at >= 0, "the approved Welcome text is not shown");
         Assert.Equal(ShortVersion, texts.Skip(at + 1).Take(ShortVersion.Length));
         Assert.Equal(OnboardingText.WelcomeNext, texts[at + 1 + ShortVersion.Length]);

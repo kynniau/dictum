@@ -53,6 +53,17 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ToggleSwitch _trailing;
     private readonly ToggleSwitch _restore;
 
+    /// <summary>
+    /// The Remote Desktop caption under the hotkey box: it describes reaching a Windows PC from a Mac, so it is not shown on a Mac (the
+    /// Mac copy block's rule, APPROVED by the owner 23/10/2026 14:06 AEDT, row 7 marker).
+    /// </summary>
+    private TextBlock MacNote()
+    {
+        var note = Ui.Text(HotkeyCheck.MacNote, "caption");
+        note.IsVisible = Shell.Platform.Words.ShowsRemoteDesktopNote;
+        return note;
+    }
+
     public GeneralPage(AppShell shell) : base(shell, "General")
     {
         _enabled = Ui.Switch(true, on => Run(() => Shell.SetEnabled(on)));
@@ -95,7 +106,7 @@ internal sealed class GeneralPage : SettingsPage
                 _capture,
                 Ui.Row(8, _saveHotkey),
                 Ui.Text(MouseNote, "caption"),
-                Ui.Text(HotkeyCheck.MacNote, "caption")), "Hotkey"),
+                MacNote()), "Hotkey"),
             Ui.Card(Ui.Stack(10,
                 Ui.Line(HandsFreeLabel, _handsFreeLimit.Value, HandsFreeHelp),
                 _handsFreeLimit.Slider,

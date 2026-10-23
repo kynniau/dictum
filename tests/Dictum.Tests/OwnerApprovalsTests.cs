@@ -551,7 +551,7 @@ public class OwnerApprovalsTests
     public void The_welcome_step_lines_say_continue_and_the_cloud_qualifier()
     {
         Assert.Equal("Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. Everything happens on this PC unless you turn on a cloud option.",
-            Dictum.UI.Views.Onboarding.OnboardingText.WelcomeText);
+            Dictum.UI.Views.Onboarding.OnboardingText.WelcomeText(Dictum.Platform.PlatformWords.Windows));
         Assert.Equal("The next few steps take a minute or two. Press Continue to begin.", Dictum.UI.Views.Onboarding.OnboardingText.WelcomeNext);
     }
 

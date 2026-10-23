@@ -1,5 +1,6 @@
 using Dictum.Core;
 using Dictum.Llm;
+using Dictum.Platform;
 using Dictum.Settings;
 
 namespace Dictum.Help;
@@ -206,6 +207,16 @@ public static class HelpText
         "It uses your current settings. It pastes nothing, and the recording is never saved to disk.",
     ];
 
+    public const string RemoveQuestion = "How do I remove Dictum completely?";
+
+    /// <summary>
+    /// The questions as this platform's Help page shows them: <see cref="Questions"/> with the remove answer's last paragraph in the
+    /// platform's words (<see cref="PlatformWords.RemoveAnswer"/>; on a Mac APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 12):
+    /// do not reword). Every other entry is the same object.
+    /// </summary>
+    public static IReadOnlyList<HelpEntry> QuestionsFor(PlatformWords words) =>
+        [.. Questions.Select(q => q.Question == RemoveQuestion ? q with { Answer = [.. q.Answer.SkipLast(1), words.RemoveAnswer] } : q)];
+
     /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
     public static readonly IReadOnlyList<HelpEntry> Questions =
     [
@@ -276,12 +287,12 @@ public static class HelpText
         new(CloudQuestion, CloudAnswer),
         // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the own-instructions box (PR #60), next to the cloud clean-up setup it also applies to.
         new(OwnInstructionsQuestion, OwnInstructionsAnswer),
-        new("How do I remove Dictum completely?",
+        // The third paragraph is the platform's (PlatformWords.RemoveAnswer): the Windows words here, unchanged; QuestionsFor gives the Mac's.
+        new(RemoveQuestion,
         [
             "Open Settings > Storage. At the bottom, choose Remove Dictum completely…",
             "Dictum first lists everything it will delete, with sizes. Then it asks you to type DELETE to confirm.",
-            "It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys, its Start menu shortcut and its start-with-Windows entry, then closes. " +
-            "If you got Dictum from the Microsoft Store, Windows Settings then opens so you can uninstall the app itself; otherwise Dictum removes the program too, unless its first warning says it cannot.",
+            PlatformWords.Windows.RemoveAnswer,
         ]),
         new("Is Dictum free?",
         [

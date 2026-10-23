@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Dictum.Platform;
 using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views;
@@ -152,12 +153,14 @@ internal static class HotkeyCheck
 {
     public const string Heading = "Check your hotkey";
 
-    public const string Intro =
-        "Dictum records while you hold this key and pastes when you let go. Press it now: the box shows exactly what Windows " +
+    /// <summary>"…exactly what Windows receives"; on a Mac "macOS" (<see cref="PlatformWords.OsName"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 5): do not reword).</summary>
+    public static string Intro(PlatformWords words) =>
+        $"Dictum records while you hold this key and pastes when you let go. Press it now: the box shows exactly what {words.OsName} " +
         "receives, and the light comes on while the key is held. Press a different key, or a mouse button other than the left " +
         "one, to choose it instead.";
 
     /// <summary>The keys by the names the box shows them (HotkeyNames: "Right Alt"; until 1.2 polish, 22/10/2026, the settings tokens). APPROVED 22/10/2026.</summary>
+    /// <remarks>Not shown on the Welcome hotkey step on a Mac (<see cref="PlatformWords.ShowsRemoteDesktopNote"/>; Mac copy block, row 7, APPROVED by the owner 23/10/2026 14:06 AEDT).</remarks>
     public const string MacNote = "On a Mac over Remote Desktop use the right Option key (Right Alt) or right Command (Right Win).";
 
     public const string UseLabel = "Use this hotkey";

@@ -457,7 +457,7 @@ public sealed class ModelFolderTests : IDisposable
         dialogs.Folder = chosen;
         Click(ButtonNamed(window, StoragePage.ChangeLabel));
         Assert.Equal(chosen, shell.Settings.Models.Folder);
-        Assert.Equal("Logs, calibration recordings", StoragePage.DataFolderRow(modelFolderChosen: true)); // PROPOSED 23/10/2026
+        Assert.Equal("Logs, calibration recordings", StoragePage.DataFolderRow(modelFolderChosen: true)); // APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 1)
         Assert.Contains("Logs, calibration recordings", Texts(window));
         Assert.DoesNotContain("Models, logs", Texts(window));
         Assert.Single(All<Button>(window), b => AutomationProperties.GetName(b) == "Open the folder for Logs, calibration recordings");

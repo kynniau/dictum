@@ -22,6 +22,9 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
 {
     public const string DictationPrompt = "Listening: press the key or mouse button you want to hold for dictation.";
 
+    /// <summary>"Windows received: Right Alt down"; on a Mac "macOS received: …" (<see cref="PlatformWords.OsName"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 6): do not reword).</summary>
+    internal static string Received(PlatformWords words, string key) => $"{words.OsName} received: {key}";
+
     private readonly AppShell _shell;
     private readonly HotkeyCapture _capture = new();
     private readonly string _caption;
@@ -131,7 +134,7 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
     {
         _key.Text = _spec is not null ? HotkeyNames.Display(_spec) : Hotkey.Length > 0 ? Hotkey : "None";
         _received.Text = _monitor is null ? "Not listening. Press Change… to try a key."
-            : _capture.LastReceived is { } last ? $"Windows received: {last}"
+            : _capture.LastReceived is { } last ? Received(_shell.Platform.Words, last)
             : _prompt;
         var held = _monitor is not null && _capture.IsHeld(_spec);
         _light[!Shape.FillProperty] = new DynamicResourceExtension(held ? "DoneBrush" : "MeterOffBrush");

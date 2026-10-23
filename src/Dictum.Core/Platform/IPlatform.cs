@@ -16,6 +16,9 @@ public interface IPlatform
     /// <summary>"Windows" or "macOS", for the log, --selftest and the About page.</summary>
     string Name { get; }
 
+    /// <summary>The words the approved copy uses for this computer and its system: "this PC" / "this Mac" and the rest (Mac copy block, 23/10/2026).</summary>
+    PlatformWords Words { get; }
+
     // ---- App paths -------------------------------------------------------------------------------------------------
 
     /// <summary>Where Dictum keeps its files: settings and secrets (config), models, logs and recordings (local).</summary>
