@@ -36,6 +36,13 @@ internal sealed partial class CalibrationWindow : Window
     /// <remarks>On a Mac "this Mac" (<see cref="PlatformWords.ThisDevice"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 11): do not reword).</remarks>
     public static string RecordingsNote(PlatformWords words) => $"Nothing is uploaded: the recordings stay in Dictum's folder on {words.ThisDevice} (Settings > Storage lists it), so the test can be re-run when you add a model.";
 
+    /// <summary>
+    /// The results card's hint, first sentence: "…per 10 s of speech on this PC…"; on a Mac "this Mac" (<see cref="PlatformWords.ThisDevice"/>;
+    /// the rule of the Mac copy block, APPROVED by the owner 23/10/2026 14:06 AEDT, row 11 marker: do not reword).
+    /// </summary>
+    internal static string ResultsHintStart(PlatformWords words) =>
+        $"Recommended: lowest errors within {CalibrationRanking.CeilingSecondsPer10s} s per 10 s of speech on {words.ThisDevice}; within one point, the faster one. ";
+
     /// <summary>The button beside <see cref="RecordingsNote(PlatformWords)"/> (APPROVED 22/10/2026; proposed 1.2 polish).</summary>
     public const string OpenRecordingsLabel = "Open the recordings folder";
 
@@ -96,7 +103,7 @@ internal sealed partial class CalibrationWindow : Window
         counterRow.Children.AddRange([_counter, _dots]);
         var sentenceCard = Ui.Card(Ui.Stack(10, counterRow, _sentence, Ui.Row(10, _record, _skip, _holdHint), _takeStatus));
         var results = Ui.Card(Ui.Stack(8, ResultsGrid, Ui.Text(
-            $"Recommended: lowest errors within {CalibrationRanking.CeilingSecondsPer10s} s per 10 s of speech on this PC; within one point, the faster one. " +
+            ResultsHintStart(shell.Platform.Words) +
             "A recording shorter than 10 s counts as 10 s, because whisper's time per recording is mostly fixed.", "hint"),
             Ui.Row(8, _run, _cancel), _progress, Ui.Overline("Not installed"), MissingList), "Results so far");
         var top = Ui.Columns(2, 16, sentenceCard, results);

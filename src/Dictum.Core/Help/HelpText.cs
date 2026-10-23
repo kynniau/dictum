@@ -207,7 +207,6 @@ public static class HelpText
         "It uses your current settings. It pastes nothing, and the recording is never saved to disk.",
     ];
 
-    /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
     public const string RemoveQuestion = "How do I remove Dictum completely?";
 
     /// <summary>
@@ -218,6 +217,7 @@ public static class HelpText
     public static IReadOnlyList<HelpEntry> QuestionsFor(PlatformWords words) =>
         [.. Questions.Select(q => q.Question == RemoveQuestion ? q with { Answer = [.. q.Answer.SkipLast(1), words.RemoveAnswer] } : q)];
 
+    /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
     public static readonly IReadOnlyList<HelpEntry> Questions =
     [
         new("Where does my voice go?",

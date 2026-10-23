@@ -6344,14 +6344,15 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
    failed, among them OwnerApprovalsTests, CloudSpeechUiTests, CleanupOffTests, UiWindowTests, PolishTests, OnboardingTests and
    every `(mac: False)` case), then the caption, the note flag and FolderText alone (5 of 73 failed: rows 4, 7 and 10), then the
    Windows startup phrase (row 2 failed).
-6. **Left open, not applied (outside the twelve rows; owner decision):** Settings > General shows the same Remote Desktop caption
-   under the hotkey box (GeneralPages.cs, `HotkeyCheck.MacNote`), still shown on a Mac. Other Mac-visible "this PC" / "Windows"
-   strings this change did not touch, seen while working (not an exhaustive sweep): the Welcome speech step's "A model that is not
-   on this PC yet…" (`OnboardingText.SpeechChoice`), the calibration results hint "…per 10 s of speech on this PC…", Settings >
+6. **Follow-up block for the owner (Mac-visible "this PC" / "Windows" strings outside the twelve rows, not changed here).** Seen while
+   working (not an exhaustive sweep): the Welcome speech step's "A model that is not
+   on this PC yet…" (`OnboardingText.SpeechChoice`), Settings >
    Privacy's card titles "What leaves this PC" and "Kept on this PC", its "the log stays on this PC" caption and the Offline only
    description ("a server on this PC"), the panel's "Clean-up via a server on this PC", `CloudPolicy.TrayLine` ("text leaves this
    PC"), `SpeechPolicy.DeclineButton` ("Keep speech on this PC"), and Help's "your Windows build" (FeedbackNote) and "on this PC"
-   (How Dictum works).
+   (How Dictum works). The lens on 32c6c1e added these sites (its file:line on that commit, not re-checked here):
+   AppShell.Actions.cs:210-211, AppShell.CloudSpeech.cs:35 and :41, HelpText.cs:226-227, :249 and :275, GeneralPages.cs:451,
+   ModelPages.cs:27, :72 and :75, SimpleView.cs:44, :72 and :98, SpeechPolicy.cs:104, HowItWorksText.cs:19 and :70.
 7. **What it might break, and how to verify.** Windows: nothing visible; every Windows string is pinned byte for byte. The Mac
    build shows the twelve surfaces in Mac words; nothing here ran on a Mac. Verify: `dotnet test Dictum.sln`; on the Mac, open the
    twelve surfaces listed in the PR.
@@ -6367,3 +6368,10 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
    set to the Windows phrase (row 2 failed), and the Windows property returning another phrase (the Windows platform test failed).
    `dotnet test Dictum.sln` (Debug, 15:27 to 15:36 AEDT): 2727 total, 2685 passed, 0 failed, 42 skipped (the Mac platform test is
    the new skip on Windows).
+10. **Lens on 32c6c1e (Needs changes, no blockers), fixed 23/10/2026 16:03 AEDT.** The rule covers a string wherever it appears:
+   Settings > General's hotkey card now hides the same Remote Desktop caption on a Mac (`GeneralPage.MacNote()`, row 7 marker;
+   pin `Row07_the_general_page_hides_the_remote_desktop_note_on_a_mac`, observed failing with the `IsVisible` line removed:
+   "Expected: False, Actual: True"), and the calibration results hint says "…per 10 s of speech on this Mac…" on a Mac
+   (`CalibrationWindow.ResultsHintStart(words)`, row 11 marker; `Row11_…` extended to the hint, observed failing with "this PC"
+   put back). HelpText's "The questions, in order" summary is back above `Questions`. `dotnet test Dictum.sln` (Debug, 15:52 to
+   16:03 AEDT): 2729 total, 2687 passed, 0 failed, 42 skipped.

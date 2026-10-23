@@ -179,6 +179,17 @@ public sealed class MacCopyBlockTests
         shell.Dispose();
     });
 
+    /// <summary>Row 7's rule on Settings > General: the same Remote Desktop caption under the hotkey box is not shown on a Mac.</summary>
+    [Theory]
+    [MemberData(nameof(BothPlatforms))]
+    public Task Row07_the_general_page_hides_the_remote_desktop_note_on_a_mac(bool mac) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _) = Shell(scratch, mac);
+        Assert.Equal(!mac, PageLines(shell, "General").Contains(HotkeyCheck.MacNote));
+        shell.Dispose();
+    });
+
     /// <summary>Row 6: the capture box's "… received:" line. The key's name follows HotkeyNames.Dialect (the Mac build says "Right Option").</summary>
     [Theory]
     [MemberData(nameof(BothPlatforms))]
@@ -238,13 +249,15 @@ public sealed class MacCopyBlockTests
         shell.Dispose();
     });
 
-    /// <summary>Row 11: the calibration window's intro.</summary>
+    /// <summary>Row 11: the calibration window's intro, and (the rule, 23/10/2026 lens on 32c6c1e) its results hint.</summary>
     [Theory]
     [MemberData(nameof(BothPlatforms))]
     public Task Row11_the_calibration_intro_names_the_computer(bool mac) => UiSession.Run(() =>
     {
         var note = $"Nothing is uploaded: the recordings stay in Dictum's folder on {(mac ? "this Mac" : "this PC")} (Settings > Storage lists it), so the test can be re-run when you add a model.";
         Assert.Equal(note, CalibrationWindow.RecordingsNote(WordsFor(mac)));
+        var hint = $"Recommended: lowest errors within {Dictum.Calibration.CalibrationRanking.CeilingSecondsPer10s} s per 10 s of speech on {(mac ? "this Mac" : "this PC")}; within one point, the faster one. " +
+                   "A recording shorter than 10 s counts as 10 s, because whisper's time per recording is mostly fixed.";
 
         using var scratch = new Scratch();
         File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
@@ -252,6 +265,8 @@ public sealed class MacCopyBlockTests
         var window = new CalibrationWindow(shell);
         window.Show();
         Assert.Contains($"{CalibrationWindow.Framing} {note}", Visible(window));
+        Assert.Contains(hint, Visible(window));
+        Assert.DoesNotContain(Visible(window), t => t.Contains(mac ? "this PC" : "this Mac", StringComparison.Ordinal));
         window.Close();
         shell.Dispose();
     });
