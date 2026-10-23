@@ -5832,9 +5832,10 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
      Continue you agree to Dictum's Terms of Use." with "Terms of Use" a link to https://dictum.kynni.au/terms, and below that
      "The Privacy Policy explains what Dictum keeps and sends." with "Privacy Policy" a link to https://dictum.kynni.au/privacy.
      Both links open through `IPlatform.Open`, as Settings opens pages. The notice sits in the button row, not the scrolling
-     body, so it never scrolls away from Continue on a small screen. Each sentence is its row's accessible name, and on this
-     step Continue's help text is the acceptance sentence. Both were added in the lens round (item 16); at ca15ede this line
-     said the first and neither was set.
+     body, so it never scrolls away from Continue on a small screen. Each row reaches UI Automation as a group named with
+     its whole sentence, and on this step Continue's help text is the acceptance sentence (items 16 and 17). At ca15ede this
+     line said the rows were named, but nothing was set. At 5f878a6 the name was set, but a row (a WrapPanel) has Avalonia's
+     NoneAutomationPeer, so only Continue's help text reached UI Automation.
    - The words are `TermsText` constants in `src/Dictum.Core/Help/TermsText.cs`, which also holds the one Terms version,
      `TermsText.Version = "1"`.
    - **When it shows:** at every start until `settings.json` records `terms.accepted` = the version in force and
@@ -6043,12 +6044,14 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
     - **O15 on the page.** It now also applies to `site/plain-words.html` ("Dictum itself sends nothing you say off your
       computer unless you switch on a cloud option and agree to it. Dictum tells you what would be sent, and to where, before
       you agree.", with the new marker). The page pin and the marker count (7) follow. Item 15's O15 point is resolved.
-    - **Accessibility.** Each notice row's accessible name is its whole sentence. The Continue button's help text is the
-      acceptance sentence on step 1 and none on the later steps, so a screen-reader user hears the sentence with the button.
-      Item 1's "Each sentence is its line's accessible name" was not true at ca15ede; it is now.
+    - **Accessibility.** The Continue button's help text is the acceptance sentence on step 1 and none on the later steps, so
+      a screen-reader user hears the sentence with the button. Each notice row was given its sentence as its name, but at
+      5f878a6 that did not reach UI Automation: the re-lens found the row's peer is a NoneAutomationPeer. Item 17 fixes it,
+      and the pin now reads the peer.
     - **NAudio.** NAudio's upstream line is "Copyright 2008-2026 Mark Heath" (item 8, corrected there).
-    - **Store notes.** `docs/STORE.md`'s TO DICTATE tester note and row 17 now say to click Continue on the first step (it
-      accepts the Terms; closing or Esc there quits). PROPOSED 23/10/2026; the owner approves before the next submission.
+    - **Store notes.** Row 17 of `docs/STORE.md` gains a PROPOSED sentence about the Continue step (the owner approves it
+      before the next submission). At 5f878a6 the approved TO DICTATE tester sentence was also rewritten in place; item 17
+      restored it.
     - **Demo scripts.** Nine of `scripts/demos/*.json` click the Welcome window first, and that first click now targets
       Continue. `dictation-stills.json` has no Welcome click, and `install.json` only points at the Welcome window at its end.
       - `first-run.json`'s caption is now "Dictum explains how it works and links its Terms of Use. Click Continue."
@@ -6119,3 +6122,39 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
         `SiteStoreFirstTests.cs` (not touched here).
       - `PublicCopyNeutralityTests` was run again after this text.
       - **Not run:** the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests.
+17. **Re-lens on 5f878a6 (verdict Block; fixed by 13:06 AEDT).**
+    - **B1. Approved copy changed in place: restored.** The TO DICTATE tester sentence in `docs/STORE.md` is back to its text
+      on origin/main, byte for byte. Approved copy is changed only by the owner's yes, never in place by a lane or on an
+      orchestrator's instruction. The proposal sits beside it, after the 1.2.1 notes block: "replace TO DICTATE's opening,
+      up to "then click into any text field", with "on the first start Dictum opens a Welcome window. Click Continue on its
+      first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then
+      click Next through the other steps (or press Esc to skip them and keep the defaults), then"." (PROPOSED 23/10/2026;
+      the owner approves it before the next submission).
+    - **M1. The rows now reach UI Automation.** Each notice row (a WrapPanel) keeps its sentence as its name and is now set to
+      `AccessibilityView.Content` with the control type `Group`, so its peer is a named control element.
+      - `A_screen_reader_hears_the_acceptance_sentence_with_Continue` now reads the automation peers
+        (`ControlAutomationPeer.CreatePeerForElement`), not the attached properties. For each row it checks the peer is a
+        control element, that its name is the sentence and that its type is Group. For Continue it checks the peer's help
+        text.
+    - **m1. The refusal's stderr line is pinned.** `CliCommands.RefusedWithoutTerms` takes `TextWriter? error = null`,
+      the `PrintModelsDir` pattern. The pin reads it through a StringWriter: exactly the PROPOSED line and a new line when
+      refused, nothing when the Terms are accepted.
+    - **m2. DEMOS.md.** `docs/DEMOS.md`'s PROPOSED captions:
+      - Install gains step 5, "Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next.", and is
+        renumbered; its online-only note now says the video counts 8 steps.
+      - First-run step 4 is "Dictum explains how it works and links its Terms of Use. Click Continue.".
+      - The welcome-defaults sentence lists Continue first.
+    - **Observed failing (23/10/2026), each restored:**
+      - The two setters removed: the pin failed with "the row "By clicking Continue you agree to Dictum's Terms of Use." is
+        not in the automation tree".
+      - `SetAccessibilityView` alone removed: the same failure.
+      - `SetControlTypeOverride` alone removed: the pin first passed, so it gained the Group check, after which it failed
+        with "Expected: Group, Actual: None".
+      - The refusal's `WriteLine` removed: `Transcribe_and_bench_cleanup_refuse_until_the_Terms_are_accepted` failed with
+        "Strings differ, Expected: "Start Dictum once and press Continue to accept its"···".
+    - **Gates:**
+      - `dotnet test Dictum.sln` (Debug, 12:58 to 13:06 AEDT, on the tree committed here): 2698 total, 2657 passed, 0
+        failed, 41 skipped.
+      - `PublicCopyNeutralityTests` was run again after this text.
+      - **Not run:** a screen reader on a real desktop (the peers were read headless), the demos, Setup, a Mac, and the 41
+        gated tests.

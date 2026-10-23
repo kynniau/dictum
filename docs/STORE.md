@@ -346,7 +346,7 @@ NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside
 
 TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json (the bundled base.en model needs no copying; optionally copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder). Settings > Storage shows both folders. Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
-TO DICTATE: on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
+TO DICTATE: on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
 GENERATIVE AI: the clean-up step runs a local language model on the user's own dictated words only; it is instructed not to add or answer anything, its output is checked against the dictation, and users can report a problem from Settings (Report a problem), from 1.2, send feedback from Settings > Help (Send feedback or suggest a feature; both open an email in the user's own mail app, and Dictum sends nothing itself), or write by email.
 
@@ -359,7 +359,7 @@ The package contains profanity.txt, a word list used only by the optional profan
 Support: hello@kynni.com.au
 ```
 
-PROPOSED 23/10/2026 (legal block, lens on PR #76; the owner approves it before the next submission): the first sentence of TO DICTATE above now says to click Continue on the Welcome window's first step, which accepts Dictum's Terms of Use, and that closing the window or pressing Esc on that step quits Dictum. It was "on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then".
+PROPOSED 23/10/2026 (legal block, lens on PR #76; the owner approves it before the next submission): replace TO DICTATE's opening, up to "then click into any text field", with "on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then".
 
 ### Notes for certification: APPROVED for 1.3.0
 

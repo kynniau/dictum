@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
@@ -316,9 +317,10 @@ public sealed class TermsAcceptanceTests
     });
 
     /// <summary>
-    /// Pin (lens on PR #76, mutation-checked): a screen reader hears each notice row as its whole sentence, and the acceptance
-    /// sentence with the Continue button (its help text, as Settings > About's Check for updates carries its line); the next
-    /// step's button carries none.
+    /// Pin (lens on PR #76 and its re-lens, mutation-checked): a screen reader hears each notice row as its whole sentence, and the
+    /// acceptance sentence with the Continue button (its help text, as Settings > About's Check for updates carries its line); the
+    /// next step's button carries none. Read from the automation peers UI Automation sees, not from the attached properties: a
+    /// panel's own peer is Avalonia's NoneAutomationPeer, which drops the name.
     /// </summary>
     [Fact]
     public Task A_screen_reader_hears_the_acceptance_sentence_with_Continue() => UiSession.Run(() =>
@@ -331,9 +333,16 @@ public sealed class TermsAcceptanceTests
         Dispatcher.UIThread.RunJobs();
         try
         {
-            Assert.Equal(["By clicking Continue you agree to Dictum's Terms of Use.", "The Privacy Policy explains what Dictum keeps and sends."],
-                NoticeLines(window).Select(l => AutomationProperties.GetName(l)));
-            Assert.Equal("By clicking Continue you agree to Dictum's Terms of Use.", AutomationProperties.GetHelpText(window.PrimaryButton));
+            string[] sentences = ["By clicking Continue you agree to Dictum's Terms of Use.", "The Privacy Policy explains what Dictum keeps and sends."];
+            foreach (var (line, sentence) in NoticeLines(window).Zip(sentences))
+            {
+                var p = ControlAutomationPeer.CreatePeerForElement(line);
+                Assert.True(p.IsControlElement(), $"the row \"{sentence}\" is not in the automation tree");
+                Assert.Equal(sentence, p.GetName());
+                Assert.Equal(AutomationControlType.Group, p.GetAutomationControlType()); // a group, not a control of no type
+            }
+            Assert.Equal(2, NoticeLines(window).Count);
+            Assert.Equal("By clicking Continue you agree to Dictum's Terms of Use.", ControlAutomationPeer.CreatePeerForElement(window.PrimaryButton).GetHelpText());
             Click(window.PrimaryButton);
             Assert.IsNotType<WelcomeStep>(window.Current);
             Assert.Null(AutomationProperties.GetHelpText(window.PrimaryButton));
@@ -384,7 +393,8 @@ public sealed class TermsAcceptanceTests
 
     /// <summary>
     /// Pin (mutation-checked): --transcribe and --bench-cleanup, the two ways of using Dictum from the command line, refuse and exit
-    /// 1 until this account has accepted the Terms of Use in the app (the PROPOSED line on stderr, a line in the log); once it has,
+    /// 1 until this account has accepted the Terms of Use in the app (the PROPOSED line on stderr, read through a StringWriter, and a
+    /// line in the log); once it has,
     /// they go on past that check. The administrator and CI modes (--selftest, the downloads, --print-models-dir) are not gated.
     /// </summary>
     [Fact]
@@ -404,7 +414,13 @@ public sealed class TermsAcceptanceTests
             Assert.Equal(1, exit);
             Assert.Contains(log.Lines, l => l.Message == $"{mode} refused: settings.json records no acceptance of the Terms of Use version 1 by this account.");
         }
+        var error = new StringWriter(); // what the refusal prints on stderr: the PROPOSED line, and nothing else
+        Assert.True(CliCommands.RefusedWithoutTerms(scratch.Paths, new RecordingLog(), "--transcribe", error));
+        Assert.Equal(CliCommands.TermsNotAccepted + Environment.NewLine, error.ToString());
         File.WriteAllText(scratch.Paths.SettingsFile, Accepted(Account));
+        var none = new StringWriter();
+        Assert.False(CliCommands.RefusedWithoutTerms(scratch.Paths, new RecordingLog(), "--transcribe", none));
+        Assert.Equal("", none.ToString());
         foreach (var mode in new[] { "--transcribe", "--bench-cleanup" })
         {
             var log = new RecordingLog();

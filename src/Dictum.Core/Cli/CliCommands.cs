@@ -42,11 +42,12 @@ public static class CliCommands
     /// otherwise they print <see cref="TermsNotAccepted"/> and exit 1. The administrator and CI modes (--selftest,
     /// --download-model, --download-cleanup-model, --print-models-dir) are not gated (owner's decision, lens on PR #76). Called
     /// after the unreadable-settings check, whose own message is the more useful one for a file that cannot be read.
+    /// <paramref name="error"/> is stderr unless a test passes its own writer (as <see cref="PrintModelsDir"/> takes one).
     /// </summary>
-    internal static bool RefusedWithoutTerms(AppPaths paths, ILog log, string mode)
+    internal static bool RefusedWithoutTerms(AppPaths paths, ILog log, string mode, TextWriter? error = null)
     {
         if (!AppRules.AsksTerms(SettingsLoader.LoadFile(paths.SettingsFile), AppRules.Account)) return false;
-        Console.Error.WriteLine(TermsNotAccepted);
+        (error ?? Console.Error).WriteLine(TermsNotAccepted);
         log.Info($"{mode} refused: settings.json records no acceptance of the Terms of Use version {Help.TermsText.Version} by this account.");
         return true;
     }
