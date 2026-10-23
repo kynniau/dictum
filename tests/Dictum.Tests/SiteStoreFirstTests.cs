@@ -6,14 +6,15 @@ namespace Dictum.Tests;
 /// <summary>
 /// Site: Store-first (owner decision, 22/10/2026; docs/DECISIONS.md). The Microsoft Store is the one install path the site
 /// shows; there is no direct-download button, no SmartScreen or signing explanation, and one quiet footer line points pro
-/// users at GitHub. Also checks that every same-site anchor on the three pages lands on an id that exists.
+/// users at GitHub. Also checks that every same-site anchor on the site's pages lands on an id that exists. The legal block
+/// (APPROVED by the owner 23/10/2026 09:50 AEDT) added terms.html to every page-wide gate here.
 /// </summary>
 public sealed class SiteStoreFirstTests
 {
     private const string StoreUrl = "https://apps.microsoft.com/detail/9N0DG1DHTR57";
     private const string MacUrl = "https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0"; // the Mac beta announcement, APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword
     private const string GitHubLine = """Source code and release files are on <a href="https://github.com/kynniau/dictum">GitHub</a>.""";
-    private static readonly string[] Pages = ["index.html", "help.html", "privacy.html", "plain-words.html"];
+    private static readonly string[] Pages = ["index.html", "help.html", "privacy.html", "plain-words.html", "terms.html"];
 
     /// <summary>A page of the site without its HTML comments.</summary>
     private static string VisibleHtml(string page) =>
@@ -92,8 +93,13 @@ public sealed class SiteStoreFirstTests
     [InlineData("img/demos/install")]
     public void No_page_explains_the_direct_download_or_the_warning(string phrase)
     {
+        // One exemption, for exactly one phrase: the privacy policy's name for that build, "the direct download for Windows" (legal block,
+        // APPROVED by the owner 23/10/2026 09:50 AEDT), names the build and explains nothing, but contains "Download for Windows" case-blind.
+        // It is removed whole before the scan, so a "Download for Windows" button or any other use still fails. Mutations (observed failing,
+        // 23/10/2026): "Download for Windows." added to site/terms.html; and, with this exemption removed, site/privacy.html fails.
         foreach (var page in Pages)
-            Assert.False(VisibleHtml(page).Contains(phrase, StringComparison.OrdinalIgnoreCase), $"site/{page} still says \"{phrase}\"");
+            Assert.False(VisibleHtml(page).Replace("direct download for Windows", "", StringComparison.Ordinal).Contains(phrase, StringComparison.OrdinalIgnoreCase),
+                $"site/{page} still says \"{phrase}\"");
     }
 
     [Theory]
@@ -101,6 +107,7 @@ public sealed class SiteStoreFirstTests
     [InlineData("help.html")]
     [InlineData("privacy.html")]
     [InlineData("plain-words.html")]
+    [InlineData("terms.html")]
     public void Every_page_has_the_same_one_quiet_GitHub_line_in_its_footer(string page)
     {
         var html = VisibleHtml(page);
@@ -132,22 +139,30 @@ public sealed class SiteStoreFirstTests
     /// The release gate: no page of the site says the voice "never leaves" the PC without an "unless" in the same sentence, and none says the
     /// voice "stays" on or here, or is "turned into text on" the PC, without "unless" or "by default". Mutations (observed failing, 22/10/2026):
     /// "Your voice never leaves this PC." put back in site/help.html, section 7; and the privacy short version put back to "Your speech is turned into
-    /// text on your PC, and the text is tidied on your PC."
+    /// text on your PC, and the text is tidied on your PC." The legal block (APPROVED by the owner 23/10/2026 09:50 AEDT) made every pattern that
+    /// matches "PC" match "computer" too, since the pages now cover the Mac. Mutations (observed failing, 23/10/2026): "Your voice never leaves your
+    /// computer." and, separately, "Your speech is turned into text on your computer." added to site/terms.html; and, with the localhost exemption
+    /// below removed, site/privacy.html fails on its localhost sentence.
     /// </summary>
     [Theory]
     [InlineData("index.html")]
     [InlineData("help.html")]
     [InlineData("privacy.html")]
     [InlineData("plain-words.html")]
+    [InlineData("terms.html")]
     public void No_page_says_the_voice_never_leaves_the_PC_without_an_unless(string page)
     {
-        var sentences = Regex.Split(Prose(page), @"(?<=[.!?])\s+");
-        foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"never\s+leaves\s+(this|your)\s+PC", RegexOptions.IgnoreCase)))
+        // One exemption, for exactly one sentence of the privacy policy (legal block): it is about a clean-up server's http://localhost connection,
+        // not about the voice or the text leaving, and has no "unless" because there is none. It is removed whole before the scan, so any
+        // other "never leaves your computer" still needs its "unless".
+        const string localhostSentence = "A clean-up server on your own computer may use http://localhost, which never leaves your computer.";
+        var sentences = Regex.Split(Prose(page).Replace(localhostSentence, "", StringComparison.Ordinal), @"(?<=[.!?])\s+");
+        foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"never\s+leaves\s+(this|your)\s+(PC|computer)", RegexOptions.IgnoreCase)))
             Assert.True(s.Contains("unless", StringComparison.OrdinalIgnoreCase), $"site/{page} says \"{s}\" with no \"unless\" in the same sentence");
         foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"voice\s+(still\s+)?stays\s+(on|here)", RegexOptions.IgnoreCase)))
             Assert.True(s.Contains("unless", StringComparison.OrdinalIgnoreCase) || s.Contains("by default", StringComparison.OrdinalIgnoreCase),
                 $"site/{page} says \"{s}\" with neither \"unless\" nor \"by default\"");
-        foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"turned\s+into\s+text\s+on\s+(this|your(\s+own)?)\s+PC", RegexOptions.IgnoreCase)))
+        foreach (var s in sentences.Where(s => Regex.IsMatch(s, @"turned\s+into\s+text\s+on\s+(this|your(\s+own)?)\s+(PC|computer)", RegexOptions.IgnoreCase)))
             Assert.True(s.Contains("unless", StringComparison.OrdinalIgnoreCase) || s.Contains("by default", StringComparison.OrdinalIgnoreCase),
                 $"site/{page} says \"{s}\" with neither \"unless\" nor \"by default\"");
         Assert.DoesNotMatch(new Regex(@"never\s+sends?\s+it\s+anywhere\.", RegexOptions.IgnoreCase), Prose(page));
@@ -172,18 +187,106 @@ public sealed class SiteStoreFirstTests
     [InlineData("help.html", "are sent to the service you chose. Your voice still stays on this PC unless you also turn on cloud speech.")]
     [InlineData("help.html", "No. Nothing is trained, and your voice stays on this PC unless you turn on cloud speech. Calibrate my voice")]
     [InlineData("help.html", "Dictum goes online only when you ask it to. That means four things: downloading a model you choose; checking for updates, in the direct-download version; cloud clean-up, if you turn it on; cloud speech, if you turn it on. Offline only, in Settings > Privacy, stops all four.")]
-    [InlineData("privacy.html", "Your speech is turned into text on your PC, unless you turn on cloud speech, and the text is tidied on your PC.")]
-    [InlineData("privacy.html", "to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose.")]
-    [InlineData("privacy.html", "It is never written to disk, except the calibration recordings you make on purpose (below). With cloud speech on, the recording is sent to the service you chose and then discarded here.")]
-    [InlineData("privacy.html", "an API key, only if you add one for cloud clean-up or cloud speech.")]
+    // The legal block (APPROVED by the owner 23/10/2026 09:50 AEDT) replaced the policy's sentences pinned on the next four lines and on the last two
+    // privacy lines of this list; the new sentences are pinned in their place, word for word.
+    [InlineData("privacy.html", "Your speech is turned into text on your computer, unless you turn on cloud speech, and the text is tidied on your computer unless you turn on cloud clean-up.")]
+    [InlineData("privacy.html", "If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose.")]
+    [InlineData("privacy.html", "It is never saved to a file, except the calibration recordings you make on purpose (below). With cloud speech on, the recording is sent to the service you chose and then discarded here.")]
+    [InlineData("privacy.html", ".env: an API key, only if you add one for cloud clean-up or cloud speech. The direct download also reads a .env you place beside Dictum.exe.")]
     [InlineData("privacy.html", "Cloud speech (off by default) Only if you switch on cloud speech in Settings > Models, agree to the service in its own consent step and, for OpenAI, Azure OpenAI or Groq, add your own API key (a server you name may need none).")]
     [InlineData("privacy.html", "sends that dictation’s recording, as a WAV file, to the service you chose, together with the words in your personal dictionary as a hint and, in hands-free, the closing words of the part before.")]
     [InlineData("privacy.html", "The service is OpenAI (api.openai.com), Azure OpenAI ({resource}.openai.azure.com, your own resource), Groq (api.groq.com) or a custom https:// address you enter.")]
     [InlineData("privacy.html", "This is an advanced option: Dictum cannot validate or certify how that service stores, protects or uses your voice. Check its terms before dictating anything sensitive.")]
-    [InlineData("privacy.html", "downloads, cloud clean-up, cloud speech and servers that aren’t on your PC are all refused. A clean-up or speech server running on your own PC still works.")]
-    [InlineData("privacy.html", "Hugging Face, Anthropic, OpenAI, Azure OpenAI, Groq, Google Gemini and any server you name handle that under their own policies. Model downloads and requests to Anthropic, OpenAI, Azure OpenAI, Groq and Google Gemini use HTTPS.")]
+    [InlineData("privacy.html", "Downloads, Check for updates, cloud clean-up, cloud speech and servers that are not on your computer are all refused. A clean-up or speech server running on your own computer still works.")]
+    [InlineData("privacy.html", "Like any internet connection, each of these reveals your IP address (your internet address) to the server Dictum connects to. Each of them handles that under its own policy. Model downloads and requests to those services use HTTPS; Dictum refuses a plain http:// address for any service that is not on your own computer.")]
     public void The_cloud_speech_sentences_are_on_the_page(string page, string sentence) =>
         Assert.Contains(sentence, Prose(page), StringComparison.Ordinal);
+
+    // ---- The legal block: Terms of Use (new page) and the Privacy Policy rewrite, APPROVED by the owner 23/10/2026 09:50 AEDT: do not reword ----
+
+    /// <summary>
+    /// The sentences of the legal block that carry its legal weight, word for word on the page that carries them (prose: markup gone, so a bold lead
+    /// joins its sentence). Mutations (observed failing, 23/10/2026, one at a time): terms.html's section 9 cap sentence deleted; the same sentence
+    /// with "A$100 (one hundred Australian dollars)" changed to "A$1,000 (one thousand Australian dollars)"; section 4's "Section 9 does not reduce
+    /// any such guarantee, or what the law entitles you to if we fail to meet one." deleted.
+    /// </summary>
+    [Theory]
+    [InlineData("terms.html", "The law’s guarantees still apply. Depending on where you live, the law may give you guarantees about Dictum that cannot be excluded or limited by agreement, for example under the Australian Consumer Law. Nothing in these terms excludes, limits or changes any such guarantee or right. Section 9 does not reduce any such guarantee, or what the law entitles you to if we fail to meet one.")]
+    [InlineData("terms.html", "For any other loss, the most we will pay you, for all claims about Dictum or this website added together, is A$100 (one hundred Australian dollars).")]
+    [InlineData("terms.html", "if you live in the European Union, the United Kingdom or anywhere else whose law lets you sue at home, you can take a claim to your home courts. We can sue you only there.")]
+    [InlineData("terms.html", "Dictum for Mac beta. The Mac beta is signed with our Apple Developer ID and notarised so that macOS will open it. Notarisation does not mean that Apple has reviewed or approved Dictum; we, not Apple, are responsible for it, and Apple is not part of these terms. If there is an issue with malware, or if Apple revokes our certificate or the app’s notarisation ticket, Dictum for Mac may stop running; we will say so on dictum.kynni.au and on the release page.")]
+    [InlineData("privacy.html", "Dictum sends nothing about you to Kynni. It has no account, no analytics, no telemetry (automatic reports on how you use an app) and no crash reporting. We never receive your audio or your text unless you send it to us yourself.")]
+    [InlineData("privacy.html", "Your speech is turned into text on your computer, unless you turn on cloud speech, and the text is tidied on your computer unless you turn on cloud clean-up. Both are off until you switch them on and agree in their own consent step.")]
+    [InlineData("privacy.html", "Dictum goes online only when you ask it to: to download a model, or to check for updates in the direct download for Windows and in the Mac beta. If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose.")]
+    [InlineData("privacy.html", "What we do hold is small: the records our web host keeps of visits to this website, which we can see for one day (the host keeps its own copy for as long as it decides, section 7), and the emails you choose to send us.")]
+    [InlineData("privacy.html", "If you are in Australia. You can complain to us at hello@kynni.com.au. We are a small business that the Australian Privacy Principles do not currently cover, so the Office of the Australian Information Commissioner (oaic.gov.au) may not be able to deal with a complaint about us; we handle your information as this policy says regardless.")]
+    [InlineData("privacy.html", "When you email hello@kynni.com.au, we keep your email address, your name if you give it, and what you wrote, in our email account, which is hosted by Zoho Mail (Zoho Corporation) under Zoho’s privacy policy; Zoho may store it outside Australia, including in the United States.")]
+    [InlineData("index.html", "No subscription, no word limits. Dictum is open source under the MIT licence")]
+    [InlineData("index.html", "Every file Dictum downloads is checked against a fingerprint built into Dictum before it is used.")]
+    [InlineData("index.html", "The speech and tidy-up models are made by other organisations and carry their own licences, listed in the Terms of Use. The recommended tidy-up model, Qwen2.5 1.5B Instruct, is licensed Apache-2.0.")]
+    public void The_legal_block_sentences_are_on_the_page(string page, string sentence) =>
+        Assert.Contains(sentence, Prose(page), StringComparison.Ordinal);
+
+    /// <summary>
+    /// The three section 9 bullets that keep the law's remedies whole sit under "We never exclude or limit liability for:", in that list, word for
+    /// word: a bullet moved into the list of losses we are not liable for fails here although its words are still on the page.
+    /// </summary>
+    [Theory]
+    [InlineData("any guarantee, right or remedy (a way the law puts things right) that the law gives you and that cannot be excluded or limited by agreement, including under the Australian Consumer Law;")]
+    [InlineData("your right under the United Kingdom’s Consumer Rights Act 2015 to have a device or other digital content repaired, or to be paid for the damage, if Dictum damages it because we did not take reasonable care and skill;")]
+    [InlineData("anything we must pay under product-liability law (laws that make a maker pay for harm a faulty product causes) that cannot be limited by agreement;")]
+    public void The_terms_never_exclude_the_laws_remedies(string bullet)
+    {
+        var html = VisibleHtml("terms.html");
+        const string lead = "<p><strong>We never exclude or limit liability for:</strong></p>";
+        var start = html.IndexOf(lead, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"terms.html has no {lead}");
+        Assert.Single(Regex.Matches(html, Regex.Escape(lead)));
+        var list = html[start..html.IndexOf("</ul>", start, StringComparison.Ordinal)];
+        Assert.Contains($"<li>{bullet}</li>", list, StringComparison.Ordinal); // the bullets hold no character HTML escapes
+    }
+
+    /// <summary>The replaced lines are gone from the page that had them (each quoted in the PR body and DECISIONS).</summary>
+    [Theory]
+    [InlineData("index.html", "no upsell")]
+    [InlineData("index.html", "Every file is checked against a fingerprint")]
+    [InlineData("index.html", "which Dictum shows when you pick one")]
+    [InlineData("index.html", "Qwen2.5 3B is for non-commercial use only")]
+    [InlineData("help.html", "We collect nothing.")]
+    [InlineData("privacy.html", "We collect nothing.")]
+    [InlineData("privacy.html", "It is never written to disk")]
+    public void The_lines_the_legal_block_replaced_are_gone(string page, string old) =>
+        Assert.DoesNotContain(old, Prose(page), StringComparison.Ordinal);
+
+    /// <summary>The four pages this lane owns link to /terms from the footer, right after the privacy policy (plain-words joins in the follow-up).</summary>
+    [Theory]
+    [InlineData("index.html")]
+    [InlineData("help.html")]
+    [InlineData("privacy.html")]
+    [InlineData("terms.html")]
+    public void Every_page_links_to_the_terms_from_its_footer_after_the_privacy_policy(string page)
+    {
+        var html = VisibleHtml(page);
+        var footer = html[html.IndexOf("<footer", StringComparison.Ordinal)..];
+        var privacy = page == "privacy.html" ? " aria-current=\"page\"" : ""; // a page marks its own footer link as the current page
+        var terms = page == "terms.html" ? " aria-current=\"page\"" : "";
+        Assert.Matches(new Regex($"<li><a href=\"/privacy\"{privacy}>Privacy policy</a></li>\\s*<li><a href=\"/terms\"{terms}>Terms of use</a></li>"), footer);
+        Assert.Single(Regex.Matches(footer, "href=\"/terms\""));
+    }
+
+    /// <summary>No page of the site names one of the words public copy may not name (PublicCopyNeutralityTests sweeps every public file; this names the page).</summary>
+    [Theory]
+    [InlineData("index.html")]
+    [InlineData("help.html")]
+    [InlineData("privacy.html")]
+    [InlineData("plain-words.html")]
+    [InlineData("terms.html")]
+    public void No_page_names_a_word_public_copy_may_not_name(string page)
+    {
+        var text = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page));
+        foreach (var word in PublicCopyNeutralityTests.Words)
+            Assert.False(text.Contains(word, StringComparison.OrdinalIgnoreCase), $"site/{page} names \"{word}\"");
+    }
 
     [Fact]
     public void The_landing_page_badges_and_lines_say_by_default_and_the_og_text_names_cloud_speech()
@@ -222,7 +325,7 @@ public sealed class SiteStoreFirstTests
     public void Every_same_site_anchor_lands_on_an_id_that_exists()
     {
         var ids = Pages.ToDictionary(p => p, p => Regex.Matches(VisibleHtml(p), "\\sid=\"([^\"]+)\"").Select(m => m.Groups[1].Value).ToHashSet());
-        var route = new Dictionary<string, string> { ["/"] = "index.html", ["/help"] = "help.html", ["/privacy"] = "privacy.html", ["/plain-words"] = "plain-words.html" };
+        var route = new Dictionary<string, string> { ["/"] = "index.html", ["/help"] = "help.html", ["/privacy"] = "privacy.html", ["/plain-words"] = "plain-words.html", ["/terms"] = "terms.html" };
         foreach (var page in Pages)
             foreach (Match link in Regex.Matches(VisibleHtml(page), "href=\"(/[a-z-]*)?#([^\"]+)\""))
             {
