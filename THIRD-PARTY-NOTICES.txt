@@ -11,8 +11,8 @@ that folder ("Ships as"), its licence, and the licence text. Where a package car
 is reproduced unchanged. Where a package names only a licence identifier (MIT), the standard text for that identifier
 follows, with the copyright line exactly as the package's .nuspec gives it; where the .nuspec gives none, the entry
 says so. "(nuspec)" marks a value quoted from the package's .nuspec. "Copyright (upstream licence)" gives, beside it,
-the copyright line of the LICENSE file in the project's own source repository (llama.cpp, LLamaSharp, NAudio and
-Avalonia; read 23/10/2026 from each repository's master branch). The versions are those this build restored.
+the copyright line of the LICENSE file in the project's own source repository, read 23/10/2026: Avalonia at tag 11.3.22,
+LLamaSharp at v0.27.0, NAudio at v3.1.0, and llama.cpp on its master branch. The versions are those this build restored.
 Annexes A to C reproduce, unchanged except for line endings, the notices that Microsoft's and the .NET Foundation's
 packages carry for the material inside them.
 
@@ -517,7 +517,7 @@ Ships as: NAudio.Core.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): © Mark Heath 2026
-Copyright (upstream licence): Copyright 2020 Mark Heath
+Copyright (upstream licence): Copyright 2008-2026 Mark Heath
 Authors (nuspec): Mark Heath
 Project (nuspec): https://naudio.github.io/NAudio/
 Repository (nuspec): https://github.com/naudio/NAudio
@@ -550,7 +550,7 @@ Ships as: NAudio.Wasapi.dll
 Licence: MIT (nuspec licence expression). The package carries no licence file, so the standard text for that
     identifier is given below.
 Copyright (nuspec): © Mark Heath 2026
-Copyright (upstream licence): Copyright 2020 Mark Heath
+Copyright (upstream licence): Copyright 2008-2026 Mark Heath
 Authors (nuspec): Mark Heath
 Project (nuspec): https://naudio.github.io/NAudio/
 Repository (nuspec): https://github.com/naudio/NAudio

@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Dictum.App;
+using Dictum.Cli;
 using Dictum.Core;
 using Dictum.Help;
 using Dictum.Settings;
@@ -69,18 +71,18 @@ public sealed class TermsAcceptanceTests
     public void The_step_shows_until_this_account_has_accepted_the_version_in_force()
     {
         Assert.Equal("1", TermsText.Version);
-        Assert.True(AppRules.AsksTerms(SettingsLoader.LoadFile(Path.Combine(Path.GetTempPath(), "dictum-no-such-dir", "settings.json")), "kyle"));
-        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse("{}"), "kyle"));
-        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse(Upgrade), "kyle"));
-        var accepted = SettingsLoader.Parse(Accepted("kyle"));
-        Assert.False(AppRules.AsksTerms(accepted, "kyle"));
+        Assert.True(AppRules.AsksTerms(SettingsLoader.LoadFile(Path.Combine(Path.GetTempPath(), "dictum-no-such-dir", "settings.json")), "alex"));
+        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse("{}"), "alex"));
+        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse(Upgrade), "alex"));
+        var accepted = SettingsLoader.Parse(Accepted("alex"));
+        Assert.False(AppRules.AsksTerms(accepted, "alex"));
         Assert.Empty(accepted.Warnings);
-        Assert.Equal(("1", "kyle"), (accepted.Settings.Terms.Accepted, accepted.Settings.Terms.AcceptedBy));
+        Assert.Equal(("1", "alex"), (accepted.Settings.Terms.Accepted, accepted.Settings.Terms.AcceptedBy));
         Assert.True(AppRules.AsksTerms(accepted, "someone-else")); // an acceptance by another account does not count
-        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse(Accepted("kyle", version: "0")), "kyle")); // another version
-        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse("""{ "terms": { "accepted": "1" } }"""), "kyle")); // no account
-        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse(Accepted("KYLE")), "kyle")); // the name exactly as recorded: a doubt asks again
-        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse("{ not json"), "kyle")); // what it records is unknown
+        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse(Accepted("alex", version: "0")), "alex")); // another version
+        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse("""{ "terms": { "accepted": "1" } }"""), "alex")); // no account
+        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse(Accepted("ALEX")), "alex")); // the name exactly as recorded: a doubt asks again
+        Assert.True(AppRules.AsksTerms(SettingsLoader.Parse("{ not json"), "alex")); // what it records is unknown
     }
 
     // ---- The window ----
@@ -313,6 +315,107 @@ public sealed class TermsAcceptanceTests
         }
     });
 
+    /// <summary>
+    /// Pin (lens on PR #76, mutation-checked): a screen reader hears each notice row as its whole sentence, and the acceptance
+    /// sentence with the Continue button (its help text, as Settings > About's Check for updates carries its line); the next
+    /// step's button carries none.
+    /// </summary>
+    [Fact]
+    public Task A_screen_reader_hears_the_acceptance_sentence_with_Continue() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch();
+        var (shell, _, _) = scratch.Shell();
+        var flow = new OnboardingFlow(shell, SettingsLoader.LoadFile(scratch.Paths.SettingsFile), askCleanup: true);
+        var window = new OnboardingWindow(flow);
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            Assert.Equal(["By clicking Continue you agree to Dictum's Terms of Use.", "The Privacy Policy explains what Dictum keeps and sends."],
+                NoticeLines(window).Select(l => AutomationProperties.GetName(l)));
+            Assert.Equal("By clicking Continue you agree to Dictum's Terms of Use.", AutomationProperties.GetHelpText(window.PrimaryButton));
+            Click(window.PrimaryButton);
+            Assert.IsNotType<WelcomeStep>(window.Current);
+            Assert.Null(AutomationProperties.GetHelpText(window.PrimaryButton));
+        }
+        finally
+        {
+            window.Close();
+            shell.Dispose();
+        }
+    });
+
+    // ---- A settings.json that cannot record the acceptance (lens on PR #76) ----
+
+    /// <summary>
+    /// Pin (mutation-checked): a settings.json that is read-only, or that does not parse, cannot record the acceptance. Continue
+    /// still starts Dictum (the person did agree); the file is left as it was; the warning is logged once, not once per try;
+    /// and the next start asks again, because nothing is recorded.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task A_settings_file_that_cannot_record_the_acceptance_starts_warns_once_and_asks_again(bool readOnly) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(readOnly ? Upgrade : "{ not json");
+        OnboardingTests.Bundle(scratch);
+        var before = File.ReadAllBytes(scratch.Paths.SettingsFile);
+        if (readOnly) File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+        var log = new RecordingLog();
+        var (shell, _, dialogs) = scratch.Shell(OnboardingTests.FakeModels(), log: log);
+        try
+        {
+            Assert.True(shell.Start(lifetime: null));
+            Assert.Equal(1, dialogs.TermsWindows);
+            Assert.True(dialogs.LastOnboarding!.TermsAccepted);
+            Assert.False(dialogs.LastOnboarding.TermsRecorded);
+            Assert.Equal(before, File.ReadAllBytes(scratch.Paths.SettingsFile));
+            Assert.Single(log.Lines, l => l.Message.Contains("settings.json could not record it", StringComparison.Ordinal));
+            Assert.True(AppRules.AsksTerms(SettingsLoader.LoadFile(scratch.Paths.SettingsFile), AppRules.Account)); // the next start asks again
+        }
+        finally
+        {
+            shell.Dispose();
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal);
+        }
+    });
+
+    // ---- The command line (lens on PR #76: the owner's decision) ----
+
+    /// <summary>
+    /// Pin (mutation-checked): --transcribe and --bench-cleanup, the two ways of using Dictum from the command line, refuse and exit
+    /// 1 until this account has accepted the Terms of Use in the app (the PROPOSED line on stderr, a line in the log); once it has,
+    /// they go on past that check. The administrator and CI modes (--selftest, the downloads, --print-models-dir) are not gated.
+    /// </summary>
+    [Fact]
+    public async Task Transcribe_and_bench_cleanup_refuse_until_the_Terms_are_accepted()
+    {
+        Assert.Equal("Start Dictum once and press Continue to accept its Terms of Use.", CliCommands.TermsNotAccepted);
+        using var scratch = new Scratch(Upgrade);
+        var input = Path.Combine(scratch.Root.FullName, "input.wav");
+        File.WriteAllText(input, "not audio"); // never read while the Terms are not accepted
+        foreach (var mode in new[] { "--transcribe", "--bench-cleanup" })
+        {
+            var log = new RecordingLog();
+            var options = CliOptions.Parse([mode, input]).Options!;
+            var exit = mode == "--transcribe"
+                ? await CliCommands.TranscribeAsync(options, scratch.Paths, log, new SecretRedactor())
+                : await BenchCleanupCommand.RunAsync(options, scratch.Paths, log, new SecretRedactor());
+            Assert.Equal(1, exit);
+            Assert.Contains(log.Lines, l => l.Message == $"{mode} refused: settings.json records no acceptance of the Terms of Use version 1 by this account.");
+        }
+        File.WriteAllText(scratch.Paths.SettingsFile, Accepted(Account));
+        foreach (var mode in new[] { "--transcribe", "--bench-cleanup" })
+        {
+            var log = new RecordingLog();
+            var options = CliOptions.Parse([mode, input]).Options!;
+            _ = mode == "--transcribe"
+                ? await CliCommands.TranscribeAsync(options, scratch.Paths, log, new SecretRedactor())
+                : await BenchCleanupCommand.RunAsync(options, scratch.Paths, log, new SecretRedactor());
+            Assert.DoesNotContain(log.Lines, l => l.Message.Contains("refused: settings.json records no acceptance", StringComparison.Ordinal));
+        }
+    }
+
     // ---- Settings (section D items 3 and 4; PROPOSED 23/10/2026) ----
 
     /// <summary>
@@ -409,4 +512,14 @@ public sealed class TermsAcceptanceTests
         foreach (var markup in new[] { "**", "##", "[", "]", "Draft 3", "PROPOSED" })
             Assert.DoesNotContain(markup, terms, StringComparison.Ordinal);
     }
+}
+
+/// <summary>The Terms of Use accepted by the account the tests run as: for tests that reach a gated command-line mode.</summary>
+internal static class TestTerms
+{
+    /// <summary>The settings.json "terms" object, for an anonymous object that JsonSerializer writes.</summary>
+    public static object Record => new { accepted = TermsText.Version, accepted_by = AppRules.Account };
+
+    /// <summary>A settings.json that records the acceptance and nothing else.</summary>
+    public static string Json => JsonSerializer.Serialize(new { terms = Record });
 }

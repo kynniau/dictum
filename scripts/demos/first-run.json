@@ -29,9 +29,9 @@
     },
     {
       "id": "welcome",
-      "caption": "Dictum explains how it works. Click Next.",
+      "caption": "Dictum explains how it works and links its Terms of Use. Click Continue.",
       "lead": 3.5,
-      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } } ]
+      "do": [ { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Continue", "timeout": 120 } } ]
     },
     {
       "id": "folder",

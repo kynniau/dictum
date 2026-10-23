@@ -33,6 +33,7 @@ internal static class OnboardingText
         "Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. " +
         "Everything happens on this PC.";
 
+    // PROPOSED 23/10/2026: "The next few steps take a minute or two. Press Continue to begin." (owner decision pending)
     public const string WelcomeNext = "The next few steps take a minute or two. Press Next to begin.";
 
     // ---- 2. Where to keep the model files ----

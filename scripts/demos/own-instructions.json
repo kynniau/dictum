@@ -6,7 +6,7 @@
     { "do": "plainDesktop" },
     { "do": "installSilently" },
     { "do": "launch" },
-    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next", "timeout": 120 } },
+    { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Continue", "timeout": 120 } },
     { "do": "wait", "seconds": 1.5 },
     { "do": "click", "target": { "window": "^Welcome to Dictum$", "type": "Button", "name": "Next" } },
     { "do": "wait", "seconds": 1.5 },

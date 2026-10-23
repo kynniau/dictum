@@ -52,7 +52,7 @@ public sealed class PlainWordsTests
             "Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence. That licence lets anyone use, copy and change Dictum, for free.",
             "How we protect you",
             "Your voice is turned into text on your own PC unless you turn on cloud speech. The text is tidied on your own PC.", // APPROVED 22/10/2026 22:05 AEDT (qualifier added)
-            "Nothing you say leaves your PC unless you switch on a cloud option and agree to it. Dictum tells you what would be sent, and to where, before you agree.",
+            "Dictum itself sends nothing you say off your computer unless you switch on a cloud option and agree to it. Dictum tells you what would be sent, and to where, before you agree.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O15)
             "Dictum refuses to send your words over an unencrypted connection to another computer.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O4)
             "Offline only, in Settings > Privacy, stops Dictum itself from connecting to any other computer at all.",
             "Every model file Dictum downloads is checked against a fingerprint built into Dictum. A file that does not match is not used.",
@@ -70,7 +70,7 @@ public sealed class PlainWordsTests
         Assert.Equal(expected, MainLines("plain-words.html"));
         Assert.Contains("APPROVED by the owner 22/10/2026 17:36 AEDT", Site("plain-words.html"));
         Assert.Contains("APPROVED 22/10/2026 20:45 AEDT (replaces the 17:36 sentence)", Site("plain-words.html"));
-        Assert.Equal(6, Regex.Matches(Site("plain-words.html"), Regex.Escape("APPROVED by the owner 23/10/2026 09:50 AEDT (legal block)")).Count); // O1 and O2, O3, O4, O5, O6, the footer link
+        Assert.Equal(7, Regex.Matches(Site("plain-words.html"), Regex.Escape("APPROVED by the owner 23/10/2026 09:50 AEDT (legal block)")).Count); // O1 and O2, O3, O4, O5, O6, O15, the footer link
     }
 
     /// <summary>Pin: the page prints no file path (the brief's code citations stay out of public copy).</summary>

@@ -153,8 +153,8 @@ public sealed partial class AppShell : IDisposable
     /// <summary>Raised on the UI thread whenever anything the tray panel or Settings show may have changed.</summary>
     public event Action? Changed;
 
-    /// <summary>The account whose acceptance of the Terms of Use counts (terms.accepted_by): the user name Dictum runs as.</summary>
-    internal static string Account => Environment.UserName;
+    /// <summary>The account whose acceptance of the Terms of Use counts (<see cref="AppRules.Account"/>).</summary>
+    internal static string Account => AppRules.Account;
 
     /// <summary>
     /// Builds the tray app. Returns false when the user chose Quit in the first-run picker, or closed the Welcome window before

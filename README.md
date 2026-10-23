@@ -297,7 +297,7 @@ Dictate: see "Moving from Dictate".
    self-contained: no .NET install is needed.
 4. **Mac (beta): `Dictum-<version>-osx-arm64.zip`** from the same releases, for Apple Silicon Macs on macOS 15 or later. Check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it and move `Dictum.app` to Applications. It is signed and notarised, so it opens normally. Dictum lives in the menu bar; on first use macOS asks for Microphone access and for Accessibility access (to see the hotkey and to paste into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app. Intel Macs are not supported.
 
-<!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): the Terms of Use line -->
+<!-- PROPOSED 23/10/2026 (legal block): the Terms of Use line (its words are in neither section C nor section D of the block) -->
 Dictum's Terms of Use: https://dictum.kynni.au/terms (shown on first start).
 
 **The direct download needs the Microsoft Visual C++ Redistributable (x64), version 14.51 or later**, unless its
@@ -568,7 +568,7 @@ whose HEAD answers 401), hashes and commits from the HF API (`https://huggingfac
 | gemma-3-1b | Google | `google/gemma-3-1b-it-qat-q4_0-gguf` / `gemma-3-1b-it-q4_0.gguf` | 1,003,541,152 | Gemma Terms of Use | **requires a Hugging Face login**; size-checked only; not tested here |
 | gemma-3-4b | Google | `google/gemma-3-4b-it-qat-q4_0-gguf` / `gemma-3-4b-it-q4_0.gguf` | 3,155,051,328 | Gemma Terms of Use | **requires a Hugging Face login**; wants a GPU; size-checked only; not tested here |
 
-No model on the list is under a non-commercial licence. `qwen2.5-3b`, under the Qwen Research License (non-commercial use only), was removed from it on 23/10/2026; with `llm.model` = `qwen2.5-3b` Dictum now logs that the name is not on its list and uses the recommended `qwen2.5-1.5b` instead (the rule-based tidy until that is downloaded), as for any other unknown name. Pickers and menus show "Gemma Terms of Use apply (ai.google.dev/gemma/terms)" beside the two Gemma models.
+No model on the list is under a non-commercial licence. `qwen2.5-3b`, under the Qwen Research License (non-commercial use only), was removed from it on 23/10/2026; with `llm.model` = `qwen2.5-3b` Dictum now logs that the name is not on its list and uses the recommended `qwen2.5-1.5b` instead (the rule-based tidy until that is downloaded), as for any other unknown name. A downloaded `qwen2.5-3b-instruct-q4_k_m.gguf` (2.1 GB) stays where it is: Settings > Storage no longer lists it and Dictum does not delete it, so delete it from the models folder yourself. Pickers and menus show "Gemma Terms of Use apply (ai.google.dev/gemma/terms)" beside the two Gemma models.
 
 SHA-256:
 
@@ -1281,7 +1281,7 @@ Dictum.exe                                   tray mode
 Dictum.exe --transcribe <file.wav> [--no-llm] print "raw: ..." (and, unless --no-llm, "cleaned: ..." and "final: ...",
                                               the text the tray app would paste after the corrections and the
                                               profanity filter), with the dictionary in both prompts; exit 0, or 1
-                                              when settings.json cannot be read
+                                              when settings.json cannot be read or the Terms of Use are not accepted
 Dictum.exe --selftest                        speech and cleanup models with their runtimes, recommendations, the
                                               active Mode preset, decoding, personal file counts, offline_only,
                                               microphones, hotkey, key presence (never values); exit 0/1
@@ -1289,7 +1289,8 @@ Dictum.exe --download-model <name>           download a speech model (e.g. small
 Dictum.exe --download-cleanup-model <name>   the same for a cleanup model (e.g. qwen2.5-1.5b)
 Dictum.exe --bench-cleanup <file.wav|file.txt> every downloaded cleanup model (and --cleanup-model's file) over the
                                               same input: output, time, validator verdict, side by side (a .wav is
-                                              transcribed first); an unreadable file exits 1
+                                              transcribed first); an unreadable file exits 1, and so does a run
+                                              before the Terms of Use are accepted
 Dictum.exe --print-models-dir                the folder the app downloads models to (models.folder, else its
                                               earlier name whisper.models_dir, else the default); install.ps1 uses it
 Dictum.exe ... --model <name|path>           use this speech model for this launch only
@@ -1308,6 +1309,12 @@ warns, and that file has no size or hash to be checked against. A value is never
 
 `Dictum.exe` is a Windows GUI program, so PowerShell does not wait for it unless you pipe the output:
 `.\Dictum.exe --selftest | Out-Host`. Diagnostics go to stderr, results to stdout.
+
+`--transcribe` and `--bench-cleanup` are ways of using Dictum, so they run only once the account they run as has accepted
+the Terms of Use in the app (`terms.accepted` and `terms.accepted_by` in settings.json, see "First run"). Before that they
+print "Start Dictum once and press Continue to accept its Terms of Use." (PROPOSED 23/10/2026) and exit 1. `--selftest`,
+`--download-model`, `--download-cleanup-model` and `--print-models-dir` are for administrators and build checks and are not
+gated.
 
 ## Troubleshooting
 

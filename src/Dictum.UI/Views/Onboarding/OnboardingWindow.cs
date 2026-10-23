@@ -218,7 +218,8 @@ internal sealed class OnboardingWindow : Window
     /// the platform), and the text after it, side by side, each centred on the row. Not a control inside the text's own run
     /// (InlineUIContainer): rendered headless on 23/10/2026, that sat the link about 5 px above the line and, with the body's
     /// fixed line height, clipped the text under it. The link takes the body text size, so it reads as part of the sentence;
-    /// on a window too narrow for the sentence the link moves to the next row.
+    /// on a window too narrow for the sentence the link moves to the next row. The whole sentence is the row's accessible name
+    /// (lens on PR #76): its parts alone read as fragments.
     /// </summary>
     private static WrapPanel TermsLine(string sentence, string link, Action open)
     {
@@ -231,6 +232,7 @@ internal sealed class OnboardingWindow : Window
             part.VerticalAlignment = VerticalAlignment.Center;
             line.Children.Add(part);
         }
+        AutomationProperties.SetName(line, sentence);
         return line;
     }
 
@@ -299,6 +301,8 @@ internal sealed class OnboardingWindow : Window
         _secondary.IsVisible = step.SecondaryVisible;
         _back.IsVisible = step.AllowsBack && _index > 0;
         _terms.IsVisible = step is WelcomeStep;
+        // A screen reader says the acceptance sentence with the Continue button (lens on PR #76), as About's Check for updates says its line.
+        AutomationProperties.SetHelpText(_primary, step is WelcomeStep ? TermsText.Acceptance : null);
     }
 
     /// <summary>This window's body text size (the theme's is <see cref="ThemeBodySize"/>).</summary>

@@ -47,6 +47,8 @@ public sealed class OnboardingFlow
     /// <summary>settings.json records the acceptance (terms.accepted and terms.accepted_by).</summary>
     public bool TermsRecorded { get; private set; }
 
+    private bool _recordTried;
+
     /// <summary>
     /// Continue on the first step: the Terms of Use version in force is accepted. It is recorded in settings.json at once when
     /// the file exists; a new install's has none yet, so its record is written with the speech answer, which creates the file in
@@ -62,11 +64,12 @@ public sealed class OnboardingFlow
     /// Once the Terms are accepted: writes terms.accepted (<see cref="TermsText.Version"/>) and terms.accepted_by (this
     /// account) in one write, keeping every other key; then nothing more. The shell calls it after the first run's own answer
     /// too, for a launch with a model override and no settings.json yet. A file that cannot be written keeps no record: Dictum
-    /// goes on this time and asks again at the next start.
+    /// goes on this time and asks again at the next start; the write is tried once, so the warning is logged once.
     /// </summary>
     internal void RecordTerms()
     {
-        if (!TermsAccepted || TermsRecorded) return;
+        if (!TermsAccepted || TermsRecorded || _recordTried) return;
+        _recordTried = true; // one try: again later only when settings.json did not exist at Continue (lens on PR #76: a refused write warned twice)
         var record = new JsonObject { ["accepted"] = TermsText.Version, ["accepted_by"] = AppShell.Account };
         TermsRecorded = SettingsFile.SetValue(_shell.Paths.SettingsFile, "terms", record, out var failure);
         if (TermsRecorded) _shell.Log.Info($"Terms of Use version {TermsText.Version} accepted; recorded in settings.json.");

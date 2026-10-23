@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Dictum.App;
 using Dictum.Audio;
 using Dictum.Core;
 using Dictum.Llm;
@@ -29,6 +30,27 @@ public static class CliCommands
         return 0;
     }
 
+    /// <summary>
+    /// PROPOSED 23/10/2026 (legal block, lens on PR #76): what --transcribe and --bench-cleanup print, on stderr, before they exit 1
+    /// while this account has not accepted the Terms of Use in the app (<see cref="RefusedWithoutTerms"/>).
+    /// </summary>
+    public const string TermsNotAccepted = "Start Dictum once and press Continue to accept its Terms of Use.";
+
+    /// <summary>
+    /// The two command-line modes a person uses Dictum with (--transcribe, --bench-cleanup) run only once settings.json records
+    /// this account's acceptance of the Terms of Use version in force (<see cref="AppRules.AsksTerms"/>, the tray app's rule);
+    /// otherwise they print <see cref="TermsNotAccepted"/> and exit 1. The administrator and CI modes (--selftest,
+    /// --download-model, --download-cleanup-model, --print-models-dir) are not gated (owner's decision, lens on PR #76). Called
+    /// after the unreadable-settings check, whose own message is the more useful one for a file that cannot be read.
+    /// </summary>
+    internal static bool RefusedWithoutTerms(AppPaths paths, ILog log, string mode)
+    {
+        if (!AppRules.AsksTerms(SettingsLoader.LoadFile(paths.SettingsFile), AppRules.Account)) return false;
+        Console.Error.WriteLine(TermsNotAccepted);
+        log.Info($"{mode} refused: settings.json records no acceptance of the Terms of Use version {Help.TermsText.Version} by this account.");
+        return true;
+    }
+
     public static async Task<int> TranscribeAsync(CliOptions options, AppPaths paths, ILog log, SecretRedactor redactor)
     {
         var wav = Path.GetFullPath(options.WavPath!);
@@ -39,6 +61,7 @@ public static class CliCommands
         }
         var config = LoadConfig(paths, log, redactor, options.CleanupModel);
         if (Unreadable(config, paths)) return 1;
+        if (RefusedWithoutTerms(paths, log, "--transcribe")) return 1;
         var (settings, secrets) = (config.Settings, config.Secrets);
         var modelPath = SettingsFile.EffectiveModelPath(settings, paths, Environment.GetEnvironmentVariable, options.Model);
         if (!File.Exists(modelPath))

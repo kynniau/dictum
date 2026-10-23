@@ -5821,7 +5821,7 @@ comment stays where it was.
         test than item 10: the reverse stored-files test. It ran before this line was written.
       - `PublicCopyNeutralityTests` and the site tests were run again afterwards.
 
-## Legal block, app side (23/10/2026 11:40 AEDT, branch legal/app)
+## Legal block, app side (23/10/2026 12:34 AEDT, branch legal/app; first written 11:40 AEDT, lens fix round 12:34 AEDT)
 
 The owner approved, at 09:50 AEDT on 23/10/2026, draft 3 of the Terms of Use and the Privacy Policy, the approved-copy changes
 O1 to O15 and the build tasks of `.demo-preview/legal/drafts/basis-and-changes.md` (sections C and D). This entry is the app
@@ -5832,7 +5832,9 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
      Continue you agree to Dictum's Terms of Use." with "Terms of Use" a link to https://dictum.kynni.au/terms, and below that
      "The Privacy Policy explains what Dictum keeps and sends." with "Privacy Policy" a link to https://dictum.kynni.au/privacy.
      Both links open through `IPlatform.Open`, as Settings opens pages. The notice sits in the button row, not the scrolling
-     body, so it never scrolls away from Continue on a small screen. Each sentence is its line's accessible name.
+     body, so it never scrolls away from Continue on a small screen. Each sentence is its row's accessible name, and on this
+     step Continue's help text is the acceptance sentence. Both were added in the lens round (item 16); at ca15ede this line
+     said the first and neither was set.
    - The words are `TermsText` constants in `src/Dictum.Core/Help/TermsText.cs`, which also holds the one Terms version,
      `TermsText.Version = "1"`.
    - **When it shows:** at every start until `settings.json` records `terms.accepted` = the version in force and
@@ -5891,10 +5893,12 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
 8. **THIRD-PARTY-NOTICES.txt (D.8):**
    - "Copyright (upstream licence):" lines sit under the .nuspec lines: llama.cpp in the three LLamaSharp.Backend entries,
      LLamaSharp, NAudio.Core and .Wasapi, and the six Avalonia packages.
-   - Each line was checked against the project's LICENSE on its master branch on 23/10/2026 (raw.githubusercontent.com):
-     llama.cpp "Copyright (c) 2023-2026 The ggml authors"; Avalonia "Copyright (c) AvaloniaUI OÜ" (followed upstream by "All
-     Rights Reserved"); NAudio "Copyright 2020 Mark Heath"; LLamaSharp "Copyright (c) 2025 SciSharp STACK".
-   - Those are master-branch files, not the tags of the versions shipped.
+   - Each line was checked against the project's LICENSE on 23/10/2026 (raw.githubusercontent.com), at the tag of the version
+     shipped where there is one: Avalonia "Copyright (c) AvaloniaUI OÜ" at 11.3.22 (followed upstream by "All Rights
+     Reserved"); LLamaSharp "Copyright (c) 2025 SciSharp STACK" at v0.27.0; NAudio "Copyright 2008-2026 Mark Heath" at
+     v3.1.0 and on main; llama.cpp "Copyright (c) 2023-2026 The ggml authors" on master.
+   - Corrected in the lens round: the first version gave NAudio "Copyright 2020 Mark Heath", read from NAudio's stale
+     `master` branch (its default branch is `main`; the 2020 line is release/2.x's).
 9. **SECURITY.md (D.13):** current release 1.3.0 (23/10/2026), and the guarantees list gains cloud speech: the consent-gated
    host, and "unless you turn on cloud speech".
 10. **README:**
@@ -6033,3 +6037,85 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
     - **Store version not checked.** SECURITY.md says the Store carries a release "once Microsoft has certified it". The
       Store's current version was not checked on 23/10/2026; GitHub's latest release is 1.3.0, published
       2026-10-22T15:31:44Z (`gh release list`), which is 23/10/2026 in Sydney.
+16. **Lens round on ca15ede (verdict Needs changes, no Block; fixed by 12:34 AEDT).** The lens observed all 8 of its mutations
+    failing, found TERMS.txt byte-faithful and every approved string byte-exact. Fixed on this branch with ordinary commits,
+    after the merge of main 5e5e9ba (PR #75, the site lane: its DECISIONS entry sits before this one):
+    - **O15 on the page.** It now also applies to `site/plain-words.html` ("Dictum itself sends nothing you say off your
+      computer unless you switch on a cloud option and agree to it. Dictum tells you what would be sent, and to where, before
+      you agree.", with the new marker). The page pin and the marker count (7) follow. Item 15's O15 point is resolved.
+    - **Accessibility.** Each notice row's accessible name is its whole sentence. The Continue button's help text is the
+      acceptance sentence on step 1 and none on the later steps, so a screen-reader user hears the sentence with the button.
+      Item 1's "Each sentence is its line's accessible name" was not true at ca15ede; it is now.
+    - **NAudio.** NAudio's upstream line is "Copyright 2008-2026 Mark Heath" (item 8, corrected there).
+    - **Store notes.** `docs/STORE.md`'s TO DICTATE tester note and row 17 now say to click Continue on the first step (it
+      accepts the Terms; closing or Esc there quits). PROPOSED 23/10/2026; the owner approves before the next submission.
+    - **Demo scripts.** Nine of `scripts/demos/*.json` click the Welcome window first, and that first click now targets
+      Continue. `dictation-stills.json` has no Welcome click, and `install.json` only points at the Welcome window at its end.
+      - `first-run.json`'s caption is now "Dictum explains how it works and links its Terms of Use. Click Continue."
+        (PROPOSED).
+      - `install.json` gains the Setup licence step: "Setup shows Dictum's Terms of Use. Choose I accept the agreement, then
+        click Next." (PROPOSED), clicking the "I accept the agreement" radio button and Next.
+      - JSON carries no markers, so the PROPOSED status is recorded here.
+      - Not run: the demos need Windows Sandbox and a built Setup.
+      - Its next step's caption still says "Setup opens. Click Next." although Setup now opens on the licence page; that
+        caption is not in the lens list and is left for the owner.
+    - **Command-line modes (owner's decision).** `--transcribe` and `--bench-cleanup` run only once settings.json records
+      this account's acceptance (`AppRules.AsksTerms`, the tray app's rule). Otherwise they print "Start Dictum once and
+      press Continue to accept its Terms of Use." (PROPOSED, `CliCommands.TermsNotAccepted`) on stderr, log one line and
+      exit 1. The check sits in Core (`CliCommands.RefusedWithoutTerms`), so the Windows and Mac entry points share it; it
+      runs after the unreadable-settings check, whose message is the more useful one for a broken file.
+      - `--selftest`, `--download-model`, `--download-cleanup-model` and `--print-models-dir` are administrator and CI modes
+        and are not gated.
+      - The README's command-line section says so.
+      - Three existing tests that run the two gated modes now record the acceptance first (`TestTerms`):
+        `ModelFolderSafetyTests.Bench_cleanup_looks_in_every_model_folder…`,
+        `FixBatchDownloadTests.Bench_cleanup_reports_an_unreadable_wav_and_exits_1`, and the gated
+        `AmendmentTests.Transcribe_exits_1_on_an_unreadable_settings_file`.
+    - **Markers.** The README Terms line and TRADEMARKS.md's "See the Terms of Use…" line are PROPOSED 23/10/2026; neither
+      is in section C or D.
+    - **"Press Next to begin."** `OnboardingText.WelcomeNext` keeps its approved text, with the comment `// PROPOSED
+      23/10/2026: "The next few steps take a minute or two. Press Continue to begin." (owner decision pending)`.
+    - **Welcome step spacing.** The step's body spacing is 12 (was 14), because the lens measured a new install's step 1 2
+      DIP over at 1366 × 768 at 125 %. Measured headless after the change, with the fitted 534.4 DIP client (the recalled
+      48 DIP taskbar and 32 DIP caption): 311 of 313 DIP.
+    - **Fixture names.** The rule test uses "alex" and "ALEX".
+    - **One write attempt.** The acceptance write is tried once (`OnboardingFlow._recordTried`): again later only when
+      settings.json did not exist at Continue. At ca15ede a refused write warned twice.
+      - New pin: `A_settings_file_that_cannot_record_the_acceptance_starts_warns_once_and_asks_again`, read-only and
+        unparseable.
+      - In both cases Dictum starts, the Terms are accepted but not recorded, the file is unchanged, the warning is logged
+        once and the next start asks again.
+    - **SECURITY.md** names 1.3.0 as live on GitHub and in the Store. The orchestrator verified the Store in Partner Center
+      (live since about 08:30 AEDT 23/10/2026); this lane did not check it. Item 15's Store point is resolved.
+    - **SPEC.**
+      - `docs/SPEC.md`'s clean-up list drops qwen2.5-3b (with a note), and its licence and recommendation rules follow.
+      - §27 step 1 describes Continue, the acceptance record, the Terms step alone and the command-line gate.
+      - Item 15's SPEC point is resolved.
+    - **README leftover file.** README says a downloaded `qwen2.5-3b-instruct-q4_k_m.gguf` stays where it is, because
+      Settings > Storage lists catalogue files only (`ModelFiles.IsModelFile`) and Dictum deletes nothing else.
+    - **Release-notes line.** PROPOSED 23/10/2026, for the notes of the release that carries this change. It was not added
+      to `packaging/release-notes-preamble.md`, which CI publishes as it is: "qwen2.5-3b is no longer on Dictum's list of
+      clean-up models, because its licence allows non-commercial use only. If you chose it, Dictum now uses the recommended
+      clean-up model instead (the rule-based tidy until that is downloaded). Its 2.1 GB file stays in your models folder and
+      Settings > Storage no longer lists it: delete qwen2.5-3b-instruct-q4_k_m.gguf yourself to free the space."
+    - **New pins, each observed failing on the reverted behaviour (23/10/2026):**
+      - (M25) Continue's help text not set: `A_screen_reader_hears_the_acceptance_sentence_with_Continue` failed with
+        "Strings differ, Expected: "By clicking Continue you agree to Dictum's Terms o"···, Actual: null".
+      - (M26) The rows' names not set: the same test failed with "Collections differ … (pos 0)".
+      - (M27) The single-try guard removed: both rows of `A_settings_file_that_cannot_record_the_acceptance…` failed with
+        "Assert.Single() Failure: The collection contained 2 matching items".
+      - (M28) The `--transcribe` gate removed: `Transcribe_and_bench_cleanup_refuse_until_the_Terms_are_accepted` failed with
+        "Assert.Contains() Failure: Filter not matched in collection".
+      - (M29) The `--bench-cleanup` gate removed: the same test failed the same way.
+      - (M30) O15 reverted on the page: `The_plain_words_page_is_the_approved_statement_word_for_word` failed with
+        "Collections differ at index 6".
+      - (M31) NAudio.Core's line put back to "Copyright 2020 Mark Heath":
+        `The_upstream_copyright_line_sits_beside_the_nuspec_line(package: "NAudio.Core", …)` failed with "Assert.Matches()
+        Failure: Pattern not found in value".
+    - **Gates for this round:**
+      - `dotnet test Dictum.sln` (Debug, 12:27 to 12:34 AEDT, on the tree committed here): 2698 total, 2657 passed, 0
+        failed, 41 skipped.
+      - Release build `--no-incremental`: 0 errors and 5 warnings, all xUnit2013 in `MacPackagingTests.cs` and
+        `SiteStoreFirstTests.cs` (not touched here).
+      - `PublicCopyNeutralityTests` was run again after this text.
+      - **Not run:** the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests.

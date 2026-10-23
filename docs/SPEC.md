@@ -196,7 +196,10 @@ by HTTP HEAD 15/10/2026:
 |---|---|---|
 | `qwen2.5-0.5b` | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | 491,400,032 |
 | `qwen2.5-1.5b` | `Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf` | 1,117,320,736 |
-| `qwen2.5-3b` | `Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q4_k_m.gguf` | 2,104,932,768 |
+
+`qwen2.5-3b` (`Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q4_k_m.gguf`, 2,104,932,768 bytes) was in this list
+until 23/10/2026, when the owner's legal block removed it: its Qwen Research License allows non-commercial use only, and
+the Terms of Use let people use Dictum at work. No catalogue entry may be non-commercial (`CleanupCatalogTests`).
 
 Catalogue breadth (decided 15/10/2026): offer several families so the team can compare,
 not only Qwen. Candidates to verify and add where the source rule below holds: Gemma 3
@@ -215,12 +218,12 @@ by side, so a user can pick a model on their own dictation rather than on benchm
 
 **Licence check is mandatory before shipping:** read each model card's licence field
 and record it in `docs/DECISIONS.md` with the URL. A model whose licence is not clearly
-commercial-use (expected: the 3B carries a research licence; verify) is listed in the
-catalogue with a "non-commercial licence" marker and is never a recommendation.
+commercial-use (the 3B carried a research licence) is not listed in the catalogue (amended
+23/10/2026, legal block: it was listed with a "non-commercial licence" marker and never recommended until then).
 
 Recommendation rule for the picker and `--selftest`: `qwen2.5-1.5b` everywhere, with
-`qwen2.5-0.5b` offered as "faster, rougher" for slow CPUs and `qwen2.5-3b` only where its
-licence allows and a GPU runtime loaded. Measure on this machine (Vulkan and CPU forced)
+`qwen2.5-0.5b` offered as "faster, rougher" for slow CPUs (`qwen2.5-3b` is no longer in the
+catalogue, 23/10/2026). Measure on this machine (Vulkan and CPU forced)
 the added cleanup time for the 10 s test clip and for a 60 s clip, and put the figures in
 the README table next to the whisper timings; if the 1.5B model adds more than about 2 s
 for the 10 s clip on CPU, make `qwen2.5-0.5b` the CPU recommendation and say why.
@@ -1431,7 +1434,14 @@ hotkey check). It is shown exactly when the hotkey check was: settings.json is u
 the step's heading and body (scrolling when it does not fit), **Back** on the left and the step's own buttons on the right;
 Enter presses the step's primary button. Steps:
 
-1. **Welcome / How it works**: one paragraph, then Next.
+1. **Welcome / How it works**: one paragraph and the short version of "Dictum in plain words", then **Continue** (amended
+   23/10/2026, legal block). Beside Continue the window says "By clicking Continue you agree to Dictum's Terms of Use." and,
+   below it, "The Privacy Policy explains what Dictum keeps and sends.", each with its link. Continue records the accepted
+   Terms version and the account name in settings.json (`terms.accepted`, `terms.accepted_by`); closing the window or Esc
+   before Continue quits Dictum and writes nothing. A copy that has its first-run answers but no acceptance of the current
+   version by the account it runs as (an upgrade, a seeded settings.json, a model override) opens the window with this step
+   alone (`AppRules.AsksTerms`); an acceptance recorded for another account does not count. `--transcribe` and
+   `--bench-cleanup` refuse until the acceptance is recorded.
 2. **Where to keep the model files**: the suggested folder (the per-user default) pre-selected, with its drive's free space
    ("C: has 41.0 GB free"; no line when it cannot be read), the network-folder note when it applies, and "Choose another
    drive or folder…" (the system's folder chooser). The text calls base.en "the included one" only when it is on this PC,

@@ -142,15 +142,16 @@ public sealed class ThirdPartyNoticesTests
     /// <summary>
     /// Pin (legal block, owner 23/10/2026 09:50 AEDT, section D item 8): the copyright lines of the upstream LICENSE files of
     /// llama.cpp, Avalonia, NAudio and LLamaSharp sit beside the .nuspec line of every entry that ships their code (read
-    /// 23/10/2026 from each repository's master branch), each directly under its entry's "Copyright (nuspec):" line.
+    /// 23/10/2026: Avalonia at tag 11.3.22, LLamaSharp at v0.27.0, NAudio at v3.1.0, llama.cpp on master), each directly under its
+    /// entry's "Copyright (nuspec):" line.
     /// </summary>
     [Theory]
     [InlineData("LLamaSharp", "Copyright (c) 2025 SciSharp STACK")]
     [InlineData("LLamaSharp.Backend.Cpu", "Copyright (c) 2023-2026 The ggml authors")]
     [InlineData("LLamaSharp.Backend.Vulkan", "Copyright (c) 2023-2026 The ggml authors")]
     [InlineData("LLamaSharp.Backend.Vulkan.Windows", "Copyright (c) 2023-2026 The ggml authors")]
-    [InlineData("NAudio.Core", "Copyright 2020 Mark Heath")]
-    [InlineData("NAudio.Wasapi", "Copyright 2020 Mark Heath")]
+    [InlineData("NAudio.Core", "Copyright 2008-2026 Mark Heath")]
+    [InlineData("NAudio.Wasapi", "Copyright 2008-2026 Mark Heath")]
     [InlineData("Avalonia", "Copyright (c) AvaloniaUI OÜ")]
     [InlineData("Avalonia.Themes.Fluent", "Copyright (c) AvaloniaUI OÜ")]
     [InlineData("Avalonia.Win32", "Copyright (c) AvaloniaUI OÜ")]

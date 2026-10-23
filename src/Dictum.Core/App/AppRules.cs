@@ -42,6 +42,9 @@ public static class AppRules
         !(file.Usable && file.Settings.Terms.Accepted == Help.TermsText.Version
           && string.Equals(file.Settings.Terms.AcceptedBy, account, StringComparison.Ordinal));
 
+    /// <summary>The account whose acceptance of the Terms of Use counts (terms.accepted_by): the user name Dictum runs as.</summary>
+    public static string Account => Environment.UserName;
+
     /// <summary>
     /// The onboarding's model-folder step: only while settings.json names no model folder (models.folder, or its earlier name
     /// whisper.models_dir), so an admin's seeded folder, or one chosen before a crash, is not asked about again.
