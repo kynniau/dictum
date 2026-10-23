@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Dictum.App;
+using Dictum.Help;
 using Dictum.Settings;
 using Dictum.UI.Shell;
 
@@ -9,8 +10,11 @@ namespace Dictum.UI.Views.Onboarding;
 /// The first-run questions the "Welcome to Dictum" window asks (Dictum 1.2), apart from the window so the shell and the tests
 /// drive the same writes: the model folder, the speech model (through ModelCoordinator's first-run answer, as the pickers did),
 /// the hotkey and the microphone. Each step writes its own settings when it is completed, only what changed, straight to
-/// settings.json and without a reload (nothing is loaded yet). <see cref="SkipRest"/> answers whatever is still open with
-/// today's defaults, so a closed window never leaves the speech choice unanswered. Runs on the UI thread.
+/// settings.json and without a reload (nothing is loaded yet). The first step's Continue accepts the Terms of Use
+/// (<see cref="AcceptTerms"/>); closed before that, the window writes nothing and the shell quits. After it,
+/// <see cref="SkipRest"/> answers whatever is still open with today's defaults, so a closed window never leaves the speech choice
+/// unanswered. <see cref="TermsOnly"/>: the first step alone, for a copy that has its first-run answers but no acceptance of the
+/// Terms (an upgrade, a seeded settings.json, a model override). Runs on the UI thread.
 /// </summary>
 public sealed class OnboardingFlow
 {
@@ -19,11 +23,13 @@ public sealed class OnboardingFlow
     private readonly bool _askCleanup;
     private FirstRunPlan? _plan;
 
-    internal OnboardingFlow(AppShell shell, SettingsLoadResult file, bool askCleanup)
+    internal OnboardingFlow(AppShell shell, SettingsLoadResult file, bool askCleanup, bool termsOnly = false)
     {
         _shell = shell;
         _file = file;
         _askCleanup = askCleanup;
+        TermsOnly = termsOnly;
+        TermsAccepted = TermsRecorded = !AppRules.AsksTerms(file, AppShell.Account); // already accepted by this account: closing does not quit
         AsksFolder = AppRules.AsksFolder(file);
         SuggestedFolder = shell.Paths.ModelsDir(file.Settings);
         Hotkey = file.Settings.Hotkey;
@@ -31,6 +37,41 @@ public sealed class OnboardingFlow
     }
 
     internal AppShell Shell => _shell;
+
+    /// <summary>The window shows the first step alone (the Terms of Use), and its Continue ends it: no first-run question is open.</summary>
+    public bool TermsOnly { get; }
+
+    /// <summary>Continue was pressed on the first step (or settings.json already recorded this account's acceptance).</summary>
+    public bool TermsAccepted { get; private set; }
+
+    /// <summary>settings.json records the acceptance (terms.accepted and terms.accepted_by).</summary>
+    public bool TermsRecorded { get; private set; }
+
+    /// <summary>
+    /// Continue on the first step: the Terms of Use version in force is accepted. It is recorded in settings.json at once when
+    /// the file exists; a new install's has none yet, so its record is written with the speech answer, which creates the file in
+    /// its documented layout (<see cref="CompleteSpeech"/>), or when the window closes after Continue (<see cref="SkipRest"/>).
+    /// </summary>
+    public void AcceptTerms()
+    {
+        TermsAccepted = true;
+        if (File.Exists(_shell.Paths.SettingsFile)) RecordTerms();
+    }
+
+    /// <summary>
+    /// Once the Terms are accepted: writes terms.accepted (<see cref="TermsText.Version"/>) and terms.accepted_by (this
+    /// account) in one write, keeping every other key; then nothing more. The shell calls it after the first run's own answer
+    /// too, for a launch with a model override and no settings.json yet. A file that cannot be written keeps no record: Dictum
+    /// goes on this time and asks again at the next start.
+    /// </summary>
+    internal void RecordTerms()
+    {
+        if (!TermsAccepted || TermsRecorded) return;
+        var record = new JsonObject { ["accepted"] = TermsText.Version, ["accepted_by"] = AppShell.Account };
+        TermsRecorded = SettingsFile.SetValue(_shell.Paths.SettingsFile, "terms", record, out var failure);
+        if (TermsRecorded) _shell.Log.Info($"Terms of Use version {TermsText.Version} accepted; recorded in settings.json.");
+        else _shell.Log.Warn($"Terms of Use version {TermsText.Version} accepted, but settings.json could not record it ({failure}); Dictum asks again at the next start.");
+    }
 
     /// <summary>Milliseconds on a monotonic clock, for the microphone test and Try it; tests move their own.</summary>
     internal Func<long> Clock { get; set; } = () => Environment.TickCount64;
@@ -129,6 +170,7 @@ public sealed class OnboardingFlow
         if (SpeechAnswered && pick is null) return;
         SpeechAnswered = true;
         _shell.Models.AnswerFirstRun(Plan, askSpeech: true, _askCleanup, keepProvider: _file.NamesCleanupProvider, speechPick: pick);
+        RecordTerms(); // a new install: settings.json exists from now on
     }
 
     /// <summary>Completes the hotkey step: writes "hotkey" only when another key was chosen (the first-run hotkey check's rule).</summary>
@@ -161,28 +203,29 @@ public sealed class OnboardingFlow
         }
     }
 
-    /// <summary>Steps 1-5 are finished: the window moves to Try it while the shell loads.</summary>
+    /// <summary>Steps 1-5 are finished: the window moves to Try it while the shell loads (or, <see cref="TermsOnly"/>, closes).</summary>
     public void FinishFirstSteps()
     {
-        CompleteSpeech(null); // the speech step always completes before this; a no-op then
+        if (!TermsOnly) CompleteSpeech(null); // the speech step always completes before this; a no-op then
         FirstStepsDone = true;
     }
 
     /// <summary>
     /// Esc, or closing the window, before the end: the rest keep today's defaults. Only the speech answer must be written (the
-    /// settings load needs it); the folder, hotkey and microphone stay as settings.json has them.
+    /// settings load needs it); the folder, hotkey and microphone stay as settings.json has them. Before Continue on the first
+    /// step nothing is written at all: the Terms of Use were not accepted, and the shell quits.
     /// </summary>
     public void SkipRest()
     {
         if (!FirstStepsDone) Abandoned = true;
-        CompleteSpeech(null);
         FirstStepsDone = true;
+        if (TermsAccepted && !TermsOnly) CompleteSpeech(null);
     }
 
     /// <summary>Called by the shell once the settings are loaded and the hotkey listens.</summary>
     internal void BeginTryIt()
     {
-        if (Abandoned || TryItLive) return;
+        if (Abandoned || TryItLive || TermsOnly) return;
         TryItLive = true;
         TryItReady?.Invoke();
     }

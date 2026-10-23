@@ -106,6 +106,7 @@ public static class SettingsLoader
             Sounds = BindSounds(r.Child("sounds")),
             Profanity = BindProfanity(r.Child("profanity")),
             Ui = BindUi(r.Child("ui")),
+            Terms = BindTerms(r.Child("terms")),
             FixHotkey = r.NullableString("fix_hotkey", v => HotkeyParser.TryParse(v, out _, out var e) ? null : e),
             LogLevel = r.String("log_level", d.LogLevel, OneOf("debug", "info", "warning", "error")).ToLowerInvariant(),
             LogTranscripts = r.Bool("log_transcripts", d.LogTranscripts),
@@ -158,6 +159,14 @@ public static class SettingsLoader
         var d = new UiSettings();
         if (r is null) return d;
         var s = new UiSettings { View = r.String("view", d.View, OneOf(UiSettings.Views)).ToLowerInvariant() };
+        r.WarnUnknown();
+        return s;
+    }
+
+    private static TermsSettings BindTerms(ObjectReader? r)
+    {
+        if (r is null) return new TermsSettings();
+        var s = new TermsSettings { Accepted = r.NullableString("accepted"), AcceptedBy = r.NullableString("accepted_by") };
         r.WarnUnknown();
         return s;
     }

@@ -48,7 +48,7 @@ public sealed partial class OnboardingTests
     }
 
     /// <summary>base.en "comes with Dictum": a file of its size beside the exe, recorded as having passed its SHA-256.</summary>
-    private static void Bundle(Scratch scratch)
+    internal static void Bundle(Scratch scratch)
     {
         Directory.CreateDirectory(scratch.Paths.BundledModelsDir);
         var path = Path.Combine(scratch.Paths.BundledModelsDir, "ggml-base.en.bin");
@@ -56,7 +56,7 @@ public sealed partial class OnboardingTests
         new ModelIntegrity(scratch.Paths.VerifiedModelsFile, NullLog.Instance).Remember(path);
     }
 
-    private static ModelManager FakeModels() => new(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+    internal static ModelManager FakeModels() => new(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
 
     private static (OnboardingFlow Flow, OnboardingWindow Window) Open(AppShell shell, Scratch scratch, long[]? clock = null)
     {
@@ -425,9 +425,13 @@ public sealed partial class OnboardingTests
         }
     });
 
-    /// <summary>Pin: a seeded settings.json that names whisper.model, and a --model override, open no window (as no hotkey check opened before).</summary>
+    /// <summary>
+    /// Pin: a seeded settings.json that names whisper.model, and a --model override, open no first-run steps (as no hotkey check
+    /// opened before); since the legal block (23/10/2026) each opens the Terms of Use step alone until it is accepted
+    /// (TermsAcceptanceTests).
+    /// </summary>
     [Fact]
-    public Task A_seeded_model_or_a_model_override_opens_no_window() => UiSession.Run(() =>
+    public Task A_seeded_model_or_a_model_override_opens_only_the_Terms_step() => UiSession.Run(() =>
     {
         using (var seeded = new Scratch("""{ "whisper": { "model": "base.en" }, "llm": { "provider": "none" } }"""))
         {
@@ -435,6 +439,7 @@ public sealed partial class OnboardingTests
             var (shell, _, dialogs) = seeded.Shell(FakeModels());
             Assert.True(shell.Start(lifetime: null));
             Assert.Equal((0, 0, 0), dialogs.FirstRunSteps);
+            Assert.Equal(1, dialogs.TermsWindows);
             shell.Dispose();
         }
         using (var scripted = new Scratch())
@@ -444,6 +449,7 @@ public sealed partial class OnboardingTests
             var (shell, _, dialogs) = scripted.Shell(FakeModels(), new ShellOptions(ModelOverride: model));
             Assert.True(shell.Start(lifetime: null));
             Assert.Equal((0, 0, 0), dialogs.FirstRunSteps);
+            Assert.Equal(1, dialogs.TermsWindows);
             Assert.Equal(ModelCatalog.Recommend(false).Model, SettingsLoader.LoadFile(scripted.Paths.SettingsFile).Settings.Whisper.Model); // FirstRun's own answer, unchanged
             shell.Dispose();
         }

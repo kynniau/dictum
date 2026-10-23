@@ -10,9 +10,11 @@ namespace Dictum.Tests;
 
 /// <summary>
 /// "Dictum in plain words" (docs/DECISIONS.md), APPROVED by the owner 22/10/2026 17:36 AEDT: the site page /plain-words (section 2a),
-/// the short version for Settings > About and the Welcome window (2b), no acceptance gate on first run (2c), the Store listing
-/// sentence (section 3), and the landing page's "Free to keep on your PC" (17:42 AEDT). Each pinned word for word, independently of
-/// the app's constants.
+/// the short version for Settings > About and the Welcome window (2b), the Store listing sentence (section 3), and the landing
+/// page's "Free to keep on your PC" (17:42 AEDT). Each pinned word for word, independently of the app's constants. The owner's
+/// legal block (23/10/2026 09:50 AEDT) changed the page (section C rows O1 to O6), the short version (O2, O15) and the Store
+/// sentence (O11), and replaced section 2c's "no acceptance gate" with the Terms of Use acceptance on the Welcome window's first
+/// step (O12): TermsAcceptanceTests pins that.
 /// </summary>
 public sealed class PlainWordsTests
 {
@@ -33,8 +35,8 @@ public sealed class PlainWordsTests
     internal static readonly string[] ShortVersion =
     [
         "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing about you to Kynni.",
-        "Dictum is open source under the MIT licence. It is provided as is, without warranty. We built it with care, but we cannot promise it will always hear you right.",
-        "Nothing you say leaves this PC unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.",
+        "Dictum is open source under the MIT licence. We built it with care, but we cannot promise it will always hear you right.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O2)
+        "Dictum itself sends nothing you say off your computer unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O15)
         "Read the whole statement at dictum.kynni.au/plain-words.",
     ];
 
@@ -46,27 +48,29 @@ public sealed class PlainWordsTests
         [
             "Dictum in plain words",
             "Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. The base product stays free to keep on your PC; optional paid extras may come later.",
-            "There is no spyware in Dictum. It does not watch what you type. It keeps no usage statistics for anyone but you: its log stays on your PC and never records what you said. It does not phone home: the only request to Kynni's website is Check for updates, which you press, and it sends nothing about you.",
+            "There is no spyware in Dictum. It does not watch what you type. It keeps no usage statistics for anyone but you: its log stays on your PC and never records what you said unless you turn on Write dictated text to the log. It does not phone home: the only request to Kynni's website is Check for updates, which you press, and it sends nothing about you.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O3)
             "Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence. That licence lets anyone use, copy and change Dictum, for free.",
             "How we protect you",
             "Your voice is turned into text on your own PC unless you turn on cloud speech. The text is tidied on your own PC.", // APPROVED 22/10/2026 22:05 AEDT (qualifier added)
             "Nothing you say leaves your PC unless you switch on a cloud option and agree to it. Dictum tells you what would be sent, and to where, before you agree.",
-            "Dictum refuses to send your words over an unencrypted connection.",
+            "Dictum refuses to send your words over an unencrypted connection to another computer.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O4)
             "Offline only, in Settings > Privacy, stops Dictum itself from connecting to any other computer at all.",
             "Every model file Dictum downloads is checked against a fingerprint built into Dictum. A file that does not match is not used.",
             "If you add a key for a cloud service, Dictum keeps it in a file on your PC. It never puts it in your settings, on screen or in a log.",
             "This website uses no cookies, no scripts and no tracking.",
             "The code is public. Anyone can check that all of this is true.",
             "What we cannot take responsibility for",
-            "Dictum is free and we give it to you as it is. The MIT licence says it in legal words: the software is provided \"as is\", without warranty of any kind, and the authors are not liable for any claim or damage arising from its use. We say it in plain words: we have built it with care, but we cannot promise it will always hear you right, and we cannot pay for a loss it causes. If you need a promise, please do not rely on Dictum for it.",
+            "Dictum is free and we give it to you as it is. We say it in plain words: we have built it with care, but we cannot promise it will always hear you right. The Terms of Use say which losses we do not pay for, limit what we pay for any other loss to A$100, and list what we never exclude or limit. The law where you live may give you rights that no agreement can take away. If you need a promise, please do not rely on Dictum for it.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O1 and O2)
             "If you choose a cloud service for clean-up or for speech, your text or your voice goes to that service. You choose the service. You hold the key. That service's own terms apply. Dictum encrypts the connection but cannot see, check or certify what that service keeps or does with your words. By switching a cloud option on, you take responsibility for the security and privacy of what is sent there. Do not dictate confidential, personal or client information with a cloud option on unless you have checked that service's terms yourself.",
-            "The files Dictum keeps on your PC (your settings, dictionary, corrections, recordings and any key) are ordinary files under your Windows account. Looking after your PC, your account and your backups is up to you.",
+            "The files Dictum keeps on your PC (your settings, dictionary, corrections, recordings and any key) are ordinary files under your account on your PC or Mac. Looking after your PC, your account and your backups is up to you.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O5)
             "If you installed Dictum from the Microsoft Store, Microsoft handles the download and updates under its own privacy statement, and gives us summary reports such as install counts and crash summaries. Dictum itself sends none of this.",
+            "The Terms of Use set out what we are and are not responsible for.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O6)
             "Questions: hello@kynni.com.au. The full privacy policy names every address Dictum can connect to.",
         ];
         Assert.Equal(expected, MainLines("plain-words.html"));
         Assert.Contains("APPROVED by the owner 22/10/2026 17:36 AEDT", Site("plain-words.html"));
         Assert.Contains("APPROVED 22/10/2026 20:45 AEDT (replaces the 17:36 sentence)", Site("plain-words.html"));
+        Assert.Equal(6, Regex.Matches(Site("plain-words.html"), Regex.Escape("APPROVED by the owner 23/10/2026 09:50 AEDT (legal block)")).Count); // O1 and O2, O3, O4, O5, O6, the footer link
     }
 
     /// <summary>Pin: the page prints no file path (the brief's code citations stay out of public copy).</summary>
@@ -110,9 +114,12 @@ public sealed class PlainWordsTests
         Assert.Equal("https://dictum.kynni.au/plain-words", PlainWordsText.Url);
     }
 
-    /// <summary>Pin (2b, 2c): the Welcome window's first step shows the short version after the approved text and before the Next line, with no checkbox and no "I understand".</summary>
+    /// <summary>
+    /// Pin (2b): the Welcome window's first step shows the short version after the approved text and before the "next few steps"
+    /// line. What its Continue asks (the Terms of Use, O12) is pinned in TermsAcceptanceTests.
+    /// </summary>
     [Fact]
-    public Task The_welcome_step_shows_the_short_version_and_asks_for_no_acceptance() => UiSession.Run(() =>
+    public Task The_welcome_step_shows_the_short_version() => UiSession.Run(() =>
     {
         using var scratch = new Scratch();
         var (shell, _, _) = scratch.Shell();
@@ -125,9 +132,6 @@ public sealed class PlainWordsTests
         Assert.True(at >= 0, "the approved Welcome text is not shown");
         Assert.Equal(ShortVersion, texts.Skip(at + 1).Take(ShortVersion.Length));
         Assert.Equal(OnboardingText.WelcomeNext, texts[at + 1 + ShortVersion.Length]);
-        Assert.Empty(window.GetVisualDescendants().OfType<CheckBox>());
-        Assert.DoesNotContain(texts, t => t.Contains("I understand", StringComparison.OrdinalIgnoreCase));
-        Assert.Equal(OnboardingText.Next, window.PrimaryButton.Content);
         window.Close();
         shell.Dispose();
     });
@@ -171,15 +175,19 @@ public sealed class PlainWordsTests
         Assert.Contains(readme.Split('\n'), l => l.StartsWith("| Only when you open the privacy policy, Dictum in plain words", StringComparison.Ordinal) && l.Contains("/plain-words"));
     }
 
-    /// <summary>Pin (section 3): the Store description ends PRIVATE BY DESIGN with the approved sentence, and the sentence has no URL.</summary>
+    /// <summary>
+    /// Pin (section 3, replaced by the legal block's O11, APPROVED by the owner 23/10/2026 09:50 AEDT): the Store description ends
+    /// PRIVATE BY DESIGN with the approved sentence, and the sentence has no URL.
+    /// </summary>
     [Fact]
     public void The_store_listing_carries_the_approved_sentence()
     {
-        const string sentence = "Dictum is provided as is under the MIT licence; if you choose a cloud service, you take responsibility for what is sent to it.";
+        const string sentence = "Dictum is free and open source under the MIT licence, and its Terms of Use apply; if you choose a cloud service, you take responsibility for what is sent to it.";
         var store = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "docs", "STORE.md"));
         var line = store.Split('\n').Single(l => l.StartsWith("Speech recognition and clean-up run on your PC by default.", StringComparison.Ordinal)).TrimEnd();
         Assert.EndsWith(" " + sentence, line);
-        Assert.Contains("APPROVED by the owner 22/10/2026 17:36 AEDT", store);
+        Assert.Contains("APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword", store);
+        Assert.DoesNotContain("Dictum is provided as is under the MIT licence", store);
         Assert.DoesNotContain("http", sentence);
     }
 

@@ -10,8 +10,8 @@ Never send real API keys, recordings or dictated text: describe them instead.
 
 ## Supported versions
 
-The current release is the one on https://github.com/kynniau/dictum/releases/latest and in the Microsoft Store (1.1.1 on
-20/10/2026). Fixes go into the next release; older releases are not patched.
+The current release is the one on https://github.com/kynniau/dictum/releases/latest (1.3.0 on 23/10/2026), and in the
+Microsoft Store once Microsoft has certified it. Fixes go into the next release; older releases are not patched.
 
 ## What Dictum promises, so what counts as a vulnerability
 
@@ -19,11 +19,11 @@ These are the guarantees the README states ("Privacy"); anything that breaks one
 
 - Nothing leaves the PC by default. Dictum connects only to `huggingface.co` (and its download CDN) when you ask for a
   model, to `dictum.kynni.au` for one small file (`/version.json`, sending nothing about you) when you click Check for
-  updates in the direct download, and to a clean-up service off this PC only after you switch it on and agree to that
-  host in the consent step. No telemetry, analytics, crash reports or automatic update checks.
+  updates in the direct download, and to a clean-up service or a cloud speech service off this PC only after you switch
+  it on and agree to that host in its own consent step. No telemetry, analytics, crash reports or automatic update checks.
 - With `offline_only: true`, Dictum itself connects to no other machine.
-- Dictation audio stays in memory and is never written to disk; transcripts are not written to disk, and reach the
-  log only if you turn on `log_transcripts`.
+- Dictation audio stays in memory and is never written to disk, and it stays on the PC unless you turn on cloud speech;
+  transcripts are not written to disk, and reach the log only if you turn on `log_transcripts`.
 - API keys come only from environment variables or `.env`, are never written to `settings.json`, the windows or error
   messages, and are redacted from the log.
 - Downloaded models are data, checked against pinned SHA-256 hashes where the catalogue has one; Dictum never

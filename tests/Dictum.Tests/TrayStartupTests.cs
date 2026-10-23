@@ -8,8 +8,9 @@ namespace Dictum.Tests;
 /// fully sandboxed: scratch APPDATA and LOCALAPPDATA, a scratch config folder (settings.json, dictionary.txt,
 /// corrections.txt), the hotkeys switched off (enabled = false, F24 / F23, so the keyboard hooks pass every key through),
 /// the models folder of DICTUM_MODEL_PATH (which, by the documented precedence, is also the model that loads) and the
-/// rule-based tidy. Gated by DICTUM_TRAY_TESTS=1 because a tray icon appears for about 12 s. Dictum's single-instance lock
-/// is its own (Local\Dictum.SingleInstance), so an installed Dictate keeps running untouched.
+/// rule-based tidy, and the Terms of Use accepted by this account (terms.*), so the Welcome window does not open. Gated by
+/// DICTUM_TRAY_TESTS=1 because a tray icon appears for about 12 s. Dictum's single-instance lock is its own
+/// (Local\Dictum.SingleInstance), so an installed Dictate keeps running untouched.
 /// </summary>
 public class TrayStartupTests(ITestOutputHelper output)
 {
@@ -34,7 +35,8 @@ public class TrayStartupTests(ITestOutputHelper output)
         using var scratch = new Scratch($$"""
             { "enabled": false, "hotkey": "F24", "fix_hotkey": "F23", "pill": { "enabled": false },
               "whisper": { "model": "base.en", "models_dir": {{System.Text.Json.JsonSerializer.Serialize(models)}} },
-              "llm": { "provider": "none" }, "profanity": { "mode": "mask" } }
+              "llm": { "provider": "none" }, "profanity": { "mode": "mask" },
+              "terms": { "accepted": {{System.Text.Json.JsonSerializer.Serialize(Dictum.Help.TermsText.Version)}}, "accepted_by": {{System.Text.Json.JsonSerializer.Serialize(Environment.UserName)}} } }
             """);
         File.WriteAllText(scratch.Paths.DictionaryFile, "Kynni\n");
         File.WriteAllText(scratch.Paths.CorrectionsFile, "report => Q3 report\n");

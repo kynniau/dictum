@@ -152,9 +152,10 @@ public sealed class CloudSpeechUiTests
 
             var (title, text, choices) = Assert.Single(dialogs.Questions);
             Assert.Equal(AppShell.SpeechConsentTitle, title);
-            // The approved consent text (owner 22/10/2026, 10:50 AEDT; last paragraph's clause revised 16:31 AEDT), byte for byte.
+            // The approved consent text (owner 22/10/2026, 10:50 AEDT; last paragraph's clause revised 16:31 AEDT; the hands-free sentence
+            // added by the legal block, O8, APPROVED by the owner 23/10/2026 09:50 AEDT), byte for byte.
             Assert.Equal(Encoding.UTF8.GetBytes(
-                "With cloud speech on, the recording of every dictation, your voice, is sent over the internet to speech.example.com to be turned into text, together with the words in your personal dictionary as a hint. It uses your own API key (SPEECH_API_KEY).\n\n" +
+                "With cloud speech on, the recording of every dictation, your voice, is sent over the internet to speech.example.com to be turned into text, together with the words in your personal dictionary as a hint. In hands-free mode, the closing words of what you said just before go with it. It uses your own API key (SPEECH_API_KEY).\n\n" +
                 "Dictum encrypts the connection (HTTPS) but cannot see, check or certify what speech.example.com keeps, for how long, how it protects it, or who else can listen to it. By switching cloud speech on you accept responsibility for the security and privacy of the speech sent there. Check that service's terms yourself, and do not dictate confidential, personal or client information with cloud speech on unless you have.\n\n" +
                 "Nothing is sent until you agree. You can switch it off at any time in Settings > Models, and offline only mode refuses any service that is not on this PC; your speech model on this PC is used again."),
                 Encoding.UTF8.GetBytes(text));

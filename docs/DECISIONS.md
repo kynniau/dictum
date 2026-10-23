@@ -5651,3 +5651,216 @@ shared UI code, so Windows had the first as well:
    - **Checked and owned** (a `Ui.Button`, synchronous up to the question): every calibration button; both cloud consents; delete model (every question before its first await); delete data; Remove Dictum completely (both warnings); the model folder move question; the Settings > Models catalogue and Simple rows; and the Welcome window's buttons. The Fix last dictation, Add word and Add snippet windows open no question.
 7. **Not verified.** Nothing ran on a Mac. The calibration path was not run on the real Win32 backend: `DICTUM_UI_TESTS` was not set, so the gated probe pin skipped. The installed app was not run, because tray mode is never run on this host. After Download, keyboard focus leaves the clicked button, as it already did when a download ended and the list was redrawn.
 8. **Gates, on this branch after the lens follow-up (23/10/2026).** Release build `--no-incremental`: 0 errors, 5 warnings, all xUnit2013 in `MacPackagingTests.cs` and `SiteStoreFirstTests.cs`, which this branch does not touch. `DialogOwnerTests`: 10 total, 9 passed, 1 skipped (the gated Win32 probe). Full suite (`dotnet test Dictum.sln`, Debug, without `DICTUM_UI_TESTS`): 2629 total, 0 failed, 2588 passed, 41 skipped. It ran on the final tree before these counts were written into this file. On f0b1bed, before pin (f): 2628 total, 0 failed, 2587 passed, 41 skipped.
+
+## Legal block, app side (23/10/2026 11:40 AEDT, branch legal/app)
+
+The owner approved, at 09:50 AEDT on 23/10/2026, draft 3 of the Terms of Use and the Privacy Policy, the approved-copy changes
+O1 to O15 and the build tasks of `.demo-preview/legal/drafts/basis-and-changes.md` (sections C and D). This entry is the app
+lane's part. The site lane builds `site/terms.html` and the new `site/privacy.html` in parallel.
+
+1. **Acceptance gate (section D item 2; O12, O14).**
+   - The Welcome window's first step has **Continue** as its button. Beside it, in the button row, it says "By clicking
+     Continue you agree to Dictum's Terms of Use." with "Terms of Use" a link to https://dictum.kynni.au/terms, and below that
+     "The Privacy Policy explains what Dictum keeps and sends." with "Privacy Policy" a link to https://dictum.kynni.au/privacy.
+     Both links open through `IPlatform.Open`, as Settings opens pages. The notice sits in the button row, not the scrolling
+     body, so it never scrolls away from Continue on a small screen. Each sentence is its line's accessible name.
+   - The words are `TermsText` constants in `src/Dictum.Core/Help/TermsText.cs`, which also holds the one Terms version,
+     `TermsText.Version = "1"`.
+   - **When it shows:** at every start until `settings.json` records `terms.accepted` = the version in force and
+     `terms.accepted_by` = the account name Dictum runs as (`Environment.UserName`), compared exactly (`AppRules.AsksTerms`).
+     A new install sees it as step 1 of the whole window. Any other copy without that record sees the window with that step
+     alone: an upgrade from 1.3.0 or earlier, an administrator's seeded file, a launch with `--model` or
+     `DICTUM_MODEL_PATH`. An unreadable `settings.json` asks too, because what it records is unknown.
+   - An acceptance recorded for another account name does not count.
+   - **Terms step alone:** no step line and no "next few steps" line; Continue records the acceptance, closes the window and
+     Dictum starts on the settings it had.
+   - **Closing before Continue quits.** Esc or the close box on the first step, before Continue, quits Dictum. Nothing is
+     written: the old `SkipRest` would have written the speech answer, so a person who closed at step 1 would next have seen
+     only the Terms step.
+   - **Recording.** One write of the `terms` object (both keys) through `SettingsFile.SetValue`, every other key kept. A new
+     install has no `settings.json` at Continue, so its record is written right after the first-run answer creates the file
+     (keeping the file's documented layout with `_doc`). A model-override launch with no file gets it after
+     `Models.FirstRun`. If the file cannot be written, Dictum goes on this time, logs a warning and asks again next start.
+   - The settings loader knows `terms.accepted` and `terms.accepted_by` (no "unknown setting" warning). README's settings
+     reference lists both.
+   - **Window size.** At 720 × 500 the first step measured 315 of 278 px (the notice in the button row, and the longer O15
+     sentence). `OnboardingWindow.WindowHeight` is now 560. `Fit` still clamps it to the work area: 1366 × 768 at 150 % was
+     already cut. At 125 % the body probably scrolls now; that is inferred from the recalled 48 DIP taskbar and 32 DIP caption
+     and was not measured.
+   - `PlainWordsText`'s "No acceptance gate goes with it (section 2c)" note is replaced. PlainWordsTests'
+     `The_welcome_step_shows_the_short_version_and_asks_for_no_acceptance` becomes `The_welcome_step_shows_the_short_version`.
+     The acceptance pins are in the new `TermsAcceptanceTests`.
+2. **Settings > About (D.3):** "Terms of use" after "Privacy policy" (opens https://dictum.kynni.au/terms) and "Third-party
+   notices" (opens the shipped `THIRD-PARTY-NOTICES.txt` through `IPlatform.Open`: `AppPaths.ThirdPartyNoticesFile`, beside
+   Dictum.exe on Windows, in Dictum.app's `Contents/Resources` on a Mac). Labels PROPOSED 23/10/2026. The Support card's
+   buttons now sit in a wrap panel, since five may not fit one row.
+3. **Settings > Privacy (D.4):** the Offline only description is now "No network at all: downloads, Check for updates, cloud
+   clean-up and cloud speech are refused; a server on this PC still works." (PROPOSED 23/10/2026).
+   `LanguageUiTests.The_clean_up_page_says_a_server_on_this_PC_tidies_each_dictation_only_while_it_does` exempts that one line
+   from its "no line names a server on this PC" check.
+4. **Approved copy changed (section C), each with the new marker:**
+   - O2 and O15 in `PlainWordsText`.
+   - O1 to O6 and the footer Terms link on `site/plain-words.html`. The O6 line sits before "Questions:", which is a placement
+     choice; its words are approved.
+   - O7 and O8 in the two consent texts.
+   - O11 in `docs/STORE.md`.
+   - O13 (a per-provider sentence in the dialogs) is not built, on the owner's word.
+5. **Installer (D.5):** `packaging/TERMS.txt` is the Terms draft 3 as plain text. It drops the italic status line, the
+   bracketed notes and the Markdown syntax, and keeps every sentence and heading.
+   - The heading line "Version 1, [date of publication]." reads "Version 1." with the bracket dropped.
+   - §16 reads as the brief gives it until the ACN and postal address are supplied.
+   - `Dictum.iss` gains `LicenseFile=TERMS.txt`. ISCC 7 compiled the script with a dummy payload ("Reading file
+     (LicenseFile)", successful compile). Setup itself was not run.
+6. **Catalogue (D.9):** qwen2.5-3b removed from `CleanupCatalog`, `scripts/download-model.ps1` and the README tables.
+   - The Gemma entries' marker, and the download note at `ModelCoordinator.SelectCleanup`, name "Gemma Terms of Use apply
+     (ai.google.dev/gemma/terms)" (PROPOSED), through `CleanupModelInfo.LicenceNote`.
+   - The two Gemma models are login-gated, so they never reach that download note: the balloon they get, "requires a Hugging
+     Face login", is unchanged.
+   - A settings.json with `llm.model` = `qwen2.5-3b` now gets the recommendation with a log line
+     (`EffectiveSettings.cs:34-38`), as for any unknown name.
+7. **TRADEMARKS.md (D.7)** with Terms §8's first three sentences; README links it under its licence line; LICENSE unchanged.
+8. **THIRD-PARTY-NOTICES.txt (D.8):**
+   - "Copyright (upstream licence):" lines sit under the .nuspec lines: llama.cpp in the three LLamaSharp.Backend entries,
+     LLamaSharp, NAudio.Core and .Wasapi, and the six Avalonia packages.
+   - Each line was checked against the project's LICENSE on its master branch on 23/10/2026 (raw.githubusercontent.com):
+     llama.cpp "Copyright (c) 2023-2026 The ggml authors"; Avalonia "Copyright (c) AvaloniaUI OÜ" (followed upstream by "All
+     Rights Reserved"); NAudio "Copyright 2020 Mark Heath"; LLamaSharp "Copyright (c) 2025 SciSharp STACK".
+   - Those are master-branch files, not the tags of the versions shipped.
+9. **SECURITY.md (D.13):** current release 1.3.0 (23/10/2026), and the guarantees list gains cloud speech: the consent-gated
+   host, and "unless you turn on cloud speech".
+10. **README:**
+    - The download-script line says the script is in the source code, not the direct download.
+    - The install section has the Terms line.
+    - The Privacy section's "Nothing leaves the machine by default." paragraph gains Terms §11's clipboard sentence.
+    - The first-run section describes the gate.
+11. **Pins and mutations.** Each pin was observed failing on the reverted or broken behaviour (23/10/2026, Debug build, the classes named), then the
+    file was restored byte for byte:
+    - (M1) The Terms step alone switched off in `AppShell.Start` (the gate as before this branch: upgrades, seeded files and
+      model overrides never asked). Four `TermsAcceptanceTests` failed:
+      - `Closing_the_window_before_Continue_quits_and_writes_nothing`: "Dictum started after the window was closed before
+        Continue ({ "whisper": … })".
+      - `An_upgrade_sees_the_Terms_step_alone_and_Continue_starts_Dictum` and `An_acceptance_by_another_account_does_not_count`:
+        "Assert.Equal() Failure: Values differ, Expected: 1, Actual: 0" (`TermsWindows`).
+      - `Continue_records_the_version_and_the_account`: "Expected: … [["accepted"] = "1", ["accepted_by"] = <this account>], Actual:
+        null".
+    - (M2a) The quit after the whole window, closed before Continue, removed: `Closing_the_window_…` failed with "Dictum
+      started after the window was closed before Continue (new install)".
+    - (M2b) The same for the Terms step alone: the same test failed with "… ({ "whisper": … })".
+    - (M24) `SkipRest` writing the speech answer before Continue: the same test failed with "a new install closed on its
+      first step wrote settings.json".
+    - (M3) The account comparison removed from `AppRules.AsksTerms`:
+      - `An_acceptance_by_another_account_does_not_count` failed with "Expected: 1, Actual: 0".
+      - `The_step_shows_until_this_account_has_accepted_the_version_in_force` failed with "Assert.True() Failure".
+    - (M4) `TermsText.Acceptance` put back to the 08:48 D1 wording ("… and confirm you have read its Privacy Policy."):
+      `The_first_step_says_the_approved_sentences_beside_Continue_and_links_both_pages` failed with "Collections differ at index
+      0 … Actual: ··· to Dictum's Terms of Use and confirm you have rea···".
+    - (M22) The button label put back to "Next": that test and the upgrade test failed with "Expected: Continue, Actual: Next".
+    - (M5) The privacy link opening the Terms page: that test failed with "Collections differ at index 1, Expected:
+      https://dictum.kynni.au/privacy, Actual: https://dictum.kynni.au/terms".
+    - (M6) `terms.accepted_by` not written. Three tests failed:
+      - `Continue_records_…` and the upgrade test: "Expected: [["accepted"] = "1", ["accepted_by"] = <this account>], Actual:
+        [["accepted"] = "1"]".
+      - The other-account test: "KeyNotFoundException: The given key 'accepted_by' was not present".
+    - (M7) A new install's record not written with the first-run answer: `Continue_records_…` failed with "Assert.True()
+      Failure" (`TermsRecorded`).
+    - (M20) Continue on the Terms step alone not ending the window: the upgrade test failed with "Assert.False() Failure"
+      (`window.IsVisible`).
+    - (M8) Settings > About's "Terms of use" removed: `Settings_About_opens_the_Terms_and_the_third_party_notices` failed with
+      "Collections differ at index 1, Expected: Terms of use, Actual: Third-party notices".
+    - (M23) The notices file looked for only beside the program: `The_notices_file_is_found_beside_the_program_or_in_the_app_bundle`
+      failed ("Expected: ···Dictum.app\Contents\Resources\THIRD-PARTY-NOT···").
+    - (M9) The old Offline only description: `Settings_Privacy_says_what_Offline_only_refuses` failed with "Assert.Contains()
+      Failure: Item not found in collection".
+    - (M10) TERMS.txt's cap sentence shortened to "is A$100.": `Setup_shows_the_Terms_with_the_cap_and_the_guarantees_word_for_word`
+      failed with "Assert.Contains() Failure: Sub-string not found".
+    - (M21) `LicenseFile=TERMS.txt` removed from `Dictum.iss`: the same test failed with "Assert.Contains() Failure: Sub-string
+      not found".
+    - (M11) qwen2.5-3b put back in the catalogue:
+      - `Catalogue_matches_the_spec_sizes_hashes_and_licences` failed with "Collections differ at index 0, Expected:
+        qwen2.5-0.5b, Actual: qwen2.5-3b".
+      - `No_catalogue_entry_is_non_commercial_and_the_Gemma_entries_name_their_terms` failed with "Assert.All() Failure: 1 out
+        of 6 items in the collection did not pass".
+    - (M12) The Gemma note dropped from `Marker`:
+      - `Catalogue_matches_…` failed with "Strings differ … Expected: ···login · size-checked only · Gemma Terms of Use
+        app···".
+      - The non-commercial test failed with "Assert.All() Failure: 2 out of 2 items … Assert.EndsWith() Failure".
+    - (M13) LLamaSharp's upstream line removed from THIRD-PARTY-NOTICES.txt:
+      `The_upstream_copyright_line_sits_beside_the_nuspec_line(package: "LLamaSharp", …)` failed with "Assert.Matches()
+      Failure: Pattern not found in value".
+    - (M14) `PlainWordsText.OpenSource` with "It is provided as is, without warranty." put back, failing at "Collections
+      differ at index 1 … Expected: ···e under the MIT licence. We built it with care, bu··· Actual: ···e under the MIT
+      licence. It is provided as is, wit···". Four tests failed:
+      - `The_short_version_is_pinned_word_for_word`, `The_about_page_ends_with_the_plain_words_card` and
+        `The_welcome_step_shows_the_short_version`.
+      - `OwnerApprovalsTests.The_plain_words_short_version_is_pinned`.
+    - (M15) `PlainWordsText.Cloud`'s first sentence put back: the same four failed at "Expected: "Dictum itself sends nothing
+      you say off your compu"··· Actual: "Nothing you say leaves this PC unless you switch o"···".
+    - (M16) O7's sentence removed from the clean-up consent:
+      - `OwnerApprovalsTests.The_clean_up_consent_text_is_the_approved_text_byte_for_byte` failed with "Collections differ …
+        (pos 287)".
+      - The three `CloudWarningAndPresetsTests.The_consent_text_names_the_key_that_goes_with_the_text` rows failed with
+        "Sub-string not found".
+    - (M17) O8's sentence removed from the speech consent:
+      - `CloudSpeechTests.The_consent_text_is_the_approved_text_byte_for_byte` failed with "Expected: ···l dictionary as a
+        hint. In hands-free mode, the cl··· Actual: ···l dictionary as a hint. It uses your own API key (···".
+      - `CloudSpeechUiTests.Declining_the_speech_consent_step_records_nothing_and_sends_nothing` failed with "Collections
+        differ … (pos 204)".
+    - (M18) STORE.md's sentence put back to "provided as is": `The_store_listing_carries_the_approved_sentence` failed with
+      "Assert.EndsWith() Failure … Expected end: " Dictum is free and open source under the MIT lice"···".
+    - (M19) A line added to plain-words.html: `The_plain_words_page_is_the_approved_statement_word_for_word` failed with
+      "Collections differ at index 17 … Actual: We cannot pay for a loss it causes.".
+12. **Left to the site lane, and follow-up.** The site lane owns `site/terms.html`, `site/privacy.html`, `site/index.html`,
+    `site/help.html`, `site/styles.css` and the pins in `SiteStoreFirstTests`, `HelpPageTests` and `UpdateCheckTests`.
+    - **O9** ("your PC" → "your computer" twice in the privacy policy's OpenAI-compatible paragraph) and **O10** (the
+      website-route sentence) change `site/privacy.html`. They are pinned by tests this lane owns:
+      `CloudWarningAndPresetsTests.The_privacy_policy_carries_the_approved_OpenAI_compatible_wording_word_for_word` (its
+      `ApprovedOpenAiCompatibleParagraph` and `ApprovedLocalServerClause`) and
+      `PlainWordsTests.The_privacy_policy_and_the_readme_name_the_plain_words_route`. They are also pinned by
+      `UpdateCheckTests.cs:44`, which the site lane owns.
+    - This branch leaves those pins on today's `site/privacy.html`. Whichever PR merges second updates them to the new
+      sentences in the same change.
+    - The README's own route row (`| Only when you open the privacy policy, Dictum in plain words …`) gets the Terms page
+      added then.
+13. **Publication order (section D item 0).**
+    - /terms, the footer links to it, the installer licence page and Partner Center's "Additional license terms" go live with
+      the first release that contains this gate, never before.
+    - Until then Terms section 3 ("Dictum still asks you to accept them the first time it starts") is false for every
+      installed copy.
+    - This branch puts the installer licence page and the plain-words footer link in the same release as the gate.
+      `docs/STORE.md` notes the Partner Center step for the owner or orchestrator.
+    - The privacy policy can go live earlier, provided its Terms link comes only with the Terms.
+14. **Gates** (this branch, 23/10/2026).
+    - `dotnet test Dictum.sln` (Debug, 11:41 to 11:49 AEDT): 2653 total, 2612 passed, 0 failed, 41 skipped. The skipped
+      tests are gated by environment variables, as on main.
+    - The same run on main bd99a24, in a separate worktree before this branch: 2629 total, 2588 passed, 0 failed, 41 skipped.
+    - Release build `--no-incremental`: 0 errors and 5 warnings, all xUnit2013 in `MacPackagingTests.cs` and
+      `SiteStoreFirstTests.cs`, which this branch does not touch.
+    - `PublicCopyNeutralityTests` is within that run, and was run again on its own after this entry was finished.
+    - ISCC 7 compiled `Dictum.iss` with a dummy payload.
+    - **Not run:**
+      - the installed app, and tray mode, which is never run on this host;
+      - the 41 gated tests (desktop, tray, audio, published layout);
+      - anything on a Mac;
+      - Setup itself.
+    - The Welcome step was rendered headless (720 × 560, and 480 wide) and looked at: the notice sits beside Continue, each
+      sentence on one row at the default size.
+15. **Open points for the owner** (not changed here, because no approved wording covers them).
+    - **"Press Next to begin."** The Welcome window's first step still shows `OnboardingText.WelcomeNext` ("The next few
+      steps take a minute or two. Press Next to begin.", approved 22/10/2026), but its button is now **Continue**. The
+      sentence needs the owner's words. It is hidden on the Terms step alone.
+    - **O15 on plain-words.html:44.** Section C row O15 names `site/plain-words.html:44` as well as `PlainWordsText`. This
+      lane's brief limited the page to rows O1 to O6 and kept every other line byte for byte, so line 44 still says
+      "Nothing you say leaves your PC unless you switch on a cloud option and agree to it.". If O15 is meant there too, it is
+      one line plus its pin.
+    - **"as it is" remains.** The page keeps "Dictum is free and we give it to you as it is." before the O1 sentences: O1
+      and O2 did not touch it.
+    - **SPEC is stale.** `docs/SPEC.md` §27 item 1 ("one paragraph, then Next") predates the gate. This lane does not own
+      SPEC.
+    - **The account name is stored.** `settings.json` now records the account name that accepted the Terms
+      (`terms.accepted_by`). The privacy policy's file list describes `settings.json` as "your settings"; whether it should
+      name the account too is for the site lane and the owner.
+    - **No date in the installer's Terms.** `packaging/TERMS.txt` has no publication date: its heading line reads "Version
+      1." until the owner sets the date of publication.
+    - **Store version not checked.** SECURITY.md says the Store carries a release "once Microsoft has certified it". The
+      Store's current version was not checked on 23/10/2026; GitHub's latest release is 1.3.0, published
+      2026-10-22T15:31:44Z (`gh release list`), which is 23/10/2026 in Sydney.

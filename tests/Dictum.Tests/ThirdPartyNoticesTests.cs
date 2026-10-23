@@ -138,4 +138,28 @@ public sealed class ThirdPartyNoticesTests
             Assert.True(Regex.IsMatch(block, @"(?m)^Copyright \(nuspec\): \S"), $"{name}: no 'Copyright (nuspec):' line");
         }
     }
+
+    /// <summary>
+    /// Pin (legal block, owner 23/10/2026 09:50 AEDT, section D item 8): the copyright lines of the upstream LICENSE files of
+    /// llama.cpp, Avalonia, NAudio and LLamaSharp sit beside the .nuspec line of every entry that ships their code (read
+    /// 23/10/2026 from each repository's master branch), each directly under its entry's "Copyright (nuspec):" line.
+    /// </summary>
+    [Theory]
+    [InlineData("LLamaSharp", "Copyright (c) 2025 SciSharp STACK")]
+    [InlineData("LLamaSharp.Backend.Cpu", "Copyright (c) 2023-2026 The ggml authors")]
+    [InlineData("LLamaSharp.Backend.Vulkan", "Copyright (c) 2023-2026 The ggml authors")]
+    [InlineData("LLamaSharp.Backend.Vulkan.Windows", "Copyright (c) 2023-2026 The ggml authors")]
+    [InlineData("NAudio.Core", "Copyright 2020 Mark Heath")]
+    [InlineData("NAudio.Wasapi", "Copyright 2020 Mark Heath")]
+    [InlineData("Avalonia", "Copyright (c) AvaloniaUI OÜ")]
+    [InlineData("Avalonia.Themes.Fluent", "Copyright (c) AvaloniaUI OÜ")]
+    [InlineData("Avalonia.Win32", "Copyright (c) AvaloniaUI OÜ")]
+    [InlineData("Avalonia.Native", "Copyright (c) AvaloniaUI OÜ")]
+    [InlineData("Avalonia.Skia", "Copyright (c) AvaloniaUI OÜ")]
+    [InlineData("Avalonia.Remote.Protocol", "Copyright (c) AvaloniaUI OÜ")]
+    public void The_upstream_copyright_line_sits_beside_the_nuspec_line(string package, string upstream)
+    {
+        var block = Regex.Split(Notices, @"(?m)^-{78}\r?$").Single(b => Regex.IsMatch(b, $@"^\s*Package: {Regex.Escape(package)} \S+\r?$", RegexOptions.Multiline));
+        Assert.Matches($@"(?m)^Copyright \(nuspec\): [^\r\n]+\r?\nCopyright \(upstream licence\): {Regex.Escape(upstream)}\r?$", block);
+    }
 }
