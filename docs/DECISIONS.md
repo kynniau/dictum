@@ -5651,3 +5651,172 @@ shared UI code, so Windows had the first as well:
    - **Checked and owned** (a `Ui.Button`, synchronous up to the question): every calibration button; both cloud consents; delete model (every question before its first await); delete data; Remove Dictum completely (both warnings); the model folder move question; the Settings > Models catalogue and Simple rows; and the Welcome window's buttons. The Fix last dictation, Add word and Add snippet windows open no question.
 7. **Not verified.** Nothing ran on a Mac. The calibration path was not run on the real Win32 backend: `DICTUM_UI_TESTS` was not set, so the gated probe pin skipped. The installed app was not run, because tray mode is never run on this host. After Download, keyboard focus leaves the clicked button, as it already did when a download ended and the list was redrawn.
 8. **Gates, on this branch after the lens follow-up (23/10/2026).** Release build `--no-incremental`: 0 errors, 5 warnings, all xUnit2013 in `MacPackagingTests.cs` and `SiteStoreFirstTests.cs`, which this branch does not touch. `DialogOwnerTests`: 10 total, 9 passed, 1 skipped (the gated Win32 probe). Full suite (`dotnet test Dictum.sln`, Debug, without `DICTUM_UI_TESTS`): 2629 total, 0 failed, 2588 passed, 41 skipped. It ran on the final tree before these counts were written into this file. On f0b1bed, before pin (f): 2628 total, 0 failed, 2587 passed, 41 skipped.
+
+## Legal block, site side: Terms of Use page, Privacy Policy rewrite, footers, pins, host and file tests (23/10/2026 11:10 AEDT, branch legal/site)
+
+The owner approved, at 09:50 AEDT on 23/10/2026, draft 3 of the Terms of Use and the Privacy Policy and the build tasks in
+`.demo-preview/legal/drafts/basis-and-changes.md` (not in the repo). This lane built the site side (build items D.1, D.10, D.11 and
+the site pins of D.12) on origin/main bd99a24. An app lane builds the in-app side in parallel and owns `site/plain-words.html`,
+`PlainWordsTests`, `CloudWarningAndPresetsTests`, `OwnerApprovalsTests` and `src/`; none of them was edited here. Every new or
+replaced piece of copy carries `APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword`; every older APPROVED
+comment stays where it was.
+
+1. **`site/terms.html` (new).** The Terms of Use, every heading and sentence of draft 3 in order, in the privacy page's skeleton
+   (head, header, `main.wrap.doc`, h1 "Terms of use", "Dictum by Kynni. Version 1, last updated 23/10/2026.", sixteen sections with
+   `aria-labelledby`, footer). The draft's italic status line and its square-bracket notes are left out. Section 16 reads "Kynni Pty
+   Ltd, Australia. Email hello@kynni.com.au. Dictum's source code and release files are at github.com/kynniau/dictum." until the
+   owner supplies the ACN and postal address. Typographic apostrophes and quotation marks, as the site's prose uses; bold runs as in
+   the draft; no script. Title "Terms of use · Dictum by Kynni"; canonical https://dictum.kynni.au/terms. The meta description is the
+   one sentence this lane wrote ("Dictum's terms of use: what we promise and do not promise for the Dictum app, the Dictum for Mac
+   beta and this website."), drawn from section 1. It is not part of the approved text and carries a `PROPOSED 23/10/2026 (meta
+   description; owner approval needed)` comment (lens on PR #75). `/terms`
+   is served by the `cleanUrls: true` that already serves `/privacy`; `site/vercel.json` is unchanged. Links: /privacy,
+   ai.google.dev/gemma/terms (the URL `CleanupCatalog.cs` already uses), hello@kynni.com.au and github.com/kynniau/dictum.
+2. **`site/privacy.html` (rewritten from draft 3).** Kept byte for byte, with their APPROVED comments: the scope sentence (07:10),
+   the cloud speech heading and paragraph (22:52 and 06:15), the OpenAI-compatible paragraph with "your PC" twice, and the
+   website-route sentence (22/10/2026 20:47). The PROPOSED sentence "In hands-free mode, up to ten words of what you said just before
+   go with each dictation's text." is added as its own paragraph after the OpenAI-compatible one, because
+   `CloudWarningAndPresetsTests` compares that paragraph whole. Not applied: O9 ("your PC" to "your computer") and O10 (the new
+   website-route sentence); see item 7. Left out: the bracketed Zoho data-processing sentence. The representative sentence reads "We
+   will review that within a year of this policy's date, and sooner if use of Dictum there grows, and say so here." Section 12 reads
+   "Kynni Pty Ltd, Australia, www.kynni.com.au." until the ACN and address arrive. "Last updated" is 23/10/2026 (the shell clock).
+   Markup: the draft's bold run-in headings in sections 2 and 4 are h3 headings, as the page already had them (the kept cloud speech
+   heading and three existing pins need the h3s); section 3's two folder headings are cards with an h3; every other bold run is
+   `<strong>`. Links added for the addresses the text names: vercel.com/legal/dpa, vercel.com/legal/privacy-notice, ico.org.uk,
+   www.oaic.gov.au (link text "oaic.gov.au" as written) and github.com/kynniau/dictum. Each answered HTTP 200 to curl on 23/10/2026.
+   The page's meta description is now "Dictum sends nothing about you to Kynni. What it keeps on your computer, when it connects to the
+   internet, and how to delete everything." (was "Dictum collects nothing. What it keeps on your PC, ..."), under the same PROPOSED
+   comment (lens on PR #75). Neither meta description is pinned.
+3. **Footers.** `<li><a href="/terms">Terms of use</a></li>` right after the Privacy policy link on `index.html`, `help.html`,
+   `privacy.html` and `terms.html`. On `terms.html` it carries `aria-current="page"`, as each page marks its own footer link.
+   `plain-words.html` gets it from the app lane.
+4. **D.10 lines, old to new.**
+   - `index.html` "Free to keep on your PC" card: "No subscription, no word limits, no upsell." to "No subscription, no word limits."
+   - `index.html` "Model downloads" card: "Every file is checked against a fingerprint built into Dictum before it is used." to "Every
+     file Dictum downloads is checked against a fingerprint built into Dictum before it is used."
+   - `index.html` FAQ "What's the licence?", second paragraph: "The speech and tidy-up models are made by other organisations and
+     carry their own licences, which Dictum shows when you pick one. The recommended tidy-up model, Qwen2.5 1.5B Instruct, is licensed
+     Apache-2.0. Qwen2.5 3B is for non-commercial use only, and Dictum never recommends it." to "The speech and tidy-up models are
+     made by other organisations and carry their own licences, listed in the Terms of Use. The recommended tidy-up model, Qwen2.5 1.5B
+     Instruct, is licensed Apache-2.0."
+   - `help.html` section 7 quote: "We collect nothing. Dictum has no account, no analytics, no telemetry and no crash reporting. We
+     never receive your audio or your text." to the policy's new first short-version bullet, word for word.
+   Each was checked by grep before and after.
+5. **Gates and pins.**
+   - `SiteStoreFirstTests`: `terms.html` is in the page list, the footer GitHub-line theory, the "unless" gate, the direct-download
+     gate, the anchor routes (`/terms`) and a new per-page neutrality theory that names the page (`PublicCopyNeutralityTests` already
+     sweeps every public file).
+   - The "unless" gate's "never leaves" and "turned into text on" patterns now match "computer" wherever they matched "PC".
+   - Two exemptions, each removing one exact string before its scan, so every other use still fails:
+     - the policy's sentence "A clean-up server on your own computer may use http://localhost, which never leaves your computer.",
+       in the "unless" gate. It is about a localhost connection, not the voice or the text leaving, so it has no "unless".
+     - on privacy.html only, the policy's "in the direct download for Windows and in the Mac beta", in the direct-download gate. It
+       is the policy's name for that build, but contains "Download for Windows" when case is ignored. The gate asserts exactly three
+       uses (one starts section 5 with a capital "In") and removes only those; the phrase on any other page still fails (lens on
+       PR #75: the first version removed "direct download for Windows" on every page).
+   - Pins replaced with the new sentences: the brief's :175, :178, :183 and :184, and also :176 and :177. The new text removes the
+     sentences those two pinned, so they would fail. :178's old sentence was still on the page; it was replaced as briefed with the
+     whole new `.env` sentence.
+   - New theory `The_legal_block_sentences_are_on_the_page` pins, word for word:
+     - from the Terms: section 4's guarantees paragraph, section 9's A$100 cap sentence, section 14's home-courts bullet and section
+       15's Mac paragraph;
+     - from the policy: the four short-version bullets, the Australia paragraph and the Zoho sentence;
+     - the three new `index.html` lines.
+   - `The_terms_never_exclude_the_laws_remedies` pins the Australian Consumer Law, UK device-damage and product-liability bullets
+     inside the "We never exclude or limit liability for:" list itself.
+   - `The_lines_the_legal_block_replaced_are_gone` checks that the replaced lines have left the page that had them.
+   - `Every_page_links_to_the_terms_from_its_footer_after_the_privacy_policy` checks the four pages above.
+   - `UpdateCheckTests`: the short-version bullet constant is replaced with the new bullet. `PrivacySiteSentence` is unchanged (O10
+     waits).
+   - `HelpPageTests.The_site_guide_quotes_the_privacy_policys_short_version_word_for_word` ties the guide's quote to the policy's
+     first bullet.
+   - New `OutboundHostsTests` (3 tests): it reads the hosts from `ModelCatalog.DownloadHost`, `UpdateCheck.VersionUrl`,
+     `AnthropicLlmClient.DefaultBaseUrl` (the brief named the first, second and fourth groups; Anthropic's default address lives
+     here, not in `CloudPresets`) and every clean-up and speech preset off this computer (Azure as its `.openai.azure.com` suffix).
+     It asserts:
+     - the hosts equal huggingface.co, dictum.kynni.au, api.anthropic.com, api.openai.com, generativelanguage.googleapis.com,
+       api.groq.com and openai.azure.com;
+     - each is named on `privacy.html`;
+     - every host-like name on the page is one of those or on a short list of names the page gives the reader: us.aws.cdn.hf.co,
+       github.com, www.kynni.com.au, vercel.com, ico.org.uk, oaic.gov.au, www.oaic.gov.au and nspasteboard.org.
+   - New `StoredFilesPolicyTests` (3 tests): it calls `PathRegistry.Locations` with a scratch profile it never creates, the app
+     folders aside. It asserts that the registry's names equal a table that gives each name the policy's word for it ("Working
+     files" for the three `.tmp` saves, the folder for files inside calibration, logs and models), and that each word appears on
+     `privacy.html` as code. The reverse test (lens on PR #75) asserts that every .json, .txt or .env name the storage section writes
+     as code is a name the registry stores.
+6. **Mutations, observed failing on 23/10/2026, each restored and re-checked byte for byte.**
+   - (a) terms.html section 9 cap sentence deleted.
+   - (b) the cap changed to "A$1,000 (one thousand Australian dollars)".
+   - (c) section 4's "Section 9 does not reduce any such guarantee, or what the law entitles you to if we fail to meet one."
+     deleted.
+   - (a) to (c) each failed `The_legal_block_sentences_are_on_the_page` for its sentence.
+   - (d) the old help quote put back: the twin test and the gone test failed.
+   - (e) `api.groq.com` taken off privacy.html: the hosts-named test (and the cloud speech pin) failed.
+   - (f) a fake host, api.example-cloud.com, added to privacy.html: the no-other-host test failed.
+   - (g) `snippets.txt` taken off privacy.html: the stored-files test failed.
+   - (h) a fake name added to the stored-files table: the registry test failed.
+   - (i) api.groq.com taken out of the host list: the host-list test failed.
+   - (j) "Your voice never leaves your computer." and, separately, "Your speech is turned into text on your computer." added to
+     terms.html: the extended "unless" gate failed.
+   - (k) with the localhost exemption removed, the gate failed on privacy.html.
+   - (l) "Download for Windows." added to terms.html: the direct-download gate failed.
+   - (m) with the direct-download exemption removed, the gate failed on privacy.html.
+   - (n) the help.html footer Terms link removed: the footer test failed.
+   - (o) the policy's online bullet put back to the 22/10/2026 text: `UpdateCheckTests.The_privacy_policy_says_when_Dictum_reads_dictum_kynni_au`
+     and two pins failed.
+7. **Deferred to a follow-up PR after both lanes merge.**
+   - O9 ("your PC" to "your computer" in the OpenAI-compatible paragraph). It is pinned whole in `CloudWarningAndPresetsTests`,
+     which the app lane owns.
+   - O10 (the website-route sentence that adds the Terms of Use and the Mac beta). The same sentence is pinned in
+     `UpdateCheckTests` (privacy page and the `index.html` dictum.kynni.au card) and in `PlainWordsTests`, so one PR must change
+     all three after both lanes merge.
+   - plain-words.html's footer link and its row in the new footer test go with the follow-up too.
+8. **Publication order (D.0).**
+   - `/terms`, the footer links to it and the `index.html` licence line ("listed in the Terms of Use") merge to main with this PR.
+     They must not be deployed until the first release that contains both the in-app acceptance gate (build item 2) and the
+     catalogue change that removes qwen2.5-3b (build item 9); until then Terms section 3 is false for every installed copy, and
+     Terms section 7 and the index.html licence line are false for qwen2.5-3b. privacy.html is not deployed before the O10
+     follow-up merges. At deploy, terms.html:36 (the date line) carries the publication date. The Mac release that ships PR #74
+     removes privacy.html's Universal Clipboard sentence and Terms section 11's clipboard clause (build item 16) in the same deploy.
+   - The orchestrator deploys the site, so every site deploy from main after this merge waits for that release, not only
+     `/terms`. Alternatively, deploy from an earlier commit.
+   - D.0 lets the privacy policy go live earlier only without its Terms link. The rewritten `privacy.html` here carries the footer
+     Terms link, so an earlier policy deploy needs that link taken out first.
+9. **Open, for the owner.**
+   - The ACN and postal address (Terms section 16, Policy section 12).
+   - The two PROPOSED meta descriptions above.
+   - `help.html` and `index.html` still say the policy "is short"; it is now twelve sections. Not in the brief, so unchanged.
+10. **Gates, on this branch (23/10/2026).**
+    - Release build: 0 errors and the 5 xUnit2013 warnings main already had (MacPackagingTests.cs, and SiteStoreFirstTests.cs's
+      landing-page button test, untouched here).
+    - Full suite (`dotnet test --solution Dictum.sln -c Release`, without `DICTUM_UI_TESTS`): 2669 total, 0 failed, 2628 passed,
+      41 skipped. The entry above recorded 2629 on PR #73's head (Debug), and this lane adds 40 tests (2629 + 40 = 2669); main itself was not re-run here. It ran on the final tree before these
+      counts were written into this file; `PublicCopyNeutralityTests` and the site tests were run again afterwards.
+    - `site/terms.html` and `site/privacy.html` pass a tag-balance, duplicate-id and `aria-labelledby` check. Every href on them
+      is a site path, the mailto address, or one of: dictum.kynni.au, github.com/kynniau/dictum, www.kynni.com.au,
+      ai.google.dev/gemma/terms, vercel.com/legal/dpa, vercel.com/legal/privacy-notice, ico.org.uk and www.oaic.gov.au.
+    - Not verified: the pages were not rendered in a browser, and nothing ran on a Mac.
+11. **Lens on PR #75 (a2ce283, Needs changes, no blockers), fixed on this branch.**
+    - The direct-download exemption now applies to privacy.html only, and to exactly three uses of "in the direct download for
+      Windows and in the Mac beta" (item 5). The lens's own code asked for that exact lowercase string three times. The page has it
+      twice, plus once with a capital "In" starting section 5, so the gate matches "[Ii]n".
+    - `StoredFilesPolicyTests` gains the reverse direction (item 5).
+    - The per-page neutrality theory calls `PublicCopyNeutralityTests.Offences` (already internal), so it is the sweep's rule, not a copy.
+    - The never-exclude bullets test asserts that each bullet appears exactly once on the page.
+    - Both meta descriptions are PROPOSED (items 1 and 2).
+    - The first publication-order bullet (item 8) is replaced as the lens wrote it. Two changes: the opening sentence naming what
+      merges is kept, because the lens's text begins "They"; and the date line is cited as terms.html:36, because the PROPOSED
+      comment moved it down from 35.
+    - Mutations, observed failing on 23/10/2026, each restored:
+      - "Prefer the direct download for Windows? It is on GitHub" added to index.html;
+      - "Get the direct download for Windows from our GitHub releases." added to help.html;
+      - a fourth use of the policy's phrase added to privacy.html: the count assertion fails every row;
+      - with the exemption's removal line deleted, the gate failed on privacy.html;
+      - a fake `history.json` item added to the storage list: the reverse test failed;
+      - the Australian Consumer Law bullet copied into the not-liable list: the never-exclude test failed;
+      - a banned word added to terms.html: the per-page neutrality theory failed.
+    - Gates after these fixes (23/10/2026):
+      - Release build: 0 errors, the same 5 xUnit2013 warnings.
+      - Full suite (`dotnet test --solution Dictum.sln -c Release`): 2670 total, 0 failed, 2629 passed, 41 skipped. That is one more
+        test than item 10: the reverse stored-files test. It ran before this line was written.
+      - `PublicCopyNeutralityTests` and the site tests were run again afterwards.

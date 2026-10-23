@@ -42,8 +42,10 @@ public class UpdateCheckTests
     /// made it match this one, as the lane's brief asked.
     /// </summary>
     private const string PrivacySiteSentence = "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
-    // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the bullet was "... to send text to a cloud clean-up service or a server you choose."
-    private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, to check for updates in the direct-download version, or, if you switch it on, to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose.</li>";
+    // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword. The bullet was "... to download a model, to check for updates in the
+    // direct-download version, or, if you switch it on, to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose."
+    // (APPROVED 22/10/2026 22:52 AEDT); the policy now covers the Mac beta's update check too.
+    private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or to check for updates in the direct download for Windows and in the Mac beta. If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose.</li>";
 
     private const string DownloadPage = "https://github.com/kynniau/dictum/releases/latest";
 
