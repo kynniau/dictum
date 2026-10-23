@@ -31,7 +31,7 @@ public static class CliCommands
     }
 
     /// <summary>
-    /// PROPOSED 23/10/2026 (legal block, lens on PR #76): what --transcribe and --bench-cleanup print, on stderr, before they exit 1
+    /// APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. What --transcribe and --bench-cleanup print, on stderr, before they exit 1
     /// while this account has not accepted the Terms of Use in the app (<see cref="RefusedWithoutTerms"/>).
     /// </summary>
     public const string TermsNotAccepted = "Start Dictum once and press Continue to accept its Terms of Use.";

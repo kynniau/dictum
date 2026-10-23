@@ -35,7 +35,7 @@ public class CleanupCatalogTests
     /// Pin (legal block, owner 23/10/2026 09:50 AEDT, section D item 9): no catalogue entry is under a non-commercial licence
     /// (qwen2.5-3b, under the Qwen Research License, was removed, here and in download-model.ps1), so Dictum may be used at work
     /// with any model it lists (Terms section 2); and the two Gemma entries name Google's Gemma Terms of Use wherever they are
-    /// listed (PROPOSED 23/10/2026: "Gemma Terms of Use apply (ai.google.dev/gemma/terms)"), the others nothing.
+    /// listed (APPROVED by the owner 23/10/2026 13:20 AEDT, legal strings block 2: "Gemma Terms of Use apply (ai.google.dev/gemma/terms)"), the others nothing.
     /// </summary>
     [Fact]
     public void No_catalogue_entry_is_non_commercial_and_the_Gemma_entries_name_their_terms()

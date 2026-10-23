@@ -26,15 +26,16 @@ internal static class OnboardingText
     public const string WelcomeHeading = "How Dictum works";
 
     /// <summary>
-    /// The orchestrator's decision (21/10/2026): "Everything happens on this PC." only. "Nothing you say is sent anywhere" was
-    /// dropped: cloud clean-up, off by default and behind its own consent step, sends text once switched on.
+    /// The orchestrator's decision (21/10/2026): "Nothing you say is sent anywhere" was dropped: cloud clean-up, off by default and
+    /// behind its own consent step, sends text once switched on. The last sentence, "Everything happens on this PC unless you turn on
+    /// a cloud option.": APPROVED by the owner 23/10/2026 13:50 AEDT (legal strings block 2, section 5 option (a)): do not reword.
     /// </summary>
     public const string WelcomeText =
         "Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. " +
-        "Everything happens on this PC.";
+        "Everything happens on this PC unless you turn on a cloud option.";
 
-    // PROPOSED 23/10/2026: "The next few steps take a minute or two. Press Continue to begin." (owner decision pending)
-    public const string WelcomeNext = "The next few steps take a minute or two. Press Next to begin.";
+    // APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. The button on this step is Continue (the Terms are accepted there).
+    public const string WelcomeNext = "The next few steps take a minute or two. Press Continue to begin.";
 
     // ---- 2. Where to keep the model files ----
     public const string FolderName = "Model files";

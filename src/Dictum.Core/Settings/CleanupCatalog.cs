@@ -30,7 +30,7 @@ public sealed record CleanupModelInfo(
 
     /// <summary>
     /// The licence a picker, a menu and the download question name beside the model, or null for one under an open-source licence
-    /// (Apache-2.0, MIT). The two Gemma models: PROPOSED 23/10/2026 (legal block, section D item 9), "Gemma Terms of Use apply
+    /// (Apache-2.0, MIT). The two Gemma models: APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword, "Gemma Terms of Use apply
     /// (ai.google.dev/gemma/terms)".
     /// </summary>
     public string? LicenceNote => Licence == CleanupCatalog.GemmaLicence ? CleanupCatalog.GemmaNote : null;
@@ -54,7 +54,7 @@ public static class CleanupCatalog
     /// <summary>The licence name the two Gemma entries carry (their model card's "gemma" licence).</summary>
     public const string GemmaLicence = "Gemma Terms of Use";
 
-    /// <summary>PROPOSED 23/10/2026 (legal block, section D item 9): what Dictum shows beside a Gemma model.</summary>
+    /// <summary>APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. What Dictum shows beside a Gemma model.</summary>
     public const string GemmaNote = "Gemma Terms of Use apply (ai.google.dev/gemma/terms)";
 
     public static IReadOnlyList<CleanupModelInfo> Entries { get; } =

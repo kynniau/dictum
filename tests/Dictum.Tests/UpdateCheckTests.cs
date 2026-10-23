@@ -38,16 +38,13 @@ public class UpdateCheckTests
 
     /// <summary>
     /// The privacy policy's sentence for dictum.kynni.au since O10 (APPROVED by the owner 23/10/2026 09:50 AEDT, legal block): it adds the Terms of
-    /// Use and the Mac beta. It replaced the 22/10/2026 20:47 AEDT sentence, which is <see cref="LandingSiteSentence"/> below.
+    /// Use and the Mac beta. It replaced the 22/10/2026 20:47 AEDT sentence; the landing page's card carries it too (see below).
     /// </summary>
     private const string PrivacySiteSentence = "Only when you open the privacy policy, the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct download for Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
 
-    /// <summary>
-    /// The landing page's card for dictum.kynni.au, unchanged by O10 (which names the privacy policy only): the sentence the policy had since 22/10/2026
-    /// 20:47 AEDT (plain-words route added, APPROVED). The card carried the earlier sentence ("... the privacy policy or the full guide ...") until the cloud
-    /// speech copy lane (APPROVED 22/10/2026 22:52 AEDT) made it match the policy; since O10 the two differ, and the owner decides whether the card follows.
-    /// </summary>
-    private const string LandingSiteSentence = "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you; the Store build is updated by the Store.";
+    // The landing page's card for dictum.kynni.au carries PrivacySiteSentence too, word for word: APPROVED by the owner 23/10/2026 13:57 AEDT (legal
+    // strings block 2). From 22/10/2026 20:47 AEDT to then it kept the earlier sentence ("... Dictum in plain words or the full guide from Settings,
+    // or click Check for updates in the direct-download version, ...").
     // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword. The bullet was "... to download a model, to check for updates in the
     // direct-download version, or, if you switch it on, to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose."
     // (APPROVED 22/10/2026 22:52 AEDT); the policy now covers the Mac beta's update check too.
@@ -698,10 +695,10 @@ public class UpdateCheckTests
     }
 
     [Fact]
-    public void The_landing_page_card_for_dictum_kynni_au_keeps_its_22_10_2026_sentence()
+    public void The_landing_page_card_for_dictum_kynni_au_says_the_same()
     {
         var html = VisibleHtml("index.html");
-        Assert.Equal(LandingSiteSentence, ParagraphAfter(html, """<h3 class="host">dictum.kynni.au</h3>"""));
+        Assert.Equal(PrivacySiteSentence, ParagraphAfter(html, """<h3 class="host">dictum.kynni.au</h3>"""));
         Assert.DoesNotContain("no update check", html, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -49,7 +49,7 @@
     },
     {
       "id": "next",
-      "caption": "Setup opens. Click Next.",
+      "caption": "Setup moves on. Click Next.",
       "do": [ { "do": "click", "target": { "window": "^Setup", "type": "Button", "name": "Next", "match": "prefix", "timeout": 60 } } ]
     },
     {

@@ -540,4 +540,79 @@ public class OwnerApprovalsTests
         Assert.Equal("the copy did not match the catalogue, so the copy was deleted", ModelMover.CopyDoesNotMatch);
         Assert.Equal("it was copied, but the original could not be removed", ModelMover.OriginalKept);
     }
+
+    // ---- Legal strings block 2: APPROVED by the owner 23/10/2026 13:20 AEDT (sections 1 to 4), 13:50 (section 5), 13:51 (contact lines), 13:57 (index.html cards, README rows) ----
+
+    private static string Repo(params string[] parts) =>
+        File.ReadAllText(Path.Combine([FixBatchDownloadTests.RepoRoot(), .. parts])).Replace("\r\n", "\n");
+
+    /// <summary>APPROVED 23/10/2026 13:20 and 13:50 AEDT pin: the Welcome step's two lines, word for word ("Continue" for the button, and the cloud qualifier).</summary>
+    [Fact]
+    public void The_welcome_step_lines_say_continue_and_the_cloud_qualifier()
+    {
+        Assert.Equal("Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. Everything happens on this PC unless you turn on a cloud option.",
+            Dictum.UI.Views.Onboarding.OnboardingText.WelcomeText);
+        Assert.Equal("The next few steps take a minute or two. Press Continue to begin.", Dictum.UI.Views.Onboarding.OnboardingText.WelcomeNext);
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:20 AEDT pin: the README's Terms line and TRADEMARKS.md's last line.</summary>
+    [Fact]
+    public void The_readme_and_trademarks_point_to_the_terms()
+    {
+        Assert.Contains("\nDictum's Terms of Use: https://dictum.kynni.au/terms (shown on first start).\n", Repo("README.md"));
+        Assert.EndsWith("\nSee the Terms of Use at https://dictum.kynni.au/terms.\n", Repo("TRADEMARKS.md"));
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:20 AEDT pin: the Store tester notes' TO DICTATE opening.</summary>
+    [Fact]
+    public void The_store_notes_tell_the_tester_to_click_continue_first()
+    {
+        var store = Repo("docs", "STORE.md");
+        Assert.Contains("TO DICTATE: on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then click into any text field", store);
+        Assert.DoesNotContain("click Next through its steps (or press Esc to skip it", store);
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:20 AEDT pin: the website guide's first-run Welcome step says Continue.</summary>
+    [Fact]
+    public void The_help_page_first_run_welcome_step_says_continue()
+    {
+        var help = Repo("site", "help.html");
+        Assert.Contains("<p>The window explains how Dictum works. Click <b>Continue</b>.</p>", help);
+        Assert.DoesNotContain("The window explains how Dictum works. Click <b>Next</b>.", help);
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:20 AEDT pin: the privacy policy's settings.json item names the accepted Terms and the account.</summary>
+    [Fact]
+    public void The_privacy_policy_says_settings_json_holds_the_accepted_terms()
+    {
+        Assert.Contains("<li><code>settings.json</code>: your settings, and which version of the Terms of Use you accepted, with the account name (your Windows or macOS user name) that accepted it.</li>", Repo("site", "privacy.html"));
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:51 AEDT pin: the contact sections carry the ACN and the postal address (TERMS.txt is pinned in TermsAcceptanceTests, and TermsTextConsistencyTests ties it to the page).</summary>
+    [Fact]
+    public void The_contact_sections_carry_the_acn_and_the_postal_address()
+    {
+        Assert.Contains("<p>Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia. Email <a href=\"mailto:hello@kynni.com.au\">hello@kynni.com.au</a>.", Repo("site", "terms.html"));
+        Assert.Contains("Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia, <a href=\"https://www.kynni.com.au\">www.kynni.com.au</a>.", Repo("site", "privacy.html"));
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:20 AEDT pin: the install demo's step after the licence page, and the two licence-block captions.</summary>
+    [Fact]
+    public void The_demo_captions_follow_the_licence_page()
+    {
+        var install = Repo("scripts", "demos", "install.json");
+        Assert.Contains("\"caption\": \"Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next.\"", install);
+        Assert.Contains("\"caption\": \"Setup moves on. Click Next.\"", install);
+        Assert.DoesNotContain("Setup opens. Click Next.", install);
+        Assert.Contains("\"caption\": \"Dictum explains how it works and links its Terms of Use. Click Continue.\"", Repo("scripts", "demos", "first-run.json"));
+    }
+
+    /// <summary>APPROVED 23/10/2026 13:57 AEDT pin: the README's two dictum.kynni.au rows name the Mac beta and the Terms of Use.</summary>
+    [Fact]
+    public void The_readme_network_rows_name_the_mac_beta_and_the_terms()
+    {
+        var lines = Repo("README.md").Split('\n');
+        Assert.Contains(lines, l => l.StartsWith("| Only when you click **Check for updates** in Settings > About (the direct download for Windows and the Mac beta; the Store build has no such button", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("| Only when you open the privacy policy, Dictum in plain words (`/plain-words`), the Terms of Use (from the Welcome window or Settings > About) or the full guide from Settings (About, Privacy, Help) |", StringComparison.Ordinal));
+    }
 }

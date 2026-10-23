@@ -42,10 +42,10 @@ public static class TermsText
     /// <summary>The words of <see cref="PrivacyLine"/> that are the link.</summary>
     public const string PrivacyLink = "Privacy Policy";
 
-    /// <summary>PROPOSED 23/10/2026 (section D, item 3): Settings > About's button beside "Privacy policy".</summary>
+    /// <summary>APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. Settings > About's button beside "Privacy policy".</summary>
     public const string AboutTermsLabel = "Terms of use";
 
-    /// <summary>PROPOSED 23/10/2026 (section D, item 3): Settings > About's button that opens <see cref="NoticesFile"/>.</summary>
+    /// <summary>APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. Settings > About's button that opens <see cref="NoticesFile"/>.</summary>
     public const string NoticesLabel = "Third-party notices";
 
     /// <summary>The notices file every build ships (scripts\publish.ps1, scripts/publish-mac.sh).</summary>

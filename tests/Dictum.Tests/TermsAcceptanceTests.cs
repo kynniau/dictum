@@ -393,7 +393,7 @@ public sealed class TermsAcceptanceTests
 
     /// <summary>
     /// Pin (mutation-checked): --transcribe and --bench-cleanup, the two ways of using Dictum from the command line, refuse and exit
-    /// 1 until this account has accepted the Terms of Use in the app (the PROPOSED line on stderr, read through a StringWriter, and a
+    /// 1 until this account has accepted the Terms of Use in the app (the line on stderr, APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2), read through a StringWriter, and a
     /// line in the log); once it has,
     /// they go on past that check. The administrator and CI modes (--selftest, the downloads, --print-models-dir) are not gated.
     /// </summary>
@@ -414,7 +414,7 @@ public sealed class TermsAcceptanceTests
             Assert.Equal(1, exit);
             Assert.Contains(log.Lines, l => l.Message == $"{mode} refused: settings.json records no acceptance of the Terms of Use version 1 by this account.");
         }
-        var error = new StringWriter(); // what the refusal prints on stderr: the PROPOSED line, and nothing else
+        var error = new StringWriter(); // what the refusal prints on stderr: the APPROVED line, and nothing else
         Assert.True(CliCommands.RefusedWithoutTerms(scratch.Paths, new RecordingLog(), "--transcribe", error));
         Assert.Equal(CliCommands.TermsNotAccepted + Environment.NewLine, error.ToString());
         File.WriteAllText(scratch.Paths.SettingsFile, Accepted(Account));
@@ -432,7 +432,7 @@ public sealed class TermsAcceptanceTests
         }
     }
 
-    // ---- Settings (section D items 3 and 4; PROPOSED 23/10/2026) ----
+    // ---- Settings (section D items 3 and 4; the labels and the Offline only description APPROVED by the owner 23/10/2026 13:20 AEDT, legal strings block 2) ----
 
     /// <summary>
     /// Pin (mutation-checked): Settings > About's Support card has "Terms of use" right after "Privacy policy", opening the Terms
@@ -513,8 +513,8 @@ public sealed class TermsAcceptanceTests
 
     /// <summary>
     /// Pin (section D item 5): Setup shows the Terms of Use as plain text (LicenseFile, so it asks for "I accept the agreement"),
-    /// and that text carries section 9's cap sentence and section 4's guarantees paragraph byte for byte, section 16 as it reads
-    /// until the owner supplies the ACN and postal address, and no Markdown or bracketed note.
+    /// and that text carries section 9's cap sentence and section 4's guarantees paragraph byte for byte, section 16 with the ACN
+    /// and postal address the owner supplied (23/10/2026 13:51 AEDT), and no Markdown or bracketed note.
     /// </summary>
     [Fact]
     public void Setup_shows_the_Terms_with_the_cap_and_the_guarantees_word_for_word()
@@ -523,7 +523,7 @@ public sealed class TermsAcceptanceTests
         var terms = Repo("packaging", "TERMS.txt");
         Assert.Contains("For any other loss, the most we will pay you, for all claims about Dictum or this website added together, is A$100 (one hundred Australian dollars).", terms);
         Assert.Contains("The law's guarantees still apply. Depending on where you live, the law may give you guarantees about Dictum that cannot be excluded or limited by agreement, for example under the Australian Consumer Law. Nothing in these terms excludes, limits or changes any such guarantee or right. Section 9 does not reduce any such guarantee, or what the law entitles you to if we fail to meet one.", terms);
-        Assert.Contains("\n16. Contact\n\nKynni Pty Ltd, Australia. Email hello@kynni.com.au. Dictum's source code and release files are at github.com/kynniau/dictum.\n", terms.Replace("\r\n", "\n"));
+        Assert.Contains("\n16. Contact\n\nKynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia. Email hello@kynni.com.au. Dictum's source code and release files are at github.com/kynniau/dictum.\n", terms.Replace("\r\n", "\n")); // the contact line, APPROVED by the owner 23/10/2026 13:51 AEDT (legal strings block 2)
         Assert.StartsWith("Dictum Terms of Use\n\nDictum by Kynni. Terms of Use. Version 1.\n", terms.Replace("\r\n", "\n"));
         foreach (var markup in new[] { "**", "##", "[", "]", "Draft 3", "PROPOSED" })
             Assert.DoesNotContain(markup, terms, StringComparison.Ordinal);

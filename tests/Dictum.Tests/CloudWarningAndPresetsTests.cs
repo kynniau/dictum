@@ -47,9 +47,9 @@ public class CloudWarningAndPresetsTests
     // The policy's clause since O9: the end of the paragraph above.
     private const string ApprovedPolicyLocalServerClause = "If the server runs on your computer, for example Ollama at localhost, nothing leaves your computer unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
 
-    // The landing page's card for a server you name still carries the clause as the policy had it before O9 ("your PC" twice). O9 named the
-    // privacy policy only, so the card is not changed here; the owner decides whether it follows.
-    private const string ApprovedLocalServerClause = "If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
+    // The landing page's card for a server you name carries the same clause as the policy (O9's "your computer" twice). APPROVED by the owner
+    // 23/10/2026 13:57 AEDT (legal strings block 2): the card followed the policy; it said "your PC" twice until then.
+    private const string ApprovedLocalServerClause = "If the server runs on your computer, for example Ollama at localhost, nothing leaves your computer unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
 
     // The tray panel's privacy line while a server on this PC, or a host off it, does the clean-up. Each line:
     // Approved by the product owner on 16/10/2026 as written: never reword it.
@@ -872,8 +872,9 @@ public class CloudWarningAndPresetsTests
     public void The_landing_page_says_a_server_on_this_PC_may_forward_the_text()
     {
         Assert.EndsWith(ApprovedPolicyLocalServerClause, ApprovedOpenAiCompatibleParagraph); // the policy's approved clause, not new wording
-        Assert.Equal(ApprovedPolicyLocalServerClause, ApprovedLocalServerClause.Replace("your PC", "your computer", StringComparison.Ordinal)); // the two clauses differ by O9's words and nothing else
+        Assert.Equal(ApprovedPolicyLocalServerClause, ApprovedLocalServerClause); // the card and the policy pin the same clause again
         var html = VisibleHtml("index.html");
+        Assert.DoesNotContain("your PC, for example Ollama", html);
         Assert.Contains("<p>Only if you point clean-up at a server of your own, such as Ollama. " + ApprovedLocalServerClause + "</p>", html);
         Assert.DoesNotContain("If that server runs on your PC, nothing leaves it.", html);
     }
