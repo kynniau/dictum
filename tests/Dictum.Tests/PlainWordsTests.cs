@@ -164,13 +164,17 @@ public sealed class PlainWordsTests
         shell.Dispose();
     });
 
-    /// <summary>Pin (20:47 AEDT): the privacy policy's "This website" list names the plain-words route, and the README's network table does too.</summary>
+    /// <summary>
+    /// Pin (20:47 AEDT, replaced by O10, APPROVED by the owner 23/10/2026 09:50 AEDT): the privacy policy's "This website" list names the plain-words route
+    /// (now with the Terms of Use and the Mac beta), and the README's network table names it too (O10 named the policy only, so the README row is unchanged).
+    /// </summary>
     [Fact]
     public void The_privacy_policy_and_the_readme_name_the_plain_words_route()
     {
         var privacy = Site("privacy.html");
-        Assert.Contains("<p>Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates in the direct-download version, which reads one small file and sends nothing about you;", privacy);
-        Assert.Contains("APPROVED 22/10/2026 20:47 AEDT (plain-words route added)", privacy);
+        Assert.Contains("<p>Only when you open the privacy policy, the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct download for Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by the Store.</p>", privacy);
+        Assert.Contains("APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword (O10; replaces the 22/10/2026 20:47 AEDT sentence)", privacy);
+        Assert.DoesNotContain("APPROVED 22/10/2026 20:47 AEDT (plain-words route added)", privacy);
         var readme = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "README.md"));
         Assert.Contains(readme.Split('\n'), l => l.StartsWith("| Only when you open the privacy policy, Dictum in plain words", StringComparison.Ordinal) && l.Contains("/plain-words"));
     }

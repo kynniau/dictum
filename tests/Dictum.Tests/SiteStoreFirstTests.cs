@@ -93,12 +93,13 @@ public sealed class SiteStoreFirstTests
     [InlineData("img/demos/install")]
     public void No_page_explains_the_direct_download_or_the_warning(string phrase)
     {
-        // One exemption, on privacy.html only and for exactly three uses of one phrase: the policy's "in the direct download for Windows and in the
+        // One exemption, on privacy.html only and for exactly four uses of one phrase: the policy's "in the direct download for Windows and in the
         // Mac beta" (legal block, APPROVED by the owner 23/10/2026 09:50 AEDT; once with a capital "In", starting section 5) names the build and
-        // explains nothing, but contains "Download for Windows" case-blind. Those three are removed before the scan, so a fourth use, the phrase on
+        // explains nothing, but contains "Download for Windows" case-blind. The fourth use is the website-route sentence of section 4 (O10, same
+        // approval, applied in the follow-up PR; three before it). Those four are removed before the scan, so a fifth use, the phrase on
         // any other page, or a "Download for Windows" button still fails. Mutations (observed failing, 23/10/2026): "Download for Windows." added to
         // site/terms.html; "Prefer the direct download for Windows? It is on GitHub" added to site/index.html; "Get the direct download for Windows
-        // from our GitHub releases." added to site/help.html; a fourth use added to site/privacy.html; and, with this exemption removed,
+        // from our GitHub releases." added to site/help.html; a fourth use added to site/privacy.html (before O10; now a fifth); and, with this exemption removed,
         // site/privacy.html fails.
         var policyName = new Regex("[Ii]n the direct download for Windows and in the Mac beta");
         foreach (var page in Pages)
@@ -106,7 +107,7 @@ public sealed class SiteStoreFirstTests
             var html = VisibleHtml(page);
             if (page == "privacy.html")
             {
-                Assert.Equal(3, policyName.Matches(html).Count);
+                Assert.Equal(4, policyName.Matches(html).Count);
                 html = policyName.Replace(html, "");
             }
             Assert.False(html.Contains(phrase, StringComparison.OrdinalIgnoreCase), $"site/{page} still says \"{phrase}\"");
@@ -270,11 +271,12 @@ public sealed class SiteStoreFirstTests
     public void The_lines_the_legal_block_replaced_are_gone(string page, string old) =>
         Assert.DoesNotContain(old, Prose(page), StringComparison.Ordinal);
 
-    /// <summary>The four pages this lane owns link to /terms from the footer, right after the privacy policy (plain-words joins in the follow-up).</summary>
+    /// <summary>Every page of the site links to /terms from the footer, right after the privacy policy (plain-words.html joined in the follow-up).</summary>
     [Theory]
     [InlineData("index.html")]
     [InlineData("help.html")]
     [InlineData("privacy.html")]
+    [InlineData("plain-words.html")]
     [InlineData("terms.html")]
     public void Every_page_links_to_the_terms_from_its_footer_after_the_privacy_policy(string page)
     {
