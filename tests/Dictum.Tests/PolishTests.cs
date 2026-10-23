@@ -256,7 +256,7 @@ public class PolishTests
         var window = new CalibrationWindow(shell);
         window.Show();
         var texts = Texts(window);
-        Assert.Contains($"{CalibrationWindow.Framing} {CalibrationWindow.RecordingsNote}", texts);
+        Assert.Contains($"{CalibrationWindow.Framing} {CalibrationWindow.RecordingsNote(Dictum.Platform.PlatformWords.Windows)}", texts);
         Assert.DoesNotContain(texts, t => t is not null && (t.Contains(scratch.Root.FullName, StringComparison.OrdinalIgnoreCase)
                                                             || t.Contains(scratch.Paths.CalibrationDir, StringComparison.OrdinalIgnoreCase)
                                                             || Regex.IsMatch(t, @"[A-Za-z]:\\")));

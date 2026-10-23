@@ -1,4 +1,5 @@
 using Dictum.Core;
+using Dictum.Platform;
 using Dictum.Settings;
 
 namespace Dictum.UI.Views.Onboarding;
@@ -29,10 +30,11 @@ internal static class OnboardingText
     /// The orchestrator's decision (21/10/2026): "Nothing you say is sent anywhere" was dropped: cloud clean-up, off by default and
     /// behind its own consent step, sends text once switched on. The last sentence, "Everything happens on this PC unless you turn on
     /// a cloud option.": APPROVED by the owner 23/10/2026 13:50 AEDT (legal strings block 2, section 5 option (a)): do not reword.
+    /// On a Mac "this Mac" (<see cref="PlatformWords.ThisDevice"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 3): do not reword).
     /// </summary>
-    public const string WelcomeText =
+    public static string WelcomeText(PlatformWords words) =>
         "Dictum types what you say. Hold down your hotkey, speak, then let go: your words appear wherever you were typing, in any program. " +
-        "Everything happens on this PC unless you turn on a cloud option.";
+        $"Everything happens on {words.ThisDevice} unless you turn on a cloud option.";
 
     // APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. The button on this step is Continue (the Terms are accepted there).
     public const string WelcomeNext = "The next few steps take a minute or two. Press Continue to begin.";
@@ -41,13 +43,16 @@ internal static class OnboardingText
     public const string FolderName = "Model files";
     public const string FolderHeading = "Where to keep the model files";
 
-    /// <summary>No exact total in the UI (orchestrator, 21/10/2026); DECISIONS records the catalogue totals behind "several gigabytes".</summary>
-    public const string FolderText =
-        "Dictum keeps its speech models on this PC. The included one is about 150 MB; adding more models can take several gigabytes more.";
+    /// <summary>
+    /// No exact total in the UI (orchestrator, 21/10/2026); DECISIONS records the catalogue totals behind "several gigabytes". On a Mac
+    /// "this Mac" (<see cref="PlatformWords.ThisDevice"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 4): do not reword).
+    /// </summary>
+    public static string FolderText(PlatformWords words) =>
+        $"Dictum keeps its speech models on {words.ThisDevice}. The included one is about 150 MB; adding more models can take several gigabytes more.";
 
-    /// <summary>The same without base.en on this PC (a build without it): "included" would be untrue (lens on 6bacce9).</summary>
-    public const string FolderTextNotIncluded =
-        "Dictum keeps its speech models on this PC. The Standard model is about 150 MB to download; adding more models can take several gigabytes more.";
+    /// <summary>The same without base.en on this PC (a build without it): "included" would be untrue (lens on 6bacce9). Row 4 of the Mac copy block too.</summary>
+    public static string FolderTextNotIncluded(PlatformWords words) =>
+        $"Dictum keeps its speech models on {words.ThisDevice}. The Standard model is about 150 MB to download; adding more models can take several gigabytes more.";
 
     public const string FolderBoxName = "Folder for the model files";
     public const string ChooseOther = "Choose another drive or folder…";

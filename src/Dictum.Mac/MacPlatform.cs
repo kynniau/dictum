@@ -38,6 +38,8 @@ public sealed class MacPlatform : IPlatform, IDisposable
 
     public string Name => "macOS";
 
+    public PlatformWords Words => PlatformWords.Mac;
+
     public string ExeDir { get; }
 
     public string ExePath { get; }

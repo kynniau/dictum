@@ -28,7 +28,8 @@ internal sealed class RemovalSteps(ILog log, AppBundle? bundle, string exeDir, F
     internal const string LoginItemPath = "System Settings > General > Login Items > Dictum";
     internal const string BundleDescription = "Dictum.app, moved to the Trash after Dictum closes";
 
-    // PROPOSED 23/10/2026 (first beta finding): the Storage page's "Remove everything" sentence named the Start menu on a Mac.
+    // First beta finding (23/10/2026): the Storage page's "Remove everything" sentence named the Start menu on a Mac.
+    // APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 2): do not reword.
     public string StartupItemsPhrase => "the login item";
 
     // PROPOSED 23/10/2026: why the program is left in place.

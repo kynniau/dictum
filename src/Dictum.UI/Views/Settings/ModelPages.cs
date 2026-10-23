@@ -580,7 +580,7 @@ internal sealed class StoragePage : SettingsPage
     // the row. The Open button's accessible name ("Open the folder for …") follows the row. The sentence takes the platform's own words
     // for what it removes (IRemovalSteps.StartupItemsPhrase).
     internal static string DataFolderRow(bool modelFolderChosen) => modelFolderChosen
-        ? "Logs, calibration recordings" // PROPOSED 23/10/2026
+        ? "Logs, calibration recordings" // APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 1): do not reword
         : "Models, logs, calibration recordings";
 
     internal static string RemoveEverythingText(string startupItems) =>

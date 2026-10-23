@@ -209,7 +209,7 @@ public sealed class TermsAcceptanceTests
             Assert.Equal("Continue", window.PrimaryButton.Content);
             Assert.True(window.TermsNotice.IsEffectivelyVisible);
             var visible = step.GetLogicalDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
-            Assert.Contains(OnboardingText.WelcomeText, visible);
+            Assert.Contains(OnboardingText.WelcomeText(Dictum.Platform.PlatformWords.Windows), visible);
             Assert.DoesNotContain(OnboardingText.WelcomeNext, visible); // no steps follow
             Assert.DoesNotContain(window.GetLogicalDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && (t.Text ?? "").StartsWith("Step 1 of", StringComparison.Ordinal));
             Click(window.PrimaryButton);

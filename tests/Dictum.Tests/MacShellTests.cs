@@ -87,7 +87,7 @@ public sealed class MacShellTests
         using var fake = new FakeBundle(AppBundle.Identifier);
         Assert.Equal(AppBundle.Identifier, RemovalSteps.BundleIdentifier(fake.InfoPlist));
         Assert.Null(fake.Steps().ProgramFolderProblem());
-        Assert.Equal("the login item", fake.Steps().StartupItemsPhrase); // the Storage page's "Remove everything" sentence on a Mac (PROPOSED)
+        Assert.Equal("the login item", fake.Steps().StartupItemsPhrase); // the Storage page's "Remove everything" sentence on a Mac (APPROVED by the owner 23/10/2026 14:06 AEDT, Mac copy block, row 2)
 
         using var other = new FakeBundle("com.example.other");
         Assert.Equal(RemovalSteps.NotInstalledCopy, other.Steps().ProgramFolderProblem());

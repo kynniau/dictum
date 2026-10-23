@@ -39,6 +39,8 @@ public sealed class WindowsPlatform : IPlatform, IDisposable
 
     public string Name => "Windows";
 
+    public PlatformWords Words => PlatformWords.Windows;
+
     public string ExeDir { get; }
 
     public string ExePath { get; }

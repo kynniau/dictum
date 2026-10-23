@@ -12,6 +12,7 @@ using Dictum.Audio;
 using Dictum.Calibration;
 using Dictum.Core;
 using Dictum.Hotkey;
+using Dictum.Platform;
 using Dictum.UI.Shell;
 
 namespace Dictum.UI.Views;
@@ -32,9 +33,10 @@ internal sealed partial class CalibrationWindow : Window
     /// (AppPaths.CalibrationDir), not one the user chose, and Settings > Storage lists it under "Models, logs, calibration recordings"
     /// ("Logs, calibration recordings" once a model folder is chosen).
     /// </summary>
-    public const string RecordingsNote = "Nothing is uploaded: the recordings stay in Dictum's folder on this PC (Settings > Storage lists it), so the test can be re-run when you add a model.";
+    /// <remarks>On a Mac "this Mac" (<see cref="PlatformWords.ThisDevice"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 11): do not reword).</remarks>
+    public static string RecordingsNote(PlatformWords words) => $"Nothing is uploaded: the recordings stay in Dictum's folder on {words.ThisDevice} (Settings > Storage lists it), so the test can be re-run when you add a model.";
 
-    /// <summary>The button beside <see cref="RecordingsNote"/> (APPROVED 22/10/2026; proposed 1.2 polish).</summary>
+    /// <summary>The button beside <see cref="RecordingsNote(PlatformWords)"/> (APPROVED 22/10/2026; proposed 1.2 polish).</summary>
     public const string OpenRecordingsLabel = "Open the recordings folder";
 
     /// <summary>Said when the recordings folder could not be opened; the reason, with the path, goes to the log (APPROVED 22/10/2026; proposed lens on 4abba54).</summary>
@@ -88,7 +90,7 @@ internal sealed partial class CalibrationWindow : Window
         // No folder path on screen (1.2 polish, 22/10/2026): a path names the Windows user, and a screenshot of this window
         // would carry it. The button opens the folder instead; Settings > Storage lists it with the rest.
         var openRecordings = Ui.Button(OpenRecordingsLabel, "secondary", OpenRecordings, Failed);
-        var framing = Ui.Card(Ui.Stack(10, Ui.Text($"{Framing} {RecordingsNote}"), Ui.Row(8, openRecordings)));
+        var framing = Ui.Card(Ui.Stack(10, Ui.Text($"{Framing} {RecordingsNote(shell.Platform.Words)}"), Ui.Row(8, openRecordings)));
         var counterRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         Grid.SetColumn(_dots, 1);
         counterRow.Children.AddRange([_counter, _dots]);
