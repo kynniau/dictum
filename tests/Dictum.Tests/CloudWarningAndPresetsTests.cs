@@ -40,9 +40,15 @@ public class CloudWarningAndPresetsTests
 
     // Approved by the product owner on 16/10/2026 for the privacy policy's OpenAI-compatible section, pinned word for word. The label
     // ("OpenAI-compatible service (off by default)") is the <h3>, so the paragraph starts with a capital like its neighbours.
-    private const string ApprovedOpenAiCompatibleParagraph = "Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
+    // O9, APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): "your PC" became "your computer" in both places of the last sentence,
+    // since the policy covers the Mac; nothing else in the paragraph changed.
+    private const string ApprovedOpenAiCompatibleParagraph = "Only if you choose a preset or enter an address yourself. The presets point at api.openai.com (OpenAI) or generativelanguage.googleapis.com (Google Gemini); a custom address goes wherever you enter. After each dictation Dictum sends that service the text of the dictation, its clean-up instructions and your dictionary terms, with your key. That service handles the data under its own terms. If the server runs on your computer, for example Ollama at localhost, nothing leaves your computer unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
 
-    // The landing page's card for a server you name ends with the policy's approved clause (the end of the paragraph above).
+    // The policy's clause since O9: the end of the paragraph above.
+    private const string ApprovedPolicyLocalServerClause = "If the server runs on your computer, for example Ollama at localhost, nothing leaves your computer unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
+
+    // The landing page's card for a server you name still carries the clause as the policy had it before O9 ("your PC" twice). O9 named the
+    // privacy policy only, so the card is not changed here; the owner decides whether it follows.
     private const string ApprovedLocalServerClause = "If the server runs on your PC, for example Ollama at localhost, nothing leaves your PC unless that server itself forwards to a cloud service, which Dictum cannot see: Ollama can serve its cloud models once you sign in to it.";
 
     // The tray panel's privacy line while a server on this PC, or a host off it, does the clean-up. Each line:
@@ -865,7 +871,8 @@ public class CloudWarningAndPresetsTests
     [Fact]
     public void The_landing_page_says_a_server_on_this_PC_may_forward_the_text()
     {
-        Assert.EndsWith(ApprovedLocalServerClause, ApprovedOpenAiCompatibleParagraph); // the policy's approved clause, not new wording
+        Assert.EndsWith(ApprovedPolicyLocalServerClause, ApprovedOpenAiCompatibleParagraph); // the policy's approved clause, not new wording
+        Assert.Equal(ApprovedPolicyLocalServerClause, ApprovedLocalServerClause.Replace("your PC", "your computer", StringComparison.Ordinal)); // the two clauses differ by O9's words and nothing else
         var html = VisibleHtml("index.html");
         Assert.Contains("<p>Only if you point clean-up at a server of your own, such as Ollama. " + ApprovedLocalServerClause + "</p>", html);
         Assert.DoesNotContain("If that server runs on your PC, nothing leaves it.", html);

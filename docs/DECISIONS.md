@@ -6158,3 +6158,71 @@ lane's part. The site lane builds `site/terms.html` and the new `site/privacy.ht
       - `PublicCopyNeutralityTests` was run again after this text.
       - **Not run:** a screen reader on a real desktop (the peers were read headless), the demos, Setup, a Mac, and the 41
         gated tests.
+
+## Legal block, follow-up: O9 and O10, footer test, Terms consistency test (23/10/2026 13:30 AEDT, branch legal/followup)
+
+The owner approved section C of the legal block's basis document at 09:50 AEDT on 23/10/2026, including O9 and O10, which were
+deferred because their pins sat in both lanes' tests (see "Legal block, site side", item 7). Both lanes are merged (main 7a966ce),
+so this one PR applies them. Approved strings change only where the brief said; each changed place carries the marker
+`APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword`.
+
+1. **O9 applied.** `site/privacy.html`, the OpenAI-compatible paragraph: "If the server runs on your PC, for example Ollama at
+   localhost, nothing leaves your PC unless …" is now "If the server runs on your computer, for example Ollama at localhost,
+   nothing leaves your computer unless …". Nothing else in the paragraph or the page changed (word diff checked).
+   - The marker sits above the `<h3>`, not between the heading and the paragraph, because
+     `CloudWarningAndPresetsTests.The_privacy_policy_carries_the_approved_OpenAI_compatible_wording_word_for_word` reads the raw
+     page and requires `<p>` straight after the heading.
+   - Pins: `ApprovedOpenAiCompatibleParagraph` carries the new words. A new `ApprovedPolicyLocalServerClause` is the new clause;
+     `ApprovedLocalServerClause` stays as the landing page's card still has it.
+     `The_landing_page_says_a_server_on_this_PC_may_forward_the_text` now checks that the paragraph ends with the new clause and
+     that the two clauses differ by "your PC" to "your computer" and nothing else.
+2. **O10 applied.** `site/privacy.html`, "This website: dictum.kynni.au", the sentence is now exactly: "Only when you open the
+   privacy policy, the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct
+   download for Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by
+   the Store." It replaces the 22/10/2026 20:47 AEDT sentence ("… the privacy policy, Dictum in plain words or the full guide from
+   Settings, or click Check for updates in the direct-download version, …") and its marker.
+   - Pins: `UpdateCheckTests.PrivacySiteSentence` (new words); `PlainWordsTests.The_privacy_policy_and_the_readme_name_the_plain_words_route`
+     (the whole new sentence, the new marker text, and the old 20:47 marker absent).
+   - **The gate count changes from 3 to 4.** `SiteStoreFirstTests.No_page_explains_the_direct_download_or_the_warning` asserts how
+     many times `privacy.html` says "in the direct download for Windows and in the Mac beta" (first letter either case) before it
+     removes them for the scan. The new sentence is the fourth use, so the assertion is `Equal(4, …)` and its comment says why.
+3. **Footer test.** `SiteStoreFirstTests.Every_page_links_to_the_terms_from_its_footer_after_the_privacy_policy` gains
+   `plain-words.html` (it has carried the footer link since the app lane). Its summary no longer says "four pages".
+4. **Terms consistency test (new).** `tests/Dictum.Tests/TermsTextConsistencyTests.cs` reads `packaging/TERMS.txt` (what Setup shows)
+   and the `<main>` of `site/terms.html` and requires the same 86 blocks (every heading, paragraph and list item) in the same order.
+   - Ignored: the title and date lines of both, and everything outside `<main>`. Smoothed: markup, character references, typographic
+     apostrophes and quotation marks (the page uses ’ “ ”, the text file ' and "), runs of spaces, and the "- " of a list item.
+   - It also checks that all sixteen numbered headings were read from both copies, so it cannot pass by reading nothing.
+   - **Mutations (observed failing 23/10/2026, each restored):** one word in `TERMS.txt` (section 9, "pay you" to "owe you"):
+     failed at block 61 and printed both blocks; the same word changed in `site/terms.html` instead: failed the same way; the
+     last line of `TERMS.txt` (section 16's body) deleted: failed with "packaging/TERMS.txt has 85 blocks and site/terms.html has 86".
+5. **Other mutations (observed failing 23/10/2026, each restored):** the second "your computer" of O9 put back to "your PC":
+   `The_privacy_policy_carries_the_approved_OpenAI_compatible_wording_word_for_word` failed; the O10 sentence put back to the
+   22/10/2026 text: the gate, `PlainWordsTests…plain_words_route` and `UpdateCheckTests.The_privacy_policy_says_when_Dictum_reads_dictum_kynni_au`
+   failed; the O10 sentence reworded so only three uses remain, and a fifth use added: the gate failed both ways; the
+   `plain-words.html` footer Terms link removed: the footer test failed for that page.
+6. **Two PROPOSED comments, no text changed (new copy for the owner).**
+   - `site/privacy.html`, above the `settings.json` list item of section 3: `PROPOSED 23/10/2026: "settings.json: your settings, and which
+     version of the Terms of Use you accepted, with the account name (your Windows or macOS user name) that accepted it."` The app now
+     records both (`terms.accepted`, `terms.accepted_by`), so the live line "your settings." understates what the file holds.
+   - `site/help.html`, above the Welcome step's "Click Next." in the first-run walkthrough: `PROPOSED 23/10/2026: "Click Continue."`
+     The Welcome step's button is now Continue.
+7. **Left alone on purpose (O9 and O10 name the privacy policy only), for the owner to decide.**
+   - `site/index.html`, the "A server you name" card still says "If the server runs on your PC, … nothing leaves your PC unless …".
+   - `site/index.html`, the `dictum.kynni.au` card still has the 22/10/2026 sentence (… "from Settings, …" "direct-download version").
+     It matched the policy until now; `UpdateCheckTests` pins it as `LandingSiteSentence` and the test that said it "says the same"
+     is renamed `The_landing_page_card_for_dictum_kynni_au_keeps_its_22_10_2026_sentence`. `SiteStoreFirstTests` already pins this
+     card's opening words.
+   - `README.md`, the network table's `dictum.kynni.au` row, still reads "Only when you open the privacy policy, Dictum in plain
+     words (`/plain-words`) or the full guide from Settings (About, Privacy, Help)"; the app lane's note said the Terms page would be
+     added there with this follow-up, but the brief for this PR does not list it.
+   - So the policy and those three surfaces now say different things about the same two facts until the owner decides.
+8. **What it might break, and how to verify.** Site text and test pins only; no program code changed. A page that quotes either
+   changed sentence would now disagree with the policy (item 7). Verify: `dotnet test Dictum.sln`, and read
+   `git diff --word-diff` of `site/privacy.html`: the only changes are "PC" to "computer" twice, the O10 sentence and its marker, the
+   O9 marker and the `settings.json` comment.
+9. **Gates.** `dotnet test Dictum.sln` (Debug, 13:23 to 13:29 AEDT, on the tree before this entry was added): 2700 total, 2659
+   passed, 0 failed, 41 skipped. `PublicCopyNeutralityTests` passed in that run and in the targeted runs before it. The app lane's
+   last recorded run was 2698 total, 2657 passed; the two extra tests are the consistency test and the `plain-words.html` footer row
+   (inferred from the test names, not measured on a main checkout).
+   - **Not run:** a Release build, the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests.
