@@ -234,8 +234,9 @@ public class OwnerApprovalsTests
     public void The_plain_words_short_version_is_pinned()
     {
         Assert.Equal("Dictum is free. Free: no subscription, no account, no ads, no analytics, no telemetry. No spyware: Dictum sends nothing about you to Kynni.", PlainWordsText.Free);
-        Assert.Equal("Dictum is open source under the MIT licence. It is provided as is, without warranty. We built it with care, but we cannot promise it will always hear you right.", PlainWordsText.OpenSource);
-        Assert.Equal("Nothing you say leaves this PC unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.", PlainWordsText.Cloud);
+        // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): OpenSource lost "It is provided as is, without warranty." (O2), Cloud's first sentence was replaced (O15).
+        Assert.Equal("Dictum is open source under the MIT licence. We built it with care, but we cannot promise it will always hear you right.", PlainWordsText.OpenSource);
+        Assert.Equal("Dictum itself sends nothing you say off your computer unless you switch on a cloud option and agree to it. If you do, you take responsibility for what is sent to that service, and its own terms apply.", PlainWordsText.Cloud);
         Assert.Equal("Read the whole statement at dictum.kynni.au/plain-words.", PlainWordsText.ReadAll);
         Assert.Equal(("In plain words", "Open in your browser", "https://dictum.kynni.au/plain-words"), (PlainWordsText.CardTitle, PlainWordsText.OpenLabel, PlainWordsText.Url));
     }
@@ -368,7 +369,8 @@ public class OwnerApprovalsTests
 
     /// <summary>
     /// Pin (mutation-checked): the whole clean-up consent text for the Anthropic and a custom OpenAI-compatible host, byte for byte,
-    /// with the owner's 18:41 parenthesis and 16:35 paragraph (22/10/2026; counsel review pending), independently of the app's copy.
+    /// with the owner's 18:41 parenthesis and 16:35 paragraph (22/10/2026; counsel review pending) and the legal block's hands-free
+    /// sentence (O7, APPROVED by the owner 23/10/2026 09:50 AEDT), independently of the app's copy.
     /// </summary>
     [Fact]
     public void The_clean_up_consent_text_is_the_approved_text_byte_for_byte()
@@ -377,6 +379,7 @@ public class OwnerApprovalsTests
         var host = Dictum.Llm.CloudPolicy.CloudHost(anthropic)!;
         Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
             $"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host} (Anthropic) together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "In hands-free mode, up to ten words of what you said just before go with each request. " + // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O7)
             "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives.\n\n" +
             ApprovedCleanupWarning(host) + "\n\n" +
             "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +
@@ -385,6 +388,7 @@ public class OwnerApprovalsTests
         var custom = new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://llm.example.com/v1", Model = "m" };
         Assert.Equal(System.Text.Encoding.UTF8.GetBytes(
             "With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to llm.example.com together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+            "In hands-free mode, up to ten words of what you said just before go with each request. " + // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O7)
             "It uses your own API key (LLM_API_KEY) if you have set one. Whoever runs that server receives the text; its own terms apply.\n\n" +
             ApprovedCleanupWarning("llm.example.com") + "\n\n" +
             "By switching cloud clean-up on you accept responsibility for the security and privacy of the text sent there.\n\n" +

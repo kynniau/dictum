@@ -40,6 +40,14 @@
       "do": [ { "do": "click", "target": { "windowClass": "ApplicationFrameWindow", "type": "Button", "name": "Run", "timeout": 1 } } ]
     },
     {
+      "id": "licence",
+      "caption": "Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next.",
+      "do": [
+        { "do": "click", "target": { "window": "^Setup", "type": "RadioButton", "name": "I accept the agreement", "timeout": 60 } },
+        { "do": "click", "target": { "window": "^Setup", "type": "Button", "name": "Next", "match": "prefix" } }
+      ]
+    },
+    {
       "id": "next",
       "caption": "Setup opens. Click Next.",
       "do": [ { "do": "click", "target": { "window": "^Setup", "type": "Button", "name": "Next", "match": "prefix", "timeout": 60 } } ]

@@ -62,6 +62,9 @@ MinVersion=10.0.17763
 ; quit Dictum first instead of replacing files under it.
 AppMutex=Local\Dictum.SingleInstance
 WizardStyle=modern
+; Dictum's Terms of Use as plain text (legal block, owner 23/10/2026 09:50 AEDT, section D item 5): Setup shows them and asks
+; for "I accept the agreement" before it installs. TERMS.txt sits beside this script; TermsAcceptanceTests pins its key sentences.
+LicenseFile=TERMS.txt
 OutputDir={#OutputDir}
 OutputBaseFilename=Dictum-Setup-{#AppVersion}
 Compression=lzma2/max

@@ -71,16 +71,36 @@ internal abstract class OnboardingStep : UserControl
     protected static TextBlock Line(string text, string cls = "body") => Ui.Text(text, cls);
 }
 
-/// <summary>Step 1: how Dictum works, then the plain-words short version (APPROVED 22/10/2026 17:36 AEDT), as plain text with no control and no gate.</summary>
+/// <summary>
+/// Step 1: how Dictum works, then the plain-words short version (APPROVED 22/10/2026 17:36 AEDT) as plain text. Its Continue
+/// accepts the Terms of Use, whose notice the window shows beside it (legal block, 23/10/2026; TermsText). The "next few steps"
+/// line is left out when the step is the window's only one (<see cref="OnboardingFlow.TermsOnly"/>): no steps follow it then.
+/// </summary>
 internal sealed class WelcomeStep : OnboardingStep
 {
-    // simplification: the four short-version paragraphs sit in a 4 px-spaced group so this step fits the default window without scrolling (290 of 294 px).
-    // Ceiling: 4 px of slack. Trigger that retires it: a font or text-size change, or Every_step_fits_the_default_window_without_scrolling failing on Welcome.
-    // Fix then: raise OnboardingWindow.WindowHeight, or move the short version to its own step.
-    public WelcomeStep(OnboardingFlow flow) : base(flow, OnboardingText.WelcomeName, OnboardingText.WelcomeHeading) =>
-        Content = Ui.Stack(14, Line(OnboardingText.WelcomeText), Ui.Stack(4, [.. PlainWordsText.Paragraphs.Select(p => Line(p))]), Line(OnboardingText.WelcomeNext));
+    // simplification: the four short-version paragraphs sit in a 4 px-spaced group so this step fits the default window without scrolling. The legal
+    // block (23/10/2026) put the Terms notice beside Continue and lengthened the short version (O15): at 500 DIP the step measured 315 of 278 px, so
+    // OnboardingWindow.WindowHeight became 560. Ceiling: a line or so of slack, read from Every_step_fits_the_default_window_without_scrolling
+    // (its failure message gives the step's height and the room for it). Trigger that retires it: that test failing on Welcome after a text change.
+    // Fix then: raise OnboardingWindow.WindowHeight again, or move the short version to its own step. The body's spacing is 12 (was 14) since the
+    // lens on PR #76 measured a new install's step 1 2 DIP over the room at 1366 × 768 at 125 %.
+    public WelcomeStep(OnboardingFlow flow) : base(flow, OnboardingText.WelcomeName, OnboardingText.WelcomeHeading)
+    {
+        var next = Line(OnboardingText.WelcomeNext);
+        next.IsVisible = !flow.TermsOnly;
+        Content = Ui.Stack(12, Line(OnboardingText.WelcomeText), Ui.Stack(4, [.. PlainWordsText.Paragraphs.Select(p => Line(p))]), next);
+    }
 
     public override bool AllowsBack => false;
+
+    public override string PrimaryLabel => TermsText.ContinueLabel;
+
+    /// <summary>Continue: the Terms of Use are accepted (<see cref="OnboardingFlow.AcceptTerms"/>).</summary>
+    public override bool Primary()
+    {
+        Flow.AcceptTerms();
+        return true;
+    }
 }
 
 /// <summary>

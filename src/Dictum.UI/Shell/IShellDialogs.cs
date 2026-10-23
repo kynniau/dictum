@@ -25,7 +25,9 @@ public interface IShellDialogs : IModelPrompts
     /// <summary>
     /// The first run's "Welcome to Dictum" window (1.2; it replaces the model pickers and the hotkey check, SPEC §20): steps 1-5
     /// ask through <paramref name="flow"/>, which writes each answer; returns when they are done or the window was closed. Try
-    /// it follows in the same window once the shell calls <see cref="OnboardingFlow.BeginTryIt"/>.
+    /// it follows in the same window once the shell calls <see cref="OnboardingFlow.BeginTryIt"/>. Step 1's Continue accepts the
+    /// Terms of Use (<see cref="OnboardingFlow.AcceptTerms"/>); with <see cref="OnboardingFlow.TermsOnly"/> the window is that
+    /// step alone.
     /// </summary>
     void Onboard(OnboardingFlow flow);
 

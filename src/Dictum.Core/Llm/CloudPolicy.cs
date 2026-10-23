@@ -77,15 +77,18 @@ public static class CloudPolicy
 
     /// <summary>
     /// What the consent dialog says is sent, and to whom (SPEC §22; Store Policies 10.5.2), then the warning paragraph, then the
-    /// responsibility paragraph (<see cref="ConsentResponsibility"/>). The parenthesis after "every dictation's text" is APPROVED
-    /// 22/10/2026 19:42 AEDT (parenthesis corrected: the earlier 18:41 wording named the clean-up host for the audio; counsel review
-    /// pending): do not reword. It was "(never the audio)" until 18:41, then "(the audio only if you also turn on cloud speech)",
-    /// which, followed by "is sent to {host}", said the audio goes to the clean-up host; cloud speech sends it to its own service.
+    /// responsibility paragraph (<see cref="ConsentResponsibility"/>). APPROVED by the owner 23/10/2026 09:50 AEDT (legal block):
+    /// do not reword. The legal block (section C row O7) added the hands-free sentence after "…the words in your personal
+    /// dictionary."; everything else is as approved before (the parenthesis after "every dictation's text" at 22/10/2026 19:42
+    /// AEDT, counsel review pending then). The parenthesis was "(never the audio)" until 18:41, then "(the audio only if you also
+    /// turn on cloud speech)", which, followed by "is sent to {host}", said the audio goes to the clean-up host; cloud speech
+    /// sends it to its own service.
     /// </summary>
     public static string ConsentText(LlmSettings s, string host) =>
         $"With cloud clean-up on, every dictation's text (not the audio: cloud speech, if you turn it on, sends the audio to the service you choose for it) is sent to {host}" +
         (s.Provider == LlmSettings.Anthropic ? " (Anthropic)" : "") +
         " together with Dictum's clean-up instructions, which include the words in your personal dictionary. " +
+        "In hands-free mode, up to ten words of what you said just before go with each request. " +
         (s.Provider == LlmSettings.Anthropic
             ? "It uses your own Anthropic API key (ANTHROPIC_API_KEY), and Anthropic's terms and privacy policy apply to what it receives."
             : KeySentence(CloudPresets.ForAddress(s.BaseUrl)) + " Whoever runs that server receives the text; its own terms apply.") +

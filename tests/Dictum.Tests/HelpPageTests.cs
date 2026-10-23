@@ -895,4 +895,28 @@ public class HelpPageTests
         Assert.DoesNotContain("are not followed", HelpText.OwnInstructionsAnswer[1]);
         Assert.Equal(HelpText.NameQuestion, HelpText.Questions[^1].Question); // still the last question
     }
+
+    /// <summary>
+    /// Pin (legal block, APPROVED by the owner 23/10/2026 09:50 AEDT): the site guide's "In the words of our privacy policy" quote is the policy's
+    /// first short-version bullet, word for word (markup aside), so the two cannot drift apart. Mutation (observed failing, 23/10/2026): the old
+    /// quote "We collect nothing. …" put back in site/help.html.
+    /// </summary>
+    [Fact]
+    public void The_site_guide_quotes_the_privacy_policys_short_version_word_for_word()
+    {
+        static string Plain(string s) => Regex.Replace(Regex.Replace(s, "<[^>]+>", ""), @"\s+", " ").Trim();
+        static string Site(string page) => File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", page));
+        var help = Site("help.html");
+        var intro = help.IndexOf("<p>In the words of our privacy policy:</p>", StringComparison.Ordinal);
+        Assert.True(intro >= 0, "site/help.html no longer introduces the privacy policy quote");
+        var quote = Regex.Match(help[intro..], "<blockquote class=\"card\">\\s*<p>(.*?)</p>\\s*</blockquote>", RegexOptions.Singleline);
+        Assert.True(quote.Success, "site/help.html has no quote after its introduction");
+        var privacy = Site("privacy.html");
+        var shortVersion = privacy.IndexOf("<h2 id=\"short\">The short version</h2>", StringComparison.Ordinal);
+        Assert.True(shortVersion >= 0, "site/privacy.html has no short version");
+        var bullet = Regex.Match(privacy[shortVersion..], "<li>(.*?)</li>", RegexOptions.Singleline);
+        Assert.Equal(Plain(bullet.Groups[1].Value), Plain(quote.Groups[1].Value));
+        Assert.Equal("Dictum sends nothing about you to Kynni. It has no account, no analytics, no telemetry (automatic reports on how you use an app) and no crash reporting. We never receive your audio or your text unless you send it to us yourself.",
+            Plain(quote.Groups[1].Value));
+    }
 }

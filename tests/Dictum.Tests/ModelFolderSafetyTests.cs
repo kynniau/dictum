@@ -730,7 +730,7 @@ public sealed class ModelFolderSafetyTests
     {
         using var scratch = new Scratch();
         var chosen = Path.Combine(scratch.Root.FullName, "E-drive models");
-        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { llm = new { provider = "local", model = "qwen2.5-1.5b" }, models = new { folder = chosen } }));
+        File.WriteAllText(scratch.Paths.SettingsFile, JsonSerializer.Serialize(new { llm = new { provider = "local", model = "qwen2.5-1.5b" }, models = new { folder = chosen }, terms = TestTerms.Record }));
         var small = CleanupCatalog.Find("qwen2.5-0.5b")!;
         Create(scratch.Paths.DefaultModelsDir, small.FileName, small.Bytes); // zeros: found by its size, then refused by its SHA-256
         var input = Path.Combine(scratch.Root.FullName, "input.txt");

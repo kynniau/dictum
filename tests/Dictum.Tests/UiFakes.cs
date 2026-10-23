@@ -234,17 +234,27 @@ internal sealed class ScriptedDialogs : IShellDialogs
     public List<string> FolderChooserOpenedIn { get; } = [];
 
     /// <summary>
-    /// The Welcome to Dictum window: counted as the hotkey step (it holds the first-run hotkey check), then <see cref="Onboarding"/>
-    /// answers through the flow if a test set it; otherwise every step is skipped (the shell then writes today's defaults).
+    /// The Welcome to Dictum window: counted as the hotkey step (it holds the first-run hotkey check), or, when it is the Terms of
+    /// Use step alone, in <see cref="TermsWindows"/>; then <see cref="Onboarding"/> answers through the flow if a test set it.
+    /// Otherwise Continue is pressed on the first step (the Terms accepted, unless <see cref="DeclineTerms"/>) and every later step
+    /// is skipped (the shell then writes today's defaults).
     /// </summary>
     public void Onboard(Dictum.UI.Views.Onboarding.OnboardingFlow flow)
     {
-        FirstRunSteps = FirstRunSteps with { Hotkey = FirstRunSteps.Hotkey + 1 };
+        if (flow.TermsOnly) TermsWindows++;
+        else FirstRunSteps = FirstRunSteps with { Hotkey = FirstRunSteps.Hotkey + 1 };
         LastOnboarding = flow;
-        Onboarding?.Invoke(flow);
+        if (Onboarding is { } answer) answer(flow);
+        else if (!DeclineTerms) flow.AcceptTerms();
     }
 
     public Action<Dictum.UI.Views.Onboarding.OnboardingFlow>? Onboarding { get; set; }
+
+    /// <summary>How many times the window showed the Terms of Use step alone (an upgrade, a seeded settings.json, a model override).</summary>
+    public int TermsWindows { get; private set; }
+
+    /// <summary>The window is closed before Continue (the Terms of Use not accepted), when no <see cref="Onboarding"/> answers it.</summary>
+    public bool DeclineTerms { get; set; }
 
     public Dictum.UI.Views.Onboarding.OnboardingFlow? LastOnboarding { get; private set; }
 

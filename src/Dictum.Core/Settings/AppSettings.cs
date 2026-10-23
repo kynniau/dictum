@@ -36,6 +36,7 @@ public sealed record AppSettings
     public SoundSettings Sounds { get; init; } = new();
     public ProfanitySettings Profanity { get; init; } = new();
     public UiSettings Ui { get; init; } = new();
+    public TermsSettings Terms { get; init; } = new();
 
     /// <summary>Optional second hotkey that opens "Fix last dictation" (SPEC §16.3). Null = unset (the default).</summary>
     public string? FixHotkey { get; init; }
@@ -223,6 +224,20 @@ public sealed record UiSettings
     public string View { get; init; } = Simple;
 
     public bool IsSimple => View == Simple;
+}
+
+/// <summary>
+/// terms.* (legal block, 23/10/2026): the Terms of Use version accepted with Continue on the Welcome window's first step, and
+/// the account that accepted it. Written only by that Continue (OnboardingFlow.AcceptTerms); an acceptance of another version,
+/// or by another account (an administrator's seeded file), does not count (<see cref="App.AppRules.AsksTerms"/>).
+/// </summary>
+public sealed record TermsSettings
+{
+    /// <summary>The version accepted (<see cref="Help.TermsText.Version"/> when current), or null for none.</summary>
+    public string? Accepted { get; init; }
+
+    /// <summary>The account name (Environment.UserName) that accepted it, or null.</summary>
+    public string? AcceptedBy { get; init; }
 }
 
 /// <summary>A short sound when recording starts and stops.</summary>

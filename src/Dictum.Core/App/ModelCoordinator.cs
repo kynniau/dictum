@@ -494,7 +494,7 @@ public sealed class ModelCoordinator(
         if (IsCleanupDownloaded(info)) SetValues(values);
         else if (info.RequiresLogin) balloon($"{info.Name} {ModelDownloader.LoginRequired}.", true);
         else ChooseDownload(info.Name, info.Download, CleanupCatalog.ResolvePath(info.Name, paths.ModelsDir(settings())), info.SizeText,
-            info.TradeOff + (info.CommercialUse ? "" : ". Licence: " + info.Licence) + ". " + SwitchNote, values, speech: false);
+            info.TradeOff + (info.LicenceNote is { } licence ? ". " + licence : "") + ". " + SwitchNote, values, speech: false); // the licence a model's own terms add (CleanupModelInfo.LicenceNote)
     }
 
     /// <summary>

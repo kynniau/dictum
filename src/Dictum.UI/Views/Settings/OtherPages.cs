@@ -206,6 +206,10 @@ internal sealed class PrivacyPage : SettingsPage
     private readonly ToggleSwitch _history;
     private readonly ToggleSwitch _transcripts;
 
+    /// <summary>The Offline only switch's description. PROPOSED 23/10/2026 (legal block, section D item 4).</summary>
+    internal const string OfflineOnlyDescription =
+        "No network at all: downloads, Check for updates, cloud clean-up and cloud speech are refused; a server on this PC still works.";
+
     public PrivacyPage(AppShell shell) : base(shell, "Privacy")
     {
         _offline = Ui.Switch(false, on =>
@@ -218,7 +222,8 @@ internal sealed class PrivacyPage : SettingsPage
             Ui.Card(Ui.Stack(8, _speechSummary, Ui.Stack(2, _cleanupCaption, _summary),
                 Ui.Text($"Models download from {ModelCatalog.DownloadHost} only when you choose one, and each file's size and SHA-256 are checked before use.", "caption")), "What leaves this PC"),
             Ui.Card(Ui.Stack(4,
-                Ui.Line("Offline only", _offline, "No network at all: downloads and cloud clean-up are refused."),
+                // PROPOSED 23/10/2026 (legal block, section D item 4): names Check for updates and cloud speech, and the server on this PC.
+                Ui.Line("Offline only", _offline, OfflineOnlyDescription),
                 Ui.Line("Keep dictations out of clipboard history", _history, "Windows clipboard history (Win+V) and cloud clipboard sync."),
                 Ui.Line("Write dictated text to the log", _transcripts, "Off by default. For troubleshooting; the log stays on this PC.")), "Settings"),
             Ui.Card(Ui.Stack(8,
@@ -321,10 +326,20 @@ internal sealed class AboutPage : SettingsPage
             Ui.Card(Ui.Stack(10,
                 Ui.Text("Report a problem opens an email to " + AppShell.SupportEmail + " in your own mail app, with the version and models filled in. " +
                         "Dictum sends nothing itself and never attaches what you dictated."),
-                Ui.Row(8,
-                    Ui.Button("Report a problem", "primary", () => Run(Shell.ReportProblem)),
-                    Ui.Button("GitHub issues", "secondary", () => Run(() => Shell.Platform.Open(AppShell.IssuesUrl))),
-                    Ui.Button("Privacy policy", "secondary", () => Run(() => Shell.Platform.Open(AppShell.PrivacyUrl))))), "Support"),
+                // Terms of use and Third-party notices (legal block, 23/10/2026; PROPOSED labels, TermsText): five buttons wrap on a narrow window.
+                new WrapPanel
+                {
+                    ItemSpacing = 8,
+                    LineSpacing = 8,
+                    Children =
+                    {
+                        Ui.Button("Report a problem", "primary", () => Run(Shell.ReportProblem)),
+                        Ui.Button("GitHub issues", "secondary", () => Run(() => Shell.Platform.Open(AppShell.IssuesUrl))),
+                        Ui.Button("Privacy policy", "secondary", () => Run(() => Shell.Platform.Open(AppShell.PrivacyUrl))),
+                        Ui.Button(TermsText.AboutTermsLabel, "secondary", () => Run(() => Shell.Platform.Open(TermsText.Url))),
+                        Ui.Button(TermsText.NoticesLabel, "secondary", () => Say(Shell.OpenPath(Shell.Paths.ThirdPartyNoticesFile, folder: false) ?? "")),
+                    },
+                }), "Support"),
             Ui.Card(Ui.Stack(10,
                 Ui.Text("settings.json is the source of truth: every change here is written to it, and an edit there is picked up within a second. " +
                         "Reload settings also re-installs the hotkey if Windows removed it."),

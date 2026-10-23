@@ -33,6 +33,9 @@ public class CloudWarningAndPresetsTests
     // and Settings > Privacy say it, with the variable of the key they wait for, while a service that needs its key is on and the key is not set.
     private static string ApprovedWaitingLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add it to .env.";
 
+    // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O7): the clean-up consent's sentence after "…the words in your personal dictionary."
+    private const string ApprovedHandsFreeSentence = "In hands-free mode, up to ten words of what you said just before go with each request.";
+
     private const string ApprovedPolicySentence = "This is an advanced option: Dictum does not validate or certify how that service stores, protects or uses the text it receives. Check its terms before dictating anything sensitive.";
 
     // Approved by the product owner on 16/10/2026 for the privacy policy's OpenAI-compatible section, pinned word for word. The label
@@ -614,7 +617,7 @@ public class CloudWarningAndPresetsTests
         var host = CloudPolicy.CloudHost(llm)!;
         var text = CloudPolicy.ConsentText(llm, host);
         // A factual sentence beside the others; the approved warning paragraph follows, untouched.
-        Assert.Contains("personal dictionary. " + sentence + " Whoever runs that server receives the text; its own terms apply.\n\n" + ApprovedWarning(host) + "\n\n" + ApprovedResponsibility + "\n\nNothing is sent until you agree.", text);
+        Assert.Contains("personal dictionary. " + ApprovedHandsFreeSentence + " " + sentence + " Whoever runs that server receives the text; its own terms apply.\n\n" + ApprovedWarning(host) + "\n\n" + ApprovedResponsibility + "\n\nNothing is sent until you agree.", text);
         Assert.Single(SecretStore.KeyNames, k => text.Contains(k, StringComparison.Ordinal)); // it names one key: the one that goes
     }
 

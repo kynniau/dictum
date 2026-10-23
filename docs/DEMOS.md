@@ -331,27 +331,28 @@ Ctrl+C, Ctrl+V), and a demo whose `environment` says `"notepad": true` gets this
 were re-run: Start found no Notepad; a click on the address bar opened a breadcrumb menu instead (hence Ctrl+L); the Save
 As dialog is inside Notepad's window for UI Automation; a target name with "…" in it was not found (the driver reads the
 data file in another encoding, so the target uses a prefix); one sandbox froze after setup and one lost the tray icon.
-change-model, test-setup, model-folder and help go through the welcome window with its defaults (Next, Next, Next,
-Use this hotkey, Next, Finish) before recording starts. install and first-run do not: install ends on the welcome
+change-model, test-setup, model-folder and help go through the welcome window with its defaults (Continue, Next, Next,
+Use this hotkey, Next, Finish; Continue since the legal block, 23/10/2026) before recording starts. install and first-run do not: install ends on the welcome
 window, and first-run records it.
 
 ## PROPOSED caption copy
 
 1. **Install Dictum** (`install.json`)
    1. Double-click Dictum-Setup in your Downloads folder.
-   2. If Windows says it protected your PC, click More info. *(online only: not seen in these recordings, so the video counts 7 steps)*
-   3. Then click Run anyway. *(online only: not seen in these recordings, so the video counts 7 steps)*
+   2. If Windows says it protected your PC, click More info. *(online only: not seen in these recordings, so the video counts 8 steps)*
+   3. Then click Run anyway. *(online only: not seen in these recordings, so the video counts 8 steps)*
    4. If Windows says SmartScreen can't be reached, click Run. *(only when that dialog appears)*
-   5. Setup opens. Click Next.
-   6. Click Install.
-   7. When it has finished, leave Launch Dictum ticked.
-   8. Click Finish.
-   9. Dictum starts and welcomes you. A few short steps set it up.
+   5. Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next. *(legal block, 23/10/2026: Setup's licence page)*
+   6. Setup opens. Click Next.
+   7. Click Install.
+   8. When it has finished, leave Launch Dictum ticked.
+   9. Click Finish.
+   10. Dictum starts and welcomes you. A few short steps set it up.
 2. **Start Dictum for the first time** (`first-run.json`)
    1. Click the Start button.
    2. Type Dictum.
    3. Press Enter to open it.
-   4. Dictum explains how it works. Click Next.
+   4. Dictum explains how it works and links its Terms of Use. Click Continue.
    5. Dictum suggests where to keep its files. Click Next to use that folder.
    6. The speech model comes with Dictum and is ready. Click Next.
    7. This is the key you hold while you speak. Right Ctrl is already chosen.

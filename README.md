@@ -297,6 +297,9 @@ Dictate: see "Moving from Dictate".
    self-contained: no .NET install is needed.
 4. **Mac (beta): `Dictum-<version>-osx-arm64.zip`** from the same releases, for Apple Silicon Macs on macOS 15 or later. Check it against `SHA256SUMS-mac.txt` (`shasum -a 256 <zip>`), unzip it and move `Dictum.app` to Applications. It is signed and notarised, so it opens normally. Dictum lives in the menu bar; on first use macOS asks for Microphone access and for Accessibility access (to see the hotkey and to paste into other apps), and for approval in System Settings > General > Login Items if launch at login is on. The base.en speech model is inside the app. Intel Macs are not supported.
 
+<!-- PROPOSED 23/10/2026 (legal block): the Terms of Use line (its words are in neither section C nor section D of the block) -->
+Dictum's Terms of Use: https://dictum.kynni.au/terms (shown on first start).
+
 **The direct download needs the Microsoft Visual C++ Redistributable (x64), version 14.51 or later**, unless its
 `runtimes` folders carry the Visual C++ runtime DLLs (a build made with `publish.ps1 -VcRuntimeDir`; see "Build from
 source"). The speech engine (whisper.cpp) and the clean-up engine (llama.cpp) are built with Microsoft's C++ compiler
@@ -377,12 +380,17 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
 
 1. **Welcome to Dictum (1.2).** With no `settings.json` yet (or a seeded one that names no `whisper.model`), Dictum opens
    one window that walks through the first run in large text, with a step line ("Step 2 of 6: Model files"), **Back**
-   and **Next**. Every step is reachable by keyboard; **Esc** or closing the window skips the rest and keeps the
-   defaults below, and the settings file is always left valid. Each step writes its own setting when you
-   finish it, and only when you changed something:
+   and **Next**. Every step is reachable by keyboard. The first step's button is **Continue**, and beside it the window
+   says "By clicking Continue you agree to Dictum's Terms of Use." and, below that, "The Privacy Policy explains what
+   Dictum keeps and sends.", each with its link (https://dictum.kynni.au/terms and https://dictum.kynni.au/privacy,
+   opened in your browser). **Esc** or closing the window before Continue quits Dictum and writes nothing; after it,
+   **Esc** or closing skips the rest and keeps the defaults below, and the settings file is always left valid. Each
+   step writes its own setting when you finish it, and only when you changed something:
    1. **How Dictum works**: hold your hotkey, speak, let go, and the words appear where you were typing; everything
-      happens on this PC. Under it is the short version of "Dictum in plain words" (free, no spyware, open source and
-      provided as is, nothing leaves the PC unless you switch on a cloud option); it asks for no click or acceptance.
+      happens on this PC. Under it is the short version of "Dictum in plain words" (free, no spyware, open source,
+      Dictum itself sends nothing you say off your computer unless you switch on a cloud option). **Continue** accepts
+      the Terms of Use: `terms.accepted` (the version, now "1") and `terms.accepted_by` (your account name) go into
+      `settings.json`, at once, or with the speech step's answer when there is no `settings.json` yet.
    2. **Where to keep the model files**: the suggested folder (`%LOCALAPPDATA%\Dictum\models`) with its drive's free
       space ("C: has 41.0 GB free"), and **Choose another drive or folder…** for a PC that is short of space on C:. It
       follows Settings > Models > Model folder's rules: the folder of the models that come with Dictum is refused, and so
@@ -418,14 +426,22 @@ Testing the self-signed MSIX package before the Store listing is live: see [docs
       **Calibrate my voice** and **Finish**. If nothing arrives within 30 seconds of the model being ready, it says so,
       and **Finish** still works.
 
+   **The Terms of Use step alone.** A copy that already has its first-run answers but no acceptance of the current Terms
+   of Use by the account it runs as (an upgrade from a version without them, a `settings.json` an administrator seeded,
+   a launch with `--model` or `DICTUM_MODEL_PATH`) opens the window with the first step only, without the "next few
+   steps" line: **Continue** records the acceptance and Dictum starts; closing it quits. An acceptance recorded for
+   another account name does not count, so each person who uses a seeded file accepts for themselves.
+
    A `settings.json` seeded by an administrator gets only the choices it leaves open. One that names `whisper.model`
-   opens no window; one without `llm.model` or `llm.provider` (but with `whisper.model`) gets the clean-up choice alone,
-   answered without a question when base.en is on the PC and in the clean-up picker when it is not. One that names
-   `llm.provider` = `local` but no `llm.model` keeps `local` when base.en is on the PC: it gets the recommended cleanup
-   model written, which is not downloaded, so nothing downloads and a notice says the rule-based tidy is used until you
-   download it in Settings > Models. A `settings.json` that cannot be read gets neither. With `DICTUM_MODEL_PATH` or
-   `--model` set no window opens and the recommendations are written. If Dictum stops after the speech step (a crash,
-   say), the next start opens no window: the hotkey and microphone steps were not shown again before 1.2 either.
+   opens only the Terms of Use step until its account has accepted them; one without `llm.model` or `llm.provider`
+   (but with `whisper.model`) gets the clean-up choice alone, after that step, answered without a question when base.en
+   is on the PC and in the clean-up picker when it is not. One that names `llm.provider` = `local` but no `llm.model`
+   keeps `local` when base.en is on the PC: it gets the recommended cleanup model written, which is not downloaded, so
+   nothing downloads and a notice says the rule-based tidy is used until you download it in Settings > Models. A
+   `settings.json` that cannot be read gets neither choice, but does get the Terms of Use step, because what it records
+   is unknown. With `DICTUM_MODEL_PATH` or `--model` set only the Terms of Use step opens (until accepted) and the
+   recommendations are written. If Dictum stops after the speech step (a crash, say), the next start opens no window:
+   the hotkey and microphone steps were not shown again before 1.2 either.
    Recommendations: speech `medium.en` when a discrete GPU is found, `base.en` otherwise, integrated graphics included
    (`small.en` offered as more accurate, a few seconds slower); cleanup `qwen2.5-1.5b` on every machine (see "Cleanup
    models" for why). `--selftest` prints both, with the Vulkan devices it found.
@@ -548,28 +564,26 @@ whose HEAD answers 401), hashes and commits from the HF API (`https://huggingfac
 |---|---|---|---|---|---|
 | qwen2.5-0.5b | Qwen | `Qwen/Qwen2.5-0.5B-Instruct-GGUF` / `qwen2.5-0.5b-instruct-q4_k_m.gguf` | 491,400,032 | Apache-2.0 | faster; never recommended (dropped content in 2 of 4 measured cases) |
 | qwen2.5-1.5b | Qwen | `Qwen/Qwen2.5-1.5B-Instruct-GGUF` / `qwen2.5-1.5b-instruct-q4_k_m.gguf` | 1,117,320,736 | Apache-2.0 | the recommendation on every machine |
-| qwen2.5-3b | Qwen | `Qwen/Qwen2.5-3B-Instruct-GGUF` / `qwen2.5-3b-instruct-q4_k_m.gguf` | 2,104,932,768 | Qwen Research License: **non-commercial** | never recommended |
 | smollm2-1.7b | Hugging Face | `HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF` / `smollm2-1.7b-instruct-q4_k_m.gguf` | 1,055,609,536 | Apache-2.0 | not tested here |
 | gemma-3-1b | Google | `google/gemma-3-1b-it-qat-q4_0-gguf` / `gemma-3-1b-it-q4_0.gguf` | 1,003,541,152 | Gemma Terms of Use | **requires a Hugging Face login**; size-checked only; not tested here |
 | gemma-3-4b | Google | `google/gemma-3-4b-it-qat-q4_0-gguf` / `gemma-3-4b-it-q4_0.gguf` | 3,155,051,328 | Gemma Terms of Use | **requires a Hugging Face login**; wants a GPU; size-checked only; not tested here |
+
+No model on the list is under a non-commercial licence. `qwen2.5-3b`, under the Qwen Research License (non-commercial use only), was removed from it on 23/10/2026; with `llm.model` = `qwen2.5-3b` Dictum now logs that the name is not on its list and uses the recommended `qwen2.5-1.5b` instead (the rule-based tidy until that is downloaded), as for any other unknown name. A downloaded `qwen2.5-3b-instruct-q4_k_m.gguf` (2.1 GB) stays where it is: Settings > Storage no longer lists it and Dictum does not delete it, so delete it from the models folder yourself. Pickers and menus show "Gemma Terms of Use apply (ai.google.dev/gemma/terms)" beside the two Gemma models.
 
 SHA-256:
 
 - qwen2.5-0.5b `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db`
 - qwen2.5-1.5b `6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`
-- qwen2.5-3b `626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d`
 - smollm2-1.7b `decd2598bc2c8ed08c19adc3c8fdd461ee19ed5708679d1c54ef54a5a30d4f33`
 - gemma-3-1b, gemma-3-4b: not published to anonymous callers (the HF API masks the hash of a gated file), so Dictum
   checks their size only; `download-model.ps1` reads the hash with your token and checks it.
 
 Commits: qwen2.5-0.5b `9217f5db79a29953eb74d5343926648285ec7e67`, qwen2.5-1.5b
-`91cad51170dc346986eccefdc2dd33a9da36ead9`, qwen2.5-3b `7dabda4d13d513e3e842b20f0d435c732f172cbe`, smollm2-1.7b
+`91cad51170dc346986eccefdc2dd33a9da36ead9`, smollm2-1.7b
 `2d4a76a30b4af41ecd395c35725ac11688d4cfe4`, gemma-3-1b `d1be121d36172a4b0b964657e2ee859d61138593`, gemma-3-4b
 `15f73f5eee9c28f53afefef5723e29680c2fc78a`.
 
-Licences: Qwen 0.5B/1.5B `https://huggingface.co/<repo>/blob/main/LICENSE` (Apache-2.0); Qwen 3B the "Qwen RESEARCH
-LICENSE AGREEMENT" (`https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/blob/main/LICENSE`), non-commercial use
-only; SmolLM2 the model card's `apache-2.0`
+Licences: Qwen 0.5B/1.5B `https://huggingface.co/<repo>/blob/main/LICENSE` (Apache-2.0); SmolLM2 the model card's `apache-2.0`
 (`https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct`); Gemma the card's `gemma` licence, i.e. the Gemma
 Terms of Use (`https://ai.google.dev/gemma/terms`, "Last modified: April 1, 2026"), which permit use by
 organisations subject to the Gemma Prohibited Use Policy and require a notice if you redistribute the file (for
@@ -579,7 +593,7 @@ example from a share used by `-ModelsFrom`). Do not deploy any model in a busine
 anonymous download gets HTTP 401. Dictum does not handle Hugging Face tokens; tray, picker and
 `--download-cleanup-model` say "requires a Hugging Face login to download; download it in your browser, then choose it
 in Settings > Models" instead of trying. Accept the licence on the repository page, then either download the file there
-and pick it with Settings > Models > Choose .gguf file…, or (direct download, which ships the scripts) run
+and pick it with Settings > Models > Choose .gguf file…, or (the script is in Dictum's source code, not in the direct download) run
 `scripts\download-model.ps1 -Cleanup gemma-3-1b` and enter the token when asked (typing is hidden), or set
 `HF_TOKEN` for that session. The token goes only to huggingface.co and only for a gated model, in a temporary header
 file, and is never written to settings or logs. `-Token <token>` still works but warns: a token on the command line
@@ -653,7 +667,7 @@ Other combinations were not measured.
 and 8.7 s for the first 60 s clip with 1.5b); the driver caches the result. A copy of Dictum in a new folder paid
 it again here (10.0 s for the 60 s clip on its first run, 1.3 s on its second), so the cache appears to be per
 program location (inferred, not documented by the driver). The tray app warms the model up after loading on
-every backend, which also evaluates the prompt once. Untested here: qwen2.5-3b, SmolLM2, Gemma, other GPUs and
+every backend, which also evaluates the prompt once. Untested here: SmolLM2, Gemma, other GPUs and
 CPUs, Azure VMs.
 
 ### Model downloads and checks
@@ -808,6 +822,8 @@ warning and the default is used; Dictum never fails to start because of settings
 | `sounds.enabled` | `false` | A short sound when recording starts and stops. |
 | `profanity.mode` | `"off"` | `off`, `mask` or `remove` (see "Profanity filter"). Settings > Clean-up; the tray panel's switch turns Mask on and off. |
 | `ui.view` | `"simple"` | How Settings > Models and the tray panel's pickers list the models: `simple` (three plain speech choices and Tidy my words) or `advanced` (every model and its details). The **Simple \| Advanced** switch at the top of Settings > Models writes it (see "Speech models"). |
+| `terms.accepted` | `null` | The Terms of Use version accepted with **Continue** on the Welcome window's first step (`"1"` now), written by that Continue together with `terms.accepted_by`. Until both match the version in force and the account Dictum runs as, Dictum shows that step at every start, and closing it before Continue quits (see "First run"). |
+| `terms.accepted_by` | `null` | The account name (the Windows or macOS user name) that accepted the Terms. An acceptance recorded for another account, for example in a `settings.json` an administrator seeded, does not count. |
 | `fix_hotkey` | `null` | A second hotkey, same format as `hotkey`, that opens Fix last dictation. Ignored (with a warning) if one press could complete both hotkeys: the same key, a chord containing the other (`Ctrl+Space` and `Ctrl+Shift+Space`), or a key group containing the other's key (`Ctrl+Shift+F` with the default `RightCtrl`, when pressed with the right-hand Ctrl). Use keys the hotkey does not use, for example `LeftCtrl+Shift+F`. Follows `enabled`. |
 | `log_level` | `"info"` | `debug`, `info`, `warning`, `error`. |
 | `log_transcripts` | `false` | `true` writes transcript text to the log. Off by default. |
@@ -1098,8 +1114,10 @@ the word you said survives, to be masked or left as it is.
 
 ## Privacy
 
-**Nothing leaves the machine by default.** Speech recognition and cleanup both run on this PC. Dictum opens a
-network connection only in these cases, and only to these hosts:
+<!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): the clipboard sentence is Terms section 11's -->
+**Nothing leaves the machine by default.** Speech recognition and cleanup both run on this PC. Your computer's own
+clipboard features can share text Dictum pastes (Privacy Policy, section 2). Dictum opens a network connection only in
+these cases, and only to these hosts:
 
 | When | Host |
 |---|---|
@@ -1263,7 +1281,7 @@ Dictum.exe                                   tray mode
 Dictum.exe --transcribe <file.wav> [--no-llm] print "raw: ..." (and, unless --no-llm, "cleaned: ..." and "final: ...",
                                               the text the tray app would paste after the corrections and the
                                               profanity filter), with the dictionary in both prompts; exit 0, or 1
-                                              when settings.json cannot be read
+                                              when settings.json cannot be read or the Terms of Use are not accepted
 Dictum.exe --selftest                        speech and cleanup models with their runtimes, recommendations, the
                                               active Mode preset, decoding, personal file counts, offline_only,
                                               microphones, hotkey, key presence (never values); exit 0/1
@@ -1271,7 +1289,8 @@ Dictum.exe --download-model <name>           download a speech model (e.g. small
 Dictum.exe --download-cleanup-model <name>   the same for a cleanup model (e.g. qwen2.5-1.5b)
 Dictum.exe --bench-cleanup <file.wav|file.txt> every downloaded cleanup model (and --cleanup-model's file) over the
                                               same input: output, time, validator verdict, side by side (a .wav is
-                                              transcribed first); an unreadable file exits 1
+                                              transcribed first); an unreadable file exits 1, and so does a run
+                                              before the Terms of Use are accepted
 Dictum.exe --print-models-dir                the folder the app downloads models to (models.folder, else its
                                               earlier name whisper.models_dir, else the default); install.ps1 uses it
 Dictum.exe ... --model <name|path>           use this speech model for this launch only
@@ -1290,6 +1309,12 @@ warns, and that file has no size or hash to be checked against. A value is never
 
 `Dictum.exe` is a Windows GUI program, so PowerShell does not wait for it unless you pipe the output:
 `.\Dictum.exe --selftest | Out-Host`. Diagnostics go to stderr, results to stdout.
+
+`--transcribe` and `--bench-cleanup` are ways of using Dictum, so they run only once the account they run as has accepted
+the Terms of Use in the app (`terms.accepted` and `terms.accepted_by` in settings.json, see "First run"). Before that they
+print "Start Dictum once and press Continue to accept its Terms of Use." (PROPOSED 23/10/2026) and exit 1. `--selftest`,
+`--download-model`, `--download-cleanup-model` and `--print-models-dir` are for administrators and build checks and are not
+gated.
 
 ## Troubleshooting
 
@@ -1499,3 +1524,4 @@ missing cleanup model is reported but does not fail it.
 See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) to build, test and propose changes, and
 [.github/SECURITY.md](.github/SECURITY.md) to report a vulnerability privately. Dictum is MIT licensed (`LICENSE`,
 Kynni Pty Ltd).
+Trademarks: see [TRADEMARKS.md](TRADEMARKS.md).
