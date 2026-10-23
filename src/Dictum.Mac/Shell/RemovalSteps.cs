@@ -30,7 +30,9 @@ internal sealed class RemovalSteps(ILog log, AppBundle? bundle, string exeDir, F
 
     // First beta finding (23/10/2026): the Storage page's "Remove everything" sentence named the Start menu on a Mac.
     // APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 2): do not reword.
-    public string StartupItemsPhrase => "the login item";
+    internal const string StartupItems = "the login item";
+
+    public string StartupItemsPhrase => StartupItems;
 
     // PROPOSED 23/10/2026: why the program is left in place.
     internal const string NotInstalledCopy = "This copy is not the installed Dictum.app, so it stays where it is. Move it to the Trash yourself.";

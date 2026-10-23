@@ -6359,3 +6359,11 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
    skipped (the previous entry recorded 2708, 2667, 0, 41 on main; the 17 new tests are MacCopyBlockTests). PublicCopyNeutralityTests
    3 of 3 passed. **Not run:** a Release build, the installed app, tray mode, a Mac, and the 41 gated tests (MacShellTests' 11
    among them, skipped off a Mac).
+9. **CI fix (23/10/2026 15:36 AEDT).** The macOS CI job failed on two of these tests with DllNotFoundException ("kernel32.dll"):
+   they built the real `WindowsPlatform` on the macOS runner. Each real platform class is now built only on its own system
+   (`The_windows_platform_hands_out_the_windows_words`, `The_mac_platform_hands_out_the_mac_words`, gated with
+   `Assert.SkipUnless(OperatingSystem.IsWindows() / IsMacOS())`), and row 2 reads each platform's phrase through a new
+   `RemovalSteps.StartupItems` constant (one per platform, the property returns it) on any system. Observed failing: the Mac constant
+   set to the Windows phrase (row 2 failed), and the Windows property returning another phrase (the Windows platform test failed).
+   `dotnet test Dictum.sln` (Debug, 15:27 to 15:36 AEDT): 2727 total, 2685 passed, 0 failed, 42 skipped (the Mac platform test is
+   the new skip on Windows).

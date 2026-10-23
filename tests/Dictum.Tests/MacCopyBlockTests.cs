@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
@@ -65,15 +66,47 @@ public sealed class MacCopyBlockTests
         }
     }
 
+    /// <summary>The fake hands out the Windows words: every window test before this block saw them.</summary>
     [Fact]
-    public void Each_platform_hands_out_its_own_words()
+    public void The_fake_platform_hands_out_the_windows_words()
+    {
+        using var scratch = new Scratch();
+        Assert.Same(PlatformWords.Windows, scratch.Shell().Platform.Words);
+    }
+
+    // Each real platform class is built only on its own system: WindowsPlatform calls kernel32 when it is constructed, so on the
+    // macOS runner it throws DllNotFoundException (PR #79's first CI runs); MacPlatform is built only on a Mac for symmetry.
+
+    /// <summary>The real Windows platform: its words and its Remove everything phrase. Windows only.</summary>
+    [Fact]
+    public void The_windows_platform_hands_out_the_windows_words()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "WindowsPlatform is built only on Windows (it calls kernel32 when constructed).");
+        WindowsPlatformChecks();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void WindowsPlatformChecks()
     {
         using var windows = new Dictum.Windows.WindowsPlatform(NullLog.Instance, AppContext.BaseDirectory);
         Assert.Same(PlatformWords.Windows, windows.Words);
+        Assert.Equal(Dictum.Windows.Shell.RemovalSteps.StartupItems, windows.Removal.StartupItemsPhrase);
+    }
+
+    /// <summary>The real Mac platform: its words and its Remove everything phrase. macOS only.</summary>
+    [Fact]
+    public void The_mac_platform_hands_out_the_mac_words()
+    {
+        Assert.SkipUnless(OperatingSystem.IsMacOS(), "MacPlatform is built only on macOS.");
+        MacPlatformChecks();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void MacPlatformChecks()
+    {
         using var mac = new Dictum.Mac.MacPlatform(NullLog.Instance, Path.GetTempPath());
         Assert.Same(PlatformWords.Mac, mac.Words);
-        using var scratch = new Scratch();
-        Assert.Same(PlatformWords.Windows, scratch.Shell().Platform.Words); // the fake: every window test before this block saw the Windows words
+        Assert.Equal(Dictum.Mac.Shell.RemovalSteps.StartupItems, mac.Removal.StartupItemsPhrase);
     }
 
     /// <summary>Row 1 (PR #71, approved as is): the Storage folder row once a model folder is chosen, the same words on both.</summary>
@@ -84,16 +117,17 @@ public sealed class MacCopyBlockTests
         Assert.Equal("Models, logs, calibration recordings", StoragePage.DataFolderRow(modelFolderChosen: false));
     }
 
-    /// <summary>Row 2 (PR #71): the Storage page's Remove everything sentence, from each platform's own removal steps.</summary>
+    /// <summary>
+    /// Row 2 (PR #71): the Storage page's Remove everything sentence, from each platform's removal-steps phrase (the constants, read on
+    /// any system; each real platform hands out its own above, on its own system).
+    /// </summary>
     [Fact]
     public void Row02_remove_everything_names_the_login_item_on_a_mac()
     {
-        using var windows = new Dictum.Windows.WindowsPlatform(NullLog.Instance, AppContext.BaseDirectory);
         Assert.Equal("Deletes every model, recording, log, setting, your dictionary, corrections and .env keys, the Start menu shortcut and the launch-at-login entry, then the program itself. " +
-                     "Two warnings come first; the second needs DELETE typed.", StoragePage.RemoveEverythingText(windows.Removal.StartupItemsPhrase));
-        using var mac = new Dictum.Mac.MacPlatform(NullLog.Instance, Path.GetTempPath());
+                     "Two warnings come first; the second needs DELETE typed.", StoragePage.RemoveEverythingText(Dictum.Windows.Shell.RemovalSteps.StartupItems));
         Assert.Equal("Deletes every model, recording, log, setting, your dictionary, corrections and .env keys, the login item, then the program itself. " +
-                     "Two warnings come first; the second needs DELETE typed.", StoragePage.RemoveEverythingText(mac.Removal.StartupItemsPhrase));
+                     "Two warnings come first; the second needs DELETE typed.", StoragePage.RemoveEverythingText(Dictum.Mac.Shell.RemovalSteps.StartupItems));
     }
 
     /// <summary>Rows 3 and 4: Welcome steps 1 and 2 say "this Mac" on a Mac.</summary>
