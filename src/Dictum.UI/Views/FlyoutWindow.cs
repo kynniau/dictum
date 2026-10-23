@@ -60,6 +60,10 @@ internal sealed class FlyoutWindow : Window
     // leaves this PC", which would then be untrue (the approved row is hidden, never reworded).
     private readonly TextBlock _speechPrivacy = Ui.Text("", "caption");
     private readonly Control _privacyRow;
+
+    /// <summary>The footer's "Nothing leaves this PC" (approved 16/10/2026); on a Mac "Nothing leaves this Mac" (<see cref="PlatformWords.ThisDevice"/>; APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 8): do not reword).</summary>
+    internal static string NothingLeavesLine(PlatformWords words) => $"Nothing leaves {words.ThisDevice}";
+
     private readonly DispatcherTimer _meterTimer;
     private List<string?> _micIds = [];
     private Dictionary<string, string>? _speechPlain; // Simple view: each listed model's tier name; null in Advanced
@@ -274,7 +278,7 @@ internal sealed class FlyoutWindow : Window
             // Each line after "Nothing leaves this PC": Approved by the product owner on 16/10/2026 as written: never reword it.
             var nothingLeaves = _shell.NothingLeaves;
             _lock.IsVisible = nothingLeaves; // the lock stands only beside "Nothing leaves this PC"
-            _privacy.Text = nothingLeaves ? "Nothing leaves this PC"
+            _privacy.Text = nothingLeaves ? NothingLeavesLine(_shell.Platform.Words)
                 : Dictum.Llm.CloudPolicy.LocalServerHost(s.Llm) is not null ? "Clean-up via a server on this PC"
                 : Dictum.Llm.CloudPolicy.TrayLine;
         }

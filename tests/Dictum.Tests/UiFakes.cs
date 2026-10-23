@@ -45,6 +45,8 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     public List<string> Opened { get; } = [];
 
     public string Name => "Test";
+    /// <summary>The Windows words by default, as every window test before the Mac copy block saw them; a test sets the Mac words.</summary>
+    public PlatformWords Words { get; set; } = PlatformWords.Windows;
     public AppPaths ResolvePaths(string? configOverride) => paths;
     public LegacyFolders LegacyFolders() => new(Path.Combine(paths.ConfigDir, "..", "legacy-config"), Path.Combine(paths.LocalDir, "..", "legacy-local"));
     public IPackageInfo Package => FakePackage;

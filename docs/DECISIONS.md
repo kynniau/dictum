@@ -6227,6 +6227,170 @@ so this one PR applies them. Approved strings change only where the brief said; 
    (inferred from the test names, not measured on a main checkout).
    - **Not run:** a Release build, the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests.
 
+## Legal strings block 2: approved labels, captions, contact details (23/10/2026 14:11 AEDT, branch legal/strings)
+
+The owner approved sections 1 to 4 of the legal strings basis document at 13:20 AEDT on 23/10/2026, chose option (a) of its
+section 5 at 13:50, supplied the contact facts at 13:51 (Kynni Pty Ltd, ACN 700 150 956, Suite 402, 88 Phillip Street,
+Parramatta NSW 2150) and approved applying the O9 and O10 wording to three more surfaces at 13:57. This one PR applies all of it.
+Each changed place carries `APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword` (13:50, 13:51 or
+13:57 where the approval was then); JSON carries no markers, so this entry records the two demo captions.
+
+1. **Flipped to APPROVED, text unchanged (13:20).** Settings > About buttons "Terms of use" and "Third-party notices"
+   (`TermsText.AboutTermsLabel`, `NoticesLabel`); the Offline only description "No network at all: downloads, Check for updates,
+   cloud clean-up and cloud speech are refused; a server on this PC still works." (`OtherPages.OfflineOnlyDescription`); the Gemma
+   note "Gemma Terms of Use apply (ai.google.dev/gemma/terms)" (`CleanupCatalog.GemmaNote`; `ModelCoordinator.SelectCleanup` reads it
+   through `LicenceNote` and carries no marker of its own); the CLI line "Start Dictum once and press Continue to accept its Terms of
+   Use." (`CliCommands.TermsNotAccepted`, and the README sentence that quotes it); README's "Dictum's Terms of Use: https://dictum.kynni.au/terms
+   (shown on first start)."; TRADEMARKS.md's last line "See the Terms of Use at https://dictum.kynni.au/terms."; both meta
+   descriptions (privacy.html, terms.html; not pinned, as briefed).
+2. **Changed (13:20).**
+
+   | Where | Old | New |
+   |---|---|---|
+   | `OnboardingText.WelcomeNext` | The next few steps take a minute or two. Press Next to begin. | The next few steps take a minute or two. Press Continue to begin. |
+   | `docs/STORE.md`, TO DICTATE opening | on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then | on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then |
+   | `site/help.html`, first-run Welcome step | Click Next. | Click Continue. |
+   | `site/privacy.html` section 3, `settings.json` item | `settings.json`: your settings. | `settings.json`: your settings, and which version of the Terms of Use you accepted, with the account name (your Windows or macOS user name) that accepted it. |
+   | `scripts/demos/install.json`, step after the licence step | Setup opens. Click Next. | Setup moves on. Click Next. |
+   | `site/plain-words.html`, "What we cannot take responsibility for", first paragraph | Dictum is free and we give it to you as it is. We say it in plain words: we have built it with care, | Dictum is free. We have built it with care, |
+
+   - The `STORE.md` PROPOSED note under the 1.2.1 notes block became an APPROVED note; row 17's appended sentence is flipped.
+   - The first-run Welcome caption and the install licence caption were already the approved text; `docs/DEMOS.md` marks both
+     (and "Setup moves on. Click Next.") APPROVED and records the approval at the top.
+   - **Plain-words tidy, completed on the coordinator's instruction (owner's section 4 text).** The paragraph must start "Dictum is free. We have
+     built it with care, …", so "and we give it to you as it is" went too (the open point "as it is remains", `Legal block, app side`,
+     item 15, is closed). It first landed with only the five words dropped; the second commit finishes it. Marker 13:20.
+3. **Section 5 (13:50).** `OnboardingText.WelcomeText`, last sentence: "Everything happens on this PC." becomes "Everything happens
+   on this PC unless you turn on a cloud option." No test held the old sentence literally (they read the constant).
+4. **Contact lines (13:51).** `site/terms.html` and `packaging/TERMS.txt` section 16: "Kynni Pty Ltd, Australia. Email …" becomes
+   "Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia. Email …" (rest unchanged;
+   `TermsTextConsistencyTests` ties the two copies). `site/privacy.html` section 12: "Kynni Pty Ltd, Australia, www.kynni.com.au"
+   becomes "Kynni Pty Ltd (ACN 700 150 956), Suite 402, 88 Phillip Street, Parramatta NSW 2150, Australia, www.kynni.com.au". The
+   mailto and GitHub links are as they were. The Terms stay "Version 1, last updated 23/10/2026" (same day; inferred that no
+   version bump is wanted for a contact detail; say if the owner wants one).
+5. **O9 and O10 on the landing page and the README (13:57).**
+   - `site/index.html`, "A server you name" card: "your PC" becomes "your computer" twice, so the clause equals the policy's
+     (`CloudWarningAndPresetsTests.ApprovedLocalServerClause` now equals `ApprovedPolicyLocalServerClause`, asserted).
+   - `site/index.html`, `dictum.kynni.au` card: now the policy's O10 sentence word for word ("Only when you open the privacy policy,
+     the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct download for
+     Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by the
+     Store."). `UpdateCheckTests` pins it equal to `PrivacySiteSentence`; the test is `The_landing_page_card_for_dictum_kynni_au_says_the_same`
+     again; the `SiteStoreFirstTests` sentence pin carries the new sentence.
+   - **The direct-download gate flagged index.html** (the new sentence contains the exempted phrase), so
+     `SiteStoreFirstTests.No_page_explains_the_direct_download_or_the_warning` now exempts exactly one use on `index.html` as well
+     as exactly four on `privacy.html`; a second use on the landing page still fails.
+   - `README.md` network table: the Check for updates row now says "(the direct download for Windows and the Mac beta; …)" and the
+     privacy-policy row "Only when you open the privacy policy, Dictum in plain words (`/plain-words`), the Terms of Use (from the
+     Welcome window or Settings > About) or the full guide from Settings (About, Privacy, Help)"; its pinned start is unchanged.
+6. **New pins** (`OwnerApprovalsTests`, one per surface): the two Welcome lines, the README and TRADEMARKS lines, the STORE
+   TO DICTATE opening, the help page step, the privacy `settings.json` item, the two contact sections, the demo captions and the
+   two README rows. Changed pins: `PlainWordsTests` (the paragraph and a count of the 13:20 marker), `TermsAcceptanceTests`
+   (section 16 of TERMS.txt), `CloudWarningAndPresetsTests`, `UpdateCheckTests`, `SiteStoreFirstTests` (above).
+7. **Still PROPOSED (unchanged here).** The Mac copy block and everything else marked PROPOSED on main.
+8. **What it might break, and how to verify.** Copy, comments and test pins; the only program-code changes are two string
+   constants (`WelcomeNext`, `WelcomeText`). A person who read the old Welcome step sees "Continue" and the cloud qualifier;
+   the landing page now mentions the Terms of Use, and it is not deployed until the gated release. Verify: `dotnet test Dictum.sln`
+   and `git diff --word-diff`.
+9. **Gates.** `dotnet test Dictum.sln` (Debug, 14:11 to 14:20 AEDT, on the final tree): 2708 total, 2667 passed, 0 failed, 41 skipped (the previous entry recorded 2700, 2659, 0, 41 on main; the eight extra are the new `OwnerApprovalsTests` facts). `PublicCopyNeutralityTests`: 3 of 3 passed.
+   - **Mutation checks (observed failing, 23/10/2026, 14:11, each file restored byte for byte and compared):** with every changed string put back to its old text at once (Welcome lines, README lines and rows, TRADEMARKS line, STORE TO DICTATE opening, help step, privacy `settings.json` item, the three contact sections, install caption, plain-words words, both index.html cards), 27 tests failed (the 8 new facts, `PlainWordsTests` whole-page, `TermsAcceptanceTests` section 16, `CloudWarningAndPresetsTests` server clause, `UpdateCheckTests` card, `SiteStoreFirstTests` sentence pin and the direct-download gate, which counts exactly one use on index.html). `TermsTextConsistencyTests` did not fail because both Terms copies were reverted together; it was not mutated one-sided in this PR.
+   - **Not run:** a Release build, the demos, Setup, the installed app, tray mode, a Mac, and the 41 gated tests. Settings > About and the Welcome window were not looked at on screen.
+
+## Release 1.3.1 prepared (23/10/2026, branch release/1.3.1, release-prep lane)
+
+The owner decided at 14:05 AEDT on 23/10/2026 that 1.3.1 is the next release for Windows and the Mac beta, carrying everything merged since v1.3.0 (main ec6102d) plus two PRs still open when this was written: the Mac copy block and PR #74 (Mac pasteboard, dictations current-host-only while clipboard history is kept off). No tag is created and nothing is built for release, published, deployed or submitted; none of that is done by this lane.
+
+1. **Edits.** `Directory.Build.props`: `<Version>` 1.3.0 to 1.3.1 (package 1.3.1.0). `packaging/release-notes-preamble.md`: a new first paragraph, "What is new in 1.3.1", above the existing runtime and model paragraphs. `docs/STORE.md`: the version references (header, section 1, section 6), a "What's new in this version (1.3.1)" block above the 1.3.0 one, a "Notes for certification: PROPOSED for 1.3.1" block after the 1.3.0 one, go-live step 5a (Additional license terms), two certification-record rows. `site/version.json`: version 1.3.1 and the PROPOSED What's new paragraph as `notes`.
+2. **`published` in `site/version.json` is still 2026-10-23, the 1.3.0 date.** It is only for people (the app ignores it, STORE.md section 10 step 7); set it to the deploy day when `site/` is deployed with the GitHub release.
+3. **APPROVED by the owner 23/10/2026 15:53 AEDT: do not reword. The GitHub release notes paragraph (`packaging/release-notes-preamble.md`) and the `site/version.json` `notes` string.** The workflow publishes `packaging/release-notes-preamble.md` as it is, followed by GitHub's generated notes (`gh release create ... --notes-file packaging/release-notes-preamble.md --generate-notes`). The new paragraph is written as final prose, so approving it means leaving the file as it is; changing it means editing the file before the tag. Because the file is not versioned, the 1.3.1 paragraph would be published again by a later release unless it is replaced then (the Qwen line is the DECISIONS "Release-notes line" PROPOSED text of the legal block, app side, item 14, extended).
+4. **APPROVED by the owner 23/10/2026 15:53 AEDT: do not reword. Store What's new (1.3.1)** and **certification notes (1.3.1)**, both in STORE.md and quoted in the PR body. The certification notes' second paragraph points back to the 1.3.0 notes for the cloud options instead of repeating the "Notes written 23/10/2026 for Dictum 1.3.0" block; if Partner Center wants a self-contained field, the owner can paste the 1.3.0 cloud paragraph after it.
+5. **Mac is deliberately absent from the Store texts.** The first submission failed on Store Policies 10.1.5 ("promotes another platform"). The two Mac changes (PR #74 pasteboard host-only; the Mac copy block, Mac words where Windows strings said PC or Windows) are not in the Windows GitHub release notes either: `MacPackagingTests` requires the Windows preamble to contain no "macOS".
+6. **`packaging/release-notes-mac.md` is unchanged.** It is the approved, version-free, single-paragraph Mac beta text ("Dictum-<version>-osx-arm64.zip"), `MacPackagingTests` pins it to one line starting "**Dictum for macOS (beta).**" with nothing else, and the owner approved it on 23/10/2026. A 1.3.1 line would need the owner's wording; PROPOSED, not applied: "Dictum on a Mac now marks each dictation it writes to the clipboard as this-Mac-only while clipboard history is kept off, so Universal Clipboard does not carry it to your other devices, and the Mac build says Mac where it said PC or Windows." If approved it needs the test changed too (the file would no longer be only the first paragraph), which this lane does not own.
+7. **Not applied literally.** (a) "The Storage page's folder row": the coordinator corrected the text to "names its folders more precisely" (the row existed; only its label changes once a model folder is chosen); PR #71's labels are "Models, logs, calibration recordings" or "Logs, calibration recordings" (PROPOSED in its own entry), so the sentence names the row without quoting either label. (b) "the Mac 'login item' wording (PR #71)" and the Mac pasteboard change are left out of the Windows texts, per item 5. (c) "The installer's licence page" is in the GitHub notes but not the Store texts: the Store package has no installer. (d) The brief's "Mac copy block" had no open PR number visible to this lane (`gh pr list` showed only #74 at 14:xx AEDT), so it is described from the brief only.
+8. **Certification-record row for Submission 4 (1.3.0).** Recorded as passed, about 08:30 AEDT on 23/10/2026, on the orchestrator's report; this lane did not read Partner Center.
+9. **What it might break, and how to verify.** Docs, release text and the version number. A version pin or a text pin that quotes the old version, STORE.md or the preamble could fail: `dotnet build Dictum.sln -c Release` and `dotnet test Dictum.sln` (counts in the PR). The About page and the update check read the packaged version, so a 1.3.0 install will see 1.3.1 as newer once `site/version.json` is deployed.
+10. **Approval (owner, 23/10/2026 15:53 AEDT, as relayed by the coordinator).** The three 1.3.1 texts (Store What's new, certification notes, GitHub release notes paragraph, and the version.json `notes` string that repeats What's new) were approved as a block, exactly as on head 80437f2. Markers changed; the texts are byte for byte. The version.json `published` date is still the deploy-day item in item 2.
+
+## Mac copy block: Mac words on the platform seam, Windows strings unchanged (23/10/2026 15:06 AEDT, branch mac/copy-block)
+
+The owner approved at 14:06 AEDT on 23/10/2026 the Mac copy block (written 14:02 AEDT from the Mac session's findings in the demo
+guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built as one change.
+
+1. **The rule (APPROVED).** Where an approved Windows string says "this PC", "your PC", "Windows", "Start menu" or "Win+V", the Mac
+   build shows the same sentence with the Mac word in that place. Nothing else in the sentence changes. The Windows build is untouched.
+2. **The rows (each APPROVED by the owner 23/10/2026 14:06 AEDT, marked in the code "(Mac copy block, row N): do not reword").**
+
+   | # | Surface | Windows (unchanged) | Mac | Where |
+   |---|---|---|---|---|
+   | 1 | Settings > Storage, folder row once a model folder is chosen | "Logs, calibration recordings" | the same words (PR #71's PROPOSED string, approved as is) | `StoragePage.DataFolderRow` (ModelPages.cs) |
+   | 2 | Settings > Storage, Remove everything | "…the Start menu shortcut and the launch-at-login entry, then the program itself." | "…the login item, then the program itself." | `IRemovalSteps.StartupItemsPhrase` (Mac RemovalSteps.cs; PR #71's PROPOSED string) |
+   | 3 | Welcome step 1 | "Everything happens on this PC unless you turn on a cloud option." | "…on this Mac…" | `OnboardingText.WelcomeText(words)` |
+   | 4 | Welcome step 2 | "Dictum keeps its speech models on this PC." | "…on this Mac." | `OnboardingText.FolderText(words)`, `FolderTextNotIncluded(words)` |
+   | 5 | Welcome hotkey step, intro | "…the box shows exactly what Windows receives." | "…what macOS receives." | `HotkeyCheck.Intro(words)` (Dialogs.cs) |
+   | 6 | Hotkey capture box | "Windows received: Right Option up" | "macOS received: Right Option up" | `HotkeyCaptureBox.Received(words, key)` |
+   | 7 | Welcome hotkey step, Remote Desktop caption | "On a Mac over Remote Desktop use the right Option key (Right Alt) or right Command (Right Win)." | not shown | `PlatformWords.ShowsRemoteDesktopNote` (OnboardingSteps.cs `HotkeyStep`) |
+   | 8 | Menu-bar panel footer | "Nothing leaves this PC" | "Nothing leaves this Mac" | `FlyoutWindow.NothingLeavesLine(words)` |
+   | 9 | Settings > Privacy, default line | "Nothing leaves this PC: speech recognition and clean-up both run here." | "Nothing leaves this Mac: …" | `PrivacyPage.NothingLeavesLine(words)` (OtherPages.cs) |
+   | 10 | Settings > Privacy, clipboard caption | "Windows clipboard history (Win+V) and cloud clipboard sync." | "Clipboard managers that follow the concealed-item convention, and Universal Clipboard to your other devices." | `PlatformWords.ClipboardHistoryCaption` |
+   | 11 | Calibration window, intro | "…in Dictum's folder on this PC (Settings > Storage lists it)…" | "…on this Mac…" | `CalibrationWindow.RecordingsNote(words)` |
+   | 12 | Settings > Help, "How do I remove Dictum completely?" | the Windows paragraph, unchanged | "It deletes its models, recordings, logs, settings, dictionary, corrections, snippets and saved keys and its login item, then closes and moves Dictum.app to the Trash, unless its first warning says it cannot." | `PlatformWords.RemoveAnswer`, `HelpText.QuestionsFor(words)` |
+
+   Not in this block (the owner's file, section 3): the site help page (one text for both platforms, keeps "PC") and the Mac App
+   Store listing.
+3. **The seam.** One record, `Dictum.Platform.PlatformWords(ThisDevice, OsName, ClipboardHistoryCaption, RemoveAnswer,
+   ShowsRemoteDesktopNote)`, handed out by a new `IPlatform.Words`: `WindowsPlatform` returns `PlatformWords.Windows`,
+   `MacPlatform` returns `PlatformWords.Mac` (both in Dictum.Core, plain strings, no platform code; ArchitectureTests still pass).
+   The Windows values are the approved Windows words byte for byte. The call sites compose their sentence from the words; none
+   branches on the operating system. Two answers cannot be made by swapping a word (rows 10 and 12), so the record holds the whole
+   sentence; row 2's phrase already lived on `IRemovalSteps`. Row 7 hides the caption (`IsVisible`) rather than removing it, so the
+   Windows step is laid out as before. `HelpText.Questions` stays the Windows list (HelpPageTests and the site twin read it);
+   `QuestionsFor(words)` swaps only the remove answer's last paragraph and keeps every other entry as the same object. The test
+   fake (`FakePlatform.Words`) defaults to the Windows words, so every existing window test sees what it saw before.
+4. **Pins** (`MacCopyBlockTests`, 17 tests): one per row, each a theory over both word sets where the row is on a window, asserting
+   the composed string and the window built on the fake platform with those words (the onboarding window, the capture box, the
+   panel, Settings > Privacy and Help, the calibration window); rows 1 and 2 as plain facts (row 2 through the real
+   `WindowsPlatform` and `MacPlatform` removal steps, so it runs on Windows, where MacShellTests' "the login item" pin is skipped);
+   and one that each platform hands out its own words. Existing pins changed only to call the composed form with
+   `PlatformWords.Windows` (OnboardingTests, OwnerApprovalsTests, PlainWordsTests, TermsAcceptanceTests, PolishTests); the
+   PROPOSED notes on rows 1 and 2 in ModelFolderTests and MacShellTests now say APPROVED.
+5. **Mutation checks (observed failing, 23/10/2026 between 14:55 and 15:05 AEDT, source restored with `git checkout` after each).**
+   Mac side, each call site put back to its pre-change literal: rows 1 (the row's word changed), 2, 3, 5, 6, 8, 9, 11 and 12 at
+   once, then rows 4, 7 and 10 on their own; every `(mac: True)` case and the row 1 and 2 facts failed (17 run, 9 failed, then 3).
+   Windows side, the Windows words changed: ThisDevice, OsName, the caption, the remove answer and the note flag at once (18 of 280
+   failed, among them OwnerApprovalsTests, CloudSpeechUiTests, CleanupOffTests, UiWindowTests, PolishTests, OnboardingTests and
+   every `(mac: False)` case), then the caption, the note flag and FolderText alone (5 of 73 failed: rows 4, 7 and 10), then the
+   Windows startup phrase (row 2 failed).
+6. **Follow-up block for the owner (Mac-visible "this PC" / "Windows" strings outside the twelve rows, not changed here).** Seen while
+   working (not an exhaustive sweep): the Welcome speech step's "A model that is not
+   on this PC yet…" (`OnboardingText.SpeechChoice`), Settings >
+   Privacy's card titles "What leaves this PC" and "Kept on this PC", its "the log stays on this PC" caption and the Offline only
+   description ("a server on this PC"), the panel's "Clean-up via a server on this PC", `CloudPolicy.TrayLine` ("text leaves this
+   PC"), `SpeechPolicy.DeclineButton` ("Keep speech on this PC"), and Help's "your Windows build" (FeedbackNote) and "on this PC"
+   (How Dictum works). The lens on 32c6c1e added these sites (its file:line on that commit, not re-checked here):
+   AppShell.Actions.cs:210-211, AppShell.CloudSpeech.cs:35 and :41, HelpText.cs:226-227, :249 and :275, GeneralPages.cs:451,
+   ModelPages.cs:27, :72 and :75, SimpleView.cs:44, :72 and :98, SpeechPolicy.cs:104, HowItWorksText.cs:19 and :70.
+7. **What it might break, and how to verify.** Windows: nothing visible; every Windows string is pinned byte for byte. The Mac
+   build shows the twelve surfaces in Mac words; nothing here ran on a Mac. Verify: `dotnet test Dictum.sln`; on the Mac, open the
+   twelve surfaces listed in the PR.
+8. **Gates.** `dotnet test Dictum.sln` (Debug, 15:07 to 15:15 AEDT, on the final tree): 2725 total, 2684 passed, 0 failed, 41
+   skipped (the previous entry recorded 2708, 2667, 0, 41 on main; the 17 new tests are MacCopyBlockTests). PublicCopyNeutralityTests
+   3 of 3 passed. **Not run:** a Release build, the installed app, tray mode, a Mac, and the 41 gated tests (MacShellTests' 11
+   among them, skipped off a Mac).
+9. **CI fix (23/10/2026 15:36 AEDT).** The macOS CI job failed on two of these tests with DllNotFoundException ("kernel32.dll"):
+   they built the real `WindowsPlatform` on the macOS runner. Each real platform class is now built only on its own system
+   (`The_windows_platform_hands_out_the_windows_words`, `The_mac_platform_hands_out_the_mac_words`, gated with
+   `Assert.SkipUnless(OperatingSystem.IsWindows() / IsMacOS())`), and row 2 reads each platform's phrase through a new
+   `RemovalSteps.StartupItems` constant (one per platform, the property returns it) on any system. Observed failing: the Mac constant
+   set to the Windows phrase (row 2 failed), and the Windows property returning another phrase (the Windows platform test failed).
+   `dotnet test Dictum.sln` (Debug, 15:27 to 15:36 AEDT): 2727 total, 2685 passed, 0 failed, 42 skipped (the Mac platform test is
+   the new skip on Windows).
+10. **Lens on 32c6c1e (Needs changes, no blockers), fixed 23/10/2026 16:03 AEDT.** The rule covers a string wherever it appears:
+   Settings > General's hotkey card now hides the same Remote Desktop caption on a Mac (`GeneralPage.MacNote()`, row 7 marker;
+   pin `Row07_the_general_page_hides_the_remote_desktop_note_on_a_mac`, observed failing with the `IsVisible` line removed:
+   "Expected: False, Actual: True"), and the calibration results hint says "…per 10 s of speech on this Mac…" on a Mac
+   (`CalibrationWindow.ResultsHintStart(words)`, row 11 marker; `Row11_…` extended to the hint, observed failing with "this PC"
+   put back). HelpText's "The questions, in order" summary is back above `Questions`. `dotnet test Dictum.sln` (Debug, 15:52 to
+   16:03 AEDT): 2729 total, 2687 passed, 0 failed, 42 skipped.
+
 ### Pasteboard writes are current-host-only (23/10/2026, branch mac/pasteboard-host-only)
 
 - **Finding (privacy re-lens, via the orchestrator):** a dictation written to the general pasteboard with Handoff on could be

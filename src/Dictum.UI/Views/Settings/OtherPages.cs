@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Avalonia.VisualTree;
 using Dictum.Help;
 using Dictum.Llm;
+using Dictum.Platform;
 using Dictum.Settings;
 using Dictum.Transcribe;
 using Dictum.UI.Shell;
@@ -206,9 +207,16 @@ internal sealed class PrivacyPage : SettingsPage
     private readonly ToggleSwitch _history;
     private readonly ToggleSwitch _transcripts;
 
-    /// <summary>The Offline only switch's description. PROPOSED 23/10/2026 (legal block, section D item 4).</summary>
+    /// <summary>The Offline only switch's description. APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword.</summary>
     internal const string OfflineOnlyDescription =
         "No network at all: downloads, Check for updates, cloud clean-up and cloud speech are refused; a server on this PC still works.";
+
+    /// <summary>
+    /// The default line under "What leaves this PC" (approved 16/10/2026); on a Mac "Nothing leaves this Mac: …" (<see cref="PlatformWords.ThisDevice"/>;
+    /// APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 9): do not reword). The clipboard caption below is
+    /// <see cref="PlatformWords.ClipboardHistoryCaption"/> (row 10).
+    /// </summary>
+    internal static string NothingLeavesLine(PlatformWords words) => $"Nothing leaves {words.ThisDevice}: speech recognition and clean-up both run here.";
 
     public PrivacyPage(AppShell shell) : base(shell, "Privacy")
     {
@@ -222,9 +230,9 @@ internal sealed class PrivacyPage : SettingsPage
             Ui.Card(Ui.Stack(8, _speechSummary, Ui.Stack(2, _cleanupCaption, _summary),
                 Ui.Text($"Models download from {ModelCatalog.DownloadHost} only when you choose one, and each file's size and SHA-256 are checked before use.", "caption")), "What leaves this PC"),
             Ui.Card(Ui.Stack(4,
-                // PROPOSED 23/10/2026 (legal block, section D item 4): names Check for updates and cloud speech, and the server on this PC.
+                // APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword (names Check for updates and cloud speech, and the server on this PC).
                 Ui.Line("Offline only", _offline, OfflineOnlyDescription),
-                Ui.Line("Keep dictations out of clipboard history", _history, "Windows clipboard history (Win+V) and cloud clipboard sync."),
+                Ui.Line("Keep dictations out of clipboard history", _history, Shell.Platform.Words.ClipboardHistoryCaption),
                 Ui.Line("Write dictated text to the log", _transcripts, "Off by default. For troubleshooting; the log stays on this PC.")), "Settings"),
             Ui.Card(Ui.Stack(8,
                 Ui.Text("The last dictation is held in memory for Fix last dictation and is gone when Dictum quits. Calibration recordings stay in your local Dictum folder until you delete them (Storage)."),
@@ -245,7 +253,7 @@ internal sealed class PrivacyPage : SettingsPage
         // Cloud clean-up that is on but sends nothing says why first, decided as on the Clean-up page.
         var cleanup = Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
             : CleanupPage.OfflineOnlyIsWhyNothingIsSent(Shell) ? CloudPolicy.OfflineOnlyLine
-            : Shell.NothingLeaves ? speechSends ? null : "Nothing leaves this PC: speech recognition and clean-up both run here."
+            : Shell.NothingLeaves ? speechSends ? null : NothingLeavesLine(Shell.Platform.Words)
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
             : Shell.WithAudioSentence($"The text of each dictation goes to {CloudPolicy.CloudHost(s.Llm)} for clean-up, because you switched cloud clean-up on. Audio never leaves this PC. {CloudPolicy.StateLineWarning}");
         _summary.Text = cleanup ?? "";
@@ -326,7 +334,7 @@ internal sealed class AboutPage : SettingsPage
             Ui.Card(Ui.Stack(10,
                 Ui.Text("Report a problem opens an email to " + AppShell.SupportEmail + " in your own mail app, with the version and models filled in. " +
                         "Dictum sends nothing itself and never attaches what you dictated."),
-                // Terms of use and Third-party notices (legal block, 23/10/2026; PROPOSED labels, TermsText): five buttons wrap on a narrow window.
+                // Terms of use and Third-party notices (legal block; labels in TermsText, APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword): five buttons wrap on a narrow window.
                 new WrapPanel
                 {
                     ItemSpacing = 8,
@@ -432,9 +440,10 @@ internal sealed class HelpPage : SettingsPage
         AutomationProperties.SetHelpText(guide, HelpText.GuideNote); // a screen reader says it with the button
         AutomationProperties.SetHelpText(support, HelpText.SupportNote);
         AutomationProperties.SetHelpText(feedback, HelpText.FeedbackNote);
-        var answers = HelpText.Questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)])).ToList();
+        var questions = HelpText.QuestionsFor(Shell.Platform.Words);
+        var answers = questions.Select(q => Readable(q.Question, Heading(q.Question, 3, 15), [.. q.Answer.Select(Paragraph)])).ToList();
         // The questions first, each a link to its answer (1.2 polish, 22/10/2026: one long page with no list of what it answers).
-        var index = Section(HelpText.IndexHeading, [.. HelpText.Questions.Select((q, i) => JumpLink(q.Question, answers[i]))]);
+        var index = Section(HelpText.IndexHeading, [.. questions.Select((q, i) => JumpLink(q.Question, answers[i]))]);
         Compose(
             index,
             Section(HelpText.MoreHelpHeading, Paragraph(HelpText.GuideNote), Ui.Row(8, guide), Paragraph(HelpText.SupportNote), Paragraph(HelpText.FeedbackNote), Ui.Row(8, support, feedback)),

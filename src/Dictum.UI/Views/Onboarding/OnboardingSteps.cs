@@ -88,7 +88,7 @@ internal sealed class WelcomeStep : OnboardingStep
     {
         var next = Line(OnboardingText.WelcomeNext);
         next.IsVisible = !flow.TermsOnly;
-        Content = Ui.Stack(12, Line(OnboardingText.WelcomeText), Ui.Stack(4, [.. PlainWordsText.Paragraphs.Select(p => Line(p))]), next);
+        Content = Ui.Stack(12, Line(OnboardingText.WelcomeText(flow.Shell.Platform.Words)), Ui.Stack(4, [.. PlainWordsText.Paragraphs.Select(p => Line(p))]), next);
     }
 
     public override bool AllowsBack => false;
@@ -114,11 +114,12 @@ internal sealed class FolderStep : OnboardingStep
     private readonly TextBlock _free = Ui.Text("", "caption");
     private readonly TextBlock _warning = Ui.Text("", "caption");
     private readonly TextBlock _refusal = Ui.Text("", "error");
-    private readonly TextBlock _intro = Ui.Text(OnboardingText.FolderText);
+    private readonly TextBlock _intro = Ui.Text("");
     private readonly Button _useSuggested;
 
     public FolderStep(OnboardingFlow flow) : base(flow, OnboardingText.FolderName, OnboardingText.FolderHeading)
     {
+        _intro.Text = OnboardingText.FolderText(flow.Shell.Platform.Words);
         AutomationProperties.SetName(_folder, OnboardingText.FolderBoxName);
         AutomationProperties.SetLiveSetting(_refusal, AutomationLiveSetting.Assertive);
         var choose = Ui.Button(OnboardingText.ChooseOther, "secondary", Choose);
@@ -128,7 +129,7 @@ internal sealed class FolderStep : OnboardingStep
     }
 
     /// <summary>"The included one" only when base.en is on this PC (looked up with the plan, as the speech step does).</summary>
-    public override void Enter() => _intro.Text = Flow.Plan.BundledPath is not null ? OnboardingText.FolderText : OnboardingText.FolderTextNotIncluded;
+    public override void Enter() => _intro.Text = Flow.Plan.BundledPath is not null ? OnboardingText.FolderText(Flow.Shell.Platform.Words) : OnboardingText.FolderTextNotIncluded(Flow.Shell.Platform.Words);
 
     private void Choose()
     {
@@ -279,7 +280,11 @@ internal sealed class HotkeyStep : OnboardingStep
     public HotkeyStep(OnboardingFlow flow) : base(flow, OnboardingText.HotkeyName, HotkeyCheck.Heading)
     {
         _box = new HotkeyCaptureBox(flow.Shell, flow.Hotkey, listenAtOnce: true); // listens while the step is on screen
-        Content = Ui.Stack(12, Line(HotkeyCheck.Intro), _box, Line(HotkeyCheck.MacNote, "caption"));
+        // The Remote Desktop caption describes reaching a Windows PC from a Mac: not shown on a Mac (Mac copy block, row 7).
+        var words = flow.Shell.Platform.Words;
+        var note = Line(HotkeyCheck.MacNote, "caption");
+        note.IsVisible = words.ShowsRemoteDesktopNote;
+        Content = Ui.Stack(12, Line(HotkeyCheck.Intro(words)), _box, note);
     }
 
     public override string PrimaryLabel => HotkeyCheck.UseLabel;

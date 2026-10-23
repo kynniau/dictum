@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 and updated 23/10/2026 for 1.3.0 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 23/10/2026 for 1.3.1 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.3.0, so the package is 1.3.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 and to 1.3.0 on 23/10/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.3.1, so the package is 1.3.1.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 and to 1.3.1 on 23/10/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -153,6 +153,14 @@ Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
 ```
 
+### What's new in this version (1.3.1)
+
+APPROVED by the owner 23/10/2026 15:53 AEDT: do not reword. Paste it in "What's new in this version" on the 1.3.1 submission. It names no other platform (the first submission failed on Store Policies 10.1.5, "promotes another platform") and carries no URL (the Store says no URLs in plain text).
+
+```text
+Dictum now shows its Terms of Use the first time it starts, and you press Continue to accept them; Settings > About has buttons for the Terms of use and the Third-party notices. The cloud clean-up and cloud speech consent dialogs now say what hands-free mode sends with each part, and the Offline only description now names Check for updates and cloud speech. Settings > Storage names its folders more precisely, and Calibration says Downloading only once you have agreed to the download. Qwen2.5-3B is no longer offered as a clean-up model, because its licence allows non-commercial use only: if you chose it, Dictum uses the recommended clean-up model instead, and its 2.1 GB file stays in your models folder for you to delete.
+```
+
 ### What's new in this version (1.3.0)
 
 APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword. Paste it in "What's new in this version" on the 1.3.0 submission, and keep only the sentences whose feature is in the build: the sentences on cloud speech depend on the cloud speech UI (merged); the sentences on your own instructions and the key file depend on the own-instructions lane (PR #60, merged at 672f85b into main 4a4072a); and "Settings > Storage offers to move your model files" depends on PR #61 (head 1730818 when this was written, open), which offers the move from Change…, Browse… and Use default (owner, 22/10/2026 21:45 AEDT).
@@ -276,7 +284,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.3.0 (set 23/10/2026; 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.3.1 (set 23/10/2026; 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -346,7 +354,7 @@ NO DOWNLOAD IS NEEDED TO TEST. Dictum ships with the base.en speech model inside
 
 TO TEST OFFLINE: before starting Dictum, set "offline_only": true in settings.json (the bundled base.en model needs no copying; optionally copy qwen2.5-1.5b-instruct-q4_k_m.gguf into Dictum's models folder). Settings > Storage shows both folders. Dictum then connects to nothing outside the PC, and download requests are refused with a message.
 
-TO DICTATE: on the first start Dictum opens a Welcome window; click Next through its steps (or press Esc to skip it and keep the defaults), then click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
+TO DICTATE: on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then click into any text field (Notepad is fine), hold Right Ctrl, say a sentence, and release. The text is pasted at the cursor a few seconds later. Double-tap Right Ctrl for hands-free; press it again to stop. Esc cancels a hold-to-talk dictation and nothing is pasted; in hands-free, Esc stops and keeps what is already typed. A microphone is required; on a virtual machine, redirect one. If the keyboard has no Right Ctrl key (for example when connecting from a Mac), choose another key in Settings; the "Press your hotkey" box shows what Windows receives.
 
 GENERATIVE AI: the clean-up step runs a local language model on the user's own dictated words only; it is instructed not to add or answer anything, its output is checked against the dictation, and users can report a problem from Settings (Report a problem), from 1.2, send feedback from Settings > Help (Send feedback or suggest a feature; both open an email in the user's own mail app, and Dictum sends nothing itself), or write by email.
 
@@ -359,7 +367,7 @@ The package contains profanity.txt, a word list used only by the optional profan
 Support: hello@kynni.com.au
 ```
 
-PROPOSED 23/10/2026 (legal block, lens on PR #76; the owner approves it before the next submission): replace TO DICTATE's opening, up to "then click into any text field", with "on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then".
+APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. TO DICTATE's opening in the block above, up to "then click into any text field", is "on the first start Dictum opens a Welcome window. Click Continue on its first step (this accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum), then click Next through the other steps (or press Esc to skip them and keep the defaults), then".
 
 ### Notes for certification: APPROVED for 1.3.0
 
@@ -371,6 +379,18 @@ Notes written 23/10/2026 for Dictum 1.3.0.
 CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.0 adds optional cloud speech. In Settings > Models, in the Advanced view, a new Cloud speech card lets the user send each recording to OpenAI, Azure OpenAI, Groq or a server of their own instead of using the speech model on this PC. It is off by default. It asks for express consent in its own dialog, which names the host and says the recording leaves the PC; it needs the user's own API key; offline only mode refuses it for any service that is not on the PC; and if a request fails, the speech model on this PC hears the dictation. Settings > Clean-up, in the Advanced view, has a new box for the user's own clean-up instructions and a Create the key file button that makes the .env file for a cloud clean-up key. Settings > Storage offers to move model files when the model folder changes. Settings > Help has new questions ("What is clean-up?", "How can I see what Dictum does with my words?" and "Can I give the clean-up my own instructions?"), and Settings > About and the Welcome window show a short "In plain words" statement. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as Dictum starts; larger speech models and AI clean-up are optional downloads.
 
 Cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
+```
+
+### Notes for certification: APPROVED for 1.3.1
+
+APPROVED by the owner 23/10/2026 15:53 AEDT: do not reword. Paste the block below in place of the 1.3.0 block when submitting 1.3.1. It names no other platform. The Partner Center "Additional license terms" step for this submission is go-live step 5a in section 10.
+
+```text
+Notes written 23/10/2026 for Dictum 1.3.1.
+
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.1 adds a Terms of Use step. On the first start, including the first start after an upgrade from an earlier version, Dictum shows its Terms of Use before anything else: the Welcome window's first step has a Continue button, and pressing Continue accepts the Terms. Closing the window, or pressing Esc on that step, quits Dictum and nothing is recorded as accepted; the later steps are as before. The command-line modes --transcribe and --bench-cleanup refuse to run until the Terms have been accepted once. Settings > About has two new buttons, Terms of use and Third-party notices. Settings > Storage names its folders more precisely, Calibration says Downloading only after the download question has been agreed, and the Offline only description names Check for updates and cloud speech. The two cloud consent dialogs (clean-up and speech) now say what hands-free mode sends with each part (for clean-up, up to ten words of what the user said just before; for speech, the closing words). The Qwen2.5-3B clean-up model is no longer offered. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as the user has pressed Continue on the Terms step; larger speech models and AI clean-up are optional downloads.
+
+Everything else is as in the notes for 1.3.0 above: cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
 ```
 
 ## 8. What to expect from certification
@@ -408,7 +428,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 14 | Personal information transmitted insecurely | Store Policies 10.5.4 | Hugging Face, Anthropic and the update check use HTTPS. A user-entered `http://` server that is not on the PC would carry transcripts unencrypted: refuse or warn for non-loopback `http://` addresses. | Risk: app change needed |
 | 15 | Cannot be cleanly uninstalled | Store Policies 10.2.7 | Uninstalling an MSIX removes the package and the AppData files Windows redirected for it (Microsoft Learn, "Understanding how packaged desktop apps run on Windows"). Settings → Storage → "Remove Dictum completely" deletes the data first. Files that already existed in the real AppData folder (for example from an earlier direct-download install) are modified in place and survive uninstall, which is one more reason the app warns when both builds are installed (SPEC §18.2). | Done in SPEC; verify in build |
 | 16 | Changes Windows settings without consent | Store Policies 10.2.8 | Launch at login only when the user ticks it; no default-app changes. | Verify manifest |
-| 17 | Value not clear on first run | Store Policies 10.1.1 | With base.en in the package the first run shows no model picker and starts ready (amended 17/10/2026). Approved by the owner 22/10/2026, for 1.2.0: the first run opens the Welcome window with a hotkey check, a microphone test and a choice of where model files are kept, and Esc keeps the defaults; after setup, show how to dictate ("Hold Right Ctrl and talk"). PROPOSED 23/10/2026 (legal block; the owner approves it before the next submission): the Welcome window's first step now asks the user to click Continue, which accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum, and the tester notes say so (TO DICTATE). | Verify in build |
+| 17 | Value not clear on first run | Store Policies 10.1.1 | With base.en in the package the first run shows no model picker and starts ready (amended 17/10/2026). Approved by the owner 22/10/2026, for 1.2.0: the first run opens the Welcome window with a hotkey check, a microphone test and a choice of where model files are kept, and Esc keeps the defaults; after setup, show how to dictate ("Hold Right Ctrl and talk"). APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2): do not reword. The Welcome window's first step now asks the user to click Continue, which accepts Dictum's Terms of Use; closing the window or pressing Esc on that step quits Dictum, and the tester notes say so (TO DICTATE). | Verify in build |
 | 18 | No message on an unsupported device | Store Policies 10.4.1 | No microphone: the pill shows "Mic error" and the README explains it; make sure first run says so plainly too. The package is x64 only; whether Windows on Arm runs it under emulation is **recalled, not verified** and untested. | Decide and test |
 | 19 | Other products' names in the metadata | Store Policies 10.1.1, 10.1.3 | No other dictation product is named in the listing or the search terms. | Done |
 | 20 | Flagged by the security scan | Certification security tests, Store Policies 10.2.3 | Antivirus may flag programs with global keyboard hooks (README). Build on a clean machine; the hook's purpose is stated in the notes. | Done |
@@ -441,6 +461,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
    `%ProgramFiles(x86)%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs.Desktop\14.0`.
    Not run for 1.1.0 (17/10/2026): Microsoft's signed VCLibs framework .appx is not available on this PC without a Visual Studio or Windows SDK install; the evidence accepted instead is the 17/10/2026 review that ran the CPU engines unpackaged on the framework's own 14.40.33728 runtime DLLs (`--selftest` PASS, `--transcribe` correct).
 5. Submit (sections 3 to 7), with the certification notes of section 7 as they now read.
+5a. **Additional license terms for 1.3.1 (the first submission that carries the Terms acceptance).** Before step 5, in Partner Center, on the 1.3.1 submission's Properties page, set "Additional license terms" to https://dictum.kynni.au/terms, after the Terms page is live (deploy the site first). Owner or orchestrator; not done by a build lane. This is the field described under the Properties page above (section D item 6 of the legal block). Nothing in this file shows the field was set: record it in section 11 when it is.
 6. When the listing is live (https://apps.microsoft.com/detail/9N0DG1DHTR57 returns 200): in
    `site/index.html`, replace the pending Store link and its "Coming soon" note with
    `<a class="btn btn-primary" href="https://apps.microsoft.com/detail/9N0DG1DHTR57">Get it from the Microsoft Store</a>`,
@@ -477,8 +498,10 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 23/10/2026 | Dictum 1.3.0 prepared (version bump; listing text and What's new approved 22/10/2026; tester notes PROPOSED). Contents: cloud speech (optional, consent), own clean-up instructions, Create the key file, "What is clean-up?" Help, Dictum in plain words, public copy for cloud speech; storage move-on-change (PR #61) pending at the time of writing. |
 | 23/10/2026 | Dictum 1.3.0 tagged (v1.3.0 on b8b072d, 02:21 AEDT); GitHub release published by the workflow (run 39803808616: Setup 184,697,595 bytes, zip 237,203,246 bytes, test msix 240,149,267 bytes); dictum.kynni.au deployed at 02:33 AEDT with version.json 1.3.0. |
 | 23/10/2026 | Store package Dictum-1.3.0-store.msix built from b8b072d: 240,138,818 bytes, SHA-256 C9F759E471802A99AEB22C18B46BD073DEC79FD7FFC9AFEB931EC5BE346210C2, manifest 1.3.0.0, unsigned (the Store signs); staged for the owner's upload. Tester notes CHANGED paragraph still PROPOSED. Store screenshot 1 and the landing-page panel are still to be captured by the owner on a PC with a microphone. |
+| 23/10/2026 | Dictum 1.3.0 (Submission 4) passed certification and is live in the Store (about 08:30 AEDT, as reported to this lane by the orchestrator's Partner Center check that day; this lane could not read Partner Center and did not re-check it). |
+| 23/10/2026 | Dictum 1.3.1 prepared (version bump, GitHub release notes, tester notes and What's new); the What's new and tester notes were approved by the owner 23/10/2026 15:53 AEDT. Contents: the Terms of Use acceptance on first start (upgrades included), the Store licence field, About's Terms of use and Third-party notices buttons, Storage naming its folders more precisely, Calibration's Downloading wording, Qwen2.5-3B removed from the catalogue, the Offline only description, the cloud consent dialogs saying what hands-free mode sends, the command-line Terms gate, the installer licence page, the rewritten Privacy Policy and the Terms page. "Additional license terms" is still to be set in Partner Center at submission. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
-for 1.1.0, 1.1.1, 1.1.2, 1.2.0, 1.2.1 or 1.3.0 (no packaged run on a clean PC yet).
+for 1.1.0, 1.1.1, 1.1.2, 1.2.0, 1.2.1, 1.3.0 or 1.3.1 (no packaged run on a clean PC yet).

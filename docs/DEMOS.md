@@ -4,10 +4,11 @@ Short captioned walkthrough videos of Dictum, recorded unattended on a clean Win
 narration, for people who have never used it. Every caption names one thing to do. Pipeline written 21/10/2026 on
 main at 6dfede8; the demos were re-recorded on 22/10/2026 against the 1.2 build on main at d47e7f9 (both polish rounds), below.
 
-All caption copy below is **PROPOSED**, for the product owner to approve, except the demos 7 to 9 captions marked APPROVED 23/10/2026 06:12 AEDT below.
+All caption copy below is **PROPOSED**, for the product owner to approve, except the demos 7 to 9 captions marked APPROVED 23/10/2026 06:12 AEDT below and the three captions marked APPROVED 23/10/2026 13:20 AEDT (legal strings block 2) below.
 Owner approval, 22/10/2026 14:25 AEDT: the captions of demo 7, **Turn on cloud clean-up (optional)** (`cloud-cleanup.json`), are **APPROVED** (DECISIONS, "Owner approvals (22/10/2026, the 1.2.1 block)"). The marker on the other demos' captions is unchanged by that entry.
 Owner approval, 22/10/2026 17:30 AEDT: step 16 of demo 1, **Start Dictum for the first time** (`first-run.json`, step id `ready`), is **APPROVED** with the wording "This is Dictum's panel. The word beside the switch says what Dictum is doing."; the other first-run captions stay PROPOSED.
 Owner approval, 23/10/2026 06:12 AEDT: every caption proposed on PR #64 is **APPROVED**, as written below with no change: demo 7 (`cloud-cleanup.json`) steps 8, 9, 10, 14 and 15, demo 8 (`own-instructions.json`) steps 4 to 12 and demo 9 (`cloud-speech.json`) steps 4 to 12, with the two new demos' titles; and the `site/help.html` section 8 figcaption for the cloud clean-up demo now says it "agrees with the placeholder key, so the card says it is waiting for the key and nothing is sent" (it said it stopped at the consent step without agreeing).
+Owner approval, 23/10/2026 13:20 AEDT (legal strings block 2): three captions are **APPROVED**, as written below: demo 2 (`first-run.json`) step 4, "Dictum explains how it works and links its Terms of Use. Click Continue."; demo 1 (`install.json`) step 5, "Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next."; and demo 1 step 6, "Setup moves on. Click Next." (it said "Setup opens. Click Next."). The other captions keep their markers; the three are re-recorded with the next demo set.
 
 ## What it makes
 
@@ -342,8 +343,8 @@ window, and first-run records it.
    2. If Windows says it protected your PC, click More info. *(online only: not seen in these recordings, so the video counts 8 steps)*
    3. Then click Run anyway. *(online only: not seen in these recordings, so the video counts 8 steps)*
    4. If Windows says SmartScreen can't be reached, click Run. *(only when that dialog appears)*
-   5. Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next. *(legal block, 23/10/2026: Setup's licence page)*
-   6. Setup opens. Click Next.
+   5. Setup shows Dictum's Terms of Use. Choose I accept the agreement, then click Next. *(APPROVED 23/10/2026 13:20 AEDT, legal strings block 2: Setup's licence page)*
+   6. Setup moves on. Click Next. *(APPROVED 23/10/2026 13:20 AEDT, legal strings block 2; was "Setup opens. Click Next.", which Setup's licence page made untrue)*
    7. Click Install.
    8. When it has finished, leave Launch Dictum ticked.
    9. Click Finish.
@@ -352,7 +353,7 @@ window, and first-run records it.
    1. Click the Start button.
    2. Type Dictum.
    3. Press Enter to open it.
-   4. Dictum explains how it works and links its Terms of Use. Click Continue.
+   4. Dictum explains how it works and links its Terms of Use. Click Continue. *(APPROVED 23/10/2026 13:20 AEDT, legal strings block 2)*
    5. Dictum suggests where to keep its files. Click Next to use that folder.
    6. The speech model comes with Dictum and is ready. Click Next.
    7. This is the key you hold while you speak. Right Ctrl is already chosen.

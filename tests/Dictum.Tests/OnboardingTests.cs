@@ -137,7 +137,7 @@ public sealed partial class OnboardingTests
             var text = Visible(window);
             Assert.Contains(OnboardingText.StepLine(i + 1, 6, step.StepName), text);
             Assert.Contains(step.Heading, text);
-            if (i == 0) Assert.Contains(OnboardingText.WelcomeText, text);
+            if (i == 0) Assert.Contains(OnboardingText.WelcomeText(Dictum.Platform.PlatformWords.Windows), text);
             Assert.Equal(step.PrimaryLabel, window.PrimaryButton.Content);
             Assert.True(window.PrimaryButton.IsDefault);
             Assert.Equal(i is > 0 and < 5, window.BackButton.IsVisible); // none on Welcome, none once the settings are loaded
@@ -180,7 +180,7 @@ public sealed partial class OnboardingTests
         var (shell, _, _) = scratch.Shell();
         var (flow, window) = Open(shell, scratch);
         var folderStep = GoTo<FolderStep>(window);
-        Assert.Contains(OnboardingText.FolderText, Visible(window));
+        Assert.Contains(OnboardingText.FolderText(Dictum.Platform.PlatformWords.Windows), Visible(window));
         Assert.Equal(scratch.Paths.DefaultModelsDir, All<TextBox>(folderStep).Single(t => AutomationProperties.GetName(t) == OnboardingText.FolderBoxName).Text);
         Next(window);
         Assert.IsType<SpeechStep>(window.Current);
@@ -348,7 +348,7 @@ public sealed partial class OnboardingTests
         GoTo<HotkeyStep>(window);
         var text = Visible(window);
         Assert.Contains(HotkeyCheck.MacNote, text);
-        Assert.Contains(HotkeyCheck.Intro, text);
+        Assert.Contains(HotkeyCheck.Intro(Dictum.Platform.PlatformWords.Windows), text);
         Assert.Equal(HotkeyCheck.UseLabel, window.PrimaryButton.Content);
         Assert.Equal(HotkeyCheck.SkipLabel, window.SecondaryButton.Content);
         var monitor = platform.LastMonitor!; // listening from the start
@@ -509,8 +509,8 @@ public sealed partial class OnboardingTests
         var (shell, _, _) = scratch.Shell(); // no base.en
         var (_, window) = Open(shell, scratch);
         GoTo<FolderStep>(window);
-        Assert.Contains(OnboardingText.FolderTextNotIncluded, Visible(window));
-        Assert.DoesNotContain(OnboardingText.FolderText, Visible(window));
+        Assert.Contains(OnboardingText.FolderTextNotIncluded(Dictum.Platform.PlatformWords.Windows), Visible(window));
+        Assert.DoesNotContain(OnboardingText.FolderText(Dictum.Platform.PlatformWords.Windows), Visible(window));
         var tryIt = (TryItStep)window.Steps.Last();
         Assert.Equal(OnboardingText.AccentExplainer, tryIt.Explainer(new AppSettings { Whisper = new WhisperSettings { Model = "base.en" } }));
         Assert.Equal(OnboardingText.AccentExplainerChosen, tryIt.Explainer(new AppSettings { Whisper = new WhisperSettings { Model = "small.en" } }));
@@ -523,7 +523,7 @@ public sealed partial class OnboardingTests
         var (shell2, _, _) = bundled.Shell();
         var (_, window2) = Open(shell2, bundled);
         GoTo<FolderStep>(window2);
-        Assert.Contains(OnboardingText.FolderText, Visible(window2));
+        Assert.Contains(OnboardingText.FolderText(Dictum.Platform.PlatformWords.Windows), Visible(window2));
         window2.Close();
         shell2.Dispose();
     });
@@ -561,7 +561,7 @@ public sealed partial class OnboardingTests
         var (shell, _, _) = scratch.Shell(); // no base.en beside the exe
         var (flow, window) = Open(shell, scratch);
         var folderStep = GoTo<FolderStep>(window);
-        Assert.Contains(OnboardingText.FolderTextNotIncluded, Visible(window)); // the plan was read here: no base.en yet
+        Assert.Contains(OnboardingText.FolderTextNotIncluded(Dictum.Platform.PlatformWords.Windows), Visible(window)); // the plan was read here: no base.en yet
         var other = Directory.CreateDirectory(Path.Combine(scratch.Root.FullName, "D-drive", "Dictum models")).FullName;
         using (var file = new FileStream(Path.Combine(other, "ggml-base.en.bin"), FileMode.Create, FileAccess.Write)) file.SetLength(BaseEnBytes);
         folderStep.Pick(other);

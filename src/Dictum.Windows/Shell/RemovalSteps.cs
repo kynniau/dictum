@@ -34,7 +34,9 @@ internal sealed class RemovalSteps(IRunKey runKey, string programFolder, string 
     internal const string WaitVariable = "DICTUM_REMOVE_AFTER_PID";
     internal const string ModeVariable = "DICTUM_REMOVE_MODE";
 
-    public string StartupItemsPhrase => "the Start menu shortcut and the launch-at-login entry";
+    internal const string StartupItems = "the Start menu shortcut and the launch-at-login entry";
+
+    public string StartupItemsPhrase => StartupItems;
 
     private string ShortcutPath => Path.Combine(roamingAppData, "Microsoft", "Windows", "Start Menu", "Programs", "Dictum.lnk");
 

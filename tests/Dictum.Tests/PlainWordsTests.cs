@@ -60,7 +60,7 @@ public sealed class PlainWordsTests
             "This website uses no cookies, no scripts and no tracking.",
             "The code is public. Anyone can check that all of this is true.",
             "What we cannot take responsibility for",
-            "Dictum is free and we give it to you as it is. We say it in plain words: we have built it with care, but we cannot promise it will always hear you right. The Terms of Use say which losses we do not pay for, limit what we pay for any other loss to A$100, and list what we never exclude or limit. The law where you live may give you rights that no agreement can take away. If you need a promise, please do not rely on Dictum for it.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O1 and O2)
+            "Dictum is free. We have built it with care, but we cannot promise it will always hear you right. The Terms of Use say which losses we do not pay for, limit what we pay for any other loss to A$100, and list what we never exclude or limit. The law where you live may give you rights that no agreement can take away. If you need a promise, please do not rely on Dictum for it.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O1 and O2); "and we give it to you as it is" and "We say it in plain words: " dropped, APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2)
             "If you choose a cloud service for clean-up or for speech, your text or your voice goes to that service. You choose the service. You hold the key. That service's own terms apply. Dictum encrypts the connection but cannot see, check or certify what that service keeps or does with your words. By switching a cloud option on, you take responsibility for the security and privacy of what is sent there. Do not dictate confidential, personal or client information with a cloud option on unless you have checked that service's terms yourself.",
             "The files Dictum keeps on your PC (your settings, dictionary, corrections, recordings and any key) are ordinary files under your account on your PC or Mac. Looking after your PC, your account and your backups is up to you.", // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O5)
             "If you installed Dictum from the Microsoft Store, Microsoft handles the download and updates under its own privacy statement, and gives us summary reports such as install counts and crash summaries. Dictum itself sends none of this.",
@@ -71,6 +71,7 @@ public sealed class PlainWordsTests
         Assert.Contains("APPROVED by the owner 22/10/2026 17:36 AEDT", Site("plain-words.html"));
         Assert.Contains("APPROVED 22/10/2026 20:45 AEDT (replaces the 17:36 sentence)", Site("plain-words.html"));
         Assert.Equal(7, Regex.Matches(Site("plain-words.html"), Regex.Escape("APPROVED by the owner 23/10/2026 09:50 AEDT (legal block)")).Count); // O1 and O2, O3, O4, O5, O6, O15, the footer link
+        Assert.Single(Regex.Matches(Site("plain-words.html"), Regex.Escape("APPROVED by the owner 23/10/2026 13:20 AEDT (legal strings block 2)"))); // the paragraph opening changed
     }
 
     /// <summary>Pin: the page prints no file path (the brief's code citations stay out of public copy).</summary>
@@ -128,7 +129,7 @@ public sealed class PlainWordsTests
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         var texts = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text ?? "").ToList();
-        var at = texts.IndexOf(OnboardingText.WelcomeText);
+        var at = texts.IndexOf(OnboardingText.WelcomeText(Dictum.Platform.PlatformWords.Windows));
         Assert.True(at >= 0, "the approved Welcome text is not shown");
         Assert.Equal(ShortVersion, texts.Skip(at + 1).Take(ShortVersion.Length));
         Assert.Equal(OnboardingText.WelcomeNext, texts[at + 1 + ShortVersion.Length]);

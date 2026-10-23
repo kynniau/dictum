@@ -563,7 +563,7 @@ public class LanguageUiTests
             Assert.Equal(ApprovedNothingSentLine, cleanUp);
             Assert.DoesNotContain(PageLines(window, "Clean-up"), l => l.Contains("server on this PC", StringComparison.Ordinal));
             Assert.Contains(ApprovedNothingLeavesLine, privacy);
-            // The Offline only switch's description names the server on this PC (PROPOSED 23/10/2026, legal block D.4): it is no state line.
+            // The Offline only switch's description names the server on this PC (APPROVED by the owner 23/10/2026 13:20 AEDT, legal strings block 2): it is no state line.
             Assert.DoesNotContain(privacy, l => l.Contains("server on this PC", StringComparison.Ordinal)
                 && l != "No network at all: downloads, Check for updates, cloud clean-up and cloud speech are refused; a server on this PC still works.");
         }

@@ -93,7 +93,7 @@ public sealed class SiteStoreFirstTests
     [InlineData("img/demos/install")]
     public void No_page_explains_the_direct_download_or_the_warning(string phrase)
     {
-        // One exemption, on privacy.html only and for exactly four uses of one phrase: the policy's "in the direct download for Windows and in the
+        // One exemption, on privacy.html (exactly four uses of one phrase) and on index.html (exactly one, see below): the policy's "in the direct download for Windows and in the
         // Mac beta" (legal block, APPROVED by the owner 23/10/2026 09:50 AEDT; once with a capital "In", starting section 5) names the build and
         // explains nothing, but contains "Download for Windows" case-blind. The fourth use is the website-route sentence of section 4 (O10, same
         // approval, applied in the follow-up PR; three before it). Those four are removed before the scan, so a fifth use, the phrase on
@@ -105,9 +105,11 @@ public sealed class SiteStoreFirstTests
         foreach (var page in Pages)
         {
             var html = VisibleHtml(page);
-            if (page == "privacy.html")
+            if (page == "privacy.html" || page == "index.html")
             {
-                Assert.Equal(4, policyName.Matches(html).Count);
+                // index.html: exactly one use, the dictum.kynni.au card, which carries the policy's O10 sentence word for word (APPROVED by the owner
+                // 23/10/2026 13:57 AEDT, legal strings block 2); a second use there still fails.
+                Assert.Equal(page == "privacy.html" ? 4 : 1, policyName.Matches(html).Count);
                 html = policyName.Replace(html, "");
             }
             Assert.False(html.Contains(phrase, StringComparison.OrdinalIgnoreCase), $"site/{page} still says \"{phrase}\"");
@@ -194,7 +196,7 @@ public sealed class SiteStoreFirstTests
     [InlineData("help.html", "First, your voice is turned into text on this PC (unless you turn on cloud speech) by a speech model.")] // owner, 22/10/2026 22:05 AEDT
     [InlineData("help.html", "Nowhere, by default. Dictum turns your voice into text on this PC")] // owner, 22/10/2026 22:05 AEDT
     [InlineData("index.html", "Dictum’s optional cloud clean-up and cloud speech are off by default and come with a warning.")]
-    [InlineData("index.html", "Only when you open the privacy policy, Dictum in plain words or the full guide from Settings, or click Check for updates")]
+    [InlineData("index.html", "Only when you open the privacy policy, the Terms of Use, Dictum in plain words or the full guide from Dictum, or click Check for updates in the direct download for Windows and in the Mac beta, which reads one small file and sends nothing about you; the Store build is updated by the Store.")] // owner, 23/10/2026 13:57 AEDT (the policy's O10 sentence)
     [InlineData("help.html", "Dictum turns your voice into text on this PC, then throws the recording away. Your voice stays on this PC unless you turn on cloud speech, an advanced option that is off by default.")]
     [InlineData("help.html", "are sent to the service you chose. Your voice still stays on this PC unless you also turn on cloud speech.")]
     [InlineData("help.html", "No. Nothing is trained, and your voice stays on this PC unless you turn on cloud speech. Calibrate my voice")]
