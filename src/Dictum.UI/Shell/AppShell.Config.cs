@@ -274,9 +274,13 @@ public sealed partial class AppShell
         StatusChanged();
     }
 
+    /// <summary>StartHook has run at least once (Start, a reload or a restart): until then a grant has no listener to replace.</summary>
+    private bool _listenersTried;
+
     /// <summary>Installs the dictation listener; false when the system refused it (the icon shows the error, and the input-access watch is told).</summary>
     private bool StartHook()
     {
+        _listenersTried = true; // first, so a listener that throws while being made still counts as tried (RestartListeners)
         var spec = HotkeyParser.Parse(_settings.Hotkey); // already validated by the loader
         var matcher = new HotkeyMatcher(spec, _settings.SuppressHotkey, Platform.IsKeyDown);
         _hook = Platform.CreateHotkeyListener(matcher, OnHotkey, _log);
@@ -294,12 +298,14 @@ public sealed partial class AppShell
     /// when the dictation listener installed; the icon then shows the real state again instead of the error. Before the listeners
     /// were ever installed (the grant arrives during the Welcome window, which runs before Start installs them) there is nothing
     /// to replace: Start installs both, and installing them here too would leave a second listener Start never disposes (merge
-    /// lens, PR #82, 27/10/2026). "Not installed yet" is <c>_hook</c> null, not <c>_controller</c> null: StartHook always keeps
-    /// the listener it made, refused or not, and a reload installs listeners on a shell Start has not built the controller for.
+    /// lens, PR #82, 27/10/2026). "Not installed yet" is <see cref="_listenersTried"/>, not <c>_controller</c> null (a reload
+    /// installs listeners on a shell Start has not built the controller for) and not <c>_hook</c> null (also true after Start when
+    /// a listener threw while being made; re-lens at f3b4388). The outcome is logged here, after the install, so the "installed"
+    /// line is only ever written when a listener did install (DECISIONS "Request access" item 5 cites it as the hardware proof).
     /// </summary>
     private bool RestartListeners()
     {
-        if (_hook is null)
+        if (!_listenersTried)
         {
             _log.Info("Input access granted before the hotkey listeners were installed; they install when Dictum finishes starting.");
             return true;
@@ -307,6 +313,7 @@ public sealed partial class AppShell
         _hook?.Dispose();
         _hook = null;
         var installed = StartHook();
+        _log.Info(installed ? "Input access granted; the hotkey listener is installed." : "Input access granted, but the hotkey listener still did not install.");
         ApplyFixHotkey(_settings, reinstall: true);
         if (installed) _tray?.SetState(_trayState);
         StatusChanged();

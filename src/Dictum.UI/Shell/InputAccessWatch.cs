@@ -88,8 +88,7 @@ public sealed class InputAccessWatch
             }
             StopPolling();
             if (state != InputAccessState.Granted) return;
-            var installed = _restartListeners();
-            _log.Info(installed ? "Input access granted; the hotkey listener is installed." : "Input access granted, but the hotkey listener still did not install.");
+            var installed = _restartListeners(); // logs its own outcome (AppShell.RestartListeners)
             Set(state, restartFailed: !installed);
         }
         catch (Exception ex)

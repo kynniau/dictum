@@ -6462,7 +6462,7 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
    the row with − and request again, which is what completed the hands-on (the ad-hoc build's row removed, re-added by the request).
 8. **Strings.** All seven APPROVED by the owner 27/10/2026 19:00 AEDT as written ("approve 1 to 7"), in `.demo-preview/approve-mac-access.md` (seven rows); none ships on Windows; no approved
    string edited. The device word is the Mac copy block's "this Mac".
-9. **Pins** (`InputAccessTests`, 20 tests after the item 13 fix round; this line said 11 at b60dc44, where the file held 13): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
+9. **Pins** (`InputAccessTests`, 21 tests after the item 14 round, 20 after item 13; this line said 11 at b60dc44, where the file held 13): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
    only); the real Mac platform answers Granted or Denied as `AXIsProcessTrusted` does and its link is the verified one (macOS only);
    with no grant to ask for, Settings > General shows no line, no button, no problem, and the box keeps its old sentence; a listener
    refused for want of the grant shows the line, the caption and the button, and the button requests; the grant arriving replaces both
@@ -6524,3 +6524,19 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     - **Known nuance, not changed:** when the grant arrives during the Welcome window, the log carries the guard's line ("…they install
       when Dictum finishes starting.") and then `Tick`'s existing "Input access granted; the hotkey listener is installed." a few
       moments before Start installs it. A log line only; left as written for the owner to decide.
+14. **Re-lens fix round (27/10/2026, from f3b4388; the re-lens returned Needs changes with two minors, both in the item 13 guard).**
+    - F1. The guard's "not installed yet" test, `_hook` null, is also true after Start when a listener threw while being made (the
+      MINOR 3 state): refused and Denied, the grant arrives and the restart throws, the grant is revoked and a General box's refusal
+      reports Denied, the grant is given again, and `Tick` left the state Granted with no live listener, no problem line, and the log
+      saying "…they install when Dictum finishes starting" long after start. Fix: `_listenersTried`, set as the first statement of
+      `StartHook`, and the guard reads it. Pin: `A_grant_after_a_restart_that_threw_still_installs_a_listener`.
+    - F2. `Tick` logged "Input access granted; the hotkey listener is installed." on the guard path, where no listener exists (item 5
+      cites that line as the hardware proof, so it must be true). Fix: the outcome line moves from `Tick` into `RestartListeners`,
+      after `StartHook`; the guard path logs only its own line. This retires item 13's "known nuance". Pin:
+      `A_grant_during_the_welcome_window_leaves_one_listener_after_start` now also asserts no "the hotkey listener is installed" line
+      before Start.
+    - **Mutation checks (27/10/2026, before 19:56 AEDT by the clock read after them, Windows, Release; restored from the index with
+      `git checkout` after each):** F1, the guard put back to `_hook is null`: observed failing ("the grant left no listener and said
+      nothing"). F2, the outcome line put back in `Tick`: observed failing (the "installed" line found before Start).
+    - **Runs on Windows after this round:** `dotnet test tests/Dictum.Tests -c Release`: 2752 total, 2709 passed, 0 failed,
+      43 skipped. The Mac runtime is not verified after the fix rounds (b60dc44 onwards).

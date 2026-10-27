@@ -358,8 +358,9 @@ public sealed class InputAccessTests
     public Task A_grant_during_the_welcome_window_leaves_one_listener_after_start() => UiSession.Run(() =>
     {
         using var scratch = new Scratch();
+        var log = new RecordingLog();
         OnboardingTests.Bundle(scratch);
-        var (shell, platform, dialogs) = scratch.Shell(OnboardingTests.FakeModels());
+        var (shell, platform, dialogs) = scratch.Shell(OnboardingTests.FakeModels(), log: log);
         platform.Words = PlatformWords.Mac;
         platform.FakeAccess.State = InputAccessState.Denied;
         platform.RefuseListeners = true;
@@ -378,6 +379,7 @@ public sealed class InputAccessTests
             shell.Access.Tick();
             listenedInWelcome = box.Listening;
             Assert.Empty(platform.Listeners); // nothing installed before Start
+            Assert.DoesNotContain(log.Lines, l => l.Message.Contains("the hotkey listener is installed", StringComparison.Ordinal)); // the log never claims a listener before one exists
             window.Close();
         };
         try
@@ -534,5 +536,46 @@ public sealed class InputAccessTests
         {
             watch.Dispose();
         }
+    });
+
+    /// <summary>
+    /// Re-lens at f3b4388: a restart that threw leaves no listener behind (the dictation listener field empty after Start); a
+    /// later grant still installs one. "Not installed yet" means StartHook never ran, not that the last attempt left nothing.
+    /// </summary>
+    [Fact]
+    public Task A_grant_after_a_restart_that_threw_still_installs_a_listener() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var log = new RecordingLog();
+        var (shell, platform, _) = scratch.Shell(log: log);
+        platform.Words = PlatformWords.Mac;
+        platform.FakeAccess.State = InputAccessState.Denied;
+        platform.RefuseListeners = true;
+        shell.Reload(userRequested: true);
+
+        platform.FakeAccess.State = InputAccessState.Granted; // the grant arrives and the restart throws
+        platform.RefuseListeners = false;
+        platform.ThrowNextListener = true;
+        shell.Access.Tick();
+        Assert.True(shell.Access.RestartFailed);
+
+        platform.FakeAccess.State = InputAccessState.Denied; // revoked; a General box's refusal reports it
+        platform.RefuseListeners = true;
+        var (window, _) = General(shell);
+        All<HotkeyCaptureBox>(window).First().Start();
+        Assert.Equal(InputAccessState.Denied, shell.Access.State);
+
+        platform.FakeAccess.State = InputAccessState.Granted; // granted again
+        platform.RefuseListeners = false;
+        shell.Access.Tick();
+
+        Assert.Equal(InputAccessState.Granted, shell.Access.State);
+        var live = platform.Listeners.Where(l => !l.Disposed && !l.Refused).ToList();
+        Assert.True(live.Count >= 1 || shell.Access.RestartFailed, "the grant left no listener and said nothing");
+        Assert.NotEmpty(live);
+        Assert.DoesNotContain(log.Lines, l => l.Message.Contains("they install when Dictum finishes starting", StringComparison.Ordinal));
+        Assert.Contains(log.Lines, l => l.Message == "Input access granted; the hotkey listener is installed.");
+        window.Close();
+        shell.Dispose();
     });
 }
