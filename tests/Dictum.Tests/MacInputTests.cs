@@ -325,6 +325,20 @@ public class MacInputTests
         Assert.Equal((nuint)0, Pasteboard.ContentsOptions(keepOutOfHistory: false));
     }
 
+    /// <summary>
+    /// The constant and the option function are pinned above, but nothing on Windows runs the write itself; this pins the
+    /// source so the options reach the pasteboard on every dictation write (SetText passes them, Write prepares with them,
+    /// and the plain clearContents appears only for the empty-snapshot case).
+    /// </summary>
+    [Fact]
+    public void MacInput_pasteboard_source_applies_the_host_only_option_on_every_dictation_write()
+    {
+        var source = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src", "Dictum.Mac", "Input", "Pasteboard.cs"));
+        Assert.Contains("Write(Payload(text, keepOutOfHistory), ContentsOptions(keepOutOfHistory))", source);
+        Assert.Contains("ObjC.Sel(\"prepareForNewContentsWithOptions:\"), (nint)options", source);
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(source, System.Text.RegularExpressions.Regex.Escape("ObjC.Sel(\"clearContents\")")).Count);
+    }
+
     // ---- On a Mac ---------------------------------------------------------------------------------------------------
 
     [Fact]
