@@ -6416,3 +6416,72 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
 ## 27/10/2026 14:00 AEDT: 1.3.1 publication dates
 
 - The Terms of Use page carries its publication date, 27/10/2026 (section D item 0 of the legal block: "At deploy, terms.html carries the publication date"); `site/version.json` `published` is 2026-10-27, the 1.3.1 deploy day. The privacy policy's "Last updated" stays 23/10/2026, the date of its last text change. No other file changes; no pin holds either date.
+
+## Request access: the Accessibility grant on the platform seam, one button on every surface that fails for want of it (27/10/2026, branch feature/mac-access-request)
+
+Owner's ask (27/10/2026, at the Mac, during the PR #74 re-test): "we need to add option in app to check access and if access not give a
+request access key, for example right now it tells me in the hotkey selector tool that the system refused to report keys, but no
+solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new feature, per the owner's tiering order).
+
+1. **The seam.** `IPlatform.InputAccess` (`IInputAccess`: `Check()` returning `InputAccessState` NotApplicable / Granted / Denied, and
+   `Request()`), beside the listeners it governs. `WindowsPlatform` hands out `InputAccessNotNeeded.Instance` (always NotApplicable, a
+   request does nothing): a low-level hook installs for any process, there is no grant to ask for, and no Windows surface changes.
+   `MacPlatform` hands out `MacInputAccess` (src/Dictum.Mac/Input/InputAccess.cs): `Check` is `AXIsProcessTrusted`; `Request` runs
+   `AXIsProcessTrustedWithOptions(prompt)` and then opens System Settings at the Accessibility page whatever the check answered.
+   Both answers are logged.
+2. **The Settings link, verified 27/10/2026 on this Mac (macOS 27.2, build 26B118):** `open
+   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"` shows the page (the owner saw the Dictum row on
+   it), and the SecurityPrivacyExtension binary on that Mac carries the `Privacy_Accessibility` anchor. On macOS 27 the page is titled
+   "Device Control and Data Access" (the owner's screenshot); on 15 and 26 "Accessibility" (recalled, not checked on those). The
+   on-screen strings therefore name no page: "turn Dictum on in the System Settings page that opens".
+3. **Why the page always opens.** 27/10/2026 18:13 AEDT, ad-hoc test build: `AXIsProcessTrustedWithOptions(prompt)` answered trusted
+   while the same process's event taps were refused ("not allowed to control this Mac yet") and `AXIsProcessTrusted` answered no. The
+   System Settings list showed one Dictum row, switched on, which belonged to the Developer-ID-signed copy in /Applications (same bundle
+   id, different signature). So the prompting check alone cannot decide, and no prompt appears in that case; the page is where the
+   switch is either way. Observed, not explained; the first version of this lane returned early on a trusted answer and the owner
+   landed on a page "already telling me it has access".
+4. **The shell.** `InputAccessWatch` (src/Dictum.UI/Shell/InputAccessWatch.cs, `AppShell.Access`): when a listener is refused
+   (`StartHook`, `ApplyFixHotkey`) and the check says Denied, it polls the silent check once a second (`PollFor` = 15 minutes, a marked
+   simplification) and on Granted replaces both listeners (`AppShell.RestartListeners`), puts the icon back to the real state, and says
+   so. `Request()` asks and polls. The old "then quit and reopen Dictum" log line is reworded (PROPOSED, row 7 of the approval file).
+5. **No relaunch needed: proved on hardware** 27/10/2026 18:37 AEDT, macOS 27.2, ad-hoc build: request logged 18:37:47, the owner
+   switched Dictum on, "Event tap installed … (hotkey listener for LeftCtrl)" and "Input access granted; the hotkey listener is
+   installed." at 18:37:50, the Settings line changed to "Dictum can now see the hotkey." on its own. The owner's words: "the line
+   changed to 'Dictum can now see the hotkey.' without reopening Dictum." `RestartFailed` and its string (row 6) are kept for the case
+   where a grant still leaves the tap refused; not seen on hardware.
+6. **Surfaces (no new page).** `InputAccessLine` (src/Dictum.UI/Views/InputAccessLine.cs): the status (a polite live region), the
+   stale-entry caption, and the named "Request access" button; hidden while NotApplicable or Granted with nothing to say, so every page
+   is laid out as before. In Settings > General's Hotkey card (above the capture box; the two boxes there build no line of their own,
+   `showsAccessLine: false`, so the card has one button); in the hotkey capture box on its own (the Welcome hotkey step), replacing the
+   "The system refused to report keys…" dead end when the grant is what is missing, and listening again by itself once the grant
+   arrives; and in the menu-bar panel's problem line with a "Request access" link (`ShellStatus.RequestAccess`), because the icon's
+   "!" said nothing (owner finding 27/10/2026, 18:20 AEDT: "it also doesnt tell me anywhere why the logo is the orange warning"). Any
+   other refusal keeps the log pointer.
+7. **Stale rows.** The owner's loop on 27/10/2026 was seven `au.kynni.dictum` Accessibility rows behind one row shown on; `tccutil reset
+   Accessibility au.kynni.dictum` cleared them. The app cannot read the list and never runs tccutil; the caption (row 2) says to remove
+   the row with − and request again, which is what completed the hands-on (the ad-hoc build's row removed, re-added by the request).
+8. **Strings.** All PROPOSED 27/10/2026, in `.demo-preview/approve-mac-access.md` (seven rows); none ships on Windows; no approved
+   string edited. The device word is the Mac copy block's "this Mac".
+9. **Pins** (`InputAccessTests`, 11 tests): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
+   only); the real Mac platform answers Granted or Denied as `AXIsProcessTrusted` does and its link is the verified one (macOS only);
+   with no grant to ask for, Settings > General shows no line, no button, no problem, and the box keeps its old sentence; a listener
+   refused for want of the grant shows the line, the caption and the button, and the button requests; the grant arriving replaces both
+   listeners and says so, without a reload; a grant that still leaves the listener refused says so; the box on its own shows the button
+   and listens once granted; Settings > General shows one button even with a refused box; the panel says why the icon shows the error
+   and offers the request, and drops both once granted; the button is named and the status is a polite live region.
+   `MacInput_tap_refused_without_accessibility_fails_cleanly_and_says_where_to_allow_it` now also requires "Press Request access" and
+   no "reopen" in the log line.
+10. **Mutation checks (observed failing 27/10/2026 between 18:39 and 18:41 AEDT, source restored with `git checkout` after each):**
+    (a) `ListenerRefused` returning at once, `InputAccessNotNeeded.Check` answering Denied, and the Settings link without its anchor,
+    together: 7 of 10 run failed (the no-grant fact, the Mac platform pin, the capture box, the General line, the one-button page, the
+    panel, the names). (b) `Tick` not restarting the listeners: 2 failed (the grant arriving, the grant that still fails).
+    (c) the line showing itself on a no-grant platform: the Windows-surface pin passed at first (it looked for the Denied words only),
+    was strengthened to assert no visible `InputAccessLine`, no Granted or RestartFailed text, no problem and no request on the status,
+    and then failed on the mutation: 1 failed.
+11. **Not verified / follow-ups.** Second grant on macOS 15 or 26 (page name, prompt behaviour); whether the prompting check's "trusted"
+    answer for a refused build is a macOS 27 behaviour or a TCC-cache one. Follow-up the owner raised from Zoom's installer: a floating
+    panel with a draggable tile of Dictum.app to drop onto the Settings list, which would side-step the stale-row loop; not in this lane.
+    `src/Dictum.Mac/README.md`'s IPlatform table has no row for `InputAccess` (the file is outside this lane's files).
+12. **Runs on the Mac at the PR head (27/10/2026 18:47 AEDT, macOS 27.2, Release):** `dotnet test --project tests/Dictum.Tests`: 2742 total,
+    2550 passed, 0 failed, 192 skipped (the Windows-only pins among them). `DICTUM_UI_TESTS=1`, MacInputTests and InputAccessTests:
+    34 total, 33 passed, 0 failed, 1 skipped (the Windows platform pin). Ad-hoc bundle built by scripts/publish-mac.sh for the hands-on.

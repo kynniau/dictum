@@ -92,8 +92,11 @@ public sealed class InputAccessTests
 
         var (window, _) = General(shell);
         var lines = VisibleLines(window);
-        Assert.DoesNotContain(lines, l => l.Contains("Request access") || l.Contains("allowed to control"));
+        Assert.DoesNotContain(lines, l => l.Contains("Request access") || l.Contains("allowed to control") || l == InputAccessText.Granted || l == InputAccessText.RestartFailed);
+        Assert.DoesNotContain(All<InputAccessLine>(window), l => l.IsEffectivelyVisible); // the page is laid out as before the line existed
         Assert.Null(RequestButton(window));
+        Assert.Null(shell.Status.Problem);
+        Assert.False(shell.Status.RequestAccess);
 
         var box = All<HotkeyCaptureBox>(window).First();
         box.Start();

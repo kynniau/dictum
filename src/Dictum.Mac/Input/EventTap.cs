@@ -82,7 +82,7 @@ internal abstract class EventTap : IDisposable
             if (!_trusted())
             {
                 // PROPOSED (log line, 22/10/2026; reworded 27/10/2026: no relaunch is needed once the grant arrives, the shell reinstalls the tap).
-                _log.Error($"Event tap ({_name}) not installed: Dictum is not allowed to control this Mac yet. Press Request access in Settings > General (or the menu-bar panel) and turn Dictum on in the System Settings page that opens; the hotkey starts working as soon as it is on.");
+                _log.Error($"Event tap ({_name}) not installed: Dictum is not allowed to control this Mac yet. Press Request access in Settings > General (or the menu-bar panel), or turn Dictum on in System Settings > Privacy & Security > Accessibility; the hotkey starts working as soon as it is on.");
                 return;
             }
             // Retained so Dispose can still stop it, or find it already finished, after this thread has ended.
