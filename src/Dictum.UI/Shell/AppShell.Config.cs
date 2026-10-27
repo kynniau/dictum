@@ -274,18 +274,34 @@ public sealed partial class AppShell
         StatusChanged();
     }
 
-    private void StartHook()
+    /// <summary>Installs the dictation listener; false when the system refused it (the icon shows the error, and the input-access watch is told).</summary>
+    private bool StartHook()
     {
         var spec = HotkeyParser.Parse(_settings.Hotkey); // already validated by the loader
         var matcher = new HotkeyMatcher(spec, _settings.SuppressHotkey, Platform.IsKeyDown);
         _hook = Platform.CreateHotkeyListener(matcher, OnHotkey, _log);
         _hookUsesMouse = spec.UsesMouse;
         ApplyHookEnabled();
-        if (!_hook.Start())
-        {
-            _tray?.SetState(TrayState.Error);
-            Notify("Dictum", "The global hotkey could not be registered. See the log for details.", warning: true);
-        }
+        if (_hook.Start()) return true;
+        _tray?.SetState(TrayState.Error);
+        Notify("Dictum", "The global hotkey could not be registered. See the log for details.", warning: true);
+        Access.ListenerRefused();
+        return false;
+    }
+
+    /// <summary>
+    /// The input-access grant arrived (InputAccessWatch): both listeners are replaced, as a hotkey change replaces them. True
+    /// when the dictation listener installed; the icon then shows the real state again instead of the error.
+    /// </summary>
+    private bool RestartListeners()
+    {
+        _hook?.Dispose();
+        _hook = null;
+        var installed = StartHook();
+        ApplyFixHotkey(_settings, reinstall: true);
+        if (installed) _tray?.SetState(_trayState);
+        StatusChanged();
+        return installed;
     }
 
     /// <summary>
@@ -360,6 +376,7 @@ public sealed partial class AppShell
                 {
                     hook.Dispose(); // its thread and a keyboard hook that did install must not live on unreferenced
                     Notify("Dictum", "The fix_hotkey could not be registered. See the log for details.", warning: true);
+                    Access.ListenerRefused();
                 }
             }
         }

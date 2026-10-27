@@ -41,6 +41,9 @@ public sealed class WindowsPlatform : IPlatform, IDisposable
 
     public PlatformWords Words => PlatformWords.Windows;
 
+    /// <summary>Windows has no Accessibility grant: a low-level hook installs for any process (SPEC §21). Nothing to ask for, nothing shown.</summary>
+    public IInputAccess InputAccess => InputAccessNotNeeded.Instance;
+
     public string ExeDir { get; }
 
     public string ExePath { get; }

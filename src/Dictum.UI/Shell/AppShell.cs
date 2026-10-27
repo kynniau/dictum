@@ -95,12 +95,17 @@ public sealed partial class AppShell : IDisposable
         _capture = platform.CreateCapture(log);
         _inserter = new TextInserter(platform.Clipboard, platform.CreateInputSender(log), log);
         _reloadDebounce = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => DebouncedReload()) { IsEnabled = false };
+        Access = new InputAccessWatch(platform.InputAccess, log, RestartListeners);
+        Access.Changed += StatusChanged; // the panel's problem line and its Request access link follow the grant
         // From construction, not from Start: nothing loads before Start, and the hotkey listener must follow every change.
         _models.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_models.LastError, ref _speechErrorShown, "Speech model"));
         _llm.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_llm.LastError, ref _cleanupErrorShown, "Clean-up model"));
     }
 
     public IPlatform Platform { get; }
+
+    /// <summary>The input-access grant (macOS Accessibility) as the hotkey surfaces show it: its state, and the one Request button.</summary>
+    public InputAccessWatch Access { get; }
 
     public AppPaths Paths { get; }
 
@@ -319,6 +324,7 @@ public sealed partial class AppShell : IDisposable
         _watcher?.Dispose();
         SaveSessionChoices(); // once at quit, the last try to keep this session's choices; with the watcher gone, nothing reloads
         _otherLaunches?.Dispose();
+        Access.Dispose();
         _hook?.Dispose();
         _fixHook?.Dispose();
         CloseWindows();

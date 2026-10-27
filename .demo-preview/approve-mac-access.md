@@ -1,0 +1,23 @@
+# Mac request-access block: strings for approval (PROPOSED 27/10/2026, branch feature/mac-access-request)
+
+Owner's ask (27/10/2026): "we need to add option in app to check access and if access not give a request access key".
+Every string below is new, marked PROPOSED in the code, and shows only on a platform that has a grant to ask for (macOS).
+No Windows string changes; no approved string is edited.
+
+The device word in rows 1 and 5 is the approved Mac copy block word ("this Mac", row 3 of that block). The lines name no
+Settings page, because macOS 15 and 26 call it "Accessibility" and macOS 27 "Device Control and Data Access" (your screenshot
+of 27/10/2026); the button opens the page, whichever name it has.
+
+| # | Surface | Proposed string | Where in the code |
+|---|---|---|---|
+| 1 | Settings > General, Hotkey card, and the menu-bar panel's problem line, while the grant is missing | "Dictum is not allowed to control this Mac yet, so it cannot see the hotkey or paste. Press Request access, then turn Dictum on in the System Settings page that opens." | `InputAccessText.Denied(words)` |
+| 2 | Under row 1, the caption (the stale-entry loop you hit: seven rows, one switch shown on) | "If Dictum is already listed there and on but still refused, remove it from that list with the − button, then press Request access again." | `InputAccessText.StaleEntryNote` |
+| 3 | The button (Settings > General, the Welcome hotkey step's box) and the link (menu-bar panel) | "Request access" | `InputAccessText.RequestLabel` |
+| 4 | Row 1's place once the grant arrived and the hotkey listener installed | "Dictum can now see the hotkey." | `InputAccessText.Granted` |
+| 5 | The hotkey capture box's line in place of "The system refused to report keys…" when the grant is what is missing | "Dictum cannot listen for keys until it is allowed to control this Mac." | `InputAccessText.BoxDenied(words)` |
+| 6 | Row 1's place if the grant arrived but the listener still did not install (not seen on hardware; kept for the case) | "Access was granted, but the hotkey still could not be set up. Quit and reopen Dictum." | `InputAccessText.RestartFailed` |
+| 7 | Log line (not on screen) when a tap cannot install; replaces the 22/10/2026 PROPOSED log line that said "quit and reopen Dictum" | "Event tap (…) not installed: Dictum is not allowed to control this Mac yet. Press Request access in Settings > General (or the menu-bar panel) and turn Dictum on in the System Settings page that opens; the hotkey starts working as soon as it is on." | `EventTap.Run` |
+
+Not in this block: the Mac startup log's "speech on this PC" (`SpeechPolicy.DeclineButton`, approved; for the Mac copy block).
+
+To approve: reply with the row numbers approved as is, and the new wording for any row changed.

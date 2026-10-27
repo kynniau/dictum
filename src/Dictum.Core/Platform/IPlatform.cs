@@ -42,6 +42,12 @@ public interface IPlatform
     /// <summary>Whether a key is physically down now (drops modifiers whose key-up was lost).</summary>
     bool IsKeyDown(int vk);
 
+    /// <summary>
+    /// The system's permission to watch keys and paste system-wide: macOS grants it under Privacy &amp; Security &gt; Accessibility
+    /// (SPEC §21); Windows has no such grant (<see cref="InputAccessNotNeeded"/>).
+    /// </summary>
+    IInputAccess InputAccess { get; }
+
     // ---- Input injector and clipboard --------------------------------------------------------------------------------
 
     IInputSender CreateInputSender(ILog log);
@@ -123,6 +129,51 @@ public interface IHotkeyListener : IDisposable
 public interface IKeyMonitor : IDisposable
 {
     bool Start();
+}
+
+/// <summary>Whether this process may watch keys and paste system-wide (the hotkey listener, the key monitor, Cmd-V).</summary>
+public enum InputAccessState
+{
+    /// <summary>The system has no such grant (Windows): nothing to ask for, nothing to show.</summary>
+    NotApplicable,
+
+    /// <summary>Granted: the listeners can install.</summary>
+    Granted,
+
+    /// <summary>Not granted yet: the listeners cannot install until the user allows Dictum, and <see cref="IInputAccess.Request"/> asks.</summary>
+    Denied,
+}
+
+/// <summary>
+/// The system's input-access grant (macOS Accessibility). <see cref="Check"/> is silent and cheap enough to poll each
+/// second; <see cref="Request"/> asks the system once and never blocks: the answer arrives through later checks.
+/// </summary>
+public interface IInputAccess
+{
+    InputAccessState Check();
+
+    /// <summary>
+    /// Asks the system for the grant: on macOS the "would like to control this computer" prompt where macOS still shows it,
+    /// and System Settings opened at Privacy &amp; Security &gt; Accessibility, where the user turns Dictum on. A no-op where
+    /// <see cref="Check"/> is <see cref="InputAccessState.NotApplicable"/>.
+    /// </summary>
+    void Request();
+}
+
+/// <summary>A platform with no input-access grant (Windows): always <see cref="InputAccessState.NotApplicable"/>, and a request does nothing.</summary>
+public sealed class InputAccessNotNeeded : IInputAccess
+{
+    public static readonly InputAccessNotNeeded Instance = new();
+
+    private InputAccessNotNeeded()
+    {
+    }
+
+    public InputAccessState Check() => InputAccessState.NotApplicable;
+
+    public void Request()
+    {
+    }
 }
 
 public interface IStartupRegistration

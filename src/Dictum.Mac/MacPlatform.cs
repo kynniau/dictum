@@ -34,11 +34,15 @@ public sealed class MacPlatform : IPlatform, IDisposable
         Package = new MacPackageInfo();
         _startup = new(() => new LoginItem(_log, Bundle));
         _removal = new(() => new RemovalSteps(_log, Bundle, ExeDir, () => _startup.Value));
+        InputAccess = new MacInputAccess(Open, _log);
     }
 
     public string Name => "macOS";
 
     public PlatformWords Words => PlatformWords.Mac;
+
+    /// <summary>The Accessibility grant: checked silently, asked for with the system prompt and the Settings page (<see cref="MacInputAccess"/>).</summary>
+    public IInputAccess InputAccess { get; }
 
     public string ExeDir { get; }
 

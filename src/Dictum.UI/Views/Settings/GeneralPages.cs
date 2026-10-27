@@ -70,10 +70,11 @@ internal sealed class GeneralPage : SettingsPage
         _login = Ui.Switch(false, on => _ = SetLoginAsync(on));
         _savedHotkey = shell.Settings.Hotkey;
         _savedFix = shell.Settings.FixHotkey ?? "";
-        _capture = new HotkeyCaptureBox(shell, shell.Settings.Hotkey, listenAtOnce: false);
+        // The Hotkey card carries the input-access line, so neither box repeats it (showsAccessLine: false).
+        _capture = new HotkeyCaptureBox(shell, shell.Settings.Hotkey, listenAtOnce: false, showsAccessLine: false);
         _saveHotkey = Ui.Button("Use this hotkey", "primary", SaveHotkey);
         _capture.Captured += key => _saveHotkey.IsEnabled = key != Shell.Settings.Hotkey;
-        _fixCapture = new HotkeyCaptureBox(shell, shell.Settings.FixHotkey, listenAtOnce: false, FixCaption, FixPrompt);
+        _fixCapture = new HotkeyCaptureBox(shell, shell.Settings.FixHotkey, listenAtOnce: false, FixCaption, FixPrompt, showsAccessLine: false);
         _saveFix = Ui.Button("Use for Fix last dictation", "primary", SaveFixHotkey);
         _clearFix = Ui.Button("Turn off", "secondary", ClearFixHotkey);
         _fixCapture.Captured += key => _saveFix.IsEnabled = key != (Shell.Settings.FixHotkey ?? "");
@@ -103,6 +104,7 @@ internal sealed class GeneralPage : SettingsPage
                 Ui.Stack(0, Ui.Line("Launch at login", _login), _loginHint)), "Dictation"),
             Ui.Card(Ui.Stack(12,
                 Ui.Text("Hold the hotkey to record and let go to paste; tap it to start hands-free and tap again to stop. Esc cancels."),
+                new InputAccessLine(shell), // hidden where the system has no grant to ask for (Windows) and while the grant is in place
                 _capture,
                 Ui.Row(8, _saveHotkey),
                 Ui.Text(MouseNote, "caption"),
