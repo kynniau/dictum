@@ -12,7 +12,7 @@ namespace Dictum.Tests;
 public sealed class SiteStoreFirstTests
 {
     private const string StoreUrl = "https://apps.microsoft.com/detail/9N0DG1DHTR57";
-    private const string MacUrl = "https://github.com/kynniau/dictum/releases/tag/mac-v1.3.0"; // the Mac beta announcement, APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword
+    private const string MacUrl = "https://github.com/kynniau/dictum/releases/tag/mac-v1.3.1"; // the Mac beta announcement, APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword; the tag advances with each Mac release (DECISIONS), 1.3.1 published 27/10/2026 19:25 AEDT
     private const string GitHubLine = """Source code and release files are on <a href="https://github.com/kynniau/dictum">GitHub</a>.""";
     private static readonly string[] Pages = ["index.html", "help.html", "privacy.html", "plain-words.html", "terms.html"];
 
