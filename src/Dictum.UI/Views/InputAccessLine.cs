@@ -6,32 +6,32 @@ using Dictum.UI.Shell;
 namespace Dictum.UI.Views;
 
 /// <summary>
-/// The words of the input-access surfaces (docs/DECISIONS.md "Request access", 27/10/2026). Every string here is PROPOSED
-/// 27/10/2026 (.demo-preview/approve-mac-access.md) and ships only on a platform whose check is not NotApplicable, so no
+/// The words of the input-access surfaces (docs/DECISIONS.md "Request access", 27/10/2026). Every string here is APPROVED by the owner 27/10/2026 19:00 AEDT
+/// (Mac request-access block, rows 1-6, .demo-preview/approve-mac-access.md): do not reword. They ship only on a platform whose check is not NotApplicable, so no
 /// Windows surface changes. The device word comes from the approved Mac copy block (<see cref="PlatformWords.ThisDevice"/>).
 /// </summary>
 internal static class InputAccessText
 {
-    /// <summary>PROPOSED 27/10/2026: the button, the owner's words ("request access").</summary>
+    /// <summary>APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 3): do not reword. The button, the owner's words ("request access").</summary>
     public const string RequestLabel = "Request access";
 
     /// <summary>
-    /// PROPOSED 27/10/2026: the status line while the grant is missing. It names no Settings page: macOS 15 and 26 call it
+    /// APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 1): do not reword. The status line while the grant is missing. It names no Settings page: macOS 15 and 26 call it
     /// "Accessibility" and macOS 27 "Device Control and Data Access" (the owner's screenshot, 27/10/2026), and the button opens it.
     /// </summary>
     public static string Denied(PlatformWords words) =>
         $"Dictum is not allowed to control {words.ThisDevice} yet, so it cannot see the hotkey or paste. Press Request access, then turn Dictum on in the System Settings page that opens.";
 
-    /// <summary>PROPOSED 27/10/2026: the caption under the status line, for the stale-entry case the owner hit (seven entries, one switch shown on).</summary>
+    /// <summary>APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 2): do not reword. The caption under the status line, for the stale-entry case the owner hit (seven entries, one switch shown on).</summary>
     public const string StaleEntryNote = "If Dictum is already listed there and on but still refused, remove it from that list with the − button, then press Request access again.";
 
-    /// <summary>PROPOSED 27/10/2026: the status line once the grant arrived and the listener installed (shown until the page is next redrawn).</summary>
+    /// <summary>APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 4): do not reword. The status line once the grant arrived and the listener installed (shown until the page is next redrawn).</summary>
     public const string Granted = "Dictum can now see the hotkey.";
 
-    /// <summary>PROPOSED 27/10/2026: the grant arrived but the listener still did not install.</summary>
+    /// <summary>APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 6): do not reword. The grant arrived but the listener still did not install.</summary>
     public const string RestartFailed = "Access was granted, but the hotkey still could not be set up. Quit and reopen Dictum.";
 
-    /// <summary>PROPOSED 27/10/2026: the hotkey capture box's line in place of "The system refused to report keys…" when the grant is what is missing.</summary>
+    /// <summary>APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 5): do not reword. The hotkey capture box's line in place of "The system refused to report keys…" when the grant is what is missing.</summary>
     public static string BoxDenied(PlatformWords words) => $"Dictum cannot listen for keys until it is allowed to control {words.ThisDevice}.";
 }
 

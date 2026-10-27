@@ -6443,7 +6443,7 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
 4. **The shell.** `InputAccessWatch` (src/Dictum.UI/Shell/InputAccessWatch.cs, `AppShell.Access`): when a listener is refused
    (`StartHook`, `ApplyFixHotkey`) and the check says Denied, it polls the silent check once a second (`PollFor` = 15 minutes, a marked
    simplification) and on Granted replaces both listeners (`AppShell.RestartListeners`), puts the icon back to the real state, and says
-   so. `Request()` asks and polls. The old "then quit and reopen Dictum" log line is reworded (PROPOSED, row 7 of the approval file).
+   so. `Request()` asks and polls. The old "then quit and reopen Dictum" log line is reworded (APPROVED 27/10/2026 19:00 AEDT, row 7 of the approval file).
 5. **No relaunch needed: proved on hardware** 27/10/2026 18:37 AEDT, macOS 27.2, ad-hoc build: request logged 18:37:47, the owner
    switched Dictum on, "Event tap installed … (hotkey listener for LeftCtrl)" and "Input access granted; the hotkey listener is
    installed." at 18:37:50, the Settings line changed to "Dictum can now see the hotkey." on its own. The owner's words: "the line
@@ -6460,7 +6460,7 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
 7. **Stale rows.** The owner's loop on 27/10/2026 was seven `au.kynni.dictum` Accessibility rows behind one row shown on; `tccutil reset
    Accessibility au.kynni.dictum` cleared them. The app cannot read the list and never runs tccutil; the caption (row 2) says to remove
    the row with − and request again, which is what completed the hands-on (the ad-hoc build's row removed, re-added by the request).
-8. **Strings.** All PROPOSED 27/10/2026, in `.demo-preview/approve-mac-access.md` (seven rows); none ships on Windows; no approved
+8. **Strings.** All seven APPROVED by the owner 27/10/2026 19:00 AEDT as written ("approve 1 to 7"), in `.demo-preview/approve-mac-access.md` (seven rows); none ships on Windows; no approved
    string edited. The device word is the Mac copy block's "this Mac".
 9. **Pins** (`InputAccessTests`, 11 tests): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
    only); the real Mac platform answers Granted or Denied as `AXIsProcessTrusted` does and its link is the verified one (macOS only);

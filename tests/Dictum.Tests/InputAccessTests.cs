@@ -78,6 +78,34 @@ public sealed class InputAccessTests
         Assert.Equal("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility", Dictum.Mac.Input.MacInputAccess.SettingsUrl);
     }
 
+    // ---- The approved words, byte for byte ------------------------------------------------------------------------
+
+    // pin: APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, rows 1 to 6)
+    [Fact]
+    public void The_six_screen_strings_are_the_approved_words()
+    {
+        Assert.Equal("Dictum is not allowed to control this Mac yet, so it cannot see the hotkey or paste. Press Request access, then turn Dictum on in the System Settings page that opens.", InputAccessText.Denied(PlatformWords.Mac)); // row 1
+        Assert.Equal("If Dictum is already listed there and on but still refused, remove it from that list with the \u2212 button, then press Request access again.", InputAccessText.StaleEntryNote); // row 2
+        Assert.Equal("Request access", InputAccessText.RequestLabel); // row 3
+        Assert.Equal("Dictum can now see the hotkey.", InputAccessText.Granted); // row 4
+        Assert.Equal("Dictum cannot listen for keys until it is allowed to control this Mac.", InputAccessText.BoxDenied(PlatformWords.Mac)); // row 5
+        Assert.Equal("Access was granted, but the hotkey still could not be set up. Quit and reopen Dictum.", InputAccessText.RestartFailed); // row 6
+    }
+
+    // pin: APPROVED by the owner 27/10/2026 19:00 AEDT (Mac request-access block, row 7): the log line when a tap cannot install
+    [Fact]
+    public void The_tap_log_line_is_the_approved_words()
+    {
+        var log = new RecordingLog();
+        using (var hotkey = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("RightAlt"), suppress: true), _ => { }, log, trusted: () => false))
+            Assert.False(hotkey.Start());
+        var errors = log.Lines.Where(l => l.Level == LogLevel.Error).Select(l => l.Message).ToList();
+        var line = Assert.Single(errors);
+        const string tail = ") not installed: Dictum is not allowed to control this Mac yet. Press Request access in Settings > General (or the menu-bar panel), or turn Dictum on in System Settings > Privacy & Security > Accessibility; the hotkey starts working as soon as it is on.";
+        Assert.StartsWith("Event tap (", line, StringComparison.Ordinal);
+        Assert.EndsWith(tail, line, StringComparison.Ordinal);
+    }
+
     // ---- Windows surfaces unchanged -------------------------------------------------------------------------------
 
     /// <summary>With no grant to ask for, a refused listener shows no access line, no button, and the box keeps its log pointer.</summary>

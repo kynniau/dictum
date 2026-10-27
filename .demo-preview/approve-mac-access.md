@@ -1,7 +1,7 @@
-# Mac request-access block: strings for approval (PROPOSED 27/10/2026, branch feature/mac-access-request)
+# Mac request-access block: strings for approval (APPROVED by the owner 27/10/2026 19:00 AEDT, rows 1-7 as written; branch feature/mac-access-request)
 
 Owner's ask (27/10/2026): "we need to add option in app to check access and if access not give a request access key".
-Every string below is new, marked PROPOSED in the code, and shows only on a platform that has a grant to ask for (macOS).
+Every string below is new, marked APPROVED in the code, and shows only on a platform that has a grant to ask for (macOS).
 No Windows string changes; no approved string is edited.
 
 The device word in rows 1 and 5 is the approved Mac copy block word ("this Mac", row 3 of that block). The lines name no
