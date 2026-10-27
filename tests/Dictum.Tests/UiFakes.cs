@@ -54,8 +54,16 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     /// <summary>Listeners created from now on fail to start, as when Windows refuses the hook.</summary>
     public bool RefuseListeners { get; set; }
 
+    /// <summary>The next listener asked for throws instead of being made (once), as a native call that fails outright.</summary>
+    public bool ThrowNextListener { get; set; }
+
     public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log)
     {
+        if (ThrowNextListener)
+        {
+            ThrowNextListener = false;
+            throw new InvalidOperationException("The listener could not be made.");
+        }
         LastListener = new FakeHotkeyListener(matcher, post) { Refused = RefuseListeners };
         Listeners.Add(LastListener);
         return LastListener;

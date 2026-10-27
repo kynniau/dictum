@@ -82,10 +82,15 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
         Render();
     }
 
-    /// <summary>The grant arrived while this box was waiting on it: listen again, as the user asked to before the refusal.</summary>
+    /// <summary>
+    /// The grant arrived while this box was waiting on it: listen again, as the user asked to before the refusal. Only a box that
+    /// carries its own line (the Welcome hotkey step): on Settings &gt; General a refused Start raises no Started, so both boxes
+    /// could still be waiting and both would resume, the fix box last; there the card's line is the cue and Change… starts one
+    /// (merge lens, PR #82, 27/10/2026).
+    /// </summary>
     private void AccessChanged()
     {
-        if (_refusedForAccess && _shell.Access.State == InputAccessState.Granted && _monitor is null) Start();
+        if (_access is not null && _refusedForAccess && _shell.Access.State == InputAccessState.Granted && _monitor is null) Start();
     }
 
     /// <summary>The hotkey chosen: the configured one until a new key is pressed; "" when none.</summary>
@@ -111,6 +116,9 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
             _pause.Dispose();
             _pause = null;
             // Refused for want of the grant: the box says so and carries the Request access button; any other refusal keeps the log pointer.
+            // A fresh check, not the shell's cached answer: the Welcome window runs before the shell installs its own listener, so
+            // nothing has asked yet on a new install (merge lens, PR #82, 27/10/2026). It also starts the watch for the grant.
+            _shell.Access.ListenerRefused();
             _refusedForAccess = _shell.Access.State == InputAccessState.Denied;
             if (_access is not null) _access.IsVisible = _refusedForAccess;
             _received.Text = _refusedForAccess ? InputAccessText.BoxDenied(_shell.Platform.Words)

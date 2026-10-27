@@ -6462,7 +6462,7 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
    the row with − and request again, which is what completed the hands-on (the ad-hoc build's row removed, re-added by the request).
 8. **Strings.** All seven APPROVED by the owner 27/10/2026 19:00 AEDT as written ("approve 1 to 7"), in `.demo-preview/approve-mac-access.md` (seven rows); none ships on Windows; no approved
    string edited. The device word is the Mac copy block's "this Mac".
-9. **Pins** (`InputAccessTests`, 11 tests): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
+9. **Pins** (`InputAccessTests`, 20 tests after the item 13 fix round; this line said 11 at b60dc44, where the file held 13): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
    only); the real Mac platform answers Granted or Denied as `AXIsProcessTrusted` does and its link is the verified one (macOS only);
    with no grant to ask for, Settings > General shows no line, no button, no problem, and the box keeps its old sentence; a listener
    refused for want of the grant shows the line, the caption and the button, and the button requests; the grant arriving replaces both
@@ -6482,6 +6482,45 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     answer for a refused build is a macOS 27 behaviour or a TCC-cache one. Follow-up the owner raised from Zoom's installer: a floating
     panel with a draggable tile of Dictum.app to drop onto the Settings list, which would side-step the stale-row loop; not in this lane.
     `src/Dictum.Mac/README.md`'s IPlatform table has no row for `InputAccess` (the file is outside this lane's files).
-12. **Runs on the Mac at the PR head (27/10/2026 18:47 AEDT, macOS 27.2, Release):** `dotnet test --project tests/Dictum.Tests`: 2742 total,
+12. **Runs on the Mac at ff9c3f9 (27/10/2026 18:47 AEDT, macOS 27.2, Release; no Mac run is recorded here at b60dc44 or after the item 13 fix round):** `dotnet test --project tests/Dictum.Tests`: 2742 total,
     2550 passed, 0 failed, 192 skipped (the Windows-only pins among them). `DICTUM_UI_TESTS=1`, MacInputTests and InputAccessTests:
     34 total, 33 passed, 0 failed, 1 skipped (the Windows platform pin). Ad-hoc bundle built by scripts/publish-mac.sh for the hands-on.
+13. **Merge-lens fix round (27/10/2026, from b60dc44; lens on Opus reproduced each with a probe test).** Windows behaviour and copy
+    unchanged: every change sits behind a Denied answer, which `InputAccessNotNeeded` never gives. No approved string changed.
+    - MAJOR 1. The Welcome hotkey step never showed Request access on a fresh install: the box read the cached state, which only turns
+      Denied after the shell's own listener is refused, and the Welcome window runs before Start installs it. Fix: the box's refusal
+      path calls `Access.ListenerRefused()` (a fresh check, which also starts the watch) before reading the state; and
+      `RestartListeners` installs nothing and returns true while no listener was ever installed (`_hook` null), since Start installs
+      both and does not dispose a listener installed before it. The guard reads `_hook`, not `_controller` as the lens suggested:
+      `StartHook` always keeps the listener it made, refused or not, and the existing pins install listeners by a reload on a shell
+      Start has not built the controller for, so a `_controller` guard would have turned every restart in them into a no-op. Pins:
+      `The_welcome_box_asks_for_itself_before_the_shell_has_installed_a_listener`,
+      `A_grant_during_the_welcome_window_leaves_one_listener_after_start`.
+    - MAJOR 2. Request access with the grant already in place (polling lapsed, Dictum switched on by hand) changed the words but
+      installed no listener. Fix: `Request()` starts polling and runs `Tick()` at once, so both answers take the one path. Pin:
+      `Request_access_with_the_grant_already_in_place_installs_the_listeners`.
+    - MINOR 3. `Tick` runs from a DispatcherTimer with nothing above it to catch a failure. Fix: its body is wrapped; on an exception
+      it stops polling, logs `Input access restart failed: {ex}` and shows the grant as a failed restart (row 6). Pin:
+      `A_restart_that_throws_is_caught_and_shown_as_a_failed_restart` (the fake's listener factory throws once).
+    - MINOR 4. Row 4 ("Dictum can now see the hotkey.") showed on every General page opened later in the session, even after a
+      revoke, because the first render set it. Fix: only a Denied-to-Granted change seen while the line is attached sets it; attaching
+      resets it. Pin: `The_granted_line_shows_only_for_a_grant_seen_while_attached`.
+    - MINOR 5. On Settings > General both refused boxes resumed on the grant (a refused Start raises no Started, so the
+      one-box-at-a-time wiring never cleared the other), and the fix box could end up listening. Fix: only a box that carries its own
+      line resumes by itself; on General the card's line is the cue and Change… starts one. Pin:
+      `Two_refused_general_boxes_do_not_resume_on_the_grant`.
+    - MINOR 6. The 15-minute cut-off read `DateTime.UtcNow`. Fix: `InputAccessWatch` takes a `TimeProvider` (null is the system
+      clock), as the "TimeProvider seam" entry does. Pin: `Polling_stops_after_the_cut_off_on_the_injected_clock`.
+    - **Mutation checks (27/10/2026, finished before 19:32 AEDT by the clock read after the last one, Windows, Release; source restored from the index with `git checkout`
+      after each, and the full suite then passed):** MAJOR 1, the box's fresh check removed: its pin observed failing (the state stayed
+      NotApplicable). MAJOR 1, the `RestartListeners` guard removed: its pin observed failing at "nothing installed before Start", and
+      with that inner assertion also removed, observed failing at the count after Start (expected 1 live listener, actual 2). MAJOR 2,
+      the old `Request()` body restored: observed failing (expected 4 listeners, actual 2). MINOR 6, the cut-off line removed:
+      observed failing (polling still on). MINOR 3, the catch disabled: observed failing (the exception escaped). MINOR 4, the grant
+      flag set on every render: observed failing (row 4 shown on the later page). MINOR 5, the own-line condition removed: observed
+      failing (the second box listening).
+    - **Runs on Windows after the fix:** `dotnet test tests/Dictum.Tests -c Release`: 2751 total, 2708 passed, 0 failed, 43 skipped.
+      The Mac runtime is not verified after this round (no Mac run from this Windows lane).
+    - **Known nuance, not changed:** when the grant arrives during the Welcome window, the log carries the guard's line ("…they install
+      when Dictum finishes starting.") and then `Tick`'s existing "Input access granted; the hotkey listener is installed." a few
+      moments before Start installs it. A log line only; left as written for the owner to decide.

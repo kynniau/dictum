@@ -22,14 +22,17 @@ public sealed class InputAccessWatch
     private readonly ILog _log;
     private readonly Func<bool> _restartListeners;
     private readonly DispatcherTimer _timer;
-    private DateTime _pollingSince;
+    private readonly TimeProvider _time;
+    private DateTimeOffset _pollingSince;
 
     /// <param name="restartListeners">Replaces the hotkey listeners; true when the dictation listener installed.</param>
-    public InputAccessWatch(IInputAccess access, ILog log, Func<bool> restartListeners)
+    /// <param name="time">The clock the <see cref="PollFor"/> cut-off reads; null is the system clock, and only tests set it (DECISIONS.md, "TimeProvider seam").</param>
+    public InputAccessWatch(IInputAccess access, ILog log, Func<bool> restartListeners, TimeProvider? time = null)
     {
         _access = access;
         _log = log;
         _restartListeners = restartListeners;
+        _time = time ?? TimeProvider.System;
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => Tick()) { IsEnabled = false };
     }
 
@@ -51,34 +54,55 @@ public sealed class InputAccessWatch
         StartPolling();
     }
 
-    /// <summary>Asks the system for the grant and watches for the answer.</summary>
+    /// <summary>
+    /// Asks the system for the grant and watches for the answer. The answer goes through <see cref="Tick"/> either way, so a grant
+    /// already in place (the user turned Dictum on by hand after polling stopped) restarts the listeners too, instead of only
+    /// changing the words (merge lens, PR #82, 27/10/2026).
+    /// </summary>
     public void Request()
     {
         _log.Info("Input access requested by the user.");
         _access.Request();
-        Set(_access.Check(), restartFailed: false);
-        if (State == InputAccessState.Denied) StartPolling();
+        StartPolling();
+        Tick();
     }
 
-    /// <summary>One poll: on a grant, stop and restart the listeners. Internal so a test ticks it without the timer.</summary>
+    /// <summary>Whether the once-a-second check is running, for the pins.</summary>
+    internal bool Polling => _timer.IsEnabled;
+
+    /// <summary>
+    /// One poll: on a grant, stop and restart the listeners. Internal so a test ticks it without the timer. It runs from a
+    /// DispatcherTimer with nothing above it to catch a failure, so a failure is caught here, logged, and shown as a grant the
+    /// listener could not use, as the debounced reload catches its own (AppShell.DebouncedReload).
+    /// </summary>
     internal void Tick()
     {
-        var state = _access.Check();
-        if (state == InputAccessState.Denied)
+        try
         {
-            if (DateTime.UtcNow - _pollingSince > PollFor) StopPolling();
-            return;
+            var state = _access.Check();
+            if (state == InputAccessState.Denied)
+            {
+                Set(state, restartFailed: false);
+                if (_time.GetUtcNow() - _pollingSince > PollFor) StopPolling();
+                return;
+            }
+            StopPolling();
+            if (state != InputAccessState.Granted) return;
+            var installed = _restartListeners();
+            _log.Info(installed ? "Input access granted; the hotkey listener is installed." : "Input access granted, but the hotkey listener still did not install.");
+            Set(state, restartFailed: !installed);
         }
-        StopPolling();
-        if (state != InputAccessState.Granted) return;
-        var installed = _restartListeners();
-        _log.Info(installed ? "Input access granted; the hotkey listener is installed." : "Input access granted, but the hotkey listener still did not install.");
-        Set(state, restartFailed: !installed);
+        catch (Exception ex)
+        {
+            StopPolling();
+            _log.Error($"Input access restart failed: {ex}");
+            Set(InputAccessState.Granted, restartFailed: true);
+        }
     }
 
     private void StartPolling()
     {
-        _pollingSince = DateTime.UtcNow;
+        _pollingSince = _time.GetUtcNow();
         _timer.Start();
     }
 

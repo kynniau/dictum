@@ -291,10 +291,19 @@ public sealed partial class AppShell
 
     /// <summary>
     /// The input-access grant arrived (InputAccessWatch): both listeners are replaced, as a hotkey change replaces them. True
-    /// when the dictation listener installed; the icon then shows the real state again instead of the error.
+    /// when the dictation listener installed; the icon then shows the real state again instead of the error. Before the listeners
+    /// were ever installed (the grant arrives during the Welcome window, which runs before Start installs them) there is nothing
+    /// to replace: Start installs both, and installing them here too would leave a second listener Start never disposes (merge
+    /// lens, PR #82, 27/10/2026). "Not installed yet" is <c>_hook</c> null, not <c>_controller</c> null: StartHook always keeps
+    /// the listener it made, refused or not, and a reload installs listeners on a shell Start has not built the controller for.
     /// </summary>
     private bool RestartListeners()
     {
+        if (_hook is null)
+        {
+            _log.Info("Input access granted before the hotkey listeners were installed; they install when Dictum finishes starting.");
+            return true;
+        }
         _hook?.Dispose();
         _hook = null;
         var installed = StartHook();

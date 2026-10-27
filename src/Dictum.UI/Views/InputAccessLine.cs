@@ -48,6 +48,7 @@ internal sealed class InputAccessLine : StackPanel
     private readonly Button _request;
     private readonly bool _showsItself;
     private bool _granted;
+    private InputAccessState _seen;
 
     /// <param name="showsItself">True: shown whenever the state calls for it (a page). False: its owner shows and hides it (the capture box, after its own refusal).</param>
     public InputAccessLine(AppShell shell, bool showsItself = true)
@@ -60,18 +61,35 @@ internal sealed class InputAccessLine : StackPanel
         Children.Add(_status);
         Children.Add(_note);
         Children.Add(Ui.Row(8, _request));
-        AttachedToVisualTree += (_, _) => { _shell.Access.Changed += Render; Render(); };
-        DetachedFromVisualTree += (_, _) => _shell.Access.Changed -= Render;
+        AttachedToVisualTree += (_, _) =>
+        {
+            // A fresh view: "Dictum can now see the hotkey." is said only for a grant that arrives while this line is on screen,
+            // never for one that was already in place when the page opened (merge lens, PR #82, 27/10/2026).
+            _granted = false;
+            _seen = _shell.Access.State;
+            _shell.Access.Changed += AccessChanged;
+            Render();
+        };
+        DetachedFromVisualTree += (_, _) => _shell.Access.Changed -= AccessChanged;
+        _seen = _shell.Access.State;
         Render();
     }
 
     /// <summary>The line as it reads now, for the pins: null while hidden.</summary>
     internal string? StatusText => IsVisible ? _status.Text : null;
 
+    /// <summary>The grant changed while this line is attached: a Denied-to-Granted change seen here is the one row 4 announces.</summary>
+    private void AccessChanged()
+    {
+        var state = _shell.Access.State;
+        _granted = state == InputAccessState.Granted && (_granted || _seen == InputAccessState.Denied);
+        _seen = state;
+        Render();
+    }
+
     private void Render()
     {
         var access = _shell.Access;
-        if (access.State == InputAccessState.Granted && !_granted) _granted = true; // say it once a grant was seen here
         var denied = access.State == InputAccessState.Denied;
         if (_showsItself) IsVisible = denied || access.RestartFailed || (_granted && access.State == InputAccessState.Granted);
         _status.Text = denied ? InputAccessText.Denied(_shell.Platform.Words)
