@@ -6412,3 +6412,7 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
 - **Not verified:** that another device actually declines to show the dictation (no second device in the lane); what is
   verified is the selector exists and the write path still pastes (paste check on a real Mac, 27/10/2026, in the PR).
 - **Lens follow-up (27/10/2026):** source-scan pin `MacInput_pasteboard_source_applies_the_host_only_option_on_every_dictation_write` (runs on Windows; Pasteboard.cs must contain the SetText call `Write(Payload(text, keepOutOfHistory), ContentsOptions(keepOutOfHistory))`, the `prepareForNewContentsWithOptions:` send with `(nint)options`, and exactly one `ObjC.Sel("clearContents")`). Mutation checks, each observed failing then reverted: SetText passing `0` instead of `ContentsOptions(keepOutOfHistory)` failed with "Assert.Contains() Failure: Sub-string not found"; Write calling `clearContents` in place of `prepareForNewContentsWithOptions:` failed with the same message.
+
+## 27/10/2026 14:00 AEDT: 1.3.1 publication dates
+
+- The Terms of Use page carries its publication date, 27/10/2026 (section D item 0 of the legal block: "At deploy, terms.html carries the publication date"); `site/version.json` `published` is 2026-10-27, the 1.3.1 deploy day. The privacy policy's "Last updated" stays 23/10/2026, the date of its last text change. No other file changes; no pin holds either date.
