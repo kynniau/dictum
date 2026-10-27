@@ -6390,3 +6390,25 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
    (`CalibrationWindow.ResultsHintStart(words)`, row 11 marker; `Row11_…` extended to the hint, observed failing with "this PC"
    put back). HelpText's "The questions, in order" summary is back above `Questions`. `dotnet test Dictum.sln` (Debug, 15:52 to
    16:03 AEDT): 2729 total, 2687 passed, 0 failed, 42 skipped.
+
+### Pasteboard writes are current-host-only (23/10/2026, branch mac/pasteboard-host-only)
+
+- **Finding (privacy re-lens, via the orchestrator):** a dictation written to the general pasteboard with Handoff on could be
+  carried to the user's other Apple devices by Universal Clipboard, which contradicts "nothing you say leaves this Mac".
+- **API, verified 23/10/2026 from the installed macOS SDK header** (`AppKit.framework/Headers/NSPasteboard.h`, Xcode SDK):
+  `- (NSInteger)prepareForNewContentsWithOptions:(NSPasteboardContentsOptions)options`, `API_AVAILABLE(macos(10.12))`,
+  "Prepares the pasteboard for new contents, clearing the existing contents … Any options specified will persist until
+  prepareForNewContentsWithOptions: or clearContents is called"; `NSPasteboardContentsCurrentHostOnly = 1 << 0`, "the pasteboard
+  contents should not be available to other devices". Apple's web pages for both symbols returned 404 or an empty body that day.
+- **Change:** `Pasteboard.Write` replaces its `clearContents` with `prepareForNewContentsWithOptions:`; `SetText` passes
+  `ContentsOptions(keepOutOfHistory)` = current-host-only when history is kept off (the default), 0 when the user allows
+  clipboard history. `Restore` passes 0, so the user's own contents are offered to their devices again as before. The
+  nspasteboard.org concealed, transient and source types are unchanged. Reasoning for tying it to the history switch
+  rather than always on: Windows already gates `CanUploadToCloudClipboard` (cloud clipboard sync) by the same setting, so a
+  user who allows history gets the same behaviour on both platforms. Owner decision 23/10/2026 13:52 AEDT: keep host-only tied to the history switch.
+  No user-visible string changes. The Mac caption (PlatformWords.Mac, approved 23/10/2026 14:06) names Universal Clipboard; this change makes it true.
+- **Pin:** `MacInput_pasteboard_dictation_is_current_host_only_unless_history_is_allowed` (constant, both switch states).
+  Mutation check recorded in the PR.
+- **Not verified:** that another device actually declines to show the dictation (no second device in the lane); what is
+  verified is the selector exists and the write path still pastes (paste check on a real Mac, 27/10/2026, in the PR).
+- **Lens follow-up (27/10/2026):** source-scan pin `MacInput_pasteboard_source_applies_the_host_only_option_on_every_dictation_write` (runs on Windows; Pasteboard.cs must contain the SetText call `Write(Payload(text, keepOutOfHistory), ContentsOptions(keepOutOfHistory))`, the `prepareForNewContentsWithOptions:` send with `(nint)options`, and exactly one `ObjC.Sel("clearContents")`). Mutation checks, each observed failing then reverted: SetText passing `0` instead of `ContentsOptions(keepOutOfHistory)` failed with "Assert.Contains() Failure: Sub-string not found"; Write calling `clearContents` in place of `prepareForNewContentsWithOptions:` failed with the same message.
