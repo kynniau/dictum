@@ -9,6 +9,14 @@ namespace Dictum.UI.Shell;
 /// listener was refused for want of the grant, it polls the silent check once a second; when the grant arrives it restarts the
 /// listeners, so the hotkey works without quitting Dictum. <see cref="Request"/> is the one button every surface shows: the
 /// system prompt where macOS gives one, else the Settings page. On Windows the check is NotApplicable and nothing here ever shows.
+/// <para>
+/// A refused or removed listener is the grant missing, whatever the check says (PR #82 round 2, 29/10/2026): after a live
+/// revocation, and with a stale row for the same bundle id, AXIsProcessTrusted answered trusted while macOS refused the tap. In
+/// that case the check is not believed again until it has answered Denied once (the row removed, then turned on again) or the
+/// user presses Request access, so a stale "trusted" never starts a restart loop; Granted is set only after a listener installs.
+/// Every listener still installed is removed as the state turns Denied (<c>stopListeners</c>): a tap left behind after the grant
+/// was taken away held every key on the Mac.
+/// </para>
 /// </summary>
 public sealed class InputAccessWatch
 {
@@ -21,19 +29,24 @@ public sealed class InputAccessWatch
     private readonly IInputAccess _access;
     private readonly ILog _log;
     private readonly Func<bool> _restartListeners;
+    private readonly Action _stopListeners;
+    private bool _checkDisagrees;
     private readonly DispatcherTimer _timer;
     private readonly TimeProvider _time;
     private DateTimeOffset _pollingSince;
 
     /// <param name="restartListeners">Replaces the hotkey listeners; true when the dictation listener installed.</param>
+    /// <param name="stopListeners">Removes every installed hotkey listener (the grant is gone).</param>
     /// <param name="time">The clock the <see cref="PollFor"/> cut-off reads; null is the system clock, and only tests set it (DECISIONS.md, "TimeProvider seam").</param>
-    public InputAccessWatch(IInputAccess access, ILog log, Func<bool> restartListeners, TimeProvider? time = null)
+    public InputAccessWatch(IInputAccess access, ILog log, Func<bool> restartListeners, Action stopListeners, TimeProvider? time = null)
     {
         _access = access;
         _log = log;
         _restartListeners = restartListeners;
+        _stopListeners = stopListeners;
         _time = time ?? TimeProvider.System;
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => Tick()) { IsEnabled = false };
+        _access.Revoked += OnRevoked;
     }
 
     /// <summary>The last answer the system gave; NotApplicable until a listener is refused or a request is made.</summary>
@@ -45,14 +58,27 @@ public sealed class InputAccessWatch
     /// <summary>Raised on the UI thread when <see cref="State"/> or <see cref="RestartFailed"/> changes.</summary>
     public event Action? Changed;
 
-    /// <summary>A listener could not install: if the grant is missing, say so and start watching for it.</summary>
+    /// <summary>
+    /// A listener could not install, or removed itself: where there is a grant, it is missing, whatever the check answers. Every
+    /// installed listener is removed, the line and the button show, and the watch starts polling for the grant.
+    /// </summary>
     public void ListenerRefused()
     {
         var state = _access.Check();
-        if (state != InputAccessState.Denied) return;
-        Set(state, restartFailed: false);
+        if (state == InputAccessState.NotApplicable) return;
+        if (state == InputAccessState.Granted && !_checkDisagrees)
+        {
+            _checkDisagrees = true;
+            // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
+            _log.Warn("Input access: a hotkey listener was refused although the system reports Dictum as allowed; treating it as not allowed until it is granted again or Request access is pressed.");
+        }
+        _stopListeners();
+        Set(InputAccessState.Denied, restartFailed: false);
         StartPolling();
     }
+
+    /// <summary>From a tap's own thread (IInputAccess.Revoked): handled on the UI thread like a refusal.</summary>
+    private void OnRevoked() => Dispatcher.UIThread.Post(ListenerRefused);
 
     /// <summary>
     /// Asks the system for the grant and watches for the answer. The answer goes through <see cref="Tick"/> either way, so a grant
@@ -62,6 +88,7 @@ public sealed class InputAccessWatch
     public void Request()
     {
         _log.Info("Input access requested by the user.");
+        _checkDisagrees = false; // the user's press earns the check one more trial: a refusal sets it again
         _access.Request();
         StartPolling();
         Tick();
@@ -80,16 +107,19 @@ public sealed class InputAccessWatch
         try
         {
             var state = _access.Check();
-            if (state == InputAccessState.Denied)
+            if (state == InputAccessState.Denied || (state == InputAccessState.Granted && _checkDisagrees))
             {
-                Set(state, restartFailed: false);
+                if (state == InputAccessState.Denied) _checkDisagrees = false; // honest again: its next "Granted" is a real grant
+                Set(InputAccessState.Denied, restartFailed: false);
                 if (_time.GetUtcNow() - _pollingSince > PollFor) StopPolling();
                 return;
             }
             StopPolling();
             if (state != InputAccessState.Granted) return;
             var installed = _restartListeners(); // logs its own outcome (AppShell.RestartListeners)
-            Set(state, restartFailed: !installed);
+            // A restart refused again has already set Denied through ListenerRefused: Granted only after a listener installed.
+            if (installed) Set(state, restartFailed: false);
+            else if (State != InputAccessState.Denied) Set(state, restartFailed: true);
         }
         catch (Exception ex)
         {
@@ -115,5 +145,9 @@ public sealed class InputAccessWatch
         Changed?.Invoke();
     }
 
-    public void Dispose() => _timer.Stop();
+    public void Dispose()
+    {
+        _access.Revoked -= OnRevoked;
+        _timer.Stop();
+    }
 }

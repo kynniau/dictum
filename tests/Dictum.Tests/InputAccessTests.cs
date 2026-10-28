@@ -192,26 +192,139 @@ public sealed class InputAccessTests
         shell.Dispose();
     });
 
+    /// <summary>
+    /// Finding A, PR #82 round 2 (29/10/2026): the check said allowed and the listener was still refused (a live revocation, a
+    /// stale row). That is the grant missing: the line, the button and the panel problem show, the stale "allowed" starts no
+    /// restart loop, and Request access earns the check one more trial.
+    /// </summary>
     [Fact]
-    public Task A_grant_that_still_leaves_the_listener_refused_says_so() => UiSession.Run(() =>
+    public Task A_listener_refused_while_the_system_says_allowed_shows_the_line_and_the_button() => UiSession.Run(() =>
     {
         using var scratch = new Scratch("""{ "hotkey": "F24" }""");
-        var (shell, platform, _) = scratch.Shell();
+        var log = new RecordingLog();
+        var (shell, platform, _) = scratch.Shell(log: log);
         platform.Words = PlatformWords.Mac;
-        platform.FakeAccess.State = InputAccessState.Denied;
-        platform.RefuseListeners = true;
+        platform.FakeAccess.State = InputAccessState.Granted; // the system says yes
+        platform.RefuseListeners = true;                      // and the listener is refused all the same
         shell.Reload(userRequested: true);
+
+        Assert.Equal(InputAccessState.Denied, shell.Access.State);
+        Assert.False(shell.Access.RestartFailed);
+        Assert.Equal(InputAccessText.Denied(PlatformWords.Mac), shell.Status.Problem);
+        Assert.True(shell.Status.RequestAccess);
         var (window, _) = General(shell);
+        Assert.Contains(InputAccessText.Denied(PlatformWords.Mac), VisibleLines(window));
+        Assert.NotNull(RequestButton(window));
+        var box = All<HotkeyCaptureBox>(window).First();
+        box.Start();
+        Assert.Contains(InputAccessText.BoxDenied(PlatformWords.Mac), VisibleLines(box)); // not "The system refused to report keys"
 
-        platform.FakeAccess.State = InputAccessState.Granted; // the system says yes, the listener still fails
-        shell.Access.Tick();
+        var made = platform.Listeners.Count;
+        shell.Access.Tick(); // the check still says allowed: not believed, no restart
+        Assert.Equal(made, platform.Listeners.Count);
+        Assert.Equal(InputAccessState.Denied, shell.Access.State);
+        Assert.True(shell.Access.Polling);
 
-        Assert.True(shell.Access.RestartFailed);
-        Assert.Contains(InputAccessText.RestartFailed, VisibleLines(window));
-        Assert.Null(RequestButton(window));
+        platform.RefuseListeners = false;
+        Click(RequestButton(window)!); // the press tries once more, and this time the listener installs
+        Assert.Equal(1, platform.FakeAccess.Requests);
+        Assert.Contains(log.Lines, l => l.Message == "Input access requested by the user.");
+        Assert.True(platform.Listeners.Count > made);
+        Assert.Equal(InputAccessState.Granted, shell.Access.State);
+        Assert.Null(shell.Status.Problem);
         window.Close();
         shell.Dispose();
     });
+
+    /// <summary>
+    /// Finding B, PR #82 round 2 (29/10/2026): a tap that lost the grant removes itself and says so; the shell then removes every
+    /// other listener (no tap stays in front of the keyboard), shows the button, and installs fresh ones only for a real grant.
+    /// </summary>
+    [Fact]
+    public Task A_listener_that_lost_the_grant_removes_every_listener_and_shows_the_button() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "fix_hotkey": "F23" }""");
+        var (shell, platform, _) = scratch.Shell();
+        platform.Words = PlatformWords.Mac;
+        platform.FakeAccess.State = InputAccessState.Granted;
+        shell.Reload(userRequested: true);
+        var installed = platform.Listeners.Where(l => !l.Disposed).ToList();
+        Assert.Equal(2, installed.Count); // dictation and fix-last
+
+        platform.FakeAccess.Revoke(); // from the tap thread; the check goes on saying allowed, as it did on hardware
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.All(installed, l => Assert.True(l.Disposed));
+        Assert.Equal(InputAccessState.Denied, shell.Access.State);
+        Assert.True(shell.Status.RequestAccess);
+        var (window, _) = General(shell);
+        Assert.NotNull(RequestButton(window));
+
+        var made = platform.Listeners.Count;
+        shell.Access.Tick(); // stale "allowed": no listener comes back
+        Assert.Equal(made, platform.Listeners.Count);
+
+        platform.FakeAccess.State = InputAccessState.Denied; // the row removed: the check is honest again
+        shell.Access.Tick();
+        Assert.Equal(made, platform.Listeners.Count);
+        platform.FakeAccess.State = InputAccessState.Granted; // turned on again: a real grant
+        shell.Access.Tick();
+        Assert.Equal(made + 2, platform.Listeners.Count);
+        Assert.Equal(InputAccessState.Granted, shell.Access.State);
+        Assert.Contains(InputAccessText.Granted, VisibleLines(window));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>With no grant to ask for (Windows), a removed listener changes nothing: the state stays NotApplicable and the listeners stay.</summary>
+    [Fact]
+    public Task With_no_grant_to_ask_for_a_refusal_removes_no_listener() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "fix_hotkey": "F23" }""");
+        var (shell, platform, _) = scratch.Shell();
+        shell.Reload(userRequested: true);
+        var installed = platform.Listeners.Where(l => !l.Disposed).ToList();
+        shell.Access.ListenerRefused();
+        Assert.Equal(InputAccessState.NotApplicable, shell.Access.State);
+        Assert.All(installed, l => Assert.False(l.Disposed));
+        shell.Dispose();
+    });
+
+    // ---- The tap macOS keeps disabling (Finding B) -----------------------------------------------------------------
+
+    [Fact]
+    public void The_disable_guard_reenables_once_and_never_for_a_repeat_or_without_the_grant()
+    {
+        var window = (long)Dictum.Mac.Input.TapDisableGuard.Window.TotalMilliseconds;
+        var guard = new Dictum.Mac.Input.TapDisableGuard();
+        Assert.True(guard.ShouldReenable(1_000, trusted: true));                // a first timeout: turned back on
+        Assert.False(guard.ShouldReenable(3_000, trusted: true));               // again 2 s later: not
+        Assert.True(guard.ShouldReenable(3_000 + window + 1, trusted: true));   // a lone timeout a minute on: turned back on
+        Assert.False(new Dictum.Mac.Input.TapDisableGuard().ShouldReenable(1_000, trusted: false)); // the grant gone: never
+    }
+
+    /// <summary>The re-enable path itself, through the tap's own handler: the second disable removes the tap, reports it once, and never turns it back on.</summary>
+    [Fact]
+    public void A_tap_macOS_keeps_disabling_is_removed_and_reported_instead_of_turned_back_on()
+    {
+        var log = new RecordingLog();
+        var lost = 0;
+        var tap = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, log, trusted: () => true, lost: () => lost++, stillTrusted: () => true);
+        Assert.True(tap.Handle(Dictum.Mac.Interop.CG.EventTapDisabledByTimeout, 0));
+        Assert.Equal(0, lost);
+        Assert.Contains(log.Lines, l => l.Level == LogLevel.Warning && l.Message.EndsWith("was disabled by macOS (timeout) and re-enabled.", StringComparison.Ordinal));
+
+        Assert.True(tap.Handle(Dictum.Mac.Interop.CG.EventTapDisabledByTimeout, 0));
+        Assert.True(tap.Handle(Dictum.Mac.Interop.CG.EventTapDisabledByUserInput, 0));
+        Assert.Equal(1, lost);
+        Assert.Single(log.Lines, l => l.Message.EndsWith("re-enabled.", StringComparison.Ordinal));
+        Assert.Single(log.Lines, l => l.Level == LogLevel.Error && l.Message.StartsWith("Event tap (key monitor) removed: macOS keeps disabling it (timeout)", StringComparison.Ordinal));
+
+        var untrusted = 0;
+        var other = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("RightAlt"), suppress: true), _ => { }, new RecordingLog(), trusted: () => true, lost: () => untrusted++, stillTrusted: () => false);
+        other.Handle(Dictum.Mac.Interop.CG.EventTapDisabledByTimeout, 0); // the grant already gone: removed at the first disable
+        Assert.Equal(1, untrusted);
+    }
 
     /// <summary>A box on its own (the Welcome hotkey step) carries the line itself; on Settings &gt; General the card's line serves both boxes.</summary>
     [Fact]
@@ -519,7 +632,7 @@ public sealed class InputAccessTests
     {
         var access = new FakeInputAccess { State = InputAccessState.Denied };
         var clock = new FakeTimeProvider();
-        var watch = new Dictum.UI.Shell.InputAccessWatch(access, NullLog.Instance, () => true, clock);
+        var watch = new Dictum.UI.Shell.InputAccessWatch(access, NullLog.Instance, () => true, () => { }, clock);
         try
         {
             watch.ListenerRefused();

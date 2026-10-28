@@ -34,7 +34,7 @@ public sealed class MacPlatform : IPlatform, IDisposable
         Package = new MacPackageInfo();
         _startup = new(() => new LoginItem(_log, Bundle));
         _removal = new(() => new RemovalSteps(_log, Bundle, ExeDir, () => _startup.Value));
-        InputAccess = new MacInputAccess(Open, _log);
+        _access = new MacInputAccess(Open, _log);
     }
 
     public string Name => "macOS";
@@ -42,7 +42,9 @@ public sealed class MacPlatform : IPlatform, IDisposable
     public PlatformWords Words => PlatformWords.Mac;
 
     /// <summary>The Accessibility grant: checked silently, asked for with the system prompt and the Settings page (<see cref="MacInputAccess"/>).</summary>
-    public IInputAccess InputAccess { get; }
+    public IInputAccess InputAccess => _access;
+
+    private readonly MacInputAccess _access;
 
     public string ExeDir { get; }
 
@@ -79,9 +81,9 @@ public sealed class MacPlatform : IPlatform, IDisposable
         }
     }
 
-    public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log) => new EventTapHotkey(matcher, post, log);
+    public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log) => new EventTapHotkey(matcher, post, log, lost: _access.ReportRevoked);
 
-    public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => new EventTapKeyMonitor(onKey, log);
+    public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => new EventTapKeyMonitor(onKey, log, lost: _access.ReportRevoked);
 
     public bool IsKeyDown(int vk) => KeyState.IsDown(vk);
 

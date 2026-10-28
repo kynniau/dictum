@@ -17,7 +17,9 @@ of 27/10/2026); the button opens the page, whichever name it has.
 | 5 | The hotkey capture box's line in place of "The system refused to report keys…" when the grant is what is missing | "Dictum cannot listen for keys until it is allowed to control this Mac." | `InputAccessText.BoxDenied(words)` |
 | 6 | Row 1's place if the grant arrived but the listener still did not install (not seen on hardware; kept for the case) | "Access was granted, but the hotkey still could not be set up. Quit and reopen Dictum." | `InputAccessText.RestartFailed` |
 | 7 | Log line (not on screen) when a tap cannot install; replaces the 22/10/2026 PROPOSED log line that said "quit and reopen Dictum" | "Event tap (…) not installed: Dictum is not allowed to control this Mac yet. Press Request access in Settings > General (or the menu-bar panel), or turn Dictum on in System Settings > Privacy & Security > Accessibility; the hotkey starts working as soon as it is on." | `EventTap.Run` |
+| 8 | Log line (not on screen), PROPOSED 29/10/2026 (round 2): a tap macOS keeps disabling is removed instead of turned back on | "Event tap (…) removed: macOS keeps disabling it (timeout), which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel)." | `EventTap.Disabled` |
+| 9 | Log line (not on screen), PROPOSED 29/10/2026 (round 2): a listener refused while the system says Dictum is allowed | "Input access: a hotkey listener was refused although the system reports Dictum as allowed; treating it as not allowed until it is granted again or Request access is pressed." | `InputAccessWatch.ListenerRefused` |
 
 Not in this block: the Mac startup log's "speech on this PC" (`SpeechPolicy.DeclineButton`, approved; for the Mac copy block).
 
-To approve: reply with the row numbers approved as is, and the new wording for any row changed.
+Rows 8 and 9 are new and PROPOSED. To approve: reply with the row numbers approved as is, and the new wording for any row changed.

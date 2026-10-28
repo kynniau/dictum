@@ -21,6 +21,11 @@ internal sealed class MacInputAccess(Action<string> open, ILog log) : IInputAcce
     /// </summary>
     internal const string SettingsUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
 
+    public event Action? Revoked;
+
+    /// <summary>From a tap's own thread: it gave up after macOS kept disabling it (<see cref="EventTap"/>).</summary>
+    internal void ReportRevoked() => Revoked?.Invoke();
+
     public InputAccessState Check() => AX.IsProcessTrusted() ? InputAccessState.Granted : InputAccessState.Denied;
 
     public void Request()

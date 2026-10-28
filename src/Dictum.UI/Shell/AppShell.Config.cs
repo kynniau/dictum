@@ -314,10 +314,22 @@ public sealed partial class AppShell
         _hook = null;
         var installed = StartHook();
         _log.Info(installed ? "Input access granted; the hotkey listener is installed." : "Input access granted, but the hotkey listener still did not install.");
-        ApplyFixHotkey(_settings, reinstall: true);
+        if (installed) ApplyFixHotkey(_settings, reinstall: true); // refused: the grant is still missing, so no fix-last tap either
         if (installed) _tray?.SetState(_trayState);
         StatusChanged();
         return installed;
+    }
+
+    /// <summary>
+    /// The grant is gone (InputAccessWatch): both listeners are removed, so no tap macOS has stopped feeding stays in front of
+    /// the keyboard (PR #82 round 2, 29/10/2026). The grant coming back replaces them (<see cref="RestartListeners"/>).
+    /// </summary>
+    private void StopListeners()
+    {
+        _hook?.Dispose();
+        _hook = null;
+        _fixHook?.Dispose();
+        _fixHook = null;
     }
 
     /// <summary>

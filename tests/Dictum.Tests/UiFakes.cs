@@ -125,6 +125,10 @@ internal sealed class FakeInputAccess : IInputAccess
     public int Requests { get; private set; }
     public InputAccessState Check() => State;
     public void Request() => Requests++;
+    public event Action? Revoked;
+
+    /// <summary>As a Mac tap does from its own thread when macOS kept disabling it.</summary>
+    public void Revoke() => Revoked?.Invoke();
 }
 
 internal sealed class FakeKeyMonitor(Action<RawKeyEvent> onKey) : IKeyMonitor

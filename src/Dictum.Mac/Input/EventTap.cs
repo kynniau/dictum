@@ -10,7 +10,9 @@ namespace Dictum.Mac.Input;
 /// A Core Graphics event tap on a dedicated thread running its own CFRunLoop: the Mac counterpart of the Windows
 /// LowLevelHook. The callback "runs from the CFRunLoop to which the tap CFMachPort is added as a source" (CGEvent.h), so a
 /// thread that does nothing but run that loop keeps the tap answering while the UI thread is busy; macOS disables a tap
-/// that is slow to answer and tells it with kCGEventTapDisabledByTimeout, and the tap re-enables itself then.
+/// that is slow to answer and tells it with kCGEventTapDisabledByTimeout, and the tap re-enables itself then, but only through
+/// <see cref="TapDisableGuard"/>: a tap macOS keeps disabling is removed instead, because re-enabling it after the grant was
+/// taken away held every key on the Mac (PR #82 round 2, 29/10/2026 08:10-08:19 AEDT, until the process was killed).
 /// <para>
 /// Both taps are active filters (kCGEventTapOptionDefault) at the session tap point (kCGHIDEventTap is for root only,
 /// CGEvent.h), so the app needs Accessibility and not Input Monitoring as well (orchestrator decision, 22/10/2026): a tap
@@ -30,6 +32,10 @@ internal abstract class EventTap : IDisposable
     private readonly ILog _log;
     private readonly string _name;
     private readonly Func<bool> _trusted;
+    private readonly Func<bool> _stillTrusted;
+    private readonly Action? _lost;
+    private readonly TapDisableGuard _disables = new();
+    private int _gaveUp;
     private Thread? _thread;
     private nint _runLoop;
     private nint _port;
@@ -38,11 +44,15 @@ internal abstract class EventTap : IDisposable
     private int _faults;
 
     /// <param name="trusted">Whether the process may run an active tap; the default asks macOS and prompts once (<see cref="Accessibility"/>). Tests pass their own.</param>
-    protected EventTap(string name, ILog log, Func<bool>? trusted = null)
+    /// <param name="lost">Told, on the tap thread, when the tap removed itself because macOS kept disabling it (IInputAccess.Revoked).</param>
+    /// <param name="stillTrusted">The silent check read when macOS disables the tap; the default is AXIsProcessTrusted. Tests pass their own.</param>
+    protected EventTap(string name, ILog log, Func<bool>? trusted = null, Action? lost = null, Func<bool>? stillTrusted = null)
     {
         _name = name;
         _log = log;
         _trusted = trusted ?? Accessibility.EnsureTrusted;
+        _lost = lost;
+        _stillTrusted = stillTrusted ?? AX.IsProcessTrusted;
     }
 
     /// <summary>Starts the tap thread and waits until the tap is installed. False when it could not be (not trusted for Accessibility, or refused), with the reason logged.</summary>
@@ -145,12 +155,12 @@ internal abstract class EventTap : IDisposable
         }
     }
 
-    private bool Handle(uint type, nint ev)
+    /// <summary>Decides one event on the tap thread; internal so a pin drives the disabled path without a real tap (no port: nothing native is called).</summary>
+    internal bool Handle(uint type, nint ev)
     {
         if (type is CG.EventTapDisabledByTimeout or CG.EventTapDisabledByUserInput)
         {
-            if (_port != 0) CG.EventTapEnable(_port, true);
-            _log.Warn($"Event tap ({_name}) was disabled by macOS ({(type == CG.EventTapDisabledByTimeout ? "timeout" : "user input")}) and re-enabled.");
+            Disabled(type == CG.EventTapDisabledByTimeout ? "timeout" : "user input");
             return true;
         }
         if (_events is null || CG.EventGetIntegerValueField(ev, CG.FieldSourceUserData) == InjectedMarker) return true;
@@ -169,6 +179,35 @@ internal abstract class EventTap : IDisposable
         var passOn = true;
         foreach (var change in changes) passOn &= OnKey(change, injected);
         return passOn;
+    }
+
+    /// <summary>
+    /// macOS disabled the tap. Re-enabled while the guard allows; otherwise the tap is never enabled again: the run loop is
+    /// stopped (Run then removes the tap), and the shell is told so it shows the line and the Request access button and replaces
+    /// the listeners once the grant is back.
+    /// </summary>
+    private void Disabled(string why)
+    {
+        if (Volatile.Read(ref _gaveUp) != 0) return;
+        if (_disables.ShouldReenable(Environment.TickCount64, _stillTrusted()))
+        {
+            if (_port != 0) CG.EventTapEnable(_port, true);
+            _log.Warn($"Event tap ({_name}) was disabled by macOS ({why}) and re-enabled.");
+            return;
+        }
+        Interlocked.Exchange(ref _gaveUp, 1);
+        // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
+        _log.Error($"Event tap ({_name}) removed: macOS keeps disabling it ({why}), which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).");
+        _stop = true;
+        if (_runLoop != 0) CF.RunLoopStop(_runLoop);
+        try
+        {
+            _lost?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Event tap ({_name}): telling the shell it was removed failed: {ex.Message}");
+        }
     }
 
     public void Dispose()
@@ -194,8 +233,8 @@ internal abstract class EventTap : IDisposable
 /// matcher says to. Mouse buttons are in the tap's mask only when the hotkey names one; a hotkey change replaces the whole
 /// listener (the shell disposes this one and starts another).
 /// </summary>
-internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> post, ILog log, Func<bool>? trusted = null)
-    : EventTap("hotkey listener", log, trusted), IHotkeyListener
+internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> post, ILog log, Func<bool>? trusted = null, Action? lost = null, Func<bool>? stillTrusted = null)
+    : EventTap("hotkey listener", log, trusted, lost, stillTrusted), IHotkeyListener
 {
     private volatile bool _enabled = true;
 
@@ -234,8 +273,8 @@ internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> po
 /// Reports every key and the right and other mouse buttons (never the left) as macOS delivers them and passes all of them
 /// on (the hotkey capture box, --selftest).
 /// </summary>
-internal sealed class EventTapKeyMonitor(Action<RawKeyEvent> onKey, ILog log, Func<bool>? trusted = null)
-    : EventTap("key monitor", log, trusted), IKeyMonitor
+internal sealed class EventTapKeyMonitor(Action<RawKeyEvent> onKey, ILog log, Func<bool>? trusted = null, Action? lost = null, Func<bool>? stillTrusted = null)
+    : EventTap("key monitor", log, trusted, lost, stillTrusted), IKeyMonitor
 {
     protected override bool WantsMouse => true;
 
@@ -243,6 +282,33 @@ internal sealed class EventTapKeyMonitor(Action<RawKeyEvent> onKey, ILog log, Fu
     {
         onKey(new RawKeyEvent(change.Vk, change.Down, injected));
         return true;
+    }
+}
+
+/// <summary>
+/// When a tap macOS disabled may be turned back on: only while the silent check still says trusted, and not when macOS disabled
+/// it again within <see cref="Window"/>. A healthy tap answers from its own thread, so a second disable that soon means the
+/// events are not reaching it (the grant was taken away under it, 29/10/2026), and re-enabling it again would hold every key.
+/// The check alone cannot decide: after a live revocation it went on answering trusted (dictum-20261029.log, 08:10:24).
+/// </summary>
+internal sealed class TapDisableGuard
+{
+    /// <summary>
+    /// simplification: a fixed count in a fixed window. Ceiling: a healthy tap that a heavily loaded Mac disables twice within a
+    /// minute is removed too; the shell then shows the line and the button, and its next grant check or Request access installs
+    /// a fresh listener. Trigger to retire: a removal seen in a log with the grant still in place.
+    /// </summary>
+    internal static readonly TimeSpan Window = TimeSpan.FromSeconds(60);
+
+    private long _lastMs = long.MinValue;
+
+    /// <param name="nowMs">Environment.TickCount64 now.</param>
+    /// <param name="trusted">What the silent Accessibility check answers now.</param>
+    public bool ShouldReenable(long nowMs, bool trusted)
+    {
+        var repeated = _lastMs != long.MinValue && nowMs - _lastMs <= (long)Window.TotalMilliseconds;
+        _lastMs = nowMs;
+        return trusted && !repeated;
     }
 }
 

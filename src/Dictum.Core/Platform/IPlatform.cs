@@ -158,6 +158,12 @@ public interface IInputAccess
     /// <see cref="Check"/> is <see cref="InputAccessState.NotApplicable"/>.
     /// </summary>
     void Request();
+
+    /// <summary>
+    /// An installed listener lost the grant and removed itself (macOS kept disabling its tap after a revocation, PR #82 round 2,
+    /// 29/10/2026). Raised on the listener's own thread; never raised where <see cref="Check"/> is <see cref="InputAccessState.NotApplicable"/>.
+    /// </summary>
+    event Action? Revoked;
 }
 
 /// <summary>A platform with no input-access grant (Windows): always <see cref="InputAccessState.NotApplicable"/>, and a request does nothing.</summary>
@@ -173,6 +179,12 @@ public sealed class InputAccessNotNeeded : IInputAccess
 
     public void Request()
     {
+    }
+
+    public event Action? Revoked
+    {
+        add { }
+        remove { }
     }
 }
 

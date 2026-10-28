@@ -6540,3 +6540,32 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
       nothing"). F2, the outcome line put back in `Tick`: observed failing (the "installed" line found before Start).
     - **Runs on Windows after this round:** `dotnet test tests/Dictum.Tests -c Release`: 2752 total, 2709 passed, 0 failed,
       43 skipped. The Mac runtime is not verified after the fix rounds (b60dc44 onwards).
+15. **Mac round-2 fix round (29/10/2026, from 811c1c5; hands-on re-test on the owner's Mac, macOS 27.2).**
+    - **B (blocker, safety).** The owner's grant was reset with `tccutil` while a test build ran: the installed hotkey tap stayed, and
+      from 08:10:51 AEDT the log repeated "Event tap (hotkey listener) was disabled by macOS (timeout) and re-enabled." while no app on
+      the Mac received keys, until the process was killed at 08:19:06. `EventTap.Handle` re-enabled a disabled tap unconditionally (the
+      same code is in tag mac-v1.3.1). Fix: `TapDisableGuard` lets a disabled tap back on only while `AXIsProcessTrusted` says trusted
+      and macOS has not disabled it again within 60 s (marked `// simplification:`); otherwise the tap logs that it was removed, stops its
+      run loop (so `Run` removes the tap) and raises `IInputAccess.Revoked`, a new event on the seam (no-op on Windows). The shell treats
+      it as a refusal, and `InputAccessWatch` now removes every installed listener as the state turns Denied (`AppShell.StopListeners`),
+      which also covers the case seen at 08:10:24: a fresh tap refused while an older one was still installed.
+      Pins: `The_disable_guard_reenables_once_and_never_for_a_repeat_or_without_the_grant`,
+      `A_tap_macOS_keeps_disabling_is_removed_and_reported_instead_of_turned_back_on`,
+      `A_listener_that_lost_the_grant_removes_every_listener_and_shows_the_button`,
+      `With_no_grant_to_ask_for_a_refusal_removes_no_listener`.
+    - **A (major).** After that reset, the hotkey box's monitor was refused ("…although Accessibility reports this app as allowed") and
+      the box showed the generic "The system refused to report keys…" with no line and no button: `ListenerRefused` returned unless the
+      check said Denied, and the check went on saying trusted (as it did for the stale rows of 27/10). Fix: where there is a grant, a
+      refused or removed listener is Denied whatever the check says; the check is then not believed until it has answered Denied once or
+      the user presses Request access (one more trial), so a stale "trusted" starts no restart loop; Granted is set only after a listener
+      installed, and a refused restart no longer reinstalls the fix-last listener. The old pin
+      `A_grant_that_still_leaves_the_listener_refused_says_so` described the behaviour this replaces and becomes
+      `A_listener_refused_while_the_system_says_allowed_shows_the_line_and_the_button`. `RestartFailed` (row 6) is now reached only when
+      a restart throws.
+    - Two new log lines are PROPOSED for owner approval (rows 8 and 9 of `.demo-preview/approve-mac-access.md`). No screen string changes.
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each):** the tap put back to re-enabling always:
+      observed failing (`A_tap_macOS_keeps_disabling…`). The early return put back in `ListenerRefused`: observed failing (both A and B
+      shell pins). The listener removal taken out: observed failing (`A_listener_that_lost_the_grant…`). The stale "trusted" believed
+      again in `Tick`: observed failing (both shell pins).
+    - Hand-test rule until B is proven on hardware: never reset Accessibility while a Dictum build runs; any reset-while-running test
+      runs under a shell watchdog that kills the test build after 60 s unless cancelled.
