@@ -12,7 +12,7 @@ namespace Dictum.Mac.Input;
 /// thread that does nothing but run that loop keeps the tap answering while the UI thread is busy; macOS disables a tap
 /// that is slow to answer and tells it with kCGEventTapDisabledByTimeout, and the tap re-enables itself then, but only through
 /// <see cref="TapDisableGuard"/> and a <see cref="TapLiveness"/> check: a tap macOS keeps disabling, or one the keys no longer
-/// reach, is not left in place, because a tap left behind after the grant was taken away held every key on the Mac (PR #82
+/// get past (not reaching it, or held after it), is not left in place, because a tap left behind after the grant was taken away held every key on the Mac (PR #82
 /// round 2, 29/10/2026). A timer off the tap thread runs the liveness check every <see cref="TapLiveness.Tick"/>, since macOS
 /// held the keys for about 50 s before its first disable notice; it never waits on the tap thread.
 /// <para>
@@ -51,8 +51,11 @@ internal abstract class EventTap : IDisposable
     private readonly TapLiveness _liveness = new();
     private readonly TapRecovery _recovery = new();
     private readonly Func<long>? _hidCount;
+    private readonly Func<long>? _sessionCount;
     private readonly Func<long> _posted;
     private readonly Func<bool> _secureInput;
+    private readonly Func<bool> _createProbe;
+    private readonly bool _diagnostics;
     private Timer? _livenessTimer;
     private long _seen;
     private int _triggered;
@@ -76,9 +79,16 @@ internal abstract class EventTap : IDisposable
     /// <param name="hidCount">Events of the tap's types the HID system has seen; the default sums CGEventSourceCounterForEventType over the mask. Tests pass their own.</param>
     /// <param name="secureInput">Whether Secure Event Input is on; the default is IsSecureEventInputEnabled. Tests pass their own.</param>
     /// <param name="posted">Key events Dictum has posted itself (<see cref="PostedEvents"/>), subtracted from the HID count; none by default.</param>
+    /// <param name="sessionCount">Events of the tap's types that reached the session; the default reads the combined session state's counters. Tests pass their own.</param>
+    /// <param name="createProbe">The diagnostic's listen-only create probe (allowed or refused); the default makes a real one. Tests pass their own.</param>
+    /// <param name="diagnostics">Whether the per-tick diagnostic runs; the default is <see cref="Diagnostics"/>. Only tests set it.</param>
     protected EventTap(string name, ILog log, Func<bool>? trusted = null, Action? lost = null, Func<bool>? stillTrusted = null,
-        Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null)
+        Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null, Func<long>? sessionCount = null,
+        Func<bool>? createProbe = null, bool? diagnostics = null)
     {
+        _sessionCount = sessionCount;
+        _createProbe = createProbe ?? CreateProbe;
+        _diagnostics = diagnostics ?? Diagnostics;
         _name = name;
         _log = log;
         _trusted = trusted ?? Accessibility.EnsureTrusted;
@@ -134,6 +144,9 @@ internal abstract class EventTap : IDisposable
 
     /// <summary>The HID count less the events Dictum posted itself, which it counts with the hardware keys (<see cref="PostedEvents"/>).</summary>
     private long AdjustedHid() => HidCount() - _posted();
+
+    /// <summary>The combined session state's count of the tap's types: keys that got past the taps into the session.</summary>
+    private long SessionCount() => _sessionCount is not null ? _sessionCount() : Count(CG.SourceStateCombinedSession);
 
     /// <summary>Events of the mask's types the callback has counted (for the pins).</summary>
     internal long Seen => Interlocked.Read(ref _seen);
@@ -286,15 +299,14 @@ internal abstract class EventTap : IDisposable
         var now = Environment.TickCount64;
         if (_disables.ShouldReenable(now, _stillTrusted()))
         {
-            var hid = AdjustedHid();
-            if (!_liveness.Probe(now, hid, Seen, _secureInput()))
+            if (!_liveness.Probe(now, AdjustedHid(), Seen, SessionCount(), _secureInput()))
             {
                 var port = Volatile.Read(ref _port);
                 if (port != 0) CG.EventTapEnable(port, true);
                 _log.Warn($"Event tap ({_name}) was disabled by macOS ({why}) and re-enabled.");
                 return;
             }
-            Trigger($"macOS disabled it ({why}) and keys had stopped reaching it", now, hid);
+            Trigger($"macOS disabled it ({why}) and keys had stopped getting through", now);
             return;
         }
         // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
@@ -310,9 +322,8 @@ internal abstract class EventTap : IDisposable
         {
             var now = nowMs ?? Environment.TickCount64;
             var hid = AdjustedHid();
-            if (Diagnostics) Diagnose(hid);
-            if (_liveness.Check(now, hid, Seen, _secureInput()))
-                Trigger("keys reached macOS but not Dictum for over a second", now, hid);
+            if (_diagnostics) Diagnose(hid);
+            if (_liveness.Check(now, hid, Seen, SessionCount(), _secureInput())) Trigger(_liveness.Tripped.Why, now);
         }
         catch (Exception ex)
         {
@@ -324,26 +335,40 @@ internal abstract class EventTap : IDisposable
         }
     }
 
-    /// <summary>The per-tick diagnostic (DICTUM_TAP_DIAG=1): every signal that might flip at a revocation, read live.</summary>
+    /// <summary>The per-tick diagnostic (DICTUM_TAP_DIAG=1): every signal that might flip at a revocation, read live, and a create probe.</summary>
     private void Diagnose(long adjustedHid)
     {
         var port = Volatile.Read(ref _port);
         _log.Info($"Tap diag ({_name}): post={CG.PreflightPostEventAccess()} listen={CG.PreflightListenEventAccess()} ax={AX.IsProcessTrusted()} "
-            + $"hid={HidCount()} session={Count(CG.SourceStateCombinedSession)} posted={_posted()} adjusted={adjustedHid} seen={Seen} "
-            + $"enabled={(port != 0 && CG.EventTapIsEnabled(port))} secure={_secureInput()} disables={_disables.Count}");
+            + $"hid={HidCount()} session={SessionCount()} posted={_posted()} adjusted={adjustedHid} seen={Seen} "
+            + $"enabled={(port != 0 && CG.EventTapIsEnabled(port))} secure={_secureInput()} disables={_disables.Count} create={(_createProbe() ? "allowed" : "refused")}");
     }
+
+    /// <summary>The diagnostic's probe: a listen-only tap for key-ups, never added to a run loop, released at once. Allowed or refused is the answer.</summary>
+    private static unsafe bool CreateProbe()
+    {
+        delegate* unmanaged<nint, uint, nint, nint, nint> callback = &ProbeCallback;
+        var port = CG.EventTapCreate(CG.SessionEventTap, CG.HeadInsertEventTap, CG.TapOptionListenOnly, CG.MaskBit(CG.EventKeyUp), (nint)callback, 0);
+        if (port == 0) return false;
+        CF.MachPortInvalidate(port);
+        CF.Release(port);
+        return true;
+    }
+
+    [UnmanagedCallersOnly]
+    private static nint ProbeCallback(nint proxy, uint type, nint ev, nint userInfo) => ev;
 
     /// <summary>
     /// Keys stopped reaching the tap, by the timer's count or macOS's disable notice: the tap is disabled at once, from whichever
     /// thread found it, so the keys are free, and the tap thread removes it and asks for a fresh one; a second trigger inside
     /// <see cref="TapRecovery.Window"/> of a fresh tap stays removed and reports the grant gone instead.
     /// </summary>
-    private void Trigger(string why, long nowMs, long adjustedHid)
+    private void Trigger(string why, long nowMs)
     {
         if (Interlocked.Exchange(ref _triggered, 1) != 0) return;
         var port = Volatile.Read(ref _port);
         if (port != 0) CG.EventTapEnable(port, false);
-        (_missed, _sinceMs) = _liveness.MissedSince(adjustedHid);
+        (_, _missed, _sinceMs) = _liveness.Tripped;
         _why = why;
         if (_recovery.MayRecreate(nowMs))
         {
@@ -377,9 +402,9 @@ internal abstract class EventTap : IDisposable
             return false;
         }
         _recovery.Recreated(now);
-        _liveness.Fed(now, AdjustedHid(), Seen);
+        _liveness.Fed(now, AdjustedHid(), Seen, SessionCount());
         // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
-        _log.Info($"Event tap ({_name}) re-created: {_missed} key events reached macOS in the last {(now - _sinceMs) / 1000.0:0.0} s without reaching it, but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
+        _log.Info($"Event tap ({_name}) re-created: {_missed} key events reached macOS in the last {(now - _sinceMs) / 1000.0:0.0} s without getting through ({_why}), but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
         Volatile.Write(ref _triggered, 0);
         return true;
     }
@@ -427,8 +452,9 @@ internal abstract class EventTap : IDisposable
 /// listener (the shell disposes this one and starts another).
 /// </summary>
 internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> post, ILog log, Func<bool>? trusted = null, Action? lost = null,
-    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null)
-    : EventTap("hotkey listener", log, trusted, lost, stillTrusted, hidCount, secureInput, posted), IHotkeyListener
+    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null, Func<long>? sessionCount = null,
+    Func<bool>? createProbe = null, bool? diagnostics = null)
+    : EventTap("hotkey listener", log, trusted, lost, stillTrusted, hidCount, secureInput, posted, sessionCount, createProbe, diagnostics), IHotkeyListener
 {
     private volatile bool _enabled = true;
 
@@ -468,8 +494,9 @@ internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> po
 /// on (the hotkey capture box, --selftest).
 /// </summary>
 internal sealed class EventTapKeyMonitor(Action<RawKeyEvent> onKey, ILog log, Func<bool>? trusted = null, Action? lost = null,
-    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null)
-    : EventTap("key monitor", log, trusted, lost, stillTrusted, hidCount, secureInput, posted), IKeyMonitor
+    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null, Func<long>? sessionCount = null,
+    Func<bool>? createProbe = null, bool? diagnostics = null)
+    : EventTap("key monitor", log, trusted, lost, stillTrusted, hidCount, secureInput, posted, sessionCount, createProbe, diagnostics), IKeyMonitor
 {
     protected override bool WantsMouse => true;
 

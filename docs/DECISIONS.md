@@ -6626,3 +6626,27 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
       the trigger re-enabling in place instead of asking for a fresh tap (three); a disabled tap with keys missed turned back on (one).
     - Not verified until the hands-on: that `CGEventTapCreate` is refused after every live revocation (one observation, 08:10:24), and
       that the fresh tap is allowed in the false-positive cases of 21:50:19 and 22:10:12.
+19. **Session-counter round (29/10/2026, from c8423dc; departure proposed with evidence at 22:34 AEDT, orchestrator GO 22:36 with four
+    conditions).** The reset run at c8423dc (watchdog 22:31:14, reset ~22:31:20) locked the owner's typing for the whole minute with
+    NO trigger: the tap was fed throughout (per-tick diag 22:31:38 to 22:32:12: HID 5140 to 5597, tap 111 to 567, combined-session
+    counter 4528 flat), and AXIsProcessTrusted, CGPreflightPostEventAccess and CGEventTapIsEnabled stayed true. So after this
+    revocation macOS called the tap and held the events it returned; a starved-tap rule cannot see it. Healthy baseline 22:29:32 to
+    22:30:02: HID +100, session +96, tap +100; the paste: HID +5, session +4. Fix: `TapLiveness` follows two laggards against the HID
+    count, the tap's count (settled one tick after the tap moves, for the paste case of 22:29:35 where the HID counter recorded the
+    tap's four events half a second late) and the combined-session count (`CGEventSourceCounterForEventType` with the combined session
+    state, over the tap's own types); HID up by four over a second while either stands still trips the existing path (disable at once,
+    remove, re-create confirm, 30 s rule). The pauses (secure input, stalled timer) cover both and the baseline is retaken on the
+    first tick after a pause. The log lines name the comparison ("keys reached macOS but not Dictum" / "but no app for over a
+    second"). The diagnostic also makes a listen-only create probe each tick (allowed/refused, released at once), under
+    DICTUM_TAP_DIAG=1 only. `CGPreflightListenEventAccess` reads Input Monitoring, not Accessibility (false all run with the grant on):
+    not a signal.
+    Pins: `Liveness_calls_keys_held_when_the_session_count_stands_still_while_the_system_sees_keys`,
+    `Liveness_does_not_call_keys_held_for_a_paste_that_reaches_the_session`, `Liveness_pauses_the_session_comparison_for_secure_input`,
+    `Liveness_waits_one_tick_after_the_tap_moves_before_counting`, `A_fed_tap_whose_keys_are_held_after_it_is_asked_for_again`,
+    `The_diagnostic_create_probe_never_runs_outside_the_switch`.
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** the session rule removed (three pins); the pause not applied to the session rule (one); the settle tick removed
+      (three); a moving follower not rebased (six); the diagnostic gate removed (one); the session rule reading HID movement alone, so
+      a paste trips it (nine, the paste pin among them).
+    - Orchestrator's pass line for the hands-on: typing back within ~3 s of the trigger WITH Dictum still running; if the trigger fires
+      and typing stays held, stop and report, no further hardware iteration.
