@@ -14,8 +14,10 @@ namespace Dictum.Mac.Input;
 /// 22:32:12: HID +457, tap +456, session +0, typing stalled the whole minute).</item>
 /// </list>
 /// Events Dictum's own taps swallowed (a suppressed hotkey) are counted by the HID system and reach no app, so they are taken off
-/// the HID count before the session comparison (<see cref="SwallowedEvents"/>); otherwise two quick hands-free dictations with no
-/// typing between read as keys held (merge lens on fe03270).
+/// the HID count before both comparisons (<see cref="SwallowedEvents"/>): the session's, or two quick hands-free dictations with no
+/// typing between read as keys held (merge lens on fe03270); and the tap's, because a Dictum tap behind another never sees what the
+/// one ahead swallowed (re-lens on 20975dc). A tap's own swallows raise HID, the swallowed count and its own count together, so its
+/// follower still moves.
 /// Either trips the tap's trigger (<see cref="EventTap"/>): disabled at once, removed, and asked for again (<see cref="TapRecovery"/>),
 /// because the counts alone cannot tell the grant gone from keys another tap or macOS took. In healthy use all three rise together
 /// (22:29:32 to 22:30:02: HID +100, session +96, tap +100). The HID counter records an event up to about half a second after the
@@ -79,9 +81,10 @@ internal sealed class TapLiveness
             _lastTickMs = nowMs;
             if (pause || stalled) _pausedUntilMs = nowMs + (long)Gap.TotalMilliseconds;
             var paused = nowMs < _pausedUntilMs;
-            var tapStuck = _tap.Follow(nowMs, hidCount, tapCount, paused);
-            var sessionStuck = _session.Follow(nowMs, hidCount - swallowedCount, sessionCount, paused);
-            return Trip(tapStuck, sessionStuck, hidCount, swallowedCount);
+            var leader = hidCount - swallowedCount;
+            var tapStuck = _tap.Follow(nowMs, leader, tapCount, paused);
+            var sessionStuck = _session.Follow(nowMs, leader, sessionCount, paused);
+            return Trip(tapStuck, sessionStuck, leader);
         }
     }
 
@@ -91,16 +94,17 @@ internal sealed class TapLiveness
         lock (_gate)
         {
             if (pause || nowMs < _pausedUntilMs) return false;
-            return Trip(_tap.Stuck(nowMs, hidCount, tapCount), _session.Stuck(nowMs, hidCount - swallowedCount, sessionCount), hidCount, swallowedCount);
+            var leader = hidCount - swallowedCount;
+            return Trip(_tap.Stuck(nowMs, leader, tapCount), _session.Stuck(nowMs, leader, sessionCount), leader);
         }
     }
 
-    private bool Trip(bool tapStuck, bool sessionStuck, long hidCount, long swallowedCount)
+    private bool Trip(bool tapStuck, bool sessionStuck, long leader)
     {
         if (!tapStuck && !sessionStuck) return false;
         (_tripped, _trippedMissed, _trippedSinceMs) = tapStuck
-            ? (TapStarved, _tap.Missed(hidCount), _tap.SinceMs)
-            : (KeysHeld, _session.Missed(hidCount - swallowedCount), _session.SinceMs);
+            ? (TapStarved, _tap.Missed(leader), _tap.SinceMs)
+            : (KeysHeld, _session.Missed(leader), _session.SinceMs);
         return true;
     }
 
@@ -109,7 +113,7 @@ internal sealed class TapLiveness
     {
         lock (_gate)
         {
-            _tap.Reset(nowMs, hidCount, tapCount);
+            _tap.Reset(nowMs, hidCount - swallowedCount, tapCount);
             _session.Reset(nowMs, hidCount - swallowedCount, sessionCount);
         }
     }

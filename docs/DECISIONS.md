@@ -6683,3 +6683,16 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     wording; relayed by the orchestrator 23:45 and confirmed 30/10 00:06):** "Event tap (…) re-created: N key events reached macOS but not
     Dictum (or: but no app), but macOS allowed a fresh tap, which usually means another app or macOS took those keys; the hotkey carries
     on." Supersedes the 23:29 "Approve all five" for that row; rows 8, 9, 10 and 14 stand as approved then. Pin reads the line whole.**
+24. **Re-lens fix round (30/10/2026 00:20 AEDT, opus re-lens on 20975dc: Needs changes, no blocker).** MAJOR: the swallowed count came
+    off the session comparison only; a Dictum tap behind another (the dictation tap re-created to the head, ahead of the fix_hotkey
+    tap) never sees what the one ahead swallowed, so its own count stayed flat while HID moved and one hands-free tap-tap read as
+    TapStarved on the fix tap (a false re-create). Fix: `hidCount - swallowedCount` is the leader for both comparisons in `Check`,
+    `Probe` and `Fed`; a tap's own swallows raise HID, the swallowed count and its own count together, so its follower still moves.
+    MINOR: `SwallowedEvents` keeps keyboard and mouse swallows apart (`Add(keyboard)`, `Count(mouse)`), and each tap subtracts only the
+    types in its own mask (`EventTap.Swallowed()` reads `WantsMouse`), so a mouse-button hotkey's swallows never cancel held keys on a
+    keyboard-only tap. Pins: `A_tap_behind_one_that_swallowed_is_not_called_starved`, `Mouse_swallows_never_cancel_held_keys_on_a_keyboard_only_tap`.
+    - **Mutation checks (30/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** the tap comparison without the subtraction (one pin); mouse swallows counted for every tap (one).
+    - The handler's swallow count cannot be pinned on Windows: a swallow needs the matcher to see a decoded key, and decoding needs a real
+      CGEvent (the null-event path counts the event as seen and passes it on before decoding). It is pinned on macOS
+      (`A_swallowed_hotkey_event_is_counted_as_swallowed`).

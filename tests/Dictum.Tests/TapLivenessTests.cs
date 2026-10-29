@@ -308,7 +308,7 @@ public sealed class TapLivenessTests
         tap.LivenessTick(TickMs);
         hid += 4;         // two hands-free taps on Right Option: four flagsChanged events the HID system counted
         for (var i = 0; i < 4; i++) tap.Handle(Dictum.Mac.Interop.CG.EventFlagsChanged, 0); // the tap saw them (null event: counted, nothing decoded)
-        swallowed.Add(4); // and Dictum swallowed them, so no app ever received them and the session count stays at 4000
+        for (var i = 0; i < 4; i++) swallowed.Add(keyboard: true); // and Dictum swallowed them, so no app ever received them and the session count stays at 4000
         tap.LivenessTick(TickMs + GapMs);
         tap.LivenessTick(TickMs + 2 * GapMs);
         Assert.False(tap.RecreateRequested);
@@ -321,6 +321,54 @@ public sealed class TapLivenessTests
         Assert.True(rule.Check(TickMs + 2 * GapMs, 5008, 18, 4000, 4, pause: false));    // four more that nobody swallowed: held
         Assert.Equal(Dictum.Mac.Input.TapLiveness.KeysHeld, rule.Tripped.Why);
         Assert.Equal(4, rule.Tripped.Missed);
+    }
+
+    /// <summary>
+    /// Re-lens on 20975dc (30/10/2026 00:20 AEDT), major: a Dictum tap behind another never sees what the one ahead swallowed (a
+    /// dictation tap re-created to the head sits ahead of the fix_hotkey tap), so its own count stays flat while HID moves. The shared
+    /// swallowed count comes off the tap comparison too: the second tap does not trip when the first swallowed four.
+    /// </summary>
+    [Fact]
+    public void A_tap_behind_one_that_swallowed_is_not_called_starved()
+    {
+        var swallowed = new Dictum.Mac.Input.SwallowedEvents();
+        long hid = 5000;
+        var first = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("RightAlt"), suppress: true), _ => { }, new RecordingLog(),
+            trusted: () => true, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false, sessionCount: () => 4000, swallowed: swallowed);
+        var second = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("F19"), suppress: true), _ => { }, new RecordingLog(),
+            trusted: () => true, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false, sessionCount: () => 4000, swallowed: swallowed);
+        first.LivenessTick(0); second.LivenessTick(0);
+        first.LivenessTick(TickMs); second.LivenessTick(TickMs);
+        hid += 4;
+        for (var i = 0; i < 4; i++) { first.Handle(Dictum.Mac.Interop.CG.EventFlagsChanged, 0); swallowed.Add(keyboard: true); } // the first saw and swallowed them; the second never saw them
+        first.LivenessTick(TickMs + GapMs); second.LivenessTick(TickMs + GapMs);
+        first.LivenessTick(TickMs + 2 * GapMs); second.LivenessTick(TickMs + 2 * GapMs);
+        Assert.False(first.RecreateRequested);
+        Assert.False(second.RecreateRequested);
+        Assert.Null(second.DeniedLine);
+    }
+
+    /// <summary>
+    /// Re-lens minor: keyboard and mouse swallows are kept apart. A mouse-button hotkey's swallows are not in a keyboard-only tap's HID
+    /// count, so they must not cancel keys that tap sees held; a tap that watches the mouse subtracts both.
+    /// </summary>
+    [Fact]
+    public void Mouse_swallows_never_cancel_held_keys_on_a_keyboard_only_tap()
+    {
+        var swallowed = new Dictum.Mac.Input.SwallowedEvents();
+        long hid = 5000;
+        var keyboardOnly = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("F19"), suppress: true), _ => { }, new RecordingLog(),
+            trusted: () => true, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false, sessionCount: () => 4000, swallowed: swallowed);
+        keyboardOnly.LivenessTick(0);
+        keyboardOnly.LivenessTick(TickMs);
+        for (var i = 0; i < 4; i++) swallowed.Add(keyboard: false); // another tap swallowed four mouse buttons: not in this tap's HID count
+        hid += 4;                                                    // four keys the system saw, this tap saw, and no app received
+        for (var i = 0; i < 4; i++) keyboardOnly.Handle(Dictum.Mac.Interop.CG.EventKeyUp, 0);
+        keyboardOnly.LivenessTick(TickMs + GapMs);
+        keyboardOnly.LivenessTick(TickMs + 2 * GapMs);
+        Assert.True(keyboardOnly.RecreateRequested); // held keys still trip it
+        Assert.Equal(4, swallowed.Count(mouse: true));
+        Assert.Equal(0, swallowed.Count(mouse: false));
     }
 
     /// <summary>The swallowed count is the handler's own: an event the hotkey swallows counts, one it passes on does not. macOS only (a real CGEvent).</summary>
@@ -341,7 +389,7 @@ public sealed class TapLivenessTests
         try
         {
             Assert.False(tap.Handle(Dictum.Mac.Interop.CG.EventKeyDown, ev)); // the hotkey: swallowed
-            Assert.Equal(1, swallowed.Count);
+            Assert.Equal(1, swallowed.Count(mouse: true));
             var other = Dictum.Mac.Interop.CG.EventCreateKeyboardEvent(0, 0 /* A */, true);
             try
             {
@@ -351,7 +399,7 @@ public sealed class TapLivenessTests
             {
                 Dictum.Mac.Interop.CF.Release(other);
             }
-            Assert.Equal(1, swallowed.Count);
+            Assert.Equal(1, swallowed.Count(mouse: true));
         }
         finally
         {

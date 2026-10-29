@@ -30,15 +30,24 @@ internal sealed class TapRecovery
 /// How many events Dictum's own taps have swallowed (the hotkey, when it is set to be suppressed; the fix-last hotkey). The HID
 /// system counted them and no app ever receives them, so the session counter stays flat for them: without this, two quick
 /// hands-free dictations with no typing between read as keys held (merge lens on fe03270, 29/10/2026 23:50 AEDT). One per
-/// platform, shared by every tap, because the session counter is one count for all of them.
+/// platform, shared by every tap, because the session counter is one count for all of them, and because a Dictum tap behind
+/// another never sees what the one ahead swallowed (re-lens on 20975dc, 30/10/2026 00:20 AEDT). Keyboard and mouse swallows are
+/// kept apart: a tap subtracts only the types in its own mask, so a mouse-button hotkey's swallows never cancel held keys on a
+/// keyboard-only tap.
 /// </summary>
 internal sealed class SwallowedEvents
 {
-    private long _count;
+    private long _keyboard;
+    private long _mouse;
 
-    public long Count => Interlocked.Read(ref _count);
+    /// <summary>The swallows a tap with this mask would have counted: keyboard always, mouse buttons only when it watches them.</summary>
+    public long Count(bool mouse) => Interlocked.Read(ref _keyboard) + (mouse ? Interlocked.Read(ref _mouse) : 0);
 
-    public void Add(int events) => Interlocked.Add(ref _count, events);
+    public void Add(bool keyboard)
+    {
+        if (keyboard) Interlocked.Increment(ref _keyboard);
+        else Interlocked.Increment(ref _mouse);
+    }
 }
 
 /// <summary>

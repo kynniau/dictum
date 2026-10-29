@@ -150,6 +150,9 @@ internal abstract class EventTap : IDisposable
     /// <summary>The HID count less the events Dictum posted itself, which it counts with the hardware keys (<see cref="PostedEvents"/>).</summary>
     private long AdjustedHid() => HidCount() - _posted();
 
+    /// <summary>The platform's swallowed events of the types in this tap's mask (<see cref="SwallowedEvents"/>).</summary>
+    private long Swallowed() => _swallowed.Count(WantsMouse);
+
     /// <summary>The combined session state's count of the tap's types: keys that got past the taps into the session.</summary>
     private long SessionCount() => _sessionCount is not null ? _sessionCount() : Count(CG.SourceStateCombinedSession);
 
@@ -308,7 +311,7 @@ internal abstract class EventTap : IDisposable
         var injected = CG.EventGetIntegerValueField(ev, CG.FieldSourceStateId) != CG.SourceStateHidSystem;
         var passOn = true;
         foreach (var change in changes) passOn &= OnKey(change, injected);
-        if (!passOn) _swallowed.Add(1); // counted by HID, received by no app: the session comparison takes it off (TapLiveness)
+        if (!passOn) _swallowed.Add(keyboard); // counted by HID, received by no app and by no tap behind this one: both comparisons take it off
         return passOn;
     }
 
@@ -322,7 +325,7 @@ internal abstract class EventTap : IDisposable
         var now = Environment.TickCount64;
         if (_disables.ShouldReenable(now, _stillTrusted()))
         {
-            if (!_liveness.Probe(now, AdjustedHid(), Seen, SessionCount(), _swallowed.Count, _secureInput()))
+            if (!_liveness.Probe(now, AdjustedHid(), Seen, SessionCount(), Swallowed(), _secureInput()))
             {
                 var port = Volatile.Read(ref _port);
                 if (port != 0) CG.EventTapEnable(port, true);
@@ -347,7 +350,7 @@ internal abstract class EventTap : IDisposable
             var now = nowMs ?? Environment.TickCount64;
             var hid = AdjustedHid();
             if (_diagnostics) Diagnose(hid);
-            if (!_liveness.Check(now, hid, Seen, SessionCount(), _swallowed.Count, Pause())) return;
+            if (!_liveness.Check(now, hid, Seen, SessionCount(), Swallowed(), Pause())) return;
             var (phrase, missed, _) = _liveness.Tripped;
             Trigger($"{missed} key events {phrase}", now);
         }
@@ -366,7 +369,7 @@ internal abstract class EventTap : IDisposable
     {
         var port = Volatile.Read(ref _port);
         _log.Info($"Tap diag ({_name}): post={CG.PreflightPostEventAccess()} listen={CG.PreflightListenEventAccess()} ax={AX.IsProcessTrusted()} "
-            + $"hid={HidCount()} session={SessionCount()} posted={_posted()} swallowed={_swallowed.Count} adjusted={adjustedHid} seen={Seen} "
+            + $"hid={HidCount()} session={SessionCount()} posted={_posted()} swallowed={Swallowed()} adjusted={adjustedHid} seen={Seen} "
             + $"enabled={(port != 0 && CG.EventTapIsEnabled(port))} secure={_secureInput()} disables={_disables.Count} create={(_createProbe() ? "allowed" : "refused")}");
     }
 
@@ -427,7 +430,7 @@ internal abstract class EventTap : IDisposable
             return false;
         }
         _recovery.Recreated(now);
-        _liveness.Fed(now, AdjustedHid(), Seen, SessionCount(), _swallowed.Count);
+        _liveness.Fed(now, AdjustedHid(), Seen, SessionCount(), Swallowed());
         // APPROVED by the owner 29/10/2026 23:44 AEDT, with his rewording (Mac request-access block, row 13): do not reword.
         _log.Info($"Event tap ({_name}) re-created: {_why}, but macOS allowed a fresh tap, which usually means another app or macOS took those keys; the hotkey carries on.");
         Volatile.Write(ref _triggered, 0);
