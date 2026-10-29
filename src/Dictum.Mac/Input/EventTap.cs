@@ -31,6 +31,17 @@ internal abstract class EventTap : IDisposable
     /// <summary>The user-data value on every event Dictum posts: the same number the Windows build puts in dwExtraInfo ("DICT").</summary>
     public const long InjectedMarker = 0x44494354;
 
+    /// <summary>The user-data value on the liveness probe ("DICU"): the tap counts it and swallows it, so no app ever sees it.</summary>
+    public const long ProbeMarker = 0x44494355;
+
+    /// <summary>
+    /// simplification: how long the timer waits for its probe, which passes through every tap ahead of Dictum (Siri's active
+    /// session key tap showed a 395 ms worst latency on the owner's Mac, 29/10/2026). Ceiling: a tap ahead slower than 500 ms makes a
+    /// fed tap read as starved and removed (Request access installs a fresh one). Trigger to retire: a probe latency over 250 ms in a
+    /// log (the "kept" line reports them). Orchestrator, 29/10/2026 22:05 AEDT.
+    /// </summary>
+    internal static readonly TimeSpan ProbeWait = TimeSpan.FromMilliseconds(500);
+
     private readonly ILog _log;
     private readonly string _name;
     private readonly Func<bool> _trusted;
@@ -40,8 +51,13 @@ internal abstract class EventTap : IDisposable
     private readonly TapLiveness _liveness = new();
     private readonly Func<long>? _hidCount;
     private readonly Func<bool> _secureInput;
+    private readonly Func<bool> _postProbe;
     private Timer? _livenessTimer;
     private long _seen;
+    private long _probesSeen;
+    private long _keptLoggedMs = long.MinValue;
+    private int _probesSinceLine;
+    private long _slowestSinceLineMs;
     private int _gaveUp;
     private int _ticking;
     private Thread? _thread;
@@ -56,9 +72,11 @@ internal abstract class EventTap : IDisposable
     /// <param name="stillTrusted">The silent check read when macOS disables the tap; the default is AXIsProcessTrusted. Tests pass their own.</param>
     /// <param name="hidCount">Events of the tap's types the HID system has seen; the default sums CGEventSourceCounterForEventType over the mask. Tests pass their own.</param>
     /// <param name="secureInput">Whether Secure Event Input is on; the default is IsSecureEventInputEnabled. Tests pass their own.</param>
+    /// <param name="postProbe">Posts one liveness probe and says whether it was posted; the default posts the real event (<see cref="PostProbe"/>). Tests pass their own.</param>
     protected EventTap(string name, ILog log, Func<bool>? trusted = null, Action? lost = null, Func<bool>? stillTrusted = null,
-        Func<long>? hidCount = null, Func<bool>? secureInput = null)
+        Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<bool>? postProbe = null)
     {
+        _postProbe = postProbe ?? PostProbe;
         _name = name;
         _log = log;
         _trusted = trusted ?? Accessibility.EnsureTrusted;
@@ -190,8 +208,14 @@ internal abstract class EventTap : IDisposable
             Disabled(type == CG.EventTapDisabledByTimeout ? "timeout" : "user input");
             return true;
         }
-        Interlocked.Increment(ref _seen); // every event of the mask's types, posted or not: the liveness count (TapLiveness)
-        if (_events is null || CG.EventGetIntegerValueField(ev, CG.FieldSourceUserData) == InjectedMarker) return true;
+        var userData = CG.EventGetIntegerValueField(ev, CG.FieldSourceUserData);
+        if (userData == ProbeMarker)
+        {
+            ProbeArrived();
+            return false; // our own probe: swallowed, no app sees it
+        }
+        Interlocked.Increment(ref _seen); // every other event of the mask's types, posted or not: the liveness count (TapLiveness)
+        if (_events is null || userData == InjectedMarker) return true;
 
         var keyboard = type is CG.EventKeyDown or CG.EventKeyUp or CG.EventFlagsChanged;
         var changes = _events.Decode(
@@ -241,9 +265,28 @@ internal abstract class EventTap : IDisposable
         if (Volatile.Read(ref _gaveUp) != 0 || Interlocked.Exchange(ref _ticking, 1) != 0) return;
         try
         {
-            if (_liveness.Check(nowMs ?? Environment.TickCount64, HidCount(), Interlocked.Read(ref _seen), _secureInput()))
-                // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
-                GiveUp($"Event tap ({_name}) removed: keys reached macOS but not Dictum for over a second, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).");
+            var now = nowMs ?? Environment.TickCount64;
+            var hid = HidCount();
+            if (!_liveness.Check(now, hid, Interlocked.Read(ref _seen), _secureInput())) return;
+            // The counts say keys went by unseen. Starved, or taken by another tap or by macOS? Only a probe of our own can tell.
+            var before = Interlocked.Read(ref _probesSeen);
+            if (_postProbe() && ProbeAnswered(before) is { } latencyMs)
+            {
+                var (missed, since) = _liveness.MissedSince(hid);
+                _liveness.Fed(now, HidCount(), Interlocked.Read(ref _seen));
+                _probesSinceLine++;
+                _slowestSinceLineMs = Math.Max(_slowestSinceLineMs, latencyMs);
+                if (_keptLoggedMs == long.MinValue || now - _keptLoggedMs >= 60_000)
+                {
+                    _keptLoggedMs = now;
+                    // PROPOSED (log line, PR #82 liveness round, 29/10/2026): awaiting owner approval. At most once a minute.
+                    _log.Info($"Event tap ({_name}) kept: {missed} key events reached macOS in the last {(now - since) / 1000.0:0.0} s without reaching it, but its probe arrived in {latencyMs} ms, so another app or macOS took those keys. Probes since the last such line: {_probesSinceLine}, slowest {_slowestSinceLineMs} ms.");
+                    (_probesSinceLine, _slowestSinceLineMs) = (0, 0);
+                }
+                return;
+            }
+            // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
+            GiveUp($"Event tap ({_name}) removed: keys reached macOS but not Dictum for over a second, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).");
         }
         catch (Exception ex)
         {
@@ -252,6 +295,46 @@ internal abstract class EventTap : IDisposable
         finally
         {
             Volatile.Write(ref _ticking, 0);
+        }
+    }
+
+    /// <summary>The tap's callback saw its own probe (internal so a pin stands in for the callback).</summary>
+    internal void ProbeArrived() => Interlocked.Increment(ref _probesSeen);
+
+    /// <summary>Waits, on the timer thread, up to <see cref="ProbeWait"/> for the probe to reach the callback: its round trip in ms, or null.</summary>
+    private long? ProbeAnswered(long before)
+    {
+        var start = Environment.TickCount64;
+        while (Interlocked.Read(ref _probesSeen) == before)
+        {
+            if (Environment.TickCount64 - start >= (long)ProbeWait.TotalMilliseconds) return null;
+            Thread.Sleep(5);
+        }
+        return Environment.TickCount64 - start;
+    }
+
+    /// <summary>Events of the mask's types the callback has counted, probes excluded (for the pins).</summary>
+    internal long Seen => Interlocked.Read(ref _seen);
+
+    /// <summary>
+    /// One probe: a flagsChanged event carrying the modifier flags already held (so it changes nothing) and <see cref="ProbeMarker"/>,
+    /// posted where Dictum's paste is posted, so it passes through this tap like a real key. False when it could not be made.
+    /// </summary>
+    private static bool PostProbe()
+    {
+        var ev = CG.EventCreate(0);
+        if (ev == 0) return false;
+        try
+        {
+            CG.EventSetType(ev, CG.EventFlagsChanged);
+            CG.EventSetFlags(ev, CG.EventSourceFlagsState(CG.SourceStateHidSystem));
+            CG.EventSetIntegerValueField(ev, CG.FieldSourceUserData, ProbeMarker);
+            CG.EventPost(CG.HidEventTap, ev);
+            return true;
+        }
+        finally
+        {
+            CF.Release(ev);
         }
     }
 
@@ -302,8 +385,8 @@ internal abstract class EventTap : IDisposable
 /// listener (the shell disposes this one and starts another).
 /// </summary>
 internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> post, ILog log, Func<bool>? trusted = null, Action? lost = null,
-    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null)
-    : EventTap("hotkey listener", log, trusted, lost, stillTrusted, hidCount, secureInput), IHotkeyListener
+    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<bool>? postProbe = null)
+    : EventTap("hotkey listener", log, trusted, lost, stillTrusted, hidCount, secureInput, postProbe), IHotkeyListener
 {
     private volatile bool _enabled = true;
 
@@ -343,8 +426,8 @@ internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> po
 /// on (the hotkey capture box, --selftest).
 /// </summary>
 internal sealed class EventTapKeyMonitor(Action<RawKeyEvent> onKey, ILog log, Func<bool>? trusted = null, Action? lost = null,
-    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null)
-    : EventTap("key monitor", log, trusted, lost, stillTrusted, hidCount, secureInput), IKeyMonitor
+    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<bool>? postProbe = null)
+    : EventTap("key monitor", log, trusted, lost, stillTrusted, hidCount, secureInput, postProbe), IKeyMonitor
 {
     protected override bool WantsMouse => true;
 

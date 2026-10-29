@@ -6589,3 +6589,16 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
       timer (one); the first disable turned back on without the probe (one); mouse moves counted (one).
     - Unverified until the hands-on: that the HID counters advance while a starved tap holds the keys, and that secure input withholds
       keys from taps while the counters still move (both recalled). Two more log lines PROPOSED (rows 10 and 11).
+17. **Probe confirmation (29/10/2026, from 3dbff2b; approved by the orchestrator at 22:05 AEDT).** Hands-on at 3dbff2b: the
+    Request access button worked (21:45:59.913 "Input access requested by the user.", 21:46:28.804 tap installed, no relaunch), but at
+    21:50:19.809 the liveness check removed a healthy hotkey listener with the grant in place (System Settings and a microphone prompt
+    on screen). `CGGetEventTapList` showed other active key taps (Logi Options+ at the HID point, Siri at the session point with a
+    395 ms worst latency), so the counts alone cannot tell starvation from keys another tap or macOS took. Fix: when the counts say
+    behind, the timer posts one probe, a flagsChanged with the flags already held and `EventTap.ProbeMarker` in the user data, at the
+    HID tap point like the paste, and waits up to 500 ms (`ProbeWait`, `// simplification:`) on the timer thread. The callback swallows
+    the probe, never passes it to the matcher, and never counts it as a key. Answered: kept, counted again from there, and a
+    once-a-minute line with the missed count and the probe's latency (row 12, PROPOSED). Unanswered, or not posted: starved, removed.
+    Pins: `A_tap_whose_probe_arrives_is_kept_though_keys_went_elsewhere`, `A_probe_that_cannot_be_posted_counts_as_starved`,
+    `The_probe_is_swallowed_and_never_counted_as_a_key` (macOS only).
+    - **Mutation checks (29/10/2026, Mac, Release), each observed failing on the reverted behaviour:** the probe step removed (two pins);
+      the probe counted as a key (one); the probe passed on instead of swallowed (one); a probe that could not be posted taken as fed (one).

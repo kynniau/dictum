@@ -359,22 +359,105 @@ public sealed class InputAccessTests
         var log = new RecordingLog();
         long hid = 500;
         var lost = 0;
-        var tap = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, log, trusted: () => true, lost: () => lost++, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false);
+        var probes = 0;
+        var tap = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, log, trusted: () => true, lost: () => lost++, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false,
+            postProbe: () => { probes++; return true; }); // posted, and never arrives: starved
         tap.LivenessTick(0);
         hid += 20; // keys typed, none reaching the tap
         tap.LivenessTick(GapMs);
         tap.LivenessTick(GapMs + TickMs);
         Assert.Equal(1, lost);
+        Assert.Equal(1, probes); // removed only after its own probe went unanswered
         Assert.Single(log.Lines, l => l.Level == LogLevel.Error && l.Message.StartsWith("Event tap (key monitor) removed: keys reached macOS but not Dictum for over a second", StringComparison.Ordinal));
 
         long secureHid = 500;
         var secureLost = 0;
-        var secure = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, new RecordingLog(), trusted: () => true, lost: () => secureLost++, stillTrusted: () => true, hidCount: () => secureHid, secureInput: () => true);
+        var secure = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, new RecordingLog(), trusted: () => true, lost: () => secureLost++, stillTrusted: () => true, hidCount: () => secureHid, secureInput: () => true, postProbe: () => true);
         secure.LivenessTick(0);
         secureHid += 20;
         secure.LivenessTick(GapMs);
         secure.LivenessTick(2 * GapMs);
         Assert.Equal(0, secureLost);
+    }
+
+    /// <summary>
+    /// The false positive of 21:50:19 AEDT (29/10/2026): keys the counts say went by unseen, taken by another tap or by macOS, while
+    /// the tap is fed. Its probe arrives, so it is kept, the count starts again, and one diagnostic line says so.
+    /// </summary>
+    [Fact]
+    public void A_tap_whose_probe_arrives_is_kept_though_keys_went_elsewhere()
+    {
+        var log = new RecordingLog();
+        long hid = 500;
+        var lost = 0;
+        Dictum.Mac.Input.EventTapKeyMonitor? tap = null;
+        tap = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, log, trusted: () => true, lost: () => lost++, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false,
+            postProbe: () => { tap!.ProbeArrived(); return true; }); // the callback swallows it at once
+        tap.LivenessTick(0);
+        hid += 20;
+        tap.LivenessTick(GapMs);
+        tap.LivenessTick(GapMs + TickMs); // counted again from the probe: nothing new missed
+        hid += 20;
+        tap.LivenessTick(2 * GapMs + TickMs); // another app takes more keys: probed again, kept again, but logged once a minute
+        Assert.Equal(0, lost);
+        Assert.Single(log.Lines, l => l.Level == LogLevel.Info && l.Message.StartsWith("Event tap (key monitor) kept: 20 key events reached macOS", StringComparison.Ordinal));
+        Assert.DoesNotContain(log.Lines, l => l.Level == LogLevel.Error);
+    }
+
+    /// <summary>(c), orchestrator 22:05 AEDT: a probe that cannot be posted (CGEventPost refused without the grant) counts as starved.</summary>
+    [Fact]
+    public void A_probe_that_cannot_be_posted_counts_as_starved()
+    {
+        long hid = 500;
+        var lost = 0;
+        var tap = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, new RecordingLog(), trusted: () => true, lost: () => lost++, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false,
+            postProbe: () => false);
+        tap.LivenessTick(0);
+        hid += 20;
+        tap.LivenessTick(GapMs);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>(b): the probe is swallowed by the tap, never reaches the hotkey matcher or the key monitor, and is not counted as a keystroke. macOS only (a real CGEvent).</summary>
+    [Fact]
+    public void The_probe_is_swallowed_and_never_counted_as_a_key()
+    {
+        Assert.SkipUnless(OperatingSystem.IsMacOS(), "Builds a real CGEvent.");
+        ProbeSwallowedCheck();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ProbeSwallowedCheck()
+    {
+        var keys = 0;
+        var monitor = new Dictum.Mac.Input.EventTapKeyMonitor(_ => keys++, new RecordingLog(), trusted: () => true, stillTrusted: () => true, hidCount: () => 0, secureInput: () => false, postProbe: () => true);
+        var signals = 0;
+        var hotkey = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("LeftCtrl"), suppress: true), _ => signals++, new RecordingLog(),
+            trusted: () => true, stillTrusted: () => true, hidCount: () => 0, secureInput: () => false, postProbe: () => true);
+        var probe = Dictum.Mac.Interop.CG.EventCreate(0);
+        var real = Dictum.Mac.Interop.CG.EventCreate(0);
+        try
+        {
+            Dictum.Mac.Interop.CG.EventSetType(probe, Dictum.Mac.Interop.CG.EventFlagsChanged);
+            Dictum.Mac.Interop.CG.EventSetFlags(probe, Dictum.Mac.Interop.CG.FlagControl);
+            Dictum.Mac.Interop.CG.EventSetIntegerValueField(probe, Dictum.Mac.Interop.CG.FieldSourceUserData, Dictum.Mac.Input.EventTap.ProbeMarker);
+            Assert.False(monitor.Handle(Dictum.Mac.Interop.CG.EventFlagsChanged, probe)); // swallowed
+            Assert.False(hotkey.Handle(Dictum.Mac.Interop.CG.EventFlagsChanged, probe));
+            Assert.Equal(0, keys);
+            Assert.Equal(0, signals);
+            Assert.Equal(0, monitor.Seen);
+            Assert.Equal(0, hotkey.Seen);
+
+            Dictum.Mac.Interop.CG.EventSetType(real, Dictum.Mac.Interop.CG.EventKeyDown);
+            Dictum.Mac.Interop.CG.EventSetIntegerValueField(real, Dictum.Mac.Interop.CG.FieldKeyboardKeycode, 0);
+            Assert.True(monitor.Handle(Dictum.Mac.Interop.CG.EventKeyDown, real)); // a real key: passed on and counted
+            Assert.Equal(1, monitor.Seen);
+        }
+        finally
+        {
+            Dictum.Mac.Interop.CF.Release(probe);
+            Dictum.Mac.Interop.CF.Release(real);
+        }
     }
 
     /// <summary>Condition 5: the first timeout-disable with the check saying trusted turns the tap back on only if a liveness probe passes.</summary>
