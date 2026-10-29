@@ -45,9 +45,12 @@ internal sealed class TapLiveness
     /// </summary>
     internal const long Behind = 4;
 
-    /// <summary>Which comparison tripped, in the words the log line uses.</summary>
-    internal const string TapStarved = "keys reached macOS but not Dictum for over a second";
-    internal const string KeysHeld = "keys reached macOS but no app for over a second";
+    /// <summary>
+    /// Which comparison tripped, in the words the log line uses after the count: what was measured, and no time claim the rule
+    /// does not measure (the second is counted from the baseline, not from the first missed key; orchestrator, 29/10/2026 22:50 AEDT).
+    /// </summary>
+    internal const string TapStarved = "reached macOS but not Dictum";
+    internal const string KeysHeld = "reached macOS but no app";
 
     private readonly object _gate = new();
     private readonly Lag _tap = new(settle: true);

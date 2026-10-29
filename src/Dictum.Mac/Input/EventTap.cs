@@ -62,8 +62,6 @@ internal abstract class EventTap : IDisposable
     private int _recreate;
     private int _ticking;
     private string _why = "";
-    private long _missed;
-    private long _sinceMs;
     private string? _deniedLine;
     private Thread? _thread;
     private nint _runLoop;
@@ -306,7 +304,8 @@ internal abstract class EventTap : IDisposable
                 _log.Warn($"Event tap ({_name}) was disabled by macOS ({why}) and re-enabled.");
                 return;
             }
-            Trigger($"macOS disabled it ({why}) and keys had stopped getting through", now);
+            var (phrase, missed, _) = _liveness.Tripped;
+            Trigger($"macOS disabled it ({why}) and {missed} key events {phrase}", now);
             return;
         }
         // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
@@ -323,7 +322,9 @@ internal abstract class EventTap : IDisposable
             var now = nowMs ?? Environment.TickCount64;
             var hid = AdjustedHid();
             if (_diagnostics) Diagnose(hid);
-            if (_liveness.Check(now, hid, Seen, SessionCount(), _secureInput())) Trigger(_liveness.Tripped.Why, now);
+            if (!_liveness.Check(now, hid, Seen, SessionCount(), _secureInput())) return;
+            var (phrase, missed, _) = _liveness.Tripped;
+            Trigger($"{missed} key events {phrase}", now);
         }
         catch (Exception ex)
         {
@@ -368,8 +369,7 @@ internal abstract class EventTap : IDisposable
         if (Interlocked.Exchange(ref _triggered, 1) != 0) return;
         var port = Volatile.Read(ref _port);
         if (port != 0) CG.EventTapEnable(port, false);
-        (_, _missed, _sinceMs) = _liveness.Tripped;
-        _why = why;
+        _why = why; // the count and what was measured, already in words
         if (_recovery.MayRecreate(nowMs))
         {
             Volatile.Write(ref _recreate, 1);
@@ -404,7 +404,7 @@ internal abstract class EventTap : IDisposable
         _recovery.Recreated(now);
         _liveness.Fed(now, AdjustedHid(), Seen, SessionCount());
         // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
-        _log.Info($"Event tap ({_name}) re-created: {_missed} key events reached macOS in the last {(now - _sinceMs) / 1000.0:0.0} s without getting through ({_why}), but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
+        _log.Info($"Event tap ({_name}) re-created: {_why}, but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
         Volatile.Write(ref _triggered, 0);
         return true;
     }

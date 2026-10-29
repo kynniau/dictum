@@ -444,7 +444,7 @@ public sealed class InputAccessTests
         Assert.DoesNotContain(log.Lines, l => l.Level == LogLevel.Error);
 
         Assert.False(tap.AfterRecreate(created: false, nowMs: GapMs + 10));
-        Assert.StartsWith("Event tap (key monitor) removed: keys reached macOS but not Dictum for over a second, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
+        Assert.StartsWith("Event tap (key monitor) removed: 20 key events reached macOS but not Dictum, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
         Assert.Contains("press Request access in Settings > General (or the menu-bar panel).", tap.DeniedLine, StringComparison.Ordinal);
     }
 
@@ -463,7 +463,7 @@ public sealed class InputAccessTests
         Assert.True(tap.RecreateRequested);
         Assert.True(tap.AfterRecreate(created: true, nowMs: TickMs + GapMs + 10));
         Assert.Null(tap.DeniedLine);
-        Assert.Single(log.Lines, l => l.Level == LogLevel.Info && l.Message.StartsWith("Event tap (key monitor) re-created: 20 key events reached macOS in the last 1.0 s without getting through (keys reached macOS but not Dictum for over a second), but macOS allowed a fresh tap", StringComparison.Ordinal));
+        Assert.Single(log.Lines, l => l.Level == LogLevel.Info && l.Message.StartsWith("Event tap (key monitor) re-created: 20 key events reached macOS but not Dictum, but macOS allowed a fresh tap", StringComparison.Ordinal));
 
         tap.LivenessTick(TickMs + 2 * GapMs); // nothing missed since the fresh tap: no trigger
         hid += 3;
@@ -534,7 +534,7 @@ public sealed class InputAccessTests
         Assert.True(tap.RecreateRequested);
         Assert.Equal(20, seenBase);
         Assert.False(tap.AfterRecreate(created: false, nowMs: TickMs + GapMs + 10));
-        Assert.StartsWith("Event tap (key monitor) removed: keys reached macOS but no app for over a second, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
+        Assert.StartsWith("Event tap (key monitor) removed: 20 key events reached macOS but no app, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
     }
 
     /// <summary>Condition 4 (29/10/2026 22:36 AEDT): the diagnostic's create probe runs on every tick under DICTUM_TAP_DIAG=1 and never otherwise.</summary>
@@ -585,7 +585,7 @@ public sealed class InputAccessTests
         Assert.True(tap.RecreateRequested);
         Assert.DoesNotContain(log.Lines, l => l.Message.EndsWith("re-enabled.", StringComparison.Ordinal));
         Assert.False(tap.AfterRecreate(created: false));
-        Assert.StartsWith("Event tap (key monitor) removed: macOS disabled it (timeout) and keys had stopped getting through, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
+        Assert.StartsWith("Event tap (key monitor) removed: macOS disabled it (timeout) and 20 key events reached macOS but not Dictum, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
 
         var quietLog = new RecordingLog();
         var quiet = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, quietLog, trusted: () => true, stillTrusted: () => true, hidCount: () => 500, secureInput: () => false, sessionCount: () => 500);

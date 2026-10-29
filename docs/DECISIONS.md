@@ -6650,3 +6650,15 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
       a paste trips it (nine, the paste pin among them).
     - Orchestrator's pass line for the hands-on: typing back within ~3 s of the trigger WITH Dictum still running; if the trigger fires
       and typing stays held, stop and report, no further hardware iteration.
+20. **Wording (29/10/2026, orchestrator 22:50 AEDT, after the reset run at 3667d9d passed: trigger 22:44:49.164, removal 22:44:49.168,
+    Dictum still running, owner "3 sec").** The rule's second is counted from the baseline (the last follower movement, settle or
+    pause), not from the first missed key, so after an idle spell it trips on the first tick that shows four missed; "for over a second"
+    overstated the wait. The lines now say what was measured and nothing timed: "N key events reached macOS but not Dictum" / "but no
+    app" (rows 10 and 13 reworded, still PROPOSED). Two findings go to follow-up PRs, not #82: (a) after a reset removes the row, Request
+    access cannot re-register a process whose prompting check still answers trusted (22:46:15.959 requested, 22:46:16.074 create
+    refused, no prompt, no row); the Accessibility page the button opens has + which works; follow-up scope: CGRequestPostEventAccess in
+    Request, an "add it with the + button" caption (PROPOSED), hands-on from a removed row. (b) The diagnostic's listen-only create probe
+    flipped to refused within one tick of the revocation, before any key (22:44:47.756; the re-create was refused at 08:10:24 and
+    22:44:49): a user-independent revocation signal; follow-up scope: show on hardware that a periodic listen-only create never raises
+    an Input Monitoring prompt or adds a row (else a minimal active tap), then make it a primary trigger and retire the 30 s
+    simplification per its own text.
