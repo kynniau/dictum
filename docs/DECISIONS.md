@@ -6696,3 +6696,10 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     - The handler's swallow count cannot be pinned on Windows: a swallow needs the matcher to see a decoded key, and decoding needs a real
       CGEvent (the null-event path counts the event as seen and passes it on before decoding). It is pinned on macOS
       (`A_swallowed_hotkey_event_is_counted_as_swallowed`).
+25. **Re-lens test-only round (30/10/2026 00:35 AEDT, opus re-lens on 9773a09: Needs changes, tests only; both counter fixes verified).**
+    The subtraction in `Fed` and in `Probe` had no pin of its own: reverting either alone left every test green (a `Fed` revert blinds the
+    tap comparison for as many events as were swallowed before a re-create; a `Probe` revert gives a false trip and a false Denied).
+    Pins: `After_a_fresh_tap_the_swallows_before_it_do_not_blind_the_tap_comparison` (four swallowed, a re-create dated 40 s back so
+    the 30 s rule lets the next trip ask again, four keys never seen: TapStarved), `A_disabled_tap_is_turned_back_on_when_the_only_keys_missing_are_its_own_swallows`.
+    - **Mutation checks (30/10/2026, Mac, Release; source restored after each), each observed failing on the reverted behaviour:** `Fed`
+      without the subtraction, alone (one pin); `Probe` without the subtraction, alone (one pin). No product code changed.

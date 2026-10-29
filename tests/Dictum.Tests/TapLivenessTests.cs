@@ -371,6 +371,61 @@ public sealed class TapLivenessTests
         Assert.Equal(0, swallowed.Count(mouse: false));
     }
 
+    /// <summary>
+    /// Re-lens on 9773a09 (30/10/2026 00:35 AEDT): the subtraction in Fed on its own. Four swallowed before a re-create, then four keys
+    /// the tap never sees: starved. Without the subtraction in Fed the fresh baseline sits four too high and the tap is blind for them.
+    /// </summary>
+    [Fact]
+    public void After_a_fresh_tap_the_swallows_before_it_do_not_blind_the_tap_comparison()
+    {
+        var swallowed = new Dictum.Mac.Input.SwallowedEvents();
+        long hid = 5000;
+        var tap = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("RightAlt"), suppress: true), _ => { }, new RecordingLog(),
+            trusted: () => true, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false, sessionCount: () => 4000, swallowed: swallowed);
+        tap.LivenessTick(0);
+        tap.LivenessTick(TickMs);
+        hid += 4;
+        for (var i = 0; i < 4; i++) { tap.Handle(Dictum.Mac.Interop.CG.EventFlagsChanged, 0); swallowed.Add(keyboard: true); } // the tap saw and swallowed four
+        tap.LivenessTick(TickMs + GapMs);
+        Assert.False(tap.RecreateRequested);
+        Assert.True(tap.AfterRecreate(created: true, nowMs: TickMs + GapMs - 40_000)); // a fresh tap, dated 40 s back so the 30 s rule lets the next trip ask again: Fed takes the new baselines
+        hid += 4;                                                                       // four keys the tap never sees
+        tap.LivenessTick(TickMs + GapMs + TickMs);
+        Assert.True(tap.RecreateRequested);
+        Assert.StartsWith("4 key events reached macOS but not Dictum", DeniedWhy(tap), StringComparison.Ordinal);
+    }
+
+    /// <summary>The words the tap would log for its last trigger (a refused fresh tap), for the pins.</summary>
+    private static string DeniedWhy(Dictum.Mac.Input.EventTap tap)
+    {
+        Assert.False(tap.AfterRecreate(created: false));
+        var line = tap.DeniedLine!;
+        var start = line.IndexOf("removed: ", StringComparison.Ordinal) + "removed: ".Length;
+        return line[start..];
+    }
+
+    /// <summary>
+    /// Re-lens on 9773a09: the subtraction in Probe on its own. macOS disables the tap right after four swallowed hotkey events: the
+    /// probe must not read them as held keys, so the tap is turned back on, not asked for again.
+    /// </summary>
+    [Fact]
+    public void A_disabled_tap_is_turned_back_on_when_the_only_keys_missing_are_its_own_swallows()
+    {
+        var swallowed = new Dictum.Mac.Input.SwallowedEvents();
+        var log = new RecordingLog();
+        long hid = 5000;
+        var tap = new Dictum.Mac.Input.EventTapHotkey(new Dictum.Hotkey.HotkeyMatcher(Dictum.Hotkey.HotkeyParser.Parse("RightAlt"), suppress: true), _ => { }, log,
+            trusted: () => true, stillTrusted: () => true, hidCount: () => hid, secureInput: () => false, sessionCount: () => 4000, swallowed: swallowed);
+        tap.LivenessTick(Environment.TickCount64 - 3 * GapMs); // the disabled path reads the real clock: the polls sit seconds back on it
+        tap.LivenessTick(Environment.TickCount64 - 2 * GapMs);
+        hid += 4;
+        for (var i = 0; i < 4; i++) { tap.Handle(Dictum.Mac.Interop.CG.EventFlagsChanged, 0); swallowed.Add(keyboard: true); }
+        Assert.True(tap.Handle(Dictum.Mac.Interop.CG.EventTapDisabledByTimeout, 0));
+        Assert.False(tap.RecreateRequested);
+        Assert.Null(tap.DeniedLine);
+        Assert.Single(log.Lines, l => l.Message.EndsWith("was disabled by macOS (timeout) and re-enabled.", StringComparison.Ordinal));
+    }
+
     /// <summary>The swallowed count is the handler's own: an event the hotkey swallows counts, one it passes on does not. macOS only (a real CGEvent).</summary>
     [Fact]
     public void A_swallowed_hotkey_event_is_counted_as_swallowed()
