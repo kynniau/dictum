@@ -537,7 +537,7 @@ public sealed class InputAccessTests
         Assert.StartsWith("Event tap (key monitor) removed: 20 key events reached macOS but no app, and macOS refused a fresh tap", tap.DeniedLine, StringComparison.Ordinal);
     }
 
-    /// <summary>Condition 4 (29/10/2026 22:36 AEDT): the diagnostic's create probe runs on every tick under DICTUM_TAP_DIAG=1 and never otherwise.</summary>
+    /// <summary>Condition 4 (29/10/2026 22:36 AEDT): the diagnostic's create probe never runs without DICTUM_TAP_DIAG=1 (both platforms).</summary>
     [Fact]
     public void The_diagnostic_create_probe_never_runs_outside_the_switch()
     {
@@ -547,7 +547,20 @@ public sealed class InputAccessTests
         for (var i = 0; i < 5; i++) quiet.LivenessTick(i * TickMs);
         Assert.Equal(0, probes);
         Assert.False(Dictum.Mac.Input.EventTap.Diagnostics); // the test host never sets the switch
+    }
 
+    /// <summary>Under the switch the probe runs on every tick and the line ends with its answer. macOS only: the line reads the Core Graphics preflight calls.</summary>
+    [Fact]
+    public void The_diagnostic_create_probe_runs_on_every_tick_under_the_switch()
+    {
+        Assert.SkipUnless(OperatingSystem.IsMacOS(), "The diagnostic line calls CGPreflightPostEventAccess and AXIsProcessTrusted.");
+        DiagnosticProbeCheck();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DiagnosticProbeCheck()
+    {
+        var probes = 0;
         var log = new RecordingLog();
         var on = new Dictum.Mac.Input.EventTapKeyMonitor(_ => { }, log, trusted: () => true, stillTrusted: () => true, hidCount: () => 100, secureInput: () => false, sessionCount: () => 100,
             createProbe: () => { probes++; return true; }, diagnostics: true);

@@ -6662,3 +6662,7 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     22:44:49): a user-independent revocation signal; follow-up scope: show on hardware that a periodic listen-only create never raises
     an Input Monitoring prompt or adds a row (else a minimal active tap), then make it a primary trigger and retire the 30 s
     simplification per its own text.
+21. **Rows 8, 9, 10, 13 and 14 APPROVED by the owner 29/10/2026 23:29 AEDT ("Approve all five"), as written in `.demo-preview/approve-mac-access.md`;
+    the code comments carry the approval. Windows CI at fbd90d2 failed one pin, `The_diagnostic_create_probe_never_runs_outside_the_switch`:
+    its "diagnostic on" half reads macOS-only functions, so it is now a macOS-only pin (`…_runs_on_every_tick_under_the_switch`), and the
+    "off" half stays ungated on both platforms (orchestrator, 23:33 AEDT).**
