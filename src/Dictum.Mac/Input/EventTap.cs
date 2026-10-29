@@ -11,10 +11,15 @@ namespace Dictum.Mac.Input;
 /// LowLevelHook. The callback "runs from the CFRunLoop to which the tap CFMachPort is added as a source" (CGEvent.h), so a
 /// thread that does nothing but run that loop keeps the tap answering while the UI thread is busy; macOS disables a tap
 /// that is slow to answer and tells it with kCGEventTapDisabledByTimeout, and the tap re-enables itself then, but only through
-/// <see cref="TapDisableGuard"/> and a <see cref="TapLiveness"/> probe: a tap macOS keeps disabling, or one the keys no longer
-/// reach, is removed instead, because a tap left in place after the grant was taken away held every key on the Mac (PR #82
-/// round 2, 29/10/2026). A timer off the tap thread runs the same liveness check every <see cref="TapLiveness.Tick"/>, since macOS
+/// <see cref="TapDisableGuard"/> and a <see cref="TapLiveness"/> check: a tap macOS keeps disabling, or one the keys no longer
+/// reach, is not left in place, because a tap left behind after the grant was taken away held every key on the Mac (PR #82
+/// round 2, 29/10/2026). A timer off the tap thread runs the liveness check every <see cref="TapLiveness.Tick"/>, since macOS
 /// held the keys for about 50 s before its first disable notice; it never waits on the tap thread.
+/// <para>
+/// When the check trips, the tap is disabled at once, so the keys are free, and the tap thread removes it and asks macOS for a
+/// fresh one (<see cref="TapRecovery"/>): refused, the grant is gone and the shell is told (IInputAccess.Revoked); created, the
+/// keys went to another tap or to macOS, and the fresh tap carries on. Nothing is ever re-enabled or re-created from the timer.
+/// </para>
 /// <para>
 /// Both taps are active filters (kCGEventTapOptionDefault) at the session tap point (kCGHIDEventTap is for root only,
 /// CGEvent.h), so the app needs Accessibility and not Input Monitoring as well (orchestrator decision, 22/10/2026): a tap
@@ -31,16 +36,11 @@ internal abstract class EventTap : IDisposable
     /// <summary>The user-data value on every event Dictum posts: the same number the Windows build puts in dwExtraInfo ("DICT").</summary>
     public const long InjectedMarker = 0x44494354;
 
-    /// <summary>The user-data value on the liveness probe ("DICU"): the tap counts it and swallows it, so no app ever sees it.</summary>
-    public const long ProbeMarker = 0x44494355;
-
     /// <summary>
-    /// simplification: how long the timer waits for its probe, which passes through every tap ahead of Dictum (Siri's active
-    /// session key tap showed a 395 ms worst latency on the owner's Mac, 29/10/2026). Ceiling: a tap ahead slower than 500 ms makes a
-    /// fed tap read as starved and removed (Request access installs a fresh one). Trigger to retire: a probe latency over 250 ms in a
-    /// log (the "kept" line reports them). Orchestrator, 29/10/2026 22:05 AEDT.
+    /// DICTUM_TAP_DIAG=1 in the environment: one Info line per liveness tick with every signal that might flip at a revocation,
+    /// for the instrumented reset run only (orchestrator, 29/10/2026 22:16 AEDT). Off by default; a release build never sets it.
     /// </summary>
-    internal static readonly TimeSpan ProbeWait = TimeSpan.FromMilliseconds(500);
+    internal static readonly bool Diagnostics = Environment.GetEnvironmentVariable("DICTUM_TAP_DIAG") == "1";
 
     private readonly ILog _log;
     private readonly string _name;
@@ -49,34 +49,36 @@ internal abstract class EventTap : IDisposable
     private readonly Action? _lost;
     private readonly TapDisableGuard _disables = new();
     private readonly TapLiveness _liveness = new();
+    private readonly TapRecovery _recovery = new();
     private readonly Func<long>? _hidCount;
+    private readonly Func<long> _posted;
     private readonly Func<bool> _secureInput;
-    private readonly Func<bool> _postProbe;
     private Timer? _livenessTimer;
     private long _seen;
-    private long _probesSeen;
-    private long _keptLoggedMs = long.MinValue;
-    private int _probesSinceLine;
-    private long _slowestSinceLineMs;
-    private int _gaveUp;
+    private int _triggered;
+    private int _recreate;
     private int _ticking;
+    private string _why = "";
+    private long _missed;
+    private long _sinceMs;
+    private string? _deniedLine;
     private Thread? _thread;
     private nint _runLoop;
     private nint _port;
+    private nint _source;
     private volatile bool _stop;
     private TapEvents? _events;
     private int _faults;
 
     /// <param name="trusted">Whether the process may run an active tap; the default asks macOS and prompts once (<see cref="Accessibility"/>). Tests pass their own.</param>
-    /// <param name="lost">Told, on the tap thread, when the tap removed itself because macOS kept disabling it (IInputAccess.Revoked).</param>
+    /// <param name="lost">Told, on the tap thread after the tap is gone, when it removed itself for want of the grant (IInputAccess.Revoked).</param>
     /// <param name="stillTrusted">The silent check read when macOS disables the tap; the default is AXIsProcessTrusted. Tests pass their own.</param>
     /// <param name="hidCount">Events of the tap's types the HID system has seen; the default sums CGEventSourceCounterForEventType over the mask. Tests pass their own.</param>
     /// <param name="secureInput">Whether Secure Event Input is on; the default is IsSecureEventInputEnabled. Tests pass their own.</param>
-    /// <param name="postProbe">Posts one liveness probe and says whether it was posted; the default posts the real event (<see cref="PostProbe"/>). Tests pass their own.</param>
+    /// <param name="posted">Key events Dictum has posted itself (<see cref="PostedEvents"/>), subtracted from the HID count; none by default.</param>
     protected EventTap(string name, ILog log, Func<bool>? trusted = null, Action? lost = null, Func<bool>? stillTrusted = null,
-        Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<bool>? postProbe = null)
+        Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null)
     {
-        _postProbe = postProbe ?? PostProbe;
         _name = name;
         _log = log;
         _trusted = trusted ?? Accessibility.EnsureTrusted;
@@ -84,15 +86,7 @@ internal abstract class EventTap : IDisposable
         _stillTrusted = stillTrusted ?? AX.IsProcessTrusted;
         _hidCount = hidCount;
         _secureInput = secureInput ?? HIToolbox.IsSecureEventInputEnabled;
-    }
-
-    /// <summary>The HID system's count of the event types in this tap's mask (CGEventSourceCounterForEventType, HID system state).</summary>
-    private long HidCount()
-    {
-        if (_hidCount is not null) return _hidCount();
-        long total = 0;
-        foreach (var type in TapEvents.Types(_events is { Mouse: true })) total += CG.EventSourceCounterForEventType(CG.SourceStateHidSystem, type);
-        return total;
+        _posted = posted ?? (() => 0);
     }
 
     /// <summary>Starts the tap thread and waits until the tap is installed. False when it could not be (not trusted for Accessibility, or refused), with the reason logged.</summary>
@@ -113,7 +107,7 @@ internal abstract class EventTap : IDisposable
         return Installed;
     }
 
-    private bool Installed => _port != 0;
+    private bool Installed => Volatile.Read(ref _port) != 0;
 
     /// <summary>For the log line: what this tap listens for.</summary>
     protected virtual string Describe() => "";
@@ -123,6 +117,26 @@ internal abstract class EventTap : IDisposable
 
     /// <summary>Decides one key or button change on the tap thread. Returns whether to pass the event on.</summary>
     protected abstract bool OnKey(KeyChange change, bool injected);
+
+    /// <summary>The HID system's count of the event types in this tap's mask (CGEventSourceCounterForEventType, HID system state).</summary>
+    private long HidCount()
+    {
+        if (_hidCount is not null) return _hidCount();
+        return Count(CG.SourceStateHidSystem);
+    }
+
+    private long Count(int stateId)
+    {
+        long total = 0;
+        foreach (var type in TapEvents.Types(_events is { Mouse: true })) total += CG.EventSourceCounterForEventType(stateId, type);
+        return total;
+    }
+
+    /// <summary>The HID count less the events Dictum posted itself, which it counts with the hardware keys (<see cref="PostedEvents"/>).</summary>
+    private long AdjustedHid() => HidCount() - _posted();
+
+    /// <summary>Events of the mask's types the callback has counted (for the pins).</summary>
+    internal long Seen => Interlocked.Read(ref _seen);
 
     private unsafe void Run(ManualResetEventSlim ready)
     {
@@ -136,39 +150,48 @@ internal abstract class EventTap : IDisposable
                 return;
             }
             // Retained so Dispose can still stop it, or find it already finished, after this thread has ended.
-            _runLoop = CF.Retain(CF.RunLoopGetCurrent());
+            Volatile.Write(ref _runLoop, CF.Retain(CF.RunLoopGetCurrent()));
             _events = new TapEvents(WantsMouse);
             self = GCHandle.Alloc(this);
             delegate* unmanaged<nint, uint, nint, nint, nint> callback = &Callback;
-            var port = CG.EventTapCreate(CG.SessionEventTap, CG.HeadInsertEventTap, CG.TapOptionDefault, TapEvents.Mask(_events.Mouse), (nint)callback, GCHandle.ToIntPtr(self));
-            if (port == 0)
+            if (!Install((nint)callback, GCHandle.ToIntPtr(self)))
             {
                 _log.Error($"Event tap ({_name}) installation failed: macOS refused it (CGEventTapCreate returned null) although Accessibility reports this app as allowed.");
                 return;
             }
-            var source = CF.MachPortCreateRunLoopSource(0, port, 0);
-            CF.RunLoopAddSource(_runLoop, source, CF.RunLoopCommonModes);
-            CG.EventTapEnable(port, true);
-            _port = port;
             _log.Info($"Event tap installed on thread {Environment.CurrentManagedThreadId} ({_name}{Describe()}{(_events.Mouse ? ", mouse buttons watched" : "")}).");
             _livenessTimer = new Timer(_ => LivenessTick(), null, TapLiveness.Tick, TapLiveness.Tick);
             ready.Set();
 
             // A timed run, not CFRunLoopRun: a stop that arrives before the loop starts running would otherwise be lost and
             // the thread never end. Dispose sets _stop and stops the loop, so the wait is normally far shorter than a second.
-            while (!_stop) CF.RunLoopRunInMode(CF.RunLoopDefaultMode, 1.0, false);
+            while (!_stop)
+            {
+                CF.RunLoopRunInMode(CF.RunLoopDefaultMode, 1.0, false);
+                if (Interlocked.Exchange(ref _recreate, 0) == 0) continue;
+                // The liveness check tripped and disabled the tap: removed here, then asked for again, on the thread that owns it.
+                Remove();
+                if (!AfterRecreate(Install((nint)callback, GCHandle.ToIntPtr(self)))) break;
+            }
 
-            // The timer may be in a tick that calls CGEventTapEnable on the port: wait for it here, on the tap thread, before the port
-            // is released. The timer never waits on this thread, so this cannot deadlock.
+            // The timer may be in a tick that reads the port: wait for it here, on the tap thread, before the port is released.
+            // The timer never waits on this thread, so this cannot deadlock.
             using (var stopped = new ManualResetEvent(false))
-                if (_livenessTimer is { } timer && timer.Dispose(stopped)) stopped.WaitOne(TimeSpan.FromSeconds(2));
-            CG.EventTapEnable(port, false);
-            CF.RunLoopRemoveSource(_runLoop, source, CF.RunLoopCommonModes);
-            CF.MachPortInvalidate(port);
-            CF.Release(source);
-            CF.Release(port);
-            _port = 0;
+                if (_livenessTimer.Dispose(stopped)) stopped.WaitOne(TimeSpan.FromSeconds(2));
+            Remove();
             _log.Info($"Event tap removed ({_name}).");
+            if (_deniedLine is { } denied)
+            {
+                _log.Error(denied);
+                try
+                {
+                    _lost?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    _log.Error($"Event tap ({_name}): telling the shell it was removed failed: {ex.Message}");
+                }
+            }
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -179,6 +202,32 @@ internal abstract class EventTap : IDisposable
             if (self.IsAllocated) self.Free();
             ready.Set(); // no-op when already set; releases Start on every failure path
         }
+    }
+
+    /// <summary>Creates the tap and adds it to this thread's run loop; false when macOS refused it. Tap thread only.</summary>
+    private bool Install(nint callback, nint userInfo)
+    {
+        var port = CG.EventTapCreate(CG.SessionEventTap, CG.HeadInsertEventTap, CG.TapOptionDefault, TapEvents.Mask(_events!.Mouse), callback, userInfo);
+        if (port == 0) return false;
+        _source = CF.MachPortCreateRunLoopSource(0, port, 0);
+        CF.RunLoopAddSource(_runLoop, _source, CF.RunLoopCommonModes);
+        CG.EventTapEnable(port, true);
+        Volatile.Write(ref _port, port);
+        return true;
+    }
+
+    /// <summary>Disables, detaches, invalidates and releases the tap, if there is one. Tap thread only.</summary>
+    private void Remove()
+    {
+        var port = Volatile.Read(ref _port);
+        if (port == 0) return;
+        CG.EventTapEnable(port, false);
+        CF.RunLoopRemoveSource(_runLoop, _source, CF.RunLoopCommonModes);
+        CF.MachPortInvalidate(port);
+        CF.Release(_source);
+        CF.Release(port);
+        _source = 0;
+        Volatile.Write(ref _port, 0);
     }
 
     /// <summary>
@@ -208,14 +257,8 @@ internal abstract class EventTap : IDisposable
             Disabled(type == CG.EventTapDisabledByTimeout ? "timeout" : "user input");
             return true;
         }
-        var userData = CG.EventGetIntegerValueField(ev, CG.FieldSourceUserData);
-        if (userData == ProbeMarker)
-        {
-            ProbeArrived();
-            return false; // our own probe: swallowed, no app sees it
-        }
-        Interlocked.Increment(ref _seen); // every other event of the mask's types, posted or not: the liveness count (TapLiveness)
-        if (_events is null || userData == InjectedMarker) return true;
+        Interlocked.Increment(ref _seen); // every event of the mask's types, posted or not: the liveness count (TapLiveness)
+        if (_events is null || CG.EventGetIntegerValueField(ev, CG.FieldSourceUserData) == InjectedMarker) return true;
 
         var keyboard = type is CG.EventKeyDown or CG.EventKeyUp or CG.EventFlagsChanged;
         var changes = _events.Decode(
@@ -234,24 +277,24 @@ internal abstract class EventTap : IDisposable
     }
 
     /// <summary>
-    /// macOS disabled the tap. Re-enabled while the guard allows; otherwise the tap is never enabled again: the run loop is
-    /// stopped (Run then removes the tap), and the shell is told so it shows the line and the Request access button and replaces
-    /// the listeners once the grant is back.
+    /// macOS disabled the tap (tap thread). Turned back on only while the guard allows and the counts say keys still reach it;
+    /// keys that stopped reaching it go through the same trigger as the timer's; a tap macOS keeps disabling is removed for good.
     /// </summary>
     private void Disabled(string why)
     {
-        if (Volatile.Read(ref _gaveUp) != 0) return;
+        if (_stop || Volatile.Read(ref _triggered) != 0) return;
         var now = Environment.TickCount64;
         if (_disables.ShouldReenable(now, _stillTrusted()))
         {
-            if (!_liveness.Probe(now, HidCount(), Interlocked.Read(ref _seen), _secureInput()))
+            var hid = AdjustedHid();
+            if (!_liveness.Probe(now, hid, Seen, _secureInput()))
             {
-                if (_port != 0) CG.EventTapEnable(_port, true);
+                var port = Volatile.Read(ref _port);
+                if (port != 0) CG.EventTapEnable(port, true);
                 _log.Warn($"Event tap ({_name}) was disabled by macOS ({why}) and re-enabled.");
                 return;
             }
-            // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
-            GiveUp($"Event tap ({_name}) removed: macOS disabled it ({why}) and keys had stopped reaching it, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).");
+            Trigger($"macOS disabled it ({why}) and keys had stopped reaching it", now, hid);
             return;
         }
         // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
@@ -262,31 +305,14 @@ internal abstract class EventTap : IDisposable
     /// <param name="nowMs">The clock reading; null is Environment.TickCount64, and only tests pass one.</param>
     internal void LivenessTick(long? nowMs = null)
     {
-        if (Volatile.Read(ref _gaveUp) != 0 || Interlocked.Exchange(ref _ticking, 1) != 0) return;
+        if (_stop || Volatile.Read(ref _triggered) != 0 || Interlocked.Exchange(ref _ticking, 1) != 0) return;
         try
         {
             var now = nowMs ?? Environment.TickCount64;
-            var hid = HidCount();
-            if (!_liveness.Check(now, hid, Interlocked.Read(ref _seen), _secureInput())) return;
-            // The counts say keys went by unseen. Starved, or taken by another tap or by macOS? Only a probe of our own can tell.
-            var before = Interlocked.Read(ref _probesSeen);
-            if (_postProbe() && ProbeAnswered(before) is { } latencyMs)
-            {
-                var (missed, since) = _liveness.MissedSince(hid);
-                _liveness.Fed(now, HidCount(), Interlocked.Read(ref _seen));
-                _probesSinceLine++;
-                _slowestSinceLineMs = Math.Max(_slowestSinceLineMs, latencyMs);
-                if (_keptLoggedMs == long.MinValue || now - _keptLoggedMs >= 60_000)
-                {
-                    _keptLoggedMs = now;
-                    // PROPOSED (log line, PR #82 liveness round, 29/10/2026): awaiting owner approval. At most once a minute.
-                    _log.Info($"Event tap ({_name}) kept: {missed} key events reached macOS in the last {(now - since) / 1000.0:0.0} s without reaching it, but its probe arrived in {latencyMs} ms, so another app or macOS took those keys. Probes since the last such line: {_probesSinceLine}, slowest {_slowestSinceLineMs} ms.");
-                    (_probesSinceLine, _slowestSinceLineMs) = (0, 0);
-                }
-                return;
-            }
-            // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
-            GiveUp($"Event tap ({_name}) removed: keys reached macOS but not Dictum for over a second, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).");
+            var hid = AdjustedHid();
+            if (Diagnostics) Diagnose(hid);
+            if (_liveness.Check(now, hid, Seen, _secureInput()))
+                Trigger("keys reached macOS but not Dictum for over a second", now, hid);
         }
         catch (Exception ex)
         {
@@ -298,83 +324,99 @@ internal abstract class EventTap : IDisposable
         }
     }
 
-    /// <summary>The tap's callback saw its own probe (internal so a pin stands in for the callback).</summary>
-    internal void ProbeArrived() => Interlocked.Increment(ref _probesSeen);
-
-    /// <summary>Waits, on the timer thread, up to <see cref="ProbeWait"/> for the probe to reach the callback: its round trip in ms, or null.</summary>
-    private long? ProbeAnswered(long before)
+    /// <summary>The per-tick diagnostic (DICTUM_TAP_DIAG=1): every signal that might flip at a revocation, read live.</summary>
+    private void Diagnose(long adjustedHid)
     {
-        var start = Environment.TickCount64;
-        while (Interlocked.Read(ref _probesSeen) == before)
-        {
-            if (Environment.TickCount64 - start >= (long)ProbeWait.TotalMilliseconds) return null;
-            Thread.Sleep(5);
-        }
-        return Environment.TickCount64 - start;
-    }
-
-    /// <summary>Events of the mask's types the callback has counted, probes excluded (for the pins).</summary>
-    internal long Seen => Interlocked.Read(ref _seen);
-
-    /// <summary>
-    /// One probe: a flagsChanged event carrying the modifier flags already held (so it changes nothing) and <see cref="ProbeMarker"/>,
-    /// posted where Dictum's paste is posted, so it passes through this tap like a real key. False when it could not be made.
-    /// </summary>
-    private static bool PostProbe()
-    {
-        var ev = CG.EventCreate(0);
-        if (ev == 0) return false;
-        try
-        {
-            CG.EventSetType(ev, CG.EventFlagsChanged);
-            CG.EventSetFlags(ev, CG.EventSourceFlagsState(CG.SourceStateHidSystem));
-            CG.EventSetIntegerValueField(ev, CG.FieldSourceUserData, ProbeMarker);
-            CG.EventPost(CG.HidEventTap, ev);
-            return true;
-        }
-        finally
-        {
-            CF.Release(ev);
-        }
+        var port = Volatile.Read(ref _port);
+        _log.Info($"Tap diag ({_name}): post={CG.PreflightPostEventAccess()} listen={CG.PreflightListenEventAccess()} ax={AX.IsProcessTrusted()} "
+            + $"hid={HidCount()} session={Count(CG.SourceStateCombinedSession)} posted={_posted()} adjusted={adjustedHid} seen={Seen} "
+            + $"enabled={(port != 0 && CG.EventTapIsEnabled(port))} secure={_secureInput()} disables={_disables.Count}");
     }
 
     /// <summary>
-    /// Removes the tap for good, from whichever thread found it dead: disabled at once (from the timer too, so the keys are let go
-    /// even while the tap thread is stuck), the run loop stopped so Run invalidates and releases it, and the shell told
-    /// (IInputAccess.Revoked). Never re-created here: the shell installs a fresh listener through its own paths.
+    /// Keys stopped reaching the tap, by the timer's count or macOS's disable notice: the tap is disabled at once, from whichever
+    /// thread found it, so the keys are free, and the tap thread removes it and asks for a fresh one; a second trigger inside
+    /// <see cref="TapRecovery.Window"/> of a fresh tap stays removed and reports the grant gone instead.
     /// </summary>
+    private void Trigger(string why, long nowMs, long adjustedHid)
+    {
+        if (Interlocked.Exchange(ref _triggered, 1) != 0) return;
+        var port = Volatile.Read(ref _port);
+        if (port != 0) CG.EventTapEnable(port, false);
+        (_missed, _sinceMs) = _liveness.MissedSince(adjustedHid);
+        _why = why;
+        if (_recovery.MayRecreate(nowMs))
+        {
+            Volatile.Write(ref _recreate, 1);
+        }
+        else
+        {
+            // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
+            _deniedLine = $"Event tap ({_name}) removed: keys stopped reaching it again within {TapRecovery.Window.TotalSeconds:0} s of a fresh tap, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).";
+            _stop = true;
+        }
+        var runLoop = Volatile.Read(ref _runLoop);
+        if (runLoop != 0) CF.RunLoopStop(runLoop);
+    }
+
+    /// <summary>
+    /// The outcome of asking for a fresh tap (tap thread; internal so a pin drives it without a tap). Refused: the grant is gone,
+    /// the thread ends and the shell is told after the removal. Created: a false positive, the counts start again from here, and
+    /// the next trigger may fire.
+    /// </summary>
+    /// <returns>Whether the tap goes on running.</returns>
+    internal bool AfterRecreate(bool created, long? nowMs = null)
+    {
+        Volatile.Write(ref _recreate, 0); // the request is answered (Run has already taken it; a pin calls this directly)
+        var now = nowMs ?? Environment.TickCount64;
+        if (!created)
+        {
+            // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
+            _deniedLine = $"Event tap ({_name}) removed: {_why}, and macOS refused a fresh tap, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).";
+            _stop = true;
+            return false;
+        }
+        _recovery.Recreated(now);
+        _liveness.Fed(now, AdjustedHid(), Seen);
+        // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
+        _log.Info($"Event tap ({_name}) re-created: {_missed} key events reached macOS in the last {(now - _sinceMs) / 1000.0:0.0} s without reaching it, but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
+        Volatile.Write(ref _triggered, 0);
+        return true;
+    }
+
+    /// <summary>A fresh tap was asked for (for the pins): the timer or the disable notice tripped and the tap thread has yet to act.</summary>
+    internal bool RecreateRequested => Volatile.Read(ref _recreate) != 0;
+
+    /// <summary>The line the tap will log, after it is gone, to say the grant is gone (for the pins); null while it runs.</summary>
+    internal string? DeniedLine => _deniedLine;
+
+    /// <summary>Removes the tap for good: disabled at once, the run loop stopped so Run removes it, the shell told after. Never re-created.</summary>
     private void GiveUp(string line)
     {
-        if (Interlocked.Exchange(ref _gaveUp, 1) != 0) return;
-        var port = _port;
+        if (Interlocked.Exchange(ref _triggered, 1) != 0) return;
+        var port = Volatile.Read(ref _port);
         if (port != 0) CG.EventTapEnable(port, false);
-        _log.Error(line);
+        _deniedLine = line;
         _stop = true;
-        if (_runLoop != 0) CF.RunLoopStop(_runLoop);
-        try
-        {
-            _lost?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            _log.Error($"Event tap ({_name}): telling the shell it was removed failed: {ex.Message}");
-        }
+        var runLoop = Volatile.Read(ref _runLoop);
+        if (runLoop != 0) CF.RunLoopStop(runLoop);
     }
 
     public void Dispose()
     {
         if (_thread is null) return;
         _stop = true;
-        if (_runLoop != 0) CF.RunLoopStop(_runLoop);
+        var runLoop = Volatile.Read(ref _runLoop);
+        if (runLoop != 0) CF.RunLoopStop(runLoop);
         if (_thread.Join(TimeSpan.FromSeconds(2)))
         {
-            if (_runLoop != 0) CF.Release(_runLoop);
+            if (runLoop != 0) CF.Release(runLoop);
         }
         else
         {
             _log.Warn($"Event tap thread ({_name}) did not exit within 2 s.");
         }
-        _runLoop = 0;
+        Volatile.Write(ref _runLoop, 0);
         _thread = null;
     }
 }
@@ -385,8 +427,8 @@ internal abstract class EventTap : IDisposable
 /// listener (the shell disposes this one and starts another).
 /// </summary>
 internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> post, ILog log, Func<bool>? trusted = null, Action? lost = null,
-    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<bool>? postProbe = null)
-    : EventTap("hotkey listener", log, trusted, lost, stillTrusted, hidCount, secureInput, postProbe), IHotkeyListener
+    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null)
+    : EventTap("hotkey listener", log, trusted, lost, stillTrusted, hidCount, secureInput, posted), IHotkeyListener
 {
     private volatile bool _enabled = true;
 
@@ -426,8 +468,8 @@ internal sealed class EventTapHotkey(HotkeyMatcher matcher, Action<HookEvent> po
 /// on (the hotkey capture box, --selftest).
 /// </summary>
 internal sealed class EventTapKeyMonitor(Action<RawKeyEvent> onKey, ILog log, Func<bool>? trusted = null, Action? lost = null,
-    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<bool>? postProbe = null)
-    : EventTap("key monitor", log, trusted, lost, stillTrusted, hidCount, secureInput, postProbe), IKeyMonitor
+    Func<bool>? stillTrusted = null, Func<long>? hidCount = null, Func<bool>? secureInput = null, Func<long>? posted = null)
+    : EventTap("key monitor", log, trusted, lost, stillTrusted, hidCount, secureInput, posted), IKeyMonitor
 {
     protected override bool WantsMouse => true;
 
@@ -454,11 +496,16 @@ internal sealed class TapDisableGuard
     internal static readonly TimeSpan Window = TimeSpan.FromSeconds(60);
 
     private long _lastMs = long.MinValue;
+    private int _count;
+
+    /// <summary>How many times macOS has disabled the tap (the diagnostic line).</summary>
+    public int Count => Volatile.Read(ref _count);
 
     /// <param name="nowMs">Environment.TickCount64 now.</param>
     /// <param name="trusted">What the silent Accessibility check answers now.</param>
     public bool ShouldReenable(long nowMs, bool trusted)
     {
+        Interlocked.Increment(ref _count);
         var repeated = _lastMs != long.MinValue && nowMs - _lastMs <= (long)Window.TotalMilliseconds;
         _lastMs = nowMs;
         return trusted && !repeated;

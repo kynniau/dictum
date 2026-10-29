@@ -57,17 +57,6 @@ internal static partial class CG
     [DllImport(Lib, EntryPoint = "CGEventSetFlags")]
     public static extern void EventSetFlags(nint ev, ulong flags);
 
-    /// <summary>An empty event (CGEvent.h); the tap liveness probe gives it a type, flags and its marker. Present on macOS 27.2, checked 29/10/2026.</summary>
-    [DllImport(Lib, EntryPoint = "CGEventCreate")]
-    public static extern nint EventCreate(nint source);
-
-    [DllImport(Lib, EntryPoint = "CGEventSetType")]
-    public static extern void EventSetType(nint ev, uint type);
-
-    /// <summary>The modifier flags the source state holds now (CGEventSource.h): the probe carries them, so it changes nothing.</summary>
-    [DllImport(Lib, EntryPoint = "CGEventSourceFlagsState")]
-    public static extern ulong EventSourceFlagsState(int stateId);
-
     [DllImport(Lib, EntryPoint = "CGEventCreateKeyboardEvent")]
     public static extern nint EventCreateKeyboardEvent(nint source, ushort virtualKey, [MarshalAs(UnmanagedType.I1)] bool keyDown);
 
@@ -91,4 +80,19 @@ internal static partial class CG
     /// <summary>How many events of this type the source state has seen (CGEventSource.h); called for the HID system state by the tap liveness check. Present on macOS 27.2, checked 29/10/2026.</summary>
     [DllImport(Lib, EntryPoint = "CGEventSourceCounterForEventType")]
     public static extern uint EventSourceCounterForEventType(int stateId, uint eventType);
+
+    /// <summary>Whether the tap is enabled now (CGEvent.h); the per-tick diagnostic reads it. Present on macOS 27.2, checked 29/10/2026.</summary>
+    [DllImport(Lib, EntryPoint = "CGEventTapIsEnabled")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool EventTapIsEnabled(nint tap);
+
+    /// <summary>Whether this process may post events (CGRemoteOperation.h); the per-tick diagnostic reads it. Present on macOS 27.2, checked 29/10/2026.</summary>
+    [DllImport(Lib, EntryPoint = "CGPreflightPostEventAccess")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool PreflightPostEventAccess();
+
+    /// <summary>Whether this process may listen to events (CGRemoteOperation.h); the per-tick diagnostic reads it. Present on macOS 27.2, checked 29/10/2026.</summary>
+    [DllImport(Lib, EntryPoint = "CGPreflightListenEventAccess")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool PreflightListenEventAccess();
 }

@@ -15,7 +15,8 @@ namespace Dictum.Mac.Input;
 /// checks first and logs instead.
 /// </para>
 /// </summary>
-internal sealed class CGEventSender(ILog log, Func<bool>? trusted = null) : IInputSender
+/// <param name="posted">Counts every key event posted, for the taps' liveness check (<see cref="PostedEvents"/>); none when null.</param>
+internal sealed class CGEventSender(ILog log, Func<bool>? trusted = null, PostedEvents? posted = null) : IInputSender
 {
     /// <summary>
     /// UTF-16 units per typed event.
@@ -117,6 +118,7 @@ internal sealed class CGEventSender(ILog log, Func<bool>? trusted = null) : IInp
                     }
                     CG.EventSetIntegerValueField(ev, CG.FieldSourceUserData, EventTap.InjectedMarker);
                     CG.EventPost(CG.HidEventTap, ev);
+                    posted?.Add(1);
                 }
                 finally
                 {

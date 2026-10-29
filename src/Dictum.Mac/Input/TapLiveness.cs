@@ -6,9 +6,10 @@ namespace Dictum.Mac.Input;
 /// notice came about 50 s later, and the Accessibility check still answered trusted, so neither could catch it (owner's Mac,
 /// 21:34-21:35 AEDT). This compares two counts instead: the events of the tap's own types the HID system has seen
 /// (CGEventSourceCounterForEventType), and the events the tap's callback has seen. When the HID count moves on by
-/// <see cref="Behind"/> while the tap's stays put for at least <see cref="Gap"/>, the tap may be starved; the tap then confirms it
-/// with a probe event of its own (<see cref="EventTap"/>), because the counts alone cannot tell starvation from keys another tap
-/// or the system consumed (a removal with the grant in place, owner's Mac 21:50:19 AEDT the same day).
+/// <see cref="Behind"/> while the tap's stays put for at least <see cref="Gap"/>, the tap may be starved. The counts alone cannot
+/// tell starvation from keys another tap or the system consumed (a healthy listener removed, owner's Mac 21:50:19 AEDT the same
+/// day), so the tap confirms by asking macOS for a fresh tap (<see cref="TapRecovery"/>); the events Dictum posts itself are
+/// subtracted from the HID count first (<see cref="PostedEvents"/>).
 /// <para>
 /// Paused while Secure Event Input is on (a password field, Terminal's Secure Keyboard Entry), when macOS keeps keys from taps
 /// on purpose, and for one <see cref="Gap"/> after it turns off; paused the same way after the timer itself stalled (sleep).
@@ -64,7 +65,7 @@ internal sealed class TapLiveness
         }
     }
 
-    /// <summary>The tap answered a probe: it is fed, and the keys the counts missed went somewhere else. Starts the count again from here.</summary>
+    /// <summary>A fresh tap was allowed: the keys the counts missed went somewhere else. Starts the count again from here.</summary>
     public void Fed(long nowMs, long hidCount, long tapCount)
     {
         lock (_gate) (_tapSeen, _hidBase, _baseMs) = (tapCount, hidCount, nowMs);

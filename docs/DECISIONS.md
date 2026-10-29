@@ -6602,3 +6602,27 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     `The_probe_is_swallowed_and_never_counted_as_a_key` (macOS only).
     - **Mutation checks (29/10/2026, Mac, Release), each observed failing on the reverted behaviour:** the probe step removed (two pins);
       the probe counted as a key (one); the probe passed on instead of swallowed (one); a probe that could not be posted taken as fed (one).
+18. **Re-create round (29/10/2026, from 41931d3; orchestrator decision 22:16 AEDT, owner's model Fable at high from 22:20).** The
+    probe of item 17 failed on hardware: reset at ~22:11:50 AEDT with the build running, the counts tripped at 22:11:55 (5 events
+    behind), the probe Dictum posted itself arrived in 0 ms, so the tap was kept, and the whole Mac's input stalled until the watchdog
+    killed the build at 22:12:47. After a revocation macOS still delivers a process's own posted events to its own tap while holding the
+    hardware keys, so no self-posted probe can confirm liveness. The probe is dropped (row 12 withdrawn). The confirmation that proved
+    honest on this Mac is `CGEventTapCreate` itself, refused after a real revocation while the check still said allowed (08:10:24):
+    on a count trigger the tap is disabled at once from whichever thread found it (the keys are free first), and the tap thread removes
+    it and asks for a fresh one (`TapRecovery`). Refused: the grant is gone, the shell hears Revoked after the removal, line and button
+    show. Created: a false positive; the fresh tap carries on, one Info line (row 13) says so, and the counts start again. A second
+    trigger within 30 s of a fresh tap stays removed and reports the grant gone (row 14, `// simplification:` on the window). Nothing is
+    re-enabled or re-created from the timer. Dictum's own posted key events (`PostedEvents`, counted by `CGEventSender`) are subtracted
+    from the HID count, for the paste case of 22:10:12. `DICTUM_TAP_DIAG=1` logs, per tick, CGPreflightPostEventAccess,
+    CGPreflightListenEventAccess, AXIsProcessTrusted, the HID and combined-session counts, posted, seen, CGEventTapIsEnabled, secure
+    input and the disable count; off by default, never set by a release build. Head-insert placement unchanged.
+    Pins: `A_starved_tap_asks_for_a_fresh_tap_and_reports_the_grant_gone_when_refused`,
+    `A_fresh_tap_allowed_is_kept_and_the_count_starts_again`, `A_second_trigger_soon_after_a_fresh_tap_stays_removed`,
+    `Keys_dictum_posted_itself_never_count_as_missed`, `A_tap_under_secure_input_is_never_asked_for_again`,
+    `A_disabled_tap_the_keys_stopped_reaching_is_asked_for_again_not_turned_back_on` (replaces the item 16 pin of that name),
+    `A_tap_macOS_keeps_disabling_is_removed_and_reported_instead_of_turned_back_on` (now reads the line the tap thread will log).
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** own posted events not subtracted (one pin); a refused fresh tap taken as created (two); the 30 s window ignored (one);
+      the trigger re-enabling in place instead of asking for a fresh tap (three); a disabled tap with keys missed turned back on (one).
+    - Not verified until the hands-on: that `CGEventTapCreate` is refused after every live revocation (one observation, 08:10:24), and
+      that the fresh tap is allowed in the false-positive cases of 21:50:19 and 22:10:12.
