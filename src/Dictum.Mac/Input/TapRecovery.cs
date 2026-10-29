@@ -27,6 +27,21 @@ internal sealed class TapRecovery
 }
 
 /// <summary>
+/// How many events Dictum's own taps have swallowed (the hotkey, when it is set to be suppressed; the fix-last hotkey). The HID
+/// system counted them and no app ever receives them, so the session counter stays flat for them: without this, two quick
+/// hands-free dictations with no typing between read as keys held (merge lens on fe03270, 29/10/2026 23:50 AEDT). One per
+/// platform, shared by every tap, because the session counter is one count for all of them.
+/// </summary>
+internal sealed class SwallowedEvents
+{
+    private long _count;
+
+    public long Count => Interlocked.Read(ref _count);
+
+    public void Add(int events) => Interlocked.Add(ref _count, events);
+}
+
+/// <summary>
 /// How many key events Dictum has posted itself (the paste's Cmd-V, typed text, released modifiers). The HID system counts them
 /// with the hardware keys, and they need not reach Dictum's own tap, so the liveness check subtracts them (a healthy listener
 /// read as starved one second after a paste, 29/10/2026 22:10:12 AEDT). One per platform, shared by the sender and every tap.

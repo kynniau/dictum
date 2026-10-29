@@ -6666,3 +6666,16 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     the code comments carry the approval. Windows CI at fbd90d2 failed one pin, `The_diagnostic_create_probe_never_runs_outside_the_switch`:
     its "diagnostic on" half reads macOS-only functions, so it is now a macOS-only pin (`…_runs_on_every_tick_under_the_switch`), and the
     "off" half stays ungated on both platforms (orchestrator, 23:33 AEDT).**
+22. **Merge-lens fix round (29/10/2026 23:50 AEDT, opus lens on fe03270: Block).** BLOCKER: the hotkey Dictum swallows (SuppressHotkey,
+    the default) is counted by the HID system and reaches no app, so two quick hands-free dictations with no typing between read as keys
+    held: trigger, re-create, and within 30 s row 14, the hotkey dead with the grant on. The soak missed it (a held Left Control and
+    pastes kept the session follower moving). Fix: `SwallowedEvents`, one per platform, incremented whenever a tap's handler returns false
+    (every Dictum tap), taken off the HID count before the session comparison in `Check`, `Probe` and `Fed`. Pins:
+    `Keys_dictum_swallowed_itself_never_count_as_held`, `A_swallowed_hotkey_event_is_counted_as_swallowed` (macOS only). Minors: (2) the
+    shutdown race — the tap thread keeps its own copy of its run loop for `Install`/`Remove`, and `Dispose` no longer zeroes the field
+    when the join times out (the retained loop is then leaked, not released under a live thread); (3) six logged strings were not on
+    the sheet: rows 15 to 20, PROPOSED; (4) the tap pins moved to `tests/Dictum.Tests/TapLivenessTests.cs` (InputAccessTests.cs was
+    1,011 lines). Measured, not recalled: `Environment.TickCount64` does not count sleep on macOS (4,306 s behind the wall clock after
+    today's sleeps), so the stalled-timer pause keyed on it never fired after a wake; the tap now also reads a wall clock for the pause
+    (`EventTap.Pause`). `Handle` tolerates a null event and makes its decoder lazily, so a pin can count a key or hand in a real event
+    without a running tap; Run still makes the decoder first.

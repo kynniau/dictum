@@ -13,6 +13,9 @@ namespace Dictum.Mac.Input;
 /// <item>the keys held after the tap: HID moves on while the session count stands still although the tap is fed (22:31:38 to
 /// 22:32:12: HID +457, tap +456, session +0, typing stalled the whole minute).</item>
 /// </list>
+/// Events Dictum's own taps swallowed (a suppressed hotkey) are counted by the HID system and reach no app, so they are taken off
+/// the HID count before the session comparison (<see cref="SwallowedEvents"/>); otherwise two quick hands-free dictations with no
+/// typing between read as keys held (merge lens on fe03270).
 /// Either trips the tap's trigger (<see cref="EventTap"/>): disabled at once, removed, and asked for again (<see cref="TapRecovery"/>),
 /// because the counts alone cannot tell the grant gone from keys another tap or macOS took. In healthy use all three rise together
 /// (22:29:32 to 22:30:02: HID +100, session +96, tap +100). The HID counter records an event up to about half a second after the
@@ -66,46 +69,48 @@ internal sealed class TapLiveness
     /// <param name="hidCount">Events of the tap's types the HID system has seen so far (Dictum's own posted ones subtracted).</param>
     /// <param name="tapCount">Events of those types the tap's callback has seen so far.</param>
     /// <param name="sessionCount">Events of those types that reached the session (the combined session state's count).</param>
-    /// <param name="secureInput">Whether Secure Event Input is on now.</param>
-    public bool Check(long nowMs, long hidCount, long tapCount, long sessionCount, bool secureInput)
+    /// <param name="swallowedCount">Events Dictum's own taps swallowed so far (<see cref="SwallowedEvents"/>): counted by HID, received by no app.</param>
+    /// <param name="pause">Whether to pause now: Secure Event Input is on, or the caller's wall clock says the timer stalled (a sleep; Environment.TickCount64 does not count sleep on macOS, measured 29/10/2026).</param>
+    public bool Check(long nowMs, long hidCount, long tapCount, long sessionCount, long swallowedCount, bool pause)
     {
         lock (_gate)
         {
             var stalled = _lastTickMs != long.MinValue && nowMs - _lastTickMs > 3 * (long)Tick.TotalMilliseconds;
             _lastTickMs = nowMs;
-            if (secureInput || stalled) _pausedUntilMs = nowMs + (long)Gap.TotalMilliseconds;
+            if (pause || stalled) _pausedUntilMs = nowMs + (long)Gap.TotalMilliseconds;
             var paused = nowMs < _pausedUntilMs;
             var tapStuck = _tap.Follow(nowMs, hidCount, tapCount, paused);
-            var sessionStuck = _session.Follow(nowMs, hidCount, sessionCount, paused);
-            return Trip(tapStuck, sessionStuck, hidCount);
+            var sessionStuck = _session.Follow(nowMs, hidCount - swallowedCount, sessionCount, paused);
+            return Trip(tapStuck, sessionStuck, hidCount, swallowedCount);
         }
     }
 
     /// <summary>The same test now, without moving the baselines: macOS disabled the tap, and it is turned back on only if this says no.</summary>
-    public bool Probe(long nowMs, long hidCount, long tapCount, long sessionCount, bool secureInput)
+    public bool Probe(long nowMs, long hidCount, long tapCount, long sessionCount, long swallowedCount, bool pause)
     {
         lock (_gate)
         {
-            if (secureInput || nowMs < _pausedUntilMs) return false;
-            return Trip(_tap.Stuck(nowMs, hidCount, tapCount), _session.Stuck(nowMs, hidCount, sessionCount), hidCount);
+            if (pause || nowMs < _pausedUntilMs) return false;
+            return Trip(_tap.Stuck(nowMs, hidCount, tapCount), _session.Stuck(nowMs, hidCount - swallowedCount, sessionCount), hidCount, swallowedCount);
         }
     }
 
-    private bool Trip(bool tapStuck, bool sessionStuck, long hidCount)
+    private bool Trip(bool tapStuck, bool sessionStuck, long hidCount, long swallowedCount)
     {
         if (!tapStuck && !sessionStuck) return false;
-        var lag = tapStuck ? _tap : _session;
-        (_tripped, _trippedMissed, _trippedSinceMs) = (tapStuck ? TapStarved : KeysHeld, lag.Missed(hidCount), lag.SinceMs);
+        (_tripped, _trippedMissed, _trippedSinceMs) = tapStuck
+            ? (TapStarved, _tap.Missed(hidCount), _tap.SinceMs)
+            : (KeysHeld, _session.Missed(hidCount - swallowedCount), _session.SinceMs);
         return true;
     }
 
     /// <summary>A fresh tap was allowed: the keys went somewhere else. Both counts start again from here.</summary>
-    public void Fed(long nowMs, long hidCount, long tapCount, long sessionCount)
+    public void Fed(long nowMs, long hidCount, long tapCount, long sessionCount, long swallowedCount)
     {
         lock (_gate)
         {
             _tap.Reset(nowMs, hidCount, tapCount);
-            _session.Reset(nowMs, hidCount, sessionCount);
+            _session.Reset(nowMs, hidCount - swallowedCount, sessionCount);
         }
     }
 

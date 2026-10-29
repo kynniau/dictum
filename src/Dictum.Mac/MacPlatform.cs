@@ -36,6 +36,7 @@ public sealed class MacPlatform : IPlatform, IDisposable
         _removal = new(() => new RemovalSteps(_log, Bundle, ExeDir, () => _startup.Value));
         _access = new MacInputAccess(Open, _log);
         _posted = new PostedEvents();
+        _swallowed = new SwallowedEvents();
     }
 
     public string Name => "macOS";
@@ -47,6 +48,7 @@ public sealed class MacPlatform : IPlatform, IDisposable
 
     private readonly MacInputAccess _access;
     private readonly PostedEvents _posted;
+    private readonly SwallowedEvents _swallowed;
 
     public string ExeDir { get; }
 
@@ -83,9 +85,9 @@ public sealed class MacPlatform : IPlatform, IDisposable
         }
     }
 
-    public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log) => new EventTapHotkey(matcher, post, log, lost: _access.ReportRevoked, posted: () => _posted.Count);
+    public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log) => new EventTapHotkey(matcher, post, log, lost: _access.ReportRevoked, posted: () => _posted.Count, swallowed: _swallowed);
 
-    public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => new EventTapKeyMonitor(onKey, log, lost: _access.ReportRevoked, posted: () => _posted.Count);
+    public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => new EventTapKeyMonitor(onKey, log, lost: _access.ReportRevoked, posted: () => _posted.Count, swallowed: _swallowed);
 
     public bool IsKeyDown(int vk) => KeyState.IsDown(vk);
 
