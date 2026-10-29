@@ -308,7 +308,7 @@ internal abstract class EventTap : IDisposable
             Trigger($"macOS disabled it ({why}) and {missed} key events {phrase}", now);
             return;
         }
-        // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
+        // APPROVED by the owner 29/10/2026 23:29 AEDT (Mac request-access block, row 8): do not reword.
         GiveUp($"Event tap ({_name}) removed: macOS keeps disabling it ({why}), which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).");
     }
 
@@ -376,7 +376,7 @@ internal abstract class EventTap : IDisposable
         }
         else
         {
-            // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
+            // APPROVED by the owner 29/10/2026 23:29 AEDT (Mac request-access block, row 14): do not reword.
             _deniedLine = $"Event tap ({_name}) removed: keys stopped reaching it again within {TapRecovery.Window.TotalSeconds:0} s of a fresh tap, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).";
             _stop = true;
         }
@@ -396,14 +396,14 @@ internal abstract class EventTap : IDisposable
         var now = nowMs ?? Environment.TickCount64;
         if (!created)
         {
-            // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
+            // APPROVED by the owner 29/10/2026 23:29 AEDT (Mac request-access block, row 10): do not reword.
             _deniedLine = $"Event tap ({_name}) removed: {_why}, and macOS refused a fresh tap, which happens when Dictum is no longer allowed to control this Mac. It is not turned back on, so keys reach other apps; press Request access in Settings > General (or the menu-bar panel).";
             _stop = true;
             return false;
         }
         _recovery.Recreated(now);
         _liveness.Fed(now, AdjustedHid(), Seen, SessionCount());
-        // PROPOSED (log line, PR #82 re-create round, 29/10/2026): awaiting owner approval.
+        // APPROVED by the owner 29/10/2026 23:29 AEDT (Mac request-access block, row 13): do not reword.
         _log.Info($"Event tap ({_name}) re-created: {_why}, but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
         Volatile.Write(ref _triggered, 0);
         return true;

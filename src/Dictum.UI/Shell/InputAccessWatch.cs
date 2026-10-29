@@ -69,7 +69,7 @@ public sealed class InputAccessWatch
         if (state == InputAccessState.Granted && !_checkDisagrees)
         {
             _checkDisagrees = true;
-            // PROPOSED (log line, PR #82 round 2, 29/10/2026): awaiting owner approval.
+            // APPROVED by the owner 29/10/2026 23:29 AEDT (Mac request-access block, row 9): do not reword.
             _log.Warn("Input access: a hotkey listener was refused although the system reports Dictum as allowed; treating it as not allowed until it is granted again or Request access is pressed.");
         }
         _stopListeners();
