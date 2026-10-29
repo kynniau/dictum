@@ -76,4 +76,8 @@ internal static partial class CG
     [DllImport(Lib, EntryPoint = "CGEventSourceButtonState")]
     [return: MarshalAs(UnmanagedType.I1)]
     public static extern bool EventSourceButtonState(int stateId, uint button);
+
+    /// <summary>How many events of this type the source state has seen (CGEventSource.h); called for the HID system state by the tap liveness check. Present on macOS 27.2, checked 29/10/2026.</summary>
+    [DllImport(Lib, EntryPoint = "CGEventSourceCounterForEventType")]
+    public static extern uint EventSourceCounterForEventType(int stateId, uint eventType);
 }

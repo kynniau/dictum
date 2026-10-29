@@ -6569,3 +6569,23 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
       again in `Tick`: observed failing (both shell pins).
     - Hand-test rule until B is proven on hardware: never reset Accessibility while a Dictum build runs; any reset-while-running test
       runs under a shell watchdog that kills the test build after 60 s unless cancelled.
+16. **Liveness round (29/10/2026, from 73c460d; design approved by the orchestrator at 21:37 AEDT with seven conditions).** On
+    hardware, 73c460d did not stop the lock: reset at about 21:34:00 AEDT with the build running, the owner could not type in any app,
+    the only log line was one "disabled by macOS (timeout) and re-enabled" at 21:34:51.680 (the check still said trusted), and the
+    watchdog killed the build at 21:35:00. Keys were held about 50 s before macOS's first notice, so no rule keyed on that notice can
+    prevent the lock. Fix: `TapLiveness` compares the HID system's count of the tap's own event types (`CGEventSourceCounterForEventType`
+    over `TapEvents.Types`, never mouse moves) with the count the tap's callback has seen; four events behind for a second means the
+    tap is starved. A 500 ms `System.Threading.Timer` runs it off the tap thread and never waits on that thread; on starvation the tap is
+    disabled at once from the timer, its run loop stopped (Run invalidates and releases it after waiting for the timer), and
+    `IInputAccess.Revoked` raised; nothing is re-created in place. Paused while Secure Event Input is on (`IsSecureEventInputEnabled`)
+    and for one gap after, and after a stalled timer (sleep). The first timeout-disable with the check saying trusted re-enables only if
+    a liveness probe passes. Thresholds carry `// simplification:` comments. Head-insert placement unchanged (condition 7).
+    Pins: `Liveness_calls_a_tap_starved_only_when_the_system_sees_keys_the_tap_does_not`,
+    `Liveness_pauses_for_secure_input_and_for_one_gap_after_it`, `Liveness_pauses_after_the_timer_stalled`,
+    `Liveness_counts_only_the_event_types_in_the_tap_mask`, `A_starved_tap_removes_itself_and_tells_the_shell_once`,
+    `A_disabled_tap_the_keys_stopped_reaching_is_removed_not_turned_back_on`.
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** the timer never calling a tap starved (three pins); no pause for secure input (two pins); no pause after a stalled
+      timer (one); the first disable turned back on without the probe (one); mouse moves counted (one).
+    - Unverified until the hands-on: that the HID counters advance while a starved tap holds the keys, and that secure input withholds
+      keys from taps while the counters still move (both recalled). Two more log lines PROPOSED (rows 10 and 11).
