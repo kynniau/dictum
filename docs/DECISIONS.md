@@ -6679,3 +6679,7 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     today's sleeps), so the stalled-timer pause keyed on it never fired after a wake; the tap now also reads a wall clock for the pause
     (`EventTap.Pause`). `Handle` tolerates a null event and makes its decoder lazily, so a pin can count a key or hand in a real event
     without a running tap; Run still makes the decoder first.
+23. **Row 13 reworded by the owner (29/10/2026 23:44 AEDT, "Approve, reword 13", typed in the orchestrator session in answer to the exact
+    wording; relayed by the orchestrator 23:45 and confirmed 30/10 00:06):** "Event tap (…) re-created: N key events reached macOS but not
+    Dictum (or: but no app), but macOS allowed a fresh tap, which usually means another app or macOS took those keys; the hotkey carries
+    on." Supersedes the 23:29 "Approve all five" for that row; rows 8, 9, 10 and 14 stand as approved then. Pin reads the line whole.**

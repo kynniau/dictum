@@ -428,8 +428,8 @@ internal abstract class EventTap : IDisposable
         }
         _recovery.Recreated(now);
         _liveness.Fed(now, AdjustedHid(), Seen, SessionCount(), _swallowed.Count);
-        // APPROVED by the owner 29/10/2026 23:29 AEDT (Mac request-access block, row 13): do not reword.
-        _log.Info($"Event tap ({_name}) re-created: {_why}, but macOS allowed a fresh tap, so another app or macOS took those keys and the hotkey carries on.");
+        // APPROVED by the owner 29/10/2026 23:44 AEDT, with his rewording (Mac request-access block, row 13): do not reword.
+        _log.Info($"Event tap ({_name}) re-created: {_why}, but macOS allowed a fresh tap, which usually means another app or macOS took those keys; the hotkey carries on.");
         Volatile.Write(ref _triggered, 0);
         return true;
     }

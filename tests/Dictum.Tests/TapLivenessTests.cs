@@ -184,7 +184,8 @@ public sealed class TapLivenessTests
         Assert.True(tap.RecreateRequested);
         Assert.True(tap.AfterRecreate(created: true, nowMs: TickMs + GapMs + 10));
         Assert.Null(tap.DeniedLine);
-        Assert.Single(log.Lines, l => l.Level == LogLevel.Info && l.Message.StartsWith("Event tap (key monitor) re-created: 20 key events reached macOS but not Dictum, but macOS allowed a fresh tap", StringComparison.Ordinal));
+        // pin: APPROVED by the owner 29/10/2026 23:44 AEDT, with his rewording (Mac request-access block, row 13)
+        Assert.Single(log.Lines, l => l.Level == LogLevel.Info && l.Message == "Event tap (key monitor) re-created: 20 key events reached macOS but not Dictum, but macOS allowed a fresh tap, which usually means another app or macOS took those keys; the hotkey carries on.");
 
         tap.LivenessTick(TickMs + 2 * GapMs); // nothing missed since the fresh tap: no trigger
         hid += 3;
