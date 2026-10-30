@@ -37,6 +37,7 @@ public sealed record AppSettings
     public ProfanitySettings Profanity { get; init; } = new();
     public UiSettings Ui { get; init; } = new();
     public TermsSettings Terms { get; init; } = new();
+    public KeysSettings Keys { get; init; } = new();
 
     /// <summary>Optional second hotkey that opens "Fix last dictation" (SPEC §16.3). Null = unset (the default).</summary>
     public string? FixHotkey { get; init; }
@@ -238,6 +239,22 @@ public sealed record TermsSettings
 
     /// <summary>The account name (Environment.UserName) that accepted it, or null.</summary>
     public string? AcceptedBy { get; init; }
+}
+
+/// <summary>
+/// keys.* (API keys, 30/10/2026): which key each service uses when there are several. Never a key: only a stored key's id
+/// (<see cref="SecretVault"/>) or one of the two sources <see cref="StoredKeyId.Environment"/> and <see cref="StoredKeyId.File"/>.
+/// </summary>
+public sealed record KeysSettings
+{
+    /// <summary>keys.active: variable (one of <see cref="SecretStore.KeyNames"/>) to the chosen source. Absent: Dictum's order decides (<see cref="SecretStore.Get"/>).</summary>
+    public IReadOnlyDictionary<string, string> Active { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>By content, as every other settings record compares: two loads of the same file are equal settings.</summary>
+    public bool Equals(KeysSettings? other) =>
+        other is not null && Active.Count == other.Active.Count && Active.All(kv => other.Active.TryGetValue(kv.Key, out var v) && v == kv.Value);
+
+    public override int GetHashCode() => Active.Count;
 }
 
 /// <summary>A short sound when recording starts and stops.</summary>

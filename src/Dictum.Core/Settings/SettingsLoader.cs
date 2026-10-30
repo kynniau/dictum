@@ -107,6 +107,7 @@ public static class SettingsLoader
             Profanity = BindProfanity(r.Child("profanity")),
             Ui = BindUi(r.Child("ui")),
             Terms = BindTerms(r.Child("terms")),
+            Keys = BindKeys(r.Child("keys")),
             FixHotkey = r.NullableString("fix_hotkey", v => HotkeyParser.TryParse(v, out _, out var e) ? null : e),
             LogLevel = r.String("log_level", d.LogLevel, OneOf("debug", "info", "warning", "error")).ToLowerInvariant(),
             LogTranscripts = r.Bool("log_transcripts", d.LogTranscripts),
@@ -167,6 +168,18 @@ public static class SettingsLoader
     {
         if (r is null) return new TermsSettings();
         var s = new TermsSettings { Accepted = r.NullableString("accepted"), AcceptedBy = r.NullableString("accepted_by") };
+        r.WarnUnknown();
+        return s;
+    }
+
+    /// <summary>
+    /// keys.active (API keys, 30/10/2026): each name must be a key Dictum reads and each value a stored key's id, "env" or "file".
+    /// A warning names the setting, never its value: a key pasted here by mistake must not reach the log.
+    /// </summary>
+    private static KeysSettings BindKeys(ObjectReader? r)
+    {
+        if (r is null) return new KeysSettings();
+        var s = new KeysSettings { Active = r.KeyChoices("active") };
         r.WarnUnknown();
         return s;
     }
@@ -404,6 +417,29 @@ public static class SettingsLoader
             // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the warning below.
             warnings.Add($"Setting \"{Full(key)}\" is {s.Length} characters long; only the first {maxLength} are used.");
             return s[..(char.IsHighSurrogate(s[maxLength - 1]) ? maxLength - 1 : maxLength)].TrimEnd();
+        }
+
+        /// <summary>keys.active: an object of variable to choice; anything else is passed over with a warning that never shows a value.</summary>
+        public IReadOnlyDictionary<string, string> KeyChoices(string key)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!TryGet(key, out var v) || v.ValueKind == JsonValueKind.Null) return result;
+            if (v.ValueKind != JsonValueKind.Object)
+            {
+                warnings.Add($"Setting \"{Full(key)}\" must be an object; no key is chosen.");
+                return result;
+            }
+            foreach (var p in v.EnumerateObject())
+            {
+                if (p.Value.ValueKind == JsonValueKind.Null) continue;
+                if (!SecretStore.KeyNames.Contains(p.Name))
+                    warnings.Add($"Setting \"{Full(key)}.{p.Name}\" is not a key Dictum reads; ignored.");
+                else if (p.Value.ValueKind != JsonValueKind.String || !StoredKeyId.IsChoice(p.Value.GetString()))
+                    warnings.Add($"Setting \"{Full(key)}.{p.Name}\" has an invalid value (not shown): expected a stored key's id, \"env\" or \"file\". No key is chosen for it.");
+                else
+                    result[p.Name] = p.Value.GetString()!;
+            }
+            return result;
         }
 
         public ObjectReader? Child(string key)

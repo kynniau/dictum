@@ -46,6 +46,9 @@ public sealed class MacPlatform : IPlatform, IDisposable
     /// <summary>The Accessibility grant: checked silently, asked for with the system prompt and the Settings page (<see cref="MacInputAccess"/>).</summary>
     public IInputAccess InputAccess => _access;
 
+    /// <summary>No credential store yet: the Keychain is the K-Mac lane's (docs/DECISIONS.md, API keys, 30/10/2026). Keys from the environment and .env still work.</summary>
+    public ICredentialStore Credentials => NoCredentialStore.Instance;
+
     private readonly MacInputAccess _access;
     private readonly PostedEvents _posted;
     private readonly SwallowedEvents _swallowed;

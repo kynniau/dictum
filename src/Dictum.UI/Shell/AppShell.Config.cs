@@ -22,7 +22,7 @@ public sealed partial class AppShell
     private void LoadConfiguration(bool isReload)
     {
         var config = ConfigLoader.Load(Paths, _redactor, Environment.GetEnvironmentVariable, ProbeGpu, _log.Warn, _options.CleanupOverride,
-            previous: isReload ? _settings : null);
+            previous: isReload ? _settings : null, vault: Vault);
         if (config.Problem is { } problem)
         {
             _log.Warn(problem);

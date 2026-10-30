@@ -86,9 +86,24 @@ public static partial class SelfTestCommand
         return ok;
     }
 
-    /// <summary>SPEC §11: every key Dictum reads (<see cref="SecretStore.KeyNames"/>), present and from where, or absent; never a value.</summary>
+    /// <summary>
+    /// SPEC §11: every key Dictum reads (<see cref="SecretStore.KeyNames"/>), present and from where, or absent, then how many are
+    /// stored in the credential store when there are any (API keys, decision D2, 30/10/2026); never a value, nor any part of one.
+    /// PROPOSED 30/10/2026: the stored-key wording (.demo-preview/approve-api-keys.md rows 1 to 4).
+    /// </summary>
     internal static void KeyLines(SecretStore secrets, Action<string, string, bool?> line)
     {
-        foreach (var name in SecretStore.KeyNames) line(name, secrets.Describe(name), null);
+        foreach (var name in SecretStore.KeyNames)
+        {
+            var count = secrets.StoredCount(name);
+            line(name, secrets.Describe(name) + (count == 0 ? "" : count == 1 ? "; 1 stored key" : $"; {count} stored keys"), null);
+        }
     }
+
+    /// <summary>
+    /// Where keys added in Dictum are kept: the system's credential store by name, or that this platform has none yet.
+    /// PROPOSED 30/10/2026 (.demo-preview/approve-api-keys.md row 5).
+    /// </summary>
+    internal static void KeyStoreLine(ISecretVault vault, Action<string, string, bool?> line) =>
+        line("key store", vault.Available ? vault.StoreName ?? "available" : "none on this platform", null);
 }

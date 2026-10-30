@@ -75,6 +75,7 @@ public sealed partial class AppShell : IDisposable
         HttpMessageHandler? updateHandler = null, LocalLlmManager? cleanupModels = null, HttpMessageHandler? providerHandler = null)
     {
         Platform = platform;
+        Vault = new SecretVault(paths, platform.Credentials);
         Paths = paths;
         _log = log;
         _fileLog = log as FileLog;
@@ -103,6 +104,9 @@ public sealed partial class AppShell : IDisposable
     }
 
     public IPlatform Platform { get; }
+
+    /// <summary>The API keys added in Dictum (several per service, in the system's credential store), read at every load; the Settings lane adds and removes through it.</summary>
+    public SecretVault Vault { get; }
 
     /// <summary>The input-access grant (macOS Accessibility) as the hotkey surfaces show it: its state, and the one Request button.</summary>
     public InputAccessWatch Access { get; }
