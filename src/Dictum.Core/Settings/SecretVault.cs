@@ -225,9 +225,15 @@ public sealed class SecretVault(AppPaths paths, ICredentialStore store, Func<Dat
                 }
             }
             var kept = refused.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
-            var file = KeysFile.Read(paths.KeysFile);
-            if (kept.Count > 0 && file.Usable) KeysFile.Write(paths.KeysFile, file.Entries.Where(e => kept.Contains(e.Id)).ToList());
-            else if (File.Exists(paths.KeysFile)) File.Delete(paths.KeysFile);
+            if (kept.Count == 0)
+            {
+                if (File.Exists(paths.KeysFile)) File.Delete(paths.KeysFile);
+            }
+            else if (KeysFile.Read(paths.KeysFile) is { Usable: true } file)
+            {
+                KeysFile.Write(paths.KeysFile, file.Entries.Where(e => kept.Contains(e.Id)).ToList());
+            }
+            // else: keys remain and keys.json cannot be read now (a parse error, or a passing sharing violation): left as it is (re-lens minor 2)
             ClearActive(chosen => StoredKeyId.IsValid(chosen) && !kept.Contains(chosen));
         }
         if (count > 0) Changed?.Invoke();

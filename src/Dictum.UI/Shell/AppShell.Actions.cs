@@ -219,6 +219,7 @@ public sealed partial class AppShell
         Models.CancelDownload(DownloadCancelReason.Remove);
         _models.Unload();
         _llm.Unload();
+        _reloadsStopped = true;
         _watcher?.Dispose();
         _watcher = null;
         _fileLog?.Stop(); // the logs folder is deleted next; nothing may write it again

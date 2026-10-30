@@ -6762,3 +6762,14 @@ decisions D1 to D5 accepted by the owner 30/10/2026 18:57 AEDT. K-Core lane: Cor
    section's unknown names echoed (1); L3 the first refused delete stopping RemoveAll (1); L4 every .env value registered (1); L5
    List showing an unsafe label (1); L6 another variable's stored key handed out (5, the new Azure and Groq cases included); L7 the
    count printed twice (2).
+10. **Re-lens fix round (30/10/2026, Opus re-lens on 9658470: Needs changes, no blocker, two minors).** (1) The `Vault.Changed`
+    subscription reloaded during "Remove Dictum completely": with a key delete refused, the "Done, except…" modal ran the posted
+    reload, which loaded defaults from the deleted folder and reinstalled the hook. `_reloadsStopped` is set where the config watcher
+    is disposed (RemoveEverything and Dispose), and the handler reloads only while it is clear and the shell is not disposed. (2)
+    RemoveAll deleted a keys.json it could not read while refused keys remained, losing their labels (a parse error, or a passing
+    sharing violation): it now deletes keys.json only when nothing remains, rewrites it when it can be read, and otherwise leaves it
+    as it is. The test dialogs gained `OnTell`, which runs posted jobs inside Tell as a real modal's frame does. **Mutation checks
+    (30/10/2026, Windows, Debug; each source restored with git checkout), each observed failing on the reverted behaviour:** R1 the
+    handler without its guard (1 pin, `A_vault_change_once_full_removal_has_started_reloads_nothing`); R1b RemoveEverything not
+    setting the flag (the same pin, through the reload run inside the modal); R2 the unreadable keys.json deleted with keys remaining
+    (1, `Remove_all_with_a_key_refused_leaves_an_unreadable_keys_json_byte_for_byte`).

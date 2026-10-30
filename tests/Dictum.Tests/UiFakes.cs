@@ -248,7 +248,14 @@ internal sealed class ScriptedDialogs : IShellDialogs
         return Answers.Count > 0 ? Answers.Dequeue() : -1;
     }
 
-    public void Tell(string title, string text) => Told.Add(text);
+    /// <summary>Runs inside Tell, as a real modal's frame runs posted jobs while it is open (SecretVaultTests).</summary>
+    public Action? OnTell { get; set; }
+
+    public void Tell(string title, string text)
+    {
+        Told.Add(text);
+        OnTell?.Invoke();
+    }
 
     public bool TypeToConfirm(string title, string text, string word)
     {

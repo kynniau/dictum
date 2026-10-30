@@ -258,6 +258,53 @@ public class SecretVaultTests
     }
 
     [Fact]
+    public void Remove_all_with_a_key_refused_leaves_an_unreadable_keys_json_byte_for_byte()
+    {
+        // Re-lens minor 2 (30/10/2026): RemoveAll deleted keys.json it could not read, so the refused key's label was lost.
+        var (scratch, store, vault) = Make();
+        using var owned = scratch;
+        vault.Add(SecretStore.OpenAiKey, "A", Value);
+        vault.Add(SecretStore.GeminiKey, "B", Value + "b");
+        File.WriteAllText(scratch.Paths.KeysFile, "{ not json");
+        store.FailDeleteNumber = 1;
+        Assert.Throws<CredentialStoreException>(() => vault.RemoveAll());
+        Assert.Single(store.Entries);
+        Assert.Equal("{ not json", File.ReadAllText(scratch.Paths.KeysFile));
+    }
+
+    [Fact]
+    public Task A_vault_change_once_full_removal_has_started_reloads_nothing() => UiSession.Run(() =>
+    {
+        // Re-lens minor 1 (30/10/2026): RemoveAll's Changed posted a reload that the "Done, except…" modal then ran, loading defaults
+        // from the deleted folder and reinstalling the hook. A refused delete makes that modal appear; the jobs it would run are run here.
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var log = new RecordingLog();
+        var (shell, platform, dialogs) = scratch.Shell(log: log);
+        shell.Reload(userRequested: false);
+        shell.Vault.Add(SecretStore.OpenAiKey, "A", Value);
+        shell.Vault.Add(SecretStore.GeminiKey, "B", Value + "b");
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        static int Reloads(RecordingLog l) => l.Lines.Count(x => x.Message.StartsWith("Settings reloaded", StringComparison.Ordinal));
+        var before = Reloads(log);
+        Assert.True(before >= 2); // each Add reloaded: the subscription is live
+        platform.FakeCredentials.FailDeleteNumber = 1;
+        dialogs.Answers.Enqueue(0);
+        dialogs.ConfirmWord = true;
+        var duringModal = -1;
+        dialogs.OnTell = () =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs(); // the "Done, except…" modal's frame, before Quit
+            duringModal = Reloads(log);
+        };
+        Assert.True(shell.RemoveEverything());
+        Assert.Contains(dialogs.Told, t => t.Contains("stored keys could not be removed", StringComparison.Ordinal));
+        Assert.Equal(before, duringModal);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Equal(before, Reloads(log));
+        Assert.False(File.Exists(scratch.Paths.SettingsFile)); // no reload wrote it back
+    });
+
+    [Fact]
     public void A_label_holding_part_of_its_key_is_listed_blank()
     {
         // Lens note 5 (30/10/2026): List applies Describe's rule, so a hand-edited keys.json cannot show a key through any caller.
