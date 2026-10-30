@@ -6703,3 +6703,47 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     the 30 s rule lets the next trip ask again, four keys never seen: TapStarved), `A_disabled_tap_is_turned_back_on_when_the_only_keys_missing_are_its_own_swallows`.
     - **Mutation checks (30/10/2026, Mac, Release; source restored after each), each observed failing on the reverted behaviour:** `Fed`
       without the subtraction, alone (one pin); `Probe` without the subtraction, alone (one pin). No product code changed.
+
+## API keys, Core: several keys per service in the system's credential store (30/10/2026 19:35 AEDT, branch feature/api-keys-core)
+
+Brief: `.demo-preview/design-api-keys.md` (orchestrator, 30/10/2026 13:31 AEDT), committed unchanged as this branch's first commit;
+decisions D1 to D5 accepted by the owner 30/10/2026 18:57 AEDT. K-Core lane: Core only, no window or page. Built on Opus 5.5.
+
+1. **Verified on Microsoft Learn before coding (read 30/10/2026).** (i) CRED_PERSIST_LOCAL_MACHINE: "visible to other logon sessions
+   of this same user on this same computer and not visible to logon sessions for this user on other computers"
+   (https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw). The page does not name a Microsoft account;
+   Learn documents Microsoft-account roaming for the WinRT Credential Locker (PasswordVault), a different API Dictum does not use
+   (https://learn.microsoft.com/windows/apps/develop/security/credential-locker). (ii) CredWrite is "desktop apps only"
+   (https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew), and full-trust packaged apps "run with the same
+   permissions as a standard desktop app" (https://learn.microsoft.com/windows/msix/msix-containerization-overview); Dictum's manifest
+   declares runFullTrust. No Learn page names CredWrite and MSIX together, and the packaged build has not been run against it: the
+   Store build's first run is the check. The DPAPI fallback was not built.
+2. **One seam, values only.** `IPlatform.Credentials` (`ICredentialStore`: Write / Read / Delete / List by variable and id) holds the
+   values; `SecretVault` (`ISecretVault`: Add / List / Get / Remove / RemoveAll, the brief's interface) is shared by every platform and
+   keeps id, variable, label and date in `keys.json`. Deviation from the brief's wording ("one implementation per platform" of
+   `ISecretVault`): with keys.json shared, each platform would have repeated the label, validation and keys.json code; now the Mac
+   lane writes four Keychain calls. Windows: `CredentialManagerStore`, target `Dictum/{VARIABLE}/{id}`, user name the variable, UTF-8
+   blob, CRED_PERSIST_LOCAL_MACHINE, no comment. macOS: `NoCredentialStore` (unavailable) until K-Mac.
+3. **Resolution (`SecretStore.Get`).** keys.active's source for the variable when it has a value (a stored key of that variable only;
+   "env"; "file"), else environment, config .env, exe .env (unchanged), else the only stored key; two or more and none chosen gives
+   none. A choice naming nothing falls back. Blank and placeholder values are not set in the store too. While settings.json is
+   broken on a reload, the choice in use is kept.
+4. **Redaction.** ConfigLoader now registers every value the store holds (`SecretStore.AllValues`): each environment value, both .env
+   files' values and every stored key, chosen or not. Before this, only the value `Get` returned was registered, so a .env value
+   shadowed by an environment variable was not (it was never sent, so no leak path was found; it is covered now).
+5. **Never a value on disk or on screen (D2).** keys.json and settings.json never hold one; a keys.active value that is not an id,
+   "env" or "file" is warned about without being shown; a label holding any eight characters of its key is refused at Add and left
+   out of `Describe`. The self-test names the store (`key store`) and counts stored keys per variable.
+6. **Full removal.** keys.json is in the path registry with the .env files (Secrets). "Remove Dictum completely" also calls
+   `SecretVault.RemoveAll` (the keys are outside every folder the plan lists; SPEC §17's "only trace" sentence stays true).
+7. **Gate left red on purpose.** `StoredFilesPolicyTests.The_privacy_policy_names_every_file_Dictum_stores` fails: site/privacy.html
+   (approved legal copy) does not name keys.json. The lane did not edit it; the sentence is PROPOSED in
+   `.demo-preview/approve-api-keys.md` row 15. The brief put the privacy paragraph in the K-Docs lane, after K-UI; this gate needs it
+   before K-Core merges.
+8. **Pins and mutation checks (30/10/2026, Windows, Debug; each source restored with git checkout after its run), each observed
+   failing on the reverted behaviour:** M1 keys.active ignored (4 pins); M2 .env before environment (3); M3 first of several stored
+   keys used (3); M4 the only stored key before environment (1); M5 a chosen id of another variable accepted (3, host isolation);
+   M6 only chosen values registered with the redactor (1); M7 placeholder in the store counted as set (1); M8 the key written as the
+   label in keys.json (4); M8b keys.active writer accepting a key (1); M9 Describe always showing the label (1); M10 a label holding
+   part of the key accepted (1); M11 a bad keys.active value echoed into the warning (1); M12 full removal leaving stored keys (1);
+   M13 CRED_PERSIST_ENTERPRISE in place of LOCAL_MACHINE (1, real Credential Manager).

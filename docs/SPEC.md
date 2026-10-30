@@ -361,6 +361,22 @@ no key" line. The placeholder `your-key-here` (`SecretStore.Placeholder`) counts
 dictation is sent with it and the pages keep their waiting-for-key line until a real key is saved over it. The button is
 `KeyFileButton`, beside "Open the settings folder" on the Cloud clean-up card.
 
+API keys in the credential store (amendment, 30/10/2026, Core lane; brief `.demo-preview/design-api-keys.md`, decisions D1 to
+D5 accepted by the owner 30/10/2026 18:57 AEDT). A key can also be kept in the operating system's credential store, several per
+variable: `ISecretVault` (`SecretVault`, shared by every platform) keeps each value in `IPlatform.Credentials` (Windows Credential
+Manager, a generic credential `Dictum/{VARIABLE}/{id}` persisted for this computer only; the macOS Keychain from the K-Mac lane,
+`NoCredentialStore` until then) and its id, variable, label and date in `keys.json` (§9). The order `SecretStore.Get` follows: the
+source settings.json's `keys.active` chooses for that variable, when it has a value (a stored key of that same variable, `"env"` for
+the environment variable, `"file"` for the `.env` line); otherwise the order above, unchanged (environment, config-folder `.env`, the
+`.env` beside the program); otherwise the stored key when exactly one is stored for that variable. Two or more stored and none
+chosen: none is used. A choice that names nothing (a removed key, an unset variable) falls back to that order. A stored key is
+only ever handed out for its own variable, so the "§5 keys" rule (§22) still decides which server gets it; consent, the http
+refusal and offline only are untouched. Blank and placeholder values are "not set" in the store too. Every value is registered
+with the log redactor at each load, the ones not chosen included (environment, both `.env` files, every stored key). `--selftest`
+names the store (`key store`) and, per variable, its source (`present (stored key "Label")`; the label is left out when it holds
+any eight characters of the key) and the count of stored keys; never a value or any part of one (D2). These lines are PROPOSED
+(`.demo-preview/approve-api-keys.md`).
+
 ## 6. Text insertion
 
 Sequence for `insert.method = "paste"`:
@@ -513,6 +529,15 @@ redraws the page and the tray panel.
 value from 5 to 29 left by an earlier version is raised to 30 at load with a log line, and the file
 is not rewritten (`EffectiveSettings.HandsFree`); 0–4 and over 3600 still fall back to the default
 with a warning. It limits hands-free only: a held key stops after a fixed 300 s (§3).
+
+`keys.active` (amendment, 30/10/2026, API keys, §5): an object of variable (one of `SecretStore.KeyNames`) to the chosen source,
+a stored key's id (twelve lower-case hex characters), `"env"` or `"file"`; absent or `null` leaves the choice to the order in §5.
+An unknown variable or any other value is passed over with a warning that names the setting and never shows the value (a key
+pasted there by mistake must not reach the log). While settings.json cannot be read on a reload, the choice in use is kept.
+`SecretVault.SetActive` writes it through the settings writer. `keys.json` beside settings.json holds `{"keys": [{"id",
+"variable", "label", "added"}]}` (the date as yyyy-MM-dd): labels trimmed, at most 60 characters, without control characters,
+and never one that holds part of the key; written atomically like settings.json, never written over while it cannot be read, and
+watched for reload like it (`AppRules.ReloadsOn`). Neither file ever holds a key.
 
 ## 10. Models
 
@@ -901,6 +926,12 @@ Users must be able to remove what the app has put on disk, from inside the app.
   path list is complete against the app's own path registry (a test enumerates every
   location the app writes and asserts the removal list covers it), and nothing outside
   those paths is touched.
+- **API keys in the credential store (amendment, 30/10/2026).** `keys.json` (§9) is in the path registry with the `.env`
+  files (`DataCategory.Secrets`): "Delete all app data" keeps it, "Remove Dictum completely" deletes it. The keys themselves are
+  in the operating system's credential store, outside every folder: "Remove Dictum completely" removes every entry Dictum made
+  there first (`SecretVault.RemoveAll`) and lists any it could not remove beside the other failures. Uninstalling without that
+  step leaves those entries in Credential Manager (Keychain on a Mac) until the user removes them; the Help line saying so, and
+  "Remove all keys" in Settings > Privacy, are the UI lane's.
 
 ## 18. Packaging and distribution (decided 15/10/2026)
 
@@ -1066,7 +1097,9 @@ the polish lane restructures the solution now:
   listeners without a relaunch (docs/DECISIONS.md "Request access", 27/10/2026).
 - `IPlatform` is the single seam: hotkey listener, input injector, clipboard, audio
   capture factory, startup registration, single-instance guard, window-flag applier,
-  app-paths provider, tray host. Nothing outside `Dictum.Windows`/`Dictum.Mac` may
+  app-paths provider, tray host, and (amendment, 30/10/2026, §5) the credential store
+  `IPlatform.Credentials` (values only; `SecretVault` in Dictum.Core keeps the labels, so each
+  platform adds just Write / Read / Delete / List). Nothing outside `Dictum.Windows`/`Dictum.Mac` may
   reference a platform API; a test asserts `Dictum.Core` and `Dictum.UI` have no such
   references.
 - WPF and WinForms are removed entirely (no two UI frameworks). The WPF pill's focus
