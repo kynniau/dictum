@@ -73,6 +73,9 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     /// <summary>No grant to ask for by default, as Windows; a Mac test sets its state.</summary>
     public FakeInputAccess FakeAccess { get; } = new();
     public IInputAccess InputAccess => FakeAccess;
+    /// <summary>An in-memory credential store (SecretVaultTests), empty and available.</summary>
+    public FakeCredentialStore FakeCredentials { get; } = new();
+    public ICredentialStore Credentials => FakeCredentials;
     public IInputSender CreateInputSender(ILog log) => Desktop;
     public IClipboard Clipboard => Desktop;
     public FakeDesktop Desktop { get; } = new();
