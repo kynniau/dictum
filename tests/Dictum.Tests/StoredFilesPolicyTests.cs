@@ -28,6 +28,10 @@ public sealed class StoredFilesPolicyTests
         ["snippets.txt"] = "snippets.txt",
         ["profanity.txt"] = "profanity.txt",
         [".env"] = ".env",
+        // API keys, Core (30/10/2026): keys.json holds the stored keys' labels. site/privacy.html must name it before this merges; the line is PROPOSED in
+        // .demo-preview/approve-api-keys.md row 15 and awaits the owner, so The_privacy_policy_names_every_file_Dictum_stores fails until then.
+        ["keys.json"] = "keys.json",
+        ["keys.json.tmp"] = "Working files",
         ["verified-models.json"] = "verified-models.json",
         ["verified-models.json.tmp"] = "Working files",
         ["gpu-load-speech.txt"] = "gpu-load-speech.txt",

@@ -219,12 +219,25 @@ public sealed partial class AppShell
         Models.CancelDownload(DownloadCancelReason.Remove);
         _models.Unload();
         _llm.Unload();
+        _reloadsStopped = true;
         _watcher?.Dispose();
         _watcher = null;
         _fileLog?.Stop(); // the logs folder is deleted next; nothing may write it again
+        // The keys added in Dictum live in the system's credential store, outside every folder the plan lists (API keys, SPEC §17
+        // amended 30/10/2026): removed first, while settings.json is still there for the choices that named them.
+        string? keysProblem = null;
+        try
+        {
+            Vault.RemoveAll();
+        }
+        catch (Exception ex) when (ex is Dictum.Platform.CredentialStoreException or IOException or UnauthorizedAccessException)
+        {
+            keysProblem = $"the API keys stored in {Vault.StoreName ?? "the credential store"} ({ex.Message})"; // PROPOSED 30/10/2026 (approve-api-keys.md row 8)
+        }
         var result = plan.Execute();
         _offlineOnlyThisSession = false; // nothing is kept: the quit must not write settings.json again (SaveSessionChoices)
         var problems = result.Failures.Concat(Platform.Removal.RemoveShortcutAndStartup()).ToList();
+        if (keysProblem is not null) problems.Add(keysProblem);
         if (packaged) Platform.Removal.OpenUninstallSettings();
         else if (!Platform.Removal.ScheduleProgramFolderRemoval(Paths.ExeDir, out var reason)) problems.Add(reason ?? "the program folder was not removed");
         if (problems.Count > 0) Dialogs.Tell("Remove Dictum completely", "Done, except:\n\n" + string.Join("\n", problems.Select(p => "• " + p)));

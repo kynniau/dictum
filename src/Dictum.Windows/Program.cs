@@ -70,13 +70,13 @@ public static class Program
         switch (options.Mode)
         {
             case CliMode.Transcribe:
-                return CliCommands.TranscribeAsync(options, paths, log, redactor).GetAwaiter().GetResult();
+                return CliCommands.TranscribeAsync(options, paths, log, redactor, new SecretVault(paths, platform.Credentials)).GetAwaiter().GetResult();
             case CliMode.SelfTest:
                 return SelfTestCommand.Run(options, paths, log, redactor, platform);
             case CliMode.PrintModelsDir:
                 return CliCommands.PrintModelsDir(paths, Console.Out, Console.Error);
             case CliMode.BenchCleanup:
-                return BenchCleanupCommand.RunAsync(options, paths, log, redactor).GetAwaiter().GetResult();
+                return BenchCleanupCommand.RunAsync(options, paths, log, redactor, new SecretVault(paths, platform.Credentials)).GetAwaiter().GetResult();
             case CliMode.DownloadModel:
             case CliMode.DownloadCleanupModel:
                 return DownloadCommand.RunAsync(options, paths, log).GetAwaiter().GetResult();

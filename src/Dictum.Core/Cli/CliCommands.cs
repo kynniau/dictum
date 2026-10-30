@@ -52,7 +52,8 @@ public static class CliCommands
         return true;
     }
 
-    public static async Task<int> TranscribeAsync(CliOptions options, AppPaths paths, ILog log, SecretRedactor redactor)
+    /// <param name="vault">The keys added in Dictum (null: none are read).</param>
+    public static async Task<int> TranscribeAsync(CliOptions options, AppPaths paths, ILog log, SecretRedactor redactor, SecretVault? vault = null)
     {
         var wav = Path.GetFullPath(options.WavPath!);
         if (!File.Exists(wav))
@@ -60,7 +61,7 @@ public static class CliCommands
             Console.Error.WriteLine($"error: WAV file not found: {wav}");
             return 1;
         }
-        var config = LoadConfig(paths, log, redactor, options.CleanupModel);
+        var config = LoadConfig(paths, log, redactor, options.CleanupModel, vault);
         if (Unreadable(config, paths)) return 1;
         if (RefusedWithoutTerms(paths, log, "--transcribe")) return 1;
         var (settings, secrets) = (config.Settings, config.Secrets);
@@ -155,9 +156,9 @@ public static class CliCommands
         PersonalText.Load(paths, w => { log.Warn(w); Console.Error.WriteLine($"note: {w}"); });
 
     /// <summary>The shared loader (<see cref="ConfigLoader"/>); warnings reach stderr through the log's echo.</summary>
-    internal static ConfigLoadResult LoadConfig(AppPaths paths, ILog log, SecretRedactor redactor, string? cleanupOverride = null) =>
+    internal static ConfigLoadResult LoadConfig(AppPaths paths, ILog log, SecretRedactor redactor, string? cleanupOverride = null, SecretVault? vault = null) =>
         ConfigLoader.Load(paths, redactor, Environment.GetEnvironmentVariable,
-            s => { WhisperEngine.ProbeRuntime(s.Whisper.Gpu, log); return WhisperEngine.GpuMachine; }, log.Warn, cleanupOverride);
+            s => { WhisperEngine.ProbeRuntime(s.Whisper.Gpu, log); return WhisperEngine.GpuMachine; }, log.Warn, cleanupOverride, vault: vault);
 
     /// <summary>
     /// SPEC §22: every CLI command exits 1 on a settings.json it cannot read (its values, offline_only included, are

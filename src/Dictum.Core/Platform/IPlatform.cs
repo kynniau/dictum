@@ -48,6 +48,14 @@ public interface IPlatform
     /// </summary>
     IInputAccess InputAccess { get; }
 
+    // ---- Credential store ----------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Where API keys added in Dictum are kept (decision D1, 30/10/2026): Windows Credential Manager; the macOS Keychain once the
+    /// K-Mac lane lands (<see cref="NoCredentialStore"/> until then). Values only: <see cref="Settings.SecretVault"/> keeps the labels.
+    /// </summary>
+    ICredentialStore Credentials { get; }
+
     // ---- Input injector and clipboard --------------------------------------------------------------------------------
 
     IInputSender CreateInputSender(ILog log);

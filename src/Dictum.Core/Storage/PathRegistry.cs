@@ -76,6 +76,9 @@ public static class PathRegistry
             new(paths.ProfanityOverrideFile, DataCategory.PersonalFiles, "your profanity word list"),
             new(paths.EnvFile, DataCategory.Secrets, "API keys (.env)"),
             new(paths.ExeEnvFile, DataCategory.Secrets, "API keys beside the program (.env)"),
+            // PROPOSED 30/10/2026 (API keys, .demo-preview/approve-api-keys.md rows 6 and 7): labels only; the keys are in the credential store.
+            new(paths.KeysFile, DataCategory.Secrets, "names of your stored API keys (keys.json)"),
+            new(paths.KeysFile + ".tmp", DataCategory.Secrets, "names being saved"),
             new(paths.VerifiedModelsFile, DataCategory.ModelVerification, "record of verified model files"),
             new(paths.VerifiedModelsFile + ".tmp", DataCategory.ModelVerification, "record being saved"),
             new(paths.SpeechGpuMarkerFile, DataCategory.ModelVerification, "speech model the GPU could not load"),
