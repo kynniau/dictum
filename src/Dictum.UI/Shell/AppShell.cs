@@ -98,6 +98,8 @@ public sealed partial class AppShell : IDisposable
         _reloadDebounce = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => DebouncedReload()) { IsEnabled = false };
         Access = new InputAccessWatch(platform.InputAccess, log, RestartListeners, StopListeners);
         Access.Changed += StatusChanged; // the panel's problem line and its Request access link follow the grant
+        // A key added or removed in the credential store may write no watched file (no keys.json): reload, so a removed key is not sent again (lens minor 1, 30/10/2026).
+        Vault.Changed += () => Dispatcher.UIThread.Post(DebouncedReload);
         // From construction, not from Start: nothing loads before Start, and the hotkey listener must follow every change.
         _models.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_models.LastError, ref _speechErrorShown, "Speech model"));
         _llm.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_llm.LastError, ref _cleanupErrorShown, "Clean-up model"));

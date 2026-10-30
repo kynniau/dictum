@@ -165,7 +165,7 @@ public sealed class SecretStore
     public string Describe(string key)
     {
         var (value, source, stored) = Resolve(key);
-        if (value is null) return StoredCount(key) > 1 ? $"absent ({StoredCount(key)} stored keys, none chosen)" : "absent";
+        if (value is null) return StoredCount(key) > 1 ? "absent (none chosen)" : "absent"; // the self-test adds the count (KeyLines)
         if (stored is null) return $"present ({source})";
         return StoredKey.LabelIsSafe(stored.Label, value) ? $"present (stored key \"{stored.Label}\")" : "present (stored key)";
     }
@@ -174,11 +174,13 @@ public sealed class SecretStore
     public int StoredCount(string key) => _stored.Count(s => s.Key.Variable == key);
 
     /// <summary>
-    /// Every value this store holds, chosen or not: each variable's environment value, every .env value it kept, every stored key.
+    /// Every key value this store holds, chosen or not: each variable's environment value, the .env values of those variables, every stored key.
     /// ConfigLoader registers them all with the log redactor, so a key that is not in use still never reaches the log.
     /// </summary>
     public IEnumerable<string> AllValues() =>
-        KeyNames.Select(_environment).OfType<string>().Concat(_values.Values.Select(v => v.Value)).Concat(_stored.Select(s => s.Value));
+        KeyNames.Select(_environment).OfType<string>()
+            .Concat(_values.Where(kv => KeyNames.Contains(kv.Key)).Select(kv => kv.Value.Value)) // keys only: a MODEL= line in .env is not a secret (lens minor 4)
+            .Concat(_stored.Select(s => s.Value));
 
     private (string? Value, string? Source, StoredKey? Stored) Resolve(string key)
     {

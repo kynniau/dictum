@@ -96,8 +96,19 @@ public interface ISecretVault
     /// <summary>Removes the stored key and its keys.json entry, and clears keys.active where it named it. False when there was none.</summary>
     bool Remove(string id);
 
-    /// <summary>Removes every key Dictum stored, keys.json's entries, and every keys.active choice of a stored key. Returns how many were removed.</summary>
+    /// <summary>
+    /// Removes every key Dictum stored, keys.json's entries, and every keys.active choice of a stored key. Returns how many were
+    /// removed. Each entry is tried; when any is refused, the rest are still removed and one <see cref="CredentialStoreException"/>
+    /// at the end gives how many were refused and the system's codes (no value), and their labels and choices are kept.
+    /// </summary>
     int RemoveAll();
+
+    /// <summary>
+    /// Raised after every <see cref="Add"/>, <see cref="Remove"/> and <see cref="RemoveAll"/> that changed something (lens minor 1,
+    /// 30/10/2026): a change in the credential store writes no watched file when keys.json is absent, so the app reloads on this
+    /// instead, and a removed key is not sent again. Raised on the caller's thread.
+    /// </summary>
+    event Action? Changed;
 }
 
 /// <inheritdoc cref="ISecretVault"/>
@@ -115,7 +126,16 @@ public sealed class SecretVault(AppPaths paths, ICredentialStore store, Func<Dat
     /// <summary>A vault over a store that has nothing: for tests and code paths with no platform.</summary>
     public static SecretVault Unavailable(AppPaths paths) => new(paths, NoCredentialStore.Instance);
 
+    public event Action? Changed;
+
     public string Add(string variable, string label, string value)
+    {
+        var id = AddLocked(variable, label, value);
+        Changed?.Invoke();
+        return id;
+    }
+
+    private string AddLocked(string variable, string label, string value)
     {
         CheckVariable(variable);
         var cleanLabel = StoredKey.CleanLabel(label);
@@ -147,10 +167,16 @@ public sealed class SecretVault(AppPaths paths, ICredentialStore store, Func<Dat
         }
     }
 
+    /// <summary>
+    /// As <see cref="ISecretVault.List"/>, with the label blanked where it holds any eight characters of its key (lens, 30/10/2026: the
+    /// rule <see cref="SecretStore.Describe"/> applies, here too, so no caller can show a key through a hand-edited keys.json).
+    /// </summary>
     public IReadOnlyList<StoredKey> List(string variable)
     {
         CheckVariable(variable);
-        return All().Where(k => k.Variable == variable).ToList();
+        return All().Where(k => k.Variable == variable)
+            .Select(k => k.Label.Length > 0 && store.Read(k.Variable, k.Id) is { } value && !StoredKey.LabelIsSafe(k.Label, value) ? k with { Label = "" } : k)
+            .ToList();
     }
 
     public string? Get(string id)
@@ -163,10 +189,11 @@ public sealed class SecretVault(AppPaths paths, ICredentialStore store, Func<Dat
     public bool Remove(string id)
     {
         if (!StoredKeyId.IsValid(id)) return false;
+        bool removed;
         lock (_gate)
         {
             var stored = store.List().Where(e => e.Id == id).ToList();
-            var removed = false;
+            removed = false;
             foreach (var (variable, _) in stored) removed |= store.Delete(variable, id);
             var file = KeysFile.Read(paths.KeysFile);
             if (file.Usable && file.Entries.Any(e => e.Id == id))
@@ -174,24 +201,42 @@ public sealed class SecretVault(AppPaths paths, ICredentialStore store, Func<Dat
                 KeysFile.Write(paths.KeysFile, file.Entries.Where(e => e.Id != id).ToList());
                 removed = true;
             }
-            ClearActive(id);
-            return removed;
+            ClearActive(chosen => chosen == id);
         }
+        if (removed) Changed?.Invoke();
+        return removed;
     }
 
     public int RemoveAll()
     {
+        var count = 0;
+        var refused = new List<(string Variable, string Id, int? Code)>();
         lock (_gate)
         {
-            var count = 0;
             foreach (var (variable, id) in store.List())
             {
-                if (store.Delete(variable, id)) count++;
+                try
+                {
+                    if (store.Delete(variable, id)) count++;
+                }
+                catch (CredentialStoreException ex)
+                {
+                    refused.Add((variable, id, ex.Code)); // the others are still removed
+                }
             }
-            if (File.Exists(paths.KeysFile)) File.Delete(paths.KeysFile);
-            ClearActive(null);
-            return count;
+            var kept = refused.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
+            var file = KeysFile.Read(paths.KeysFile);
+            if (kept.Count > 0 && file.Usable) KeysFile.Write(paths.KeysFile, file.Entries.Where(e => kept.Contains(e.Id)).ToList());
+            else if (File.Exists(paths.KeysFile)) File.Delete(paths.KeysFile);
+            ClearActive(chosen => StoredKeyId.IsValid(chosen) && !kept.Contains(chosen));
         }
+        if (count > 0) Changed?.Invoke();
+        if (refused.Count > 0)
+        {
+            var codes = string.Join(", ", refused.Select(r => r.Code?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unknown"));
+            throw new CredentialStoreException($"{refused.Count} of {refused.Count + count} stored keys could not be removed (system error {codes}).");
+        }
+        return count;
     }
 
     /// <summary>
@@ -240,13 +285,13 @@ public sealed class SecretVault(AppPaths paths, ICredentialStore store, Func<Dat
         return result;
     }
 
-    /// <summary>Clears keys.active entries that name <paramref name="id"/>, or every stored key's id when null. Best effort: a choice left behind names nothing and is passed over.</summary>
-    private void ClearActive(string? id)
+    /// <summary>Clears the keys.active entries whose choice <paramref name="clears"/> matches. Best effort: a choice left behind names nothing and is passed over.</summary>
+    private void ClearActive(Func<string, bool> clears)
     {
         var active = SettingsLoader.LoadFile(paths.SettingsFile) is { Usable: true } file ? file.Settings.Keys.Active : new Dictionary<string, string>();
         foreach (var (variable, chosen) in active)
         {
-            if (id is null ? StoredKeyId.IsValid(chosen) : chosen == id) SettingsFile.SetValue(paths.SettingsFile, $"keys.active.{variable}", null);
+            if (clears(chosen)) SettingsFile.SetValue(paths.SettingsFile, $"keys.active.{variable}", null);
         }
     }
 

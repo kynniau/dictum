@@ -66,7 +66,7 @@ public class KeyResolutionTests
     {
         var secrets = Store(env: false, config: false, exe: false, stored: Both);
         Assert.Null(secrets.Get(Openai));
-        Assert.Equal("absent (2 stored keys, none chosen)", secrets.Describe(Openai));
+        Assert.Equal("absent (none chosen)", secrets.Describe(Openai));
         Assert.Equal(EnvValue, Store(stored: Both).Get(Openai)); // today's sources still work beside them
     }
 
@@ -176,7 +176,7 @@ public class KeyResolutionTests
         var secrets = Store(env: false, config: false, exe: false, stored: [.. Both, Stored(SecretStore.GroqKey, "cccccccccccc", "Groq", "k-stored-groq-6666")]);
         var lines = new List<(string Label, string Value)>();
         SelfTestCommand.KeyLines(secrets, (label, value, _) => lines.Add((label, value)));
-        Assert.Contains((Openai, "absent (2 stored keys, none chosen); 2 stored keys"), lines);
+        Assert.Contains((Openai, "absent (none chosen); 2 stored keys"), lines);
         Assert.Contains((SecretStore.GroqKey, "present (stored key \"Groq\"); 1 stored key"), lines);
         Assert.Contains((SecretStore.AnthropicKey, "absent"), lines);
         using var scratch = new Scratch();
@@ -201,6 +201,38 @@ public class KeyResolutionTests
         await cleaner.CleanAsync("um the client's account is overdrawn", TestContext.Current.CancellationToken);
         Assert.Equal(0, handler.Count);
         Assert.NotNull(cleaner.MissingKey);
+    }
+
+    [Theory]
+    [InlineData("https://my-resource.openai.azure.com/openai/v1/", SecretStore.AzureOpenAiKey)]
+    [InlineData("https://api.groq.com/openai/v1", SecretStore.GroqKey)]
+    public async Task A_stored_OpenAI_key_never_goes_to_Azure_or_Groq_speech_even_when_chosen_for_them(string baseUrl, string variable)
+    {
+        // Lens note 6 (30/10/2026): the same isolation for the cloud speech hosts.
+        var active = new Dictionary<string, string> { [Openai] = WorkId, [SecretStore.AzureOpenAiKey] = WorkId, [SecretStore.GroqKey] = WorkId };
+        var secrets = SecretStore.FromContents(null, null, _ => null, active, [Stored(Openai, WorkId, "Work", WorkValue)]);
+        var settings = new SpeechSettings { Provider = SpeechSettings.OpenAiCompatible, BaseUrl = baseUrl, Model = "speech-model", Consent = new Uri(baseUrl).Host };
+        var handler = new Recorder();
+        var local = new FakeTranscriber("heard here");
+        var speech = Dictum.Transcribe.CloudSpeech.Create(settings, new Dictum.Transcribe.DecodeOptions(null, 0, "en", false), offlineOnly: false, secrets,
+            new HttpClient(handler), NullLog.Instance, _ => Task.FromResult<Dictum.Transcribe.ITranscriber>(local));
+        var engine = await speech.GetAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("heard here", await engine.TranscribeAsync(new float[16000], TestContext.Current.CancellationToken));
+        Assert.Equal(0, handler.Count);
+        Assert.False(speech.SendsAudio);
+        Assert.Equal(variable, speech.MissingKey);
+    }
+
+    [Fact]
+    public void Only_key_variables_from_a_env_file_are_registered_with_the_redactor()
+    {
+        // Lens minor 4 (30/10/2026): every .env line's value was registered, so MODEL=whisper-large was redacted from the log.
+        using var scratch = new Scratch();
+        File.WriteAllText(scratch.Paths.EnvFile, $"MODEL=whisper-large\n{Openai}={ConfigValue}\n");
+        var redactor = new SecretRedactor();
+        ConfigLoader.Load(scratch.Paths, redactor, _ => null, _ => false, _ => { });
+        Assert.Equal("using whisper-large", redactor.Redact("using whisper-large"));
+        Assert.Equal("a [redacted] b", redactor.Redact($"a {ConfigValue} b"));
     }
 
     [Fact]

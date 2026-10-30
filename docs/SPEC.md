@@ -371,11 +371,13 @@ the environment variable, `"file"` for the `.env` line); otherwise the order abo
 `.env` beside the program); otherwise the stored key when exactly one is stored for that variable. Two or more stored and none
 chosen: none is used. A choice that names nothing (a removed key, an unset variable) falls back to that order. A stored key is
 only ever handed out for its own variable, so the "§5 keys" rule (§22) still decides which server gets it; consent, the http
-refusal and offline only are untouched. Blank and placeholder values are "not set" in the store too. Every value is registered
-with the log redactor at each load, the ones not chosen included (environment, both `.env` files, every stored key). `--selftest`
-names the store (`key store`) and, per variable, its source (`present (stored key "Label")`; the label is left out when it holds
-any eight characters of the key) and the count of stored keys; never a value or any part of one (D2). These lines are PROPOSED
-(`.demo-preview/approve-api-keys.md`).
+refusal and offline only are untouched. Blank and placeholder values are "not set" in the store too. Every key value is registered
+with the log redactor at each load, the ones not chosen included (the environment and both `.env` files for the key variables
+only, every stored key). `--selftest` names the store (`key store`) and, per variable, its source (`present (stored key "Label")`;
+the label is left out, here and in `SecretVault.List`, when it holds any eight characters of the key) and the count of stored keys;
+never a value or any part of one (D2). These lines are PROPOSED (`.demo-preview/approve-api-keys.md`). Every Add, Remove and
+Remove all raises `ISecretVault.Changed`, and the app reloads on it, because a change in the credential store writes no watched
+file when keys.json is absent (lens, 30/10/2026).
 
 ## 6. Text insertion
 
@@ -532,8 +534,8 @@ with a warning. It limits hands-free only: a held key stops after a fixed 300 s 
 
 `keys.active` (amendment, 30/10/2026, API keys, §5): an object of variable (one of `SecretStore.KeyNames`) to the chosen source,
 a stored key's id (twelve lower-case hex characters), `"env"` or `"file"`; absent or `null` leaves the choice to the order in §5.
-An unknown variable or any other value is passed over with a warning that names the setting and never shows the value (a key
-pasted there by mistake must not reach the log). While settings.json cannot be read on a reload, the choice in use is kept.
+An unknown variable or any other value is passed over with a warning that shows neither an unknown name nor the value, and
+unknown entries in the `keys` section are counted, not named (a key pasted there by mistake must not reach the log). While settings.json cannot be read on a reload, the choice in use is kept.
 `SecretVault.SetActive` writes it through the settings writer. `keys.json` beside settings.json holds `{"keys": [{"id",
 "variable", "label", "added"}]}` (the date as yyyy-MM-dd): labels trimmed, at most 60 characters, without control characters,
 and never one that holds part of the key; written atomically like settings.json, never written over while it cannot be read, and
@@ -929,7 +931,8 @@ Users must be able to remove what the app has put on disk, from inside the app.
 - **API keys in the credential store (amendment, 30/10/2026).** `keys.json` (§9) is in the path registry with the `.env`
   files (`DataCategory.Secrets`): "Delete all app data" keeps it, "Remove Dictum completely" deletes it. The keys themselves are
   in the operating system's credential store, outside every folder: "Remove Dictum completely" removes every entry Dictum made
-  there first (`SecretVault.RemoveAll`) and lists any it could not remove beside the other failures. Uninstalling without that
+  there first (`SecretVault.RemoveAll`, which tries every entry and reports the refused ones once, by count and system code) and
+  lists any it could not remove beside the other failures. Uninstalling without that
   step leaves those entries in Credential Manager (Keychain on a Mac) until the user removes them; the Help line saying so, and
   "Remove all keys" in Settings > Privacy, are the UI lane's.
 

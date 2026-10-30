@@ -27,7 +27,16 @@ internal sealed class FakeCredentialStore : ICredentialStore
 
     public string? Read(string variable, string id) => _entries.TryGetValue((variable, id), out var v) ? v : null;
 
-    public bool Delete(string variable, string id) => _entries.Remove((variable, id));
+    /// <summary>The Nth delete call (1-based) throws, as the system refusing with error 5; null: none does.</summary>
+    public int? FailDeleteNumber { get; set; }
+
+    private int _deletes;
+
+    public bool Delete(string variable, string id)
+    {
+        if (++_deletes == FailDeleteNumber) throw new CredentialStoreException("CredDelete failed: Access is denied. (5).", 5);
+        return _entries.Remove((variable, id));
+    }
 
     public IReadOnlyList<(string Variable, string Id)> List() => [.. _entries.Keys];
 }
@@ -216,7 +225,74 @@ public class SecretVaultTests
         Assert.Equal(2, load.Warnings.Count);
         Assert.All(load.Warnings, w => Assert.DoesNotContain("sk-test", w, StringComparison.Ordinal)); // a key pasted there by mistake stays out of the log
         Assert.Contains(load.Warnings, w => w.Contains("keys.active.ANTHROPIC_API_KEY", StringComparison.Ordinal));
-        Assert.Contains(load.Warnings, w => w.Contains("keys.active.NOT_A_KEY", StringComparison.Ordinal));
+        Assert.Contains("Setting under \"keys.active\" names a variable Dictum does not read (not shown); ignored.", load.Warnings);
+    }
+
+    [Fact]
+    public void A_key_pasted_as_a_name_under_keys_never_reaches_a_warning()
+    {
+        // Lens minor 2 (30/10/2026): the warning echoed the property name, so a key pasted as the name went to the log.
+        var load = SettingsLoader.Parse($$"""{ "keys": { "active": { "{{Value}}": "env" }, "{{Value}}-2": 1, "_comment": "x" } }""");
+        Assert.True(load.Usable);
+        Assert.Empty(load.Settings.Keys.Active);
+        Assert.Equal(2, load.Warnings.Count);
+        Assert.All(load.Warnings, w => Assert.DoesNotContain("sk-test", w, StringComparison.Ordinal));
+        Assert.Contains("Setting \"keys\" has 1 entry Dictum does not read (not shown); ignored.", load.Warnings);
+    }
+
+    [Fact]
+    public void Remove_all_still_removes_the_others_when_one_is_refused_and_reports_it_once_without_a_value()
+    {
+        // Lens minor 3 (30/10/2026): the first refused delete stopped the loop.
+        var (scratch, store, vault) = Make("""{ "hotkey": "F24" }""");
+        using var owned = scratch;
+        var ids = new[] { SecretStore.OpenAiKey, SecretStore.GeminiKey, SecretStore.GroqKey }.Select((v, i) => vault.Add(v, $"K{i}", Value + i)).ToList();
+        foreach (var (v, i) in new[] { SecretStore.OpenAiKey, SecretStore.GeminiKey, SecretStore.GroqKey }.Select((v, i) => (v, i)))
+            SecretVault.SetActive(scratch.Paths, v, ids[i], out _);
+        store.FailDeleteNumber = 2;
+        var ex = Assert.Throws<CredentialStoreException>(() => vault.RemoveAll());
+        Assert.Equal("1 of 3 stored keys could not be removed (system error 5).", ex.Message);
+        var left = Assert.Single(store.Entries);
+        Assert.Single(vault.List(left.Key.Variable), k => k.Id == left.Key.Id && k.Label.Length > 0); // its label is kept
+        Assert.Equal(new Dictionary<string, string> { [left.Key.Variable] = left.Key.Id }, SettingsLoader.LoadFile(scratch.Paths.SettingsFile).Settings.Keys.Active);
+    }
+
+    [Fact]
+    public void A_label_holding_part_of_its_key_is_listed_blank()
+    {
+        // Lens note 5 (30/10/2026): List applies Describe's rule, so a hand-edited keys.json cannot show a key through any caller.
+        var (scratch, store, vault) = Make();
+        using var owned = scratch;
+        var id = vault.Add(SecretStore.OpenAiKey, "Work", Value);
+        File.WriteAllText(scratch.Paths.KeysFile, $$"""{"keys":[{"id":"{{id}}","variable":"OPENAI_API_KEY","label":"mine {{Value[..12]}}","added":"2026-10-30"}]}""");
+        Assert.Equal("", Assert.Single(vault.List(SecretStore.OpenAiKey)).Label);
+        Assert.Single(store.Entries);
+    }
+
+    [Fact]
+    public Task A_key_removed_with_no_keys_json_is_not_used_again_without_a_manual_reload()
+    {
+        // Lens minor 1 (30/10/2026): with keys.json missing, removing the only stored key wrote no watched file, so the key in memory
+        // was still sent until a restart. The vault's Changed event reloads instead.
+        Assert.SkipWhen(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SecretStore.OpenAiKey)), "OPENAI_API_KEY is set in this machine's environment, which wins over a stored key.");
+        return UiSession.Run(() =>
+        {
+            using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+            var (shell, _, dialogs) = scratch.Shell();
+            shell.Reload(userRequested: false);
+            dialogs.Answers.Enqueue(0); // Allow
+            Assert.Null(shell.EnableCloud(new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://api.openai.com/v1", Model = "gpt-5.4-nano" }));
+            const string waiting = "rule-based tidy only: OPENAI_API_KEY is not set (environment or .env)";
+            Assert.Equal(waiting, shell.CleanupStatus);
+            var id = shell.Vault.Add(SecretStore.OpenAiKey, "Work", Value);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.NotEqual(waiting, shell.CleanupStatus); // the only stored key is in use
+            File.Delete(scratch.Paths.KeysFile); // the removal below then changes no watched file
+            Assert.True(shell.Vault.Remove(id));
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.Equal(waiting, shell.CleanupStatus);
+            shell.Dispose();
+        });
     }
 
     [Fact]

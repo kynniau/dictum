@@ -29,7 +29,11 @@ public interface ICredentialStore
 }
 
 /// <summary>The system refused a credential-store call. The message names the call and the system's code, never a value.</summary>
-public sealed class CredentialStoreException(string message) : Exception(message);
+/// <param name="code">The system's error code (Windows: GetLastError), when there is one.</param>
+public sealed class CredentialStoreException(string message, int? code = null) : Exception(message)
+{
+    public int? Code { get; } = code;
+}
 
 /// <summary>A platform with no credential store Dictum uses: unavailable, empty, and a write is refused.</summary>
 public sealed class NoCredentialStore : ICredentialStore

@@ -6709,15 +6709,16 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
 Brief: `.demo-preview/design-api-keys.md` (orchestrator, 30/10/2026 13:31 AEDT), committed unchanged as this branch's first commit;
 decisions D1 to D5 accepted by the owner 30/10/2026 18:57 AEDT. K-Core lane: Core only, no window or page. Built on Opus 5.5.
 
-1. **Verified on Microsoft Learn before coding (read 30/10/2026).** (i) CRED_PERSIST_LOCAL_MACHINE: "visible to other logon sessions
+1. **Read on Microsoft Learn before coding (30/10/2026); (i) verified there, (ii) Inferred from two Learn pages, not verified on the
+   packaged build: a packaged-build check per docs/TESTING-MSIX.md is required before 1.4 ships.** (i) CRED_PERSIST_LOCAL_MACHINE: "visible to other logon sessions
    of this same user on this same computer and not visible to logon sessions for this user on other computers"
    (https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw). The page does not name a Microsoft account;
    Learn documents Microsoft-account roaming for the WinRT Credential Locker (PasswordVault), a different API Dictum does not use
-   (https://learn.microsoft.com/windows/apps/develop/security/credential-locker). (ii) CredWrite is "desktop apps only"
+   (https://learn.microsoft.com/windows/apps/develop/security/credential-locker). (ii) Inferred: CredWrite is "desktop apps only"
    (https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew), and full-trust packaged apps "run with the same
    permissions as a standard desktop app" (https://learn.microsoft.com/windows/msix/msix-containerization-overview); Dictum's manifest
-   declares runFullTrust. No Learn page names CredWrite and MSIX together, and the packaged build has not been run against it: the
-   Store build's first run is the check. The DPAPI fallback was not built.
+   declares runFullTrust. No Learn page names CredWrite and MSIX together, and the packaged build has not been run against it. The
+   DPAPI fallback was not built.
 2. **One seam, values only.** `IPlatform.Credentials` (`ICredentialStore`: Write / Read / Delete / List by variable and id) holds the
    values; `SecretVault` (`ISecretVault`: Add / List / Get / Remove / RemoveAll, the brief's interface) is shared by every platform and
    keeps id, variable, label and date in `keys.json`. Deviation from the brief's wording ("one implementation per platform" of
@@ -6747,3 +6748,17 @@ decisions D1 to D5 accepted by the owner 30/10/2026 18:57 AEDT. K-Core lane: Cor
    label in keys.json (4); M8b keys.active writer accepting a key (1); M9 Describe always showing the label (1); M10 a label holding
    part of the key accepted (1); M11 a bad keys.active value echoed into the warning (1); M12 full removal leaving stored keys (1);
    M13 CRED_PERSIST_ENTERPRISE in place of LOCAL_MACHINE (1, real Credential Manager).
+9. **Lens fix round (30/10/2026, Opus lens on 01d1ed3: Needs changes, no blocker, four minors and three notes).** (1) A removal that
+   wrote no watched file (keys.json absent, the only stored key in use) left the key in memory and still sent until a restart:
+   `ISecretVault.Changed` is raised after every Add, Remove and RemoveAll that changed something, and AppShell reloads on it. (2) The
+   keys.active warning echoed the property name, so a key pasted as the name reached the log: the name is no longer shown, and the
+   keys section counts its unknown entries without naming them (`WarnUnknownUnnamed`); the general `WarnUnknown` elsewhere still
+   echoes names (pre-existing, a follow-up). (3) RemoveAll stopped at the first refused delete: every entry is tried, the refused
+   ones keep their labels and choices, and one exception gives the count and system codes. (4) AllValues registered every .env
+   value, so `MODEL=whisper-large` was redacted: key variables only. Notes: `SecretVault.List` blanks a label that holds part of its
+   key; host isolation pinned for Azure OpenAI and Groq speech too; the self-test no longer prints the count twice (rows 3-4 of the
+   sheet revised). **Mutation checks (30/10/2026, Windows, Debug; each source restored with git checkout), each observed failing on
+   the reverted behaviour:** L1 Remove raising no Changed (1 pin); L2 the name echoed in the keys.active warning (2); L2b the keys
+   section's unknown names echoed (1); L3 the first refused delete stopping RemoveAll (1); L4 every .env value registered (1); L5
+   List showing an unsafe label (1); L6 another variable's stored key handed out (5, the new Azure and Groq cases included); L7 the
+   count printed twice (2).

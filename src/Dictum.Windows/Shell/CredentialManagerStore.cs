@@ -17,7 +17,8 @@ namespace Dictum.Windows.Shell;
 /// (https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw, Persist). Roaming with a Microsoft account
 /// is documented for the WinRT Credential Locker (PasswordVault), a different API this class does not use
 /// (https://learn.microsoft.com/windows/apps/develop/security/credential-locker).
-/// (ii) CredWrite's requirements say "desktop apps only" (https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew),
+/// (ii) Inferred from two Learn pages, not verified on the packaged build (a check per docs/TESTING-MSIX.md is required before 1.4
+/// ships): CredWrite's requirements say "desktop apps only" (https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew),
 /// and a full-trust packaged app "run[s] with the same permissions as a standard desktop app"
 /// (https://learn.microsoft.com/windows/msix/msix-containerization-overview); Dictum's package declares runFullTrust and
 /// Windows.FullTrustApplication (packaging/AppxManifest.template.xml). No Learn page names CredWrite and MSIX together, and the
@@ -135,7 +136,7 @@ internal sealed class CredentialManagerStore : ICredentialStore
     private static CredentialStoreException Refused(string call)
     {
         var code = Marshal.GetLastWin32Error();
-        return new CredentialStoreException($"{call} failed: {new Win32Exception(code).Message} ({code}).");
+        return new CredentialStoreException($"{call} failed: {new Win32Exception(code).Message} ({code}).", code);
     }
 
     [StructLayout(LayoutKind.Sequential)]

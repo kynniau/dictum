@@ -180,7 +180,7 @@ public static class SettingsLoader
     {
         if (r is null) return new KeysSettings();
         var s = new KeysSettings { Active = r.KeyChoices("active") };
-        r.WarnUnknown();
+        r.WarnUnknownUnnamed();
         return s;
     }
 
@@ -432,8 +432,8 @@ public static class SettingsLoader
             foreach (var p in v.EnumerateObject())
             {
                 if (p.Value.ValueKind == JsonValueKind.Null) continue;
-                if (!SecretStore.KeyNames.Contains(p.Name))
-                    warnings.Add($"Setting \"{Full(key)}.{p.Name}\" is not a key Dictum reads; ignored.");
+                if (!SecretStore.KeyNames.Contains(p.Name)) // the name is not echoed: a key pasted as the name must not reach the log (lens minor 2)
+                    warnings.Add($"Setting under \"{Full(key)}\" names a variable Dictum does not read (not shown); ignored.");
                 else if (p.Value.ValueKind != JsonValueKind.String || !StoredKeyId.IsChoice(p.Value.GetString()))
                     warnings.Add($"Setting \"{Full(key)}.{p.Name}\" has an invalid value (not shown): expected a stored key's id, \"env\" or \"file\". No key is chosen for it.");
                 else
@@ -448,6 +448,16 @@ public static class SettingsLoader
             if (v.ValueKind == JsonValueKind.Object) return new ObjectReader(v, Full(key), warnings);
             warnings.Add($"Setting \"{Full(key)}\" must be an object; using defaults for that section.");
             return null;
+        }
+
+        /// <summary>
+        /// <see cref="WarnUnknown"/> for the keys section: one warning with a count, never the names, since a name there may be a key
+        /// pasted by mistake (lens minor 2, 30/10/2026). Comment keys ("_…") are passed over as everywhere.
+        /// </summary>
+        public void WarnUnknownUnnamed()
+        {
+            var unknown = obj.EnumerateObject().Count(p => !p.Name.StartsWith('_') && !_seen.Contains(p.Name));
+            if (unknown > 0) warnings.Add($"Setting \"{path}\" has {unknown} entr{(unknown == 1 ? "y" : "ies")} Dictum does not read (not shown); ignored.");
         }
 
         public void WarnUnknown()
