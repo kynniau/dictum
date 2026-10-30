@@ -6416,3 +6416,290 @@ guest and the two PROPOSED strings of PR #71): one rule and twelve rows, built a
 ## 27/10/2026 14:00 AEDT: 1.3.1 publication dates
 
 - The Terms of Use page carries its publication date, 27/10/2026 (section D item 0 of the legal block: "At deploy, terms.html carries the publication date"); `site/version.json` `published` is 2026-10-27, the 1.3.1 deploy day. The privacy policy's "Last updated" stays 23/10/2026, the date of its last text change. No other file changes; no pin holds either date.
+
+## Request access: the Accessibility grant on the platform seam, one button on every surface that fails for want of it (27/10/2026, branch feature/mac-access-request)
+
+Owner's ask (27/10/2026, at the Mac, during the PR #74 re-test): "we need to add option in app to check access and if access not give a
+request access key, for example right now it tells me in the hotkey selector tool that the system refused to report keys, but no
+solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new feature, per the owner's tiering order).
+
+1. **The seam.** `IPlatform.InputAccess` (`IInputAccess`: `Check()` returning `InputAccessState` NotApplicable / Granted / Denied, and
+   `Request()`), beside the listeners it governs. `WindowsPlatform` hands out `InputAccessNotNeeded.Instance` (always NotApplicable, a
+   request does nothing): a low-level hook installs for any process, there is no grant to ask for, and no Windows surface changes.
+   `MacPlatform` hands out `MacInputAccess` (src/Dictum.Mac/Input/InputAccess.cs): `Check` is `AXIsProcessTrusted`; `Request` runs
+   `AXIsProcessTrustedWithOptions(prompt)` and then opens System Settings at the Accessibility page whatever the check answered.
+   Both answers are logged.
+2. **The Settings link, verified 27/10/2026 on this Mac (macOS 27.2, build 26B118):** `open
+   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"` shows the page (the owner saw the Dictum row on
+   it), and the SecurityPrivacyExtension binary on that Mac carries the `Privacy_Accessibility` anchor. On macOS 27 the page is titled
+   "Device Control and Data Access" (the owner's screenshot); on 15 and 26 "Accessibility" (recalled, not checked on those). The
+   on-screen strings therefore name no page: "turn Dictum on in the System Settings page that opens".
+3. **Why the page always opens.** 27/10/2026 18:13 AEDT, ad-hoc test build: `AXIsProcessTrustedWithOptions(prompt)` answered trusted
+   while the same process's event taps were refused ("not allowed to control this Mac yet") and `AXIsProcessTrusted` answered no. The
+   System Settings list showed one Dictum row, switched on, which belonged to the Developer-ID-signed copy in /Applications (same bundle
+   id, different signature). So the prompting check alone cannot decide, and no prompt appears in that case; the page is where the
+   switch is either way. Observed, not explained; the first version of this lane returned early on a trusted answer and the owner
+   landed on a page "already telling me it has access".
+4. **The shell.** `InputAccessWatch` (src/Dictum.UI/Shell/InputAccessWatch.cs, `AppShell.Access`): when a listener is refused
+   (`StartHook`, `ApplyFixHotkey`) and the check says Denied, it polls the silent check once a second (`PollFor` = 15 minutes, a marked
+   simplification) and on Granted replaces both listeners (`AppShell.RestartListeners`), puts the icon back to the real state, and says
+   so. `Request()` asks and polls. The old "then quit and reopen Dictum" log line is reworded (APPROVED 27/10/2026 19:00 AEDT, row 7 of the approval file).
+5. **No relaunch needed: proved on hardware** 27/10/2026 18:37 AEDT, macOS 27.2, ad-hoc build: request logged 18:37:47, the owner
+   switched Dictum on, "Event tap installed … (hotkey listener for LeftCtrl)" and "Input access granted; the hotkey listener is
+   installed." at 18:37:50, the Settings line changed to "Dictum can now see the hotkey." on its own. The owner's words: "the line
+   changed to 'Dictum can now see the hotkey.' without reopening Dictum." `RestartFailed` and its string (row 6) are kept for the case
+   where a grant still leaves the tap refused; not seen on hardware.
+6. **Surfaces (no new page).** `InputAccessLine` (src/Dictum.UI/Views/InputAccessLine.cs): the status (a polite live region), the
+   stale-entry caption, and the named "Request access" button; hidden while NotApplicable or Granted with nothing to say, so every page
+   is laid out as before. In Settings > General's Hotkey card (above the capture box; the two boxes there build no line of their own,
+   `showsAccessLine: false`, so the card has one button); in the hotkey capture box on its own (the Welcome hotkey step), replacing the
+   "The system refused to report keys…" dead end when the grant is what is missing, and listening again by itself once the grant
+   arrives; and in the menu-bar panel's problem line with a "Request access" link (`ShellStatus.RequestAccess`), because the icon's
+   "!" said nothing (owner finding 27/10/2026, 18:20 AEDT: "it also doesnt tell me anywhere why the logo is the orange warning"). Any
+   other refusal keeps the log pointer.
+7. **Stale rows.** The owner's loop on 27/10/2026 was seven `au.kynni.dictum` Accessibility rows behind one row shown on; `tccutil reset
+   Accessibility au.kynni.dictum` cleared them. The app cannot read the list and never runs tccutil; the caption (row 2) says to remove
+   the row with − and request again, which is what completed the hands-on (the ad-hoc build's row removed, re-added by the request).
+8. **Strings.** All seven APPROVED by the owner 27/10/2026 19:00 AEDT as written ("approve 1 to 7"), in `.demo-preview/approve-mac-access.md` (seven rows); none ships on Windows; no approved
+   string edited. The device word is the Mac copy block's "this Mac".
+9. **Pins** (`InputAccessTests`, 21 tests after the item 14 round, 20 after item 13; this line said 11 at b60dc44, where the file held 13): the no-grant platform answers NotApplicable; the real Windows platform hands out it (Windows
+   only); the real Mac platform answers Granted or Denied as `AXIsProcessTrusted` does and its link is the verified one (macOS only);
+   with no grant to ask for, Settings > General shows no line, no button, no problem, and the box keeps its old sentence; a listener
+   refused for want of the grant shows the line, the caption and the button, and the button requests; the grant arriving replaces both
+   listeners and says so, without a reload; a grant that still leaves the listener refused says so; the box on its own shows the button
+   and listens once granted; Settings > General shows one button even with a refused box; the panel says why the icon shows the error
+   and offers the request, and drops both once granted; the button is named and the status is a polite live region.
+   `MacInput_tap_refused_without_accessibility_fails_cleanly_and_says_where_to_allow_it` now also requires "Press Request access" and
+   no "reopen" in the log line.
+10. **Mutation checks (observed failing 27/10/2026 between 18:39 and 18:41 AEDT, source restored with `git checkout` after each):**
+    (a) `ListenerRefused` returning at once, `InputAccessNotNeeded.Check` answering Denied, and the Settings link without its anchor,
+    together: 7 of 10 run failed (the no-grant fact, the Mac platform pin, the capture box, the General line, the one-button page, the
+    panel, the names). (b) `Tick` not restarting the listeners: 2 failed (the grant arriving, the grant that still fails).
+    (c) the line showing itself on a no-grant platform: the Windows-surface pin passed at first (it looked for the Denied words only),
+    was strengthened to assert no visible `InputAccessLine`, no Granted or RestartFailed text, no problem and no request on the status,
+    and then failed on the mutation: 1 failed.
+11. **Not verified / follow-ups.** Second grant on macOS 15 or 26 (page name, prompt behaviour); whether the prompting check's "trusted"
+    answer for a refused build is a macOS 27 behaviour or a TCC-cache one. Follow-up the owner raised from Zoom's installer: a floating
+    panel with a draggable tile of Dictum.app to drop onto the Settings list, which would side-step the stale-row loop; not in this lane.
+    `src/Dictum.Mac/README.md`'s IPlatform table has no row for `InputAccess` (the file is outside this lane's files).
+12. **Runs on the Mac at ff9c3f9 (27/10/2026 18:47 AEDT, macOS 27.2, Release; no Mac run is recorded here at b60dc44 or after the item 13 fix round):** `dotnet test --project tests/Dictum.Tests`: 2742 total,
+    2550 passed, 0 failed, 192 skipped (the Windows-only pins among them). `DICTUM_UI_TESTS=1`, MacInputTests and InputAccessTests:
+    34 total, 33 passed, 0 failed, 1 skipped (the Windows platform pin). Ad-hoc bundle built by scripts/publish-mac.sh for the hands-on.
+13. **Merge-lens fix round (27/10/2026, from b60dc44; lens on Opus reproduced each with a probe test).** Windows behaviour and copy
+    unchanged: every change sits behind a Denied answer, which `InputAccessNotNeeded` never gives. No approved string changed.
+    - MAJOR 1. The Welcome hotkey step never showed Request access on a fresh install: the box read the cached state, which only turns
+      Denied after the shell's own listener is refused, and the Welcome window runs before Start installs it. Fix: the box's refusal
+      path calls `Access.ListenerRefused()` (a fresh check, which also starts the watch) before reading the state; and
+      `RestartListeners` installs nothing and returns true while no listener was ever installed (`_hook` null), since Start installs
+      both and does not dispose a listener installed before it. The guard reads `_hook`, not `_controller` as the lens suggested:
+      `StartHook` always keeps the listener it made, refused or not, and the existing pins install listeners by a reload on a shell
+      Start has not built the controller for, so a `_controller` guard would have turned every restart in them into a no-op. Pins:
+      `The_welcome_box_asks_for_itself_before_the_shell_has_installed_a_listener`,
+      `A_grant_during_the_welcome_window_leaves_one_listener_after_start`.
+    - MAJOR 2. Request access with the grant already in place (polling lapsed, Dictum switched on by hand) changed the words but
+      installed no listener. Fix: `Request()` starts polling and runs `Tick()` at once, so both answers take the one path. Pin:
+      `Request_access_with_the_grant_already_in_place_installs_the_listeners`.
+    - MINOR 3. `Tick` runs from a DispatcherTimer with nothing above it to catch a failure. Fix: its body is wrapped; on an exception
+      it stops polling, logs `Input access restart failed: {ex}` and shows the grant as a failed restart (row 6). Pin:
+      `A_restart_that_throws_is_caught_and_shown_as_a_failed_restart` (the fake's listener factory throws once).
+    - MINOR 4. Row 4 ("Dictum can now see the hotkey.") showed on every General page opened later in the session, even after a
+      revoke, because the first render set it. Fix: only a Denied-to-Granted change seen while the line is attached sets it; attaching
+      resets it. Pin: `The_granted_line_shows_only_for_a_grant_seen_while_attached`.
+    - MINOR 5. On Settings > General both refused boxes resumed on the grant (a refused Start raises no Started, so the
+      one-box-at-a-time wiring never cleared the other), and the fix box could end up listening. Fix: only a box that carries its own
+      line resumes by itself; on General the card's line is the cue and Change… starts one. Pin:
+      `Two_refused_general_boxes_do_not_resume_on_the_grant`.
+    - MINOR 6. The 15-minute cut-off read `DateTime.UtcNow`. Fix: `InputAccessWatch` takes a `TimeProvider` (null is the system
+      clock), as the "TimeProvider seam" entry does. Pin: `Polling_stops_after_the_cut_off_on_the_injected_clock`.
+    - **Mutation checks (27/10/2026, finished before 19:32 AEDT by the clock read after the last one, Windows, Release; source restored from the index with `git checkout`
+      after each, and the full suite then passed):** MAJOR 1, the box's fresh check removed: its pin observed failing (the state stayed
+      NotApplicable). MAJOR 1, the `RestartListeners` guard removed: its pin observed failing at "nothing installed before Start", and
+      with that inner assertion also removed, observed failing at the count after Start (expected 1 live listener, actual 2). MAJOR 2,
+      the old `Request()` body restored: observed failing (expected 4 listeners, actual 2). MINOR 6, the cut-off line removed:
+      observed failing (polling still on). MINOR 3, the catch disabled: observed failing (the exception escaped). MINOR 4, the grant
+      flag set on every render: observed failing (row 4 shown on the later page). MINOR 5, the own-line condition removed: observed
+      failing (the second box listening).
+    - **Runs on Windows after the fix:** `dotnet test tests/Dictum.Tests -c Release`: 2751 total, 2708 passed, 0 failed, 43 skipped.
+      The Mac runtime is not verified after this round (no Mac run from this Windows lane).
+    - **Known nuance, not changed:** when the grant arrives during the Welcome window, the log carries the guard's line ("…they install
+      when Dictum finishes starting.") and then `Tick`'s existing "Input access granted; the hotkey listener is installed." a few
+      moments before Start installs it. A log line only; left as written for the owner to decide.
+14. **Re-lens fix round (27/10/2026, from f3b4388; the re-lens returned Needs changes with two minors, both in the item 13 guard).**
+    - F1. The guard's "not installed yet" test, `_hook` null, is also true after Start when a listener threw while being made (the
+      MINOR 3 state): refused and Denied, the grant arrives and the restart throws, the grant is revoked and a General box's refusal
+      reports Denied, the grant is given again, and `Tick` left the state Granted with no live listener, no problem line, and the log
+      saying "…they install when Dictum finishes starting" long after start. Fix: `_listenersTried`, set as the first statement of
+      `StartHook`, and the guard reads it. Pin: `A_grant_after_a_restart_that_threw_still_installs_a_listener`.
+    - F2. `Tick` logged "Input access granted; the hotkey listener is installed." on the guard path, where no listener exists (item 5
+      cites that line as the hardware proof, so it must be true). Fix: the outcome line moves from `Tick` into `RestartListeners`,
+      after `StartHook`; the guard path logs only its own line. This retires item 13's "known nuance". Pin:
+      `A_grant_during_the_welcome_window_leaves_one_listener_after_start` now also asserts no "the hotkey listener is installed" line
+      before Start.
+    - **Mutation checks (27/10/2026, before 19:56 AEDT by the clock read after them, Windows, Release; restored from the index with
+      `git checkout` after each):** F1, the guard put back to `_hook is null`: observed failing ("the grant left no listener and said
+      nothing"). F2, the outcome line put back in `Tick`: observed failing (the "installed" line found before Start).
+    - **Runs on Windows after this round:** `dotnet test tests/Dictum.Tests -c Release`: 2752 total, 2709 passed, 0 failed,
+      43 skipped. The Mac runtime is not verified after the fix rounds (b60dc44 onwards).
+15. **Mac round-2 fix round (29/10/2026, from 811c1c5; hands-on re-test on the owner's Mac, macOS 27.2).**
+    - **B (blocker, safety).** The owner's grant was reset with `tccutil` while a test build ran: the installed hotkey tap stayed, and
+      from 08:10:51 AEDT the log repeated "Event tap (hotkey listener) was disabled by macOS (timeout) and re-enabled." while no app on
+      the Mac received keys, until the process was killed at 08:19:06. `EventTap.Handle` re-enabled a disabled tap unconditionally (the
+      same code is in tag mac-v1.3.1). Fix: `TapDisableGuard` lets a disabled tap back on only while `AXIsProcessTrusted` says trusted
+      and macOS has not disabled it again within 60 s (marked `// simplification:`); otherwise the tap logs that it was removed, stops its
+      run loop (so `Run` removes the tap) and raises `IInputAccess.Revoked`, a new event on the seam (no-op on Windows). The shell treats
+      it as a refusal, and `InputAccessWatch` now removes every installed listener as the state turns Denied (`AppShell.StopListeners`),
+      which also covers the case seen at 08:10:24: a fresh tap refused while an older one was still installed.
+      Pins: `The_disable_guard_reenables_once_and_never_for_a_repeat_or_without_the_grant`,
+      `A_tap_macOS_keeps_disabling_is_removed_and_reported_instead_of_turned_back_on`,
+      `A_listener_that_lost_the_grant_removes_every_listener_and_shows_the_button`,
+      `With_no_grant_to_ask_for_a_refusal_removes_no_listener`.
+    - **A (major).** After that reset, the hotkey box's monitor was refused ("…although Accessibility reports this app as allowed") and
+      the box showed the generic "The system refused to report keys…" with no line and no button: `ListenerRefused` returned unless the
+      check said Denied, and the check went on saying trusted (as it did for the stale rows of 27/10). Fix: where there is a grant, a
+      refused or removed listener is Denied whatever the check says; the check is then not believed until it has answered Denied once or
+      the user presses Request access (one more trial), so a stale "trusted" starts no restart loop; Granted is set only after a listener
+      installed, and a refused restart no longer reinstalls the fix-last listener. The old pin
+      `A_grant_that_still_leaves_the_listener_refused_says_so` described the behaviour this replaces and becomes
+      `A_listener_refused_while_the_system_says_allowed_shows_the_line_and_the_button`. `RestartFailed` (row 6) is now reached only when
+      a restart throws.
+    - Two new log lines are PROPOSED for owner approval (rows 8 and 9 of `.demo-preview/approve-mac-access.md`). No screen string changes.
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each):** the tap put back to re-enabling always:
+      observed failing (`A_tap_macOS_keeps_disabling…`). The early return put back in `ListenerRefused`: observed failing (both A and B
+      shell pins). The listener removal taken out: observed failing (`A_listener_that_lost_the_grant…`). The stale "trusted" believed
+      again in `Tick`: observed failing (both shell pins).
+    - Hand-test rule until B is proven on hardware: never reset Accessibility while a Dictum build runs; any reset-while-running test
+      runs under a shell watchdog that kills the test build after 60 s unless cancelled.
+16. **Liveness round (29/10/2026, from 73c460d; design approved by the orchestrator at 21:37 AEDT with seven conditions).** On
+    hardware, 73c460d did not stop the lock: reset at about 21:34:00 AEDT with the build running, the owner could not type in any app,
+    the only log line was one "disabled by macOS (timeout) and re-enabled" at 21:34:51.680 (the check still said trusted), and the
+    watchdog killed the build at 21:35:00. Keys were held about 50 s before macOS's first notice, so no rule keyed on that notice can
+    prevent the lock. Fix: `TapLiveness` compares the HID system's count of the tap's own event types (`CGEventSourceCounterForEventType`
+    over `TapEvents.Types`, never mouse moves) with the count the tap's callback has seen; four events behind for a second means the
+    tap is starved. A 500 ms `System.Threading.Timer` runs it off the tap thread and never waits on that thread; on starvation the tap is
+    disabled at once from the timer, its run loop stopped (Run invalidates and releases it after waiting for the timer), and
+    `IInputAccess.Revoked` raised; nothing is re-created in place. Paused while Secure Event Input is on (`IsSecureEventInputEnabled`)
+    and for one gap after, and after a stalled timer (sleep). The first timeout-disable with the check saying trusted re-enables only if
+    a liveness probe passes. Thresholds carry `// simplification:` comments. Head-insert placement unchanged (condition 7).
+    Pins: `Liveness_calls_a_tap_starved_only_when_the_system_sees_keys_the_tap_does_not`,
+    `Liveness_pauses_for_secure_input_and_for_one_gap_after_it`, `Liveness_pauses_after_the_timer_stalled`,
+    `Liveness_counts_only_the_event_types_in_the_tap_mask`, `A_starved_tap_removes_itself_and_tells_the_shell_once`,
+    `A_disabled_tap_the_keys_stopped_reaching_is_removed_not_turned_back_on`.
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** the timer never calling a tap starved (three pins); no pause for secure input (two pins); no pause after a stalled
+      timer (one); the first disable turned back on without the probe (one); mouse moves counted (one).
+    - Unverified until the hands-on: that the HID counters advance while a starved tap holds the keys, and that secure input withholds
+      keys from taps while the counters still move (both recalled). Two more log lines PROPOSED (rows 10 and 11).
+17. **Probe confirmation (29/10/2026, from 3dbff2b; approved by the orchestrator at 22:05 AEDT).** Hands-on at 3dbff2b: the
+    Request access button worked (21:45:59.913 "Input access requested by the user.", 21:46:28.804 tap installed, no relaunch), but at
+    21:50:19.809 the liveness check removed a healthy hotkey listener with the grant in place (System Settings and a microphone prompt
+    on screen). `CGGetEventTapList` showed other active key taps (Logi Options+ at the HID point, Siri at the session point with a
+    395 ms worst latency), so the counts alone cannot tell starvation from keys another tap or macOS took. Fix: when the counts say
+    behind, the timer posts one probe, a flagsChanged with the flags already held and `EventTap.ProbeMarker` in the user data, at the
+    HID tap point like the paste, and waits up to 500 ms (`ProbeWait`, `// simplification:`) on the timer thread. The callback swallows
+    the probe, never passes it to the matcher, and never counts it as a key. Answered: kept, counted again from there, and a
+    once-a-minute line with the missed count and the probe's latency (row 12, PROPOSED). Unanswered, or not posted: starved, removed.
+    Pins: `A_tap_whose_probe_arrives_is_kept_though_keys_went_elsewhere`, `A_probe_that_cannot_be_posted_counts_as_starved`,
+    `The_probe_is_swallowed_and_never_counted_as_a_key` (macOS only).
+    - **Mutation checks (29/10/2026, Mac, Release), each observed failing on the reverted behaviour:** the probe step removed (two pins);
+      the probe counted as a key (one); the probe passed on instead of swallowed (one); a probe that could not be posted taken as fed (one).
+18. **Re-create round (29/10/2026, from 41931d3; orchestrator decision 22:16 AEDT, owner's model Fable at high from 22:20).** The
+    probe of item 17 failed on hardware: reset at ~22:11:50 AEDT with the build running, the counts tripped at 22:11:55 (5 events
+    behind), the probe Dictum posted itself arrived in 0 ms, so the tap was kept, and the whole Mac's input stalled until the watchdog
+    killed the build at 22:12:47. After a revocation macOS still delivers a process's own posted events to its own tap while holding the
+    hardware keys, so no self-posted probe can confirm liveness. The probe is dropped (row 12 withdrawn). The confirmation that proved
+    honest on this Mac is `CGEventTapCreate` itself, refused after a real revocation while the check still said allowed (08:10:24):
+    on a count trigger the tap is disabled at once from whichever thread found it (the keys are free first), and the tap thread removes
+    it and asks for a fresh one (`TapRecovery`). Refused: the grant is gone, the shell hears Revoked after the removal, line and button
+    show. Created: a false positive; the fresh tap carries on, one Info line (row 13) says so, and the counts start again. A second
+    trigger within 30 s of a fresh tap stays removed and reports the grant gone (row 14, `// simplification:` on the window). Nothing is
+    re-enabled or re-created from the timer. Dictum's own posted key events (`PostedEvents`, counted by `CGEventSender`) are subtracted
+    from the HID count, for the paste case of 22:10:12. `DICTUM_TAP_DIAG=1` logs, per tick, CGPreflightPostEventAccess,
+    CGPreflightListenEventAccess, AXIsProcessTrusted, the HID and combined-session counts, posted, seen, CGEventTapIsEnabled, secure
+    input and the disable count; off by default, never set by a release build. Head-insert placement unchanged.
+    Pins: `A_starved_tap_asks_for_a_fresh_tap_and_reports_the_grant_gone_when_refused`,
+    `A_fresh_tap_allowed_is_kept_and_the_count_starts_again`, `A_second_trigger_soon_after_a_fresh_tap_stays_removed`,
+    `Keys_dictum_posted_itself_never_count_as_missed`, `A_tap_under_secure_input_is_never_asked_for_again`,
+    `A_disabled_tap_the_keys_stopped_reaching_is_asked_for_again_not_turned_back_on` (replaces the item 16 pin of that name),
+    `A_tap_macOS_keeps_disabling_is_removed_and_reported_instead_of_turned_back_on` (now reads the line the tap thread will log).
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** own posted events not subtracted (one pin); a refused fresh tap taken as created (two); the 30 s window ignored (one);
+      the trigger re-enabling in place instead of asking for a fresh tap (three); a disabled tap with keys missed turned back on (one).
+    - Not verified until the hands-on: that `CGEventTapCreate` is refused after every live revocation (one observation, 08:10:24), and
+      that the fresh tap is allowed in the false-positive cases of 21:50:19 and 22:10:12.
+19. **Session-counter round (29/10/2026, from c8423dc; departure proposed with evidence at 22:34 AEDT, orchestrator GO 22:36 with four
+    conditions).** The reset run at c8423dc (watchdog 22:31:14, reset ~22:31:20) locked the owner's typing for the whole minute with
+    NO trigger: the tap was fed throughout (per-tick diag 22:31:38 to 22:32:12: HID 5140 to 5597, tap 111 to 567, combined-session
+    counter 4528 flat), and AXIsProcessTrusted, CGPreflightPostEventAccess and CGEventTapIsEnabled stayed true. So after this
+    revocation macOS called the tap and held the events it returned; a starved-tap rule cannot see it. Healthy baseline 22:29:32 to
+    22:30:02: HID +100, session +96, tap +100; the paste: HID +5, session +4. Fix: `TapLiveness` follows two laggards against the HID
+    count, the tap's count (settled one tick after the tap moves, for the paste case of 22:29:35 where the HID counter recorded the
+    tap's four events half a second late) and the combined-session count (`CGEventSourceCounterForEventType` with the combined session
+    state, over the tap's own types); HID up by four over a second while either stands still trips the existing path (disable at once,
+    remove, re-create confirm, 30 s rule). The pauses (secure input, stalled timer) cover both and the baseline is retaken on the
+    first tick after a pause. The log lines name the comparison ("keys reached macOS but not Dictum" / "but no app for over a
+    second"). The diagnostic also makes a listen-only create probe each tick (allowed/refused, released at once), under
+    DICTUM_TAP_DIAG=1 only. `CGPreflightListenEventAccess` reads Input Monitoring, not Accessibility (false all run with the grant on):
+    not a signal.
+    Pins: `Liveness_calls_keys_held_when_the_session_count_stands_still_while_the_system_sees_keys`,
+    `Liveness_does_not_call_keys_held_for_a_paste_that_reaches_the_session`, `Liveness_pauses_the_session_comparison_for_secure_input`,
+    `Liveness_waits_one_tick_after_the_tap_moves_before_counting`, `A_fed_tap_whose_keys_are_held_after_it_is_asked_for_again`,
+    `The_diagnostic_create_probe_never_runs_outside_the_switch`.
+    - **Mutation checks (29/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** the session rule removed (three pins); the pause not applied to the session rule (one); the settle tick removed
+      (three); a moving follower not rebased (six); the diagnostic gate removed (one); the session rule reading HID movement alone, so
+      a paste trips it (nine, the paste pin among them).
+    - Orchestrator's pass line for the hands-on: typing back within ~3 s of the trigger WITH Dictum still running; if the trigger fires
+      and typing stays held, stop and report, no further hardware iteration.
+20. **Wording (29/10/2026, orchestrator 22:50 AEDT, after the reset run at 3667d9d passed: trigger 22:44:49.164, removal 22:44:49.168,
+    Dictum still running, owner "3 sec").** The rule's second is counted from the baseline (the last follower movement, settle or
+    pause), not from the first missed key, so after an idle spell it trips on the first tick that shows four missed; "for over a second"
+    overstated the wait. The lines now say what was measured and nothing timed: "N key events reached macOS but not Dictum" / "but no
+    app" (rows 10 and 13 reworded, still PROPOSED). Two findings go to follow-up PRs, not #82: (a) after a reset removes the row, Request
+    access cannot re-register a process whose prompting check still answers trusted (22:46:15.959 requested, 22:46:16.074 create
+    refused, no prompt, no row); the Accessibility page the button opens has + which works; follow-up scope: CGRequestPostEventAccess in
+    Request, an "add it with the + button" caption (PROPOSED), hands-on from a removed row. (b) The diagnostic's listen-only create probe
+    flipped to refused within one tick of the revocation, before any key (22:44:47.756; the re-create was refused at 08:10:24 and
+    22:44:49): a user-independent revocation signal; follow-up scope: show on hardware that a periodic listen-only create never raises
+    an Input Monitoring prompt or adds a row (else a minimal active tap), then make it a primary trigger and retire the 30 s
+    simplification per its own text.
+21. **Rows 8, 9, 10, 13 and 14 APPROVED by the owner 29/10/2026 23:29 AEDT ("Approve all five"), as written in `.demo-preview/approve-mac-access.md`;
+    the code comments carry the approval. Windows CI at fbd90d2 failed one pin, `The_diagnostic_create_probe_never_runs_outside_the_switch`:
+    its "diagnostic on" half reads macOS-only functions, so it is now a macOS-only pin (`…_runs_on_every_tick_under_the_switch`), and the
+    "off" half stays ungated on both platforms (orchestrator, 23:33 AEDT).**
+22. **Merge-lens fix round (29/10/2026 23:50 AEDT, opus lens on fe03270: Block).** BLOCKER: the hotkey Dictum swallows (SuppressHotkey,
+    the default) is counted by the HID system and reaches no app, so two quick hands-free dictations with no typing between read as keys
+    held: trigger, re-create, and within 30 s row 14, the hotkey dead with the grant on. The soak missed it (a held Left Control and
+    pastes kept the session follower moving). Fix: `SwallowedEvents`, one per platform, incremented whenever a tap's handler returns false
+    (every Dictum tap), taken off the HID count before the session comparison in `Check`, `Probe` and `Fed`. Pins:
+    `Keys_dictum_swallowed_itself_never_count_as_held`, `A_swallowed_hotkey_event_is_counted_as_swallowed` (macOS only). Minors: (2) the
+    shutdown race — the tap thread keeps its own copy of its run loop for `Install`/`Remove`, and `Dispose` no longer zeroes the field
+    when the join times out (the retained loop is then leaked, not released under a live thread); (3) six logged strings were not on
+    the sheet: rows 15 to 20, PROPOSED; (4) the tap pins moved to `tests/Dictum.Tests/TapLivenessTests.cs` (InputAccessTests.cs was
+    1,011 lines). Measured, not recalled: `Environment.TickCount64` does not count sleep on macOS (4,306 s behind the wall clock after
+    today's sleeps), so the stalled-timer pause keyed on it never fired after a wake; the tap now also reads a wall clock for the pause
+    (`EventTap.Pause`). `Handle` tolerates a null event and makes its decoder lazily, so a pin can count a key or hand in a real event
+    without a running tap; Run still makes the decoder first.
+23. **Row 13 reworded by the owner (29/10/2026 23:44 AEDT, "Approve, reword 13", typed in the orchestrator session in answer to the exact
+    wording; relayed by the orchestrator 23:45 and confirmed 30/10 00:06):** "Event tap (…) re-created: N key events reached macOS but not
+    Dictum (or: but no app), but macOS allowed a fresh tap, which usually means another app or macOS took those keys; the hotkey carries
+    on." Supersedes the 23:29 "Approve all five" for that row; rows 8, 9, 10 and 14 stand as approved then. Pin reads the line whole.**
+24. **Re-lens fix round (30/10/2026 00:20 AEDT, opus re-lens on 20975dc: Needs changes, no blocker).** MAJOR: the swallowed count came
+    off the session comparison only; a Dictum tap behind another (the dictation tap re-created to the head, ahead of the fix_hotkey
+    tap) never sees what the one ahead swallowed, so its own count stayed flat while HID moved and one hands-free tap-tap read as
+    TapStarved on the fix tap (a false re-create). Fix: `hidCount - swallowedCount` is the leader for both comparisons in `Check`,
+    `Probe` and `Fed`; a tap's own swallows raise HID, the swallowed count and its own count together, so its follower still moves.
+    MINOR: `SwallowedEvents` keeps keyboard and mouse swallows apart (`Add(keyboard)`, `Count(mouse)`), and each tap subtracts only the
+    types in its own mask (`EventTap.Swallowed()` reads `WantsMouse`), so a mouse-button hotkey's swallows never cancel held keys on a
+    keyboard-only tap. Pins: `A_tap_behind_one_that_swallowed_is_not_called_starved`, `Mouse_swallows_never_cancel_held_keys_on_a_keyboard_only_tap`.
+    - **Mutation checks (30/10/2026, Mac, Release; sources restored from a copy after each), each observed failing on the reverted
+      behaviour:** the tap comparison without the subtraction (one pin); mouse swallows counted for every tap (one).
+    - The handler's swallow count cannot be pinned on Windows: a swallow needs the matcher to see a decoded key, and decoding needs a real
+      CGEvent (the null-event path counts the event as seen and passes it on before decoding). It is pinned on macOS
+      (`A_swallowed_hotkey_event_is_counted_as_swallowed`).
+25. **Re-lens test-only round (30/10/2026 00:35 AEDT, opus re-lens on 9773a09: Needs changes, tests only; both counter fixes verified).**
+    The subtraction in `Fed` and in `Probe` had no pin of its own: reverting either alone left every test green (a `Fed` revert blinds the
+    tap comparison for as many events as were swallowed before a re-create; a `Probe` revert gives a false trip and a false Denied).
+    Pins: `After_a_fresh_tap_the_swallows_before_it_do_not_blind_the_tap_comparison` (four swallowed, a re-create dated 40 s back so
+    the 30 s rule lets the next trip ask again, four keys never seen: TapStarved), `A_disabled_tap_is_turned_back_on_when_the_only_keys_missing_are_its_own_swallows`.
+    - **Mutation checks (30/10/2026, Mac, Release; source restored after each), each observed failing on the reverted behaviour:** `Fed`
+      without the subtraction, alone (one pin); `Probe` without the subtraction, alone (one pin). No product code changed.

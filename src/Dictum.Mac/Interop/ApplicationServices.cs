@@ -37,3 +37,17 @@ internal static class AX
         }
     }
 }
+
+/// <summary>
+/// Secure Event Input (Carbon HIToolbox, CarbonEvents.h): on while a password field or Terminal's Secure Keyboard Entry has the
+/// keyboard, and then macOS keeps keystrokes from event taps (recalled; the tap liveness check pauses for it). Present on macOS
+/// 27.2, checked 29/10/2026. <c>Boolean</c> is one byte.
+/// </summary>
+internal static class HIToolbox
+{
+    private const string Lib = "/System/Library/Frameworks/Carbon.framework/Carbon";
+
+    [DllImport(Lib, EntryPoint = "IsSecureEventInputEnabled")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool IsSecureEventInputEnabled();
+}

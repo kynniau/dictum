@@ -237,6 +237,8 @@ public class MacInputTests
         var errors = log.Lines.Where(l => l.Level == LogLevel.Error).Select(l => l.Message).ToList();
         Assert.Equal(2, errors.Count);
         Assert.All(errors, e => Assert.Contains("System Settings > Privacy & Security > Accessibility", e, StringComparison.Ordinal));
+        Assert.All(errors, e => Assert.Contains("Press Request access", e, StringComparison.Ordinal)); // the button is the way in (27/10/2026); no "quit and reopen"
+        Assert.All(errors, e => Assert.DoesNotContain("reopen", e, StringComparison.Ordinal));
         Assert.Contains(errors, e => e.Contains("(hotkey listener)", StringComparison.Ordinal));
         Assert.Contains(errors, e => e.Contains("(key monitor)", StringComparison.Ordinal));
     }

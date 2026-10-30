@@ -35,14 +35,17 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
     private readonly TextBlock _lightText = Ui.Text("Hold to test", "caption");
     private readonly Button _listen;
     private readonly Border _box;
+    private readonly InputAccessLine? _access;
     private IKeyMonitor? _monitor;
     private IDisposable? _pause;
     private HotkeySpec? _spec;
+    private bool _refusedForAccess;
 
     /// <param name="current">The hotkey configured now, or null/"" when none is set.</param>
     /// <param name="caption">The line above the box ("Press your hotkey").</param>
     /// <param name="prompt">What the box says while it listens and nothing has arrived yet.</param>
-    public HotkeyCaptureBox(AppShell shell, string? current, bool listenAtOnce, string caption = "Press your hotkey", string prompt = DictationPrompt)
+    /// <param name="showsAccessLine">Whether the box carries the input-access line and its Request access button after a refusal for want of the grant; false on a page that already shows the line (Settings &gt; General).</param>
+    public HotkeyCaptureBox(AppShell shell, string? current, bool listenAtOnce, string caption = "Press your hotkey", string prompt = DictationPrompt, bool showsAccessLine = true)
     {
         _shell = shell;
         _caption = caption;
@@ -64,10 +67,30 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
         _box[!Border.BackgroundProperty] = new DynamicResourceExtension("ControlBrush");
         AutomationProperties.SetName(_box, caption);
         AutomationProperties.SetLiveSetting(_received, AutomationLiveSetting.Polite);
-        Content = Ui.Stack(8, Ui.Text(caption, "caption"), _box, Ui.Row(8, _light, _lightText, _listen));
+        // A box that carries the grant line keeps it under the "received" line, shown only while the monitor was refused for want of it.
+        _access = showsAccessLine ? new InputAccessLine(shell, showsItself: false) { IsVisible = false } : null;
+        Content = _access is null
+            ? Ui.Stack(8, Ui.Text(caption, "caption"), _box, Ui.Row(8, _light, _lightText, _listen))
+            : Ui.Stack(8, Ui.Text(caption, "caption"), _box, _access, Ui.Row(8, _light, _lightText, _listen));
         if (listenAtOnce) AttachedToVisualTree += (_, _) => Start();
-        DetachedFromVisualTree += (_, _) => Stop();
+        AttachedToVisualTree += (_, _) => shell.Access.Changed += AccessChanged;
+        DetachedFromVisualTree += (_, _) =>
+        {
+            shell.Access.Changed -= AccessChanged;
+            Stop();
+        };
         Render();
+    }
+
+    /// <summary>
+    /// The grant arrived while this box was waiting on it: listen again, as the user asked to before the refusal. Only a box that
+    /// carries its own line (the Welcome hotkey step): on Settings &gt; General a refused Start raises no Started, so both boxes
+    /// could still be waiting and both would resume, the fix box last; there the card's line is the cue and Change… starts one
+    /// (merge lens, PR #82, 27/10/2026).
+    /// </summary>
+    private void AccessChanged()
+    {
+        if (_access is not null && _refusedForAccess && _shell.Access.State == InputAccessState.Granted && _monitor is null) Start();
     }
 
     /// <summary>The hotkey chosen: the configured one until a new key is pressed; "" when none.</summary>
@@ -92,10 +115,19 @@ internal sealed class HotkeyCaptureBox : UserControl, IDisposable
             monitor.Dispose();
             _pause.Dispose();
             _pause = null;
-            _received.Text = "The system refused to report keys, so the hotkey cannot be checked here. The log has details.";
+            // Refused for want of the grant: the box says so and carries the Request access button; any other refusal keeps the log pointer.
+            // A fresh check, not the shell's cached answer: the Welcome window runs before the shell installs its own listener, so
+            // nothing has asked yet on a new install (merge lens, PR #82, 27/10/2026). It also starts the watch for the grant.
+            _shell.Access.ListenerRefused();
+            _refusedForAccess = _shell.Access.State == InputAccessState.Denied;
+            if (_access is not null) _access.IsVisible = _refusedForAccess;
+            _received.Text = _refusedForAccess ? InputAccessText.BoxDenied(_shell.Platform.Words)
+                : "The system refused to report keys, so the hotkey cannot be checked here. The log has details.";
             return;
         }
         _monitor = monitor;
+        _refusedForAccess = false;
+        if (_access is not null) _access.IsVisible = false;
         Render();
         Started?.Invoke();
     }

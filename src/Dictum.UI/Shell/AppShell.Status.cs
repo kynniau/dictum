@@ -15,8 +15,9 @@ namespace Dictum.UI.Shell;
 /// (<see cref="AppShell.ModelProblem"/>), and under it "Last dictation heard nothing: check the microphone" while that holds
 /// (21/10/2026); null when nothing is wrong.</param>
 /// <param name="TryCpu">"Try on the CPU" is offered (<see cref="AppShell.TryOnCpu"/>).</param>
+/// <param name="RequestAccess">"Request access" is offered: the hotkey listener was refused for want of the input-access grant (<see cref="AppShell.Access"/>), and <paramref name="Problem"/> says so.</param>
 public sealed record ShellStatus(string State, string Tone, string Models, string Tooltip, string? Download, double? DownloadFraction,
-    string? Problem = null, bool TryCpu = false);
+    string? Problem = null, bool TryCpu = false, bool RequestAccess = false);
 
 public sealed partial class AppShell
 {
@@ -61,7 +62,8 @@ public sealed partial class AppShell
                     _ => ("Ready", "ready"),
                 };
             var tooltip = TooltipLine(hotkey);
-            return new ShellStatus(state, tone, models, tooltip, download, Models.DownloadFraction, WithHeardNothing(ModelProblem, _heardNothing), TryCpuOffered);
+            var problem = WithAccessProblem(WithHeardNothing(ModelProblem, _heardNothing), AccessProblem);
+            return new ShellStatus(state, tone, models, tooltip, download, Models.DownloadFraction, problem, TryCpuOffered, Access.State == InputAccessState.Denied);
         }
     }
 
@@ -138,6 +140,18 @@ public sealed partial class AppShell
     internal string? ModelProblem => ProblemLine(
         _models.IsLoading ? null : Reason(_models.LastError, _models.RestartForCpu, _models.Notice),
         _settings.Llm.Provider != LlmSettings.Local || _llm.IsLoading ? null : Reason(_llm.LastError, _llm.RestartForCpu, _llm.Notice));
+
+    /// <summary>
+    /// Why the icon shows the error while the hotkey listener is refused for want of the input-access grant (the panel's "!" said
+    /// nothing before, owner finding 27/10/2026): the same words as Settings &gt; General, with the Request access link beside them.
+    /// </summary>
+    internal string? AccessProblem => Access.State == InputAccessState.Denied ? Views.InputAccessText.Denied(Platform.Words)
+        : Access.RestartFailed ? Views.InputAccessText.RestartFailed
+        : null;
+
+    /// <summary>The problem line with the access line under it, when there is one.</summary>
+    internal static string? WithAccessProblem(string? problem, string? access) =>
+        access is null ? problem : problem is null ? access : $"{problem}\n{access}";
 
     /// <summary>The problem line, with the heard-nothing line under it while the last dictation heard nothing (21/10/2026).</summary>
     internal static string? WithHeardNothing(string? problem, bool heardNothing) =>

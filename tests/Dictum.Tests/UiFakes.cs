@@ -54,14 +54,25 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     /// <summary>Listeners created from now on fail to start, as when Windows refuses the hook.</summary>
     public bool RefuseListeners { get; set; }
 
+    /// <summary>The next listener asked for throws instead of being made (once), as a native call that fails outright.</summary>
+    public bool ThrowNextListener { get; set; }
+
     public IHotkeyListener CreateHotkeyListener(HotkeyMatcher matcher, Action<HookEvent> post, ILog log)
     {
+        if (ThrowNextListener)
+        {
+            ThrowNextListener = false;
+            throw new InvalidOperationException("The listener could not be made.");
+        }
         LastListener = new FakeHotkeyListener(matcher, post) { Refused = RefuseListeners };
         Listeners.Add(LastListener);
         return LastListener;
     }
-    public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => LastMonitor = new FakeKeyMonitor(onKey);
+    public IKeyMonitor CreateKeyMonitor(Action<RawKeyEvent> onKey, ILog log) => LastMonitor = new FakeKeyMonitor(onKey) { Refused = RefuseListeners };
     public bool IsKeyDown(int vk) => false;
+    /// <summary>No grant to ask for by default, as Windows; a Mac test sets its state.</summary>
+    public FakeInputAccess FakeAccess { get; } = new();
+    public IInputAccess InputAccess => FakeAccess;
     public IInputSender CreateInputSender(ILog log) => Desktop;
     public IClipboard Clipboard => Desktop;
     public FakeDesktop Desktop { get; } = new();
@@ -107,11 +118,25 @@ internal sealed class FakeHotkeyListener(HotkeyMatcher matcher, Action<HookEvent
     public void Dispose() => Disposed = true;
 }
 
+/// <summary>The input-access grant as a test scripts it: the state the check returns, and how many times a request was made.</summary>
+internal sealed class FakeInputAccess : IInputAccess
+{
+    public InputAccessState State { get; set; } = InputAccessState.NotApplicable;
+    public int Requests { get; private set; }
+    public InputAccessState Check() => State;
+    public void Request() => Requests++;
+    public event Action? Revoked;
+
+    /// <summary>As a Mac tap does from its own thread when macOS kept disabling it.</summary>
+    public void Revoke() => Revoked?.Invoke();
+}
+
 internal sealed class FakeKeyMonitor(Action<RawKeyEvent> onKey) : IKeyMonitor
 {
     public bool Started { get; private set; }
     public bool Disposed { get; private set; }
-    public bool Start() => Started = true;
+    public bool Refused { get; init; }
+    public bool Start() => Started = !Refused;
     public void Press(int vk, bool down) => onKey(new RawKeyEvent(vk, down, Injected: false));
     public void Dispose() => Disposed = true;
 }

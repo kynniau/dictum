@@ -23,10 +23,15 @@ internal sealed class TapEvents(bool mouse)
     /// <summary>The event types a tap asks for: keys and modifier changes, plus the right and other buttons when <paramref name="mouse"/>. Never the left button.</summary>
     public static ulong Mask(bool mouse)
     {
-        var mask = CG.MaskBit(CG.EventKeyDown) | CG.MaskBit(CG.EventKeyUp) | CG.MaskBit(CG.EventFlagsChanged);
-        if (mouse) mask |= CG.MaskBit(CG.EventRightMouseDown) | CG.MaskBit(CG.EventRightMouseUp) | CG.MaskBit(CG.EventOtherMouseDown) | CG.MaskBit(CG.EventOtherMouseUp);
+        ulong mask = 0;
+        foreach (var type in Types(mouse)) mask |= CG.MaskBit(type);
         return mask;
     }
+
+    /// <summary>The event types a tap asks for: the mask, and the HID counts the liveness check compares (never mouse moves, which the tap never sees).</summary>
+    public static uint[] Types(bool mouse) => mouse
+        ? [CG.EventKeyDown, CG.EventKeyUp, CG.EventFlagsChanged, CG.EventRightMouseDown, CG.EventRightMouseUp, CG.EventOtherMouseDown, CG.EventOtherMouseUp]
+        : [CG.EventKeyDown, CG.EventKeyUp, CG.EventFlagsChanged];
 
     /// <summary>The key changes one event means; empty for events with nothing to report (Fn, an unmapped key, the left button).</summary>
     public KeyChange[] Decode(uint type, long keyCode, ulong flags, bool autorepeat, long buttonNumber)

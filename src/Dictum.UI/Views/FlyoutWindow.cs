@@ -36,6 +36,7 @@ internal sealed class FlyoutWindow : Window
     private readonly TextBlock _problem = Ui.Text("", "caption");
     private readonly Button _openLogs;
     private readonly Button _tryCpu;
+    private readonly Button _requestAccess;
     private readonly StackPanel _problemBox;
     private readonly Ellipse _dot = new() { Width = 8, Height = 8 };
     private readonly TextBlock _state = Ui.Text("", "caption");
@@ -113,8 +114,10 @@ internal sealed class FlyoutWindow : Window
         {
             if (shell.OpenPath(shell.RealPath(shell.Paths.LogsDir), folder: true) is { } why) shell.Notify("Dictum", why, warning: true);
         }));
+        // The hotkey listener refused for want of the input-access grant: the one Request access button, here as a link (27/10/2026).
+        _requestAccess = Ui.Button(InputAccessText.RequestLabel, "link", () => Act(() => shell.Access.Request()), name: InputAccessText.RequestLabel);
         AutomationProperties.SetLiveSetting(_problem, AutomationLiveSetting.Polite);
-        _problemBox = Ui.Stack(4, _problem, Ui.Row(12, _tryCpu, _openLogs));
+        _problemBox = Ui.Stack(4, _problem, Ui.Row(12, _tryCpu, _requestAccess, _openLogs));
 
         // Two rows: "Dictum", the state and the switch, then the models line under all three, so it has the panel's width
         // less the mark (1.2 polish round 2: beside the state and the switch it wrapped the key's name onto a second line).
@@ -242,6 +245,7 @@ internal sealed class FlyoutWindow : Window
             _problem.Text = problem ?? "";
             _problemBox.IsVisible = problem is not null;
             _tryCpu.IsVisible = status.TryCpu;
+            _requestAccess.IsVisible = status.RequestAccess;
             // The log is for a problem the log explains (a model that failed, a dictation that heard nothing), not for the
             // no-microphone sentence alone, which says what to do (1.2 polish round 2).
             _openLogs.IsVisible = status.Problem is not null;
