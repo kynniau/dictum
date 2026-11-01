@@ -37,7 +37,7 @@
     <!-- Native whisper.cpp and llama.cpp runtimes for macOS. The arm64 builds of both carry ggml's Metal backend
          (libggml-metal*.dylib, checked in the packages 22/10/2026), so the "CPU" runtime uses the GPU on Apple Silicon. -->
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
-    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
   </ItemGroup>
 
 </Project>
