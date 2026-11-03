@@ -132,7 +132,7 @@ public class CleanupPageOwnInstructionsTests
         Assert.Contains(row.Children.OfType<Button>(), b => b.Content as string == "Open the settings folder");
 
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); // the Service list starts on Anthropic (Claude)
-        Assert.Equal(KeyFile.Contents(SecretStore.AnthropicKey), File.ReadAllText(scratch.Paths.EnvFile));
+        Assert.Equal(KeyFile.Contents(), File.ReadAllText(scratch.Paths.EnvFile));
         Assert.Equal(scratch.Paths.EnvFile, Assert.Single(platform.Opened));
         Assert.Contains(AppShell.KeyFileCreated(SecretStore.AnthropicKey), Lines(window));
         window.Close();

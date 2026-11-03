@@ -35,6 +35,7 @@ internal sealed class CleanupPage : SettingsPage
     private readonly Button _enable;
     private readonly TextBlock _offline = Ui.Text("", "caption");
     private readonly OwnInstructionsCard _own; // your own instructions (1.3), Advanced view only
+    private readonly KeysPanel _keys; // API keys (K-UI, 04/11/2026): the keys for the service shown, under its fields and in the on state
 
     /// <summary>
     /// The card's introduction (approved: never reword it). Its last sentence, "Audio never leaves this PC.", is untrue while cloud
@@ -51,6 +52,7 @@ internal sealed class CleanupPage : SettingsPage
         _profanity.Width = 300;
         _profanity.HorizontalAlignment = HorizontalAlignment.Left;
         _grammar = Ui.Switch(false, on => Write(("llm.grammar_assist", Json(on))));
+        _keys = new KeysPanel(Shell, Shell.Vault, Say);
         _provider.SelectionChanged += (_, _) => DefaultsForProvider();
         _baseUrl.TextChanged += (_, _) => ShowAddressHints();
         DefaultsForProvider();
@@ -74,7 +76,26 @@ internal sealed class CleanupPage : SettingsPage
                 Ui.Text("Mask keeps the first letter (f***); Remove drops the word. The clean-up model keeps every word you said, swear words included: this setting is the only thing that changes them.", "caption")), "Profanity filter"),
             Ui.Card(Ui.Line("Grammar assist", _grammar, "For speakers whose first language is not English: also fixes articles, tenses, prepositions and word order, keeping every fact and name."), "Grammar"),
             _own.View,
-            Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff), "Cloud clean-up"));
+            Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff, _keys.View), "Cloud clean-up"));
+    }
+
+    /// <summary>
+    /// The key list under the card (K-UI, 04/11/2026): while cloud clean-up is on, the keys of the service in use (where Check this key
+    /// can be offered, since its consent is on record); while it is off, the keys of the service and address chosen in the fields, the
+    /// variable the card's key line names (<see cref="KeyFileButton.VariableFor"/>). Hidden for a service that takes no key.
+    /// </summary>
+    private void ShowKeys()
+    {
+        var s = Shell.Settings;
+        if (_cloudOn.IsVisible)
+        {
+            var anthropic = s.Llm.Provider == LlmSettings.Anthropic;
+            var inUse = CloudPresets.ForAddress(s.Llm.BaseUrl);
+            _keys.Show(anthropic ? SecretStore.AnthropicKey : s.Llm.Provider == LlmSettings.OpenAiCompatible ? inUse.KeyVariable : null, anthropic ? "Anthropic" : inUse.Name);
+            return;
+        }
+        var preset = Preset;
+        _keys.Show(KeyFileButton.VariableFor(preset, Address(preset)), preset is null ? "Anthropic" : CloudPresets.ForAddress(Address(preset)).Name);
     }
 
     /// <summary>Leaving the page (another page, or the window closed) saves your own instructions if they changed.</summary>
@@ -101,6 +122,7 @@ internal sealed class CleanupPage : SettingsPage
         _intro.Text = Shell.WithAudioSentence(Intro); // the owner's replacement for "Audio never leaves this PC." while cloud speech sends audio
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
+        ShowKeys();
     }
 
     /// <summary>The card's state line while cloud clean-up is on (a host agreed to, or a server on this PC).</summary>
@@ -154,6 +176,7 @@ internal sealed class CleanupPage : SettingsPage
     private void ShowAddressHints()
     {
         var preset = Preset;
+        if (!_cloudOn.IsVisible) ShowKeys(); // the keys follow the service and address chosen, as the key line does
         if (preset is null)
         {
             _model.Watermark = LlmSettings.AnthropicDefaultModel;
@@ -236,7 +259,34 @@ internal sealed class PrivacyPage : SettingsPage
                 Ui.Line("Write dictated text to the log", _transcripts, "Off by default. For troubleshooting; the log stays on this PC.")), "Settings"),
             Ui.Card(Ui.Stack(8,
                 Ui.Text("The last dictation is held in memory for Fix last dictation and is gone when Dictum quits. Calibration recordings stay in your local Dictum folder until you delete them (Storage)."),
-                Ui.Row(8, Ui.Button("Privacy policy", "link", () => Shell.Platform.Open(AppShell.PrivacyUrl)))), "Kept on this PC"));
+                Ui.Row(8, Ui.Button("Privacy policy", "link", () => Shell.Platform.Open(AppShell.PrivacyUrl)))), "Kept on this PC"),
+            KeysCard(Shell, Say));
+    }
+
+    // PROPOSED 04/11/2026 (approve-api-keys.md row 38): the API keys card on Settings > Privacy.
+
+    /// <summary>PROPOSED 04/11/2026 (row 38): the card's title.</summary>
+    internal const string KeysTitle = "API keys";
+
+    /// <summary>PROPOSED 04/11/2026 (row 38): the card's line, naming the store (the uninstall fact: Credential Manager entries outlive an MSIX uninstall).</summary>
+    internal static string KeysLine(string store) =>
+        $"Keys you add in Dictum are kept in {store} for your account on this computer. They stay there until you remove them here, also if you uninstall Dictum.";
+
+    /// <summary>PROPOSED 04/11/2026 (row 38): the button.</summary>
+    internal const string RemoveAllLabel = "Remove all keys…";
+
+    /// <summary>
+    /// Settings > Privacy > API keys (K-UI, 04/11/2026; brief §3 "Remove all keys in Settings > Privacy"): the store's line and Remove all
+    /// keys (<see cref="AppShell.RemoveAllKeys"/>, which asks first). Not shown where the platform has no credential store: nothing can be
+    /// stored there.
+    /// </summary>
+    private static Control KeysCard(AppShell shell, Action<string> say)
+    {
+        var card = Ui.Card(Ui.Stack(8,
+            Ui.Text(KeysLine(shell.Vault.StoreName ?? "")),
+            Ui.Row(8, Ui.Button(RemoveAllLabel, "danger", () => say(shell.RemoveAllKeys() ?? ""), ex => say($"That did not work: {ex.Message}")))), KeysTitle);
+        card.IsVisible = shell.Vault.Available;
+        return card;
     }
 
     protected override void Redraw()

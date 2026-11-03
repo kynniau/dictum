@@ -156,6 +156,26 @@ public static class HelpText
         "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
     ];
 
+    /// <summary>
+    /// PROPOSED 04/11/2026 (K-UI lane; approve-api-keys.md row 40): not shown yet. On approval it goes into <see cref="CloudAnswer"/>
+    /// directly above the APPROVED "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key
+    /// file…." paragraph (index 4 today), with the site's help page given the same words; no approved paragraph is reworded. Kept beside,
+    /// not in place, because CloudAnswer is pinned word for word against the site (HelpPageTests) and the approved indexes (OwnerApprovalsTests).
+    /// </summary>
+    public const string ProposedPasteBoxParagraph =
+        "The easiest way to add a key: choose the service in Settings > Clean-up, press Add a key…, paste the key, and press Save. " +
+        "Dictum keeps it in Windows Credential Manager, never in a file, and uses it from the next dictation. " +
+        "You can add more than one key for a service, such as a work one and a personal one, and choose which one Dictum uses.";
+
+    /// <summary>
+    /// PROPOSED 04/11/2026 (K-UI lane; approve-api-keys.md row 41): not shown yet; on approval it follows <see cref="ProposedPasteBoxParagraph"/>.
+    /// Inferred, not verified: CRED_PERSIST_LOCAL_MACHINE credentials belong to the user's logon on this computer, not to the package
+    /// (CredentialManagerStore's Learn notes), and an MSIX uninstall removes the package's own data; no Learn page read says an uninstall
+    /// removes them. docs/TESTING-MSIX.md step 4 on a packaged install is the check before this is approved.
+    /// </summary>
+    public const string ProposedUninstallLine =
+        "Uninstalling Dictum does not remove the keys you added in Dictum: they stay in Windows Credential Manager until you remove them. To remove them, use Remove all keys in Settings > Privacy before you uninstall.";
+
     /// <summary>APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the question for the own-instructions box (PR #60).</summary>
     public const string OwnInstructionsQuestion = "Can I give the clean-up my own instructions?";
 

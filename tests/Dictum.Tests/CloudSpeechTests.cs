@@ -464,8 +464,9 @@ public sealed class CloudSpeechTests
             .ToList();
         // SingleInstance.cs is the macOS one (src/Dictum.Mac/Shell): a Unix domain socket under the app's own folder, through
         // which a second launch tells the running copy to show itself. It never leaves this Mac (docs/DECISIONS.md, "Dictum
-        // for macOS", 22/10/2026); it is listed so the audit stays exact.
-        Assert.Equal(["src/Dictum.Core/App/AppRules.cs", "src/Dictum.Core/Llm/AnthropicLlmClient.cs", "src/Dictum.Core/Llm/OpenAiCompatibleLlmClient.cs", "src/Dictum.Core/Transcribe/CloudSpeechEngine.cs", "src/Dictum.Core/Transcribe/ModelDownloader.cs", "src/Dictum.Core/Transcribe/OfflineGuardHandler.cs", "src/Dictum.Core/Transcribe/UpdateCheck.cs", "src/Dictum.Mac/Shell/SingleInstance.cs", "src/Dictum.UI/Shell/AppShell.cs"], senders);
+        // for macOS", 22/10/2026); it is listed so the audit stays exact. KeyCheck.cs (API keys, K-UI, 04/11/2026) is Check this key:
+        // one GET with no body per click, through the provider client the shell passes it, to the consented host only (ApiKeysUiTests).
+        Assert.Equal(["src/Dictum.Core/App/AppRules.cs", "src/Dictum.Core/Llm/AnthropicLlmClient.cs", "src/Dictum.Core/Llm/OpenAiCompatibleLlmClient.cs", "src/Dictum.Core/Settings/KeyCheck.cs", "src/Dictum.Core/Transcribe/CloudSpeechEngine.cs", "src/Dictum.Core/Transcribe/ModelDownloader.cs", "src/Dictum.Core/Transcribe/OfflineGuardHandler.cs", "src/Dictum.Core/Transcribe/UpdateCheck.cs", "src/Dictum.Mac/Shell/SingleInstance.cs", "src/Dictum.UI/Shell/AppShell.cs"], senders);
     }
 
     /// <summary>Records each request: where it went, its key, and every multipart field's bytes; answers with a transcription.</summary>

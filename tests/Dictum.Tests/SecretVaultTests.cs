@@ -38,7 +38,10 @@ internal sealed class FakeCredentialStore : ICredentialStore
         return _entries.Remove((variable, id));
     }
 
-    public IReadOnlyList<(string Variable, string Id)> List() => [.. _entries.Keys];
+    /// <summary>Every List call throws this, as a store that cannot be enumerated (ApiKeysUiTests); null: none does.</summary>
+    public CredentialStoreException? ListFails { get; set; }
+
+    public IReadOnlyList<(string Variable, string Id)> List() => ListFails is { } fails ? throw fails : [.. _entries.Keys];
 }
 
 /// <summary>

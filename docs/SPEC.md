@@ -379,6 +379,34 @@ never a value or any part of one (D2). These lines are PROPOSED (`.demo-preview/
 Remove all raises `ISecretVault.Changed`, and the app reloads on it, because a change in the credential store writes no watched
 file when keys.json is absent (lens, 30/10/2026).
 
+API keys in Settings (amendment, 04/11/2026, K-UI lane; brief §2 items 1, 2, 3 and 5; every string PROPOSED in
+`.demo-preview/approve-api-keys.md` rows 16 to 45). Under the service on Settings > Clean-up's Cloud clean-up card and Settings >
+Models' Cloud speech card (Advanced view only; the Simple card stays its state line and off switch), `KeysPanel` lists that service's
+keys: while the service is on, the one in use; while off, the one the fields name (the variable the key line names). Each row: the
+label (a stored key's own, "Unnamed key" when the vault left it out; the variable's name for the other two), where it lives (added
+here with its date, key file, environment variable), an Active mark on the entry `SecretStore.Get` uses (the same order, pinned against
+`SecretStore.Describe`) or "Use this key" (`SecretVault.SetActive`, then a reload), Check this key (below), and Remove for a stored key
+(asked first). The list is read again only when the settings load again, the service shown changes, or after its own action, never on
+a redraw tick. A store that cannot be read (`CredentialStoreException` from `List`) shows its reason in one line; the rest of the list
+and the page work. "Add a key…" opens `AddKeyWindow` (the shared dialog frame): Label prefilled with the service's name, a masked Key
+field (no undo history), Save, Cancel and "How do I get a key?" (https://dictum.kynni.au/help#key-anthropic, -openai, -gemini, -azure,
+-groq, -custom). Save calls `ISecretVault.Add`; its refusals are the dialog's error line byte for byte; the field is emptied as soon as
+Add returns and when the window closes. A key saved is made the one in use. Where the platform has no credential store the button is
+not shown and a line says to use the key file. Settings > Privacy has an API keys card (only with a credential store) with "Remove all
+keys…" (asked first; `ISecretVault.RemoveAll`; a refusal is said with "Remove Dictum completely"'s row 8 line).
+
+Check this key (decision D3, 04/11/2026): offered only when the settings in use carry the consent step's host for the service that
+takes that key (`KeyCheck.Target`: clean-up's consent for Anthropic or an OpenAI-compatible address, the speech consent for a speech
+address), never automatic, one request per click. It is a GET with no body to the service's model list on the consented host
+(Anthropic `{base}/v1/models` with `anthropic-version`; every OpenAI-compatible address `{base_url}/models`, Azure with `api-key`;
+URLs and dates in `KeyCheck`'s remarks), sent through the provider client (offline only refuses it; no redirects), refused before
+sending for a plain http:// address off this PC, given up after 15 s. It says "The key works." or the status code and the service's
+own message with every key-like token hidden (`KeyCheck.Redact`). The log names the variable and the host only.
+
+Create the key file (amendment to the paragraph above, 04/11/2026, K-UI lane): the file is now the APPROVED header, a blank line, then
+the repository's `.env.example` in full (compiled into Dictum.Core as a resource), every empty key line holding `your-key-here`. Still
+one line per variable (D4); the approved strings around the button are unchanged.
+
 ## 6. Text insertion
 
 Sequence for `insert.method = "paste"`:
@@ -539,7 +567,8 @@ unknown entries in the `keys` section are counted, not named (a key pasted there
 `SecretVault.SetActive` writes it through the settings writer. `keys.json` beside settings.json holds `{"keys": [{"id",
 "variable", "label", "added"}]}` (the date as yyyy-MM-dd): labels trimmed, at most 60 characters, without control characters,
 and never one that holds part of the key; written atomically like settings.json, never written over while it cannot be read, and
-watched for reload like it (`AppRules.ReloadsOn`). Neither file ever holds a key.
+watched for reload like it (`AppRules.ReloadsOn`). Neither file ever holds a key. Settings writes `keys.active` from a key list's
+"Use this key" and after "Add a key…" saves (§5, 04/11/2026), always through `SecretVault.SetActive`.
 
 ## 10. Models
 
