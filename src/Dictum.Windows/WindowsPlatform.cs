@@ -44,6 +44,9 @@ public sealed class WindowsPlatform : IPlatform, IDisposable
     /// <summary>Windows has no Accessibility grant: a low-level hook installs for any process (SPEC §21). Nothing to ask for, nothing shown.</summary>
     public IInputAccess InputAccess => InputAccessNotNeeded.Instance;
 
+    /// <summary>Windows Credential Manager: one generic credential per key added in Dictum, for this computer only (<see cref="CredentialManagerStore"/>).</summary>
+    public ICredentialStore Credentials { get; } = new CredentialManagerStore();
+
     public string ExeDir { get; }
 
     public string ExePath { get; }

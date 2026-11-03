@@ -28,6 +28,10 @@ public sealed class StoredFilesPolicyTests
         ["snippets.txt"] = "snippets.txt",
         ["profanity.txt"] = "profanity.txt",
         [".env"] = ".env",
+        // API keys, Core (30/10/2026): keys.json holds the stored keys' labels, never a key. site/privacy.html names it
+        // (.demo-preview/approve-api-keys.md row 15, APPROVED by the owner 03/11/2026, applied 04/11/2026).
+        ["keys.json"] = "keys.json",
+        ["keys.json.tmp"] = "Working files",
         ["verified-models.json"] = "verified-models.json",
         ["verified-models.json.tmp"] = "Working files",
         ["gpu-load-speech.txt"] = "gpu-load-speech.txt",
