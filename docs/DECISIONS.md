@@ -6731,3 +6731,29 @@ Lane brief from the Dictum orchestrator (04/11/2026), after its exploration of 0
 4. **What a refused take shows.** The log says "no speech (the voice activity detector found no speech in N s)"; See how it works
    shows the reason it already shows for a take whisper heard nothing in, "no speech recognised", so no new words reach a screen.
    The Help line is PROPOSED in `.demo-preview/approve-vad.md`.
+5. **Measured (04/11/2026, this PC, Vulkan, `VoiceGateIntegrationTests`, characters typed by the pipeline; lengths only).** Clips: 5 s
+   of digital silence; 5 s of white noise (seeded, peak block RMS 0.031, above `silence_threshold`); the synthesised sentence the
+   whisper integration test uses (4.7 s, System.Speech).
+
+   | Model | Clip | Whisper alone | Typed before (level rule) | Typed after (gate) |
+   |---|---|---|---|---|
+   | base.en | digital silence | 3 | 0 | 0 |
+   | base.en | white noise | 0 | 0 | 0 |
+   | base.en | spoken sentence | 61 | 58 | 58 (same text) |
+   | large-v3-turbo | digital silence | 10 | 0 | 0 |
+   | large-v3-turbo | white noise | 1 | 1 | 0 |
+   | large-v3-turbo | spoken sentence | 61 | 58 | 58 (same text) |
+
+   Read plainly: digital silence was already stopped by the level rule, and on these synthetic clips the gate's gain is one noise case
+   on large-v3-turbo. The published gain (Calm-Whisper, "The Null Token Knows") is on real non-speech audio, which this lane did not
+   record. The detector itself found no speech in the silence and the noise, and one 3.9 s segment in the sentence.
+6. **Mutation checks (04/11/2026, Windows, Debug; each source restored from git after), each observed failing on the reverted
+   behaviour:** the pipeline ignoring the gate (5 pins); the level still deciding beside the gate (1); no gate skipping the level rule
+   (1); a failed detector dropping the level rule (1); the page showing the detector's own reason (1); whisper given a copy of the
+   samples (1); ModelIntegrity not knowing the file (2); `vad` off ignored (1); the loader not reading `vad` (1); the gate loading
+   before the runtime is chosen (1); the lookup taking any size (1); the lookup always finding a file (2); the self-test off line
+   failing the self-test (1); Remove Dictum completely not knowing the file (1).
+7. **Remove Dictum completely and the mover.** The removal plan's model matcher also takes `ggml-silero-v6.2.0.bin` and its `.part`,
+   so "Delete all app data" leaves nothing behind. `ModelFiles.IsModelFile` is unchanged: Settings > Storage reads a catalogue name
+   for every file it lists. So the model is not listed there and Settings > Models > Move leaves it in the old folder. The gate is
+   then off after a move (the level decides) until it is fetched again. Follow-up: give the file a place in the catalogues.

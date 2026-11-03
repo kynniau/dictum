@@ -207,6 +207,35 @@ public sealed class VoiceGateTests : IDisposable
     }
 
     [Fact]
+    public void Deleting_all_app_data_removes_the_voice_activity_model_and_its_partial_download()
+    {
+        var paths = new AppPaths(Path.Combine(_dir.FullName, "cfg"), Path.Combine(_dir.FullName, "local"), Path.Combine(_dir.FullName, "exe"));
+        Directory.CreateDirectory(paths.DefaultModelsDir);
+        var file = Path.Combine(paths.DefaultModelsDir, SileroVoiceGate.FileName);
+        File.WriteAllBytes(file, new byte[10]);
+        File.WriteAllBytes(file + ".part", new byte[5]);
+        File.WriteAllBytes(Path.Combine(paths.DefaultModelsDir, "notes.txt"), new byte[3]); // not Dictum's: never in the plan
+        var plan = Dictum.Storage.RemovalPlan.Build(paths, new AppSettings(), Dictum.Storage.RemovalScope.AllData);
+        Assert.Contains(plan.Items, i => i.Path == file);
+        Assert.Contains(plan.Items, i => i.Path == file + ".part");
+        Assert.DoesNotContain(plan.Items, i => i.Path.EndsWith("notes.txt", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_self_test_says_the_gate_is_off_and_why_without_failing()
+    {
+        var paths = new AppPaths(Path.Combine(_dir.FullName, "cfg"), Path.Combine(_dir.FullName, "local"), Path.Combine(_dir.FullName, "exe"));
+        var lines = new List<(string Label, string Value, bool? Pass)>();
+        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, NullLog.Instance);
+        Assert.True(Dictum.Cli.SelfTestCommand.VoiceGateLine(new AppSettings(), paths, integrity, (l, v, p) => lines.Add((l, v, p))));
+        Assert.Equal(("voice activity", "off: no ggml-silero-v6.2.0.bin in the model folders; Dictum.exe --download-model silero-v6.2.0 fetches it; silence_threshold decides silence", (bool?)null),
+            Assert.Single(lines));
+        lines.Clear();
+        Assert.True(Dictum.Cli.SelfTestCommand.VoiceGateLine(new AppSettings { Vad = AppSettings.VadOff }, paths, integrity, (l, v, p) => lines.Add((l, v, p))));
+        Assert.Equal("off: vad is off in settings.json; silence_threshold decides silence", Assert.Single(lines).Value);
+    }
+
+    [Fact]
     public void A_model_that_fails_its_check_is_never_loaded_and_the_level_decides()
     {
         var paths = new AppPaths(Path.Combine(_dir.FullName, "cfg"), Path.Combine(_dir.FullName, "local"), Path.Combine(_dir.FullName, "exe"));
