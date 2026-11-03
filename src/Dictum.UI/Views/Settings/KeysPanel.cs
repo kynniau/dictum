@@ -35,7 +35,7 @@ internal sealed record KeyEntry(KeySource Source, string? Id, string Label, Date
 }
 
 /// <summary>A service's keys as the list shows them, and why the stored ones could not be read, if they could not.</summary>
-internal sealed record KeyListing(IReadOnlyList<KeyEntry> Entries, string? Problem)
+internal sealed record KeyListing(string Variable, IReadOnlyList<KeyEntry> Entries, string? Problem)
 {
     /// <summary>
     /// Every key for <paramref name="variable"/>: the stored ones in keys.json's order (<see cref="ISecretVault.List"/>), then the
@@ -59,21 +59,25 @@ internal sealed record KeyListing(IReadOnlyList<KeyEntry> Entries, string? Probl
         }
         if (environment(variable) is { Length: > 0 }) entries.Add(new KeyEntry(KeySource.Environment, null, variable, null));
         if (AppShell.FileKey(paths, variable) is not null) entries.Add(new KeyEntry(KeySource.File, null, variable, null));
-        return new KeyListing(entries, problem);
+        return new KeyListing(variable, entries, problem);
     }
 
+    /// <summary>Stands in for each source's value when <see cref="Active"/> asks SecretStore: never a key, only "this source has one".</summary>
+    private const string StandIn = "set";
+
     /// <summary>
-    /// The entry the next dictation uses, as <see cref="SecretStore.Get"/> decides it (SPEC §5): the one keys.active chose when it is
-    /// in the list; otherwise the environment variable, then the .env line, then the stored key when exactly one is stored. Null: none
+    /// The entry the next dictation uses, decided by <see cref="SecretStore.InUse"/> itself (SPEC §5; lens on PR #87, MINOR 9: one order,
+    /// not a copy of it): a store holding a stand-in value for each source this listing found, and <paramref name="choice"/>. Null: none
     /// is used (two or more stored, none chosen, nothing else). Pinned against SecretStore.Describe (ApiKeysUiTests).
     /// </summary>
     public KeyEntry? Active(string? choice)
     {
-        if (choice is not null && Entries.FirstOrDefault(e => e.Choice == choice) is { } chosen) return chosen;
-        var stored = Entries.Where(e => e.Source == KeySource.Stored).ToList();
-        return Entries.FirstOrDefault(e => e.Source == KeySource.Environment)
-               ?? Entries.FirstOrDefault(e => e.Source == KeySource.File)
-               ?? (stored.Count == 1 ? stored[0] : null);
+        var secrets = SecretStore.FromContents(
+            Entries.Any(e => e.Source == KeySource.File) ? $"{Variable}={StandIn}\n" : null, null,
+            v => v == Variable && Entries.Any(e => e.Source == KeySource.Environment) ? StandIn : null,
+            choice is null ? null : new Dictionary<string, string> { [Variable] = choice },
+            Entries.Where(e => e.Source == KeySource.Stored).Select(e => (new StoredKey(e.Id!, Variable, e.Label, e.Added), StandIn)).ToList());
+        return secrets.InUse(Variable) is { } used ? Entries.FirstOrDefault(e => e.Choice == used) : null;
     }
 }
 
@@ -115,9 +119,9 @@ internal sealed class KeysPanel
     internal const string CheckLabel = "Check this key";
 
     /// <summary>PROPOSED 04/11/2026 (row 25): the buttons' accessible names, which say which key each acts on.</summary>
-    internal static string UseName(string label) => $"Use {label}";
+    internal static string UseName(string label) => $"{UseLabel}: {label}"; // the visible words first (WCAG 2.5.3, as CalibrationWindow names its rows)
 
-    internal static string CheckName(string label) => $"Check {label}";
+    internal static string CheckName(string label) => $"{CheckLabel}: {label}";
 
     internal static string RemoveName(string label) => $"Remove {label}";
 
@@ -178,7 +182,7 @@ internal sealed class KeysPanel
         _vault = vault;
         _say = say;
         _environment = environment ?? System.Environment.GetEnvironmentVariable;
-        _add = Ui.Button(AddLabel, "secondary", OpenAdd);
+        _add = Ui.Button(AddLabel, "secondary", OpenAdd, Failed); // a failure after the dialog is said on the page, never unhandled
         _note.IsVisible = false;
         View = Ui.Stack(8, _rows, _note, Ui.Row(8, _add), _noStore);
     }
@@ -304,7 +308,15 @@ internal sealed class KeysPanel
     internal void Added(string variable, string? id)
     {
         if (id is null) return;
-        var label = _vault.List(variable).FirstOrDefault(k => k.Id == id) is { Label.Length: > 0 } key ? key.Label : Unnamed;
+        string label;
+        try
+        {
+            label = _vault.List(variable).FirstOrDefault(k => k.Id == id) is { Label.Length: > 0 } key ? key.Label : Unnamed;
+        }
+        catch (CredentialStoreException)
+        {
+            label = Unnamed; // the key was stored; only its label could not be read back (the list then says why)
+        }
         _say(_shell.ChooseKey(variable, id) is { } failure ? AddedNotChosen(label, failure) : Added(label));
         Show(variable, _service, force: true);
     }

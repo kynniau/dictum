@@ -80,7 +80,8 @@ public sealed partial class AppShell
         if (key is null) return KeyGone;
         _log.Info($"Check this key: one request for {variable} to {target.Host}."); // PROPOSED 04/11/2026 (row 39)
         var said = await KeyCheck.RunAsync(_http, target, key, _settings.OfflineOnly, cancel);
-        _log.Info($"Check this key: {target.Host} {(said == KeyCheck.Works ? "accepted the key" : "did not accept it, or was not reached")}."); // PROPOSED (row 39)
+        var accepted = said == KeyCheck.Works || said == KeyCheck.Accepted(target.Host);
+        _log.Info($"Check this key: {target.Host} {(accepted ? "accepted the request" : "did not accept it, or was not reached")}."); // PROPOSED (row 39)
         return said;
     }
 

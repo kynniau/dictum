@@ -105,6 +105,20 @@ Test-Path "$env:LOCALAPPDATA\Packages\Kynni.Dictum_*"
 Test-Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\Dictum.exe"
 ```
 
+### API keys in Credential Manager (added 04/11/2026, API keys UI, PR #87)
+
+This decides whether the PROPOSED uninstall lines (approve-api-keys.md rows 38a, 41 and 42) may be shown. Run it before the
+uninstall above:
+
+1. With the package installed, open Settings > Clean-up, choose OpenAI and click Add a key….
+2. Paste a test value (any text, not a real key), label it `MSIX check`, and click Save.
+3. In normal PowerShell, list the entries: `cmdkey /list | Select-String "Dictum/"`. Expect one target `Dictum/OPENAI_API_KEY/<id>`.
+4. Uninstall as above.
+5. Run `cmdkey /list | Select-String "Dictum/"` again, and look in Control Panel > Credential Manager > Windows Credentials.
+6. Record in the release notes whether the entry is still there. If it is, rows 38a, 41 and 42 are true. If it is gone, they must not
+   ship, and the Help and privacy copy say so instead.
+7. Clean up a leftover entry with `cmdkey /delete:Dictum/OPENAI_API_KEY/<id>`.
+
 ## 5. Remove the trust when testing is over (ELEVATED PowerShell)
 
 ```powershell

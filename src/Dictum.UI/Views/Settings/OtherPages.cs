@@ -268,9 +268,15 @@ internal sealed class PrivacyPage : SettingsPage
     /// <summary>PROPOSED 04/11/2026 (row 38): the card's title.</summary>
     internal const string KeysTitle = "API keys";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): the card's line, naming the store (the uninstall fact: Credential Manager entries outlive an MSIX uninstall).</summary>
+    /// <summary>PROPOSED 04/11/2026 (row 38): the card's line, naming the store.</summary>
     internal static string KeysLine(string store) =>
-        $"Keys you add in Dictum are kept in {store} for your account on this computer. They stay there until you remove them here, also if you uninstall Dictum.";
+        $"Keys you add in Dictum are kept in {store} for your account on this computer, until you remove them.";
+
+    /// <summary>
+    /// PROPOSED 04/11/2026 (row 38a), NOT SHOWN (PR #87 lens, MINOR 7): Inferred, not verified. It follows <see cref="KeysLine"/> once
+    /// docs/TESTING-MSIX.md §4's Credential Manager step confirms that the entries outlive an uninstall, as HelpText row 41 is held back.
+    /// </summary>
+    internal const string ProposedKeysUninstallSentence = "They stay there also if you uninstall Dictum.";
 
     /// <summary>PROPOSED 04/11/2026 (row 38): the button.</summary>
     internal const string RemoveAllLabel = "Remove all keys…";

@@ -186,15 +186,15 @@ public sealed class ApiKeysUiTests
             host.Show();
             panel.Show(SecretStore.OpenAiKey, "OpenAI");
             Assert.Contains(KeysPanel.NoneChosen, Exposed(host));
-            Assert.Empty(All<TextBlock>(host).Where(t => t.IsEffectivelyVisible && t.Text == "Active"));
+            Assert.DoesNotContain(All<TextBlock>(host), t => t.IsEffectivelyVisible && t.Text == "Active");
 
-            Click(ButtonNamed(host, "Use Personal"));
+            Click(ButtonNamed(host, "Use this key: Personal"));
             var written = JsonNode.Parse(File.ReadAllText(scratch.Paths.SettingsFile))!["keys"]!["active"]![SecretStore.OpenAiKey]!.GetValue<string>();
             Assert.Equal(personal, written);
             Assert.Equal(personal, shell.Settings.Keys.Active[SecretStore.OpenAiKey]);
             Assert.Equal("Dictum now uses \"Personal\" from the next dictation.", said[^1]);
             Assert.Single(All<TextBlock>(host), t => t.IsEffectivelyVisible && t.Text == "Active");
-            ButtonNamed(host, "Use Work"); // the other one is offered
+            ButtonNamed(host, "Use this key: Work"); // the other one is offered
             Assert.DoesNotContain(All<TextBlock>(host), t => t.IsEffectivelyVisible && t.Text == KeysPanel.NoneChosen);
             Assert.NotEqual(work, personal);
             host.Close();
@@ -233,7 +233,7 @@ public sealed class ApiKeysUiTests
                 var d when d.StartsWith("absent", StringComparison.Ordinal) => "none",
                 var d => throw new InvalidOperationException(d),
             };
-            var mark = new KeyListing(entries, null).Active(choice) switch
+            var mark = new KeyListing(variable, entries, null).Active(choice) switch
             {
                 null => "none",
                 { Source: KeySource.Stored } e => e.Label,
@@ -347,7 +347,7 @@ public sealed class ApiKeysUiTests
             CleanupConsent(scratch, "api.openai.com");
             shell.Reload(userRequested: false);
             panel.Show(SecretStore.OpenAiKey, "OpenAI");
-            ButtonNamed(host, "Check Work");
+            ButtonNamed(host, "Check this key: Work");
             Assert.Null(KeyCheck.Target(SecretStore.GeminiKey, shell.Settings)); // that consent names api.openai.com only
             Assert.Null(KeyCheck.Target(SecretStore.AnthropicKey, shell.Settings));
             host.Close();
@@ -446,6 +446,151 @@ public sealed class ApiKeysUiTests
         Assert.Null(KeyCheck.ProviderMessage("<html>502 Bad Gateway</html>"));
         Assert.Equal("invalid x-api-key", KeyCheck.ProviderMessage("""{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""));
     }
+
+    // ---- Lens on 92d6b5a ----------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Pin (MAJOR 1, mutation-checked): the Key field's automation peer never gives the typed key to a UI Automation client; its value is
+    /// the fixed mask while the field holds anything. The field is never revealed.
+    /// </summary>
+    [Fact]
+    public Task The_key_fields_automation_value_never_holds_the_key() => UiSession.Run(() =>
+    {
+        var window = new AddKeyWindow(new FakeVault(), SecretStore.OpenAiKey, "OpenAI", _ => { });
+        window.Show();
+        Assert.False(window.KeyBox.RevealPassword);
+        window.KeyBox.Text = Key;
+        var peer = Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(window.KeyBox);
+        var value = Assert.IsAssignableFrom<Avalonia.Automation.Provider.IValueProvider>(peer).Value ?? "";
+        Assert.Equal(MaskedKeyBox.AutomationMask, value);
+        Assert.False(HoldsPartOfKey(value, 2), value);
+        window.KeyBox.Text = "";
+        Assert.Equal("", ((Avalonia.Automation.Provider.IValueProvider)peer).Value);
+        window.Close();
+    });
+
+    /// <summary>
+    /// Pin (MINOR 3, mutation-checked): a store that cannot be listed just after a successful Add does not throw out of the dialog's
+    /// button: the page says the key was added, under "Unnamed key", and the list says why the stored keys cannot be read.
+    /// </summary>
+    [Fact]
+    public Task A_store_that_cannot_be_listed_after_Add_is_said_not_thrown() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch($$"""{ {{Base}} }""");
+        var (shell, _, _) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            var vault = new FakeVault();
+            var id = vault.Add(SecretStore.GroqKey, "Work", Key);
+            vault.ListFails = new CredentialStoreException("CredEnumerate failed: refused (5).", 5);
+            var said = new List<string>();
+            var panel = new KeysPanel(shell, vault, said.Add, _ => null);
+            panel.Show(SecretStore.GroqKey, "Groq");
+            panel.Added(SecretStore.GroqKey, id);
+            Assert.Equal("Key \"Unnamed key\" added. Dictum uses it from the next dictation.", said[^1]);
+            Assert.Equal(id, shell.Settings.Keys.Active[SecretStore.GroqKey]);
+            Assert.NotNull(panel.Listing?.Problem);
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>Pin (MINOR 4, mutation-checked): every named button in the list says its visible words first (WCAG 2.5.3, label in name).</summary>
+    [Fact]
+    public Task Each_key_buttons_accessible_name_starts_with_its_visible_words() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch($$"""{ {{Base}}{{OpenAiCleanup}} }""");
+        CleanupConsent(scratch, "api.openai.com");
+        var (shell, _, _) = scratch.Shell(providerHandler: new RecordingHandler());
+        try
+        {
+            shell.Vault.Add(SecretStore.OpenAiKey, "Work", Key);
+            shell.Vault.Add(SecretStore.OpenAiKey, "Personal", Key + "B");
+            shell.Reload(userRequested: false);
+            var panel = new KeysPanel(shell, shell.Vault, _ => { }, _ => null);
+            var host = new Window { Content = panel.View };
+            host.Show();
+            panel.Show(SecretStore.OpenAiKey, "OpenAI");
+            var named = All<Button>(host).Where(b => AutomationProperties.GetName(b) is { Length: > 0 }).ToList();
+            Assert.Equal(6, named.Count); // Use this key, Check this key and Remove, on each of two rows
+            Assert.All(named, b => Assert.StartsWith((string)b.Content!, AutomationProperties.GetName(b), StringComparison.Ordinal));
+            host.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
+
+    /// <summary>
+    /// Pin (MINOR 5, mutation-checked): the headers each kind of check actually sends. Azure OpenAI: the key in api-key and no
+    /// Authorization; Anthropic: Bearer and anthropic-version; the others: Bearer alone.
+    /// </summary>
+    [Theory]
+    [InlineData(KeyCheckAuth.ApiKeyHeader)]
+    [InlineData(KeyCheckAuth.Anthropic)]
+    [InlineData(KeyCheckAuth.Bearer)]
+    public async Task Each_kind_of_check_sends_its_own_header(KeyCheckAuth auth)
+    {
+        var handler = new RecordingHandler();
+        using var http = new HttpClient(handler);
+        var target = new KeyCheckTarget(SecretStore.OpenAiKey, "svc.example.com", new Uri("https://svc.example.com/v1/models"), auth);
+        Assert.Equal("The key works.", await KeyCheck.RunAsync(http, target, Key, offlineOnly: false, TestContext.Current.CancellationToken));
+        var sent = Assert.Single(handler.Requests);
+        switch (auth)
+        {
+            case KeyCheckAuth.ApiKeyHeader:
+                Assert.Null(sent.Authorization);
+                Assert.Contains($"api-key: {Key}", sent.Everything.Split('\n'));
+                break;
+            case KeyCheckAuth.Anthropic:
+                Assert.Equal("Bearer " + Key, sent.Authorization);
+                Assert.Contains($"anthropic-version: {KeyCheck.AnthropicVersion}", sent.Everything.Split('\n'));
+                break;
+            default:
+                Assert.Equal("Bearer " + Key, sent.Authorization);
+                Assert.DoesNotContain(sent.Everything.Split('\n'), l => l.StartsWith("api-key:", StringComparison.Ordinal) || l.StartsWith("anthropic-version:", StringComparison.Ordinal));
+                break;
+        }
+    }
+
+    /// <summary>Pin (MINOR 8, mutation-checked): a custom server's 200 says it accepted the request, never that the key works.</summary>
+    [Theory]
+    [InlineData(SecretStore.LlmKey, "llm.example.net accepted the request.")]
+    [InlineData(SecretStore.SpeechKey, "llm.example.net accepted the request.")]
+    [InlineData(SecretStore.GroqKey, "The key works.")]
+    public async Task A_custom_servers_200_does_not_say_the_key_works(string variable, string expected)
+    {
+        using var http = new HttpClient(new RecordingHandler());
+        var target = new KeyCheckTarget(variable, "llm.example.net", new Uri("https://llm.example.net/v1/models"), KeyCheckAuth.Bearer);
+        Assert.Equal(expected, await KeyCheck.RunAsync(http, target, Key, offlineOnly: false, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>Pin (MINOR 7, mutation-checked): Settings > Privacy does not state the unverified uninstall fact (row 38a is held back).</summary>
+    [Fact]
+    public Task Privacy_does_not_say_keys_outlive_an_uninstall_until_it_is_checked() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch($$"""{ {{Base}} }""");
+        var (shell, _, _) = scratch.Shell();
+        try
+        {
+            shell.Reload(userRequested: false);
+            var window = new SettingsWindow(shell);
+            window.Show();
+            window.ShowPage("Privacy");
+            var lines = Exposed(window);
+            Assert.Contains("Keys you add in Dictum are kept in Test store for your account on this computer, until you remove them.", lines);
+            Assert.DoesNotContain(lines, l => l.Contains("uninstall", StringComparison.OrdinalIgnoreCase));
+            window.Close();
+        }
+        finally
+        {
+            shell.Dispose();
+        }
+    });
 
     // ---- 6. The full-template key file -------------------------------------------------------------------------------------------
 

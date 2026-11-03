@@ -6876,3 +6876,19 @@ Brief: `.demo-preview/design-api-keys.md`, items 1, 2, 3 and 5 of §2 (item 4, t
    target (`Check_this_key_sends_only_to_the_presets_host...`); M7 the one-line key file (`The_key_file_is_the_full_template...` and 5
    KeyFileTests); M8 file before environment in the Active rule (`The_active_mark_is_the_key_SecretStore_uses`); M9 the masked-token
    rule removed (`A_services_message_is_shown_with_key_like_tokens_hidden`, after a case with no shared characters was added).
+7. **Lens fix round (04/11/2026, Opus lens on 92d6b5a: Needs changes, no blocker, two majors, seven minors).** (1) Avalonia's
+   TextBoxAutomationPeer gave UI Automation the plain key of the password box: the field is a `MaskedKeyBox` whose peer's Value is a
+   fixed mask. The claim that a screen reader says "password" is withdrawn as unverified. (2) Check this key is an outbound connection
+   the privacy policy's §4 does not list: approval row 46, which blocks release, not merge; privacy.html not edited. (3) A store that
+   cannot be listed just after Add is said, not thrown, and the Add button reports failures. (4) Use/Check accessible names start
+   with the visible words. (5) Each auth kind's sent headers pinned. (6) Unlisted log and exception strings added to rows 37 and 39.
+   (7) Privacy's uninstall sentence is held back as Inferred (row 38a), and docs/TESTING-MSIX.md §4 gained a Credential Manager step.
+   (8) A custom server's 200 says "HOST accepted the request." (row 30a). (9) `SecretStore.InUse` (EnvFile.cs, on the coordinator's
+   instruction) names the source `Get` uses; the panel's Active mark asks it with stand-in values instead of copying the order.
+   **Mutation checks (04/11/2026, Windows, Debug; each restored with git checkout), each observed failing on the reverted behaviour:**
+   N1 the TextBox's own peer, N1b RevealPassword = true (`The_key_fields_automation_value_never_holds_the_key`); N3 the catch in
+   Added removed (`A_store_that_cannot_be_listed_after_Add_is_said_not_thrown`); N4 "Use LABEL" (the label-in-name pin and
+   `Use_this_key...`); N5a Azure sending Bearer, N5b Anthropic without anthropic-version, N5c the Bearer kind sending api-key
+   (`Each_kind_of_check_sends_its_own_header`, one case each); N7 the uninstall sentence shown (`Privacy_does_not_say...`); N8
+   "The key works." for a custom server (`A_custom_servers_200...`, 2 cases); N9 the choice not passed to InUse (the exhaustive
+   active-mark pin and `Use_this_key...`). Not pinned on its own: passing Failed to the Add button (the pin calls Added directly).

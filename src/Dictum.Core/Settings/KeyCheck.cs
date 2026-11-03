@@ -72,8 +72,17 @@ public static class KeyCheck
 
     // PROPOSED 04/11/2026 (approve-api-keys.md rows 30 to 35): what a check says.
 
-    /// <summary>PROPOSED 04/11/2026 (row 30): the service accepted the key.</summary>
+    /// <summary>PROPOSED 04/11/2026 (row 30): a named service (Anthropic, OpenAI, Google Gemini, Azure OpenAI, Groq) accepted the key.</summary>
     public const string Works = "The key works.";
+
+    /// <summary>
+    /// PROPOSED 04/11/2026 (row 30a; PR #87 lens, MINOR 8): a custom server (LLM_API_KEY, SPEECH_API_KEY) answered 200. One that ignores
+    /// keys answers 200 to any key, so this says what happened, not that the key works.
+    /// </summary>
+    public static string Accepted(string host) => $"{host} accepted the request.";
+
+    /// <summary>True for the keys of a server the user names (a custom server), whose 200 does not prove the key.</summary>
+    public static bool IsCustom(string variable) => variable is SecretStore.LlmKey or SecretStore.SpeechKey;
 
     /// <summary>PROPOSED 04/11/2026 (row 31): the service answered with an error. The message is the service's own, key-like tokens hidden.</summary>
     public static string Refused(string host, int code, string? reason, string? message) =>
@@ -169,7 +178,7 @@ public static class KeyCheck
         try
         {
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
-            if (response.IsSuccessStatusCode) return Works;
+            if (response.IsSuccessStatusCode) return IsCustom(target.Variable) ? Accepted(target.Host) : Works;
             var body = await ReadCapped(response, deadline.Token).ConfigureAwait(false);
             return Refused(target.Host, (int)response.StatusCode, Redact(response.ReasonPhrase, key), Redact(ProviderMessage(body), key));
         }

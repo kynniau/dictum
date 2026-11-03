@@ -161,6 +161,19 @@ public sealed class SecretStore
     /// </summary>
     public string? Get(string key) => Resolve(key).Value;
 
+    /// <summary>
+    /// Which source <see cref="Get"/> uses for <paramref name="key"/>, as keys.active names one: a stored key's id,
+    /// <see cref="StoredKeyId.Environment"/> or <see cref="StoredKeyId.File"/>; null when none is used. Never a value (Settings' key lists
+    /// mark it Active, so they follow this order instead of copying it; K-UI, 04/11/2026).
+    /// </summary>
+    public string? InUse(string key) => Resolve(key) switch
+    {
+        { Value: null } => null,
+        { Stored: { } stored } => stored.Id,
+        { Source: "environment variable" } => StoredKeyId.Environment,
+        _ => StoredKeyId.File,
+    };
+
     /// <summary>Where a key came from, for the self-test. Never returns the value, nor any part of it (decision D2).</summary>
     public string Describe(string key)
     {

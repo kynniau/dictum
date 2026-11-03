@@ -1,4 +1,6 @@
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Dictum.Help;
 using Dictum.Platform;
@@ -34,7 +36,10 @@ internal sealed class AddKeyWindow : DialogWindow
     /// <summary>PROPOSED 04/11/2026 (row 20): the Key field's caption.</summary>
     internal const string KeyCaption = "Key";
 
-    /// <summary>PROPOSED 04/11/2026 (row 20): the Key field's accessible name: a screen reader also says it is a password field.</summary>
+    /// <summary>
+    /// PROPOSED 04/11/2026 (row 20): the Key field's accessible name. What the field holds is masked for automation clients (screen
+    /// readers included) as on screen: <see cref="MaskedKeyBox"/>. Whether a screen reader also says "password" is not verified.
+    /// </summary>
     internal const string KeyName = "API key, hidden as you paste";
 
     /// <summary>PROPOSED 04/11/2026 (row 20): the Key field's placeholder.</summary>
@@ -95,8 +100,8 @@ internal sealed class AddKeyWindow : DialogWindow
         _variable = variable;
         _label = new TextBox { Text = service, MaxLength = StoredKey.LabelMaxLength };
         AutomationProperties.SetName(_label, LabelCaption);
-        // Masked, and no undo history: once emptied, nothing (Ctrl+Z included) brings the key back. A password box also refuses copy and cut.
-        _key = new TextBox { PasswordChar = '•', RevealPassword = false, IsUndoEnabled = false, Watermark = KeyWatermark, AcceptsReturn = false };
+        // Masked on screen and for automation (MaskedKeyBox), and no undo history: once emptied, nothing (Ctrl+Z included) brings the key back.
+        _key = new MaskedKeyBox { PasswordChar = '•', RevealPassword = false, IsUndoEnabled = false, Watermark = KeyWatermark, AcceptsReturn = false };
         AutomationProperties.SetName(_key, KeyName);
         _error.IsVisible = false;
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Assertive);
@@ -158,5 +163,32 @@ internal sealed class AddKeyWindow : DialogWindow
         _error.Text = error;
         _error.IsVisible = true;
         _key.Focus();
+    }
+}
+
+/// <summary>
+/// The Key field (PR #87 lens, MAJOR 1): Avalonia's TextBoxAutomationPeer gives UI Automation the plain text of a password box as its
+/// Value, so any automation client could read the key. This box's peer is an Edit whose Value is a fixed mask while it holds anything
+/// (no length, no character of the key) and empty otherwise; a value set through automation (a paste by assistive technology) still
+/// goes in. Styled as a TextBox.
+/// </summary>
+internal sealed class MaskedKeyBox : TextBox
+{
+    /// <summary>What automation reads while the field holds a key: the same for every key.</summary>
+    internal const string AutomationMask = "••••••••";
+
+    protected override Type StyleKeyOverride => typeof(TextBox);
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new Peer(this);
+
+    private sealed class Peer(MaskedKeyBox owner) : ControlAutomationPeer(owner), IValueProvider
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Edit;
+
+        public bool IsReadOnly => false;
+
+        public string? Value => string.IsNullOrEmpty(owner.Text) ? "" : AutomationMask;
+
+        public void SetValue(string? value) => owner.Text = value;
     }
 }

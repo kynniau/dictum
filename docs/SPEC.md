@@ -405,7 +405,8 @@ a redraw tick. A store that cannot be read (`CredentialStoreException` from `Lis
 and the page work. "Add a key…" opens `AddKeyWindow` (the shared dialog frame): Label prefilled with the service's name, a masked Key
 field (no undo history), Save, Cancel and "How do I get a key?" (https://dictum.kynni.au/help#key-anthropic, -openai, -gemini, -azure,
 -groq, -custom). Save calls `ISecretVault.Add`; its refusals are the dialog's error line byte for byte; the field is emptied as soon as
-Add returns and when the window closes. A key saved is made the one in use. Where the platform has no credential store the button is
+Add returns and when the window closes; its automation value is a fixed mask, never the key (`MaskedKeyBox`, lens 04/11/2026). A
+key saved is made the one in use. Where the platform has no credential store the button is
 not shown and a line says to use the key file. Settings > Privacy has an API keys card (only with a credential store) with "Remove all
 keys…" (asked first; `ISecretVault.RemoveAll`; a refusal is said with "Remove Dictum completely"'s row 8 line).
 
@@ -414,7 +415,8 @@ takes that key (`KeyCheck.Target`: clean-up's consent for Anthropic or an OpenAI
 address), never automatic, one request per click. It is a GET with no body to the service's model list on the consented host
 (Anthropic `{base}/v1/models` with `anthropic-version`; every OpenAI-compatible address `{base_url}/models`, Azure with `api-key`;
 URLs and dates in `KeyCheck`'s remarks), sent through the provider client (offline only refuses it; no redirects), refused before
-sending for a plain http:// address off this PC, given up after 15 s. It says "The key works." or the status code and the service's
+sending for a plain http:// address off this PC, given up after 15 s. It says "The key works." (a custom server's 200: "HOST accepted
+the request.", since a server that ignores keys accepts any) or the status code and the service's
 own message with every key-like token hidden (`KeyCheck.Redact`). The log names the variable and the host only.
 
 Create the key file (amendment to the paragraph above, 04/11/2026, K-UI lane): the file is now the APPROVED header, a blank line, then
