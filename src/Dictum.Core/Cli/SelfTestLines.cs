@@ -87,6 +87,32 @@ public static partial class SelfTestCommand
     }
 
     /// <summary>
+    /// The voice activity gate (SPEC §3): off and why (no pass mark: the gate is optional, and without it the level decides silence),
+    /// or the model file, checked and loaded as the tray app loads it. A file that fails its check or its load fails the self-test.
+    /// </summary>
+    internal static bool VoiceGateLine(AppSettings settings, AppPaths paths, ModelIntegrity integrity, Action<string, string, bool?> line)
+    {
+        if (VoiceGates.Locate(VoiceGates.Enabled(settings), paths, settings, integrity.Passes) is not { } path)
+        {
+            line("voice activity", $"off: {VoiceGates.OffReason(settings)}; silence_threshold decides silence", null);
+            return true;
+        }
+        try
+        {
+            var status = integrity.Verify(path);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var gate = SileroVoiceGate.Load(path);
+            line("voice activity", $"on: {path} ({status}; loaded in {sw.ElapsedMilliseconds} ms, on the CPU)", true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            line("voice activity", $"{path}: {ex.GetType().Name}: {ex.Message} (the level decides silence)", false);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// SPEC §11: every key Dictum reads (<see cref="SecretStore.KeyNames"/>), present and from where, or absent, then how many are
     /// stored in the credential store when there are any (API keys, decision D2, 30/10/2026); never a value, nor any part of one.
     /// PROPOSED 30/10/2026: the stored-key wording (.demo-preview/approve-api-keys.md rows 1 to 4).

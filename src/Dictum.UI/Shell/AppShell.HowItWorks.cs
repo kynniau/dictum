@@ -14,7 +14,7 @@ public sealed partial class AppShell
     /// on first use, so the demonstration page has it in a shell that has not started (tests) as in the running app.
     /// </summary>
     internal DictationPipeline Pipeline => _pipeline ??= new DictationPipeline(token => _speech.GetAsync(token), () => _cleaner, InsertAsync, () => _settings, _log,
-        Personal.Finish, RememberPasted, names: () => Personal.Text.Dictionary.Terms);
+        Personal.Finish, RememberPasted, names: () => Personal.Text.Dictionary.Terms, voiceGate: _voiceGates.Get);
 
     /// <summary>
     /// Settings &gt; See how it works: runs one recording, held in memory, through <see cref="Pipeline"/> with nothing pasted
