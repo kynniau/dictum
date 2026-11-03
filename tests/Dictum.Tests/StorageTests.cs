@@ -21,6 +21,7 @@ public class StorageTests
         TextList.Append(paths.CorrectionsFile, ["teh => the"], Corrections.FileHeader);
         File.WriteAllText(paths.ProfanityOverrideFile, "bloody\n");
         File.WriteAllText(paths.EnvFile, "LLM_API_KEY=x\n");
+        new SecretVault(paths, new FakeCredentialStore()).Add(SecretStore.OpenAiKey, "Work", "k-storage-test-123456"); // keys.json (API keys, 30/10/2026)
         var models = paths.ModelsDir(settings);
         Directory.CreateDirectory(models);
         File.WriteAllBytes(Path.Combine(models, "ggml-small.en.bin"), new byte[1000]);

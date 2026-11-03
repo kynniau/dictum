@@ -107,6 +107,7 @@ public static class SettingsLoader
             Profanity = BindProfanity(r.Child("profanity")),
             Ui = BindUi(r.Child("ui")),
             Terms = BindTerms(r.Child("terms")),
+            Keys = BindKeys(r.Child("keys")),
             FixHotkey = r.NullableString("fix_hotkey", v => HotkeyParser.TryParse(v, out _, out var e) ? null : e),
             LogLevel = r.String("log_level", d.LogLevel, OneOf("debug", "info", "warning", "error")).ToLowerInvariant(),
             LogTranscripts = r.Bool("log_transcripts", d.LogTranscripts),
@@ -168,6 +169,18 @@ public static class SettingsLoader
         if (r is null) return new TermsSettings();
         var s = new TermsSettings { Accepted = r.NullableString("accepted"), AcceptedBy = r.NullableString("accepted_by") };
         r.WarnUnknown();
+        return s;
+    }
+
+    /// <summary>
+    /// keys.active (API keys, 30/10/2026): each name must be a key Dictum reads and each value a stored key's id, "env" or "file".
+    /// A warning names the setting, never its value: a key pasted here by mistake must not reach the log.
+    /// </summary>
+    private static KeysSettings BindKeys(ObjectReader? r)
+    {
+        if (r is null) return new KeysSettings();
+        var s = new KeysSettings { Active = r.KeyChoices("active") };
+        r.WarnUnknownUnnamed();
         return s;
     }
 
@@ -406,12 +419,45 @@ public static class SettingsLoader
             return s[..(char.IsHighSurrogate(s[maxLength - 1]) ? maxLength - 1 : maxLength)].TrimEnd();
         }
 
+        /// <summary>keys.active: an object of variable to choice; anything else is passed over with a warning that never shows a value.</summary>
+        public IReadOnlyDictionary<string, string> KeyChoices(string key)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!TryGet(key, out var v) || v.ValueKind == JsonValueKind.Null) return result;
+            if (v.ValueKind != JsonValueKind.Object)
+            {
+                warnings.Add($"Setting \"{Full(key)}\" must be an object; no key is chosen.");
+                return result;
+            }
+            foreach (var p in v.EnumerateObject())
+            {
+                if (p.Value.ValueKind == JsonValueKind.Null) continue;
+                if (!SecretStore.KeyNames.Contains(p.Name)) // the name is not echoed: a key pasted as the name must not reach the log (lens minor 2)
+                    warnings.Add($"Setting under \"{Full(key)}\" names a variable Dictum does not read (not shown); ignored.");
+                else if (p.Value.ValueKind != JsonValueKind.String || !StoredKeyId.IsChoice(p.Value.GetString()))
+                    warnings.Add($"Setting \"{Full(key)}.{p.Name}\" has an invalid value (not shown): expected a stored key's id, \"env\" or \"file\". No key is chosen for it.");
+                else
+                    result[p.Name] = p.Value.GetString()!;
+            }
+            return result;
+        }
+
         public ObjectReader? Child(string key)
         {
             if (!TryGet(key, out var v) || v.ValueKind == JsonValueKind.Null) return null;
             if (v.ValueKind == JsonValueKind.Object) return new ObjectReader(v, Full(key), warnings);
             warnings.Add($"Setting \"{Full(key)}\" must be an object; using defaults for that section.");
             return null;
+        }
+
+        /// <summary>
+        /// <see cref="WarnUnknown"/> for the keys section: one warning with a count, never the names, since a name there may be a key
+        /// pasted by mistake (lens minor 2, 30/10/2026). Comment keys ("_…") are passed over as everywhere.
+        /// </summary>
+        public void WarnUnknownUnnamed()
+        {
+            var unknown = obj.EnumerateObject().Count(p => !p.Name.StartsWith('_') && !_seen.Contains(p.Name));
+            if (unknown > 0) warnings.Add($"Setting \"{path}\" has {unknown} entr{(unknown == 1 ? "y" : "ies")} Dictum does not read (not shown); ignored.");
         }
 
         public void WarnUnknown()

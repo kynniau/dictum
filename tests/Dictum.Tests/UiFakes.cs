@@ -73,6 +73,9 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
     /// <summary>No grant to ask for by default, as Windows; a Mac test sets its state.</summary>
     public FakeInputAccess FakeAccess { get; } = new();
     public IInputAccess InputAccess => FakeAccess;
+    /// <summary>An in-memory credential store (SecretVaultTests), empty and available.</summary>
+    public FakeCredentialStore FakeCredentials { get; } = new();
+    public ICredentialStore Credentials => FakeCredentials;
     public IInputSender CreateInputSender(ILog log) => Desktop;
     public IClipboard Clipboard => Desktop;
     public FakeDesktop Desktop { get; } = new();
@@ -245,7 +248,14 @@ internal sealed class ScriptedDialogs : IShellDialogs
         return Answers.Count > 0 ? Answers.Dequeue() : -1;
     }
 
-    public void Tell(string title, string text) => Told.Add(text);
+    /// <summary>Runs inside Tell, as a real modal's frame runs posted jobs while it is open (SecretVaultTests).</summary>
+    public Action? OnTell { get; set; }
+
+    public void Tell(string title, string text)
+    {
+        Told.Add(text);
+        OnTell?.Invoke();
+    }
 
     public bool TypeToConfirm(string title, string text, string word)
     {

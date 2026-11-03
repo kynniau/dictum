@@ -39,8 +39,9 @@ public static partial class SelfTestCommand
         Console.Out.WriteLine($"Dictum {typeof(SelfTestCommand).Assembly.GetName().Version?.ToString(3)} self-test on {platform.Name}");
         DataLines(paths, platform, Line);
         var messages = new List<string>();
+        var vault = new SecretVault(paths, platform.Credentials);
         var config = ConfigLoader.Load(paths, redactor, Environment.GetEnvironmentVariable,
-            s => { WhisperEngine.ProbeRuntime(s.Whisper.Gpu, log); return WhisperEngine.GpuMachine; }, messages.Add, options.CleanupModel);
+            s => { WhisperEngine.ProbeRuntime(s.Whisper.Gpu, log); return WhisperEngine.GpuMachine; }, messages.Add, options.CleanupModel, vault: vault);
         var load = config.File;
         if (config.Problem is { } problem)
         {
@@ -152,6 +153,7 @@ public static partial class SelfTestCommand
             ok = false;
         }
 
+        KeyStoreLine(vault, Line);
         KeyLines(secrets, Line);
         Console.Out.WriteLine(ok ? "result: PASS" : "result: FAIL");
         Console.Out.Flush();

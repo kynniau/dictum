@@ -19,7 +19,7 @@ public static class BenchCleanupCommand
 {
     private sealed record Row(string Model, string Backend, string Time, string Verdict, string Output);
 
-    public static async Task<int> RunAsync(CliOptions options, AppPaths paths, ILog log, SecretRedactor redactor)
+    public static async Task<int> RunAsync(CliOptions options, AppPaths paths, ILog log, SecretRedactor redactor, SecretVault? vault = null)
     {
         var input = Path.GetFullPath(options.WavPath!);
         if (!File.Exists(input))
@@ -27,7 +27,7 @@ public static class BenchCleanupCommand
             Console.Error.WriteLine($"error: file not found: {input}");
             return 1;
         }
-        var config = CliCommands.LoadConfig(paths, log, redactor);
+        var config = CliCommands.LoadConfig(paths, log, redactor, vault: vault);
         if (CliCommands.Unreadable(config, paths)) return 1;
         if (CliCommands.RefusedWithoutTerms(paths, log, "--bench-cleanup")) return 1;
         var settings = config.Settings;

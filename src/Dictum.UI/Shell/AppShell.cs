@@ -60,6 +60,9 @@ public sealed partial class AppShell : IDisposable
     private int _hotkeyPauses;
     private bool _disposed;
 
+    /// <summary>Set where the config watcher is disposed (full removal, quit): a vault change after that reloads nothing (re-lens minor 1, 30/10/2026).</summary>
+    private bool _reloadsStopped;
+
     /// <param name="instance">The single-instance lock the entry point took; this shell listens on it for later launches.</param>
     /// <param name="gpuMachine">Tests decide; production asks the whisper runtime (<see cref="WhisperEngine.GpuMachine"/>).</param>
     /// <param name="speechModels">Tests pass one that loads a fake engine; production builds the whisper one.</param>
@@ -75,6 +78,7 @@ public sealed partial class AppShell : IDisposable
         HttpMessageHandler? updateHandler = null, LocalLlmManager? cleanupModels = null, HttpMessageHandler? providerHandler = null)
     {
         Platform = platform;
+        Vault = new SecretVault(paths, platform.Credentials);
         Paths = paths;
         _log = log;
         _fileLog = log as FileLog;
@@ -97,12 +101,20 @@ public sealed partial class AppShell : IDisposable
         _reloadDebounce = new DispatcherTimer(TimeSpan.FromMilliseconds(500), DispatcherPriority.Background, (_, _) => DebouncedReload()) { IsEnabled = false };
         Access = new InputAccessWatch(platform.InputAccess, log, RestartListeners, StopListeners);
         Access.Changed += StatusChanged; // the panel's problem line and its Request access link follow the grant
+        // A key added or removed in the credential store may write no watched file (no keys.json): reload, so a removed key is not sent again (lens minor 1, 30/10/2026).
+        Vault.Changed += () => Dispatcher.UIThread.Post(() =>
+        {
+            if (!_reloadsStopped && !_disposed) DebouncedReload();
+        });
         // From construction, not from Start: nothing loads before Start, and the hotkey listener must follow every change.
         _models.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_models.LastError, ref _speechErrorShown, "Speech model"));
         _llm.Changed += () => Dispatcher.UIThread.Post(() => ModelStateChanged(_llm.LastError, ref _cleanupErrorShown, "Clean-up model"));
     }
 
     public IPlatform Platform { get; }
+
+    /// <summary>The API keys added in Dictum (several per service, in the system's credential store), read at every load; the Settings lane adds and removes through it.</summary>
+    public SecretVault Vault { get; }
 
     /// <summary>The input-access grant (macOS Accessibility) as the hotkey surfaces show it: its state, and the one Request button.</summary>
     public InputAccessWatch Access { get; }
@@ -321,6 +333,7 @@ public sealed partial class AppShell : IDisposable
         if (_disposed) return;
         _disposed = true;
         Models.CancelDownload(DownloadCancelReason.Quit); // a download still running at quit stops and deletes its .part
+        _reloadsStopped = true;
         _watcher?.Dispose();
         SaveSessionChoices(); // once at quit, the last try to keep this session's choices; with the watcher gone, nothing reloads
         _otherLaunches?.Dispose();

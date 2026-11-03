@@ -29,13 +29,20 @@ public static class ConfigLoader
     /// <param name="gpuRuntime">Probes the GPU for the settings being loaded; asked only when the cleanup repair needs a recommendation.</param>
     /// <param name="warn">Receives every settings warning and repair, for the log.</param>
     /// <param name="previous">The settings in use, on a reload; null at startup and in the CLI.</param>
+    /// <param name="vault">The keys added in Dictum (<see cref="SecretVault"/>); null where no platform is at hand (none are read then).</param>
     public static ConfigLoadResult Load(AppPaths paths, SecretRedactor redactor, Func<string, string?> environment, Func<AppSettings, bool> gpuRuntime,
-        Action<string> warn, string? cleanupOverride = null, AppSettings? previous = null)
+        Action<string> warn, string? cleanupOverride = null, AppSettings? previous = null, SecretVault? vault = null)
     {
         var file = SettingsLoader.LoadFile(paths.SettingsFile);
         foreach (var warning in file.Warnings) warn(warning);
-        var secrets = SecretStore.Load(paths, environment);
-        foreach (var name in SecretStore.KeyNames) redactor.Register(secrets.Get(name));
+        // keys.active from the file, or, while it cannot be read, from the settings kept in use (a broken file never changes which key goes out).
+        var active = file.Usable ? file.Settings.Keys.Active : previous?.Keys.Active;
+        string? vaultProblem = null;
+        IReadOnlyList<(StoredKey Key, string Value)> stored = vault is null ? [] : vault.Snapshot(out vaultProblem);
+        if (vaultProblem is not null) warn(vaultProblem);
+        var secrets = SecretStore.Load(paths, environment, active, stored);
+        // Every value, the ones not chosen too (environment, both .env files, every stored key), so none can reach a log line.
+        foreach (var value in secrets.AllValues()) redactor.Register(value);
 
         // A file that cannot be read fails closed: its values are unknown, so neither a stray comma nor a locked file may
         // turn a suppressed hotkey back on or drop offline_only.

@@ -73,19 +73,19 @@ public static class AppRules
     private static readonly string[] PersonalFiles = ["dictionary.txt", "corrections.txt", "snippets.txt", "profanity.txt"];
 
     /// <summary>
-    /// Which config-folder changes reload: settings.json, consent.json, .env and the personal text files. Deleting a text
-    /// file switches its feature off (SPEC §16), deleting or renaming .env drops its keys at once, and deleting consent.json
-    /// withdraws the consent at once. Deleting settings.json does not reload (the settings in use stay until the file is
+    /// Which config-folder changes reload: settings.json, consent.json, .env, keys.json and the personal text files. Deleting a text
+    /// file switches its feature off (SPEC §16), deleting or renaming .env drops its keys at once, deleting keys.json drops the
+    /// stored keys' labels at once (the keys stay in the credential store), and deleting consent.json withdraws the consent at once. Deleting settings.json does not reload (the settings in use stay until the file is
     /// back). A change of attributes is a change too: clearing read-only on settings.json or consent.json lets the reload
     /// save what this session holds (AppShell.SaveSessionChoices).
     /// </summary>
     public static bool ReloadsOn(WatcherChangeTypes change, string? name, string? oldName)
     {
         static bool Personal(string? n) => n is not null && PersonalFiles.Contains(n, StringComparer.OrdinalIgnoreCase);
-        static bool Watched(string? n) => n is "settings.json" or "consent.json" or ".env" || Personal(n);
+        static bool Watched(string? n) => n is "settings.json" or "consent.json" or ".env" or "keys.json" || Personal(n);
         return change switch
         {
-            WatcherChangeTypes.Deleted => name is ".env" or "consent.json" || Personal(name),
+            WatcherChangeTypes.Deleted => name is ".env" or "consent.json" or "keys.json" || Personal(name),
             WatcherChangeTypes.Renamed => Watched(name) || Watched(oldName), // renamed away counts as deleted
             _ => Watched(name),
         };

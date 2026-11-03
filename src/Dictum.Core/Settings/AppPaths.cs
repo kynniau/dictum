@@ -22,6 +22,9 @@ public sealed record AppPaths(string ConfigDir, string LocalDir, string ExeDir)
     /// <summary>Consent to cloud clean-up, written only by the in-app dialog (SPEC §22).</summary>
     public string ConsentFile => Path.Combine(ConfigDir, "consent.json");
     public string EnvFile => Path.Combine(ConfigDir, ".env");
+
+    /// <summary>The labels and dates of the API keys kept in the system's credential store (<see cref="SecretVault"/>); never a key.</summary>
+    public string KeysFile => Path.Combine(ConfigDir, "keys.json");
     public string ExeEnvFile => Path.Combine(ExeDir, ".env");
     public string DefaultModelsDir => Path.Combine(LocalDir, "models");
     public string LogsDir => Path.Combine(LocalDir, "logs");

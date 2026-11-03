@@ -63,6 +63,8 @@ public static class EnvFile
 /// Secret lookup (SPEC §5, standard dotenv behaviour): a real process/user/machine environment variable wins;
 /// .env only fills gaps, the config-folder .env before the one beside the exe (SPEC §9). A staff machine or
 /// Azure VM can therefore carry a machine-level ANTHROPIC_API_KEY and no .env at all. Values are never logged.
+/// API keys (SPEC §5 amended 30/10/2026): keys added in Dictum live in the system's credential store (<see cref="SecretVault"/>),
+/// several per variable; settings.json's keys.active chooses one source per variable, and <see cref="Get"/> gives the order.
 /// </summary>
 public sealed class SecretStore
 {
@@ -91,22 +93,34 @@ public sealed class SecretStore
 
     private readonly Dictionary<string, (string Value, string Source)> _values = new(StringComparer.Ordinal);
     private readonly Func<string, string?> _environment;
+    private readonly IReadOnlyDictionary<string, string> _active;
+    private readonly IReadOnlyList<(StoredKey Key, string Value)> _stored;
 
-    private SecretStore(Func<string, string?> environment) => _environment = environment;
-
-    public static SecretStore Empty { get; } = new(_ => null);
-
-    public static SecretStore FromContents(string? appDataEnv, string? exeDirEnv, Func<string, string?> environment)
+    private SecretStore(Func<string, string?> environment, IReadOnlyDictionary<string, string>? active, IReadOnlyList<(StoredKey Key, string Value)>? stored)
     {
-        var store = new SecretStore(environment);
+        _environment = environment;
+        _active = active ?? new Dictionary<string, string>();
+        // A blank or placeholder value is "not set" in the credential store too, as in a .env line.
+        _stored = (stored ?? []).Where(s => s.Value.Length > 0 && s.Value != Placeholder).ToList();
+    }
+
+    public static SecretStore Empty { get; } = new(_ => null, null, null);
+
+    /// <param name="active">settings.json's keys.active (<see cref="KeysSettings.Active"/>): variable to a stored key's id, "env" or "file".</param>
+    /// <param name="stored">Every stored key with its value (<see cref="SecretVault.Snapshot"/>), read once per load.</param>
+    public static SecretStore FromContents(string? appDataEnv, string? exeDirEnv, Func<string, string?> environment,
+        IReadOnlyDictionary<string, string>? active = null, IReadOnlyList<(StoredKey Key, string Value)>? stored = null)
+    {
+        var store = new SecretStore(environment, active, stored);
         // Lowest precedence first; later sources overwrite.
         if (exeDirEnv is not null) store.Merge(EnvFile.Parse(exeDirEnv), "exe-folder .env");
         if (appDataEnv is not null) store.Merge(EnvFile.Parse(appDataEnv), "config-folder .env");
         return store;
     }
 
-    public static SecretStore Load(AppPaths paths, Func<string, string?>? environment = null) =>
-        FromContents(ReadOrNull(paths.EnvFile), ReadOrNull(paths.ExeEnvFile), environment ?? Environment.GetEnvironmentVariable);
+    public static SecretStore Load(AppPaths paths, Func<string, string?>? environment = null, IReadOnlyDictionary<string, string>? active = null,
+        IReadOnlyList<(StoredKey Key, string Value)>? stored = null) =>
+        FromContents(ReadOrNull(paths.EnvFile), ReadOrNull(paths.ExeEnvFile), environment ?? Environment.GetEnvironmentVariable, active, stored);
 
     private static string? ReadOrNull(string path)
     {
@@ -139,17 +153,60 @@ public sealed class SecretStore
         }
     }
 
-    public string? Get(string key)
-    {
-        var env = _environment(key);
-        if (!string.IsNullOrEmpty(env)) return env;
-        return _values.TryGetValue(key, out var entry) && entry.Value.Length > 0 ? entry.Value : null;
-    }
+    /// <summary>
+    /// The key for <paramref name="key"/> (API keys, SPEC §5 amended 30/10/2026): the source keys.active chose for it, when that
+    /// source has a value (a stored key of this same variable, the environment variable, or the .env line); otherwise today's order,
+    /// a real environment variable, then the config-folder .env, then the one beside the program; otherwise the stored key, when
+    /// exactly one is stored for this variable. Two or more stored and none chosen: none is used, as Dictum cannot tell which.
+    /// </summary>
+    public string? Get(string key) => Resolve(key).Value;
 
-    /// <summary>Where a key came from, for the self-test. Never returns the value.</summary>
+    /// <summary>Where a key came from, for the self-test. Never returns the value, nor any part of it (decision D2).</summary>
     public string Describe(string key)
     {
-        if (!string.IsNullOrEmpty(_environment(key))) return "present (environment variable)";
-        return _values.TryGetValue(key, out var entry) && entry.Value.Length > 0 ? $"present ({entry.Source})" : "absent";
+        var (value, source, stored) = Resolve(key);
+        if (value is null) return StoredCount(key) > 1 ? "absent (none chosen)" : "absent"; // the self-test adds the count (KeyLines)
+        if (stored is null) return $"present ({source})";
+        return StoredKey.LabelIsSafe(stored.Label, value) ? $"present (stored key \"{stored.Label}\")" : "present (stored key)";
     }
+
+    /// <summary>How many keys are stored for <paramref name="key"/> in the credential store (the self-test's count; decision D2: a count, never a value).</summary>
+    public int StoredCount(string key) => _stored.Count(s => s.Key.Variable == key);
+
+    /// <summary>
+    /// Every key value this store holds, chosen or not: each variable's environment value, the .env values of those variables, every stored key.
+    /// ConfigLoader registers them all with the log redactor, so a key that is not in use still never reaches the log.
+    /// </summary>
+    public IEnumerable<string> AllValues() =>
+        KeyNames.Select(_environment).OfType<string>()
+            .Concat(_values.Where(kv => KeyNames.Contains(kv.Key)).Select(kv => kv.Value.Value)) // keys only: a MODEL= line in .env is not a secret (lens minor 4)
+            .Concat(_stored.Select(s => s.Value));
+
+    private (string? Value, string? Source, StoredKey? Stored) Resolve(string key)
+    {
+        if (_active.TryGetValue(key, out var chosen))
+        {
+            var picked = chosen switch
+            {
+                StoredKeyId.Environment => FromEnvironment(key),
+                StoredKeyId.File => FromFile(key),
+                _ => FromStored(key, chosen),
+            };
+            if (picked.Value is not null) return picked; // a choice that names nothing (removed, emptied) falls back to the order below
+        }
+        if (FromEnvironment(key) is { Value: not null } env) return env;
+        if (FromFile(key) is { Value: not null } file) return file;
+        var mine = _stored.Where(s => s.Key.Variable == key).ToList();
+        return mine.Count == 1 ? (mine[0].Value, null, mine[0].Key) : (null, null, null);
+    }
+
+    private (string? Value, string? Source, StoredKey? Stored) FromEnvironment(string key) =>
+        _environment(key) is { Length: > 0 } env ? (env, "environment variable", null) : (null, null, null);
+
+    private (string? Value, string? Source, StoredKey? Stored) FromFile(string key) =>
+        _values.TryGetValue(key, out var entry) && entry.Value.Length > 0 ? (entry.Value, entry.Source, null) : (null, null, null);
+
+    /// <summary>The stored key <paramref name="id"/>, only when it is a key for this same variable: another service's key is never sent here.</summary>
+    private (string? Value, string? Source, StoredKey? Stored) FromStored(string key, string id) =>
+        _stored.FirstOrDefault(s => s.Key.Id == id && s.Key.Variable == key) is { Key: not null } s ? (s.Value, null, s.Key) : (null, null, null);
 }
