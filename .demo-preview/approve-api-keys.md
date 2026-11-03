@@ -1,4 +1,4 @@
-# API keys block: strings for approval (ALL PROPOSED 30/10/2026, K-Core lane, branch feature/api-keys-core)
+# API keys block: strings for approval (PROPOSED 30/10/2026 except row 15, APPROVED 03/11/2026; K-Core lane, branch feature/api-keys-core)
 
 Brief: `.demo-preview/design-api-keys.md` (decisions D1 to D5 accepted 30/10/2026 18:57 AEDT). The Core lane adds no window
 and no page. Every string below is new, marked PROPOSED in the code, and shows only in `--selftest`, the log, the Storage page's
@@ -26,4 +26,15 @@ characters of the key.
 | 13 | Exception message the UI lane may show: keys.json exists but cannot be read, so it is not written over | `keys.json could not be read, so it was left as it is; fix or delete it, then try again.` | `KeysFile.Unreadable` |
 | 14 | Exception messages the UI lane may show when Add is refused | `The label is empty.` / `The key is empty.` / `The key holds a line break or another control character.` / `The key is longer than 2560 bytes.` / `The label holds part of the key.` / `This platform has no credential store Dictum can use.` | `SecretVault.Add`, `NoCredentialStore.Write` |
 | 14a | Exception message (shown as row 8's REASON) when Remove all keys could not remove every entry; the others are removed (added after the lens 30/10/2026) | `N of M stored keys could not be removed (system error CODES).` | `SecretVault.RemoveAll` |
-| 15 | site/privacy.html, "What Dictum stores" list, a new item after the `.env` item. **Needed before this branch merges**: `StoredFilesPolicyTests.The_privacy_policy_names_every_file_Dictum_stores` fails until the policy names keys.json. The page is approved legal copy, so the lane has not edited it; the sentence is for the owner (or the K-Docs lane's privacy paragraph, brought forward). | `<li><code>keys.json</code>: the names you give API keys you add in Dictum, the service each is for and the day you added it, never a key. The keys themselves are kept by your operating system's credential store (Windows Credential Manager), for this computer and your account only.</li>` | `PathRegistry.Locations` (keys.json, `DataCategory.Secrets`) |
+| 15 | **APPROVED by the owner 03/11/2026 14:09 AEDT (confirmed 04/11/2026 06:39 AEDT).** site/privacy.html, "What Dictum stores" list (Windows settings folder), a new item directly after the `.env` item; added byte for byte. `StoredFilesPolicyTests.The_privacy_policy_names_every_file_Dictum_stores` needed it. | `<li><code>keys.json</code>: the names you give API keys you add in Dictum, the service each is for and the day you added it, never a key. The keys themselves are kept by your operating system's credential store (Windows Credential Manager), for this computer and your account only.</li>` | `PathRegistry.Locations` (keys.json, `DataCategory.Secrets`) |
+
+## Two-model check, row 15 (standing order 02/11/2026)
+
+- **Fable (orchestrator)** recommended keeping the sentence as written.
+- **GPT 6.1 sol** (codex-lane, read-only, 03/11/2026 14:10 AEDT) disagreed on three points:
+  - (a) "your operating system's credential store" could imply macOS support.
+  - (b) The random id in keys.json is not named.
+  - (c) The active-key choice in settings.json is not named.
+- **Kyle decided "Keep as written"**, 04/11/2026 06:39 AEDT.
+
+**Note for K-UI and K-Docs:** the privacy policy's Store paragraph says "deletes them when you uninstall Dictum". That sentence is about files. Credential Manager entries survive an MSIX uninstall, so a PROPOSED privacy line must say so, alongside the planned Help line.
