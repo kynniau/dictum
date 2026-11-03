@@ -28,6 +28,10 @@ public static class DownloadCommand
         {
             spec = CleanupCatalog.Find(options.DownloadName!)!.Download;
         }
+        else if (string.Equals(options.DownloadName, SileroVoiceGate.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            spec = SileroVoiceGate.Download; // the voice activity model (SPEC §3): pinned like a catalogue model, size and SHA-256 checked
+        }
         else
         {
             var info = ModelCatalog.Find(options.DownloadName!);

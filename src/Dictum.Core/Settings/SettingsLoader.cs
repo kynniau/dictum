@@ -95,6 +95,7 @@ public static class SettingsLoader
             MinRecordingMs = r.Int("min_recording_ms", d.MinRecordingMs, 0, 10000),
             HandsFreeMaxSeconds = r.Int("hands_free_max_seconds", d.HandsFreeMaxSeconds, 5, 3600),
             SilenceThreshold = r.Double("silence_threshold", d.SilenceThreshold, 0, 1),
+            Vad = r.String("vad", d.Vad, OneOf(AppSettings.VadAuto, AppSettings.VadOff)).ToLowerInvariant(),
             Audio = BindAudio(r.Child("audio")),
             Whisper = BindWhisper(r.Child("whisper")),
             Speech = BindSpeech(r.Child("speech")),

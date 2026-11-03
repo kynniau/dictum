@@ -86,6 +86,32 @@ public static partial class SelfTestCommand
         return ok;
     }
 
+    /// <summary>
+    /// The voice activity gate (SPEC §3): off and why (no pass mark: the gate is optional, and without it the level decides silence),
+    /// or the model file, checked and loaded as the tray app loads it. A file that fails its check or its load fails the self-test.
+    /// </summary>
+    internal static bool VoiceGateLine(AppSettings settings, AppPaths paths, ModelIntegrity integrity, Action<string, string, bool?> line)
+    {
+        if (VoiceGates.Locate(VoiceGates.Enabled(settings), paths, settings, integrity.Passes) is not { } path)
+        {
+            line("voice activity", $"off: {VoiceGates.OffReason(settings)}; silence_threshold decides silence", null);
+            return true;
+        }
+        try
+        {
+            var status = integrity.Verify(path);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using var gate = SileroVoiceGate.Load(path);
+            line("voice activity", $"on: {path} ({status}; loaded in {sw.ElapsedMilliseconds} ms, on the CPU)", true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            line("voice activity", $"{path}: {ex.GetType().Name}: {ex.Message} (the level decides silence)", false);
+            return false;
+        }
+    }
+
     /// <summary>SPEC §11: every key Dictum reads (<see cref="SecretStore.KeyNames"/>), present and from where, or absent; never a value.</summary>
     internal static void KeyLines(SecretStore secrets, Action<string, string, bool?> line)
     {

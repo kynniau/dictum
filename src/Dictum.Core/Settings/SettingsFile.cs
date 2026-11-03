@@ -64,6 +64,8 @@ public static class SettingsFile
                 ["min_recording_ms"] = "Recordings shorter than this are discarded.",
                 ["hands_free_max_seconds"] = "Hands-free stops by itself after this many seconds (30-3600; Settings > General). Hands-free types each part as you pause, and what is left is typed at the stop. A held key always stops after 300 seconds, whatever this says.",
                 ["silence_threshold"] = "Recordings whose loudest 20 ms block (RMS, 0-1) stays below this are discarded as silence.",
+                // PROPOSED 04/11/2026 (.demo-preview/approve-vad.md row 9): the vad note.
+                ["vad"] = "auto: when ggml-silero-v6.2.0.bin is in a model folder (Dictum.exe --download-model silero-v6.2.0), a voice detector on this PC checks each recording for speech first, and one with none is discarded; silence_threshold then no longer decides silence. off: silence_threshold decides, as without the file.",
                 ["audio.device"] = "null = the system's default microphone, or a device ID / part of its name (see Settings > Microphone or Dictum.exe --selftest).",
                 ["whisper"] = "model: short name (small.en, medium.en, medium.en-q5_0, large-v3-turbo, or the multilingual small, medium, large-v3...) looked up as ggml-<name>.bin in the model folders (see models), or an absolute path. language: a whisper code (en, es, de, ja...) or auto to detect it; anything but en needs a multilingual model (no .en). translate: true writes English whatever language is spoken (multilingual model; large-v3-turbo cannot translate). gpu: auto | vulkan | cpu (change needs a restart). threads: 0 = auto. beam_size: 0 = greedy decoding (fastest), 1-8 = beam search (Calibrate my voice can set it).",
                 // The speech note (cloud speech): APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
@@ -87,6 +89,7 @@ public static class SettingsFile
             ["min_recording_ms"] = d.MinRecordingMs,
             ["hands_free_max_seconds"] = d.HandsFreeMaxSeconds,
             ["silence_threshold"] = d.SilenceThreshold,
+            ["vad"] = d.Vad,
             ["audio"] = new JsonObject { ["device"] = null },
             ["whisper"] = new JsonObject
             {

@@ -172,10 +172,13 @@ public static class RecordingGate
 {
     public static string? RejectReason(CapturedAudio audio, int minRecordingMs, double silenceThreshold)
     {
-        if (audio.Duration.TotalMilliseconds < minRecordingMs)
-            return $"too short ({audio.Duration.TotalMilliseconds:0} ms < {minRecordingMs} ms)";
+        if (TooShort(audio, minRecordingMs) is { } tooShort) return tooShort;
         if (audio.PeakLevel < silenceThreshold)
             return $"silent (peak level {audio.PeakLevel:0.0000} < {silenceThreshold})";
         return null;
     }
+
+    /// <summary>The length check alone: what still applies when the voice activity detector, not the level, decides silence.</summary>
+    public static string? TooShort(CapturedAudio audio, int minRecordingMs) =>
+        audio.Duration.TotalMilliseconds < minRecordingMs ? $"too short ({audio.Duration.TotalMilliseconds:0} ms < {minRecordingMs} ms)" : null;
 }

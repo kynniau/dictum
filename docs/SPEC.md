@@ -112,6 +112,19 @@ Rules:
 - Key auto-repeat (repeated WM_KEYDOWN while held) is ignored.
 - A recording shorter than `min_recording_ms` (default 300) or with peak level below
   `silence_threshold` is discarded, not transcribed. Whisper hallucinates on silence.
+- Voice activity gate (amendment, 04/11/2026): when `ggml-silero-v6.2.0.bin` is in a model folder (§24) and `vad` is not
+  `off` (§9), whisper.cpp's Silero voice activity detector (Whisper.net 1.9.1's `WhisperVadProcessor`, on the CPU, whisper.cpp's
+  defaults: threshold 0.5, at least 250 ms of speech) hears each take after the length check, and a take it finds no speech
+  segment in is discarded, never transcribed; the peak level is then not compared with `silence_threshold`, so speech below it
+  is heard and noise above it is not. A take with speech goes to the speech step whole and unchanged: the detector decides, it
+  never trims. In hands-free each part is gated on its own. Without the file, with `vad` off, when the detector fails, or until
+  a speech load has chosen the whisper runtime (the detector loads into that runtime and never sets the order itself, so a start
+  that GpuLoadMarker keeps on the CPU stays there), the level rule above decides, as before. The log names each decision and
+  why (segments, seconds of speech; never the audio), and See how it works (§29) shows a refused take as "no speech recognised".
+  The model is fetched only when asked (`--download-model silero-v6.2.0`, §11) from huggingface.co/ggml-org/whisper-vad (MIT) at
+  commit 9ffd54a1e1ee413ddf265af9913beaf518d1639b: 885,098 bytes, SHA-256 2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987
+  (Hugging Face API, 04/11/2026), checked before it loads like every model (§24). `silence_threshold` still sets the hands-free
+  cut floor below. Evidence for the gate: docsDECISIONS.md, "Voice activity gate".
 - For chords, suppress only the final non-modifier key, never bare modifiers, and only
   while the chord is complete.
 - The hook must survive the UI being busy: that is why it has its own thread.
@@ -483,6 +496,7 @@ present; AppData wins). Models and logs in `%LOCALAPPDATA%\Dictate\models` and
   "min_recording_ms": 300,
   "hands_free_max_seconds": 300,
   "silence_threshold": 0.01,
+  "vad": "auto",
   "audio": { "device": null },
   "whisper": { "model": "medium.en", "language": "en", "threads": 0, "gpu": "auto" },
   "models": { "folder": null },
@@ -508,6 +522,11 @@ folder that is looked in first and downloaded to; a relative or invalid value fa
 or `"advanced"`; any other value falls back to `"simple"` with a warning. The Simple | Advanced
 segments at the top of Settings > Models write it through the settings writer, and the reload
 redraws the page and the tray panel.
+
+`vad` (amendment, 04/11/2026, §3): `"auto"` (the default, also when the key is absent) puts the voice activity gate in front of
+the speech step when `ggml-silero-v6.2.0.bin` is in a model folder; `"off"` never does, and `silence_threshold` decides silence as
+before. Any other value falls back to `"auto"` with a warning. A reload applies it; `--selftest` prints the gate's state on its
+`voice activity` line.
 
 `hands_free_max_seconds` (amendment, 16/10/2026): 30–3600, set from Settings > General (§20). A
 value from 5 to 29 left by an earlier version is raised to 30 at load with a log line, and the file
@@ -632,6 +651,10 @@ today's full detail is the **Advanced** view, one click away (`ui.view`, §9).
 - `Dictate.exe --model <name>` — one-off override of `whisper.model` for this launch.
 - `Dictate.exe --download-model <name>` — headless download to the models dir with a
   console progress line (for scripted deployments), exits 0/1.
+- Amendment 04/11/2026 (§3, voice activity gate): `--download-model silero-v6.2.0` fetches the voice activity model, size and
+  SHA-256 checked; `--selftest` prints a `voice activity` line (on, with the file, checked and loaded; or off and why, with no pass
+  mark, since the gate is optional); `--transcribe` runs the gate after the model loads and prints its verdict on stderr, and a
+  take with no speech prints an empty `raw:` line and nothing more. Without the file `--transcribe` transcribes everything, as before.
 
 ## 12. Tests (xUnit, `tests/Dictate.Tests`)
 

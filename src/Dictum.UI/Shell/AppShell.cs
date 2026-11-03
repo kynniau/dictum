@@ -34,6 +34,7 @@ public sealed partial class AppShell : IDisposable
     private readonly HttpClient _updateHttp; // Check for updates only: follows no redirect
     private readonly ModelManager _models;
     private readonly LocalLlmManager _llm;
+    private readonly VoiceGates _voiceGates; // the voice activity gate in front of the speech step (SPEC §3)
     private readonly IAudioCapture _capture;
     private readonly TextInserter _inserter;
     private readonly DispatcherTimer _reloadDebounce;
@@ -87,6 +88,7 @@ public sealed partial class AppShell : IDisposable
         Integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, _settings));
         _llm = cleanupModels ?? new LocalLlmManager(log, Integrity);
         _models = speechModels ?? new ModelManager(log, Integrity);
+        _voiceGates = new VoiceGates(log, Integrity);
         _speech = CloudSpeech.Local(_models.GetAsync); // until the settings load builds the configured one (LoadConfiguration)
         Models = new ModelCoordinator(paths, _models, _llm, _downloadHttp, log, () => _settings, options.ModelOverride, Dialogs, Environment.GetEnvironmentVariable,
             reload: () => Reload(userRequested: false), shutdown: Quit, refreshTooltip: StatusChanged,
@@ -330,6 +332,7 @@ public sealed partial class AppShell : IDisposable
         CloseWindows();
         _speech.Retire(); // quitting: a cloud speech request under way stops, and none starts, before the models and the provider client go
         _controller?.Dispose();
+        _voiceGates.Dispose(); // after the controller: no take is being checked now
         (_capture as IDisposable)?.Dispose();
         _tray?.Dispose(); // the icon goes at once; releasing the models below can wait for a warm-up still running
         _overlays?.Dispose();

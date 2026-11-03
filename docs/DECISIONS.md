@@ -6703,3 +6703,31 @@ solution." Lane brief from the orchestrator 16:47 AEDT. Built on Fable 5.1 (new 
     the 30 s rule lets the next trip ask again, four keys never seen: TapStarved), `A_disabled_tap_is_turned_back_on_when_the_only_keys_missing_are_its_own_swallows`.
     - **Mutation checks (30/10/2026, Mac, Release; source restored after each), each observed failing on the reverted behaviour:** `Fed`
       without the subtraction, alone (one pin); `Probe` without the subtraction, alone (one pin). No product code changed.
+
+## Voice activity gate: whisper.cpp's Silero detector in front of the speech step (04/11/2026, branch claude/distracted-mccarthy-f9ab00)
+
+Lane brief from the Dictum orchestrator (04/11/2026), after its exploration of 03/11/2026 (`.demo-preview/explore-speech-models-2026-11.md`,
+§3 and §5 S-2): whisper writes text for silence and noise, and the only guard was `silence_threshold`, a peak-level rule.
+
+1. **Reuse, no upgrade, no new package.** Whisper.net 1.9.1, already in use, ships `WhisperVadFactory`, `WhisperVadProcessor`,
+   `WhisperVadProcessorBuilder` and `VadSegmentData` (read in the package's `lib/net10.0/Whisper.net.xml` and its DLL, NuGet cache,
+   04/11/2026), and every native runtime Dictum ships exports `whisper_vad_*` (strings read in `whisper.dll` of Whisper.net.Runtime,
+   .Vulkan and .NoAvx for win-x64, and `libwhisper.dylib` for macos-arm64 and macos-x64, all 1.9.1). So there is no second inference
+   runtime, no NuGet change and no change to the runtime order or the Mac build. Dictum has no security CHANGELOG, and none is needed:
+   no dependency changed.
+2. **The model.** `ggml-silero-v6.2.0.bin` from huggingface.co/ggml-org/whisper-vad (whisper.cpp's own organisation, MIT), pinned
+   at commit 9ffd54a1e1ee413ddf265af9913beaf518d1639b (last modified 17/11/2025), 885,098 bytes, SHA-256
+   2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987: all from the Hugging Face API's tree listing on 04/11/2026, and the
+   downloaded file matched both. v6.2.0 rather than v5.1.2 (same size, also listed) because it is the newer of the two Whisper.net 1.9.1
+   names (`SileroVadType`, strings in its DLL); the real-model pin passed with it. It is downloaded only when asked
+   (`--download-model silero-v6.2.0`) through `ModelDownloader`, and `ModelIntegrity` checks it like a catalogue model. It is not
+   in `ModelCatalog` (a Settings file owned by another lane), so Settings > Models does not list it.
+3. **The gate only decides.** A take with speech goes to the speech step whole, never trimmed to the detector's segments (whisper.cpp's
+   own `vad` decode option would trim, and that would change what speech produces). With the detector the peak level no longer decides
+   silence; the length rule stays. Without the file, when the detector fails, or until a speech load has chosen the whisper runtime,
+   the level rule decides, as before. The detector loads into the runtime the speech model chose and never sets the order itself:
+   Whisper.net keeps the first native library it loads, and a detector loaded first could put Vulkan back on a start that
+   GpuLoadMarker keeps on the CPU.
+4. **What a refused take shows.** The log says "no speech (the voice activity detector found no speech in N s)"; See how it works
+   shows the reason it already shows for a take whisper heard nothing in, "no speech recognised", so no new words reach a screen.
+   The Help line is PROPOSED in `.demo-preview/approve-vad.md`.

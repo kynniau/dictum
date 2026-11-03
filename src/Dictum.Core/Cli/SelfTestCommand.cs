@@ -98,6 +98,7 @@ public static partial class SelfTestCommand
             ok = false; // missing, or it failed its size/SHA-256 check
             Line("whisper runtime", $"{WhisperEngine.ProbeRuntime(settings.Whisper.Gpu, log)} (probed without a model)");
         }
+        ok &= VoiceGateLine(settings, paths, integrity, Line); // after the runtime lines: the speech load or the probe chose the runtime it loads into
         var (recommended, why) = ModelCatalog.Recommend(WhisperEngine.GpuMachine);
         Line("recommended speech", $"{recommended} ({why}; Vulkan devices reported: {WhisperEngine.DeviceSummary})");
         ok &= PersonalLines(settings, paths, log, Line);

@@ -94,6 +94,25 @@ public static class CliCommands
 
             var audio = AudioFiles.ReadWav(wav);
             Console.Error.WriteLine($"audio: {audio.Duration.TotalSeconds:0.00} s at 16 kHz mono, peak block RMS {audio.PeakLevel:0.000}");
+            // The voice activity gate the tray app applies (SPEC §3): a take with no speech is not transcribed. Its model loads into the
+            // runtime the speech model just chose. Without it --transcribe transcribes everything, as it always has.
+            if (VoiceGates.Locate(VoiceGates.Enabled(settings), paths, settings, integrity.Passes) is not { } vadPath)
+            {
+                Console.Error.WriteLine($"voice activity: off ({VoiceGates.OffReason(settings)})");
+            }
+            else
+            {
+                integrity.Verify(vadPath);
+                using var gate = SileroVoiceGate.Load(vadPath);
+                var verdict = await gate.CheckAsync(audio.Samples, CancellationToken.None);
+                Console.Error.WriteLine($"voice activity: {verdict.Why}{(verdict.Speech ? "" : "; nothing transcribed")}");
+                if (!verdict.Speech)
+                {
+                    Console.Out.WriteLine("raw: ");
+                    Console.Out.Flush();
+                    return 0;
+                }
+            }
 
             var sw = Stopwatch.StartNew();
             var raw = await engine.TranscribeAsync(audio.Samples, CancellationToken.None);
