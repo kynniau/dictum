@@ -24,9 +24,13 @@ public sealed class DictationPipeline
     private readonly Func<string, string> _finish;
     private readonly Action<string> _inserted;
     private readonly Func<IEnumerable<string>> _names;
+    private readonly Func<IVoiceGate?> _voiceGate;
 
     /// <summary>Why a recording whisper found no words in is dropped (the log's wording), as <see cref="PipelineProgress.Reason"/>.</summary>
     public const string NoSpeech = "no speech recognised";
+
+    /// <summary>How a take the voice activity detector found no speech in starts its log reason ("no speech (the voice activity detector …)").</summary>
+    public const string VoiceRejected = "no speech";
 
     /// <param name="transcriber">Returns the loaded engine, waiting for a model load still in progress.</param>
     /// <param name="cleaner">Current cleanup configuration (rebuilt on settings reload).</param>
@@ -34,6 +38,7 @@ public sealed class DictationPipeline
     /// <param name="finish">The last step before the paste (SPEC §22 order: corrections, the profanity filter, then snippets); identity if null.</param>
     /// <param name="inserted">Told the text that was pasted (kept in memory for "Fix last dictation"; in hands-free, each part's own text).</param>
     /// <param name="names">The personal dictionary's terms: a hands-free part that goes on with a sentence keeps the capital of one spelt with a capital; none if null.</param>
+    /// <param name="voiceGate">The voice activity gate in use (SPEC §3), none if null: then the level decides silence, as before.</param>
     public DictationPipeline(
         Func<CancellationToken, Task<ITranscriber>> transcriber,
         Func<TranscriptCleaner> cleaner,
@@ -42,7 +47,8 @@ public sealed class DictationPipeline
         ILog log,
         Func<string, string>? finish = null,
         Action<string>? inserted = null,
-        Func<IEnumerable<string>>? names = null)
+        Func<IEnumerable<string>>? names = null,
+        Func<IVoiceGate?>? voiceGate = null)
     {
         _transcriber = transcriber;
         _cleaner = cleaner;
@@ -52,6 +58,7 @@ public sealed class DictationPipeline
         _finish = finish ?? (text => text);
         _inserted = inserted ?? (_ => { });
         _names = names ?? (() => []);
+        _voiceGate = voiceGate ?? (() => null);
     }
 
     /// <param name="insertedWords">Told how many words were pasted (for the "Pasted · 38 words" pill).</param>
@@ -76,11 +83,19 @@ public sealed class DictationPipeline
         HandsFreePart? part, Action<PipelineProgress>? report, bool paste)
     {
         var settings = _settings();
-        var reject = RecordingGate.RejectReason(audio, settings.MinRecordingMs, settings.SilenceThreshold);
+        var what = part is null ? "Recording" : $"Segment {part.Number}";
+        var gate = _voiceGate();
+        // With the voice activity detector the level no longer decides silence (SPEC §3): it hears speech below silence_threshold
+        // and refuses noise above it. The length check stays either way.
+        var (reject, byDetector) = gate is null
+            ? (RecordingGate.RejectReason(audio, settings.MinRecordingMs, settings.SilenceThreshold), false)
+            : RecordingGate.TooShort(audio, settings.MinRecordingMs) is { } tooShort ? (tooShort, false)
+            : await VoiceRejectAsync(gate, audio, settings, what, token).ConfigureAwait(false);
         if (reject is not null)
         {
-            _log.Info(part is null ? $"Recording discarded: {reject}." : $"Segment {part.Number} discarded: {reject}.");
-            report?.Invoke(new PipelineProgress(PipelineStep.Discarded, "", Reason: reject));
+            _log.Info($"{what} discarded: {reject}.");
+            // The page shows the reason (SPEC §29): a take the detector refused says what a take whisper heard nothing in says.
+            report?.Invoke(new PipelineProgress(PipelineStep.Discarded, "", Reason: byDetector ? NoSpeech : reject));
             return ProcessingOutcome.Discarded;
         }
 
@@ -144,5 +159,28 @@ public sealed class DictationPipeline
         if (part is not null) (part.Typed, part.Spoken, part.CleanedBy) = (text, spoken, cleaner);
         insertedWords?.Invoke(text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
         return ProcessingOutcome.Inserted;
+    }
+
+    /// <summary>
+    /// The voice activity gate's say on a take (SPEC §3): no reason to transcribe it, or the reason it is discarded and whether the
+    /// detector gave it. Either way the log says what the detector decided and why, never the audio. A detector that fails leaves
+    /// the decision to the level, as without one, so a broken gate never drops a take that today's rule would keep.
+    /// </summary>
+    private async Task<(string? Reason, bool ByDetector)> VoiceRejectAsync(IVoiceGate gate, CapturedAudio audio, AppSettings settings, string what,
+        CancellationToken token)
+    {
+        VoiceVerdict verdict;
+        try
+        {
+            verdict = await gate.CheckAsync(audio.Samples, token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.Warn($"{what}: the voice activity detector failed ({ex.GetType().Name}: {ex.Message}); the level decides instead (silence_threshold).");
+            return (RecordingGate.RejectReason(audio, settings.MinRecordingMs, settings.SilenceThreshold), false);
+        }
+        if (!verdict.Speech) return ($"{VoiceRejected} ({verdict.Why})", true);
+        _log.Info($"{what}: {verdict.Why}; transcribing.");
+        return (null, false);
     }
 }

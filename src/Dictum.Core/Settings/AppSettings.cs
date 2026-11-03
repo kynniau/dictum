@@ -25,6 +25,12 @@ public sealed record AppSettings
     /// </summary>
     public int HandsFreeMaxSeconds { get; init; } = 300;
     public double SilenceThreshold { get; init; } = 0.01;
+
+    /// <summary>vad (SPEC §3, §9): auto puts the voice activity gate in front of the speech step when its model file is in a model folder; off never does.</summary>
+    public string Vad { get; init; } = VadAuto;
+
+    public const string VadAuto = "auto";
+    public const string VadOff = "off";
     public AudioSettings Audio { get; init; } = new();
     public WhisperSettings Whisper { get; init; } = new();
     public SpeechSettings Speech { get; init; } = new();

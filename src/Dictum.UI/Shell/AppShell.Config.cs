@@ -52,6 +52,7 @@ public sealed partial class AppShell
         var agreedAt = _settings.Speech.Consent is null ? null : config.SpeechConsentAgreedAt;
         _speech = CloudSpeech.Create(_settings.Speech, decode, _settings.OfflineOnly, config.Secrets, _http, _log, _models.GetAsync, Models.CurrentName, agreedAt);
         outgoingSpeech.Retire();
+        _voiceGates.Configure(VoiceGates.Locate(VoiceGates.Enabled(_settings), Paths, _settings, Integrity.Passes), VoiceGates.OffReason(_settings));
         if (TranscriptCleaner.OfflineRefusal(_settings.Llm, _settings.OfflineOnly) is { } refusal && _offlineWarned != refusal)
         {
             _offlineWarned = refusal; // once per distinct refusal

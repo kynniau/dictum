@@ -6774,6 +6774,72 @@ decisions D1 to D5 accepted by the owner 30/10/2026 18:57 AEDT. K-Core lane: Cor
     setting the flag (the same pin, through the reload run inside the modal); R2 the unreadable keys.json deleted with keys remaining
     (1, `Remove_all_with_a_key_refused_leaves_an_unreadable_keys_json_byte_for_byte`).
 
+## Voice activity gate: whisper.cpp's Silero detector in front of the speech step (04/11/2026, branch claude/distracted-mccarthy-f9ab00)
+
+Lane brief from the Dictum orchestrator (04/11/2026), after its exploration of 03/11/2026 (`.demo-preview/explore-speech-models-2026-11.md`,
+§3 and §5 S-2): whisper writes text for silence and noise, and the only guard was `silence_threshold`, a peak-level rule.
+
+1. **Reuse, no upgrade, no new package.** Whisper.net 1.9.1, already in use, ships `WhisperVadFactory`, `WhisperVadProcessor`,
+   `WhisperVadProcessorBuilder` and `VadSegmentData` (read in the package's `lib/net10.0/Whisper.net.xml` and its DLL, NuGet cache,
+   04/11/2026), and every native runtime Dictum ships exports `whisper_vad_*` (strings read in `whisper.dll` of Whisper.net.Runtime,
+   .Vulkan and .NoAvx for win-x64, and `libwhisper.dylib` for macos-arm64 and macos-x64, all 1.9.1). So there is no second inference
+   runtime, no NuGet change and no change to the runtime order or the Mac build. Dictum has no security CHANGELOG, and none is needed:
+   no dependency changed.
+2. **The model.** `ggml-silero-v6.2.0.bin` from huggingface.co/ggml-org/whisper-vad (whisper.cpp's own organisation, MIT), pinned
+   at commit 9ffd54a1e1ee413ddf265af9913beaf518d1639b (last modified 17/11/2025), 885,098 bytes, SHA-256
+   2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987: all from the Hugging Face API's tree listing on 04/11/2026, and the
+   downloaded file matched both. v6.2.0 rather than v5.1.2 (same size, also listed) because it is the newer of the two Whisper.net 1.9.1
+   names (`SileroVadType`, strings in its DLL); the real-model pin passed with it. It is downloaded only when asked
+   (`--download-model silero-v6.2.0`) through `ModelDownloader`, and `ModelIntegrity` checks it like a catalogue model. It is not
+   in `ModelCatalog` (a Settings file owned by another lane), so Settings > Models does not list it.
+3. **The gate only decides.** A take with speech goes to the speech step whole, never trimmed to the detector's segments (whisper.cpp's
+   own `vad` decode option would trim, and that would change what speech produces). With the detector the peak level no longer decides
+   silence; the length rule stays. Without the file, when the detector fails, or until a speech load has loaded whisper's native
+   library, the level rule decides, as before. The detector loads into that library and is never the first native load: Whisper.net
+   keeps the first library it loads, and ModelManager.BeginLoad sets the order on the calling thread but loads the library later on
+   the pool, behind the SHA-256 check and inside GpuLoadMarker's record. So the gate waits for the library itself
+   (`RuntimeOptions.LoadedLibrary`), not for the order (lens on e6b7055, 04/11/2026).
+4. **What a refused take shows.** The log says "no speech (the voice activity detector found no speech in N s)"; See how it works
+   shows the reason it already shows for a take whisper heard nothing in, "no speech recognised", so no new words reach a screen.
+   The Help line is PROPOSED in `.demo-preview/approve-vad.md`.
+5. **Measured (04/11/2026, this PC, Vulkan, `VoiceGateIntegrationTests`, characters typed by the pipeline; lengths only).** Clips: 5 s
+   of digital silence; 5 s of white noise (seeded, peak block RMS 0.031, above `silence_threshold`); the synthesised sentence the
+   whisper integration test uses (4.7 s, System.Speech).
+
+   | Model | Clip | Whisper alone | Typed before (level rule) | Typed after (gate) |
+   |---|---|---|---|---|
+   | base.en | digital silence | 3 | 0 | 0 |
+   | base.en | white noise | 0 | 0 | 0 |
+   | base.en | spoken sentence | 61 | 58 | 58 (same text) |
+   | large-v3-turbo | digital silence | 10 | 0 | 0 |
+   | large-v3-turbo | white noise | 1 | 1 | 0 |
+   | large-v3-turbo | spoken sentence | 61 | 58 | 58 (same text) |
+
+   Read plainly: digital silence was already stopped by the level rule, and on these synthetic clips the gate's gain is one noise case
+   on large-v3-turbo. The published gain (Calm-Whisper, "The Null Token Knows") is on real non-speech audio, which this lane did not
+   record. The detector itself found no speech in the silence and the noise, and one 3.9 s segment in the sentence.
+6. **Mutation checks (04/11/2026, Windows, Debug; each source restored from git after), each observed failing on the reverted
+   behaviour:** the pipeline ignoring the gate (5 pins); the level still deciding beside the gate (1); no gate skipping the level rule
+   (1); a failed detector dropping the level rule (1); the page showing the detector's own reason (1); whisper given a copy of the
+   samples (1); ModelIntegrity not knowing the file (2); `vad` off ignored (1); the loader not reading `vad` (1); the gate loading
+   before the runtime is chosen (1); the lookup taking any size (1); the lookup always finding a file (2); the self-test off line
+   failing the self-test (1); Remove Dictum completely not knowing the file (1).
+7. **Remove Dictum completely and the mover.** The removal plan's model matcher also takes `ggml-silero-v6.2.0.bin` and its `.part`,
+   so "Delete all app data" leaves nothing behind. `ModelFiles.IsModelFile` is unchanged: Settings > Storage reads a catalogue name
+   for every file it lists. So the model is not listed there and Settings > Models > Move leaves it in the old folder. The gate is
+   then off after a move (the level decides) until it is fetched again. Follow-up: give the file a place in the catalogues.
+8. **Lens round on e6b7055 (04/11/2026, orchestrator lens: Needs changes, one major).** MAJOR: the gate waited for the runtime order,
+   but `ModelManager.BeginLoad` sets the order before the library loads, so a start-up dictation could make the detector the first
+   native load. Fixed as item 3 now says: `VoiceGates.Ready` reads `RuntimeOptions.LoadedLibrary`. MINORS: a cancelled detector
+   check now has its own pin; the hands-free pin gates three parts (silent, speech, silent) and whisper hears only the second; a check
+   queued behind `Dispose` throws `ObjectDisposedException` instead of running on the freed processor (`SerialUse`, whose semaphore
+   is never disposed so a queued call can wake and see the free); `VoiceGates.Get` checks and loads outside its lock and keeps the
+   result only if the file in use is unchanged, so a settings reload never waits behind `NativeLoadGate`; the SPEC path is fixed.
+   The README `vad` row is PROPOSED in the approval sheet (row 10).
+   - **Mutation checks (04/11/2026, Windows, Debug; each source restored from git after), each observed failing on the reverted
+     behaviour:** readiness on the order instead of the library (1 pin); cancellation caught as a detector failure (1); hands-free
+     parts not gated (1); no freed check after the wait (1); the check and load held under the lock (1); a load for an old file kept (1).
+
 ## API keys, UI: Add a key, key lists, Check this key, the full key file (04/11/2026 08:16 AEDT, branch feature/api-keys-ui)
 
 Brief: `.demo-preview/design-api-keys.md`, items 1, 2, 3 and 5 of §2 (item 4, the guides, is K-Docs). K-UI lane, Opus 5.5, cut from main

@@ -168,6 +168,15 @@ public sealed partial class WhisperEngine : ISpeechEngine
         return ([RuntimeLibrary.Vulkan, .. CpuOrder], null);
     }
 
+    /// <summary>Whether a speech load (or a probe) has set the runtime order. Not enough for the voice activity gate, which waits for the library itself (<see cref="VoiceGates.Ready"/>).</summary>
+    internal static bool RuntimeConfigured
+    {
+        get
+        {
+            lock (RuntimeGate) return _runtimeConfigured;
+        }
+    }
+
     /// <summary>
     /// Sets the runtime order for this process (<see cref="RuntimeOrder"/>). Must run before the first factory is created;
     /// later calls are no-ops because Whisper.net keeps the first native library it loads.

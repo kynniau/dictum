@@ -33,9 +33,10 @@ public sealed class ModelIntegrity(string cacheFile, ILog log, Func<IReadOnlyLis
     /// <summary>The folder of the verified record: the per-user local data folder in the app (<see cref="AppPaths.LocalDir"/>), where the model managers keep their <see cref="GpuLoadMarker"/>.</summary>
     internal string Folder => Path.GetDirectoryName(Path.GetFullPath(cacheFile))!;
 
-    /// <summary>The catalogue's expectation for this file name (speech or cleanup), or null.</summary>
+    /// <summary>The catalogue's expectation for this file name (speech, cleanup or the voice activity model), or null.</summary>
     public static DownloadSpec? Expected(string path) =>
-        ModelCatalog.FindByFile(path)?.Download ?? CleanupCatalog.FindByFile(path)?.Download;
+        ModelCatalog.FindByFile(path)?.Download ?? CleanupCatalog.FindByFile(path)?.Download
+        ?? (string.Equals(Path.GetFileName(path), SileroVoiceGate.FileName, StringComparison.OrdinalIgnoreCase) ? SileroVoiceGate.Download : null);
 
     /// <summary>
     /// Returns a short status for --selftest; throws <see cref="ModelIntegrityException"/> on a mismatch.
