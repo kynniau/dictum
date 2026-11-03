@@ -424,6 +424,13 @@ public sealed class ApiKeysUiTests
         Assert.Null(KeyCheck.Target(SecretStore.LlmKey, plain)); // a plain http:// address off this PC is never offered
         var noConsent = groq with { Speech = groq.Speech with { Consent = null } };
         Assert.Null(KeyCheck.Target(SecretStore.GroqKey, noConsent));
+
+        // KeyCheck's own consent gate, apart from the loader's: a consent for another host, or none, offers no check.
+        var gemini = new AppSettings { Llm = new LlmSettings { Provider = LlmSettings.OpenAiCompatible, BaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/", Model = "m", CloudConsent = "api.openai.com" } };
+        Assert.Null(KeyCheck.Target(SecretStore.GeminiKey, gemini));
+        Assert.Null(KeyCheck.Target(SecretStore.GeminiKey, gemini with { Llm = gemini.Llm with { CloudConsent = null } }));
+        Assert.Null(KeyCheck.Target(SecretStore.AnthropicKey, anthropic with { Llm = anthropic.Llm with { CloudConsent = null } }));
+        Assert.NotNull(KeyCheck.Target(SecretStore.GeminiKey, gemini with { Llm = gemini.Llm with { CloudConsent = "generativelanguage.googleapis.com" } }));
     }
 
     /// <summary>A service's message loses every key-like token; ordinary words stay.</summary>
@@ -434,6 +441,7 @@ public sealed class ApiKeysUiTests
             KeyCheck.Redact("Incorrect API key provided: Zq81****************Yb5N. You can find your API key at https://platform.openai.com/account/api-keys.", Key));
         Assert.Equal("Request [hidden] failed", KeyCheck.Redact("Request req_011CZkZaBF1tNoB5wlCeusgy failed", Key)); // a long token of any kind
         Assert.Equal("Bad [hidden] here", KeyCheck.Redact("Bad " + Key + " here", Key));
+        Assert.Equal("Got [hidden] here", KeyCheck.Redact("Got ab****cd here", Key)); // a masked key shares nothing with it, and still goes
         Assert.Equal("Invalid bearer token", KeyCheck.Redact("Invalid bearer token", Key));
         Assert.Null(KeyCheck.ProviderMessage("<html>502 Bad Gateway</html>"));
         Assert.Equal("invalid x-api-key", KeyCheck.ProviderMessage("""{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""));

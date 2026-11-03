@@ -6773,3 +6773,40 @@ decisions D1 to D5 accepted by the owner 30/10/2026 18:57 AEDT. K-Core lane: Cor
     handler without its guard (1 pin, `A_vault_change_once_full_removal_has_started_reloads_nothing`); R1b RemoveEverything not
     setting the flag (the same pin, through the reload run inside the modal); R2 the unreadable keys.json deleted with keys remaining
     (1, `Remove_all_with_a_key_refused_leaves_an_unreadable_keys_json_byte_for_byte`).
+
+## API keys, UI: Add a key, key lists, Check this key, the full key file (04/11/2026 08:16 AEDT, branch feature/api-keys-ui)
+
+Brief: `.demo-preview/design-api-keys.md`, items 1, 2, 3 and 5 of §2 (item 4, the guides, is K-Docs). K-UI lane, Opus 5.5, cut from main
+5689b9a (PR #84 merged). Every new string is PROPOSED in `.demo-preview/approve-api-keys.md` rows 16 to 45; no approved string is edited.
+
+1. **One list primitive, two pages.** `KeysPanel` sits under the service on the Cloud clean-up card and the Cloud speech card (Advanced
+   view only: the owner's 22/10/2026 rule keeps the Simple card to its state line and off switch). It shows the keys of the service in
+   use while it is on, else of the service the fields name. It is read again only on a new settings load, a change of service or its
+   own action, never on a redraw tick (listing reads the credential store). Its Active mark mirrors `SecretStore.Get`'s order, pinned
+   against `SecretStore.Describe` over every mix of sources and choices.
+2. **Add a key… is a `DialogWindow`, like Add a word.** Refusals are row 14's sentences byte for byte (an ArgumentException's Message
+   carries a "(Parameter ...)" suffix, so the known sentence is matched at its start). The Key field is masked, has no undo history, and
+   is emptied the moment Add returns and on close. A key saved is made the one in use (decision of this lane: a user who pastes a key
+   wants it used, and an old .env line would otherwise win silently); said on the page.
+3. **Check this key (D3).** `KeyCheck.Target` offers it only when the settings in use carry the consent step's host for the service
+   that takes the key; the URL is always on that host. One GET, no body, through the shell's provider client (offline guard, no
+   redirects), 15 s limit; the answer names the status and the service's own message with key-like tokens hidden. Endpoints read
+   04/11/2026 on each provider's page, listed in `KeyCheck`'s remarks; the custom-server path (`{base_url}/models`) is Inferred.
+   The network-sweep pin (`CloudSpeechTests.Only_the_known_clients_make_network_requests`) lists KeyCheck.cs on purpose.
+4. **Full key file.** `.env.example` is compiled into Dictum.Core as a resource and written after the approved header; empty key lines
+   get `your-key-here`. `KeyFile.Contents()` lost its unused variable parameter. KeyFile.cs is under Settings/: only `Contents` and its
+   comment changed; `Header` is byte for byte as approved (pinned against a literal).
+5. **Help and privacy copy beside, not in place.** The paste-box paragraph and the uninstall line are `HelpText.Proposed*` constants,
+   not in `CloudAnswer` (pinned word for word against the site and by approved index). The privacy sentence is row 42 only. Three
+   approved sentences become untrue once this ships; the sheet lists them with proposed successors (rows 44, 45) for the owner.
+6. **Mutation checks (04/11/2026, Windows, Debug; each source restored with git checkout), each observed failing on the reverted
+   behaviour:** M1 the dialog showing ex.Message (5 cases of `Add_refusals_are_shown_verbatim`); M2 the Key field not emptied after Add
+   or on close (`Nothing_of_the_key_survives...` and all 6 refusal cases); M3 ChooseKey writing null in place of the choice
+   (`Use_this_key_writes_keys_active_through_SetActive`); M4 the CredentialStoreException catch removed (both store-unreadable pins);
+   M5 KeyCheck's clean-up consent gate removed and M5b its speech gate removed (`Each_service_is_checked...`; note: the page-level
+   `Check_this_key_is_absent_without_the_consent_on_record` did NOT fail under M5: without the consent the
+   settings in use offered no target anyway (Inferred: the load does not keep that service in use; not traced), so the unit pin with
+   hand-built settings was added); M6a a body on the request and M6b the first preset's URL whatever the
+   target (`Check_this_key_sends_only_to_the_presets_host...`); M7 the one-line key file (`The_key_file_is_the_full_template...` and 5
+   KeyFileTests); M8 file before environment in the Active rule (`The_active_mark_is_the_key_SecretStore_uses`); M9 the masked-token
+   rule removed (`A_services_message_is_shown_with_key_like_tokens_hidden`, after a case with no shared characters was added).
