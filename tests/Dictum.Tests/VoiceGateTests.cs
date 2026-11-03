@@ -233,6 +233,67 @@ public sealed class VoiceGateTests : IDisposable
         Assert.DoesNotContain("waiting for the speech model", log.All); // what it found was for a file no longer in use
     }
 
+    /// <summary>A loaded detector stand-in that says whether it was freed.</summary>
+    private sealed class DisposableGate : IVoiceGate, IDisposable
+    {
+        public bool Disposed { get; private set; }
+
+        public Task<VoiceVerdict> CheckAsync(float[] samples16kMono, CancellationToken cancellationToken) => Task.FromResult(new VoiceVerdict(true, "speech"));
+
+        public void Dispose() => Disposed = true;
+    }
+
+    [Fact]
+    public async Task A_failed_load_for_an_earlier_setting_never_turns_off_the_same_file_set_again()
+    {
+        // vad on with file A, then off, then A again, all while one Get is still loading for the first A: its failure belongs to
+        // the first setting, and the gate for the second must still load (re-lens on cc54ea6, 04/11/2026).
+        var file = Path.Combine(_dir.FullName, SileroVoiceGate.FileName);
+        File.WriteAllBytes(file, new byte[885_098]);
+        var inCheck = new ManualResetEventSlim();
+        var go = new ManualResetEventSlim();
+        var calls = 0;
+        var later = new DisposableGate();
+        using var gates = new VoiceGates(new RecordingLog(), integrity: null, runtimeReady: () => true, load: _ =>
+        {
+            if (Interlocked.Increment(ref calls) > 1) return later;
+            inCheck.Set();
+            go.Wait(TimeSpan.FromSeconds(10));
+            throw new InvalidOperationException("load failed");
+        });
+        gates.Configure(file);
+        var first = Task.Run(gates.Get);
+        Assert.True(inCheck.Wait(TimeSpan.FromSeconds(10)));
+        gates.Configure(null, "vad is off in settings.json");
+        gates.Configure(file); // the same file again: a new setting
+        go.Set();
+        Assert.Null(await first);
+        Assert.Same(later, gates.Get()); // not given up on the first setting's failure
+    }
+
+    [Fact]
+    public async Task A_gate_loaded_for_an_earlier_setting_is_freed_not_kept()
+    {
+        var file = Path.Combine(_dir.FullName, SileroVoiceGate.FileName);
+        File.WriteAllBytes(file, new byte[885_098]);
+        var inCheck = new ManualResetEventSlim();
+        var go = new ManualResetEventSlim();
+        var stale = new DisposableGate();
+        using var gates = new VoiceGates(new RecordingLog(), integrity: null, runtimeReady: () =>
+        {
+            inCheck.Set();
+            go.Wait(TimeSpan.FromSeconds(10));
+            return true;
+        }, load: _ => stale);
+        gates.Configure(file);
+        var get = Task.Run(gates.Get);
+        Assert.True(inCheck.Wait(TimeSpan.FromSeconds(10)));
+        gates.Configure(null, "vad is off in settings.json"); // a reload while the load runs
+        go.Set();
+        Assert.Null(await get);
+        Assert.True(stale.Disposed); // its native state is freed, never left loaded for nobody
+    }
+
     [Fact]
     public async Task See_how_it_works_shows_a_refused_take_as_no_speech_recognised()
     {
@@ -347,10 +408,10 @@ public sealed class VoiceGateTests : IDisposable
     }
 
     [Fact]
-    public void The_gate_never_loads_before_a_speech_load_chooses_the_runtime()
+    public void The_gate_never_loads_before_a_speech_load_loads_the_library()
     {
-        // Whisper.net keeps the first native library it loads: a detector loaded first would choose it, and could put Vulkan back on a
-        // PC whose last start the GPU ended (GpuLoadMarker's CPU-only order). Until then the level decides, and the gate is not given up.
+        // Whisper.net keeps the first native library it loads: a detector loaded first would be that first load, outside GpuLoadMarker's
+        // record and before the speech model's SHA-256 check. Until the library has loaded the level decides, and the gate is not given up.
         var file = Path.Combine(_dir.FullName, SileroVoiceGate.FileName);
         File.WriteAllBytes(file, new byte[885_098]);
         var log = new RecordingLog();
@@ -405,7 +466,7 @@ public class VoiceGateIntegrationTests(ITestOutputHelper output)
         Assert.SkipWhen(string.IsNullOrWhiteSpace(modelPath), "DICTUM_VAD_MODEL_PATH is not set.");
         TestEnv.WindowsOnly("The spoken clip is synthesised with System.Speech.");
         var ct = TestContext.Current.CancellationToken;
-        WhisperEngine.ConfigureRuntime("auto", NullLog.Instance); // as a speech load does first
+        WhisperEngine.ProbeRuntime("auto", NullLog.Instance); // loads the library first, as a speech load does: the gate never is the first load
         using var gate = SileroVoiceGate.Load(modelPath!);
 
         var silence = await gate.CheckAsync(new float[5 * 16000], ct);
@@ -448,7 +509,7 @@ public class VoiceGateIntegrationTests(ITestOutputHelper output)
         Assert.SkipWhen(string.IsNullOrWhiteSpace(vadPath) || string.IsNullOrWhiteSpace(modelPath), "DICTUM_VAD_MODEL_PATH and DICTUM_MODEL_PATH are not both set.");
         TestEnv.WindowsOnly("The spoken clip is synthesised with System.Speech.");
         var ct = TestContext.Current.CancellationToken;
-        using var engine = WhisperEngine.Load(modelPath!, 0, "auto", NullLog.Instance); // chooses the runtime, as the app's speech load does
+        using var engine = WhisperEngine.Load(modelPath!, 0, "auto", NullLog.Instance); // loads the library first, as the app's speech load does
         using var gate = SileroVoiceGate.Load(vadPath!);
         output.WriteLine($"{Path.GetFileName(modelPath)} on {WhisperEngine.LoadedRuntime}");
 

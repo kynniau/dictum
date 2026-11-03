@@ -142,12 +142,16 @@ internal sealed class SerialUse(string owner)
 /// (null) while vad is off or no model folder holds the file: then the level decides silence, as before the gate.
 /// </summary>
 /// <param name="runtimeReady">Whether a speech load has loaded whisper's native library (<see cref="Ready"/>); tests pass their own.</param>
-public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<bool>? runtimeReady = null) : IDisposable
+/// <param name="load">Loads the detector from its file (<see cref="SileroVoiceGate.Load"/>); tests pass their own. What it returns is disposed
+/// when it is dropped, if it is disposable.</param>
+public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<bool>? runtimeReady = null, Func<string, IVoiceGate>? load = null) : IDisposable
 {
     private readonly object _lock = new();
     private readonly Func<bool> _runtimeReady = runtimeReady ?? (() => Ready(Runtime()));
+    private readonly Func<string, IVoiceGate> _load = load ?? SileroVoiceGate.Load;
     private string? _path;
-    private SileroVoiceGate? _loaded;
+    private long _generation; // every Configure that changes the gate starts a new one: a load from an older one is dropped
+    private IVoiceGate? _loaded;
     private bool _failed;
     private bool _waitSaid;
     private bool _configured; // the first Configure always says where the gate stands
@@ -190,23 +194,25 @@ public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<
     /// <param name="why">Why there is no gate, for the log line when <paramref name="modelPath"/> is null.</param>
     public void Configure(string? modelPath, string why = "")
     {
-        SileroVoiceGate? retired;
+        IVoiceGate? retired;
         lock (_lock)
         {
             if (_configured && string.Equals(_path, modelPath, StringComparison.OrdinalIgnoreCase)) return;
             (retired, _loaded, _failed, _waitSaid, _path, _configured) = (_loaded, null, false, false, modelPath, true);
+            _generation++;
         }
         log.Info(modelPath is null
             ? $"Voice activity gate: off ({why}); the level decides silence (silence_threshold)."
             : $"Voice activity gate: on, with {modelPath}; it loads with the first dictation.");
-        retired?.Dispose(); // waits for a check in progress
+        (retired as IDisposable)?.Dispose(); // waits for a check in progress
     }
 
     /// <summary>
     /// The loaded gate, loading it on first use; null when there is none, when its file failed its check or its load (said once in
     /// the log), or while no speech load has loaded the whisper runtime (said once; the gate loads with a later take). The check and
     /// the load run outside the lock (lens, 04/11/2026): the load waits on NativeLoadGate, and Configure, on the UI thread, must not
-    /// wait behind it. What they find is kept only if the file in use is still the one they looked at.
+    /// wait behind it. What they find is kept only if no Configure has changed the gate since they began (its generation), even back to
+    /// the same file: a result for an earlier setting never decides for a later one.
     /// </summary>
     // simplification: until a speech load has loaded the runtime the level decides. Ceiling: with cloud speech and the local model
     // never loaded this session, every take is judged by the level alone. Trigger to retire: cloud speech reported sending silent
@@ -214,12 +220,13 @@ public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<
     public IVoiceGate? Get()
     {
         string path;
+        long generation;
         lock (_lock)
         {
             if (_loaded is not null || _path is null || _failed) return _loaded;
-            path = _path;
+            (path, generation) = (_path, _generation);
         }
-        SileroVoiceGate? loaded = null;
+        IVoiceGate? loaded = null;
         Exception? failure = null;
         var waiting = false;
         long ms = 0;
@@ -230,7 +237,7 @@ public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<
             else
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                loaded = SileroVoiceGate.Load(path);
+                loaded = _load(path);
                 ms = sw.ElapsedMilliseconds;
             }
         }
@@ -238,12 +245,12 @@ public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<
         {
             failure = ex;
         }
-        SileroVoiceGate? discard = loaded;
+        var discard = loaded;
         try
         {
             lock (_lock)
             {
-                if (!string.Equals(_path, path, StringComparison.OrdinalIgnoreCase)) return _loaded; // the file changed meanwhile
+                if (_generation != generation) return _loaded; // the gate was configured again meanwhile
                 if (waiting)
                 {
                     if (!_waitSaid) log.Info("Voice activity gate: waiting for the speech model to load the whisper runtime; until then the level decides silence (silence_threshold).");
@@ -264,7 +271,7 @@ public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<
         }
         finally
         {
-            discard?.Dispose(); // a gate loaded for a file no longer in use, or loaded twice
+            (discard as IDisposable)?.Dispose(); // a gate loaded for an earlier setting, or loaded twice
         }
     }
 
