@@ -120,21 +120,117 @@ public sealed class VoiceGateTests : IDisposable
         Assert.Contains("the voice activity detector failed (InvalidOperationException: detector broke); the level decides instead", log.All);
     }
 
+    /// <summary>A detector that answers each call in turn from <paramref name="answers"/> (true: speech).</summary>
+    private sealed class ScriptedGate(params bool[] answers) : IVoiceGate
+    {
+        public int Calls { get; private set; }
+
+        public Task<VoiceVerdict> CheckAsync(float[] samples16kMono, CancellationToken cancellationToken)
+        {
+            var speech = answers[Calls++];
+            return Task.FromResult(new VoiceVerdict(speech, speech ? "the voice activity detector found speech: 1 segment, 1.0 s of 3.0 s" : "the voice activity detector found no speech in 3.0 s"));
+        }
+    }
+
     [Fact]
     public async Task Each_hands_free_part_is_gated_on_its_own()
     {
-        var whisper = new HallucinatingTranscriber("Thank you.");
+        var whisper = new HallucinatingTranscriber("Send it today.");
         var inserted = new List<string>();
         var log = new RecordingLog();
-        var gate = new FakeGate(speech: false);
+        var gate = new ScriptedGate(false, true, false); // silent, speech, silent
         var first = new HandsFreePart(1, null);
         var second = new HandsFreePart(2, first);
+        var third = new HandsFreePart(3, second);
+        var (one, two, three) = (Loud(), Loud(), Loud());
         var pipeline = Make(whisper, gate, inserted, log);
-        Assert.Equal(ProcessingOutcome.Discarded, await pipeline.RunAsync(Loud(), CancellationToken.None, _ => { }, part: first));
-        Assert.Equal(ProcessingOutcome.Discarded, await pipeline.RunAsync(Loud(), CancellationToken.None, _ => { }, part: second));
-        Assert.Equal(2, gate.Calls);
-        Assert.Empty(whisper.Heard);
-        Assert.Contains("Segment 2 discarded: no speech (the voice activity detector found no speech in 3.0 s).", log.All);
+        Assert.Equal(ProcessingOutcome.Discarded, await pipeline.RunAsync(one, CancellationToken.None, _ => { }, part: first));
+        Assert.Equal(ProcessingOutcome.Inserted, await pipeline.RunAsync(two, CancellationToken.None, _ => { }, part: second));
+        Assert.Equal(ProcessingOutcome.Discarded, await pipeline.RunAsync(three, CancellationToken.None, _ => { }, part: third));
+        Assert.Equal(3, gate.Calls);
+        Assert.Same(two.Samples, Assert.Single(whisper.Heard)); // whisper heard part 2 only
+        Assert.Equal(["Send it today."], inserted);
+        Assert.Contains("Segment 1 discarded: no speech (the voice activity detector found no speech in 3.0 s).", log.All);
+        Assert.Contains("Segment 2: the voice activity detector found speech: 1 segment, 1.0 s of 3.0 s; transcribing.", log.All);
+        Assert.Contains("Segment 3 discarded: no speech (the voice activity detector found no speech in 3.0 s).", log.All);
+    }
+
+    /// <summary>A detector that honours the token, as the real one does (DetectSpeechAsync takes it).</summary>
+    private sealed class CancellingGate : IVoiceGate
+    {
+        public Task<VoiceVerdict> CheckAsync(float[] samples16kMono, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new VoiceVerdict(true, "speech"));
+        }
+    }
+
+    [Fact]
+    public async Task Esc_during_the_detector_check_cancels_the_take_and_whisper_never_hears_it()
+    {
+        var whisper = new HallucinatingTranscriber("Thank you.");
+        var inserted = new List<string>();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Make(whisper, new CancellingGate(), inserted).RunAsync(Loud(), cts.Token, _ => { }));
+        Assert.Empty(whisper.Heard); // a cancellation is not a detector failure: the level never takes over
+        Assert.Empty(inserted);
+    }
+
+    [Fact]
+    public async Task A_check_queued_behind_the_free_never_runs_on_the_freed_detector()
+    {
+        var use = new SerialUse("detector");
+        var inside = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+        var first = use.RunAsync(async () =>
+        {
+            inside.SetResult();
+            await release.Task;
+            return 1;
+        }, CancellationToken.None);
+        await inside.Task;
+        var secondRan = false;
+        var second = use.RunAsync(() =>
+        {
+            secondRan = true;
+            return Task.FromResult(2);
+        }, CancellationToken.None); // queued behind the first
+        var freed = false;
+        var free = Task.Run(() => use.Free(() => freed = true)); // waits for the first, as Dispose does
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.False(freed); // never under the call in progress
+        release.SetResult();
+        Assert.Equal(1, await first);
+        await free;
+        Assert.True(freed);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => second);
+        Assert.False(secondRan);
+    }
+
+    [Fact]
+    public async Task Settings_reload_never_waits_behind_a_load_and_a_load_for_an_old_file_is_dropped()
+    {
+        var file = Path.Combine(_dir.FullName, SileroVoiceGate.FileName);
+        File.WriteAllBytes(file, new byte[885_098]);
+        var inCheck = new ManualResetEventSlim();
+        var go = new ManualResetEventSlim();
+        var log = new RecordingLog();
+        // The readiness check stands in for the load's wait on NativeLoadGate: it holds Get here until the reload has happened.
+        using var gates = new VoiceGates(log, integrity: null, runtimeReady: () =>
+        {
+            inCheck.Set();
+            go.Wait(TimeSpan.FromSeconds(10));
+            return false;
+        });
+        gates.Configure(file);
+        var get = Task.Run(gates.Get);
+        Assert.True(inCheck.Wait(TimeSpan.FromSeconds(10)));
+        var reload = Task.Run(() => gates.Configure(null, "vad is off in settings.json")); // the UI thread's settings reload
+        Assert.True(reload.Wait(TimeSpan.FromSeconds(5)), "Configure waited behind Get");
+        go.Set();
+        Assert.Null(await get);
+        Assert.DoesNotContain("waiting for the speech model", log.All); // what it found was for a file no longer in use
     }
 
     [Fact]
@@ -262,8 +358,39 @@ public sealed class VoiceGateTests : IDisposable
         gates.Configure(file);
         Assert.Null(gates.Get());
         Assert.Null(gates.Get());
-        Assert.Single(log.Lines, l => l.Message.Contains("waiting for the speech model to choose the whisper runtime", StringComparison.Ordinal));
+        Assert.Single(log.Lines, l => l.Message.Contains("waiting for the speech model to load the whisper runtime", StringComparison.Ordinal));
         Assert.DoesNotContain("could not be loaded", log.All);
+    }
+}
+
+/// <summary>The gate's runtime rule against the real default readiness check, with the runtime state it reads replaced.</summary>
+[Collection("Process-wide state")] // swaps VoiceGates.Runtime, a static: never beside a class that reads it
+public sealed class VoiceGateRuntimeTests : IDisposable
+{
+    private readonly DirectoryInfo _dir = Directory.CreateTempSubdirectory("dictum-vad-rt-");
+    private readonly Func<(bool OrderSet, bool LibraryLoaded)> _real = VoiceGates.Runtime;
+
+    public void Dispose()
+    {
+        VoiceGates.Runtime = _real;
+        _dir.Delete(recursive: true);
+    }
+
+    [Fact]
+    public void The_order_set_with_no_library_loaded_gives_no_gate()
+    {
+        // ModelManager.BeginLoad sets the order at once and loads the library later, behind its SHA-256 check: in between the detector
+        // would be the first native load, outside GpuLoadMarker's record (lens on e6b7055, 04/11/2026).
+        VoiceGates.Runtime = () => (OrderSet: true, LibraryLoaded: false);
+        var file = Path.Combine(_dir.FullName, SileroVoiceGate.FileName);
+        File.WriteAllBytes(file, new byte[885_098]);
+        var log = new RecordingLog();
+        using var gates = new VoiceGates(log); // the default readiness check
+        gates.Configure(file);
+        Assert.Null(gates.Get());
+        Assert.Contains("waiting for the speech model to load the whisper runtime", log.All);
+        Assert.False(VoiceGates.Ready((OrderSet: true, LibraryLoaded: false)));
+        Assert.True(VoiceGates.Ready((OrderSet: true, LibraryLoaded: true)));
     }
 }
 

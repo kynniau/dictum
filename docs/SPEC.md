@@ -118,13 +118,14 @@ Rules:
   segment in is discarded, never transcribed; the peak level is then not compared with `silence_threshold`, so speech below it
   is heard and noise above it is not. A take with speech goes to the speech step whole and unchanged: the detector decides, it
   never trims. In hands-free each part is gated on its own. Without the file, with `vad` off, when the detector fails, or until
-  a speech load has chosen the whisper runtime (the detector loads into that runtime and never sets the order itself, so a start
-  that GpuLoadMarker keeps on the CPU stays there), the level rule above decides, as before. The log names each decision and
-  why (segments, seconds of speech; never the audio), and See how it works (§29) shows a refused take as "no speech recognised".
+  a speech load has loaded whisper's native library (not merely set the runtime order: the detector loads into that library, never
+  first, so the first native load stays inside GpuLoadMarker's record and a start it keeps on the CPU stays there), the level
+  rule above decides, as before. The log names each decision and why (segments, seconds of speech; never the audio), and See
+  how it works (§29) shows a refused take as "no speech recognised".
   The model is fetched only when asked (`--download-model silero-v6.2.0`, §11) from huggingface.co/ggml-org/whisper-vad (MIT) at
   commit 9ffd54a1e1ee413ddf265af9913beaf518d1639b: 885,098 bytes, SHA-256 2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987
   (Hugging Face API, 04/11/2026), checked before it loads like every model (§24). `silence_threshold` still sets the hands-free
-  cut floor below. Evidence for the gate: docsDECISIONS.md, "Voice activity gate".
+  cut floor below. Evidence for the gate: `docs\DECISIONS.md`, "Voice activity gate".
 - For chords, suppress only the final non-modifier key, never bare modifiers, and only
   while the chord is complete.
 - The hook must survive the UI being busy: that is why it has its own thread.

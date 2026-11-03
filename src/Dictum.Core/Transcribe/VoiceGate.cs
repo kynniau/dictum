@@ -38,10 +38,9 @@ public sealed class SileroVoiceGate : IVoiceGate, IDisposable
         new Uri("https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin"),
         FileName, 885_098, "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987");
 
-    private readonly SemaphoreSlim _busy = new(1, 1);
+    private readonly SerialUse _use = new(nameof(SileroVoiceGate));
     private readonly WhisperVadFactory _factory;
     private readonly WhisperVadProcessor _processor;
-    private int _disposed;
 
     private SileroVoiceGate(WhisperVadFactory factory, WhisperVadProcessor processor, string modelPath)
     {
@@ -53,9 +52,9 @@ public sealed class SileroVoiceGate : IVoiceGate, IDisposable
     public string ModelPath { get; }
 
     /// <summary>
-    /// Loads the model into the whisper runtime this process already chose (<see cref="WhisperEngine.ConfigureRuntime"/> must have
-    /// run): Whisper.net keeps the first native library it loads, so a detector that loaded first would set the order itself, and
-    /// could put Vulkan back on a PC whose last start the GPU ended (GpuLoadMarker's CPU-only order).
+    /// Loads the model into the whisper runtime a speech load has already loaded (<see cref="VoiceGates.Ready"/>): Whisper.net keeps
+    /// the first native library it loads, so a detector that loaded first would load it outside GpuLoadMarker's record, and before
+    /// ModelManager's SHA-256 check of the speech model.
     /// </summary>
     public static SileroVoiceGate Load(string modelPath)
     {
@@ -75,19 +74,12 @@ public sealed class SileroVoiceGate : IVoiceGate, IDisposable
         });
     }
 
-    public async Task<VoiceVerdict> CheckAsync(float[] samples16kMono, CancellationToken cancellationToken)
-    {
-        await _busy.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
+    public Task<VoiceVerdict> CheckAsync(float[] samples16kMono, CancellationToken cancellationToken) =>
+        _use.RunAsync(async () =>
         {
             var segments = await _processor.DetectSpeechAsync(samples16kMono, cancellationToken).ConfigureAwait(false);
             return Decide([.. segments.Select(s => (s.Start, s.End))], TimeSpan.FromSeconds(samples16kMono.Length / 16000.0));
-        }
-        finally
-        {
-            _busy.Release();
-        }
-    }
+        }, cancellationToken);
 
     /// <summary>The verdict from the detector's speech segments: any segment is speech.</summary>
     internal static VoiceVerdict Decide(IReadOnlyList<(TimeSpan Start, TimeSpan End)> segments, TimeSpan duration)
@@ -98,19 +90,48 @@ public sealed class SileroVoiceGate : IVoiceGate, IDisposable
                          $"{speech.TotalSeconds:0.0} s of {duration.TotalSeconds:0.0} s");
     }
 
-    public void Dispose()
+    public void Dispose() => _use.Free(() =>
     {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
-        _busy.Wait();
+        Task.Run(() => _processor.DisposeAsync().AsTask()).GetAwaiter().GetResult(); // on the pool, as WhisperEngine.Dispose says why
+        _factory.Dispose();
+    });
+}
+
+/// <summary>
+/// A native object used by one call at a time and freed only after the call in progress (lens, 04/11/2026): a call queued behind
+/// the free wakes to find it freed and throws ObjectDisposedException instead of running on freed native state.
+/// </summary>
+internal sealed class SerialUse(string owner)
+{
+    private readonly SemaphoreSlim _busy = new(1, 1); // never disposed: a call still queued must be able to wake and see the free
+    private int _freed;
+
+    public async Task<T> RunAsync<T>(Func<Task<T>> use, CancellationToken cancellationToken)
+    {
+        await _busy.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            Task.Run(() => _processor.DisposeAsync().AsTask()).GetAwaiter().GetResult(); // on the pool, as WhisperEngine.Dispose says why
-            _factory.Dispose();
+            if (Volatile.Read(ref _freed) == 1) throw new ObjectDisposedException(owner);
+            return await use().ConfigureAwait(false);
         }
         finally
         {
             _busy.Release();
-            _busy.Dispose();
+        }
+    }
+
+    /// <summary>Frees once: waits for the call in progress, then runs <paramref name="free"/>; later calls do nothing.</summary>
+    public void Free(Action free)
+    {
+        if (Interlocked.Exchange(ref _freed, 1) == 1) return;
+        _busy.Wait();
+        try
+        {
+            free();
+        }
+        finally
+        {
+            _busy.Release();
         }
     }
 }
@@ -120,16 +141,29 @@ public sealed class SileroVoiceGate : IVoiceGate, IDisposable
 /// take that needs it loads it (after the size and SHA-256 check every model gets), and a changed file or quitting frees it. None
 /// (null) while vad is off or no model folder holds the file: then the level decides silence, as before the gate.
 /// </summary>
-/// <param name="runtimeReady">Whether the whisper runtime order is set (<see cref="WhisperEngine.RuntimeConfigured"/>); tests pass their own.</param>
+/// <param name="runtimeReady">Whether a speech load has loaded whisper's native library (<see cref="Ready"/>); tests pass their own.</param>
 public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<bool>? runtimeReady = null) : IDisposable
 {
     private readonly object _lock = new();
-    private readonly Func<bool> _runtimeReady = runtimeReady ?? (() => WhisperEngine.RuntimeConfigured);
+    private readonly Func<bool> _runtimeReady = runtimeReady ?? (() => Ready(Runtime()));
     private string? _path;
     private SileroVoiceGate? _loaded;
     private bool _failed;
     private bool _waitSaid;
     private bool _configured; // the first Configure always says where the gate stands
+
+    /// <summary>
+    /// The whisper runtime as the gate reads it: whether the order is set, and whether a native library has loaded. Tests replace it.
+    /// </summary>
+    internal static Func<(bool OrderSet, bool LibraryLoaded)> Runtime { get; set; } =
+        () => (WhisperEngine.RuntimeConfigured, Whisper.net.LibraryLoader.RuntimeOptions.LoadedLibrary is not null);
+
+    /// <summary>
+    /// The gate may load only once the library has (lens, 04/11/2026), not when the order is set: ModelManager.BeginLoad sets the order
+    /// on the calling thread and loads the library later, on the pool, behind its SHA-256 check and inside GpuLoadMarker's record. The
+    /// speech load sets the order and loads the library under one NativeLoadGate lock, which the detector's load takes too.
+    /// </summary>
+    internal static bool Ready((bool OrderSet, bool LibraryLoaded) runtime) => runtime.LibraryLoaded;
 
     /// <summary>Whether the settings ask for the gate (it still needs its model file).</summary>
     public static bool Enabled(AppSettings settings) => settings.Vad != AppSettings.VadOff;
@@ -170,35 +204,67 @@ public sealed class VoiceGates(ILog log, ModelIntegrity? integrity = null, Func<
 
     /// <summary>
     /// The loaded gate, loading it on first use; null when there is none, when its file failed its check or its load (said once in
-    /// the log), or while no speech load has chosen the whisper runtime (said once; the gate loads with a later take).
+    /// the log), or while no speech load has loaded the whisper runtime (said once; the gate loads with a later take). The check and
+    /// the load run outside the lock (lens, 04/11/2026): the load waits on NativeLoadGate, and Configure, on the UI thread, must not
+    /// wait behind it. What they find is kept only if the file in use is still the one they looked at.
     /// </summary>
-    // simplification: until a speech load sets the runtime order the level decides. Ceiling: with cloud speech and the local model
+    // simplification: until a speech load has loaded the runtime the level decides. Ceiling: with cloud speech and the local model
     // never loaded this session, every take is judged by the level alone. Trigger to retire: cloud speech reported sending silent
-    // takes, or a runtime probe that sets the order (ProbeRuntime) made part of the gate's start.
+    // takes, or a runtime probe that loads the library (ProbeRuntime) made part of the gate's start.
     public IVoiceGate? Get()
     {
+        string path;
         lock (_lock)
         {
             if (_loaded is not null || _path is null || _failed) return _loaded;
-            try
+            path = _path;
+        }
+        SileroVoiceGate? loaded = null;
+        Exception? failure = null;
+        var waiting = false;
+        long ms = 0;
+        try
+        {
+            integrity?.Verify(path);
+            if (!_runtimeReady()) waiting = true;
+            else
             {
-                integrity?.Verify(_path);
-                if (!_runtimeReady())
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                loaded = SileroVoiceGate.Load(path);
+                ms = sw.ElapsedMilliseconds;
+            }
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
+        SileroVoiceGate? discard = loaded;
+        try
+        {
+            lock (_lock)
+            {
+                if (!string.Equals(_path, path, StringComparison.OrdinalIgnoreCase)) return _loaded; // the file changed meanwhile
+                if (waiting)
                 {
-                    if (!_waitSaid) log.Info("Voice activity gate: waiting for the speech model to choose the whisper runtime; until then the level decides silence (silence_threshold).");
+                    if (!_waitSaid) log.Info("Voice activity gate: waiting for the speech model to load the whisper runtime; until then the level decides silence (silence_threshold).");
                     _waitSaid = true;
                     return null;
                 }
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                _loaded = SileroVoiceGate.Load(_path);
-                log.Info($"Voice activity gate: {Path.GetFileName(_path)} loaded in {sw.ElapsedMilliseconds} ms, on the CPU.");
+                if (failure is not null)
+                {
+                    if (!_failed) log.Warn($"Voice activity gate: {Path.GetFileName(path)} could not be loaded ({failure.GetType().Name}: {failure.Message}); the level decides silence (silence_threshold) until the file changes.");
+                    _failed = true;
+                    return null;
+                }
+                if (_loaded is not null) return _loaded; // another take loaded it first
+                (_loaded, discard) = (loaded, null);
+                log.Info($"Voice activity gate: {Path.GetFileName(path)} loaded in {ms} ms, on the CPU.");
+                return _loaded;
             }
-            catch (Exception ex)
-            {
-                _failed = true;
-                log.Warn($"Voice activity gate: {Path.GetFileName(_path)} could not be loaded ({ex.GetType().Name}: {ex.Message}); the level decides silence (silence_threshold) until the file changes.");
-            }
-            return _loaded;
+        }
+        finally
+        {
+            discard?.Dispose(); // a gate loaded for a file no longer in use, or loaded twice
         }
     }
 

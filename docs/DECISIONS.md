@@ -6794,10 +6794,11 @@ Lane brief from the Dictum orchestrator (04/11/2026), after its exploration of 0
    in `ModelCatalog` (a Settings file owned by another lane), so Settings > Models does not list it.
 3. **The gate only decides.** A take with speech goes to the speech step whole, never trimmed to the detector's segments (whisper.cpp's
    own `vad` decode option would trim, and that would change what speech produces). With the detector the peak level no longer decides
-   silence; the length rule stays. Without the file, when the detector fails, or until a speech load has chosen the whisper runtime,
-   the level rule decides, as before. The detector loads into the runtime the speech model chose and never sets the order itself:
-   Whisper.net keeps the first native library it loads, and a detector loaded first could put Vulkan back on a start that
-   GpuLoadMarker keeps on the CPU.
+   silence; the length rule stays. Without the file, when the detector fails, or until a speech load has loaded whisper's native
+   library, the level rule decides, as before. The detector loads into that library and is never the first native load: Whisper.net
+   keeps the first library it loads, and ModelManager.BeginLoad sets the order on the calling thread but loads the library later on
+   the pool, behind the SHA-256 check and inside GpuLoadMarker's record. So the gate waits for the library itself
+   (`RuntimeOptions.LoadedLibrary`), not for the order (lens on e6b7055, 04/11/2026).
 4. **What a refused take shows.** The log says "no speech (the voice activity detector found no speech in N s)"; See how it works
    shows the reason it already shows for a take whisper heard nothing in, "no speech recognised", so no new words reach a screen.
    The Help line is PROPOSED in `.demo-preview/approve-vad.md`.
@@ -6827,3 +6828,14 @@ Lane brief from the Dictum orchestrator (04/11/2026), after its exploration of 0
    so "Delete all app data" leaves nothing behind. `ModelFiles.IsModelFile` is unchanged: Settings > Storage reads a catalogue name
    for every file it lists. So the model is not listed there and Settings > Models > Move leaves it in the old folder. The gate is
    then off after a move (the level decides) until it is fetched again. Follow-up: give the file a place in the catalogues.
+8. **Lens round on e6b7055 (04/11/2026, orchestrator lens: Needs changes, one major).** MAJOR: the gate waited for the runtime order,
+   but `ModelManager.BeginLoad` sets the order before the library loads, so a start-up dictation could make the detector the first
+   native load. Fixed as item 3 now says: `VoiceGates.Ready` reads `RuntimeOptions.LoadedLibrary`. MINORS: a cancelled detector
+   check now has its own pin; the hands-free pin gates three parts (silent, speech, silent) and whisper hears only the second; a check
+   queued behind `Dispose` throws `ObjectDisposedException` instead of running on the freed processor (`SerialUse`, whose semaphore
+   is never disposed so a queued call can wake and see the free); `VoiceGates.Get` checks and loads outside its lock and keeps the
+   result only if the file in use is unchanged, so a settings reload never waits behind `NativeLoadGate`; the SPEC path is fixed.
+   The README `vad` row is PROPOSED in the approval sheet (row 10).
+   - **Mutation checks (04/11/2026, Windows, Debug; each source restored from git after), each observed failing on the reverted
+     behaviour:** readiness on the order instead of the library (1 pin); cancellation caught as a detector failure (1); hands-free
+     parts not gated (1); no freed check after the wait (1); the check and load held under the lock (1); a load for an old file kept (1).
