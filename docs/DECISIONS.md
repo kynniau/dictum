@@ -6892,3 +6892,10 @@ Brief: `.demo-preview/design-api-keys.md`, items 1, 2, 3 and 5 of §2 (item 4, t
    (`Each_kind_of_check_sends_its_own_header`, one case each); N7 the uninstall sentence shown (`Privacy_does_not_say...`); N8
    "The key works." for a custom server (`A_custom_servers_200...`, 2 cases); N9 the choice not passed to InUse (the exhaustive
    active-mark pin and `Use_this_key...`). Not pinned on its own: passing Failed to the Add button (the pin calls Added directly).
+8. **Re-lens fix round (04/11/2026, Opus re-lens on 317eb79: Needs changes, three minors).** (1) An Anthropic target off
+   api.anthropic.com (a custom llm.base_url, consent on record) said "The key works." on a 200: `KeyCheck.IsCustom` now decides on
+   the target, and no other preset takes an address of the user's. (2) Row 46 names the address you entered. (3) The key field's peer
+   follows IsReadOnly and gives the Watermark as its placeholder. **Mutation checks, each observed failing on the reverted behaviour:**
+   P1 the variable-only IsCustom (the proxy case of `A_custom_servers_200...` and `An_Anthropic_custom_address_is_checked_at_that_address`);
+   P3a IsReadOnly hard-coded false and P3b no placeholder override (`The_key_fields_peer_follows_read_only_and_gives_the_placeholder`, each
+   at its own assertion).

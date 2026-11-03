@@ -185,7 +185,9 @@ internal sealed class MaskedKeyBox : TextBox
     {
         protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Edit;
 
-        public bool IsReadOnly => false;
+        protected override string? GetPlaceholderTextCore() => owner.Watermark; // as TextBoxAutomationPeer gives it (macOS reads it)
+
+        public bool IsReadOnly => owner.IsReadOnly;
 
         public string? Value => string.IsNullOrEmpty(owner.Text) ? "" : AutomationMask;
 

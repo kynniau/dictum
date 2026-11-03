@@ -537,7 +537,8 @@ public sealed class ApiKeysUiTests
     {
         var handler = new RecordingHandler();
         using var http = new HttpClient(handler);
-        var target = new KeyCheckTarget(SecretStore.OpenAiKey, "svc.example.com", new Uri("https://svc.example.com/v1/models"), auth);
+        var host = auth == KeyCheckAuth.Anthropic ? "api.anthropic.com" : "svc.example.com"; // Anthropic's own host: a named service
+        var target = new KeyCheckTarget(auth == KeyCheckAuth.Anthropic ? SecretStore.AnthropicKey : SecretStore.OpenAiKey, host, new Uri($"https://{host}/v1/models"), auth);
         Assert.Equal("The key works.", await KeyCheck.RunAsync(http, target, Key, offlineOnly: false, TestContext.Current.CancellationToken));
         var sent = Assert.Single(handler.Requests);
         switch (auth)
@@ -557,17 +558,50 @@ public sealed class ApiKeysUiTests
         }
     }
 
-    /// <summary>Pin (MINOR 8, mutation-checked): a custom server's 200 says it accepted the request, never that the key works.</summary>
+    /// <summary>
+    /// Pin (MINOR 8 and re-lens item 1, mutation-checked): a 200 from a server the user names (a custom server, or Anthropic at a custom
+    /// llm.base_url) says it accepted the request, never that the key works; a named service's 200 says the key works.
+    /// </summary>
     [Theory]
-    [InlineData(SecretStore.LlmKey, "llm.example.net accepted the request.")]
-    [InlineData(SecretStore.SpeechKey, "llm.example.net accepted the request.")]
-    [InlineData(SecretStore.GroqKey, "The key works.")]
-    public async Task A_custom_servers_200_does_not_say_the_key_works(string variable, string expected)
+    [InlineData(SecretStore.LlmKey, "llm.example.net", KeyCheckAuth.Bearer, "llm.example.net accepted the request.")]
+    [InlineData(SecretStore.SpeechKey, "llm.example.net", KeyCheckAuth.Bearer, "llm.example.net accepted the request.")]
+    [InlineData(SecretStore.AnthropicKey, "proxy.example.com", KeyCheckAuth.Anthropic, "proxy.example.com accepted the request.")]
+    [InlineData(SecretStore.AnthropicKey, "api.anthropic.com", KeyCheckAuth.Anthropic, "The key works.")]
+    [InlineData(SecretStore.GroqKey, "api.groq.com", KeyCheckAuth.Bearer, "The key works.")]
+    public async Task A_custom_servers_200_does_not_say_the_key_works(string variable, string host, KeyCheckAuth auth, string expected)
     {
         using var http = new HttpClient(new RecordingHandler());
-        var target = new KeyCheckTarget(variable, "llm.example.net", new Uri("https://llm.example.net/v1/models"), KeyCheckAuth.Bearer);
+        var target = new KeyCheckTarget(variable, host, new Uri($"https://{host}/v1/models"), auth);
         Assert.Equal(expected, await KeyCheck.RunAsync(http, target, Key, offlineOnly: false, TestContext.Current.CancellationToken));
     }
+
+    /// <summary>The Anthropic proxy case as the settings make it: a custom llm.base_url with its consent on record is checked there.</summary>
+    [Fact]
+    public void An_Anthropic_custom_address_is_checked_at_that_address()
+    {
+        var proxy = new AppSettings { Llm = new LlmSettings { Provider = LlmSettings.Anthropic, BaseUrl = "https://proxy.example.com", CloudConsent = "proxy.example.com" } };
+        var target = KeyCheck.Target(SecretStore.AnthropicKey, proxy)!;
+        Assert.Equal("https://proxy.example.com/v1/models", target.Url.AbsoluteUri);
+        Assert.True(KeyCheck.IsCustom(target));
+    }
+
+    /// <summary>
+    /// Pin (re-lens item 3, mutation-checked): the Key field's automation peer reports the box's read-only state and its placeholder,
+    /// as the TextBox's own peer would, while still never its text.
+    /// </summary>
+    [Fact]
+    public Task The_key_fields_peer_follows_read_only_and_gives_the_placeholder() => UiSession.Run(() =>
+    {
+        var window = new AddKeyWindow(new FakeVault(), SecretStore.OpenAiKey, "OpenAI", _ => { });
+        window.Show();
+        var peer = Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(window.KeyBox);
+        var value = (Avalonia.Automation.Provider.IValueProvider)peer;
+        Assert.False(value.IsReadOnly);
+        window.KeyBox.IsReadOnly = true;
+        Assert.True(value.IsReadOnly);
+        Assert.Equal("Paste your key here", peer.GetPlaceholderText());
+        window.Close();
+    });
 
     /// <summary>Pin (MINOR 7, mutation-checked): Settings > Privacy does not state the unverified uninstall fact (row 38a is held back).</summary>
     [Fact]

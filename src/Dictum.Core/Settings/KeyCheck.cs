@@ -76,13 +76,20 @@ public static class KeyCheck
     public const string Works = "The key works.";
 
     /// <summary>
-    /// PROPOSED 04/11/2026 (row 30a; PR #87 lens, MINOR 8): a custom server (LLM_API_KEY, SPEECH_API_KEY) answered 200. One that ignores
-    /// keys answers 200 to any key, so this says what happened, not that the key works.
+    /// PROPOSED 04/11/2026 (row 30a; PR #87 lens, MINOR 8; widened on the re-lens): a server the user names answered 200. One that
+    /// ignores keys answers 200 to any key, so this says what happened, not that the key works.
     /// </summary>
     public static string Accepted(string host) => $"{host} accepted the request.";
 
-    /// <summary>True for the keys of a server the user names (a custom server), whose 200 does not prove the key.</summary>
-    public static bool IsCustom(string variable) => variable is SecretStore.LlmKey or SecretStore.SpeechKey;
+    /// <summary>
+    /// True when <paramref name="target"/> is a server the user names, whose 200 does not prove the key: a custom server (LLM_API_KEY,
+    /// SPEECH_API_KEY), or Anthropic at an llm.base_url other than Anthropic's own host (a proxy). The other presets cannot take an address
+    /// of the user's: one typed over an OpenAI, Gemini or Groq address is a custom server (its key is LLM_API_KEY or SPEECH_API_KEY, or none),
+    /// and Azure OpenAI's own hosts (*.openai.azure.com) are Microsoft's.
+    /// </summary>
+    public static bool IsCustom(KeyCheckTarget target) =>
+        target.Variable is SecretStore.LlmKey or SecretStore.SpeechKey
+        || (target.Auth == KeyCheckAuth.Anthropic && !string.Equals(target.Host.TrimEnd('.'), new Uri(AnthropicLlmClient.DefaultBaseUrl).Host, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>PROPOSED 04/11/2026 (row 31): the service answered with an error. The message is the service's own, key-like tokens hidden.</summary>
     public static string Refused(string host, int code, string? reason, string? message) =>
@@ -178,7 +185,7 @@ public static class KeyCheck
         try
         {
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
-            if (response.IsSuccessStatusCode) return IsCustom(target.Variable) ? Accepted(target.Host) : Works;
+            if (response.IsSuccessStatusCode) return IsCustom(target) ? Accepted(target.Host) : Works;
             var body = await ReadCapped(response, deadline.Token).ConfigureAwait(false);
             return Refused(target.Host, (int)response.StatusCode, Redact(response.ReasonPhrase, key), Redact(ProviderMessage(body), key));
         }

@@ -112,7 +112,7 @@ uninstall above:
 
 1. With the package installed, open Settings > Clean-up, choose OpenAI and click Add a key….
 2. Paste a test value (any text, not a real key), label it `MSIX check`, and click Save.
-3. In normal PowerShell, list the entries: `cmdkey /list | Select-String "Dictum/"`. Expect one target `Dictum/OPENAI_API_KEY/<id>`.
+3. In normal PowerShell, list the entries: `cmdkey /list | Select-String "Dictum/"`. Expect one line `Target: LegacyGeneric:target=Dictum/OPENAI_API_KEY/<id>` (cmdkey prints the `LegacyGeneric:target=` prefix for a generic credential).
 4. Uninstall as above.
 5. Run `cmdkey /list | Select-String "Dictum/"` again, and look in Control Panel > Credential Manager > Windows Credentials.
 6. Record in the release notes whether the entry is still there. If it is, rows 38a, 41 and 42 are true. If it is gone, they must not
