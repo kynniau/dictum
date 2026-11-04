@@ -207,6 +207,54 @@ public class LoopbackCaptureTests
     }
 
     [Fact]
+    public void Idle_pulses_cut_speech_and_advance_progress_before_stop()
+    {
+        var now = TimeSpan.Zero;
+        var device = new FakeSource();
+        using var capture = new LoopbackCapture(NullLog.Instance, _ => device, () => now);
+        capture.Start(null, new Stopwatch());
+        var seen = new List<(CapturedAudio Part, CutReason Reason, TimeSpan Offset)>();
+        capture.SegmentAtPauses(.01, (audio, reason, offset) => seen.Add((audio, reason, offset)));
+        for (var i = 0; i < 30; i++)
+        {
+            now += TimeSpan.FromMilliseconds(100);
+            device.Emit(1600, .25f);
+            capture.Pulse();
+        }
+        Assert.Empty(seen);
+        var pending = capture.Progress.PendingStart;
+        for (var i = 0; i < 20; i++)
+        {
+            now += TimeSpan.FromMilliseconds(100);
+            capture.Pulse();
+            var progress = capture.Progress.PendingStart;
+            Assert.True(progress >= pending);
+            pending = progress;
+            if (i == 4) Assert.Empty(seen); // Exactly 500 ms is still within the idle threshold.
+        }
+        var speech = Assert.Single(seen.Where(part => part.Part.PeakLevel > .1));
+        Assert.Equal(CutReason.Pause, speech.Reason);
+        Assert.Equal(TimeSpan.Zero, speech.Offset);
+        Assert.Equal(48000, speech.Part.Samples.Count(sample => sample == .25f));
+        Assert.Equal(CaptureActivity.Silent, capture.Progress.Activity);
+        Assert.True(pending > TimeSpan.FromSeconds(4));
+
+        // A late packet follows the silence already committed by sample count.
+        device.Emit(320, .5f);
+        capture.Pulse();
+        var tail = capture.StopTimestamped();
+        seen.Add((tail.Part, CutReason.Stop, tail.Offset));
+        var end = TimeSpan.Zero;
+        foreach (var part in seen)
+        {
+            Assert.Equal(end, part.Offset);
+            end += part.Part.Duration;
+        }
+        Assert.Equal(320, seen.Sum(part => part.Part.Samples.Count(sample => sample == .5f)));
+        Assert.Equal(now, end);
+    }
+
+    [Fact]
     public async Task Stop_preserves_packets_delivered_before_recording_stopped()
     {
         var now = TimeSpan.Zero;

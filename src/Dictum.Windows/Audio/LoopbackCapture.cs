@@ -147,7 +147,15 @@ public sealed class LoopbackCapture : ITimestampedCapture, IDisposable
             {
                 if (generation != _generation || _capture is null) return;
                 _capture.CheckDevice();
-                lock (_sync) { if (_running && !_failed) FlushPackets(); }
+                lock (_sync)
+                {
+                    if (!_running || _failed) return;
+                    FlushPackets();
+                    var now = Now;
+                    // simplification: fixed idle threshold and packet grace; retire after device latency measurements
+                    if (_anchored && _packets.Count == 0 && now - _audio!.End > TimeSpan.FromMilliseconds(500))
+                        _audio.FillSilence(now - TimeSpan.FromMilliseconds(250));
+                }
             }
         }
         catch (Exception ex) { ReportFailure(generation, ex); }
