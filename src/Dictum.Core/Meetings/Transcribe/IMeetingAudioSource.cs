@@ -4,6 +4,7 @@ namespace Dictum.Meetings.Transcribe;
 
 public interface IMeetingAudioSource
 {
+    /// <summary>Empty parts signal watermark progress without adding audio.</summary>
     IAsyncEnumerable<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> ReadAsync(CancellationToken cancellationToken);
 
     /// <summary>No future part starts before this point. Unordered sources may leave the default until EOF.</summary>

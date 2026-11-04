@@ -34,7 +34,7 @@ public sealed class MeetingTranscriber(ISpeechEngine engine, IVoiceGate gate, IM
                 if (!more) break;
                 var part = reader.Current;
                 cancellationToken.ThrowIfCancellationRequested();
-                queue.Enqueue(part, (part.Offset, sequence++));
+                if (part.Part.Samples.Length != 0) queue.Enqueue(part, (part.Offset, sequence++));
                 await Drain(source.Watermark).ConfigureAwait(false);
             }
             await Drain(TimeSpan.MaxValue).ConfigureAwait(false);

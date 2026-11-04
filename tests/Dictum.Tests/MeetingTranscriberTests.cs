@@ -239,6 +239,69 @@ public class MeetingTranscriberTests
     }
 
     [Fact]
+    public async Task One_live_part_then_silence_is_emitted_on_a_progress_tick_before_stop()
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var mic = new Capture();
+        var other = new Capture();
+        var clock = new ManualTime();
+        var source = new LiveTwoTrackSource(mic, other, timeProvider: clock);
+        var observed = new ObservedSource(source);
+        var emitted = new TaskCompletionSource<Segment>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new Gate();
+        var run = new MeetingTranscriber(new ToneEngine(), gate, store).RunAsync(id, observed,
+            s => emitted.TrySetResult(s), default);
+        await clock.TimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            clock.Advance(TimeSpan.FromSeconds(5));
+            mic.Emit(Tone(440));
+            await observed.PartConsumed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(emitted.Task.IsCompleted);
+            // Neither capture sends another part. Only clock progress can release the buffered audio.
+            clock.Advance(TimeSpan.FromSeconds(35));
+            var segment = await emitted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(TimeSpan.FromSeconds(4.9), segment.Start);
+            Assert.Equal(First, segment.Text);
+            Assert.False(mic.Stopped || other.Stopped);
+            Assert.Equal(segment, Assert.Single(store.ReadTranscript(id)));
+        }
+        finally { source.Stop(); }
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(clock.TimerDisposed);
+        Assert.Equal(1, gate.Calls);
+    }
+
+    [Fact]
+    public async Task Capture_fault_while_user_stop_owns_lifecycle_surfaces_after_both_tails()
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var error = new InvalidOperationException("Capture failed during user Stop");
+        var mic = new Capture { Tail = Tone(440) };
+        var other = new Capture { Tail = Tone(880) };
+        var clock = new ManualTime();
+        var source = new LiveTwoTrackSource(mic, other, timeProvider: clock);
+        // The normal Stop already owns the lifecycle lock when the capture reports its failure.
+        // Its queued fault shutdown cannot acquire the lock until normal Stop completes.
+        mic.OnStop = () => mic.Fail(error);
+        other.OnStop = () => other.Fail(new InvalidOperationException("Later failure"));
+        var seen = new List<Segment>();
+        var run = new MeetingTranscriber(new ToneEngine(), new Gate(), store).RunAsync(id, source, seen.Add, default);
+        await clock.TimerCreated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        source.Stop();
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => run.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Same(error, thrown);
+        Assert.True(mic.Stopped && other.Stopped);
+        Assert.True(clock.TimerDisposed);
+        Assert.Equal(new[] { First, Second }, seen.Select(s => s.Text));
+        Assert.Equal(seen, store.ReadTranscript(id));
+    }
+
+    [Fact]
     public async Task Live_stop_drains_both_tails_and_emits_before_stop()
     {
         using var f = new MeetingFixture();
@@ -354,6 +417,66 @@ public class MeetingTranscriberTests
         public void Dispose() { }
     }
 
+    private sealed class ObservedSource(IMeetingAudioSource source) : IMeetingAudioSource
+    {
+        public TimeSpan Watermark => source.Watermark;
+        public TaskCompletionSource PartConsumed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async IAsyncEnumerable<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> ReadAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var part in source.ReadAsync(cancellationToken))
+            {
+                yield return part;
+                // RunAsync has buffered this part and requested the next event.
+                if (part.Part.Samples.Length != 0) PartConsumed.TrySetResult();
+            }
+        }
+    }
+
+    private sealed class ManualTime : TimeProvider
+    {
+        private long _timestamp;
+        private ManualTimer? _timer;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => Interlocked.Read(ref _timestamp);
+        public TaskCompletionSource TimerCreated { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool TimerDisposed => _timer?.Disposed == true;
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            _timer = new ManualTimer(this, callback, state);
+            _timer.Change(dueTime, period);
+            TimerCreated.TrySetResult();
+            return _timer;
+        }
+        public void Advance(TimeSpan elapsed)
+        {
+            Interlocked.Add(ref _timestamp, elapsed.Ticks);
+            _timer?.Fire();
+        }
+
+        private sealed class ManualTimer(ManualTime clock, TimerCallback callback, object? state) : ITimer
+        {
+            private long _next;
+            private TimeSpan _period;
+            public bool Disposed { get; private set; }
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                if (Disposed) return false;
+                _next = dueTime == Timeout.InfiniteTimeSpan ? long.MaxValue : clock.GetTimestamp() + dueTime.Ticks;
+                _period = period;
+                return true;
+            }
+            public void Fire()
+            {
+                if (Disposed || clock.GetTimestamp() < _next) return;
+                _next = _period == Timeout.InfiniteTimeSpan ? long.MaxValue : clock.GetTimestamp() + _period.Ticks;
+                callback(state);
+            }
+            public void Dispose() => Disposed = true;
+            public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+        }
+    }
+
     private sealed class Capture : IAudioCapture
     {
         public float CurrentLevel => 0;
@@ -361,6 +484,7 @@ public class MeetingTranscriberTests
         public bool Stopped;
         public CapturedAudio Tail = CapturedAudio.Empty;
         public Exception? StopError;
+        public Action? OnStop;
         public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Action<CapturedAudio, CutReason>? _part;
         public event Action<Exception>? Failed;
@@ -369,6 +493,6 @@ public class MeetingTranscriberTests
         public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part)
         { _part = part; Ready.TrySetResult(); }
         public void Emit(CapturedAudio audio) => _part!(audio, CutReason.Pause);
-        public CapturedAudio Stop() { Stopped = true; if (StopError is not null) throw StopError; return Tail; }
+        public CapturedAudio Stop() { Stopped = true; OnStop?.Invoke(); if (StopError is not null) throw StopError; return Tail; }
     }
 }
