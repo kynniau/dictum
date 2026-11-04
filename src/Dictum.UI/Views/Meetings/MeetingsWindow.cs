@@ -20,7 +20,9 @@ internal sealed class MeetingsWindow : Window
     private readonly TextBlock _status = Ui.Text("", "caption");
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DispatcherTimer _timer;
-    private MicrophoneMeetingSource? _source;
+    private IHostMeetingSource? _source;
+    private Dictum.Audio.IAudioCapture? _pendingLoopback;
+    private bool _awaitingArrival;
     private Task? _transcription;
     private CancellationTokenSource? _recordingCancellation;
     private MeetingId? _recording;
@@ -28,6 +30,8 @@ internal sealed class MeetingsWindow : Window
     private bool _shuttingDown, _ending, _transcriptionFailed;
     private bool _exitPending;
     internal event Action? ShutdownReady;
+    private Button? _pauseButton;
+    private TextBlock? _captureState;
     private TextBlock? _elapsed;
     private ProgressBar? _meter;
     private string _search = "";
@@ -58,11 +62,19 @@ internal sealed class MeetingsWindow : Window
         {
             if (!_shuttingDown && (_recording is not null || _busy)) { e.Cancel = true; Say(PROPOSED_CloseRecording); }
         };
-        Closed += (_, _) => { _timer.Stop(); _source?.Dispose(); _lifetime.Cancel(); _lifetime.Dispose(); };
+        Closed += (_, _) => { _timer.Stop(); _source?.Dispose(); (_pendingLoopback as IDisposable)?.Dispose(); _lifetime.Cancel(); _lifetime.Dispose(); };
         ShowList();
     }
 
     internal static Button Button(string text, Action action) => Ui.Button(text, "secondary", action, name: text);
+    internal static Control DialogContent(Window dialog, params Control[] controls)
+    {
+        var content = new ScrollViewer { MaxHeight = 600, Margin = new Thickness(24), Content = Ui.Stack(16, controls) };
+        if (controls.FirstOrDefault() is { } notice) AutomationProperties.SetLiveSetting(notice, AutomationLiveSetting.Polite);
+        dialog.Opened += (_, _) => Dispatcher.UIThread.Post(() =>
+            content.GetLogicalDescendants().OfType<Button>().FirstOrDefault()?.Focus(NavigationMethod.Tab), DispatcherPriority.Background);
+        return content;
+    }
     internal static T Named<T>(T control, string name) where T : Control
     {
         AutomationProperties.SetName(control, name);
@@ -108,6 +120,7 @@ internal sealed class MeetingsWindow : Window
     internal void ShowList()
     {
         if (_recording is not null) return;
+        (_pendingLoopback as IDisposable)?.Dispose(); _pendingLoopback = null;
         var results = Ui.Stack(8);
         void Search()
         {
@@ -151,53 +164,83 @@ internal sealed class MeetingsWindow : Window
             return;
         }
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = PROPOSED_Import, AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType(PROPOSED_Import) { Patterns = ["*.wav"] }] });
+            FileTypeFilter = [new FilePickerFileType(PROPOSED_Import) { Patterns = ["*.wav", "*.mp3", "*.m4a", "*.mp4", "*.flac", "*.wma", "*.aac"] }] });
         if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) BeginImportAgreement(path);
     }
     internal void BeginImportAgreement(string path)
     {
-        if (_recording is null && !_busy && _host.Settings().Enabled) Agreement(path);
+        if (_recording is not null || _busy || !_host.Settings().Enabled) return;
+        if (!_host.ImportsEnabled())
+        {
+            Screen(Ui.Heading(APPROVED_EnableImportsTitle), Ui.Text(APPROVED_EnableImportsBody),
+                Ui.Row(8, Button(APPROVED_Cancel, ShowList), Button(APPROVED_EnableImports, () =>
+                {
+                    try { _host.EnableImports(); if (_host.ImportsEnabled()) Agreement(path); }
+                    catch { Say(PROPOSED_Error); }
+                })));
+            return;
+        }
+        Agreement(path);
     }
     internal void BeginAgreement() { if (_recording is null && !_busy && _host.Settings().Enabled) Agreement(null); }
     private void Agreement(string? importPath)
     {
         var importing = importPath is not null;
-        var how = Named(new ComboBox { ItemsSource = importing
-            ? new[] { PLACEHOLDER_Spoken, PLACEHOLDER_Written, PLACEHOLDER_Platform }
-            : new[] { PLACEHOLDER_Spoken, PLACEHOLDER_Written }, SelectedIndex = 0 }, PLACEHOLDER_How);
+        (_pendingLoopback as IDisposable)?.Dispose(); _pendingLoopback = null;
+        if (!importing) _pendingLoopback = _host.LoopbackCapture();
+        var how = Named(new ComboBox { ItemsSource = new[] { APPROVED_Spoken, APPROVED_Written }, SelectedIndex = 0 }, APPROVED_How);
         var settings = _host.Settings();
-        var summaryRoute = settings.SummaryEngine switch { SummaryEngine.Ollama => PLACEHOLDER_Ollama, SummaryEngine.OwnKey => PLACEHOLDER_OwnKey, _ => PLACEHOLDER_Local };
-        summaryRoute = (_host.CloudSpeechHost() is { } speechHost ? string.Format(PLACEHOLDER_CloudSpeech, speechHost)
-            : PLACEHOLDER_LocalSpeech) + Environment.NewLine + summaryRoute;
-        var retention = settings.KeepAudio == KeepAudio.Forever ? PLACEHOLDER_KeepForever
-            : string.Format(PLACEHOLDER_KeepDays, settings.KeepAudio == KeepAudio.Days30 ? 30 : 90);
-        var acknowledge = Button(importing ? PLACEHOLDER_Import : PLACEHOLDER_Start, () => _ = Work(async () =>
+        var speechHostAtNotice = _host.CloudSpeechHost();
+        var summaryHostAtNotice = _host.SummaryHost();
+        var summaryRoute = settings.SummaryEngine switch { SummaryEngine.Ollama => APPROVED_Ollama, SummaryEngine.OwnKey => string.Format(APPROVED_OwnKey, summaryHostAtNotice ?? PROPOSED_UnconfiguredProvider), _ => APPROVED_Local };
+        if (settings.SummaryEngine == SummaryEngine.Ollama && summaryHostAtNotice is not null)
+            summaryRoute += Environment.NewLine + string.Format(PROPOSED_SummaryHost, summaryHostAtNotice);
+        summaryRoute = (speechHostAtNotice is { } speechHost ? string.Format(APPROVED_CloudSpeech, speechHost)
+            : APPROVED_LocalSpeech) + Environment.NewLine + summaryRoute;
+        var retention = settings.KeepAudio == KeepAudio.Forever ? APPROVED_KeepForever
+            : string.Format(APPROVED_KeepDays, settings.KeepAudio == KeepAudio.Days30 ? 30 : 90);
+        var script = string.Join("\n\n", importing ? APPROVED_ImportAgreement : APPROVED_Agreement,
+            importing ? "" : (_pendingLoopback is null ? APPROVED_CaptureMicrophone : APPROVED_CaptureSystem),
+            importing ? "" : APPROVED_Uses, APPROVED_Access, summaryRoute, retention, APPROVED_ConfirmationNote);
+        var acknowledge = Button(importing ? APPROVED_Import : APPROVED_Start, () => _ = Work(async () =>
         {
             if (!_host.Settings().Enabled) { ShowList(); return; }
+            if (_host.Settings() != settings || _host.CloudSpeechHost() != speechHostAtNotice || _host.SummaryHost() != summaryHostAtNotice)
+            { Agreement(importPath); return; }
+            if (importing && !_host.ImportsEnabled()) { BeginImportAgreement(importPath!); return; }
             var agreement = new Agreement(DateTimeOffset.UtcNow,
-                how.SelectedIndex switch { 1 => "written", 2 => "platform-announced", _ => "spoken" }, "PLACEHOLDER-L6-v1",
+                how.SelectedIndex == 1 ? "written" : "spoken", ApprovedScriptVersion,
                 importing ? AgreementKind.Import : AgreementKind.Live);
             if (importing)
             {
                 var id = await _host.Import(importPath!, agreement, _lifetime.Token);
+                try { _host.SaveConfirmation(id, new(agreement.How, agreement.AcknowledgedAt, agreement.Kind,
+                    agreement.ScriptVersion, script, Environment.UserName)); }
+                catch { _host.Store.Delete(id); throw; }
                 ShowMeeting(id);
                 await _host.Regenerate(id, _host.Settings().SummaryTemplate, _lifetime.Token);
                 ShowMeeting(id);
             }
-            else StartRecording(agreement);
+            else StartRecording(agreement, script);
         }));
-        Screen(Ui.Heading(importing ? PLACEHOLDER_BeforeImport : PLACEHOLDER_Before),
-            Ui.Card(Ui.Stack(8, Ui.Text(importing ? PLACEHOLDER_ImportAgreement : PLACEHOLDER_Agreement), Ui.Text(summaryRoute), Ui.Text(retention), Ui.Text(importing ? "" : PROPOSED_AudioUntilStop))),
-            Ui.Text(PLACEHOLDER_How), how, Button(PLACEHOLDER_Refused, TakeNotes), Ui.Row(8, Button(PROPOSED_Cancel, ShowList), acknowledge));
+        Screen(Ui.Heading(importing ? APPROVED_BeforeImport : APPROVED_Before),
+            Ui.Card(Ui.Stack(8, Ui.Text(script), Ui.Text(importing ? "" : APPROVED_AudioUntilStop))),
+            Ui.Text(APPROVED_How), how, Button(APPROVED_Refused, TakeNotes), Ui.Row(8, Button(APPROVED_Cancel, ShowList), acknowledge));
     }
 
     private void TakeNotes()
     {
         var notes = Named(new TextBox { AcceptsReturn = true, MinHeight = 180, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, PROPOSED_Notes);
-        Screen(Ui.Heading(PROPOSED_Notes), Ui.Text(PROPOSED_NotesText), notes,
-            Ui.Row(8, Button(PROPOSED_Cancel, ShowList), Button(PROPOSED_SaveNotes, () => _ = Work(() =>
+        Screen(Ui.Heading(PROPOSED_Notes), Ui.Text(_recording is null ? PROPOSED_NotesText : APPROVED_RefusalNotes), notes,
+            Ui.Row(8, Button(_recording is null ? APPROVED_Cancel : PROPOSED_Discard, () => { if (_recording is null) ShowList(); else ConfirmDiscard(); }), Button(PROPOSED_SaveNotes, () => _ = Work(async () =>
             {
-                if (string.IsNullOrWhiteSpace(notes.Text)) return Task.CompletedTask;
+                if (string.IsNullOrWhiteSpace(notes.Text)) return;
+                if (_recording is { } existing)
+                {
+                    _host.Store.AppendSegments(existing, [new Segment(_source!.Elapsed, _source.Elapsed, Channel.Mixed, notes.Text)]);
+                    await StopRecording(false);
+                    return;
+                }
                 var meta = new MeetingMeta(MeetingId.New(), PROPOSED_Notes, DateTimeOffset.UtcNow,
                     TimeSpan.Zero, MeetingSource.Recorded, null, [], [], false, null, null);
                 try
@@ -207,12 +250,11 @@ internal sealed class MeetingsWindow : Window
                     ShowMeeting(id);
                 }
                 catch { Rollback(meta); throw; }
-                return Task.CompletedTask;
             }))));
         notes.Focus(NavigationMethod.Tab);
     }
 
-    private void StartRecording(Agreement agreement)
+    private void StartRecording(Agreement agreement, string script)
     {
         var meta = new MeetingMeta(MeetingId.New(), PROPOSED_Meetings, agreement.AcknowledgedAt, TimeSpan.Zero,
             MeetingSource.Recorded, agreement, [], [], false, null, null);
@@ -220,6 +262,7 @@ internal sealed class MeetingsWindow : Window
         {
             var id = _host.Store.Create(meta);
             _recording = id;
+            _host.SaveConfirmation(id, new(agreement.How, agreement.AcknowledgedAt, agreement.Kind, agreement.ScriptVersion, script));
             _transcriptionFailed = false;
             var lines = Named(Ui.Text(""), PROPOSED_Live);
             AutomationProperties.SetLiveSetting(lines, AutomationLiveSetting.Polite);
@@ -227,15 +270,20 @@ internal sealed class MeetingsWindow : Window
             AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
             var elapsed = Named(Ui.Text(""), PROPOSED_Elapsed);
             var meter = Named(new ProgressBar { Minimum = 0, Maximum = 1, Height = 16 }, PROPOSED_You);
-            _source = new(_host.Capture(), _host.MicrophoneDevice(), _host.SilenceThreshold());
+            _source = _pendingLoopback is { } system
+                ? new TwoTrackMeetingSource(_host.Capture(), system, _host.MicrophoneDevice(), _host.SilenceThreshold())
+                : new MicrophoneMeetingSource(_host.Capture(), _host.MicrophoneDevice(), _host.SilenceThreshold());
+            _pendingLoopback = null;
             _source.Failed += error => Dispatcher.UIThread.Post(() => _ = Work(async () => { await StopRecording(false); Say(PROPOSED_Error); }));
             _source.Start();
             var source = _source;
             var pause = Button(PROPOSED_Pause, () => { });
+            _pauseButton = pause; _captureState = state;
             pause.Click += (_, _) =>
             {
                 try
                 {
+                    if (_awaitingArrival) { ShowJoined(); return; }
                     if (_paused) _source.Resume(); else _source.Pause();
                     _paused = !_paused;
                     pause.Content = _paused ? PROPOSED_Resume : PROPOSED_Pause;
@@ -245,12 +293,12 @@ internal sealed class MeetingsWindow : Window
                 }
                 catch { Say(PROPOSED_Error); }
             };
-            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(PROPOSED_MicOnly), Ui.Text(PROPOSED_AudioUntilStop),
-                Ui.Text(string.Format(PLACEHOLDER_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())), state, elapsed,
+            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(_source.Tracks.Count == 2 ? APPROVED_CaptureSystem : APPROVED_MicOnly), Ui.Text(APPROVED_AudioUntilStop),
+                Ui.Text(string.Format(APPROVED_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())), state, elapsed,
                 Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_You), meter)), Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Live), lines)),
                 Ui.Row(8, Button(PROPOSED_Mark, () => { _host.Store.AddMarker(id, new(_source.Elapsed, MarkerKind.Moment)); Say(PROPOSED_Marked); }),
                     Button(PROPOSED_Joined, ShowJoined), pause),
-                Ui.Row(8, Button(PROPOSED_Discard, ConfirmDiscard), Button(PROPOSED_Stop, () => _ = Work(() => StopRecording(false)))));
+                Ui.Row(8, Button(APPROVED_Refused, RefuseRecording), Button(PROPOSED_Discard, ConfirmDiscard), Button(PROPOSED_Stop, () => _ = Work(() => StopRecording(false)))));
             _elapsed = elapsed;
             _meter = meter;
             _timer.Start();
@@ -278,7 +326,7 @@ internal sealed class MeetingsWindow : Window
         if (stored is null || (stored.StartedAt == meta.StartedAt && stored.Title == meta.Title)) _host.Store.Delete(meta.Id);
     }
 
-    private async Task ObserveTranscription(Task transcription, MicrophoneMeetingSource source)
+    private async Task ObserveTranscription(Task transcription, IHostMeetingSource source)
     {
         try { await transcription; }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
@@ -299,23 +347,75 @@ internal sealed class MeetingsWindow : Window
     private void ConfirmDiscard() => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Discard,
         () => _ = Work(() => StopRecording(true)));
 
+    private void RefuseRecording()
+    {
+        if (_recording is not { } id || _source is null) return;
+        StopCapture();
+        Exception? failure = null;
+        try { _host.SaveConfirmation(id, new("refused", DateTimeOffset.UtcNow, AgreementKind.Live, ApprovedScriptVersion, APPROVED_RefusalNotes)); }
+        catch (Exception error) { failure = error; }
+        TakeNotes();
+        if (failure is not null) Say(PROPOSED_Error);
+    }
+
     private void ShowJoined()
     {
+        if (_source is not { } source || _recording is not { } id) return;
+        source.Pause();
+        _paused = true; _awaitingArrival = true;
+        UpdatePauseState();
+        Say(PROPOSED_Paused);
+        var answered = false;
+        void Answer(string answer)
+        {
+            _host.SaveConfirmation(id, new(answer, DateTimeOffset.UtcNow, AgreementKind.Live, ApprovedScriptVersion, APPROVED_Joined));
+            answered = true;
+        }
         var dialog = new Window { Title = PROPOSED_Joined, Width = 520, SizeToContent = SizeToContent.Height, CanResize = false };
-        dialog.Content = new Border { Padding = new Thickness(24), Child = Ui.Stack(16, Ui.Text(PLACEHOLDER_Joined),
-            Button(PROPOSED_Cancel, dialog.Close), Button(PROPOSED_Discard, () => { dialog.Close(); ConfirmDiscard(); }),
-            Button(PLACEHOLDER_Continue, () =>
+        dialog.Closed += (_, _) =>
+        {
+            if (!answered) { try { Answer("unconfirmed"); } catch { Say(PROPOSED_Error); } }
+        };
+        dialog.Content = DialogContent(dialog, Ui.Text(APPROVED_Joined),
+            Button(APPROVED_Cancel, () => { Answer("unconfirmed"); dialog.Close(); }),
+            Button(PROPOSED_Discard, () => { Answer("discard-requested"); dialog.Close(); ConfirmDiscard(); }),
+            Button(APPROVED_Refused, () =>
             {
-                if (_recording is { } id && _source is { } source) _host.Store.AddMarker(id, new(source.Elapsed, MarkerKind.Joined));
+                StopCapture();
+                try { Answer("refused"); } catch { Say(PROPOSED_Error); }
                 dialog.Close();
-            })) };
+                TakeNotes();
+            }),
+            Button(APPROVED_Continue, () =>
+            {
+                try
+                {
+                    Answer("agreed");
+                    _host.Store.AddMarker(id, new(source.Elapsed, MarkerKind.Joined));
+                    source.Resume();
+                    _awaitingArrival = false; _paused = false;
+                    UpdatePauseState();
+                    Say(PROPOSED_Recording);
+                    dialog.Close();
+                }
+                catch { Say(PROPOSED_Error); }
+            }));
         _ = dialog.ShowDialog(this);
+    }
+    private void UpdatePauseState()
+    {
+        if (_pauseButton is not null)
+        {
+            _pauseButton.Content = _paused ? PROPOSED_Resume : PROPOSED_Pause;
+            AutomationProperties.SetName(_pauseButton, _paused ? PROPOSED_Resume : PROPOSED_Pause);
+        }
+        if (_captureState is not null) _captureState.Text = _paused ? PROPOSED_Paused : PROPOSED_Recording;
     }
     private void Confirm(string message, string accept, Action action)
     {
         var dialog = new Window { Title = accept, Width = 500, SizeToContent = SizeToContent.Height, CanResize = false };
-        dialog.Content = new Border { Padding = new Thickness(24), Child = Ui.Stack(16, Ui.Text(message),
-            Ui.Row(8, Button(PROPOSED_Cancel, dialog.Close), Button(accept, () => { dialog.Close(); action(); }))) };
+        dialog.Content = DialogContent(dialog, Ui.Text(message),
+            Ui.Row(8, Button(APPROVED_Cancel, dialog.Close), Button(accept, () => { dialog.Close(); action(); })));
         _ = dialog.ShowDialog(this);
     }
     private void StopCapture()
@@ -342,7 +442,7 @@ internal sealed class MeetingsWindow : Window
     private void ReleaseRecording()
     {
         _source?.Dispose(); _source = null; _recording = null; _paused = false;
-        _transcription = null; _ending = false;
+        _transcription = null; _ending = false; _awaitingArrival = false;
         _recordingCancellation?.Dispose(); _recordingCancellation = null;
     }
 
@@ -364,8 +464,7 @@ internal sealed class MeetingsWindow : Window
             if (discard) _host.Store.Delete(id);
             else
             {
-                using var audio = _source.Audio();
-                _host.Store.WriteAudio(id, Channel.You, audio);
+                SaveTracks(id, _source);
                 _host.Finish(id, _source.Elapsed);
             }
         }
@@ -397,8 +496,7 @@ internal sealed class MeetingsWindow : Window
             {
                 StopCapture();
                 DrainTranscription().GetAwaiter().GetResult();
-                using var audio = source.Audio();
-                _host.Store.WriteAudio(id, Channel.You, audio);
+                SaveTracks(id, source);
                 _host.Finish(id, source.Elapsed);
             }
             ReleaseRecording();
@@ -411,6 +509,15 @@ internal sealed class MeetingsWindow : Window
             _exitPending = true;
             PresentSaveFailure();
             return false;
+        }
+    }
+
+    private void SaveTracks(MeetingId id, IHostMeetingSource source)
+    {
+        foreach (var channel in source.Tracks)
+        {
+            using var audio = source.Audio(channel);
+            _host.Store.WriteAudio(id, channel, audio);
         }
     }
 
@@ -434,13 +541,13 @@ internal sealed class MeetingsWindow : Window
         var summaryCard = Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Summary), template,
                 Button(PROPOSED_Regenerate, () => _ = Work(async () => { await _host.Regenerate(id, TemplateIds[template.SelectedIndex], _lifetime.Token); ShowMeeting(id); })),
                 Ui.Text(summary is null ? PROPOSED_NoSummary : MeetingsHost.Caption(summary.Engine), "caption"), Ui.Text(summary?.Markdown ?? "")));
-        var record = meta.Agreement is { } agreement ? Ui.Text(string.Format(PLACEHOLDER_Record,
-            agreement.Kind == AgreementKind.Live ? PLACEHOLDER_LiveKind : PLACEHOLDER_ImportKind, agreement.AcknowledgedAt.ToLocalTime(),
-            agreement.How switch { "written" => PLACEHOLDER_Written, "platform-announced" => PLACEHOLDER_Platform, _ => PLACEHOLDER_Spoken })) : Ui.Text(PROPOSED_NotesText);
+        var record = meta.Agreement is { } agreement ? Ui.Text(string.Format(APPROVED_Record,
+            agreement.Kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind, agreement.AcknowledgedAt.ToLocalTime(),
+            agreement.How switch { "written" => APPROVED_Written, "platform-announced" => PROPOSED_Platform, _ => APPROVED_Spoken })) : Ui.Text(PROPOSED_NotesText);
         Screen(Ui.Row(8, Button(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title),
             Ui.Text(string.Format(PROPOSED_ListRow, meta.Title, meta.StartedAt.ToLocalTime(), meta.Duration, _host.Store.SizeOf(id))),
             Ui.Columns(2, 16, transcriptCard, Ui.Stack(12, summaryCard, Ui.Card(record, PROPOSED_Record))),
-            Ui.Row(8, Button(PROPOSED_Export, () => _ = Work(async () =>
+            Ui.Row(8, Button(PROPOSED_Export, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = Work(async () =>
             {
                 var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = PROPOSED_Export, DefaultExtension = "md" });
                 if (file is null) return;
@@ -448,7 +555,7 @@ internal sealed class MeetingsWindow : Window
                 stream.SetLength(0);
                 await using var writer = new StreamWriter(stream);
                 await writer.WriteAsync(_host.Export(id)); Say(PROPOSED_Saved);
-            })), Button(PROPOSED_Copy, () => { _host.Copy(_host.Export(id)); Say(PROPOSED_Copied); }),
+            }))), Button(PROPOSED_Copy, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => { _host.Copy(_host.Export(id)); Say(PROPOSED_Copied); })),
                 Button(PROPOSED_Delete, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Delete, () => { _host.Store.Delete(id); ShowList(); }))));
     }
     private static string FormatSegment(Segment segment) => string.Format(PROPOSED_Segment, segment.Start,

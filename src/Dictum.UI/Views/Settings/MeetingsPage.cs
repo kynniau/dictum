@@ -14,7 +14,7 @@ internal sealed class MeetingsPage : SettingsPage
     private readonly ToggleSwitch _enabled;
     private readonly TextBlock _folder = Ui.Text("");
     private readonly ComboBox _retention = MeetingsWindow.Named(new ComboBox { ItemsSource = new[] { PROPOSED_Forever, PROPOSED_Days30, PROPOSED_Days90 } }, PROPOSED_Retention);
-    private readonly ComboBox _engine = MeetingsWindow.Named(new ComboBox { ItemsSource = new[] { PROPOSED_LocalEngine, PROPOSED_OllamaEngine, PROPOSED_OwnKeyEngine } }, PROPOSED_Engine);
+    private readonly ComboBox _engine = MeetingsWindow.Named(new ComboBox { ItemsSource = new[] { APPROVED_LocalEngine, APPROVED_OllamaEngine, APPROVED_OwnKeyEngine } }, PROPOSED_Engine);
     private readonly ComboBox _template = MeetingsWindow.Named(new ComboBox { ItemsSource = PROPOSED_TemplateNames }, PROPOSED_Template);
     private readonly StackPanel _warning;
     private int _warningVersion;
@@ -28,25 +28,25 @@ internal sealed class MeetingsPage : SettingsPage
             if (!on) { Write(("meetings.enabled", Json(false))); return; }
             var dialog = new Window { Title = PROPOSED_Enable, Width = 500, SizeToContent = SizeToContent.Height };
             dialog.Closed += (_, _) => Refresh();
-            dialog.Content = Ui.Stack(16, Ui.Text(PLACEHOLDER_Enable), MeetingsWindow.Button(PROPOSED_Cancel, () => { dialog.Close(); Refresh(); }),
-                MeetingsWindow.Button(PROPOSED_Enable, () => { Write(("meetings.enabled", Json(true))); dialog.Close(); Refresh(); }));
+            dialog.Content = MeetingsWindow.DialogContent(dialog, Ui.Text(APPROVED_Enable), Ui.Text(APPROVED_Disclaimer), MeetingsWindow.Button(APPROVED_Cancel, () => { dialog.Close(); Refresh(); }),
+                MeetingsWindow.Button(APPROVED_EnableConfirm, () => { Write(("meetings.enabled", Json(true))); dialog.Close(); Refresh(); }));
             if (TopLevel.GetTopLevel(this) is Window owner) _ = dialog.ShowDialog(owner);
         });
         _retention.SelectionChanged += (_, _) => { if (_retention.SelectedIndex >= 0) Write(("meetings.keep_audio", Json(((KeepAudio)_retention.SelectedIndex).ToString()))); };
         _engine.SelectionChanged += (_, _) => { if (_engine.SelectedIndex >= 0) Write(("meetings.summary_engine", Json(((SummaryEngine)_engine.SelectedIndex).ToString()))); };
         _template.SelectionChanged += (_, _) => { if (_template.SelectedIndex >= 0) Write(("meetings.summary_template", Json(TemplateIds[_template.SelectedIndex]))); };
-        _warning = Ui.Stack(8, Ui.Text(PROPOSED_DriveWarning), MeetingsWindow.Button(PROPOSED_Dismiss, () =>
+        _warning = Ui.Stack(8, Ui.Text(APPROVED_DriveWarning), MeetingsWindow.Button(APPROVED_Dismiss, () =>
         {
             try { _host.DismissWarning(); _warning!.IsVisible = false; }
             catch { Say(PROPOSED_Error); }
         }));
         AutomationProperties.SetLiveSetting(_warning, AutomationLiveSetting.Polite);
         _warning.IsVisible = false;
-        Compose(Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Enable, _enabled), Ui.Text(PLACEHOLDER_Enable), Ui.Text(PROPOSED_Protection))),
+        Compose(Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Enable, _enabled), Ui.Text(APPROVED_Enable), Ui.Text(APPROVED_Protection))),
             Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_Folder), _folder, Ui.Text(PROPOSED_FolderNote, "caption"), MeetingsWindow.Button(PROPOSED_Change, () => _ = ChangeFolder()),
                 Ui.Line(PROPOSED_Retention, _retention))),
-            _warning, Ui.Text(PROPOSED_MicOnly), Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Engine, _engine),
-                Ui.Text(PROPOSED_ConfigureSummary, "caption"), Ui.Line(PROPOSED_Template, _template))),
+            _warning, Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Engine, _engine),
+                Ui.Text(APPROVED_EngineNote), Ui.Text(PROPOSED_ConfigureSummary, "caption"), Ui.Line(PROPOSED_Template, _template))),
             MeetingsWindow.Button(PROPOSED_Existing, () => shell.OpenMeetings()));
     }
     protected override void Redraw()
@@ -66,9 +66,9 @@ internal sealed class MeetingsPage : SettingsPage
         {
             if (_host.WarningDismissed()) return;
             var encrypted = await _host.DriveEncrypted(folder);
-            if (version == _warningVersion) _warning.IsVisible = encrypted == false && !_host.WarningDismissed();
+            if (version == _warningVersion) _warning.IsVisible = encrypted != true && !_host.WarningDismissed();
         }
-        catch { _warning.IsVisible = false; }
+        catch { if (version == _warningVersion) _warning.IsVisible = !_host.WarningDismissed(); }
     }
     private async Task ChangeFolder()
     {

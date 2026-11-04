@@ -35,9 +35,13 @@ public sealed partial class AppShell
     internal MeetingsHost CreateMeetingsHost() => MeetingsHost.Create(Paths, () => MeetingsSettings, Platform.Credentials,
         new MeetingTranscriberFactory(cancellation => _speech.GetAsync(cancellation), _voiceGates.Get,
             () => _settings.SilenceThreshold, Personal.Text.Dictionary),
-        () => Platform.CreateCapture(_log), MeetingSummaryClient, CopyText) with
+        () => Platform.CreateCapture(_log), MeetingSummaryClient, CopyText, Platform.AudioDecoder) with
         {
             Log = _log,
+            LoopbackCapture = () => Platform.CreateLoopbackCapture(_log),
+            SummaryHost = () => _settings.Llm.Provider == LlmSettings.Anthropic
+                ? new Uri(AnthropicLlmClient.DefaultBaseUrl).Host
+                : CloudPolicy.CloudHost(_settings.Llm) ?? CloudPolicy.LocalServerHost(_settings.Llm),
             MicrophoneDevice = () => _settings.Audio.Device,
             SilenceThreshold = () => _settings.SilenceThreshold,
             CloudSpeechHost = () => _speech.SendsAudio ? _speech.Host : null,
