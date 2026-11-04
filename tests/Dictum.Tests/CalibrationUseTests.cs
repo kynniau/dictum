@@ -321,8 +321,8 @@ public class CalibrationUseTests
 
     /// <summary>
     /// Pin 9 (privacy, lens major 1): while cloud speech sends each recording to a service, the line does not say Dictum uses the
-    /// model (the service hears dictation; the model is the fallback). It says what was saved and uses the owner's APPROVED words
-    /// for the fallback (Settings > Models, 22/10/2026 18:41 AEDT), byte for byte.
+    /// model (the service hears dictation; the model is the fallback). It says the owner's APPROVED sentence (04/11/2026 22:48 AEDT,
+    /// GPT 6.1 sol's wording from the two-model check), byte for byte, with the real host.
     /// </summary>
     [Fact]
     public Task Use_this_while_cloud_speech_is_on_does_not_claim_the_model_hears_dictation() => UiSession.Run(() =>
@@ -335,9 +335,8 @@ public class CalibrationUseTests
         Click(Row(window, $"Use {BaseGreedy}"));
 
         var lines = Texts(window).Split('\n');
-        Assert.Contains("Saved: base.en (greedy) is the speech model on this PC; with cloud speech on, speech.example.com does this and the model here is the fallback.", lines);
+        Assert.Contains("Saved: base.en (greedy) is now the fallback. Cloud speech is on, so each recording is sent to speech.example.com to turn your voice into words; Dictum uses this model only if the cloud request fails.", lines);
         Assert.DoesNotContain("Dictum now uses", Texts(window));
-        Assert.Equal("with cloud speech on, speech.example.com does this and the model here is the fallback", CalibrationWindow.CloudFallbackClause(SpeechHost));
         window.Close();
         shell.Dispose();
     });

@@ -193,7 +193,7 @@ internal sealed partial class CalibrationWindow
 
     /// <summary>
     /// The button's name: as it always was ("Use small.en with greedy (recommended)"); on the row in use the state replaces the verb
-    /// ("small.en with greedy (recommended): in use"). PROPOSED (not yet approved) 04/11/2026: approve-calibration-use.md row 4.
+    /// ("small.en with greedy (recommended): in use"). APPROVED 04/11/2026 22:49 AEDT (owner): do not reword (approve-calibration-use.md row 4).
     /// </summary>
     private static string UseName(ComboResult combo, bool best, bool inUse)
     {
@@ -202,26 +202,18 @@ internal sealed partial class CalibrationWindow
     }
 
     /// <summary>
-    /// The status line after Use this took effect. PROPOSED (not yet approved) 04/11/2026, approve-calibration-use.md rows 1 to 3 (in row 3 only the frame is proposed):
-    /// local, a new model ("loads": the hotkey is ignored until it has); local, the same model with other decoding (nothing loads);
-    /// cloud speech on, where the audio goes to <paramref name="cloudHost"/> and the model here is only the fallback, so no claim that
-    /// it hears dictation, and the clause about the fallback is the owner's APPROVED wording, taken from the sentence itself.
+    /// The status line after Use this took effect. approve-calibration-use.md rows 1 to 3. Local, a new model or one still loading ("loads": the hotkey is ignored until it
+    /// has) and local, the same model with other decoding (nothing loads), are APPROVED 04/11/2026 22:49 AEDT (owner): do not reword.
+    /// Cloud speech on, where the audio goes to <paramref name="cloudHost"/> and the model here is only the fallback, so no claim that
+    /// it hears dictation, is APPROVED 04/11/2026 22:48 AEDT (row 3, below).
     /// </summary>
     internal static string UsingLine(ComboResult combo, bool loads, string? cloudHost)
     {
         var model = $"{combo.Model} ({combo.Decoding})";
-        if (cloudHost is not null) return $"Saved: {model} is the speech model on this PC; {CloudFallbackClause(cloudHost)}."; // PROPOSED frame, row 3
-        return loads ? $"Dictum now uses {model} from the next dictation, once the model has loaded." : $"Dictum now uses {model} from the next dictation."; // PROPOSED, rows 1 and 2
-    }
-
-    /// <summary>
-    /// "with cloud speech on, {host} does this and the model here is the fallback": APPROVED 22/10/2026 18:41 AEDT (owner), the second
-    /// half of <see cref="ModelsPage.SpeechIntroCloudSentence"/>, cut from it so the words cannot drift from the approved ones.
-    /// </summary>
-    internal static string CloudFallbackClause(string host)
-    {
-        var sentence = ModelsPage.SpeechIntroCloudSentence(host);
-        return sentence[(sentence.IndexOf("; ", StringComparison.Ordinal) + 2)..].TrimEnd('.');
+        // APPROVED 04/11/2026 22:48 AEDT (owner; GPT 6.1 sol's wording from the two-model check, .demo-preview/two-model-calibration-cloud-line.md): do not reword.
+        if (cloudHost is not null)
+            return $"Saved: {model} is now the fallback. Cloud speech is on, so each recording is sent to {cloudHost} to turn your voice into words; Dictum uses this model only if the cloud request fails.";
+        return loads ? $"Dictum now uses {model} from the next dictation, once the model has loaded." : $"Dictum now uses {model} from the next dictation."; // APPROVED 04/11/2026 22:49 AEDT (owner): do not reword (rows 1 and 2)
     }
 
     private void AddCells(int row, Control[] cells)
