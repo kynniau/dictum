@@ -111,6 +111,9 @@ public sealed class MeetingSummaryTests
     [InlineData("min")]
     [InlineData("20")]
     [InlineData("dozen")]
+    [InlineData("didn't")]
+    [InlineData("won’t")]
+    [InlineData("cannot")]
     public void Figure_context_checks_three_words_in_both_directions(string context)
     {
         const string reply = "- \"500 dollars\" [00:00 You]";
@@ -157,6 +160,10 @@ public sealed class MeetingSummaryTests
     [InlineData("once")]
     [InlineData("several")]
     [InlineData("multiple")]
+    [InlineData("doubled")]
+    [InlineData("tripled")]
+    [InlineData("halved")]
+    [InlineData("tenfold")]
     public void Quantity_words_require_checked_quotes(string quantity)
     {
         Assert.Null(SummaryValidator.Validate("- " + quantity, Transcript(quantity), General, "Local").Ok);

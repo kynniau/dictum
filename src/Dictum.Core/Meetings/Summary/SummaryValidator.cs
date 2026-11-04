@@ -11,7 +11,8 @@ public static class SummaryValidator
     // a trigger is retained, so an unfamiliar format cannot evade validation.
     private const string NumberWords = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety";
     private const string OrdinalWords = "first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth twentieth twenty-first twenty-second twenty-third twenty-fourth twenty-fifth twenty-sixth twenty-seventh twenty-eighth twenty-ninth thirtieth thirty-first";
-    private const string QuantityWords = "dozen dozens score gross pair couple twice thrice double triple quadruple half halves quarter quarters single once several multiple";
+    private const string QuantityWords = "dozen dozens score gross pair couple twice thrice double triple quadruple half halves quarter quarters single once several multiple " +
+        "doubled doubles doubling tripled triples tripling quadrupled quadruples quadrupling halved halving [a-z]+fold";
     private static readonly string CurrencyCodes = string.Join("|", CultureInfo.GetCultures(CultureTypes.SpecificCultures)
         .Select(culture => new RegionInfo(culture.Name).ISOCurrencySymbol).Distinct());
     private static readonly Regex Html = new(@"<[\p{L}/]|&(?:[a-z][a-z0-9]*|\#[^;\s]*);",
@@ -30,9 +31,10 @@ public static class SummaryValidator
         """(?:"(?<text>[^"]+)"|\u201c(?<text>[^\u201c\u201d]+)\u201d)[ \t]+\[(?<time>(?:[0-9]+:[0-5][0-9]|[0-9]{2,}):[0-5][0-9]) (?<channel>You|Others|Mixed)\]""",
         RegexOptions.CultureInvariant);
     private static readonly Regex QuoteSpan = new("\"[^\"]*\"|\u201c[^\u201c\u201d]*\u201d", RegexOptions.CultureInvariant);
-    private static readonly Regex ContextWords = new(@"[\p{L}\p{N}]+|[-\u2013\u2212]", RegexOptions.CultureInvariant);
+    // A contraction stays one word, so "didn't" is seen whole as a negation.
+    private static readonly Regex ContextWords = new(@"[\p{L}\p{N}]+(?:['\u2019][\p{L}]+)*|[-\u2013\u2212]", RegexOptions.CultureInvariant);
     private static readonly Regex Qualifier = new(
-        @"^(?:to|through|-|and|or|per|not|no|never|none|up|at|least|most|about|around|approximately|roughly|under|over|below|above|less|more|than|between|nearly|almost|only|maximum|minimum|max|min)$",
+        @"^(?:to|through|-|and|or|per|not|no|never|none|cannot|without|up|at|least|most|about|around|approximately|roughly|under|over|below|above|less|more|than|between|nearly|almost|only|maximum|minimum|max|min|\p{L}+n['\u2019]t)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex Continuation = new(
         @"[\p{N}\p{Sc}%\u2030\u2031]|\b(?:kg|mg|g|km|cm|mm|metres?|meters?|miles?|litres?|liters?|hours?|minutes?|seconds?|days?|weeks?|months?|years?|millions?|billions?|trillions?|thousands?|hundreds?|bps|basis|points?|degrees?|ounces?|tonnes?|tons?|feet|inches|kilograms?|milligrams?|grams?|kilometres?|kilometers?|kilowatts?|watts?|mph|kph|Australian|US|Canadian|New Zealand)\b",
