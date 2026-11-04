@@ -88,6 +88,8 @@ internal sealed class FakePlatform(AppPaths paths) : IPlatform
         Captures.Add(capture);
         return capture;
     }
+    public IAudioCapture? CreateLoopbackCapture(ILog log) => null;
+    public IAudioDecoder AudioDecoder { get; } = new Dictum.Meetings.Import.WavOnlyDecoder();
     /// <summary>The microphones the system lists; one by default.</summary>
     public List<AudioDeviceInfo> Devices { get; } = [new("id-1", "Test microphone", true)];
     /// <summary>Listing the microphones throws, as the Windows device list does with the audio service stopped.</summary>
