@@ -7,148 +7,189 @@ using NAudio.Wave;
 namespace Dictum.Windows.Audio;
 
 /// <summary>Default render endpoint, independent of the dictation microphone.</summary>
-public sealed class LoopbackCapture(ILog log) : ITimestampedCapture, IDisposable
+public sealed class LoopbackCapture : ITimestampedCapture, IDisposable
 {
-    private readonly object _sync = new();
-    private readonly object _lifecycle = new();
-    private WasapiLoopbackCapture? _capture;
-    private MMDeviceEnumerator? _enumerator;
-    private MMDevice? _device;
+    private readonly ILog _log;
+    private readonly Func<string?, ILoopbackCaptureSource> _factory;
+    private readonly Action<Action> _queue;
+    private readonly Func<TimeSpan>? _now;
+    private readonly object _sync = new(), _lifecycle = new();
+    private ILoopbackCaptureSource? _capture;
+    private EventHandler<WaveInEventArgs>? _data;
+    private EventHandler<StoppedEventArgs>? _stopped;
+    private ManualResetEventSlim? _drained;
     private Timer? _timer;
     private Stopwatch? _clock;
     private LoopbackAudioBuffer? _audio;
-    private TimeSpan _origin;
+    private readonly List<byte[]> _packets = new();
+    private TimeSpan _lastArrival;
+    private long _packetFrames;
     private int _rate, _align;
-    private bool _running, _followDefault;
-    private int _failed;
+    private long _generation;
+    private bool _running, _stopping, _failed, _recordingStarted, _anchored;
+    private TimeSpan Now => _now?.Invoke() ?? _clock!.Elapsed;
     public event Action<Exception>? Failed;
     public float CurrentLevel { get { lock (_sync) return _audio?.CurrentLevel ?? 0; } }
-    public CaptureProgress Progress { get { lock (_sync) return _audio?.Progress ?? new(CaptureActivity.Silent, TimeSpan.Zero); } }
+    public CaptureProgress Progress
+    {
+        get
+        {
+            lock (_sync)
+            {
+                var progress = _audio?.Progress ?? new(CaptureActivity.Silent, TimeSpan.Zero);
+                // Idle progress need not commit zeros that a later drain could cover. Buffered speech
+                // still pins the watermark; leave a packet grace before advancing an empty track.
+                if (_running && _packets.Count == 0 && _audio is not null && progress.PendingStart >= _audio.End)
+                {
+                    var idle = Now - TimeSpan.FromMilliseconds(250);
+                    if (idle > progress.PendingStart) return new(CaptureActivity.Silent, idle);
+                }
+                return progress;
+            }
+        }
+    }
+
+    public LoopbackCapture(ILog log) : this(log, setting => new DefaultLoopbackSource(setting)) { }
+    internal LoopbackCapture(ILog log, Func<string?, ILoopbackCaptureSource> factory,
+        Func<TimeSpan>? now = null, Action<Action>? queue = null)
+    {
+        _log = log; _factory = factory; _now = now;
+        _queue = queue ?? (work => ThreadPool.QueueUserWorkItem(_ => work()));
+    }
 
     public void Start(string? deviceSetting, long keyDownStamp) => Start(deviceSetting, Stopwatch.StartNew());
-
     public void Start(string? deviceSetting, Stopwatch sessionClock)
     {
         lock (_lifecycle)
         {
             DisposeDevice();
+            var generation = ++_generation;
             try
             {
-                _enumerator = new MMDeviceEnumerator();
-                _followDefault = string.IsNullOrWhiteSpace(deviceSetting);
-                _device = _followDefault
-                    ? _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)
-                    : _enumerator.GetDevice(deviceSetting);
-                _capture = new WasapiLoopbackCapture(_device);
+                _capture = _factory(deviceSetting);
                 var format = _capture.WaveFormat;
+                _drained = new ManualResetEventSlim();
                 lock (_sync)
                 {
                     _clock = sessionClock;
-                    _origin = sessionClock.Elapsed;
-                    _rate = format.SampleRate;
-                    _align = format.BlockAlign;
-                    _audio = new LoopbackAudioBuffer(format, _origin);
-                    _failed = 0;
-                    _running = true;
+                    _rate = format.SampleRate; _align = format.BlockAlign;
+                    _audio = new LoopbackAudioBuffer(format, Now);
+                    _packets.Clear(); _packetFrames = 0;
+                    _failed = _stopping = _anchored = false; _running = true;
                 }
-                _capture.DataAvailable += OnData;
-                _capture.RecordingStopped += OnStopped;
+                var drained = _drained;
+                _data = (_, args) => OnData(generation, args);
+                _stopped = (_, args) =>
+                {
+                    drained.Set();
+                    lock (_sync)
+                    {
+                        if (generation != _generation) return;
+                        if (args.Exception is { } error) ReportFailure(generation, error);
+                        else if (!_stopping) ReportFailure(generation, new InvalidOperationException("The output capture stopped unexpectedly."));
+                    }
+                };
+                _capture.DataAvailable += _data;
+                _capture.RecordingStopped += _stopped;
                 _capture.StartRecording();
-                _timer = new Timer(_ => Pulse(), null, 100, 100);
-                log.Info($"Loopback started: {format.SampleRate} Hz, {format.Channels} channels.");
+                _recordingStarted = true;
+                if (_now is null) _timer = new Timer(_ => Pulse(generation), null, 100, 100);
+                _log.Info($"Loopback started: {format.SampleRate} Hz, {format.Channels} channels.");
             }
-            catch
-            {
-                DisposeDevice();
-                throw;
-            }
+            catch { DisposeDevice(); throw; }
         }
     }
 
-    private void OnData(object? sender, WaveInEventArgs args)
+    private void OnData(long generation, WaveInEventArgs args)
     {
         try
         {
             lock (_sync)
             {
-                if (!_running) return;
+                if (generation != _generation || !_running || _failed) return;
                 var frames = args.BytesRecorded / _align;
-                // simplification: legacy WasapiLoopbackCapture exposes no packet QPC positions. Place packets at
-                // callback time minus duration, bounded by already synthesised audio; retire with a QPC-capable loopback API.
-                FillSilence(_clock!.Elapsed - TimeSpan.FromSeconds(frames / (double)_rate));
-                var packetStart = _clock!.Elapsed - TimeSpan.FromSeconds(frames / (double)_rate);
-                if (packetStart < _origin) packetStart = _origin;
-                _audio!.Append(args.Buffer.AsSpan(0, frames * _align), packetStart);
+                if (frames == 0) return;
+                var arrival = Now;
+                if (_packets.Count != 0 && arrival - _lastArrival > TimeSpan.FromMilliseconds(250)) FlushPackets();
+                // simplification: retain at most ten minutes before a consumer attaches or the pulse drains packets.
+                if (_packetFrames + frames > _rate * 600L)
+                    throw new InvalidOperationException("Loopback retained audio exceeded the ten minute limit.");
+                _packets.Add(args.Buffer.AsSpan(0, frames * _align).ToArray());
+                _packetFrames += frames;
+                _lastArrival = arrival;
             }
         }
-        catch (Exception ex) { ReportFailure(ex); }
+        catch (Exception ex) { ReportFailure(generation, ex); }
     }
 
-    private void Pulse()
+    private void FlushPackets()
+    {
+        if (_packets.Count == 0) return;
+        // NAudio supplies no QPC packet position. Batch packets before comparing the
+        // clock with the sample-count end, so all packets in a wake-up cover their own time first.
+        var start = _lastArrival - TimeSpan.FromSeconds(_packetFrames / (double)_rate);
+        if (!_anchored)
+        {
+            _audio!.Anchor(start);
+            _anchored = true;
+        }
+        if (start - _audio!.End > TimeSpan.FromMilliseconds(250)) _audio.FillSilence(start);
+        foreach (var packet in _packets) _audio.Append(packet);
+        _packets.Clear(); _packetFrames = 0;
+    }
+
+    internal void Pulse() => Pulse(_generation);
+    private void Pulse(long generation)
     {
         try
         {
-            // Poll endpoint identity off the audio thread. Disappearance and a new default both end this session.
             lock (_lifecycle)
             {
-                if (_capture is null) return;
-                if (_followDefault)
-                {
-                    using var current = _enumerator!.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-                    if (current.ID != _device!.ID)
-                        throw new InvalidOperationException("The default output device changed.");
-                }
-                if (_device!.State != DeviceState.Active)
-                    throw new InvalidOperationException("The output device vanished or became unavailable.");
-                lock (_sync)
-                {
-                    // Leave one endpoint buffer for late packets before filling an absent packet with silence.
-                    // simplification: a fixed 200 ms packet grace bounds silence synthesis latency; retire after device latency measurements.
-                    if (_running) FillSilence(_clock!.Elapsed - TimeSpan.FromMilliseconds(200));
-                }
+                if (generation != _generation || _capture is null) return;
+                _capture.CheckDevice();
+                lock (_sync) { if (_running && !_failed) FlushPackets(); }
             }
         }
-        catch (Exception ex) { ReportFailure(ex); }
+        catch (Exception ex) { ReportFailure(generation, ex); }
     }
 
-    private void FillSilence(TimeSpan through) => _audio!.FillSilence(through);
-
-    private void OnStopped(object? sender, StoppedEventArgs args)
+    private void ReportFailure(long generation, Exception error)
     {
-        if (args.Exception is { } error) ReportFailure(error);
-        else if (Volatile.Read(ref _running)) ReportFailure(new InvalidOperationException("The output capture stopped unexpectedly."));
-    }
-
-    private void ReportFailure(Exception error)
-    {
-        if (Interlocked.Exchange(ref _failed, 1) != 0) return;
-        log.Error($"Loopback stopped: {error.GetType().Name}: {error.Message}");
-        // Stop away from NAudio's callback thread, which Dispose may join.
-        ThreadPool.QueueUserWorkItem(_ =>
+        lock (_sync)
         {
-            lock (_lifecycle) DisposeDevice();
-            Failed?.Invoke(error);
+            if (generation != _generation || _failed) return;
+            _failed = true;
+        }
+        _log.Error($"Loopback stopped: {error.GetType().Name}: {error.Message}");
+        _queue(() =>
+        {
+            lock (_lifecycle)
+            {
+                if (generation != _generation) return;
+                DisposeDevice();
+                Failed?.Invoke(error);
+            }
         });
     }
 
     public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part) =>
         SegmentAtPauses(silenceThreshold, (audio, reason, _) => part(audio, reason));
-
     public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason, TimeSpan> part)
-    {
-        lock (_sync) _audio?.SegmentAtPauses(silenceThreshold, part);
-    }
-
+    { lock (_sync) _audio?.SegmentAtPauses(silenceThreshold, part); }
     public CapturedAudio Stop() => StopTimestamped().Part;
-
     public (CapturedAudio Part, TimeSpan Offset) StopTimestamped()
     {
         lock (_lifecycle)
         {
+            var boundary = _clock is null ? TimeSpan.Zero : Now;
             DisposeDevice();
             lock (_sync)
             {
-                if (_audio is not null && _clock is not null && _failed == 0) FillSilence(_clock.Elapsed);
+                if (_audio is not null && !_failed)
+                {
+                    FlushPackets();
+                    _audio.FillSilence(boundary);
+                }
                 return _audio?.Seal() ?? (CapturedAudio.Empty, TimeSpan.Zero);
             }
         }
@@ -156,31 +197,76 @@ public sealed class LoopbackCapture(ILog log) : ITimestampedCapture, IDisposable
 
     private void DisposeDevice()
     {
-        _timer?.Dispose();
-        _timer = null;
-        lock (_sync) _running = false;
+        _timer?.Dispose(); _timer = null;
         var capture = _capture;
-        _capture = null;
-        if (capture is not null)
+        if (capture is null) return;
+        lock (_sync) _stopping = true;
+        // StopRecording is asynchronous. DataAvailable remains attached and running until the last
+        // packet and RecordingStopped, before we fill any missing tail at the saved stop boundary.
+        try
         {
-            capture.DataAvailable -= OnData;
-            capture.RecordingStopped -= OnStopped;
-            try { capture.StopRecording(); }
-            catch (Exception ex) { log.Debug($"Loopback stop: {ex.GetType().Name}"); }
-            try { capture.Dispose(); }
-            catch (Exception ex) { log.Debug($"Loopback release: {ex.GetType().Name}"); }
+            capture.StopRecording();
+            if (_recordingStarted && !_drained!.Wait(TimeSpan.FromSeconds(2)))
+                _log.Error("Loopback drain timed out after 2 seconds waiting for RecordingStopped; detaching callbacks and filling the missing tail.");
         }
-        try { _device?.Dispose(); }
-        catch (Exception ex) { log.Debug($"Loopback endpoint release: {ex.GetType().Name}"); }
-        _device = null;
-        try { _enumerator?.Dispose(); }
-        catch (Exception ex) { log.Debug($"Loopback enumerator release: {ex.GetType().Name}"); }
-        _enumerator = null;
+        finally
+        {
+            lock (_sync) _running = false;
+            capture.DataAvailable -= _data;
+            capture.RecordingStopped -= _stopped;
+            _capture = null;
+            _recordingStarted = false;
+            capture.Dispose();
+            // Keep the signal alive for a callback already in flight; it is collected with its session.
+            _drained = null;
+        }
     }
-
     public void Dispose() { lock (_lifecycle) DisposeDevice(); }
 }
 
+internal interface ILoopbackCaptureSource : IDisposable
+{
+    WaveFormat WaveFormat { get; }
+    event EventHandler<WaveInEventArgs>? DataAvailable;
+    event EventHandler<StoppedEventArgs>? RecordingStopped;
+    void StartRecording();
+    void StopRecording();
+    void CheckDevice();
+}
+
+internal sealed class DefaultLoopbackSource : ILoopbackCaptureSource
+{
+    private readonly MMDeviceEnumerator _enumerator = new();
+    private readonly MMDevice _device;
+    private readonly WasapiLoopbackCapture _capture;
+    private readonly bool _followDefault;
+    public DefaultLoopbackSource(string? setting)
+    {
+        try
+        {
+            _followDefault = string.IsNullOrWhiteSpace(setting);
+            _device = _followDefault ? _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia) : _enumerator.GetDevice(setting);
+            try { _capture = new WasapiLoopbackCapture(_device); }
+            catch { _device.Dispose(); throw; }
+        }
+        catch { _enumerator.Dispose(); throw; }
+    }
+    public WaveFormat WaveFormat => _capture.WaveFormat;
+    public event EventHandler<WaveInEventArgs>? DataAvailable { add => _capture.DataAvailable += value; remove => _capture.DataAvailable -= value; }
+    public event EventHandler<StoppedEventArgs>? RecordingStopped { add => _capture.RecordingStopped += value; remove => _capture.RecordingStopped -= value; }
+    public void StartRecording() => _capture.StartRecording();
+    public void StopRecording() => _capture.StopRecording();
+    public void CheckDevice()
+    {
+        if (_followDefault)
+        {
+            using var current = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            if (current.ID != _device.ID) throw new InvalidOperationException("The default output device changed.");
+        }
+        if (_device.State != DeviceState.Active) throw new InvalidOperationException("The output device vanished or became unavailable.");
+    }
+    public void Dispose() { try { _capture.Dispose(); } finally { _device.Dispose(); _enumerator.Dispose(); } }
+}
 /// <summary>Managed streaming decode/downmix/resample path shared with microphone capture.
 /// Quiet blocks are delivered too, so an idle track remains continuous without holding speech behind it.</summary>
 internal sealed class LoopbackAudioBuffer
@@ -189,7 +275,7 @@ internal sealed class LoopbackAudioBuffer
     private readonly int _channels, _inputRate, _align;
     private long _inputFrames;
     private readonly MonoResampler _resampler;
-    private readonly TimeSpan _origin;
+    private TimeSpan _origin;
     private readonly List<float> _pending = new();
     private readonly float[] _block = new float[CaptureBuffer.BlockSamples];
     private int _blockCount;
@@ -203,6 +289,7 @@ internal sealed class LoopbackAudioBuffer
     private bool _sealed;
     private CaptureActivity _activity = CaptureActivity.Silent;
     public float CurrentLevel { get; private set; }
+    public TimeSpan End => _origin + TimeSpan.FromTicks(_inputFrames * TimeSpan.TicksPerSecond / _inputRate);
     private TimeSpan Start
     {
         get
@@ -224,6 +311,11 @@ internal sealed class LoopbackAudioBuffer
         _origin = origin;
     }
 
+    public void Anchor(TimeSpan at)
+    {
+        if (_inputFrames == 0 && at > _origin) _origin = at;
+    }
+
     public void SegmentAtPauses(double threshold, Action<CapturedAudio, CutReason, TimeSpan> part)
     {
         if (_part is not null || _sealed) return;
@@ -243,18 +335,19 @@ internal sealed class LoopbackAudioBuffer
         while (_inputFrames < target)
         {
             var count = (int)Math.Min(zeros.Length / _align, target - _inputFrames);
-            Append(zeros.AsSpan(0, count * _align),
-                _origin + TimeSpan.FromTicks(_inputFrames * TimeSpan.TicksPerSecond / _inputRate));
+            Append(zeros.AsSpan(0, count * _align));
         }
     }
 
     public void Append(ReadOnlySpan<byte> raw, TimeSpan? packetStart = null)
     {
         if (_sealed) return;
+        // simplification: bound pre-segmentation and retained speech to ten minutes at 16 kHz.
+        if (_pending.Count + raw.Length / _align * 16000L / _inputRate > 16000L * 600)
+            throw new InvalidOperationException("Loopback retained audio exceeded the ten minute limit.");
+        // Explicit anchors are monotonic; the capture normally uses only the contiguous sample clock.
+        if (packetStart is { } at) _anchors.Add((_receivedSamples, at < End ? End : at));
         _inputFrames += raw.Length / _align;
-        // Anchor each packet to the session clock; sample counts locate boundaries within that packet only.
-        // This prevents device-rate drift from accumulating over a long meeting.
-        if (packetStart is { } at) _anchors.Add((_receivedSamples, at));
         var decoded = new float[raw.Length / SampleDecoder.BytesPerSample(_encoding)];
         var count = SampleDecoder.Decode(raw, _encoding, decoded);
         var mono = new float[count / _channels];
@@ -301,7 +394,7 @@ internal sealed class LoopbackAudioBuffer
         var offset = Start;
         _pending.RemoveRange(0, count);
         _firstSample += count;
-        _lastStart = offset;
+        _lastStart = offset + TimeSpan.FromTicks(count * 625L);
         while (_anchors.Count > 1 && _anchors[1].Sample <= _firstSample) _anchors.RemoveAt(0);
         _part!(new CapturedAudio(samples, Peak(samples)), reason, offset);
     }

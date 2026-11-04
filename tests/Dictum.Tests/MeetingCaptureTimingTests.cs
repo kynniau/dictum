@@ -11,6 +11,21 @@ public class MeetingCaptureTimingTests
     private static CapturedAudio Audio => new(new float[1600], .2f);
 
     [Fact]
+    public async Task Tiny_retention_limit_fails_explicitly_and_reaches_the_transcriber()
+    {
+        using var fixture = new MeetingFixture();
+        var store = fixture.Store(); var id = store.Create(fixture.Meta());
+        var mic = new TimedCapture(); var other = new TimedCapture();
+        var source = new LiveTwoTrackSource(mic, other, maxQueuedAudio: TimeSpan.FromMilliseconds(50));
+        var run = new MeetingTranscriber(new Engine(), new Gate(), store).RunAsync(id, source,
+            _ => { }, TestContext.Current.CancellationToken);
+        mic.Emit(Audio, TimeSpan.Zero);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => run.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Contains("retention limit", error.Message);
+        Assert.True(mic.Stopped && other.Stopped);
+    }
+
+    [Fact]
     public async Task Reported_starts_and_stop_tails_override_callback_time()
     {
         var clock = new ManualClock();

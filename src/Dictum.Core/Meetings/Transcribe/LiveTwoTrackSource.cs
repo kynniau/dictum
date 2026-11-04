@@ -7,7 +7,7 @@ namespace Dictum.Meetings.Transcribe;
 /// <summary>Starts both devices on enumeration. Stop completes normally, including both capture tails.</summary>
 public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture system,
     double silenceThreshold = 0.01, string? microphoneDevice = null, string? systemDevice = null,
-    TimeProvider? timeProvider = null) : IMeetingAudioSource
+    TimeProvider? timeProvider = null, TimeSpan? maxQueuedAudio = null) : IMeetingAudioSource
 {
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
     private long _startedAt;
@@ -20,7 +20,12 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
     private readonly object _sync = new();
     private readonly object _lifecycle = new();
     private readonly System.Threading.Channels.Channel<(Channel Channel, CapturedAudio Part, TimeSpan Offset)?> _parts =
-        System.Threading.Channels.Channel.CreateUnbounded<(Channel, CapturedAudio, TimeSpan)?>();
+        // simplification: cap queued audio at ten minutes (both tracks combined) and 30,000 parts.
+        // Fail on overflow instead of blocking the capture callback or discarding a part.
+        System.Threading.Channels.Channel.CreateBounded<(Channel, CapturedAudio, TimeSpan)?>(30000);
+    private readonly TimeSpan _maxQueuedAudio = maxQueuedAudio ?? TimeSpan.FromMinutes(10);
+    private TimeSpan _queuedAudio;
+    private bool _overflow;
     private readonly TimeSpan[] _latest = [TimeSpan.MinValue, TimeSpan.MinValue];
     private readonly Queue<TimeSpan>[] _pending = [new(), new()];
     private static readonly TimeSpan LongestPart = TimeSpan.FromMilliseconds(SpeechSegmenter.LimitBlocks * SpeechSegmenter.BlockMs);
@@ -58,6 +63,7 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
                     {
                         _latest[part.Channel == Channel.You ? 0 : 1] = part.Offset;
                         _pending[part.Channel == Channel.You ? 0 : 1].Dequeue();
+                        _queuedAudio -= part.Part.Duration;
                     }
                     else _tickPending = false;
                     var idle = TimeSpan.Zero;
@@ -116,6 +122,7 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
         var systemProgress = _timestamped ? ((ITimestampedCapture)system).Progress : default;
         lock (_sync)
         {
+            if (_failure is not null) return;
             if (Volatile.Read(ref _stopped) != 0 || _tickPending) return;
             if (_timestamped) { _progress[0] = micProgress; _progress[1] = systemProgress; }
             _tickPending = _parts.Writer.TryWrite(null);
@@ -127,6 +134,7 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
         if (part.Samples.Length == 0) return;
         lock (_sync)
         {
+            if (_overflow) return;
             var offset = reportedStart ?? LegacyOffset();
             TimeSpan LegacyOffset()
             {
@@ -136,7 +144,16 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
                 return estimate < _published[track] ? _published[track] : estimate;
             }
             _published[track] = offset;
-            if (_parts.Writer.TryWrite((channel, part, offset))) _pending[track].Enqueue(offset);
+            if (_queuedAudio + part.Duration > _maxQueuedAudio || !_parts.Writer.TryWrite((channel, part, offset)))
+            {
+                var error = new InvalidOperationException("Meeting queued audio exceeded the retention limit.");
+                _overflow = true;
+                _parts.Writer.TryComplete(error);
+                Failed(error);
+                return;
+            }
+            _queuedAudio += part.Duration;
+            _pending[track].Enqueue(offset);
         }
     }
 

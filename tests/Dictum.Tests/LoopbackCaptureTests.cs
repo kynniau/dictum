@@ -20,13 +20,19 @@ public class LoopbackCaptureTests
     [Fact]
     public void Platform_seams_create_loopback_and_existing_decoders_without_opening_devices()
     {
+        TestEnv.WindowsOnly("Constructs WindowsPlatform and its Windows services.");
         using var windows = new WindowsPlatform();
         using var loopback = Assert.IsType<LoopbackCapture>(windows.CreateLoopbackCapture(NullLog.Instance));
         Assert.IsType<MediaFoundationDecoder>(windows.AudioDecoder);
+        Assert.IsAssignableFrom<ITimestampedCapture>(loopback);
+    }
+
+    [Fact]
+    public void Mac_platform_seam_is_constructible_without_native_audio()
+    {
         using var mac = new Dictum.Mac.MacPlatform();
         Assert.Null(mac.CreateLoopbackCapture(NullLog.Instance));
         Assert.IsType<Dictum.Meetings.Import.WavOnlyDecoder>(mac.AudioDecoder);
-        Assert.IsAssignableFrom<ITimestampedCapture>(loopback);
     }
 
     [Fact]
@@ -131,6 +137,7 @@ public class LoopbackCaptureTests
     [Fact]
     public async Task Real_default_output_produces_continuous_audio()
     {
+        TestEnv.WindowsOnly("Plays a generated tone through the default Windows output.");
         Assert.SkipUnless(Environment.GetEnvironmentVariable("DICTUM_DEVICE_TESTS") == "1" &&
             string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CI")) &&
             string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TF_BUILD")) &&
@@ -138,8 +145,210 @@ public class LoopbackCaptureTests
         using var capture = new LoopbackCapture(NullLog.Instance);
         var clock = Stopwatch.StartNew();
         capture.Start(null, clock);
+        var pcm = new byte[48000 * 2];
+        for (var i = 0; i < 48000; i++)
+            BitConverter.TryWriteBytes(pcm.AsSpan(i * 2), (short)(8000 * Math.Sin(2 * Math.PI * 1000 * i / 48000)));
+        using var stream = new MemoryStream(pcm);
+        using var tone = new RawSourceWaveStream(stream, new WaveFormat(48000, 16, 1));
+        using var output = new WasapiOut();
+        output.Init(tone);
+        output.Play();
         await Task.Delay(1000, TestContext.Current.CancellationToken);
+        output.Stop();
         var audio = capture.StopTimestamped();
         Assert.InRange(audio.Part.Duration.TotalSeconds, .7, 1.5);
+        var energies = Enumerable.Range(0, audio.Part.Samples.Length / 1600)
+            .Select(i => (Tone: Energy(audio.Part.Samples, i * 1600, 1000), Other: Energy(audio.Part.Samples, i * 1600, 700))).ToArray();
+        Assert.Contains(energies, energy => energy.Tone > .0001 && energy.Tone > energy.Other * 10);
+    }
+
+    private static double Energy(float[] samples, int start, int frequency)
+    {
+        double real = 0, imaginary = 0;
+        for (var i = 0; i < 1600; i++)
+        {
+            var phase = 2 * Math.PI * frequency * i / 16000;
+            real += samples[start + i] * Math.Cos(phase);
+            imaginary += samples[start + i] * Math.Sin(phase);
+        }
+        return (real * real + imaginary * imaginary) / (1600 * 1600);
+    }
+
+    [Fact]
+    public void Batched_packets_tile_and_a_real_one_second_gap_adds_only_missing_silence()
+    {
+        var now = TimeSpan.Zero;
+        var device = new FakeSource();
+        using var capture = new LoopbackCapture(NullLog.Instance, _ => device, () => now);
+        capture.Start(null, new Stopwatch());
+        var seen = new List<(CapturedAudio Part, TimeSpan Offset)>();
+        capture.SegmentAtPauses(.01, (audio, _, offset) => seen.Add((audio, offset)));
+        now = TimeSpan.FromMilliseconds(50);
+        for (var i = 0; i < 5; i++) device.Emit(160, .25f);
+        capture.Pulse();
+        // Another wake-up batches five 10 ms packets, with 10 ms of scheduling jitter.
+        // The short discrepancy must not insert silence between the speech batches.
+        now = TimeSpan.FromMilliseconds(110);
+        for (var i = 0; i < 5; i++) device.Emit(160, .5f);
+        capture.Pulse();
+        now = TimeSpan.FromMilliseconds(1110);
+        device.Emit(160, .25f);
+        capture.Pulse();
+        seen.Add(capture.StopTimestamped());
+        var samples = seen.SelectMany(part => part.Part.Samples).ToArray();
+        Assert.Equal(17760, samples.Length);
+        Assert.All(samples.Take(800), sample => Assert.Equal(.25f, sample));
+        Assert.All(samples.Skip(800).Take(800), sample => Assert.Equal(.5f, sample));
+        Assert.All(samples.Skip(1600).Take(16000), sample => Assert.Equal(0, sample));
+        Assert.All(samples.Skip(17600), sample => Assert.Equal(.25f, sample));
+        var end = TimeSpan.Zero;
+        foreach (var part in seen.Where(part => part.Part.Samples.Length > 0))
+        { Assert.Equal(end, part.Offset); end += part.Part.Duration; }
+    }
+
+    [Fact]
+    public async Task Stop_preserves_packets_delivered_before_recording_stopped()
+    {
+        var now = TimeSpan.Zero;
+        var device = new FakeSource { AutoStop = false };
+        using var capture = new LoopbackCapture(NullLog.Instance, _ => device, () => now);
+        capture.Start(null, new Stopwatch());
+        now = TimeSpan.FromMilliseconds(50);
+        var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        device.OnStop = () => stopping.TrySetResult();
+        var stop = Task.Run(capture.StopTimestamped);
+        try
+        {
+            await stopping.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            // StopRecording has returned, but RecordingStopped has deliberately not fired.
+            await Task.WhenAny(stop, Task.Delay(100));
+            for (var i = 0; i < 5; i++) device.Emit(160, .25f);
+        }
+        finally { device.CompleteStop(); }
+        var audio = await stop.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(800, audio.Part.Samples.Length);
+        Assert.All(audio.Part.Samples, sample => Assert.Equal(.25f, sample));
+        Assert.True(device.Disposed);
+    }
+
+    [Fact]
+    public void Old_generation_data_and_failure_callbacks_do_not_reach_the_restarted_capture()
+    {
+        var first = new FakeSource();
+        var second = new FakeSource();
+        var devices = new Queue<FakeSource>([first, second]);
+        var work = new Queue<Action>();
+        var now = TimeSpan.Zero;
+        using var capture = new LoopbackCapture(NullLog.Instance, _ => devices.Dequeue(), () => now, work.Enqueue);
+        var failures = new List<Exception>();
+        capture.Failed += failures.Add;
+        capture.Start(null, new Stopwatch());
+        // Retain delegates as if the first device had callbacks already in flight when detached.
+        var oldData = first.DataCallback!;
+        var oldStopped = first.StoppedCallback!;
+        capture.Stop();
+        capture.Start(null, new Stopwatch());
+        now = TimeSpan.FromMilliseconds(10);
+        var stalePacket = new byte[160 * sizeof(float)];
+        for (var i = 0; i < 160; i++) BitConverter.TryWriteBytes(stalePacket.AsSpan(i * 4), .75f);
+        oldData(first, new WaveInEventArgs(stalePacket, stalePacket.Length));
+        oldStopped(first, new StoppedEventArgs(new InvalidOperationException("Old device failure")));
+        oldStopped(first, new StoppedEventArgs());
+        while (work.TryDequeue(out var action)) action();
+        Assert.Empty(work);
+        Assert.Empty(failures);
+        Assert.False(second.Disposed);
+        second.Emit(160, .25f);
+        var audio = capture.Stop();
+        Assert.Equal(160, audio.Samples.Length);
+        Assert.All(audio.Samples, sample => Assert.Equal(.25f, sample));
+    }
+
+    [Fact]
+    public async Task Stop_times_out_without_recording_stopped_and_fills_only_missing_tail()
+    {
+        var now = TimeSpan.Zero;
+        var device = new FakeSource { AutoStop = false };
+        var log = new DrainLog();
+        using var capture = new LoopbackCapture(log, _ => device, () => now);
+        capture.Start(null, new Stopwatch());
+        now = TimeSpan.FromMilliseconds(50);
+        device.Emit(800, .25f);
+        capture.Pulse();
+        now = TimeSpan.FromMilliseconds(100);
+        var elapsed = Stopwatch.StartNew();
+        var stop = Task.Run(capture.StopTimestamped);
+        (CapturedAudio Part, TimeSpan Offset) audio;
+        try { audio = await stop.WaitAsync(TimeSpan.FromSeconds(4)); }
+        finally
+        {
+            // Release the worker even if an unbounded-wait regression fails the test.
+            device.CompleteStop();
+            await stop.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        Assert.InRange(elapsed.Elapsed, TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(4));
+        Assert.Contains(log.Errors, message => message.Contains("timed out") && message.Contains("RecordingStopped"));
+        Assert.True(device.Disposed);
+        Assert.Null(device.DataCallback);
+        Assert.Null(device.StoppedCallback);
+        Assert.Equal(TimeSpan.Zero, audio.Offset);
+        Assert.Equal(1600, audio.Part.Samples.Length);
+        Assert.All(audio.Part.Samples.Take(800), sample => Assert.Equal(.25f, sample));
+        Assert.All(audio.Part.Samples.Skip(800), sample => Assert.Equal(0, sample));
+    }
+
+    [Fact]
+    public void Stale_failure_cleanup_and_callbacks_cannot_dispose_a_new_session()
+    {
+        var first = new FakeSource(); var second = new FakeSource();
+        var devices = new Queue<FakeSource>([first, second]);
+        var work = new Queue<Action>();
+        using var capture = new LoopbackCapture(NullLog.Instance, _ => devices.Dequeue(), () => TimeSpan.Zero, work.Enqueue);
+        var failures = new List<Exception>();
+        capture.Failed += failures.Add;
+        capture.Start(null, new Stopwatch());
+        var stale = first.StoppedCallback;
+        first.Fail();
+        capture.Stop();
+        capture.Start(null, new Stopwatch());
+        stale!(first, new StoppedEventArgs(new InvalidOperationException("Stale failure")));
+        while (work.TryDequeue(out var action)) action();
+        Assert.False(second.Disposed);
+        Assert.Empty(failures);
+        second.Emit(160, .25f);
+        Assert.Equal(160, capture.Stop().Samples.Length);
+    }
+
+    private sealed class DrainLog : ILog
+    {
+        public List<string> Errors { get; } = new();
+        public void Write(LogLevel level, string message)
+        {
+            if (level == LogLevel.Error) Errors.Add(message);
+        }
+    }
+
+    private sealed class FakeSource : ILoopbackCaptureSource
+    {
+        public WaveFormat WaveFormat => WaveFormat.CreateIeeeFloatWaveFormat(16000, 1);
+        public event EventHandler<WaveInEventArgs>? DataAvailable;
+        public event EventHandler<StoppedEventArgs>? RecordingStopped;
+        public EventHandler<WaveInEventArgs>? DataCallback => DataAvailable;
+        public EventHandler<StoppedEventArgs>? StoppedCallback => RecordingStopped;
+        public bool AutoStop = true;
+        public Action? OnStop;
+        public bool Disposed;
+        public void Emit(int frames, float value)
+        {
+            var raw = new byte[frames * sizeof(float)];
+            for (var i = 0; i < frames; i++) BitConverter.TryWriteBytes(raw.AsSpan(i * 4), value);
+            DataAvailable?.Invoke(this, new WaveInEventArgs(raw, raw.Length));
+        }
+        public void Fail() => RecordingStopped?.Invoke(this, new StoppedEventArgs(new InvalidOperationException("Synthetic failure")));
+        public void StartRecording() { }
+        public void CompleteStop() => RecordingStopped?.Invoke(this, new StoppedEventArgs());
+        public void StopRecording() { OnStop?.Invoke(); if (AutoStop) CompleteStop(); }
+        public void CheckDevice() { }
+        public void Dispose() => Disposed = true;
     }
 }
