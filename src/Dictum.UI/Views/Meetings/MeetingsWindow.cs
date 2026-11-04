@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using Dictum.Core;
 using Dictum.Meetings;
 using Dictum.Meetings.Summaries;
+using Dictum.Meetings.Store;
 using static Dictum.UI.Views.Meetings.MeetingsText;
 
 namespace Dictum.UI.Views.Meetings;
@@ -224,7 +225,7 @@ internal sealed class MeetingsWindow : Window
             else StartRecording(agreement, script);
         }));
         Screen(Ui.Heading(importing ? APPROVED_BeforeImport : APPROVED_Before),
-            Ui.Card(Ui.Stack(8, Ui.Text(script), Ui.Text(importing ? "" : APPROVED_AudioUntilStop))),
+            Ui.Card(Ui.Stack(8, Ui.Text(script))),
             Ui.Text(APPROVED_How), how, Button(APPROVED_Refused, TakeNotes), Ui.Row(8, Button(APPROVED_Cancel, ShowList), acknowledge));
     }
 
@@ -270,11 +271,20 @@ internal sealed class MeetingsWindow : Window
             AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
             var elapsed = Named(Ui.Text(""), PROPOSED_Elapsed);
             var meter = Named(new ProgressBar { Minimum = 0, Maximum = 1, Height = 16 }, PROPOSED_You);
-            _source = _pendingLoopback is { } system
-                ? new TwoTrackMeetingSource(_host.Capture(), system, _host.MicrophoneDevice(), _host.SilenceThreshold())
-                : new MicrophoneMeetingSource(_host.Capture(), _host.MicrophoneDevice(), _host.SilenceThreshold());
+            var saving = new LiveAudioWriter(_host.Store, id, _pendingLoopback is null ? [Channel.You] : [Channel.You, Channel.Others]);
+            try
+            {
+                _source = _pendingLoopback is { } system
+                    ? new TwoTrackMeetingSource(_host.Capture(), system, _host.MicrophoneDevice(), _host.SilenceThreshold(), saving)
+                    : new MicrophoneMeetingSource(_host.Capture(), _host.MicrophoneDevice(), _host.SilenceThreshold(), saving);
+            }
+            catch { saving.Dispose(); throw; }
             _pendingLoopback = null;
-            _source.Failed += error => Dispatcher.UIThread.Post(() => _ = Work(async () => { await StopRecording(false); Say(PROPOSED_Error); }));
+            _source.Failed += error => Dispatcher.UIThread.Post(() => _ = Work(async () =>
+            {
+                if (error is AudioSaveException) { StopCapture(); await DrainTranscription(); ShowSaveFailure(); }
+                else { await StopRecording(false); Say(PROPOSED_Error); }
+            }));
             _source.Start();
             var source = _source;
             var pause = Button(PROPOSED_Pause, () => { });
@@ -293,7 +303,7 @@ internal sealed class MeetingsWindow : Window
                 }
                 catch { Say(PROPOSED_Error); }
             };
-            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(_source.Tracks.Count == 2 ? APPROVED_CaptureSystem : APPROVED_MicOnly), Ui.Text(APPROVED_AudioUntilStop),
+            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(_source.Tracks.Count == 2 ? APPROVED_CaptureSystem : APPROVED_MicOnly),
                 Ui.Text(string.Format(APPROVED_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())), state, elapsed,
                 Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_You), meter)), Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Live), lines)),
                 Ui.Row(8, Button(PROPOSED_Mark, () => { _host.Store.AddMarker(id, new(_source.Elapsed, MarkerKind.Moment)); Say(PROPOSED_Marked); }),
@@ -461,7 +471,7 @@ internal sealed class MeetingsWindow : Window
             StopCapture();
             await DrainTranscription();
             if (_shuttingDown) return;
-            if (discard) _host.Store.Delete(id);
+            if (discard) { _source.Dispose(); _host.Store.Delete(id); }
             else
             {
                 SaveTracks(id, _source);
@@ -514,11 +524,7 @@ internal sealed class MeetingsWindow : Window
 
     private void SaveTracks(MeetingId id, IHostMeetingSource source)
     {
-        foreach (var channel in source.Tracks)
-        {
-            using var audio = source.Audio(channel);
-            _host.Store.WriteAudio(id, channel, audio);
-        }
+        source.CompleteAudio();
     }
 
     private void PresentSaveFailure()
@@ -544,7 +550,7 @@ internal sealed class MeetingsWindow : Window
         var record = meta.Agreement is { } agreement ? Ui.Text(string.Format(APPROVED_Record,
             agreement.Kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind, agreement.AcknowledgedAt.ToLocalTime(),
             agreement.How switch { "written" => APPROVED_Written, "platform-announced" => PROPOSED_Platform, _ => APPROVED_Spoken })) : Ui.Text(PROPOSED_NotesText);
-        Screen(Ui.Row(8, Button(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title),
+        Screen(Ui.Row(8, Button(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title), Ui.Text(meta.AudioIncomplete ? PROPOSED_AudioRecovered : ""),
             Ui.Text(string.Format(PROPOSED_ListRow, meta.Title, meta.StartedAt.ToLocalTime(), meta.Duration, _host.Store.SizeOf(id))),
             Ui.Columns(2, 16, transcriptCard, Ui.Stack(12, summaryCard, Ui.Card(record, PROPOSED_Record))),
             Ui.Row(8, Button(PROPOSED_Export, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = Work(async () =>

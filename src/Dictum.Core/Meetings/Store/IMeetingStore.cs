@@ -4,6 +4,7 @@ public interface IMeetingStore
 {
     MeetingId Create(MeetingMeta meta);
     void WriteAudio(MeetingId id, Channel channel, Stream wav16k);
+    IMeetingAudioWriter BeginAudio(MeetingId id, Channel channel) => throw new NotSupportedException("Appendable audio is required for live recording.");
     void AppendSegments(MeetingId id, IEnumerable<Segment> segments);
     void AddMarker(MeetingId id, Marker marker);
     void WriteSummary(MeetingId id, Summary summary);
@@ -18,4 +19,10 @@ public interface IMeetingStore
     long SizeOf(MeetingId id);
     void ApplyRetention(DateTimeOffset now);
     string ExportMarkdown(MeetingId id);
+}
+
+public interface IMeetingAudioWriter : IDisposable
+{
+    void Append(float[] samples);
+    void Complete();
 }

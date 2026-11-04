@@ -37,7 +37,11 @@ public record Agreement
 public enum MeetingSource { Recorded, ImportedZoom, ImportedFile }
 public record MeetingMeta(MeetingId Id, string Title, DateTimeOffset StartedAt, TimeSpan Duration,
     MeetingSource Source, Agreement? Agreement, IReadOnlyList<Marker> Markers,
-    IReadOnlyList<KeyWrap> Wraps, bool HasVideo, string? SummaryEngine, string? SummaryTemplate);
+    IReadOnlyList<KeyWrap> Wraps, bool HasVideo, string? SummaryEngine, string? SummaryTemplate)
+{
+    public IReadOnlyList<Channel> IncompleteAudioChannels { get; init; } = [];
+    public bool AudioIncomplete => IncompleteAudioChannels.Count != 0;
+}
 public record KeyWrap(string RecipientId, byte[] WrappedKey);
 public record Summary(string Markdown, string Engine, string Template, DateTimeOffset At, IReadOnlyList<ActionItem> Items);
 public record ActionItem(string Owner, string Text);

@@ -123,6 +123,7 @@ internal sealed record MeetingsHost(
         private FileMeetingStore Current() => new(root, settings() with { Folder = root }, ring, Caption);
         public MeetingId Create(MeetingMeta meta) => Current().Create(meta);
         public void WriteAudio(MeetingId id, Channel channel, Stream audio) => Current().WriteAudio(id, channel, audio);
+        public IMeetingAudioWriter BeginAudio(MeetingId id, Channel channel) => Current().BeginAudio(id, channel);
         public void AppendSegments(MeetingId id, IEnumerable<Segment> segments) => Current().AppendSegments(id, segments);
         public void AddMarker(MeetingId id, Marker marker) => Current().AddMarker(id, marker);
         public void WriteSummary(MeetingId id, Summary summary) => Current().WriteSummary(id, summary);
@@ -217,14 +218,15 @@ internal sealed class MeetingTranscriberFactory(Func<CancellationToken, Task<ITr
 }
 
 /// <summary>One microphone, with capture closed while paused. All offsets use one elapsed clock.</summary>
-internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? device, double threshold) : IHostMeetingSource
+internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? device, double threshold, LiveAudioWriter? saving = null) : IHostMeetingSource
 {
     private readonly Stopwatch _clock = new();
     private readonly object _sync = new();
     private readonly System.Threading.Channels.Channel<(Channel, CapturedAudio, TimeSpan)> _parts = System.Threading.Channels.Channel.CreateUnbounded<(Channel, CapturedAudio, TimeSpan)>();
-    // simplification: hold microphone PCM in memory until stop because WriteAudio replaces a track;
-    // retire when the store supports an appendable encrypted audio stream.
-    private readonly List<float> _audio = [];
+    // simplification: audio reaches the store when the capture cuts a part at a pause, or at the segmenter's limit
+    // (SpeechSegmenter.LimitBlocks, 30 s of unbroken speech), so a crash can lose up to that much. The device is never
+    // restarted to drain it, which would cut words. Retire when capture offers a non-destructive PCM drain.
+    private readonly object _lifecycle = new();
     private bool _active, _stopped;
     public TimeSpan Elapsed => _clock.Elapsed;
     public float Level => _active ? capture.CurrentLevel : 0;
@@ -234,17 +236,21 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
     public void Start()
     {
         capture.Failed += OnFailure;
+        if (saving is not null) saving.Failed += OnFailure;
         _clock.Start();
         Resume();
     }
     private void OnFailure(Exception error) => Failed?.Invoke(error);
     public void Resume()
     {
-        if (_stopped || _active) return;
-        _clock.Start();
-        capture.Start(device, Stopwatch.GetTimestamp());
-        _active = true;
-        capture.SegmentAtPauses(threshold, (part, _) => Publish(part));
+        lock (_lifecycle)
+        {
+            if (_stopped || _active) return;
+            _clock.Start();
+            capture.Start(device, Stopwatch.GetTimestamp());
+            _active = true;
+            capture.SegmentAtPauses(threshold, (part, _) => Publish(part));
+        }
     }
     private void Publish(CapturedAudio part)
     {
@@ -253,30 +259,35 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
         {
             var offset = Elapsed - part.Duration;
             if (offset < TimeSpan.Zero) offset = TimeSpan.Zero;
-            var required = checked((int)(offset.TotalSeconds * 16000));
-            while (_audio.Count < required) _audio.Add(0);
-            _audio.AddRange(part.Samples);
+            saving?.Enqueue(Channel.You, part.Samples, offset);
             _parts.Writer.TryWrite((Channel.You, part, offset));
         }
     }
     public void Pause()
     {
-        if (!_active) return;
-        var tail = capture.Stop();
-        _clock.Stop();
-        _active = false;
-        Publish(tail);
+        lock (_lifecycle)
+        {
+            if (!_active) return;
+            var tail = capture.Stop();
+            _clock.Stop();
+            _active = false;
+            Publish(tail);
+        }
     }
     public void Stop()
     {
-        if (_stopped) return;
-        try { Pause(); }
-        finally { _stopped = true; _clock.Stop(); _parts.Writer.TryComplete(); }
+        lock (_lifecycle)
+        {
+            if (_stopped) return;
+            try { Pause(); }
+            finally { _stopped = true; _clock.Stop(); _parts.Writer.TryComplete(); }
+        }
     }
     public IReadOnlyList<Channel> Tracks => [Channel.You];
+    public void CompleteAudio() => saving?.Complete();
     public Stream Audio(Channel channel = Channel.You)
     {
-        lock (_sync) return new MemoryStream(Wav.Encode(_audio.ToArray()), writable: false);
+        return saving?.Audio(channel) ?? throw new InvalidOperationException("Audio persistence is required.");
     }
     public async IAsyncEnumerable<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -285,7 +296,7 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
     public void Dispose()
     {
         try { Stop(); }
-        finally { capture.Failed -= OnFailure; (capture as IDisposable)?.Dispose(); }
+        finally { saving?.Dispose(); capture.Failed -= OnFailure; (capture as IDisposable)?.Dispose(); }
     }
 }
 
@@ -303,18 +314,18 @@ internal interface IHostMeetingSource : IMeetingAudioSource, IDisposable
     void Resume();
     void Stop();
     Stream Audio(Channel channel = Channel.You);
+    void CompleteAudio();
 }
 
-/// <summary>Retains two tracks in memory; each resumed interval uses L2's shared-clock source.</summary>
+/// <summary>Each resumed interval uses the shared-clock source and persists without retaining tracks.</summary>
 internal sealed class TwoTrackMeetingSource(IAudioCapture microphone, IAudioCapture system,
-    string? device, double threshold) : IHostMeetingSource
+    string? device, double threshold, LiveAudioWriter? saving = null) : IHostMeetingSource
 {
     private readonly Stopwatch _elapsed = new();
-    private readonly object _sync = new();
-    private readonly List<float>[] _audio = [[], []];
+    private readonly object _lifecycle = new();
     private readonly System.Threading.Channels.Channel<(Channel Channel, CapturedAudio Part, TimeSpan Offset, TimeSpan Watermark)> _parts =
         System.Threading.Channels.Channel.CreateUnbounded<(Channel, CapturedAudio, TimeSpan, TimeSpan)>();
-    private readonly List<Task> _pumps = [];
+    private Task _pump = Task.CompletedTask;
     private LiveTwoTrackSource? _current;
     private TimeSpan _intervalStart;
     private TimeSpan _watermark = TimeSpan.MinValue;
@@ -325,15 +336,23 @@ internal sealed class TwoTrackMeetingSource(IAudioCapture microphone, IAudioCapt
     public TimeSpan Watermark => _watermark;
     public IReadOnlyList<Channel> Tracks => [Channel.You, Channel.Others];
     public event Action<Exception>? Failed;
-    public void Start() => Resume();
+    public void Start()
+    {
+        if (saving is not null) saving.Failed += error => Failed?.Invoke(error);
+        // simplification: as for the microphone source, each track reaches the store per cut part, never by restarting devices.
+        Resume();
+    }
     public void Resume()
     {
-        if (_stopped || _current is not null) return;
-        _intervalStart = Elapsed;
-        _elapsed.Start();
-        var source = new LiveTwoTrackSource(microphone, system, threshold, device);
-        _current = source;
-        _pumps.Add(Pump(source, _intervalStart));
+        lock (_lifecycle)
+        {
+            if (_stopped || _current is not null) return;
+            _intervalStart = Elapsed;
+            _elapsed.Start();
+            var source = new LiveTwoTrackSource(microphone, system, threshold, device);
+            _current = source;
+            _pump = Pump(source, _intervalStart);
+        }
     }
     private async Task Pump(LiveTwoTrackSource source, TimeSpan start)
     {
@@ -343,13 +362,7 @@ internal sealed class TwoTrackMeetingSource(IAudioCapture microphone, IAudioCapt
             {
                 if (part.Part.Samples.Length == 0) { _parts.Writer.TryWrite((part.Channel, part.Part, start + part.Offset, start + source.Watermark)); continue; }
                 var offset = start + part.Offset;
-                lock (_sync)
-                {
-                    var track = _audio[part.Channel == Channel.You ? 0 : 1];
-                    var required = checked((int)(offset.TotalSeconds * 16000));
-                    while (track.Count < required + part.Part.Samples.Length) track.Add(0);
-                    for (var index = 0; index < part.Part.Samples.Length; index++) track[required + index] = part.Part.Samples[index];
-                }
+                saving?.Enqueue(part.Channel, part.Part.Samples, offset);
                 _parts.Writer.TryWrite((part.Channel, part.Part, offset, start + source.Watermark));
             }
         }
@@ -357,30 +370,37 @@ internal sealed class TwoTrackMeetingSource(IAudioCapture microphone, IAudioCapt
     }
     public void Pause()
     {
+        lock (_lifecycle)
+        {
         var current = _current;
         if (current is null) return;
         current.Stop();
         // Drain this interval's capture tails before starting another shared clock.
-        _pumps[^1].GetAwaiter().GetResult();
+        _pump.GetAwaiter().GetResult();
         _elapsed.Stop();
         _current = null;
         _parts.Writer.TryWrite((Channel.Mixed, CapturedAudio.Empty, Elapsed, Elapsed));
+            }
     }
     public void Stop()
     {
-        if (_stopped) return;
-        _stopped = true;
-        Pause();
-        _ = Complete();
+        lock (_lifecycle)
+        {
+            if (_stopped) return;
+            _stopped = true;
+            Pause();
+            _ = Complete();
+        }
     }
     private async Task Complete()
     {
-        await Task.WhenAll(_pumps).ConfigureAwait(false);
+        await _pump.ConfigureAwait(false);
         _parts.Writer.TryComplete();
     }
+    public void CompleteAudio() => saving?.Complete();
     public Stream Audio(Channel channel = Channel.You)
     {
-        lock (_sync) return new MemoryStream(Wav.Encode(_audio[channel == Channel.You ? 0 : 1].ToArray()), false);
+        return saving?.Audio(channel) ?? throw new InvalidOperationException("Audio persistence is required.");
     }
     public async IAsyncEnumerable<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> ReadAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -394,6 +414,7 @@ internal sealed class TwoTrackMeetingSource(IAudioCapture microphone, IAudioCapt
     public void Dispose()
     {
         Stop();
+        saving?.Dispose();
         (microphone as IDisposable)?.Dispose();
         (system as IDisposable)?.Dispose();
     }

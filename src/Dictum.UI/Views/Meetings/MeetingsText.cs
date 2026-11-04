@@ -7,6 +7,8 @@ internal static class MeetingsText
     public const string PROPOSED_SummaryHost = "Summary service host: {0}";
     // simplification: retire when audio is saved in encrypted chunks during recording
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.
+    public const string PROPOSED_AudioRecovered = "Recording ended unexpectedly. Saved audio and transcript are available.";
+    // Retired by chunked saving; kept unchanged for the approved-copy record.
     public const string APPROVED_AudioUntilStop = "Audio is held in memory until you press Stop. If Dictum stops unexpectedly or the computer shuts down before then, the audio may be lost. Only transcript text already saved will remain.";
     public const string PROPOSED_AudioSaveFailed = "The recording could not be saved. Your audio is still in memory. Retry saving or discard it.";
     public const string PROPOSED_Retry = "Retry";

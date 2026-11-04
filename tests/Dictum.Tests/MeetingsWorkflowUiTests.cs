@@ -92,10 +92,13 @@ public sealed class MeetingsWorkflowUiTests
     private sealed class TestCapture : IAudioCapture
     {
         public int Starts, Stops;
-        public bool Active;
+        public bool Active, FailStart;
+        private Action<CapturedAudio, CutReason>? _part;
+        public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part) => _part = part;
+        public void Emit() => _part?.Invoke(new(new float[1600], .2f), default);
         public float CurrentLevel => Active ? 0.5f : 0;
         public event Action<Exception>? Failed { add { } remove { } }
-        public void Start(string? deviceSetting, long keyDownStamp) { Active = true; Starts++; }
+        public void Start(string? deviceSetting, long keyDownStamp) { if (FailStart) throw new IOException("Synthetic start failure"); Active = true; Starts++; }
         public CapturedAudio Stop() { Active = false; Stops++; return new(Enumerable.Range(0, 1600).Select(i => (float)(0.2 * Math.Sin(i * 0.2))).ToArray(), 0.2f); }
     }
     private sealed class TestTranscriber(IMeetingStore store) : IMeetingTranscriber
@@ -285,13 +288,29 @@ public sealed class MeetingsWorkflowUiTests
 
     private sealed class FaultStore(IMeetingStore inner) : IMeetingStore
     {
-        public bool FailCreate, FailAppend, FailAudioOnce, ForeignOwner, Unreadable;
+        public bool FailCreate, FailAppend, FailAudioOnce, FailChunk, ForeignOwner, Unreadable;
         public int AudioAttempts, Deletes;
         public MeetingId Create(MeetingMeta meta)
         {
             var id = inner.Create(ForeignOwner ? meta with { Title = "Another meeting" } : meta);
             if (FailCreate) throw new IOException("Synthetic partial create failure");
             return id;
+        }
+        public IMeetingAudioWriter BeginAudio(MeetingId id, Channel channel) => new FaultWriter(this, inner.BeginAudio(id, channel));
+        private sealed class FaultWriter(FaultStore owner, IMeetingAudioWriter writer) : IMeetingAudioWriter
+        {
+            public void Append(float[] samples)
+            {
+                if (owner.FailChunk) throw new IOException("Synthetic chunk failure");
+                writer.Append(samples);
+            }
+            public void Complete()
+            {
+                owner.AudioAttempts++;
+                if (owner.FailAudioOnce) { owner.FailAudioOnce = false; throw new IOException("Synthetic save failure"); }
+                writer.Complete();
+            }
+            public void Dispose() => writer.Dispose();
         }
         public void WriteAudio(MeetingId id, Channel channel, Stream audio)
         {
@@ -524,13 +543,13 @@ public sealed class MeetingsWorkflowUiTests
     });
 
     [Fact]
-    public Task Agreement_and_recording_explain_audio_is_saved_at_stop() => UiSession.Run(() =>
+    public Task Agreement_and_recording_retire_the_audio_until_stop_notice() => UiSession.Run(() =>
     {
         using var fixture = new Fixture();
         var window = new MeetingsWindow(fixture.Host); window.Show(); window.BeginAgreement();
-        Assert.Contains(APPROVED_AudioUntilStop, Texts(window));
+        Assert.DoesNotContain(APPROVED_AudioUntilStop, Texts(window));
         Click(window, APPROVED_Start);
-        Assert.Contains(APPROVED_AudioUntilStop, Texts(window));
+        Assert.DoesNotContain(APPROVED_AudioUntilStop, Texts(window));
         window.Shutdown();
     });
 
@@ -930,7 +949,10 @@ public sealed class MeetingsWorkflowUiTests
     {
         var microphone = new TestCapture();
         var others = new TestCapture();
-        using var source = new TwoTrackMeetingSource(microphone, others, null, 0.01);
+        using var files = new MeetingFixture();
+        var store = files.Store(); var id = store.Create(files.Meta());
+        using var saving = new LiveAudioWriter(store, id, Channel.You, Channel.Others);
+        using var source = new TwoTrackMeetingSource(microphone, others, null, 0.01, saving);
         source.Start(); source.Pause();
         Assert.False(microphone.Active); Assert.False(others.Active);
         source.Resume(); source.Stop();
@@ -941,6 +963,7 @@ public sealed class MeetingsWorkflowUiTests
             if (part.Part.Samples.Length > 0) channels.Add(part.Channel);
         }
         Assert.Equal(new[] { Channel.You, Channel.Others, Channel.You, Channel.Others }, channels);
+        source.CompleteAudio();
         foreach (var channel in source.Tracks)
         {
             using var audio = source.Audio(channel);
@@ -993,4 +1016,44 @@ public sealed class MeetingsWorkflowUiTests
         Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(path));
         using var saved = host.Store.OpenAudio(id, Channel.Mixed); Assert.True(AudioBytes(saved).Length > 44);
     }
+    [Fact]
+    public Task Chunk_write_failure_surfaces_audio_save_failure_while_recording() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var store = new FaultStore(fixture.Store) { FailChunk = true };
+        var window = new MeetingsWindow(fixture.Host with { Store = store });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        fixture.Capture.Emit();
+        await Until(() => Texts(window).Contains(PROPOSED_AudioSaveFailed) && window.IsEnabled);
+        Assert.False(fixture.Capture.Active);
+        Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        await Until(() => fixture.Store.List().Count == 0);
+        Assert.Empty(Directory.GetFiles(fixture.Files.Root, "*.chunks.enc", SearchOption.AllDirectories));
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Capture_start_rollback_deletes_created_chunk_files() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture(); fixture.Capture.FailStart = true;
+        var window = new MeetingsWindow(fixture.Host); window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        Assert.Empty(fixture.Store.List());
+        Assert.Empty(Directory.GetFiles(fixture.Files.Root, "*.chunks.enc", SearchOption.AllDirectories));
+        window.Close();
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Discard_deletes_all_live_chunk_files(bool dual) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host with { LoopbackCapture = () => dual ? new TestCapture() : null });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        Assert.NotEmpty(Directory.GetFiles(fixture.Files.Root, "*.chunks.enc", SearchOption.AllDirectories));
+        Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        await Until(() => fixture.Store.List().Count == 0);
+        Assert.Empty(Directory.GetFiles(fixture.Files.Root, "*.chunks.enc", SearchOption.AllDirectories));
+        window.Close(); return true;
+    });
+
 }
