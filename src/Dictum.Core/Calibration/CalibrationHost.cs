@@ -28,6 +28,9 @@ namespace Dictum.Calibration;
 /// The host each recording goes to while cloud speech is on (<c>CloudSpeech.SendsAudio</c>; the local model is then only the
 /// fallback), else null. Null: never.
 /// </param>
+/// <param name="SpeechReady">
+/// A speech model is loaded and none is loading (<c>ModelManager.IsReady</c>); the dictation hotkey is ignored until then. Null: always ready.
+/// </param>
 /// <param name="DownloadSpeechModel">Asks, downloads through the app's downloader (refused under offline_only), then calls back, in
 /// this order: whether the download goes ahead (true once agreed, false when the question is declined; not called when it is
 /// refused before the question; called synchronously on the calling thread, before this returns), then on arrival, then the
@@ -49,11 +52,15 @@ internal sealed record CalibrationHost(
     Func<bool>? MovingFiles = null,
     Func<string>? CurrentModel = null,
     Func<string?>? SpeechLoadProblem = null,
-    Func<string?>? CloudSpeechHost = null)
+    Func<string?>? CloudSpeechHost = null,
+    Func<bool>? SpeechReady = null)
 {
-    /// <summary>Whether this model is the one dictation uses now: the one named (<see cref="CurrentModel"/>), and its latest load has not failed (<see cref="SpeechLoadProblem"/>).</summary>
-    public bool ModelInUse(string model) =>
-        SpeechLoadProblem?.Invoke() is null && string.Equals(CurrentModel?.Invoke() ?? Settings().Whisper.Model, model, StringComparison.OrdinalIgnoreCase);
+    /// <summary>Whether the app holds this model: the one named by <see cref="CurrentModel"/> (loaded or loading, failed or not).</summary>
+    public bool HoldsModel(string model) =>
+        string.Equals(CurrentModel?.Invoke() ?? Settings().Whisper.Model, model, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether this model is the one dictation uses now: <see cref="HoldsModel"/>, and its latest load has not failed (<see cref="SpeechLoadProblem"/>).</summary>
+    public bool ModelInUse(string model) => SpeechLoadProblem?.Invoke() is null && HoldsModel(model);
 
     /// <summary>Whether this combination is what dictation uses now: <see cref="ModelInUse"/>, and the decoding settings.json holds (greedy is whisper.beam_size 0).</summary>
     public bool InUse(ComboResult combo) => ModelInUse(combo.Model) && Settings().Whisper.BeamSize == combo.BeamSize;

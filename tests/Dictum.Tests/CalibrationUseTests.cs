@@ -53,7 +53,7 @@ public class CalibrationUseTests
         window.Show();
         var session = typeof(CalibrationWindow).GetField("_session", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
         var add = session.GetType().GetMethod("Add")!;
-        foreach (var combo in new[] { Combo("tiny.en", 0, 9), Combo("tiny.en", 5, 7), Combo("base.en", 0, 3) }) add.Invoke(session, [combo, "clips"]);
+        foreach (var combo in new[] { Combo("tiny.en", 0, 9), Combo("tiny.en", 5, 7), Combo("base.en", 0, 3), Combo("base.en", 5, 4), Combo("small.en", 0, 10) }) add.Invoke(session, [combo, "clips"]);
         typeof(CalibrationWindow).GetMethod("RenderResults", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, null);
         Dispatcher.UIThread.RunJobs();
         return (shell, window);
@@ -309,6 +309,7 @@ public class CalibrationUseTests
     {
         using var scratch = new Scratch(Profile);
         var (shell, window) = Open(scratch);
+        Assert.True(Eventually(() => shell.SpeechReady), "tiny.en never finished loading"); // a model still loading would keep the hotkey ignored (pin 12)
 
         Click(Row(window, $"Use {TinyBeam}"));
 
@@ -412,6 +413,66 @@ public class CalibrationUseTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Contains(said, Texts(window).Split('\n')); // untouched: the closed window was not told
+        shell.Dispose();
+    });
+
+    /// <summary>A speech model manager whose loader holds base.en until <paramref name="release"/> is set, then loads it (tiny.en loads at once).</summary>
+    private static ModelManager HeldBase(ManualResetEventSlim release) => new(NullLog.Instance, loader: (path, _, decode) =>
+    {
+        if (path.EndsWith("ggml-base.en.bin", StringComparison.Ordinal)) release.Wait(TestContext.Current.CancellationToken);
+        return new HoldingSpeechEngine(path, decode);
+    }, gpuInUse: () => false);
+
+    /// <summary>
+    /// Pin 12 (lens minor 1): pressing the same model with other decoding while that model is still loading (an earlier press) still
+    /// waits for the load, because the hotkey is ignored until it has: the line says "once the model has loaded". Once it has loaded,
+    /// the same press is the decoding-only wording (pin 8).
+    /// </summary>
+    [Fact]
+    public Task A_decoding_press_while_the_same_model_is_still_loading_still_says_once_loaded() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Profile);
+        using var release = new ManualResetEventSlim();
+        var (shell, window) = Open(scratch, models: HeldBase(release));
+        try
+        {
+            Click(Row(window, $"Use {BaseGreedy}")); // base.en starts loading and is held
+            Assert.False(shell.SpeechReady);
+
+            Click(Row(window, "Use base.en with beam search (5)"));
+
+            Assert.Contains("Dictum now uses base.en (beam search (5)) from the next dictation, once the model has loaded.", Texts(window).Split('\n'));
+        }
+        finally
+        {
+            release.Set();
+        }
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin 13 (lens minor 2): a failure belongs to the model that failed. After base.en's load failed, pressing a row whose model file
+    /// is not on this PC starts no load (the tray only says it is not downloaded), so base.en's failure is not shown against it, and
+    /// no success line is either: the status line says nothing.
+    /// </summary>
+    [Fact]
+    public Task An_old_failure_is_not_reported_against_a_different_model() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Profile);
+        using var release = new ManualResetEventSlim(initialState: true);
+        var (shell, window) = Open(scratch, models: FailingBase(release));
+        Click(Row(window, $"Use {BaseGreedy}"));
+        Assert.True(Eventually(() => shell.SpeechLoadProblem is not null), "the load never failed");
+        Dispatcher.UIThread.RunJobs();
+        var progress = (TextBlock)typeof(CalibrationWindow).GetField("_progress", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+        progress.Text = "";
+
+        Click(Row(window, "Use small.en with greedy")); // small.en is not on disk in this scratch profile
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("", progress.Text);
+        window.Close();
         shell.Dispose();
     });
 }

@@ -132,7 +132,9 @@ internal sealed partial class CalibrationWindow
             _progress.Text = refused;
             return;
         }
-        var loads = !_host.ModelInUse(combo.Model); // before the write: a changed model loads, a changed decoding alone does not
+        // Before the write: a changed model loads and a changed decoding alone does not, but the same model still loading (an earlier
+        // press) keeps the hotkey ignored until it has, so that too is waiting for a load.
+        var loads = !_host.ModelInUse(combo.Model) || _host.SpeechReady?.Invoke() == false;
         if (!_host.Write([("whisper.model", JsonValue.Create(combo.Model)), ("whisper.beam_size", JsonValue.Create(combo.BeamSize))]))
         {
             _progress.Text = ModelCoordinator.WriteFailed; // the tray's balloon says it too; nothing was written or reloaded
@@ -145,9 +147,11 @@ internal sealed partial class CalibrationWindow
     /// <summary>What Use this says once the write went through: the tray's text if the load has already failed, else the line (if the app holds this model).</summary>
     private void Say(ComboResult combo, bool loads)
     {
-        if (_host.SpeechLoadProblem?.Invoke() is { } problem) // the load already failed: the tray's own text, and no claim
+        if (_host.SpeechLoadProblem?.Invoke() is { } problem) // a load has failed: the tray's own text, and no claim, but only for the model it was
         {
-            _progress.Text = problem;
+            // The failure is the app's latest one, not this row's: pressing a model whose file is gone starts no load (Ensure only
+            // balloons), so base.en's old failure must not be reported against it.
+            if (_host.HoldsModel(combo.Model)) _progress.Text = problem;
             return;
         }
         if (!_host.InUse(combo)) return;

@@ -15,7 +15,8 @@ public sealed partial class AppShell
         MovingFiles: () => Models.MovingFiles,
         CurrentModel: () => Models.CurrentName,
         SpeechLoadProblem: () => SpeechLoadProblem,
-        CloudSpeechHost: () => SpeechSendsAudio ? Speech.Host : null); // as Settings > Models asks it (ModelPages: cloudHost)
+        CloudSpeechHost: () => SpeechSendsAudio ? Speech.Host : null, // as Settings > Models asks it (ModelPages: cloudHost)
+        SpeechReady: () => SpeechReady);
 
     /// <summary>Fix last dictation → Copy: the clipboard, kept out of clipboard history unless insert.clipboard_history is on.</summary>
     public void CopyText(string text) => Platform.Clipboard.SetText(text, keepOutOfHistory: !_settings.Insert.ClipboardHistory);
