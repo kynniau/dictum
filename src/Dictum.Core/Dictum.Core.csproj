@@ -20,6 +20,8 @@
     <!-- Shipped as plain text beside the executable (SPEC §16.4, §16.5); every app project that references Core gets them. -->
     <Content Include="Data\profanity.txt" Link="profanity.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Data\calibration-sentences.txt" Link="calibration-sentences.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- API keys (K-UI, 04/11/2026): "Create the key file…" writes the repository's .env.example as it is (KeyFile.Contents). -->
+    <EmbeddedResource Include="..\..\.env.example" LogicalName="Dictum.Settings.env.example" />
   </ItemGroup>
 
   <ItemGroup>

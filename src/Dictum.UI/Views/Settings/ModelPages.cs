@@ -159,6 +159,7 @@ internal sealed class ModelsPage : SettingsPage
     private readonly Border _cloudSpeechCard; // Advanced: always; Simple: only while cloud speech is on (state line and off switch)
     private readonly TextBlock _speechIntro = Ui.Text(SpeechIntro); // Advanced Speech model card: SpeechIntroFor
     private readonly TextBlock _explainerText = Ui.Text(SimpleView.Explainer); // Simple speech card: SimpleView.ExplainerFor
+    private readonly KeysPanel _speechKeys; // API keys (K-UI, 04/11/2026): the speech service's keys, Advanced view only (the Simple card is its state line and off switch)
 
     public ModelsPage(AppShell shell, SettingsWindow window) : base(shell, "Models")
     {
@@ -226,6 +227,7 @@ internal sealed class ModelsPage : SettingsPage
         var languageSimple = Ui.Text(LanguageIntroSimple);
         var languageAdvanced = Ui.Text(LanguageIntroAdvanced);
         // Cloud speech (spec "Cloud speech" §3): a preset only fills the fields; switching on goes through the shell's speech consent step.
+        _speechKeys = new KeysPanel(Shell, Shell.Vault, Say);
         _speechService.SelectionChanged += (_, _) => SpeechDefaultsForService();
         _speechAddress.TextChanged += (_, _) => ShowSpeechKey();
         _speechAddressLine = Ui.Line("Server address", _speechAddress, CloudSpeechAddressHint);
@@ -242,7 +244,7 @@ internal sealed class ModelsPage : SettingsPage
             _speechOffline]);
         _speechCloudOn.Children.AddRange([_speechCloudState, Ui.Row(8, Ui.Button(CloudSpeechOffLabel, "secondary", () => Run(() =>
             Say(Shell.DisableCloudSpeech() ?? CloudSpeechSwitchedOff))))]);
-        _cloudSpeechCard = Ui.Card(Ui.Stack(10, _speechCloudOn, _speechCloudOff), CloudSpeechTitle);
+        _cloudSpeechCard = Ui.Card(Ui.Stack(10, _speechCloudOn, _speechCloudOff, _speechKeys.View), CloudSpeechTitle);
         _simpleOnly = [explainer, _simpleSpeech, _simpleCleanup, _simpleOff, languageSimple];
         _advancedOnly = [speechIntro, _speech, chooseFile, decoding, _cleanup, cleanupButtons, cloudNote, languageAdvanced];
         Compose(
@@ -439,6 +441,26 @@ internal sealed class ModelsPage : SettingsPage
         _speechEnable.IsEnabled = !s.OfflineOnly;
         _speechOffline.Text = s.OfflineOnly ? CloudSpeechOfflineNote : "";
         _speechOffline.IsVisible = s.OfflineOnly;
+        ShowSpeechKeys();
+    }
+
+    /// <summary>
+    /// The key list on the Cloud speech card (K-UI, 04/11/2026): while cloud speech is on, the keys of the service in use (where Check
+    /// this key can be offered); while it is off, those of the service and address in the fields, the variable the key line names.
+    /// Advanced view only: the Simple view's card is only its state line and off switch (owner, 22/10/2026).
+    /// </summary>
+    private void ShowSpeechKeys()
+    {
+        var s = Shell.Settings;
+        if (s.Ui.IsSimple)
+        {
+            _speechKeys.Show(null, "");
+            return;
+        }
+        var preset = SpeechPreset;
+        var service = Shell.CloudSpeechOn ? SpeechPresets.ForAddress(s.Speech.BaseUrl)
+            : string.IsNullOrWhiteSpace(_speechAddress.Text) ? preset : SpeechPresets.ForAddress(SpeechAddress(preset));
+        _speechKeys.Show(service.KeyVariable, service.Name);
     }
 
     /// <summary>The speech preset chosen in the Service list.</summary>
@@ -468,6 +490,7 @@ internal sealed class ModelsPage : SettingsPage
     {
         var preset = SpeechPreset;
         _speechKey.Text = CloudSpeechKeyLine(string.IsNullOrWhiteSpace(_speechAddress.Text) ? preset : SpeechPresets.ForAddress(SpeechAddress(preset)));
+        if (_speechKeys is not null) ShowSpeechKeys(); // the keys follow the service and address chosen, as the key line does
     }
 
     /// <summary>A preset only filled the fields: switching on goes through the shell's speech consent step, as for a typed address.</summary>

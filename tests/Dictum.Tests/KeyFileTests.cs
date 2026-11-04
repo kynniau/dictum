@@ -41,9 +41,10 @@ public class KeyFileTests
         Assert.False(File.Exists(scratch.Paths.EnvFile));
         Assert.Equal(AppShell.KeyFileCreated(variable), shell.CreateKeyFile(variable));
         var text = File.ReadAllText(scratch.Paths.EnvFile);
-        Assert.Equal(KeyFile.Header + "\n" + variable + "=your-key-here\n", text);
+        Assert.Equal(KeyFile.Contents(), text); // the full template since 04/11/2026 (ApiKeysUiTests pins its text)
         Assert.StartsWith("# ", text); // .env.example's comment style
-        Assert.Equal([variable], EnvFile.Parse(text).Keys);
+        Assert.Contains(variable + "=your-key-here\n", text); // the line the created message names is there
+        Assert.Equal(SecretStore.KeyNames.Order(), EnvFile.Parse(text).Keys.Order());
         Assert.Equal(scratch.Paths.EnvFile, Assert.Single(platform.Opened)); // opened, at its real path (the fake package's is the same)
         Assert.Equal($"Your key file has been created and opened: put your key in place of your-key-here after {variable}=, then save it.", AppShell.KeyFileCreated(variable));
         shell.Dispose();
@@ -79,7 +80,7 @@ public class KeyFileTests
             Assert.False(File.Exists(paths.EnvFile));
             Assert.True(KeyFile.CreateIfMissing(paths, SecretStore.GeminiKey)); // the config folder is made when missing
             Assert.False(KeyFile.CreateIfMissing(paths, SecretStore.OpenAiKey));
-            Assert.Equal(KeyFile.Contents(SecretStore.GeminiKey), File.ReadAllText(paths.EnvFile));
+            Assert.Equal(KeyFile.Contents(), File.ReadAllText(paths.EnvFile));
         }
         finally
         {
@@ -94,11 +95,11 @@ public class KeyFileTests
     [Fact]
     public async Task The_placeholder_counts_as_not_set_so_nothing_is_sent_with_it()
     {
-        var placeholder = SecretStore.FromContents(KeyFile.Contents(SecretStore.OpenAiKey), null, _ => null);
+        var placeholder = SecretStore.FromContents(KeyFile.Contents(), null, _ => null);
         Assert.Null(placeholder.Get(SecretStore.OpenAiKey));
         Assert.Equal("absent", placeholder.Describe(SecretStore.OpenAiKey));
         // It never hides a key beside the program either.
-        Assert.Equal("k-exe", SecretStore.FromContents(KeyFile.Contents(SecretStore.OpenAiKey), "OPENAI_API_KEY=k-exe\n", _ => null).Get(SecretStore.OpenAiKey));
+        Assert.Equal("k-exe", SecretStore.FromContents(KeyFile.Contents(), "OPENAI_API_KEY=k-exe\n", _ => null).Get(SecretStore.OpenAiKey));
 
         var openAi = Preset("OpenAI");
         var llm = new LlmSettings { Provider = openAi.Provider, BaseUrl = openAi.BaseUrl, Model = openAi.DefaultModel! };
@@ -108,7 +109,7 @@ public class KeyFileTests
         await cleaner.CleanAsync("um the account is overdrawn", TestContext.Current.CancellationToken);
         Assert.Equal(0, handler.Requests);
 
-        var pasted = SecretStore.FromContents(KeyFile.Contents(SecretStore.OpenAiKey).Replace(SecretStore.Placeholder, "k-real-looking-test"), null, _ => null);
+        var pasted = SecretStore.FromContents(KeyFile.Contents().Replace(SecretStore.Placeholder, "k-real-looking-test"), null, _ => null);
         Assert.Equal("k-real-looking-test", pasted.Get(SecretStore.OpenAiKey));
     }
 
@@ -133,7 +134,7 @@ public class KeyFileTests
         variable = SecretStore.GeminiKey;
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(AppShell.KeyFileCreated(SecretStore.GeminiKey), said[^1]);
-        Assert.Equal(KeyFile.Contents(SecretStore.GeminiKey), File.ReadAllText(scratch.Paths.EnvFile));
+        Assert.Equal(KeyFile.Contents(), File.ReadAllText(scratch.Paths.EnvFile));
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(AppShell.KeyFileExists, said[^1]);
         Assert.Equal([scratch.Paths.EnvFile, scratch.Paths.EnvFile], platform.Opened);
