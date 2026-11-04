@@ -6930,3 +6930,12 @@ Also decided by the brief and not contested: no bot, no CRM, no telemetry, no co
 Next: Kyle re-answers the orchestrator question; Fable writes the interfaces, stubs and failing tests for lanes L1, L3, L4, L5; the orchestrator runs the Ollama lanes (cloud-fast first) and Opus lenses, gated as §11: mock (done), smallest slice, read the dashboard, then the rest.
 
 **Addendum 04/11/2026 22:50 AEDT, decision 6 and the scanner.** (6) Kyle: "existing orchestrator": the Dictum orchestrator session already in the lock (declared 29/10/2026) owns lanes, lenses and merges for Meetings; the Fable session wrote the lane contracts (brief §13) and stops. Budget (Kyle 22:35): Claude weekly usage nearly exhausted; cloud lanes (deepseek, gemma, mistral) write stubs and code from the contracts, GPT 6.1 sol is the adversarial lens, Opus writes only the verdict line. Scanner rule approved by Kyle 22:39 and shipped 22:41 in `~/.claude/local-llm/cloud-scan.mjs`: files identical to a public GitHub repo's origin default branch are skipped; 24 tests pass, both mutation checks observed failing, a fresh worktree of kynniau/dictum scans clean (467 skipped).
+
+
+## Release 1.4.0 prepared (05/11/2026, branch release/1.4.0)
+
+PROPOSED: the 1.4.0 release copy in STORE.md, release-notes-preamble.md and version.json is awaiting the owner's approval. Earlier approved release text is retained unchanged beside the new proposals. Publication dates in version.json and the Help page are DD/MM/YYYY for the owner to fill in at release. The Terms (legal edition in force, unchanged) and Privacy (unchanged since 04/11/2026) pages keep their dates; the orchestrator reverted a placeholder on both on 05/11/2026.
+
+PROPOSED: Directory.Build.props supplies version 1.4.0 to the projects; package-msix.ps1 derives Identity Version 1.4.0.0 through AppxManifest.template.xml. About and the update check read the assembly version. Existing Mac download links still name the published mac-v1.3.1 tag; the version-free Mac release preamble is unchanged, as in the 1.3.1 preparation.
+
+PROPOSED: no MSIX was built and nothing was tagged, published, deployed, committed or pushed. Tests were not run: the requested LOCALAPPDATA/Microsoft/dotnet/dotnet.exe was unavailable in this sandbox.
