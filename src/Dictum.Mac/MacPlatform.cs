@@ -100,6 +100,11 @@ public sealed class MacPlatform : IPlatform, IDisposable
 
     public IAudioCapture CreateCapture(ILog log) => new AudioQueueCapture(log);
 
+    // simplification: Mac loopback waits for the Mac lane to choose ScreenCaptureKit or Core Audio taps.
+    public IAudioCapture? CreateLoopbackCapture(ILog log) => null;
+
+    public IAudioDecoder AudioDecoder { get; } = new Dictum.Meetings.Import.WavOnlyDecoder();
+
     public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => CaptureDevices.List();
 
     public IStartupRegistration Startup => _startup.Value;
