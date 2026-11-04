@@ -100,13 +100,13 @@ public static class SummaryValidator
         {
             // Strip only outer Markdown markers. Interior punctuation may be
             // arithmetic, and parentheses may denote a negative amount.
-            var token = match.Value.Trim('*', '`', '_', '#')
+            var piece = match.Value.Trim('*', '`', '_', '#')
                 .Trim('.', ',', ';', ':', '!', '?');
-            if (token.Length == 0) continue;
-            if (FigureTrigger.IsMatch(token)) run.Add(token);
+            if (piece.Length == 0) continue;
+            if (FigureTrigger.IsMatch(piece)) run.Add(piece);
             else if (run.Count > 0)
             {
-                run.Add(token);
+                run.Add(piece);
                 yield return NormaliseFigure(string.Join(" ", run));
                 run.Clear();
             }
