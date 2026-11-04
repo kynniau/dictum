@@ -630,7 +630,7 @@ public sealed class ApiKeysUiTests
 
     /// <summary>
     /// Pin (mutation-checked): "Create the key file…" writes the APPROVED header first, byte for byte (written out here, not read from the
-    /// app), then the repository's .env.example in full, every empty key line holding the placeholder; every variable is in it once, and
+    /// app), then the repository's .env.example from its "# Syntax" line on (the opening "Copy to %APPDATA%…" paragraph is left out, row 43), every empty key line holding the placeholder; every variable is in it once, and
     /// none counts as set.
     /// </summary>
     [Fact]
@@ -640,7 +640,7 @@ public sealed class ApiKeysUiTests
             "# Dictum keys, created by Settings > Clean-up. Replace your-key-here with your key and save this file: Dictum reads it again by itself.\n" +
             "# A real environment variable of the same name wins over this file. Keys are never written to settings.json or the log.\n";
         var example = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), ".env.example")).Replace("\r\n", "\n");
-        var expected = approvedHeader + "\n" + Regex.Replace(example, @"^([A-Z_]+)=$", "$1=your-key-here", RegexOptions.Multiline);
+        var expected = approvedHeader + "\n" + Regex.Replace(example[example.IndexOf("# Syntax", StringComparison.Ordinal)..], @"^([A-Z_]+)=$", "$1=your-key-here", RegexOptions.Multiline);
         var text = KeyFile.Contents();
         Assert.Equal(Encoding.UTF8.GetBytes(approvedHeader), Encoding.UTF8.GetBytes(text)[..Encoding.UTF8.GetByteCount(approvedHeader)]);
         Assert.Equal(expected, text);

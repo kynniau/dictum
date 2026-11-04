@@ -16,6 +16,8 @@ packaging/test-cert/
 # secrets and local state
 .env
 *.env
+# the one .env-named file that is committed: the site's downloadable key file, which is KeyFile.Contents() (placeholders only; KeysDocsTests pins it)
+!site/dictum-keys.env
 *.pfx
 *.p12
 *.pfx-password.txt

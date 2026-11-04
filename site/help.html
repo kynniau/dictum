@@ -32,7 +32,7 @@
 
 <main id="main" class="wrap doc guide">
   <h1>Help guide</h1>
-  <p class="updated">Step by step, for Dictum 1.2 on Windows. Last updated <time datetime="2026-10-22">22/10/2026</time>.</p>
+  <p class="updated">Step by step, for Dictum 1.2 on Windows. Last updated <time datetime="2026-11-04">04/11/2026</time>.</p>
   <p>Dictum types what you say into the program you are using. You hold down a key, speak, and let go. Your words appear wherever you were typing. This guide goes one step at a time. You do not need to know anything about computers to follow it.</p>
 
   <nav class="card toc" aria-labelledby="toc-title">
@@ -46,6 +46,7 @@
       <li><a href="#models">Where the model files live</a></li>
       <li><a href="#privacy">Your privacy</a></li>
       <li><a href="#cloud">Optional: turn on cloud clean-up</a></li>
+      <li><a href="#keys">Get an API key, service by service</a></li>
       <li><a href="#free">Free</a></li>
       <li><a href="#feedback">Send feedback or report a problem</a></li>
       <li><a href="#faq">Questions and answers</a></li>
@@ -333,6 +334,8 @@
     <p>To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.</p>
 
     <h3>Save the key, then switch it on</h3>
+    <!-- APPROVED 04/11/2026 16:51 AEDT (row 40, Windows only): do not reword (twin of PlatformWords.Windows.HelpAddKeyParagraph). The service-by-service steps for getting a key are in section 9 below. -->
+    <p>The easiest way to add a key: choose the service in Settings &gt; Clean-up, press <b>Add a key…</b>, paste the key, and press <b>Save</b>. Dictum keeps it in Windows Credential Manager, never in a file, and uses it from the next dictation. You can add more than one key for a service, such as a work one and a personal one, and choose which one Dictum uses.</p>
     <!-- APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword (key file paragraphs; twins of HelpText.CloudAnswer) -->
     <p>To add a key for cloud clean-up, choose the service in Settings &gt; Clean-up and press <b>Create the key file…</b>. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.</p>
     <p>If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.</p>
@@ -370,23 +373,113 @@
     </figure>
 
     <h3>Is it working?</h3>
-    <p>When Dictum has found your key, the Cloud clean-up card on that page starts with "On: the text of each dictation is sent to" and names the service, and the Dictum menu says "Cloud clean-up on · text leaves this PC". Dictum cannot check that the key itself is right: if your dictations come back only lightly tidied, check the key.</p>
-    <p>If the card says "On, but waiting for your …", Dictum cannot find your key. For OpenAI, for example, it says "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add it to .env." Check the file's name, and the line in it.</p>
+    <p>When Dictum has found your key, the Cloud clean-up card on that page starts with "On: the text of each dictation is sent to" and names the service, and the Dictum menu says "Cloud clean-up on · text leaves this PC". <!-- APPROVED 04/11/2026 16:51 AEDT (row 45, Windows only): the last sentence replaces the 22/10/2026 one --> To check the key itself, press <b>Check this key</b> beside it in Settings &gt; Clean-up once cloud clean-up is on. If your dictations come back only lightly tidied, check the key.</p>
+    <!-- APPROVED 04/11/2026 17:14 AEDT (the waiting line, Windows only): the quoted line replaces the 16/10/2026 one -->
+    <p>If the card says "On, but waiting for your …", Dictum cannot find your key. For OpenAI, for example, it says "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add the key in Settings &gt; Clean-up or in .env." Check the file's name, and the line in it.</p>
 
     <h3>Turn it off</h3>
     <p>To turn it off, open Settings &gt; Clean-up and click <b>Switch cloud clean-up off</b>. Your dictations are tidied on this PC again.</p>
-    <p>Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.</p>
+    <!-- APPROVED 04/11/2026 16:51 AEDT (row 44, Windows only): replaces the 22/10/2026 paragraph -->
+    <p>Dictum reads your key from the keys you add in Dictum (kept in Windows Credential Manager), the .env file or a Windows environment variable. It never saves the key in its settings, and never shows it on screen or writes it in its log.</p>
+  </section>
+
+  <!-- PROPOSED 04/11/2026 (K-Docs lane; new words for Kyle, approve-api-keys.md "K-Docs proposals"): the whole of section 9. The provider steps below are
+       taken from each provider's own documentation as read on 04/11/2026 (the URL and date are in a comment in each part). Anything the
+       documentation did not say is left out. Names only, no logos. Screenshots are by Kyle from his own accounts (docs/SHOT-LIST-API-KEYS.md). -->
+  <section id="keys" aria-labelledby="keys-title">
+    <h2 id="keys-title">9. Get an API key, service by service</h2>
+    <p>An API key is a long line of letters and numbers that a service gives you. It works like a password: keep it to yourself. Each service's website changes from time to time. If what you see is not what a step says, follow the service's own instructions, linked in each part.</p>
+    <p>The service handles what Dictum sends it under its own terms. Our <a href="/privacy#network">privacy policy</a>, section 4, says what each service told us on 23/10/2026.</p>
+    <p>You can paste the key into Dictum with <b>Add a key…</b> (the steps are in each part), or put it in a key file. For the key file, <a href="dictum-keys.env" download>download the same key file that Dictum makes</a>, save it as <code>.env</code> in Dictum's settings folder, and put each key in place of <code>your-key-here</code>.</p>
+    <!-- SCREENSHOT 1: see docs/SHOT-LIST-API-KEYS.md (Dictum: Settings > Clean-up, the key list and Add a key…) -->
+
+    <h3 id="key-anthropic">Anthropic (Claude)</h3>
+    <!-- Source: https://platform.claude.com/docs/en/get-api-key, read 04/11/2026 -->
+    <ol>
+      <li>In your web browser, go to <code>platform.claude.com</code> and sign in. If you do not have an account yet, the site lets you create one.</li>
+      <li>Go to the API keys page: <code>platform.claude.com/settings/keys</code>.</li>
+      <li>Click <b>Create key</b>. Give the key a name, choose when it expires, and set <b>Linked account</b> to yourself.</li>
+      <li>Copy the key. The Console shows the whole key, which starts with <code>sk-ant-</code>, only once. If you lose it, create a new one.</li>
+      <li>In Dictum, open Settings &gt; Clean-up. In the <b>Service</b> list, choose <b>Anthropic (Claude)</b>.</li>
+      <li>Press <b>Add a key…</b>, paste the key in the <b>Key</b> box, and press <b>Save</b>.</li>
+      <li>Click <b>Use cloud clean-up…</b> and read what Dictum says. When cloud clean-up is on, press <b>Check this key</b> beside the key to test it.</li>
+    </ol>
+    <!-- SCREENSHOT 2: see docs/SHOT-LIST-API-KEYS.md (Anthropic: the API keys page, Create key) -->
+    <p>Anthropic's own instructions: <code>platform.claude.com/docs/en/get-api-key</code>.</p>
+
+    <h3 id="key-openai">OpenAI</h3>
+    <!-- Source: https://developers.openai.com/api/docs/quickstart and https://developers.openai.com/api/reference/overview, read 04/11/2026. Not verified, so left out: the address and menu path of OpenAI's key page (neither page gave them), and whether the key is shown only once. -->
+    <ol>
+      <li>Open OpenAI's quickstart, <code>developers.openai.com/api/docs/quickstart</code>, and find the part called "Create and export an API key". It leads to your OpenAI dashboard.</li>
+      <li>In the dashboard, click <b>Create an API Key</b>.</li>
+      <li>Copy the key when it is shown, and keep it safe. OpenAI says to treat your key as a secret and not to share it.</li>
+      <li>OpenAI works for both cloud clean-up and cloud speech. For cloud clean-up: in Dictum, open Settings &gt; Clean-up, choose <b>OpenAI</b> in the <b>Service</b> list, press <b>Add a key…</b>, paste the key, and press <b>Save</b>. For cloud speech: open Settings &gt; Models in the Advanced view, find the <b>Cloud speech</b> card, and do the same there.</li>
+      <li>Click <b>Use cloud clean-up…</b> (or <b>Use cloud speech…</b>) and read what Dictum says. When the service is on, press <b>Check this key</b> beside the key to test it.</li>
+    </ol>
+    <!-- SCREENSHOT 3: see docs/SHOT-LIST-API-KEYS.md (OpenAI: the dashboard, Create an API Key) -->
+
+    <h3 id="key-gemini">Google Gemini</h3>
+    <!-- Source: https://aistudio.google.com/docs/api-key (redirected from https://ai.google.dev/gemini-api/docs/api-key), read 04/11/2026. Not verified, so left out: billing steps (the page states no billing requirement). -->
+    <ol>
+      <li>In your web browser, go to <code>aistudio.google.com/apikey</code>. If it asks you to sign in or to accept the Terms of Service, do so. Every key belongs to a Google Cloud project; for a new user, Google AI Studio makes a default project and key after you accept the Terms.</li>
+      <li>On the <b>API Keys</b> page, click <b>Create API key</b>.</li>
+      <li>If the button is unavailable and says "You do not have permission to create a key in this project", you need permission in that project. Ask whoever manages your Google Cloud account.</li>
+      <li>Copy the new key.</li>
+      <li>In Dictum, open Settings &gt; Clean-up. In the <b>Service</b> list, choose <b>Google Gemini</b>.</li>
+      <li>Press <b>Add a key…</b>, paste the key in the <b>Key</b> box, and press <b>Save</b>.</li>
+      <li>Click <b>Use cloud clean-up…</b> and read what Dictum says. When cloud clean-up is on, press <b>Check this key</b> beside the key to test it.</li>
+    </ol>
+    <!-- SCREENSHOT 4: see docs/SHOT-LIST-API-KEYS.md (Google AI Studio: API Keys, Create API key) -->
+    <p>Google's own instructions: <code>aistudio.google.com/docs/api-key</code>.</p>
+
+    <h3 id="key-azure">Azure OpenAI</h3>
+    <!-- Sources, read 04/11/2026: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/create-resource (it redirects to https://learn.microsoft.com/en-us/azure/foundry-classic/openai/how-to/create-resource; steps to create a resource and deploy a model) and https://learn.microsoft.com/en-us/azure/ai-services/multi-service-resource (Overview > Endpoint, Resource Management > Keys and Endpoint, for a Foundry resource).
+         Not verified, so left out: the portal's menu names for an Azure OpenAI resource itself (Microsoft's page names them for a Foundry resource), and which speech model to deploy. -->
+    <p>Azure OpenAI is a cloud speech service in Dictum. You need an Azure subscription, and permission to create an Azure OpenAI resource and to deploy a model in it.</p>
+    <ol>
+      <li>Sign in to the Azure portal, <code>portal.azure.com</code>. If you already have an Azure OpenAI resource with a model deployed, go to step 4.</li>
+      <li>Click <b>Create a resource</b>, search for <b>Azure OpenAI</b>, and click <b>Create</b>. On the <b>Basics</b> tab, fill in <b>Subscription</b>, <b>Resource group</b>, <b>Region</b> and <b>Name</b>. Click <b>Next</b> until <b>Review + submit</b>, then click <b>Create</b>. When Azure says the resource is ready, click <b>Go to resource</b>.</li>
+      <li>Deploy a model that turns speech into text. Microsoft's instructions for this are in the page linked below. Remember the <b>Deployment name</b> you choose: Dictum asks for it.</li>
+      <li>In the portal, open your resource. On the <b>Overview</b> page, note the <b>Endpoint</b>. It looks like <code>https://YOUR-RESOURCE-NAME.openai.azure.com</code>. Under <b>Resource Management</b>, click <b>Keys and Endpoint</b> and copy a key. Microsoft's page describes these menus for a Foundry resource; for an Azure OpenAI resource they may differ a little.</li>
+      <li>In Dictum, open Settings &gt; Models in the Advanced view and find the <b>Cloud speech</b> card. In the <b>Service</b> list, choose <b>Azure OpenAI</b>. Type your resource's address in <b>Server address</b> and your deployment name in <b>Model</b>.</li>
+      <li>Press <b>Add a key…</b>, paste the key in the <b>Key</b> box, and press <b>Save</b>.</li>
+      <li>Click <b>Use cloud speech…</b> and read what Dictum says. When cloud speech is on, press <b>Check this key</b> beside the key to test it.</li>
+    </ol>
+    <!-- SCREENSHOT 5: see docs/SHOT-LIST-API-KEYS.md (Azure portal: the resource's Keys and Endpoint page) -->
+    <p>Microsoft's own instructions: <code>learn.microsoft.com/en-us/azure/ai-services/openai/how-to/create-resource</code>.</p>
+
+    <h3 id="key-groq">Groq</h3>
+    <!-- Source: https://console.groq.com/docs/quickstart and https://console.groq.com/keys, read 04/11/2026. Not verified, so left out: how to sign up, and whether the console asks you to name the key. -->
+    <p>Groq is a cloud speech service in Dictum.</p>
+    <ol>
+      <li>In your web browser, go to <code>console.groq.com/keys</code>. If the page asks you to sign in, sign in. Groq's page says only team owners and users with the developer role can create or manage keys.</li>
+      <li>Click <b>Create API Key</b>.</li>
+      <li>Copy the key, and keep it to yourself.</li>
+      <li>In Dictum, open Settings &gt; Models in the Advanced view and find the <b>Cloud speech</b> card. In the <b>Service</b> list, choose <b>Groq</b>.</li>
+      <li>Press <b>Add a key…</b>, paste the key in the <b>Key</b> box, and press <b>Save</b>.</li>
+      <li>Click <b>Use cloud speech…</b> and read what Dictum says. When cloud speech is on, press <b>Check this key</b> beside the key to test it.</li>
+    </ol>
+    <!-- SCREENSHOT 6: see docs/SHOT-LIST-API-KEYS.md (Groq console: the API Keys page, Create API Key) -->
+
+    <h3 id="key-custom">A server of your own</h3>
+    <!-- No provider documentation: this part describes only what Dictum does. -->
+    <p>If you chose <b>Custom server (OpenAI-compatible)</b>, whoever runs the server gives you its key, if it needs one. Some servers, such as one on your own computer, need none: then add no key. Dictum sends the key to the address you typed in <b>Server address</b>, and nowhere else.</p>
+    <ol>
+      <li>Ask whoever runs the server for a key, and copy it.</li>
+      <li>In Dictum, open Settings &gt; Clean-up (or, for cloud speech, Settings &gt; Models in the Advanced view). Choose <b>Custom server (OpenAI-compatible)</b> in the <b>Service</b> list, and type its address in <b>Server address</b> and its model name in <b>Model</b>.</li>
+      <li>Press <b>Add a key…</b>, paste the key in the <b>Key</b> box, and press <b>Save</b>.</li>
+    </ol>
   </section>
 
   <section id="free" aria-labelledby="free-title">
-    <h2 id="free-title">9. Free</h2>
+    <h2 id="free-title">10. Free</h2>
     <p>Free: no subscription, no account, no ads, no analytics, no telemetry.</p>
     <p>The base product stays free to keep on your PC; optional paid extras may come later.</p>
     <p>There is no charge and no word limit. Dictum is open source, which means anyone can read the program's code. It is made by Kynni Pty Ltd and shared under the MIT licence.</p>
   </section>
 
   <section id="feedback" aria-labelledby="feedback-title">
-    <h2 id="feedback-title">10. Send feedback or report a problem</h2>
+    <h2 id="feedback-title">11. Send feedback or report a problem</h2>
     <p>Dictum sends nothing by itself. Instead, it opens a new email in your own email program. You can read and change it before you send it.</p>
 
     <h3>Send feedback or suggest a feature</h3>
@@ -412,7 +505,7 @@
   </section>
 
   <section id="faq" aria-labelledby="faq-title">
-    <h2 id="faq-title">11. Questions and answers</h2>
+    <h2 id="faq-title">12. Questions and answers</h2>
     <p>Click a question to see its answer.</p>
     <div class="faq">
 

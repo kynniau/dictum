@@ -289,7 +289,7 @@ public sealed class MacCopyBlockTests
         Assert.Equal(HelpText.Questions.Select(q => q.Question), questions.Select(q => q.Question));
         var remove = questions.Single(q => q.Question == HelpText.RemoveQuestion).Answer;
         Assert.Equal([.. HelpText.Questions.Single(q => q.Question == HelpText.RemoveQuestion).Answer.SkipLast(1), expected], remove);
-        foreach (var (before, after) in HelpText.Questions.Zip(questions).Where(p => p.First.Question != HelpText.RemoveQuestion))
+        foreach (var (before, after) in HelpText.Questions.Zip(questions).Where(p => p.First.Question != HelpText.RemoveQuestion && !(mac && p.First.Question == HelpText.CloudQuestion))) // the Mac's cloud answer keeps the approved key sentences (KeysDocsTests)
             Assert.Same(before, after);
 
         using var scratch = new Scratch();

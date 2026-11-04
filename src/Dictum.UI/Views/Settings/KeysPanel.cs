@@ -90,15 +90,15 @@ internal sealed record KeyListing(string Variable, IReadOnlyList<KeyEntry> Entri
 /// </summary>
 internal sealed class KeysPanel
 {
-    // PROPOSED 04/11/2026 (approve-api-keys.md rows 16 and 23 to 29): the list's own words.
+    // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (approve-api-keys.md rows 16 and 23 to 29): the list's own words.
 
-    /// <summary>PROPOSED 04/11/2026 (row 16): the button that opens the dialog.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 16): the button that opens the dialog.</summary>
     internal const string AddLabel = "Add a key…";
 
-    /// <summary>PROPOSED 04/11/2026 (row 23): in place of the button where there is no credential store Dictum can use (macOS until the K-Mac lane).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 23): in place of the button where there is no credential store Dictum can use (macOS until the K-Mac lane).</summary>
     internal const string NoStoreLine = "Adding a key here needs a credential store Dictum can use, which this computer does not have yet. Put the key in the key file instead.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 24): where each kind of key lives.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 24): where each kind of key lives.</summary>
     internal static string Where(KeyEntry entry) => entry.Source switch
     {
         KeySource.Environment => "Environment variable",
@@ -106,59 +106,59 @@ internal sealed class KeysPanel
         _ => entry.Added is { } day ? $"Added here on {day:dd'/'MM'/'yyyy}" : "Added here",
     };
 
-    /// <summary>PROPOSED 04/11/2026 (row 25): the mark on the key in use, and the button on the others.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 25): the mark on the key in use, and the button on the others.</summary>
     internal const string ActiveLabel = "Active";
 
-    /// <summary>PROPOSED 04/11/2026 (row 25).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 25).</summary>
     internal const string UseLabel = "Use this key";
 
-    /// <summary>PROPOSED 04/11/2026 (row 26).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 26).</summary>
     internal const string RemoveLabel = "Remove";
 
-    /// <summary>PROPOSED 04/11/2026 (row 37).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 37).</summary>
     internal const string CheckLabel = "Check this key";
 
-    /// <summary>PROPOSED 04/11/2026 (row 25): the buttons' accessible names, which say which key each acts on.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 25): the buttons' accessible names, which say which key each acts on.</summary>
     internal static string UseName(string label) => $"{UseLabel}: {label}"; // the visible words first (WCAG 2.5.3, as CalibrationWindow names its rows)
 
     internal static string CheckName(string label) => $"{CheckLabel}: {label}";
 
     internal static string RemoveName(string label) => $"Remove {label}";
 
-    /// <summary>PROPOSED 04/11/2026 (row 26): Remove's question.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 26): Remove's question.</summary>
     internal const string RemoveTitle = "Remove this key?";
 
-    /// <summary>PROPOSED 04/11/2026 (row 26).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 26).</summary>
     internal static string RemoveText(string label, string store) =>
         $"Dictum removes the key \"{label}\" from {store}. There is no undo: to use it again, add it again.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 27): after Save, the key added (Dictum also makes it the one in use).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 27): after Save, the key added (Dictum also makes it the one in use).</summary>
     internal static string Added(string label) => $"Key \"{label}\" added. Dictum uses it from the next dictation.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 27): saved, but settings.json could not record it as the one in use.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 27): saved, but settings.json could not record it as the one in use.</summary>
     internal static string AddedNotChosen(string label, string failure) =>
         $"Key \"{label}\" added, but it could not be made the one in use ({failure}). Choose Use this key on it once settings.json can be saved.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 27).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 27).</summary>
     internal const string Removed = "Key removed.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 27).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 27).</summary>
     internal static string NowUsing(string label) => $"Dictum now uses \"{label}\" from the next dictation.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 28): the stored keys could not be read; the rest of the list and the page still work.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 28): the stored keys could not be read; the rest of the list and the page still work.</summary>
     internal static string CouldNotRead(string store, string reason) =>
         $"Your stored keys could not be read from {store} ({reason.TrimEnd('.')}). Keys in the key file and environment variables still work.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 29): two or more stored, none chosen, nothing else: none is sent.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 29): two or more stored, none chosen, nothing else: none is sent.</summary>
     internal const string NoneChosen = "Two or more keys are stored and none is chosen, so none is used: choose Use this key on one.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 29): no key yet.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 29): no key yet.</summary>
     internal const string NoKeyYet = "No key yet.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 29): a stored key whose label the vault left out (empty, or it held part of the key).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 29): a stored key whose label the vault left out (empty, or it held part of the key).</summary>
     internal const string Unnamed = "Unnamed key";
 
-    /// <summary>PROPOSED 04/11/2026 (row 37): while a check is under way.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 37): while a check is under way.</summary>
     internal static string Checking(string label) => $"Checking \"{label}\"…";
 
     private readonly AppShell _shell;

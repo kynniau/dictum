@@ -1,3 +1,4 @@
+using Dictum.Platform;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Automation;
@@ -493,7 +494,7 @@ public class HelpPageTests
     private static string ApprovedWarning(string host) =>
         $"WARNING: this is an advanced option and it is less private than local clean-up. Your text leaves this PC to be processed on {host}'s servers. Dictum encrypts the connection (HTTPS) but cannot see, validate or certify how that service stores, protects or uses your text, or who else can read it. Do not dictate confidential, personal or client information with cloud clean-up on unless you have checked that service's terms yourself.";
 
-    private const string ApprovedWaitingLine = "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add it to .env.";
+    private const string ApprovedWaitingLine = "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add the key in Settings > Clean-up or in .env."; // APPROVED 04/11/2026 17:14 AEDT (Windows only)
 
     private const string ApprovedTrayLine = "Cloud clean-up on · text leaves this PC";
 
@@ -658,7 +659,7 @@ public class HelpPageTests
             Click(window, "Use cloud clean-up…");
             var withoutKey = CleanUpPage();
             Assert.DoesNotContain(withoutKey, l => l.StartsWith("On:", StringComparison.Ordinal));
-            Assert.Contains(CloudPolicy.WaitingForKeyLine(SecretStore.AnthropicKey), withoutKey);
+            Assert.Contains(CloudPolicy.WaitingForKeyLine(SecretStore.AnthropicKey, PlatformWords.Windows), withoutKey);
             Assert.Contains("Switch cloud clean-up off", withoutKey);
             Assert.True(shell.NothingLeaves);
             Assert.Contains("If the card says \"On, but waiting for your …\", Dictum cannot find your key.", answer);

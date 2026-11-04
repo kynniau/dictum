@@ -33,7 +33,7 @@
 
 <main id="main" class="wrap doc">
   <h1>Privacy policy</h1>
-  <p class="updated">Dictum by Kynni. Last updated <time datetime="2026-10-23">23/10/2026</time>.</p>
+  <p class="updated">Dictum by Kynni. Last updated <time datetime="2026-11-04">04/11/2026</time>.</p>
   <!-- APPROVED by the owner 23/10/2026 07:10 AEDT: do not reword (scope sentence: the Dictum for Mac beta is covered) -->
   <p>This policy covers the Dictum desktop app for Windows PCs, whether you install it from the Microsoft Store or as the direct download, the Dictum for Mac beta, and this website, dictum.kynni.au. Dictum is made by Kynni Pty Ltd (“we”).</p>
 
@@ -43,7 +43,7 @@
     <ul>
       <li><strong>Dictum sends nothing about you to Kynni.</strong> It has no account, no analytics, no telemetry (automatic reports on how you use an app) and no crash reporting. We never receive your audio or your text unless you send it to us yourself.</li>
       <li><strong>Your speech is turned into text on your computer, unless you turn on cloud speech</strong>, and the text is tidied on your computer unless you turn on cloud clean-up. Both are off until you switch them on and agree in their own consent step.</li>
-      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or to check for updates in the direct download for Windows and in the Mac beta. If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose.</li>
+      <li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or to check for updates in the direct download for Windows and in the Mac beta. If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose. If you press Check this key beside a key you added, it sends that key, and nothing you dictated or wrote, to the same address your dictations go to.</li>
       <li><strong>What we do hold</strong> is small: the records our web host keeps of visits to this website, which we can see for one day (the host keeps its own copy for as long as it decides, section 7), and the emails you choose to send us.</li>
     </ul>
   </section>
@@ -140,6 +140,10 @@
     <!-- APPROVED 23/10/2026 06:15 AEDT (confirmed as shipped; proposed 22/10/2026): do not reword -->
     <p>Only if you switch on cloud speech in Settings &gt; Models, agree to the service in its own consent step and, for OpenAI, Azure OpenAI or Groq, add your own API key (a server you name may need none). After each dictation (each part, in hands-free) Dictum then sends that dictation’s recording, as a WAV file, to the service you chose, together with the words in your personal dictionary as a hint and, in hands-free, the closing words of the part before. The service is OpenAI (<code>api.openai.com</code>), Azure OpenAI (<code>{resource}.openai.azure.com</code>, your own resource), Groq (<code>api.groq.com</code>) or a custom <code>https://</code> address you enter. That service handles your voice under its own terms. This is an advanced option: Dictum cannot validate or certify how that service stores, protects or uses your voice. Check its terms before dictating anything sensitive.</p>
 
+    <!-- APPROVED by the owner 04/11/2026 16:49 AEDT (row 46, two-model record .demo-preview/two-model-api-keys-privacy.md): do not reword -->
+    <h3>Check this key (only when you press it)</h3>
+    <p>Only if you have switched on cloud clean-up or cloud speech, agreed to the service in its consent step, and press Check this key beside a key in Settings. Dictum then sends one request to that service, or to the address you entered, asking it to list its models. The request carries your key and nothing you dictated or wrote. It goes to the same address your dictations go to, and nowhere else. The answer is shown to you with anything that looks like a key hidden. Offline only refuses it unless that address is on your own computer.</p>
+
     <h3>What each cloud service says about your data</h3>
     <p>The services differ, and their pages can change. On 23/10/2026 their own pages said:</p>
     <ul>
@@ -201,7 +205,7 @@
   <!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword -->
   <section aria-labelledby="delete">
     <h2 id="delete">10. Deleting everything</h2>
-    <p>In Dictum, open Settings &gt; Storage. You can delete calibration recordings, logs or individual models, or choose <strong>Remove Dictum completely</strong>. That deletes everything Dictum has stored: models, recordings, logs, settings, consent records, dictionary, corrections, snippets and <code>.env</code>. It also deletes its start-at-login entry and, on Windows, its Start menu shortcut. Then it removes the app itself, unless its first warning says it cannot. You see the full list of files and their sizes first and type DELETE to confirm; there is no undo. In the Microsoft Store version it deletes the data, then opens Windows Settings so you can uninstall the app. On a Mac it removes the login item and, if you are running the installed Dictum.app, moves it to the Trash after Dictum closes; otherwise it tells you to drag Dictum.app to the Trash yourself.</p>
+    <p>In Dictum, open Settings &gt; Storage. You can delete calibration recordings, logs or individual models, or choose <strong>Remove Dictum completely</strong>. That deletes everything Dictum has stored: models, recordings, logs, settings, consent records, dictionary, corrections, snippets, <code>.env</code> and the API keys you added in Dictum. It also deletes its start-at-login entry and, on Windows, its Start menu shortcut. Then it removes the app itself, unless its first warning says it cannot. You see the full list of files and their sizes first and type DELETE to confirm; there is no undo. In the Microsoft Store version it deletes the data, then opens Windows Settings so you can uninstall the app. On a Mac it removes the login item and, if you are running the installed Dictum.app, moves it to the Trash after Dictum closes; otherwise it tells you to drag Dictum.app to the Trash yourself.</p>
     <p>By hand on Windows: for the installed direct download or the Store version, search Start for “Add or remove programs”, find Dictum and choose Uninstall; for the portable zip, delete the folder you unzipped. For the direct download, then delete the folders <code>%APPDATA%\Dictum</code> and <code>%LOCALAPPDATA%\Dictum</code>, and any models folder you chose yourself. Uninstalling the Microsoft Store version also deletes the files Windows kept in Dictum’s private app folder. By hand on a Mac: move Dictum.app to the Trash and delete <code>~/Library/Application Support/Dictum</code>.</p>
     <p>To delete an email you sent us, ask us (section 9).</p>
   </section>

@@ -18,7 +18,8 @@ public static class KeyFile
 
     /// <summary>
     /// The new file's text (K-UI lane, 04/11/2026, brief §2 item 3): the approved <see cref="Header"/> first, byte for byte, a blank
-    /// line, then the whole of the repository's .env.example (every variable and its comments, in its own words), each empty
+    /// line, then the repository's .env.example from its "# Syntax" line on (<see cref="SyntaxLine"/>; the file's opening paragraph, which tells
+    /// someone to copy it to a folder by hand, is left out: decided by the owner 04/11/2026 16:52 AEDT, row 43), each empty
     /// "VARIABLE=" line given <see cref="SecretStore.Placeholder"/>, which counts as not set. Still one line per variable (decision D4):
     /// several keys for one service live in the credential store only. .env.example is compiled in (Dictum.Core.csproj), so the file
     /// Dictum writes cannot drift from the template the repository carries.
@@ -28,7 +29,10 @@ public static class KeyFile
     /// <summary>The logical name Dictum.Core.csproj gives the embedded .env.example.</summary>
     internal const string TemplateResource = "Dictum.Settings.env.example";
 
-    /// <summary>.env.example with LF line ends and the placeholder after every empty key line.</summary>
+    /// <summary>The line of .env.example where the file Dictum writes begins; everything above it is the "Copy to %APPDATA%\Dictum\.env…" paragraph.</summary>
+    internal const string SyntaxLine = "# Syntax";
+
+    /// <summary>.env.example from its "# Syntax" line on, with LF line ends and the placeholder after every empty key line.</summary>
     internal static string Template { get; } = Placeholders(ReadTemplate());
 
     private static string ReadTemplate()
@@ -36,7 +40,19 @@ public static class KeyFile
         using var stream = typeof(KeyFile).Assembly.GetManifestResourceStream(TemplateResource)
                            ?? throw new InvalidOperationException($"{TemplateResource} is not compiled into Dictum.Core.");
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        return reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
+        return FromSyntaxLine(reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// <paramref name="template"/> (LF line ends) from its first line that starts with <see cref="SyntaxLine"/>. Throws when there is none, so a
+    /// reworded .env.example cannot quietly ship a key file with the wrong start (a hard-coded line count would).
+    /// </summary>
+    internal static string FromSyntaxLine(string template)
+    {
+        var at = template.StartsWith(SyntaxLine, StringComparison.Ordinal) ? 0 : template.IndexOf("\n" + SyntaxLine, StringComparison.Ordinal) + 1;
+        if (at == 0 && !template.StartsWith(SyntaxLine, StringComparison.Ordinal))
+            throw new InvalidOperationException($".env.example has no line starting \"{SyntaxLine}\", so the key file cannot be made from it.");
+        return template[at..];
     }
 
     private static string Placeholders(string template) =>

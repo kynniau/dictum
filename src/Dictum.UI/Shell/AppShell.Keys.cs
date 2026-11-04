@@ -12,25 +12,25 @@ namespace Dictum.UI.Shell;
 /// </summary>
 public sealed partial class AppShell
 {
-    // PROPOSED 04/11/2026 (approve-api-keys.md rows 37 and 38): the shell's lines for the key lists and Settings > Privacy.
+    // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (approve-api-keys.md rows 37 and 38): the shell's lines for the key lists and Settings > Privacy.
 
-    /// <summary>PROPOSED 04/11/2026 (row 37): Check this key was asked without the consent step for that host (the button is not shown then).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 37): Check this key was asked without the consent step for that host (the button is not shown then).</summary>
     internal const string CheckNeedsConsent = "Switch the service on first: the key is checked only with a service you agreed to in its consent step.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 37): the entry chosen no longer has a key (removed, or the file changed meanwhile).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 37): the entry chosen no longer has a key (removed, or the file changed meanwhile).</summary>
     internal const string KeyGone = "That key is no longer there.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): Remove all keys' question title.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): Remove all keys' question title.</summary>
     internal const string RemoveAllTitle = "Remove all keys?";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): Remove all keys' question.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): Remove all keys' question.</summary>
     internal static string RemoveAllText(string store) =>
         $"Dictum removes every API key you added in Dictum from {store}, and their names. Keys in the key file (.env) and in environment variables are not touched. There is no undo: to use a key again, add it again.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): the question's buttons.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): the question's buttons.</summary>
     internal const string RemoveAllButton = "Remove all keys";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): done.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): done.</summary>
     internal static string RemovedKeys(int count) => count switch
     {
         0 => "There were no stored keys to remove.",
@@ -63,7 +63,7 @@ public sealed partial class AppShell
     public string? ChooseKey(string variable, string choice)
     {
         if (!SecretVault.SetActive(Paths, variable, choice, out var failure)) return failure ?? ModelCoordinator.WriteFailed;
-        _log.Info($"Key choice saved for {variable}."); // PROPOSED 04/11/2026 (row 39): no id, no label, no value
+        _log.Info($"Key choice saved for {variable}."); // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 39): no id, no label, no value
         Reload(userRequested: false);
         return null;
     }
@@ -78,10 +78,10 @@ public sealed partial class AppShell
         if (KeyCheck.Target(variable, _settings) is not { } target) return CheckNeedsConsent;
         var key = KeyValue(variable, choice);
         if (key is null) return KeyGone;
-        _log.Info($"Check this key: one request for {variable} to {target.Host}."); // PROPOSED 04/11/2026 (row 39)
+        _log.Info($"Check this key: one request for {variable} to {target.Host}."); // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 39)
         var said = await KeyCheck.RunAsync(_http, target, key, _settings.OfflineOnly, cancel);
         var accepted = said == KeyCheck.Works || said == KeyCheck.Accepted(target.Host);
-        _log.Info($"Check this key: {target.Host} {(accepted ? "accepted the request" : "did not accept it, or was not reached")}."); // PROPOSED (row 39)
+        _log.Info($"Check this key: {target.Host} {(accepted ? "accepted the request" : "did not accept it, or was not reached")}."); // APPROVED 04/11/2026 16:50 AEDT (row 39)
         return said;
     }
 
@@ -97,7 +97,7 @@ public sealed partial class AppShell
         try
         {
             var removed = Vault.RemoveAll();
-            _log.Info($"Remove all keys: {removed} removed."); // PROPOSED 04/11/2026 (row 39)
+            _log.Info($"Remove all keys: {removed} removed."); // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 39)
             return RemovedKeys(removed);
         }
         catch (Exception ex) when (ex is CredentialStoreException or IOException or UnauthorizedAccessException)

@@ -31,7 +31,8 @@ public class CloudWarningAndPresetsTests
 
     // Approved by the product owner on 16/10/2026 as written; pinned word for word, independently of the app's copy. Settings > Clean-up
     // and Settings > Privacy say it, with the variable of the key they wait for, while a service that needs its key is on and the key is not set.
-    private static string ApprovedWaitingLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add it to .env.";
+    // APPROVED by the owner 04/11/2026 17:14 AEDT (Windows only; the Mac keeps the 16/10/2026 line, pinned in KeysDocsTests): the Clean-up card's waiting line.
+    private static string ApprovedWaitingLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add the key in Settings > Clean-up or in .env.";
 
     // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block, O7): the clean-up consent's sentence after "…the words in your personal dictionary."
     private const string ApprovedHandsFreeSentence = "In hands-free mode, up to ten words of what you said just before go with each request.";
