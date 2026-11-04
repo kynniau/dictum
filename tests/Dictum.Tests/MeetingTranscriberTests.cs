@@ -141,17 +141,101 @@ public class MeetingTranscriberTests
         Assert.True(mic.Stopped && other.Stopped);
     }
 
-    [Fact]
-    public async Task Dictionary_uses_dictation_prompt_and_preserves_decoder_options()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Dictionary_uses_per_call_prompt_and_leaves_decoder_unchanged(bool cancelRun)
     {
         using var f = new MeetingFixture();
         var store = f.Store();
         var engine = new ToneEngine();
-        engine.Reconfigure(new(null, 5, "fr", true));
+        engine.Reconfigure(new("Dictation prompt", 5, "fr", true));
+        var original = engine.Decode;
         var dictionary = new PersonalDictionary(["A. Example", "Budget Friday"]);
-        await new MeetingTranscriber(engine, new Gate(), store, dictionary).RunAsync(store.Create(f.Meta()),
-            new FileSource(Tone(440)), _ => { }, default);
-        Assert.Equal(new(dictionary.WhisperPrompt, 5, "fr", true), engine.Decode);
+        using var cancel = new CancellationTokenSource();
+        var run = new MeetingTranscriber(engine, new Gate(), store, dictionary).RunAsync(store.Create(f.Meta()),
+            new FileSource(Tone(440), Tone(880)), _ => { if (cancelRun) cancel.Cancel(); }, cancel.Token);
+        if (cancelRun) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+        else await run;
+        Assert.Equal(original, engine.Decode);
+        Assert.NotEmpty(engine.Prompts);
+        Assert.All(engine.Prompts, prompt => Assert.Equal(dictionary.WhisperPrompt, prompt));
+        Assert.All(engine.Decoders, decode => Assert.Equal(original, decode));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \t\r\n")]
+    public async Task Blank_engine_output_is_not_stored_or_emitted(string output)
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var engine = new ToneEngine { Output = output };
+        var seen = new List<Segment>();
+        await new MeetingTranscriber(engine, new Gate(), store).RunAsync(id,
+            new FileSource(Tone(440)), seen.Add, default);
+        Assert.Single(engine.Frequencies);
+        Assert.Empty(seen);
+        Assert.Empty(store.ReadTranscript(id));
+    }
+
+    [Fact]
+    public async Task A_silent_live_track_allows_parts_before_stop()
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var mic = new Capture();
+        var other = new Capture();
+        var source = new LiveTwoTrackSource(mic, other);
+        var emitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = new MeetingTranscriber(new ToneEngine(), new Gate(), store).RunAsync(id, source,
+            _ => emitted.TrySetResult(), default);
+        await Task.WhenAll(mic.Ready.Task, other.Ready.Task).WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            // A maximum-length cut starts at zero, the idle track's floored watermark.
+            mic.Emit(Tone(440, SpeechSegmenter.LimitBlocks * SpeechSegmenter.BlockMs / 1000.0));
+            await emitted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(mic.Stopped);
+            Assert.False(other.Stopped);
+            Assert.Equal(First, Assert.Single(store.ReadTranscript(id)).Text);
+        }
+        finally { source.Stop(); }
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Live_fault_drains_buffered_parts_and_other_tail_before_rethrow(bool captureFailure)
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var error = new InvalidOperationException("Capture failed");
+        var mic = new Capture { StopError = error };
+        var other = new Capture { Tail = Tone(880, .02) };
+        var source = new LiveTwoTrackSource(mic, other);
+        var seen = new List<Segment>();
+        var engine = new ToneEngine();
+        var original = engine.Decode;
+        var run = new MeetingTranscriber(engine, new Gate(), store, new PersonalDictionary(["Example"]))
+            .RunAsync(id, source, seen.Add, default);
+        await Task.WhenAll(mic.Ready.Task, other.Ready.Task).WaitAsync(TimeSpan.FromSeconds(5));
+        // Positive offsets remain buffered behind the silent track until the source faults.
+        await Task.Delay(150);
+        mic.Emit(Tone(440, .02));
+        if (captureFailure) mic.Fail(error);
+        else source.Stop();
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => run.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Same(error, thrown);
+        Assert.True(mic.Stopped && other.Stopped);
+        Assert.Equal(new[] { First, Second }, seen.Select(s => s.Text));
+        Assert.Equal(seen.OrderBy(s => s.Start), seen);
+        Assert.Equal(seen, store.ReadTranscript(id));
+        Assert.Equal(original, engine.Decode);
     }
 
     [Fact]
@@ -229,6 +313,15 @@ public class MeetingTranscriberTests
         public DecodeOptions Decode { get; private set; } = DecodeOptions.Default;
         public void Reconfigure(DecodeOptions decode) => Decode = decode;
         public List<int> Frequencies { get; } = [];
+        public List<string?> Prompts { get; } = [];
+        public List<DecodeOptions> Decoders { get; } = [];
+        public string? Output;
+        public Task<string> TranscribeAsync(float[] samples16kMono, string? carried, CancellationToken cancellationToken)
+        {
+            Prompts.Add(carried);
+            Decoders.Add(Decode);
+            return TranscribeAsync(samples16kMono, cancellationToken);
+        }
         private int _active;
         public int MaxActive;
         public async Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken)
@@ -254,7 +347,7 @@ public class MeetingTranscriberTests
                 }
                 var frequency = Power(440) > Power(880) ? 440 : 880;
                 Frequencies.Add(frequency);
-                return frequency == 440 ? First : Second;
+                return Output ?? (frequency == 440 ? First : Second);
             }
             finally { Interlocked.Decrement(ref _active); }
         }
@@ -267,13 +360,15 @@ public class MeetingTranscriberTests
         public long Stamp;
         public bool Stopped;
         public CapturedAudio Tail = CapturedAudio.Empty;
+        public Exception? StopError;
         public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Action<CapturedAudio, CutReason>? _part;
-        public event Action<Exception>? Failed { add { } remove { } }
+        public event Action<Exception>? Failed;
+        public void Fail(Exception error) => Failed?.Invoke(error);
         public void Start(string? deviceSetting, long keyDownStamp) => Stamp = keyDownStamp;
         public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part)
         { _part = part; Ready.TrySetResult(); }
         public void Emit(CapturedAudio audio) => _part!(audio, CutReason.Pause);
-        public CapturedAudio Stop() { Stopped = true; return Tail; }
+        public CapturedAudio Stop() { Stopped = true; if (StopError is not null) throw StopError; return Tail; }
     }
 }

@@ -2,6 +2,7 @@ using Dictum.Audio;
 using Dictum.Meetings.Store;
 using Dictum.Personal;
 using Dictum.Transcribe;
+using System.Runtime.ExceptionServices;
 
 namespace Dictum.Meetings.Transcribe;
 
@@ -16,18 +17,28 @@ public sealed class MeetingTranscriber(ISpeechEngine engine, IVoiceGate gate, IM
         await _run.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            // The same initial-prompt path as dictation; keep language, translation and beam settings.
-            if (dictionary is not null)
-                engine.Reconfigure(engine.Decode with { Prompt = dictionary.WhisperPrompt });
+            // The per-call prompt leaves the shared dictation decoder unchanged.
             var queue = new PriorityQueue<(Channel Channel, CapturedAudio Part, TimeSpan Offset), (TimeSpan, long)>();
             long sequence = 0;
-            await foreach (var part in source.ReadAsync(cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+            ExceptionDispatchInfo? sourceError = null;
+            await using var reader = source.ReadAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+            while (true)
             {
+                bool more;
+                try { more = await reader.MoveNextAsync().ConfigureAwait(false); }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    sourceError = ExceptionDispatchInfo.Capture(ex);
+                    break;
+                }
+                if (!more) break;
+                var part = reader.Current;
                 cancellationToken.ThrowIfCancellationRequested();
                 queue.Enqueue(part, (part.Offset, sequence++));
                 await Drain(source.Watermark).ConfigureAwait(false);
             }
             await Drain(TimeSpan.MaxValue).ConfigureAwait(false);
+            sourceError?.Throw();
 
             async Task Drain(TimeSpan through)
             {
@@ -36,7 +47,8 @@ public sealed class MeetingTranscriber(ISpeechEngine engine, IVoiceGate gate, IM
                     cancellationToken.ThrowIfCancellationRequested();
                     queue.Dequeue();
                     if (!(await gate.CheckAsync(part.Part.Samples, cancellationToken).ConfigureAwait(false)).Speech) continue;
-                    var text = await engine.TranscribeAsync(part.Part.Samples, cancellationToken).ConfigureAwait(false);
+                    var text = await engine.TranscribeAsync(part.Part.Samples, dictionary?.WhisperPrompt, cancellationToken).ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(text)) continue;
                     // Persist a completed inference even if cancellation arrived as it returned.
                     var segment = new Segment(part.Offset, part.Offset + part.Part.Duration, part.Channel, text);
                     store.AppendSegments(id, [segment]);

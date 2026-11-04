@@ -14,6 +14,8 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
     private readonly System.Threading.Channels.Channel<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> _parts =
         System.Threading.Channels.Channel.CreateUnbounded<(Channel, CapturedAudio, TimeSpan)>();
     private readonly TimeSpan[] _latest = [TimeSpan.MinValue, TimeSpan.MinValue];
+    private readonly Queue<TimeSpan>[] _pending = [new(), new()];
+    private static readonly TimeSpan LongestPart = TimeSpan.FromMilliseconds(SpeechSegmenter.LimitBlocks * SpeechSegmenter.BlockMs);
     private bool _micStarted, _systemStarted;
     private int _read, _stopped;
     private TimeSpan _watermark = TimeSpan.MinValue;
@@ -47,9 +49,17 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
                 lock (_sync)
                 {
                     _latest[part.Channel == Channel.You ? 0 : 1] = part.Offset;
-                    // simplification: an idle track holds the ordering watermark until its next cut or Stop.
-                    // Retire when IAudioCapture supplies timestamped progress during silence, allowing earlier draining.
-                    _watermark = _latest.Min();
+                    _pending[part.Channel == Channel.You ? 0 : 1].Dequeue();
+                    // simplification: an idle track holds the watermark LongestPart (the segmenter's 30 s bound) behind the clock, so while one side is
+                    // silent the other side's parts surface up to 30 s late; retire when capture (lane L2) reports whether each track is in speech.
+                    var idle = _clock.Elapsed - LongestPart;
+                    if (idle < TimeSpan.Zero) idle = TimeSpan.Zero;
+                    // Unconsumed callbacks must still enter the transcription queue before we pass them.
+                    _watermark = Enumerable.Range(0, 2).Select(track =>
+                    {
+                        var progress = _latest[track] > idle ? _latest[track] : idle;
+                        return _pending[track].TryPeek(out var next) && next < progress ? next : progress;
+                    }).Min();
                 }
                 yield return part;
             }
@@ -72,24 +82,23 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
         if (part.Samples.Length == 0) return;
         lock (_sync)
         {
-            // simplification: IAudioCapture exposes neither packet timestamps nor the segmenter's retained look-back.
-            // Anchor each part's end at callback wall time; pause/limit look-back and callback latency bound the error.
-            // Retire when capture exposes the actual cut timestamp. Sample totals never accumulate device drift here.
+            // simplification: offset = shared clock at callback minus part duration; it ignores segmenter look-back and pause trailing time, so live tracks can be skewed by a few hundred ms; retire when capture (lane L2) reports sample boundaries on the shared clock
             var offset = _clock.Elapsed - part.Duration;
             if (offset < _published[track]) offset = _published[track];
             _published[track] = offset;
-            _parts.Writer.TryWrite((channel, part, offset));
+            if (_parts.Writer.TryWrite((channel, part, offset))) _pending[track].Enqueue(offset);
         }
     }
 
-    public void Stop()
+    public void Stop() => Stop(null);
+
+    private void Stop(Exception? error)
     {
         lock (_lifecycle)
         {
             if (Interlocked.Exchange(ref _stopped, 1) != 0) return;
-            Exception? error = null;
             try { if (_micStarted) Publish(0, Channel.You, microphone.Stop()); }
-            catch (Exception ex) { error = ex; }
+            catch (Exception ex) { error ??= ex; }
             try { if (_systemStarted) Publish(1, Channel.Others, system.Stop()); }
             catch (Exception ex) { error ??= ex; }
             _parts.Writer.TryComplete(error);
@@ -97,5 +106,6 @@ public sealed class LiveTwoTrackSource(IAudioCapture microphone, IAudioCapture s
         }
     }
 
-    private void Failed(Exception error) => _parts.Writer.TryComplete(error);
+    // A failure callback runs on the capture thread; stop on a worker so capture shutdown can join it.
+    private void Failed(Exception error) => ThreadPool.QueueUserWorkItem(_ => Stop(error));
 }
