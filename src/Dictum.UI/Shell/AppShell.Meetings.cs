@@ -14,6 +14,7 @@ public sealed partial class AppShell
             () => _settings.SilenceThreshold, Personal.Text.Dictionary),
         () => Platform.CreateCapture(_log), MeetingSummaryClient, CopyText) with
         {
+            Log = _log,
             MicrophoneDevice = () => _settings.Audio.Device,
             SilenceThreshold = () => _settings.SilenceThreshold,
             CloudSpeechHost = () => _speech.SendsAudio ? _speech.Host : null,

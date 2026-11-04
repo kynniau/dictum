@@ -35,6 +35,7 @@ internal sealed record MeetingsHost(
             : storedEngine == "OwnKey" ? SummaryCaption.For("OwnKey", PLACEHOLDER_UnrecordedProvider)
             : SummaryCaption.For(storedEngine);
     }
+    public ILog Log { get; init; } = NullLog.Instance;
     public Func<string?> MicrophoneDevice { get; init; } = () => null;
     public Func<double> SilenceThreshold { get; init; } = () => 0.01;
     public Func<string?> CloudSpeechHost { get; init; } = () => null;
@@ -45,7 +46,7 @@ internal sealed record MeetingsHost(
     {
         var snapshot = settings();
         var root = snapshot.Folder ?? Path.Combine(paths.LocalDir, "meetings");
-        IMeetingStore store = new FileMeetingStore(paths, snapshot, new MeetingKeyring(credentials), Caption);
+        IMeetingStore store = new CurrentSettingsStore(root, settings, new MeetingKeyring(credentials));
         var transcriber = factory.Create(store);
         // simplification: until IPlatform gains AudioDecoder and CreateLoopbackCapture (lane L2)
         var importer = new MeetingImporter(store, transcriber, new WavOnlyDecoder());
@@ -63,6 +64,28 @@ internal sealed record MeetingsHost(
             }, BitLockerStatus,
             () => credentials.Read(dismissal, computer) == "dismissed",
             () => credentials.Write(dismissal, computer, "dismissed"));
+    }
+
+    // The folder stays pinned until reopening, as described in Settings. Read other settings per operation.
+    internal sealed class CurrentSettingsStore(string root, Func<MeetingsSettings> settings, IMeetingKeyring ring) : IMeetingStore
+    {
+        private FileMeetingStore Current() => new(root, settings() with { Folder = root }, ring, Caption);
+        public MeetingId Create(MeetingMeta meta) => Current().Create(meta);
+        public void WriteAudio(MeetingId id, Channel channel, Stream audio) => Current().WriteAudio(id, channel, audio);
+        public void AppendSegments(MeetingId id, IEnumerable<Segment> segments) => Current().AppendSegments(id, segments);
+        public void AddMarker(MeetingId id, Marker marker) => Current().AddMarker(id, marker);
+        public void WriteSummary(MeetingId id, Summary summary) => Current().WriteSummary(id, summary);
+        public void WriteVideo(MeetingId id, string path) => Current().WriteVideo(id, path);
+        public MeetingMeta Read(MeetingId id) => Current().Read(id);
+        public IReadOnlyList<Segment> ReadTranscript(MeetingId id) => Current().ReadTranscript(id);
+        public Summary? ReadSummary(MeetingId id) => Current().ReadSummary(id);
+        public Stream OpenAudio(MeetingId id, Channel channel) => Current().OpenAudio(id, channel);
+        public IReadOnlyList<MeetingMeta> List() => Current().List();
+        public IReadOnlyList<(MeetingMeta, string Snippet)> Search(string text) => Current().Search(text);
+        public void Delete(MeetingId id) => Current().Delete(id);
+        public long SizeOf(MeetingId id) => Current().SizeOf(id);
+        public void ApplyRetention(DateTimeOffset now) => Current().ApplyRetention(now);
+        public string ExportMarkdown(MeetingId id) => Current().ExportMarkdown(id);
     }
 
     public async Task Regenerate(MeetingId id, string template, CancellationToken cancellation)

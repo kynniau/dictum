@@ -33,6 +33,12 @@ public sealed class MeetingsWorkflowUiTests
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Dispatcher.UIThread.RunJobs();
     }
+    private static byte[] AudioBytes(Stream audio)
+    {
+        using var copy = new MemoryStream();
+        audio.CopyTo(copy);
+        return copy.ToArray();
+    }
     private static string Texts(ILogical root) => string.Join("\n", All<TextBlock>(root).Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
     private static async Task Until(Func<bool> done)
     {
@@ -56,7 +62,7 @@ public sealed class MeetingsWorkflowUiTests
             Paths = new(Path.Combine(Files.Root, "config"), Path.Combine(Files.Root, "local"), Path.Combine(Files.Root, "exe"));
             Directory.CreateDirectory(Paths.ConfigDir);
             Directory.CreateDirectory(Paths.ExeDir);
-            Store = new FileMeetingStore(Path.Combine(Files.Root, "meetings"), Settings, Files.Keyring, MeetingsHost.Caption);
+            Store = new MeetingsHost.CurrentSettingsStore(Path.Combine(Files.Root, "meetings"), () => Settings, Files.Keyring);
             var transcriber = new TestTranscriber(Store);
             var importer = new MeetingImporter(Store, transcriber, new WavOnlyDecoder());
             Host = new(Paths, () => Settings, Store, async (path, agreement, cancellation) =>
@@ -259,6 +265,256 @@ public sealed class MeetingsWorkflowUiTests
             Assert.True(shell.CreateMeetingsHost().WarningDismissed());
         }
         window.Close();
+    });
+
+    private sealed class FaultStore(IMeetingStore inner) : IMeetingStore
+    {
+        public bool FailCreate, FailAppend, FailAudioOnce, ForeignOwner, Unreadable;
+        public int AudioAttempts, Deletes;
+        public MeetingId Create(MeetingMeta meta)
+        {
+            var id = inner.Create(ForeignOwner ? meta with { Title = "Another meeting" } : meta);
+            if (FailCreate) throw new IOException("Synthetic partial create failure");
+            return id;
+        }
+        public void WriteAudio(MeetingId id, Channel channel, Stream audio)
+        {
+            AudioAttempts++;
+            if (FailAudioOnce) { FailAudioOnce = false; throw new IOException("Synthetic save failure"); }
+            inner.WriteAudio(id, channel, audio);
+        }
+        public void AppendSegments(MeetingId id, IEnumerable<Segment> segments)
+        {
+            if (FailAppend) throw new IOException("Synthetic notes failure");
+            inner.AppendSegments(id, segments);
+        }
+        public MeetingMeta Read(MeetingId id) => Unreadable ? throw new InvalidDataException("Synthetic unreadable metadata") : inner.Read(id);
+        public void Delete(MeetingId id) { Deletes++; inner.Delete(id); }
+        public void AddMarker(MeetingId id, Marker marker) => inner.AddMarker(id, marker);
+        public void WriteSummary(MeetingId id, Summary summary) => inner.WriteSummary(id, summary);
+        public void WriteVideo(MeetingId id, string path) => inner.WriteVideo(id, path);
+        public IReadOnlyList<Segment> ReadTranscript(MeetingId id) => inner.ReadTranscript(id);
+        public Summary? ReadSummary(MeetingId id) => inner.ReadSummary(id);
+        public Stream OpenAudio(MeetingId id, Channel channel) => inner.OpenAudio(id, channel);
+        public IReadOnlyList<MeetingMeta> List() => inner.List();
+        public IReadOnlyList<(MeetingMeta, string Snippet)> Search(string text) => inner.Search(text);
+        public long SizeOf(MeetingId id) => inner.SizeOf(id);
+        public void ApplyRetention(DateTimeOffset now) => inner.ApplyRetention(now);
+        public string ExportMarkdown(MeetingId id) => inner.ExportMarkdown(id);
+    }
+
+    private sealed class DelayedTranscriber(IMeetingStore store) : IMeetingTranscriber
+    {
+        public async Task RunAsync(MeetingId id, IMeetingAudioSource source, Action<Segment> onSegment, CancellationToken cancellationToken)
+        {
+            await foreach (var part in source.ReadAsync(cancellationToken))
+            {
+                await Task.Delay(80, cancellationToken);
+                var segment = new Segment(part.Offset, part.Offset + part.Part.Duration, part.Channel, "Final segment");
+                store.AppendSegments(id, [segment]);
+                onSegment(segment);
+            }
+        }
+    }
+
+    private sealed class FailingTranscriber : IMeetingTranscriber
+    {
+        public TaskCompletionSource Fail { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async Task RunAsync(MeetingId id, IMeetingAudioSource source, Action<Segment> onSegment, CancellationToken cancellationToken)
+        {
+            await Fail.Task;
+            throw new IOException("Synthetic transcription failure");
+        }
+    }
+
+    [Fact]
+    public Task Retention_uses_changed_settings_while_window_stays_open() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        fixture.Settings = fixture.Settings with { KeepAudio = KeepAudio.Days30 };
+        var window = new MeetingsWindow(fixture.Host); window.Show();
+        var id = fixture.Store.Create(fixture.Files.Meta());
+        using (var audio = new MemoryStream(MeetingFixture.Wav())) fixture.Store.WriteAudio(id, Channel.You, audio);
+        fixture.Settings = fixture.Settings with { KeepAudio = KeepAudio.Forever };
+        window.ShowList();
+        using var saved = fixture.Store.OpenAudio(id, Channel.You);
+        Assert.Equal(MeetingFixture.Wav(), AudioBytes(saved));
+        window.Close();
+    });
+
+    [Fact]
+    public Task Failed_audio_save_keeps_audio_for_retry_and_discard_requires_confirmation() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var store = new FaultStore(fixture.Store) { FailAudioOnce = true };
+        var window = new MeetingsWindow(fixture.Host with { Store = store }); window.Show(); window.BeginAgreement();
+        Click(window, PLACEHOLDER_Start);
+        var id = Assert.Single(fixture.Store.List()).Id;
+        Click(window, PROPOSED_Stop);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Retry && b.IsEffectivelyEnabled));
+        Assert.False(fixture.Capture.Active);
+        Assert.Contains(PROPOSED_AudioSaveFailed, Texts(window));
+        window.Close(); Assert.True(window.IsVisible);
+        Click(window, PROPOSED_Discard);
+        var confirm = Assert.Single(window.OwnedWindows);
+        Assert.Contains(PROPOSED_DeleteQuestion, Texts(confirm));
+        Click(confirm, PROPOSED_Cancel);
+        Assert.Single(fixture.Store.List());
+        Click(window, PROPOSED_Retry);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+        using var audio = fixture.Store.OpenAudio(id, Channel.You);
+        Assert.True(AudioBytes(audio).Length > 44);
+        Assert.Equal(2, store.AudioAttempts);
+        Assert.Equal(0, store.Deletes);
+        Assert.Equal(1, fixture.Capture.Stops);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Shutdown_drains_final_segments_before_closing() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host with { Transcriber = new DelayedTranscriber(fixture.Store) });
+        window.Show(); window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
+        var id = Assert.Single(fixture.Store.List()).Id;
+        window.Shutdown();
+        Assert.False(window.IsVisible);
+        Assert.Equal("Final segment", Assert.Single(fixture.Store.ReadTranscript(id)).Text);
+        using var audio = fixture.Store.OpenAudio(id, Channel.You);
+        Assert.True(AudioBytes(audio).Length > 44);
+    });
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    public Task Partial_create_rolls_back_only_owned_live_meetings_and_notes(bool notes, bool foreign, bool unreadable) => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var existing = fixture.Store.Create(fixture.Files.Meta());
+        var store = new FaultStore(fixture.Store) { FailCreate = true, ForeignOwner = foreign, Unreadable = unreadable };
+        var window = new MeetingsWindow(fixture.Host with { Store = store }); window.Show(); window.BeginAgreement();
+        if (notes)
+        {
+            Click(window, PLACEHOLDER_Refused);
+            All<TextBox>(window).Single().Text = MeetingFixture.TranscriptText;
+            Click(window, PROPOSED_SaveNotes);
+        }
+        else Click(window, PLACEHOLDER_Start);
+        Assert.Equal(foreign ? 2 : 1, fixture.Store.List().Count);
+        Assert.Equal(foreign ? 0 : 1, store.Deletes);
+        Assert.Equal(existing, fixture.Store.Read(existing).Id);
+        Assert.Contains(PROPOSED_Error, Texts(window));
+        window.Close(); Assert.False(window.IsVisible);
+    });
+
+    [Fact]
+    public Task Notes_append_failure_rolls_back_only_new_meeting() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var existing = fixture.Store.Create(fixture.Files.Meta());
+        var store = new FaultStore(fixture.Store) { FailAppend = true };
+        var window = new MeetingsWindow(fixture.Host with { Store = store }); window.Show(); window.BeginAgreement();
+        Click(window, PLACEHOLDER_Refused);
+        All<TextBox>(window).Single().Text = MeetingFixture.TranscriptText;
+        Click(window, PROPOSED_SaveNotes);
+        Assert.Equal(existing, Assert.Single(fixture.Store.List()).Id);
+        Assert.Equal(1, store.Deletes);
+        window.Close();
+    });
+
+    [Fact]
+    public Task Late_joiner_discard_uses_recording_confirmation() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host); window.Show(); window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
+        Click(window, PROPOSED_Joined); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        var confirm = Assert.Single(window.OwnedWindows);
+        Assert.Contains(PROPOSED_DeleteQuestion, Texts(confirm));
+        Assert.True(fixture.Capture.Active); Assert.Single(fixture.Store.List());
+        Click(confirm, PROPOSED_Cancel);
+        Assert.True(fixture.Capture.Active);
+        Click(window, PROPOSED_Joined); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        await Until(() => fixture.Store.List().Count == 0 && !fixture.Capture.Active);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Agreement_and_recording_explain_audio_is_saved_at_stop() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host); window.Show(); window.BeginAgreement();
+        Assert.Contains(PROPOSED_AudioUntilStop, Texts(window));
+        Click(window, PLACEHOLDER_Start);
+        Assert.Contains(PROPOSED_AudioUntilStop, Texts(window));
+        window.Shutdown();
+    });
+
+    [Fact]
+    public Task Transcription_fault_is_announced_immediately_and_audio_can_be_saved() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var transcriber = new FailingTranscriber();
+        var window = new MeetingsWindow(fixture.Host with { Transcriber = transcriber });
+        window.Show(); window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
+        var id = Assert.Single(fixture.Store.List()).Id;
+        Assert.True(fixture.Capture.Active);
+        transcriber.Fail.SetResult();
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_SaveAudioStop));
+        Assert.False(fixture.Capture.Active);
+        Assert.Contains(All<TextBlock>(window), t => t.Text == PROPOSED_TranscriptionFailed && AutomationProperties.GetLiveSetting(t) == AutomationLiveSetting.Polite);
+        Click(window, PROPOSED_SaveAudioStop);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+        using var audio = fixture.Store.OpenAudio(id, Channel.You); Assert.True(AudioBytes(audio).Length > 44);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Screen_changes_move_focus_and_announce_the_screen() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host); window.Show(); Dispatcher.UIThread.RunJobs();
+        Assert.True(Find(window, PROPOSED_Start).IsFocused);
+        window.BeginAgreement(); Dispatcher.UIThread.RunJobs();
+        Assert.True(All<ComboBox>(window).Single().IsFocused);
+        Assert.Contains(All<TextBlock>(window), t => t.Text == PLACEHOLDER_Before && AutomationProperties.GetLiveSetting(t) == AutomationLiveSetting.Polite);
+        Click(window, PLACEHOLDER_Refused);
+        Assert.True(All<TextBox>(window).Single().IsFocused);
+        Click(window, PROPOSED_Cancel);
+        Assert.True(Find(window, PROPOSED_Start).IsFocused);
+        window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
+        Assert.True(Find(window, PROPOSED_Mark).IsFocused);
+        Assert.Contains(All<TextBlock>(window), t => t.Text == PROPOSED_Recording && AutomationProperties.GetLiveSetting(t) == AutomationLiveSetting.Polite);
+        Click(window, PROPOSED_Stop);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(Find(window, PROPOSED_Meetings).IsFocused);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Two_recordings_share_one_timer_handler() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host); window.Show();
+        var timer = (DispatcherTimer)typeof(MeetingsWindow).GetField("_timer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(window)!;
+        var tick = typeof(DispatcherTimer).GetField("Tick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        for (var index = 0; index < 2; index++)
+        {
+            window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
+            Assert.Single(((Delegate)tick.GetValue(timer)!).GetInvocationList());
+            Click(window, PROPOSED_Stop);
+            await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+            Assert.False(timer.IsEnabled);
+            Assert.Single(((Delegate)tick.GetValue(timer)!).GetInvocationList());
+            Click(window, PROPOSED_Meetings);
+        }
+        Assert.Equal(2, fixture.Capture.Starts); Assert.Equal(2, fixture.Capture.Stops);
+        window.Close(); return true;
     });
 
     private static void KeyboardReach(Window window)

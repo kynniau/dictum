@@ -1,10 +1,12 @@
 using Avalonia;
+using Avalonia.LogicalTree;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Dictum.Core;
 using Dictum.Meetings;
 using Dictum.Meetings.Summaries;
 using static Dictum.UI.Views.Meetings.MeetingsText;
@@ -20,9 +22,12 @@ internal sealed class MeetingsWindow : Window
     private readonly DispatcherTimer _timer;
     private MicrophoneMeetingSource? _source;
     private Task? _transcription;
+    private CancellationTokenSource? _recordingCancellation;
     private MeetingId? _recording;
     private bool _paused, _busy;
-    private bool _shuttingDown;
+    private bool _shuttingDown, _ending, _transcriptionFailed;
+    private TextBlock? _elapsed;
+    private ProgressBar? _meter;
     private string _search = "";
     private MeetingsEntries? _entries;
     private Button? _importButton;
@@ -41,6 +46,12 @@ internal sealed class MeetingsWindow : Window
             Children = { Ui.Stack(12, _status, _screen) },
         };
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _timer.Tick += (_, _) =>
+        {
+            if (_source is null) return;
+            if (_elapsed is not null) _elapsed.Text = _source.Elapsed.ToString(@"hh\:mm\:ss");
+            if (_meter is not null) _meter.Value = _source.Level;
+        };
         Closing += (_, e) =>
         {
             if (!_shuttingDown && (_recording is not null || _busy)) { e.Cancel = true; Say(PROPOSED_CloseRecording); }
@@ -58,7 +69,23 @@ internal sealed class MeetingsWindow : Window
     private void Say(string text) => _status.Text = text;
     private void Screen(params Control[] controls)
     {
-        _screen.Content = Named(new ScrollViewer { Content = Ui.Stack(16, controls) }, PROPOSED_Meetings);
+        var content = Named(new ScrollViewer { Content = Ui.Stack(16, controls) }, PROPOSED_Meetings);
+        _screen.Content = content;
+        var heading = content.GetLogicalDescendants().OfType<TextBlock>().FirstOrDefault();
+        Say(heading?.Text ?? PROPOSED_Meetings);
+        FocusScreen(content);
+    }
+    private void FocusScreen(Control content)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(_screen.Content, content)) return;
+            var first = content.GetLogicalDescendants().OfType<Control>()
+                .FirstOrDefault(c => (c is Avalonia.Controls.Button or TextBox or ComboBox or ToggleSwitch) && c.Focusable && c.IsEffectivelyVisible && c.IsEffectivelyEnabled);
+            if (first is not null) first.Focus(NavigationMethod.Tab);
+            else if (content.GetLogicalDescendants().OfType<TextBlock>().FirstOrDefault() is { } heading)
+            { heading.Focusable = true; heading.Focus(NavigationMethod.Tab); }
+        }, DispatcherPriority.Background);
     }
     private async Task Work(Func<Task> action)
     {
@@ -69,7 +96,11 @@ internal sealed class MeetingsWindow : Window
         try { await action(); if (_status.Text == PROPOSED_Busy) Say(""); }
         catch (OperationCanceledException) { }
         catch { Say(PROPOSED_Error); }
-        finally { _busy = false; _screen.IsEnabled = true; }
+        finally
+        {
+            _busy = false; _screen.IsEnabled = true;
+            if (_screen.Content is Control content) FocusScreen(content);
+        }
     }
 
     internal void ShowList()
@@ -154,9 +185,8 @@ internal sealed class MeetingsWindow : Window
             else StartRecording(agreement);
         }));
         Screen(Ui.Heading(importing ? PLACEHOLDER_BeforeImport : PLACEHOLDER_Before),
-            Ui.Card(Ui.Stack(8, Ui.Text(importing ? PLACEHOLDER_ImportAgreement : PLACEHOLDER_Agreement), Ui.Text(summaryRoute), Ui.Text(retention))),
+            Ui.Card(Ui.Stack(8, Ui.Text(importing ? PLACEHOLDER_ImportAgreement : PLACEHOLDER_Agreement), Ui.Text(summaryRoute), Ui.Text(retention), Ui.Text(importing ? "" : PROPOSED_AudioUntilStop))),
             Ui.Text(PLACEHOLDER_How), how, Button(PLACEHOLDER_Refused, TakeNotes), Ui.Row(8, Button(PROPOSED_Cancel, ShowList), acknowledge));
-        Dispatcher.UIThread.Post(() => acknowledge.Focus(NavigationMethod.Tab));
     }
 
     private void TakeNotes()
@@ -166,10 +196,15 @@ internal sealed class MeetingsWindow : Window
             Ui.Row(8, Button(PROPOSED_Cancel, ShowList), Button(PROPOSED_SaveNotes, () => _ = Work(() =>
             {
                 if (string.IsNullOrWhiteSpace(notes.Text)) return Task.CompletedTask;
-                var id = _host.Store.Create(new MeetingMeta(MeetingId.New(), PROPOSED_Notes, DateTimeOffset.UtcNow,
-                    TimeSpan.Zero, MeetingSource.Recorded, null, [], [], false, null, null));
-                _host.Store.AppendSegments(id, [new Segment(TimeSpan.Zero, TimeSpan.Zero, Channel.Mixed, notes.Text)]);
-                ShowMeeting(id);
+                var meta = new MeetingMeta(MeetingId.New(), PROPOSED_Notes, DateTimeOffset.UtcNow,
+                    TimeSpan.Zero, MeetingSource.Recorded, null, [], [], false, null, null);
+                try
+                {
+                    var id = _host.Store.Create(meta);
+                    _host.Store.AppendSegments(id, [new Segment(TimeSpan.Zero, TimeSpan.Zero, Channel.Mixed, notes.Text)]);
+                    ShowMeeting(id);
+                }
+                catch { Rollback(meta); throw; }
                 return Task.CompletedTask;
             }))));
         notes.Focus(NavigationMethod.Tab);
@@ -179,67 +214,94 @@ internal sealed class MeetingsWindow : Window
     {
         var meta = new MeetingMeta(MeetingId.New(), PROPOSED_Meetings, agreement.AcknowledgedAt, TimeSpan.Zero,
             MeetingSource.Recorded, agreement, [], [], false, null, null);
-        var id = _host.Store.Create(meta);
-        _recording = id;
-        var lines = Named(Ui.Text(""), PROPOSED_Live);
-        AutomationProperties.SetLiveSetting(lines, AutomationLiveSetting.Polite);
-        var state = Named(Ui.Text(PROPOSED_Recording), PROPOSED_Status);
-        AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
-        var elapsed = Named(Ui.Text(""), PROPOSED_Elapsed);
-        var meter = Named(new ProgressBar { Minimum = 0, Maximum = 1, Height = 16 }, PROPOSED_You);
         try
         {
+            var id = _host.Store.Create(meta);
+            _recording = id;
+            _transcriptionFailed = false;
+            var lines = Named(Ui.Text(""), PROPOSED_Live);
+            AutomationProperties.SetLiveSetting(lines, AutomationLiveSetting.Polite);
+            var state = Named(Ui.Text(PROPOSED_Recording), PROPOSED_Status);
+            AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
+            var elapsed = Named(Ui.Text(""), PROPOSED_Elapsed);
+            var meter = Named(new ProgressBar { Minimum = 0, Maximum = 1, Height = 16 }, PROPOSED_You);
             _source = new(_host.Capture(), _host.MicrophoneDevice(), _host.SilenceThreshold());
             _source.Failed += error => Dispatcher.UIThread.Post(() => _ = Work(async () => { await StopRecording(false); Say(PROPOSED_Error); }));
             _source.Start();
+            var source = _source;
+            var pause = Button(PROPOSED_Pause, () => { });
+            pause.Click += (_, _) =>
+            {
+                try
+                {
+                    if (_paused) _source.Resume(); else _source.Pause();
+                    _paused = !_paused;
+                    pause.Content = _paused ? PROPOSED_Resume : PROPOSED_Pause;
+                    AutomationProperties.SetName(pause, _paused ? PROPOSED_Resume : PROPOSED_Pause);
+                    state.Text = _paused ? PROPOSED_Paused : PROPOSED_Recording;
+                    _host.Store.AddMarker(id, new(_source.Elapsed, _paused ? MarkerKind.Paused : MarkerKind.Resumed));
+                }
+                catch { Say(PROPOSED_Error); }
+            };
+            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(PROPOSED_MicOnly), Ui.Text(PROPOSED_AudioUntilStop),
+                Ui.Text(string.Format(PLACEHOLDER_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())), state, elapsed,
+                Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_You), meter)), Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Live), lines)),
+                Ui.Row(8, Button(PROPOSED_Mark, () => { _host.Store.AddMarker(id, new(_source.Elapsed, MarkerKind.Moment)); Say(PROPOSED_Marked); }),
+                    Button(PROPOSED_Joined, ShowJoined), pause),
+                Ui.Row(8, Button(PROPOSED_Discard, ConfirmDiscard), Button(PROPOSED_Stop, () => _ = Work(() => StopRecording(false)))));
+            _elapsed = elapsed;
+            _meter = meter;
+            _timer.Start();
+            // Start the writer only once capture and the recording screen are ready.
+            _recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            var cancellation = _recordingCancellation.Token;
+            _transcription = Task.Run(() => _host.Transcriber.RunAsync(id, source, segment => Dispatcher.UIThread.Post(() =>
+                lines.Text += FormatSegment(segment) + Environment.NewLine), cancellation));
+            _ = ObserveTranscription(_transcription, source);
         }
         catch
         {
+            _timer.Stop();
             try { _source?.Dispose(); }
-            finally { _source = null; _recording = null; _host.Store.Delete(id); }
+            finally { ReleaseRecording(); Rollback(meta); }
             throw;
         }
-        var source = _source;
-        var cancellation = _lifetime.Token;
-        _transcription = Task.Run(() => _host.Transcriber.RunAsync(id, source, segment => Dispatcher.UIThread.Post(() =>
-            lines.Text += FormatSegment(segment) + Environment.NewLine), cancellation));
-        var pause = Button(PROPOSED_Pause, () => { });
-        pause.Click += (_, _) =>
+    }
+
+    private void Rollback(MeetingMeta meta)
+    {
+        MeetingMeta? stored = null;
+        try { stored = _host.Store.Read(meta.Id); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException) { }
+        if (stored is null || (stored.StartedAt == meta.StartedAt && stored.Title == meta.Title)) _host.Store.Delete(meta.Id);
+    }
+
+    private async Task ObserveTranscription(Task transcription, MicrophoneMeetingSource source)
+    {
+        try { await transcription; }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch
         {
-            try
-            {
-                if (_paused) _source.Resume(); else _source.Pause();
-                _paused = !_paused;
-                pause.Content = _paused ? PROPOSED_Resume : PROPOSED_Pause;
-                AutomationProperties.SetName(pause, _paused ? PROPOSED_Resume : PROPOSED_Pause);
-                state.Text = _paused ? PROPOSED_Paused : PROPOSED_Recording;
-                _host.Store.AddMarker(id, new(_source.Elapsed, _paused ? MarkerKind.Paused : MarkerKind.Resumed));
-            }
-            catch { Say(PROPOSED_Error); }
-        };
-        Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(PROPOSED_MicOnly),
-            Ui.Text(string.Format(PLACEHOLDER_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())), state, elapsed,
-            Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_You), meter)), Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Live), lines)),
-            Ui.Row(8, Button(PROPOSED_Mark, () => { _host.Store.AddMarker(id, new(_source.Elapsed, MarkerKind.Moment)); Say(PROPOSED_Marked); }),
-                Button(PROPOSED_Joined, ShowJoined), pause),
-            Ui.Row(8, Button(PROPOSED_Discard, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Discard,
-                () => _ = Work(() => StopRecording(true)))), Button(PROPOSED_Stop, () => _ = Work(() => StopRecording(false)))));
-        _timer.Tick += Tick;
-        _timer.Start();
-        void Tick(object? sender, EventArgs args)
-        {
-            if (_source is null) { _timer.Tick -= Tick; return; }
-            elapsed.Text = _source.Elapsed.ToString(@"hh\:mm\:ss");
-            // No transitions, pulsing or scrolling animations: also the reduced-motion path.
-            meter.Value = _source.Level;
+            if (_ending || !ReferenceEquals(_source, source)) return;
+            _transcriptionFailed = true;
+            try { source.Stop(); }
+            catch (Exception error) { _host.Log.Warn("Meeting capture stop failed: " + error.GetType().Name); }
+            _timer.Stop();
+            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(PROPOSED_TranscriptionFailed),
+                Button(PROPOSED_SaveAudioStop, () => _ = Work(() => StopRecording(false))),
+                Button(PROPOSED_Discard, ConfirmDiscard));
+            Say(PROPOSED_TranscriptionFailed);
         }
     }
+
+    private void ConfirmDiscard() => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Discard,
+        () => _ = Work(() => StopRecording(true)));
 
     private void ShowJoined()
     {
         var dialog = new Window { Title = PROPOSED_Joined, Width = 520, SizeToContent = SizeToContent.Height, CanResize = false };
         dialog.Content = new Border { Padding = new Thickness(24), Child = Ui.Stack(16, Ui.Text(PLACEHOLDER_Joined),
-            Button(PROPOSED_Cancel, dialog.Close), Button(PROPOSED_Discard, () => { dialog.Close(); _ = Work(() => StopRecording(true)); }),
+            Button(PROPOSED_Cancel, dialog.Close), Button(PROPOSED_Discard, () => { dialog.Close(); ConfirmDiscard(); }),
             Button(PLACEHOLDER_Continue, () =>
             {
                 if (_recording is { } id && _source is { } source) _host.Store.AddMarker(id, new(source.Elapsed, MarkerKind.Joined));
@@ -254,57 +316,89 @@ internal sealed class MeetingsWindow : Window
             Ui.Row(8, Button(PROPOSED_Cancel, dialog.Close), Button(accept, () => { dialog.Close(); action(); }))) };
         _ = dialog.ShowDialog(this);
     }
+    private void StopCapture()
+    {
+        _ending = true;
+        _timer.Stop();
+        _elapsed = null; _meter = null;
+        _source?.Stop();
+    }
+
+    private async Task DrainTranscription()
+    {
+        if (_transcription is null) return;
+        try { await _transcription.WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false); }
+        catch (TimeoutException)
+        {
+            _transcriptionFailed = true;
+            _host.Log.Warn("Meeting transcription did not drain within 30 seconds.");
+            _recordingCancellation?.Cancel();
+        }
+        catch (Exception error) { _transcriptionFailed = true; _host.Log.Warn("Meeting transcription failed: " + error.GetType().Name); }
+    }
+
+    private void ReleaseRecording()
+    {
+        _source?.Dispose(); _source = null; _recording = null; _paused = false;
+        _transcription = null; _ending = false;
+        _recordingCancellation?.Dispose(); _recordingCancellation = null;
+    }
+
+    private void ShowSaveFailure()
+    {
+        Screen(Ui.Heading(PROPOSED_AudioSaveFailed), Button(PROPOSED_Retry, () => _ = Work(() => StopRecording(false))),
+            Button(PROPOSED_Discard, ConfirmDiscard));
+        Say(PROPOSED_AudioSaveFailed);
+    }
+
     private async Task StopRecording(bool discard)
     {
         if (_recording is not { } id || _source is null) return;
-        var source = _source;
-        Exception? failure = null;
         try
         {
-            try { source.Stop(); }
-            catch (Exception error) { failure = error; }
-            _timer.Stop();
-            using (var audio = source.Audio()) _host.Store.WriteAudio(id, Channel.You, audio);
-            _host.Finish(id, source.Elapsed);
-            if (_transcription is not null) await _transcription;
-        }
-        catch (Exception error) { failure ??= error; }
-        finally
-        {
-            source.Dispose(); _source = null; _recording = null; _paused = false;
+            StopCapture();
+            await DrainTranscription();
+            if (_shuttingDown) return;
             if (discard) _host.Store.Delete(id);
-        }
-        if (discard) ShowList();
-        else
-        {
-            ShowMeeting(id);
-            if (failure is null)
+            else
             {
-                await _host.Regenerate(id, _host.Settings().SummaryTemplate, _lifetime.Token);
-                ShowMeeting(id);
+                using var audio = _source.Audio();
+                _host.Store.WriteAudio(id, Channel.You, audio);
+                _host.Finish(id, _source.Elapsed);
             }
         }
-        if (failure is not null) Say(PROPOSED_Error);
+        catch { ShowSaveFailure(); return; }
+        ReleaseRecording();
+        if (discard) { ShowList(); return; }
+        ShowMeeting(id);
+        if (_transcriptionFailed) { Say(PROPOSED_TranscriptionFailed); return; }
+        await _host.Regenerate(id, _host.Settings().SummaryTemplate, _lifetime.Token);
+        ShowMeeting(id);
     }
 
+    // AppShell disposal is synchronous. Drain without capturing the UI context;
+    // transcript persistence runs on the worker and display callbacks are posted.
     internal void Shutdown()
     {
+        if (_shuttingDown) return;
         _shuttingDown = true;
         try
         {
             if (_recording is { } id && _source is { } source)
             {
-                source.Stop();
+                StopCapture();
+                DrainTranscription().GetAwaiter().GetResult();
                 using var audio = source.Audio();
                 _host.Store.WriteAudio(id, Channel.You, audio);
                 _host.Finish(id, source.Elapsed);
             }
+            ReleaseRecording();
+            Close();
         }
-        catch { Say(PROPOSED_Error); }
-        finally
+        catch
         {
-            try { _source?.Dispose(); }
-            finally { _source = null; _recording = null; Close(); }
+            _shuttingDown = false;
+            ShowSaveFailure();
         }
     }
 

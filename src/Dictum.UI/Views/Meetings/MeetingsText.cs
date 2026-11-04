@@ -2,6 +2,12 @@ namespace Dictum.UI.Views.Meetings;
 
 internal static class MeetingsText
 {
+    // simplification: retire when audio is saved in encrypted chunks during recording
+    public const string PROPOSED_AudioUntilStop = "Your recording is saved when you press Stop. If Dictum or your computer closes before then, the recording is lost, but the transcript so far is kept.";
+    public const string PROPOSED_AudioSaveFailed = "The recording could not be saved. Your audio is still in memory. Retry saving or discard it.";
+    public const string PROPOSED_Retry = "Retry";
+    public const string PROPOSED_TranscriptionFailed = "Transcription stopped unexpectedly. Capture has stopped. Save your audio and stop the meeting.";
+    public const string PROPOSED_SaveAudioStop = "Save audio and Stop";
     public const string PROPOSED_Meetings = "Meetings";
     public const string PROPOSED_Start = "Start a meeting";
     public const string PROPOSED_Import = "Import a recording";
