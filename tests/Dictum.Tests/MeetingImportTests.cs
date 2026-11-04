@@ -17,6 +17,138 @@ public sealed class MeetingImportTests
     private static Agreement ImportAgreement => new(MeetingFixture.Started, "written", "synthetic-v1", AgreementKind.Live);
 
     [Fact]
+    public async Task Cancellation_after_audio_is_saved_removes_the_meeting()
+    {
+        using var fixture = new MeetingFixture();
+        var path = WriteTone(fixture);
+        var store = fixture.Store();
+        using var cancel = new CancellationTokenSource();
+        var transcriber = new StubTranscriber((_, _) => throw new InvalidOperationException("Must not transcribe"));
+        var progress = new InlineProgress(message =>
+        {
+            if (message != "Transcribing recording") return;
+            var meeting = Assert.Single(store.List());
+            using var saved = store.OpenAudio(meeting.Id, Channel.Mixed);
+            cancel.Cancel();
+        });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new MeetingImporter(store, transcriber, new WavOnlyDecoder()).ImportAsync(path,
+                MeetingSource.ImportedFile, ImportAgreement, progress, cancel.Token));
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public async Task A_transcription_failure_removes_the_meeting_and_preserves_the_error()
+    {
+        using var fixture = new MeetingFixture();
+        var path = WriteTone(fixture);
+        var store = fixture.Store();
+        var expected = new InvalidOperationException("transcription failed");
+        var transcriber = new StubTranscriber((_, _) => Task.FromException(expected));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new MeetingImporter(store, transcriber, new WavOnlyDecoder()).ImportAsync(path,
+                MeetingSource.ImportedFile, ImportAgreement));
+        Assert.Same(expected, error);
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public async Task A_video_write_failure_removes_the_meeting_and_preserves_the_error()
+    {
+        using var fixture = new MeetingFixture();
+        var wav = WriteTone(fixture);
+        var path = Path.ChangeExtension(wav, ".mp4");
+        File.Copy(wav, path);
+        var expected = new IOException("video write failed");
+        var store = new FaultStore(fixture.Store()) { VideoError = expected };
+        var error = await Assert.ThrowsAsync<IOException>(() =>
+            Importer(store, new FixedDecoder(wav)).ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement));
+        Assert.Same(expected, error);
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public async Task A_cleanup_failure_carries_both_errors()
+    {
+        using var fixture = new MeetingFixture();
+        var path = WriteTone(fixture);
+        var expected = new IOException("transcription failed");
+        var cleanup = new IOException("delete failed");
+        var store = new FaultStore(fixture.Store()) { DeleteError = cleanup };
+        var error = await Assert.ThrowsAsync<AggregateException>(() =>
+            new MeetingImporter(store, new StubTranscriber((_, _) => Task.FromException(expected)),
+                new WavOnlyDecoder()).ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement));
+        Assert.Equal(new Exception[] { expected, cleanup }, error.InnerExceptions);
+    }
+
+    [Fact]
+    public async Task The_original_can_be_renamed_while_transcription_is_pending()
+    {
+        using var fixture = new MeetingFixture();
+        var path = WriteTone(fixture);
+        var store = fixture.Store();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transcriber = new StubTranscriber(async (_, cancellation) =>
+        {
+            entered.SetResult();
+            await release.Task.WaitAsync(cancellation);
+        });
+        var importing = new MeetingImporter(store, transcriber, new WavOnlyDecoder())
+            .ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement);
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.False(importing.IsCompleted);
+            File.Move(path, path + ".renamed");
+            File.Move(path + ".renamed", path);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await importing;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Decoders_enforce_an_injected_duration_cap(bool platform)
+    {
+        using var fixture = new MeetingFixture();
+        var path = WriteTone(fixture);
+        var limit = TimeSpan.FromMilliseconds(50);
+        IAudioDecoder decoder = platform ? new MediaFoundationDecoder(limit) : new WavOnlyDecoder(limit);
+        var error = Assert.Throws<NotSupportedException>(() => decoder.Decode(path, CancellationToken.None));
+        Assert.Contains("maximum duration", error.Message);
+        IAudioDecoder atLimit = platform ? new MediaFoundationDecoder(TimeSpan.FromMilliseconds(100))
+            : new WavOnlyDecoder(TimeSpan.FromMilliseconds(100));
+        Assert.Equal(TimeSpan.FromMilliseconds(100), atLimit.Decode(path).Duration);
+    }
+
+    [Fact]
+    public void Cancellation_during_decode_stops_reading()
+    {
+        using var cancel = new CancellationTokenSource();
+        using var reader = new CancellingReader(cancel);
+        Assert.ThrowsAny<OperationCanceledException>(() => new WavOnlyDecoder().Decode(reader, cancel.Token));
+        Assert.Equal(1, reader.Reads);
+    }
+
+    [Fact]
+    public async Task Importer_passes_cancellation_to_the_decoder()
+    {
+        using var fixture = new MeetingFixture();
+        var path = WriteTone(fixture);
+        var store = fixture.Store();
+        using var cancel = new CancellationTokenSource();
+        var decoder = new CancellingDecoder(cancel);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Importer(store, decoder)
+            .ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement, cancellationToken: cancel.Token));
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
     public async Task A_wav_import_round_trips_to_a_Mixed_transcript()
     {
         using var fixture = new MeetingFixture();
@@ -204,7 +336,17 @@ public sealed class MeetingImportTests
         {
             var errors = process.StandardError.ReadToEndAsync();
             var output = process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30));
+            try
+            {
+                await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            catch (Exception error) when (error is TimeoutException or OperationCanceledException)
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None);
+                await Task.WhenAll(errors, output);
+                throw;
+            }
             await output;
             Assert.Equal(0, process.ExitCode);
             Assert.True(File.Exists(destination), await errors);
@@ -215,6 +357,79 @@ public sealed class MeetingImportTests
     {
         public Task<VoiceVerdict> CheckAsync(float[] samples16kMono, CancellationToken cancellationToken) =>
             Task.FromResult(new VoiceVerdict(samples16kMono.Any(s => Math.Abs(s) > .001), "Synthesized tone"));
+    }
+
+    private sealed class InlineProgress(Action<string> report) : IProgress<string>
+    {
+        public void Report(string value) => report(value);
+    }
+
+    private sealed class StubTranscriber(Func<MeetingId, CancellationToken, Task> run) : IMeetingTranscriber
+    {
+        public Task RunAsync(MeetingId id, IMeetingAudioSource source, Action<Segment> onSegment,
+            CancellationToken cancellationToken) => run(id, cancellationToken);
+    }
+
+    private sealed class FixedDecoder(string wav) : IAudioDecoder
+    {
+        public CapturedAudio Decode(string path) => new WavOnlyDecoder().Decode(wav);
+    }
+
+    private sealed class CancellingDecoder(CancellationTokenSource cancel) : IAudioDecoder
+    {
+        public CapturedAudio Decode(string path) => throw new InvalidOperationException("Use cancellable decode");
+        public CapturedAudio Decode(string path, CancellationToken cancellationToken)
+        {
+            Assert.Equal(cancel.Token, cancellationToken);
+            using var reader = new CancellingReader(cancel);
+            return new WavOnlyDecoder().Decode(reader, cancellationToken);
+        }
+    }
+
+    private sealed class CancellingReader(CancellationTokenSource cancel) : WaveStream
+    {
+        public int Reads { get; private set; }
+        public override WaveFormat WaveFormat => new(16000, 16, 1);
+        public override long Length => 32000;
+        public override long Position { get; set; }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            Reads++;
+            Array.Clear(buffer, offset, count);
+            Position += count;
+            cancel.Cancel();
+            return count;
+        }
+    }
+
+    private sealed class FaultStore(IMeetingStore inner) : IMeetingStore
+    {
+        public Exception? VideoError { get; init; }
+        public Exception? DeleteError { get; init; }
+        public MeetingId Create(MeetingMeta meta) => inner.Create(meta);
+        public void WriteAudio(MeetingId id, Channel channel, Stream wav16k) => inner.WriteAudio(id, channel, wav16k);
+        public void WriteVideo(MeetingId id, string sourcePath)
+        {
+            if (VideoError is not null) throw VideoError;
+            inner.WriteVideo(id, sourcePath);
+        }
+        public void Delete(MeetingId id)
+        {
+            if (DeleteError is not null) throw DeleteError;
+            inner.Delete(id);
+        }
+        public void AppendSegments(MeetingId id, IEnumerable<Segment> segments) => inner.AppendSegments(id, segments);
+        public void AddMarker(MeetingId id, Marker marker) => inner.AddMarker(id, marker);
+        public void WriteSummary(MeetingId id, Summary summary) => inner.WriteSummary(id, summary);
+        public MeetingMeta Read(MeetingId id) => inner.Read(id);
+        public IReadOnlyList<Segment> ReadTranscript(MeetingId id) => inner.ReadTranscript(id);
+        public Summary? ReadSummary(MeetingId id) => inner.ReadSummary(id);
+        public Stream OpenAudio(MeetingId id, Channel channel) => inner.OpenAudio(id, channel);
+        public IReadOnlyList<MeetingMeta> List() => inner.List();
+        public IReadOnlyList<(MeetingMeta, string Snippet)> Search(string text) => inner.Search(text);
+        public long SizeOf(MeetingId id) => inner.SizeOf(id);
+        public void ApplyRetention(DateTimeOffset now) => inner.ApplyRetention(now);
+        public string ExportMarkdown(MeetingId id) => inner.ExportMarkdown(id);
     }
 
     private sealed class ToneEngine : ISpeechEngine

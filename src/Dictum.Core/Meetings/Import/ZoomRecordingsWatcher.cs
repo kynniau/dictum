@@ -15,6 +15,7 @@ public sealed class ZoomRecordingsWatcher : IDisposable
     private bool _disposed;
 
     public bool ImportExisting { get; init; }
+    public event Action<string, Exception>? Failed;
 
     public ZoomRecordingsWatcher(TimeProvider? timeProvider = null, TimeSpan? stabilityWindow = null,
         TimeSpan? pollInterval = null)
@@ -82,10 +83,10 @@ public sealed class ZoomRecordingsWatcher : IDisposable
                 _files[path] = new(size, now, initial && !ImportExisting);
                 return;
             }
-            if (observed.Done) return;
+            if (observed.Done || observed.Attempts >= 3) return;
             if (observed.Size != size)
             {
-                _files[path] = new(size, now, false);
+                _files[path] = observed with { Size = size, Since = now };
                 return;
             }
             if (_clock.GetElapsedTime(observed.Since, now) < _stableFor) return;
@@ -93,15 +94,27 @@ public sealed class ZoomRecordingsWatcher : IDisposable
             {
                 if (input.Length != size)
                 {
-                    _files[path] = new(input.Length, now, false);
+                    _files[path] = observed with { Size = input.Length, Since = now };
                     return;
                 }
             }
-            _files[path] = observed with { Done = true };
+            _files[path] = observed with { Attempts = observed.Attempts + 1 };
         }
         catch (IOException) { return; }
         catch (UnauthorizedAccessException) { return; }
-        _onFinished!(path);
+        try
+        {
+            _onFinished!(path);
+            _files[path] = _files[path] with { Done = true };
+        }
+        catch (Exception error)
+        {
+            // A subscriber must not let an exception escape the timer thread either.
+            if (Failed is { } handlers)
+                foreach (Action<string, Exception> handler in handlers.GetInvocationList())
+                    try { handler(path, error); }
+                    catch (Exception) { /* Failure reporting must not terminate polling. */ }
+        }
     }
 
     public void Dispose()
@@ -115,5 +128,5 @@ public sealed class ZoomRecordingsWatcher : IDisposable
         }
     }
 
-    private sealed record Observation(long Size, long Since, bool Done);
+    private sealed record Observation(long Size, long Since, bool Done, int Attempts = 0);
 }

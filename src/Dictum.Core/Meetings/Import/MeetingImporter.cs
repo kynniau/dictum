@@ -17,25 +17,47 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
             throw new ArgumentOutOfRangeException(nameof(source), "Choose an imported meeting source.");
         path = Path.GetFullPath(path);
         // Keep the recording unchanged while decoding and copying it; concurrent writers must finish first.
-        using var original = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report("Decoding recording");
-        // IAudioDecoder returns CapturedAudio: downmix and MonoResampler have already run in its shared CaptureBuffer path.
-        var audio = decoder.Decode(path);
-        cancellationToken.ThrowIfCancellationRequested();
-        var hasVideo = Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase);
-        using var wav = AudioWithOriginal(audio, hasVideo ? null : original, cancellationToken);
-        var id = store.Create(new(MeetingId.New(), Path.GetFileNameWithoutExtension(path),
-            (timeProvider ?? TimeProvider.System).GetUtcNow(), audio.Duration, source,
-            agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null));
-        progress?.Report("Saving encrypted recording");
-        store.WriteAudio(id, Channel.Mixed, wav);
-        if (hasVideo) store.WriteVideo(id, path);
-        cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report("Transcribing recording");
-        await transcriber.RunAsync(id, new FileSource(audio), _ => { }, cancellationToken).ConfigureAwait(false);
-        progress?.Report("Import complete");
-        return id;
+        MeetingId? created = null;
+        try
+        {
+            CapturedAudio audio;
+            MeetingId id;
+            using (var original = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report("Decoding recording");
+                // IAudioDecoder returns CapturedAudio: downmix and MonoResampler have already run in its shared CaptureBuffer path.
+                audio = decoder.Decode(path, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                var hasVideo = Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+                using var wav = AudioWithOriginal(audio, hasVideo ? null : original, cancellationToken);
+                id = store.Create(new(MeetingId.New(), Path.GetFileNameWithoutExtension(path),
+                    (timeProvider ?? TimeProvider.System).GetUtcNow(), audio.Duration, source,
+                    agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null));
+                created = id;
+                progress?.Report("Saving encrypted recording");
+                cancellationToken.ThrowIfCancellationRequested();
+                store.WriteAudio(id, Channel.Mixed, wav);
+                if (hasVideo) store.WriteVideo(id, path);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report("Transcribing recording");
+            cancellationToken.ThrowIfCancellationRequested();
+            await transcriber.RunAsync(id, new FileSource(audio), _ => { }, cancellationToken).ConfigureAwait(false);
+            progress?.Report("Import complete");
+            return id;
+        }
+        catch (Exception error)
+        {
+            if (created is { } id) DeleteFailedImport(id, error);
+            throw;
+        }
+    }
+
+    private void DeleteFailedImport(MeetingId id, Exception error)
+    {
+        try { store.Delete(id); }
+        catch (Exception deleteError) { throw new AggregateException("Import failed and its meeting could not be deleted.", error, deleteError); }
     }
 
     private static MemoryStream AudioWithOriginal(CapturedAudio audio, Stream? original, CancellationToken cancellationToken)

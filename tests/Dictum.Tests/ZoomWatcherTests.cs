@@ -4,6 +4,54 @@ namespace Dictum.Tests;
 
 public sealed class ZoomWatcherTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Callback_failures_are_reported_and_limited_to_three_attempts(bool ioFailure)
+    {
+        using var fixture = new MeetingFixture();
+        Directory.CreateDirectory(fixture.Root);
+        var path = Path.Combine(fixture.Root, "audio.m4a");
+        File.WriteAllBytes(path, []);
+        var clock = new FakeTimeProvider();
+        using var watcher = new ZoomRecordingsWatcher(clock) { ImportExisting = true };
+        var failures = new List<(string Path, Exception Error)>();
+        Exception expected = ioFailure ? new IOException("callback") : new InvalidOperationException("callback");
+        watcher.Failed += (recording, error) => failures.Add((recording, error));
+        watcher.Failed += (_, _) => throw new Exception("reporting failure");
+        var attempts = 0;
+        watcher.Start(fixture.Root, _ => { attempts++; throw expected; });
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(3, attempts);
+        Assert.Equal(3, failures.Count);
+        Assert.All(failures, failure => { Assert.Equal(path, failure.Path); Assert.Same(expected, failure.Error); });
+        File.WriteAllBytes(path, [1]);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(3, attempts);
+    }
+
+    [Fact]
+    public void Callback_that_fails_once_is_retried_on_the_next_scan()
+    {
+        using var fixture = new MeetingFixture();
+        Directory.CreateDirectory(fixture.Root);
+        var path = Path.Combine(fixture.Root, "audio.m4a");
+        File.WriteAllBytes(path, []);
+        var clock = new FakeTimeProvider();
+        using var watcher = new ZoomRecordingsWatcher(clock) { ImportExisting = true };
+        var attempts = 0;
+        var failures = 0;
+        watcher.Failed += (_, _) => failures++;
+        watcher.Start(fixture.Root, _ => { if (++attempts == 1) throw new IOException("retry"); });
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, attempts);
+        clock.Advance(TimeSpan.FromMilliseconds(250));
+        Assert.Equal(2, attempts);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(2, attempts);
+        Assert.Equal(1, failures);
+    }
+
     [Fact]
     public void Watcher_raises_only_when_the_file_has_stopped_growing()
     {
