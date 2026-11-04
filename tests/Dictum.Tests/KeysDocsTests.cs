@@ -43,7 +43,8 @@ public class KeysDocsTests
 
     private const string NewWaiting = "On, but waiting for your OPENAI_API_KEY: nothing is sent until you add the key in Settings > Clean-up or in .env.";
 
-    private static string Site(string file) => File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", file));
+    /// <summary>A site page with LF line ends: a Windows checkout with core.autocrlf=true reads it with CRLF.</summary>
+    private static string Site(string file) => File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", file)).Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static IReadOnlyList<string> CloudAnswer(PlatformWords words) =>
         HelpText.QuestionsFor(words).Single(q => q.Question == HelpText.CloudQuestion).Answer;
