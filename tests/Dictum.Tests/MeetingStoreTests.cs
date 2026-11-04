@@ -385,4 +385,20 @@ public class MeetingStoreTests
         using var fixture = new MeetingFixture();
         Assert.Throws<ArgumentException>(() => fixture.Store().Read(default));
     }
+
+    [Fact]
+    public void Scrub_zeroes_a_file_larger_than_its_chunk_in_place()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "dictum-scrub-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            var length = 2 * FileMeetingStore.ScrubChunk + 7;
+            File.WriteAllBytes(path, RandomNumberGenerator.GetBytes(length));
+            FileMeetingStore.Scrub(path);
+            var after = File.ReadAllBytes(path);
+            Assert.Equal(length, after.Length);
+            Assert.True(after.All(b => b == 0), "Scrub left non-zero bytes");
+        }
+        finally { File.Delete(path); }
+    }
 }

@@ -262,11 +262,14 @@ public sealed class FileMeetingStore : IMeetingStore
             RebuildIndex();
         }
     }
-    private static void Scrub(string path)
+    internal const int ScrubChunk = 1 << 20;
+    /// <summary>Zero-fills the file in place in fixed-size chunks, so a multi-gigabyte crash leftover (a video temp) is scrubbed without one huge buffer.</summary>
+    internal static void Scrub(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
-        var zeros = new byte[checked((int)stream.Length)];
-        stream.Write(zeros); stream.Flush(true);
+        var zeros = new byte[ScrubChunk];
+        for (var left = stream.Length; left > 0; left -= ScrubChunk) stream.Write(zeros, 0, (int)Math.Min(left, ScrubChunk));
+        stream.Flush(true);
     }
     public string ExportMarkdown(MeetingId id)
     {
