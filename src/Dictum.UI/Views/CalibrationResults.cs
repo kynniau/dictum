@@ -5,8 +5,10 @@ using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Calibration;
 using Dictum.Personal;
+using Dictum.UI.Views.Settings;
 
 namespace Dictum.UI.Views;
 
@@ -15,6 +17,7 @@ internal sealed partial class CalibrationWindow
 {
     private readonly Grid ResultsGrid = new() { ColumnDefinitions = new ColumnDefinitions("1.6*,1.2*,0.7*,Auto"), ColumnSpacing = 10, RowSpacing = 6 };
     private readonly StackPanel MissingList = new() { Spacing = 6 };
+    private readonly List<(ComboResult Combo, Button Use, bool Best)> _useButtons = []; // the buttons RenderResults drew, for ShowInUse
     private readonly StackPanel SuggestionList = new() { Spacing = 4 };
 
     private async Task RunAsync(IReadOnlyList<SpeechCandidate> models)
@@ -85,6 +88,7 @@ internal sealed partial class CalibrationWindow
     {
         ResultsGrid.Children.Clear();
         ResultsGrid.RowDefinitions.Clear();
+        _useButtons.Clear();
         if (_session.Results.Count == 0)
         {
             ResultsGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
@@ -103,12 +107,67 @@ internal sealed partial class CalibrationWindow
             if (best) name.FontWeight = FontWeight.SemiBold;
             var errors = Ui.Text(combo.ErrorsText, slow ? "caption" : "body");
             var time = Ui.Text(slow ? $"{combo.AverageSeconds:0.0} s (too slow here)" : $"{combo.AverageSeconds:0.0} s", slow ? "caption" : "body");
-            var use = Ui.Button("Use this", best ? "primary" : "secondary", () => _host.Write([("whisper.model", JsonValue.Create(combo.Model)), ("whisper.beam_size", JsonValue.Create(combo.BeamSize))]),
-                Failed, name: $"Use {combo.Model} with {combo.Decoding}{(best ? " (recommended)" : "")}");
+            var use = Ui.Button(UseLabel, best ? "primary" : "secondary", () => Use(combo), Failed, name: UseName(combo, best, inUse: false));
             use.MinHeight = 30;
+            _useButtons.Add((combo, use, best));
             AddCells(row++, [name, errors, time, use]);
         }
+        ShowInUse();
     }
+
+    /// <summary>
+    /// Use this: writes the combination's model and decoding, and says it took effect. The settings file is read back through the
+    /// same question the "In use" mark asks (<see cref="CalibrationHost.InUse"/>), so the line is only said when the model is the
+    /// one loaded or loading: a refusal, a failed write and a model that could not be switched to each say nothing of the kind.
+    /// When it takes effect (verified in ModelCoordinator.TryWrite, AppShell.Reload and ModelManager.SetDecoding, 04/11/2026): at
+    /// once, with no restart. The new model loads in the background and the hotkey is ignored until it has (AppShell: hotkeyBlocked
+    /// is "not ready"); a changed decoding rebuilds the decoder in the background.
+    /// </summary>
+    private void Use(ComboResult combo)
+    {
+        if (_host.InUse(combo)) return; // already what dictation uses: nothing to write, and the button says so
+        if (_host.Refusal() is { } refused) // model files are moving: nothing is loaded now, so nothing is claimed
+        {
+            _progress.Text = refused;
+            return;
+        }
+        if (!_host.Write([("whisper.model", JsonValue.Create(combo.Model)), ("whisper.beam_size", JsonValue.Create(combo.BeamSize))]))
+        {
+            _progress.Text = ModelCoordinator.WriteFailed; // the tray's balloon says it too; nothing was written or reloaded
+            return;
+        }
+        ShowInUse(); // the same buttons, so the one pressed keeps the keyboard focus
+        if (_host.InUse(combo)) _progress.Text = UsingLine(combo);
+    }
+
+    /// <summary>
+    /// Marks the row in use (<see cref="CalibrationHost.InUse"/>): its button reads "In use" (Settings > Models' label) and its
+    /// name says so; the others read "Use this". The buttons are changed, not rebuilt, so keyboard focus stays on the one pressed.
+    /// </summary>
+    private void ShowInUse()
+    {
+        foreach (var (combo, use, best) in _useButtons)
+        {
+            var inUse = _host.InUse(combo);
+            use.Content = inUse ? ModelsPage.InUseLabel : UseLabel;
+            AutomationProperties.SetName(use, UseName(combo, best, inUse));
+        }
+    }
+
+    private const string UseLabel = "Use this";
+
+    /// <summary>
+    /// The button's name: as it always was ("Use small.en with greedy (recommended)"); on the row in use the state replaces the verb
+    /// ("small.en with greedy (recommended): in use"). PROPOSED (not yet approved) 04/11/2026: approve-calibration-use.md row 2.
+    /// </summary>
+    private static string UseName(ComboResult combo, bool best, bool inUse)
+    {
+        var what = $"{combo.Model} with {combo.Decoding}{(best ? " (recommended)" : "")}";
+        return inUse ? $"{what}: in use" : $"Use {what}";
+    }
+
+    /// <summary>The status line after Use this took effect. PROPOSED (not yet approved) 04/11/2026: approve-calibration-use.md row 1.</summary>
+    internal static string UsingLine(ComboResult combo) => $"Dictum now uses {combo.Model} ({combo.Decoding}) from the next dictation, once the model has loaded.";
 
     private void AddCells(int row, Control[] cells)
     {

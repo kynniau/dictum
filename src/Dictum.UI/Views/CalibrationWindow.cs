@@ -133,6 +133,7 @@ internal sealed partial class CalibrationWindow : Window
         {
             _hotkey ??= shell.RedirectHotkey(OnHotkey); // the hotkey records here only while this window is active
             CheckMicrophone(); // one plugged in while the person was elsewhere turns Record back on
+            ShowInUse(); // the model or decoding may have been changed on Settings > Models meanwhile
         };
         Deactivated += (_, _) =>
         {

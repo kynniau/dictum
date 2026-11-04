@@ -11,7 +11,14 @@ namespace Dictum.Calibration;
 /// The tray app's own lookup (<see cref="App.ModelCoordinator.Find"/>): the file a catalogue speech model is used from, in the
 /// model folders, with a file that came with Dictum held to its full check (size and SHA-256); null when it is not on this PC.
 /// </param>
-/// <param name="Write">Writes settings.json keys through the tray's writer (which reloads and hot-swaps the model).</param>
+/// <param name="Write">
+/// Writes settings.json keys through the tray's writer (which reloads and hot-swaps the model). False when the file could not be
+/// written: the tray's balloon has said so, and nothing was reloaded (<see cref="App.ModelCoordinator.Write"/>).
+/// </param>
+/// <param name="CurrentModel">
+/// The speech model loaded or loading (<see cref="App.ModelCoordinator.CurrentName"/>): it sees a --model or DICTUM_MODEL_PATH
+/// override, and a switch that could not load (the old model stays). Null: settings.json's whisper.model.
+/// </param>
 /// <param name="DownloadSpeechModel">Asks, downloads through the app's downloader (refused under offline_only), then calls back, in
 /// this order: whether the download goes ahead (true once agreed, false when the question is declined; not called when it is
 /// refused before the question; called synchronously on the calling thread, before this returns), then on arrival, then the
@@ -25,13 +32,18 @@ internal sealed record CalibrationHost(
     ModelIntegrity Integrity,
     ILog Log,
     Func<ModelInfo, string?> FindSpeechModel,
-    Action<(string Key, JsonNode? Value)[]> Write,
+    Func<(string Key, JsonNode? Value)[], bool> Write,
     Action<string, Action<bool>, Action, Action<bool>> DownloadSpeechModel,
     Action<IReadOnlyList<string>> AddDictionaryTerms,
     Action<IReadOnlyList<CorrectionRule>> AddCorrections,
     Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null,
-    Func<bool>? MovingFiles = null)
+    Func<bool>? MovingFiles = null,
+    Func<string>? CurrentModel = null)
 {
+    /// <summary>Whether this combination is what dictation uses now: the model loaded or loading, and the decoding settings.json holds (greedy is whisper.beam_size 0).</summary>
+    public bool InUse(ComboResult combo) =>
+        string.Equals(CurrentModel?.Invoke() ?? Settings().Whisper.Model, combo.Model, StringComparison.OrdinalIgnoreCase) && Settings().Whisper.BeamSize == combo.BeamSize;
+
     /// <summary>Why calibration cannot run now (model files are moving: <see cref="App.ModelCoordinator.MovingRefusal"/>), or null.</summary>
     public string? Refusal() => MovingFiles?.Invoke() == true ? App.ModelCoordinator.MovingRefusal : null;
 
