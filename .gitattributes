@@ -1,6 +1,3 @@
 # The hook scripts must keep LF endings in every checkout, whatever core.autocrlf says: a strict POSIX shell (dash, as on
 # Linux and macOS) cannot run a script saved with CRLF. Git for Windows' own sh happens to tolerate it.
 .githooks/* text eol=lf
-
-# The site's downloadable key file is byte for byte what Dictum writes (KeyFile.Contents(), LF), whatever core.autocrlf says: KeysDocsTests compares the bytes.
-site/dictum-keys.env text eol=lf

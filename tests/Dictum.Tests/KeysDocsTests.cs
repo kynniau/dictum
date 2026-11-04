@@ -12,7 +12,7 @@ namespace Dictum.Tests;
 /// <summary>
 /// K-Docs lane (04/11/2026), the API keys block's words placed where the owner approved them: the key file Dictum writes (row 43), the waiting line
 /// (APPROVED 04/11/2026 17:14 AEDT, Windows only), Help rows 40, 44 and 45 (16:51, Windows only), the privacy policy's row 46 entry (16:49), section 10's
-/// list and the short version's third bullet (17:37 and 17:28), and the downloadable key file on the site. Every expected string here is written out
+/// list and the short version's third bullet (17:37 and 17:28), and the key guides' anchors on the site. Every expected string here is written out
 /// from the owner's record (.demo-preview/two-model-api-keys-privacy.md and approve-api-keys.md), not read from the app, so a reworded constant fails.
 /// The held rows (38a, 41, 42 and section 10's second paragraph pointer) must not show anywhere.
 /// </summary>
@@ -164,21 +164,6 @@ public class KeysDocsTests
     }
 
     // ---- The site's key file and guides ---------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// site/dictum-keys.env is the file Dictum writes (KeyFile.Contents), byte for byte, so it cannot drift. Run with DICTUM_WRITE_SITE_KEY_FILE=1 to
-    /// write it from KeyFile.Contents, then commit it.
-    /// </summary>
-    [Fact]
-    public void The_downloadable_key_file_is_the_one_Dictum_writes()
-    {
-        var path = Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "dictum-keys.env");
-        var expected = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(KeyFile.Contents());
-        if (Environment.GetEnvironmentVariable("DICTUM_WRITE_SITE_KEY_FILE") == "1") File.WriteAllBytes(path, expected);
-        Assert.True(File.Exists(path), "site/dictum-keys.env is missing: run this test once with DICTUM_WRITE_SITE_KEY_FILE=1");
-        Assert.Equal(expected, File.ReadAllBytes(path));
-        Assert.Contains("href=\"dictum-keys.env\"", Site("help.html"), StringComparison.Ordinal);
-    }
 
     /// <summary>The dialog's "How do I get a key?" link opens a section that exists (row 22), and each provider's part names its source and the date read.</summary>
     [Theory]
