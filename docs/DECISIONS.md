@@ -6899,3 +6899,15 @@ Brief: `.demo-preview/design-api-keys.md`, items 1, 2, 3 and 5 of §2 (item 4, t
    P1 the variable-only IsCustom (the proxy case of `A_custom_servers_200...` and `An_Anthropic_custom_address_is_checked_at_that_address`);
    P3a IsReadOnly hard-coded false and P3b no placeholder override (`The_key_fields_peer_follows_read_only_and_gives_the_placeholder`, each
    at its own assertion).
+
+## Site deploy gate for the K-Docs pages (04/11/2026 18:25 AEDT, branch feature/k-docs; orchestrator decision)
+
+Recorded from the Opus lens on 3350c2e (finding 3).
+
+1. **No site deploy from main after this PR merges** may go out until the 1.4 release ships **and** the owner approves `site/help.html` section 9 (K1 to K7 in `.demo-preview/approve-api-keys.md`, "K-Docs proposals").
+2. **Why.**
+   - `help.html` carries the approved Windows Help words for rows 40 and 45, the new waiting-line quote and the section 9 guides. They describe buttons ("Add a key…", "Check this key") that 1.3.1 does not have.
+   - Section 9 is PROPOSED wording, not approved.
+   - `privacy.html` also gains the row 46 entry (Check this key) and the date, which are true only with 1.4.
+3. **The orchestrator deploys the site**, so this waits on the 1.4 release, not on this PR alone. Alternatively, deploy from a commit before this merge.
+4. **Held with it:** rows 38a, 41, 42 and section 10's second-paragraph pointer (Store uninstall check, owner, 04/11/2026 15:23 AEDT), and the cloud speech waiting line (K9, PROPOSED, not shown).

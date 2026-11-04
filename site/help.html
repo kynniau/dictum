@@ -389,7 +389,7 @@
   <section id="keys" aria-labelledby="keys-title">
     <h2 id="keys-title">9. Get an API key, service by service</h2>
     <p>An API key is a long line of letters and numbers that a service gives you. It works like a password: keep it to yourself. Each service's website changes from time to time. If what you see is not what a step says, follow the service's own instructions, linked in each part.</p>
-    <p>The service handles what Dictum sends it under its own terms. Our <a href="/privacy#network">privacy policy</a>, section 4, says what each service told us on 23/10/2026.</p>
+    <p>The service handles what Dictum sends it under its own terms. Our <a href="/privacy#network">privacy policy</a>, section 4, says what each service's own pages said on 23/10/2026.</p>
     <p>You can paste the key into Dictum with <b>Add a key…</b> (the steps are in each part), or put it in a key file. For the key file, <a href="dictum-keys.env" download>download the same key file that Dictum makes</a>, save it as <code>.env</code> in Dictum's settings folder, and put each key in place of <code>your-key-here</code>.</p>
     <!-- SCREENSHOT 1: see docs/SHOT-LIST-API-KEYS.md (Dictum: Settings > Clean-up, the key list and Add a key…) -->
 
@@ -408,10 +408,10 @@
     <p>Anthropic's own instructions: <code>platform.claude.com/docs/en/get-api-key</code>.</p>
 
     <h3 id="key-openai">OpenAI</h3>
-    <!-- Source: https://developers.openai.com/api/docs/quickstart and https://developers.openai.com/api/reference/overview, read 04/11/2026. Not verified, so left out: the address and menu path of OpenAI's key page (neither page gave them), and whether the key is shown only once. -->
+    <!-- Source: https://developers.openai.com/api/docs/quickstart and https://developers.openai.com/api/reference/overview, read 04/11/2026. The API reference's "Start here" links its "API key" to https://platform.openai.com/settings/organization/api-keys (read 04/11/2026). Not verified, so left out: the menu path to that page and the button labels on it, and whether the key is shown only once. -->
     <ol>
       <li>Open OpenAI's quickstart, <code>developers.openai.com/api/docs/quickstart</code>, and find the part called "Create and export an API key". It leads to your OpenAI dashboard.</li>
-      <li>In the dashboard, click <b>Create an API Key</b>.</li>
+      <li>Under that part, click <b>Create an API Key</b>.</li>
       <li>Copy the key when it is shown, and keep it safe. OpenAI says to treat your key as a secret and not to share it.</li>
       <li>OpenAI works for both cloud clean-up and cloud speech. For cloud clean-up: in Dictum, open Settings &gt; Clean-up, choose <b>OpenAI</b> in the <b>Service</b> list, press <b>Add a key…</b>, paste the key, and press <b>Save</b>. For cloud speech: open Settings &gt; Models in the Advanced view, find the <b>Cloud speech</b> card, and do the same there.</li>
       <li>Click <b>Use cloud clean-up…</b> (or <b>Use cloud speech…</b>) and read what Dictum says. When the service is on, press <b>Check this key</b> beside the key to test it.</li>
