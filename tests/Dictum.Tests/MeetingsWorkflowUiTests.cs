@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
@@ -377,11 +378,75 @@ public sealed class MeetingsWorkflowUiTests
         var window = new MeetingsWindow(fixture.Host with { Transcriber = new DelayedTranscriber(fixture.Store) });
         window.Show(); window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
         var id = Assert.Single(fixture.Store.List()).Id;
-        window.Shutdown();
+        Assert.True(window.Shutdown());
         Assert.False(window.IsVisible);
         Assert.Equal("Final segment", Assert.Single(fixture.Store.ReadTranscript(id)).Text);
         using var audio = fixture.Store.OpenAudio(id, Channel.You);
         Assert.True(AudioBytes(audio).Length > 44);
+    });
+
+    [Theory]
+    [InlineData("quit", false)]
+    [InlineData("session", false)]
+    [InlineData("dispose", false)]
+    [InlineData("quit", true)]
+    [InlineData("session", true)]
+    [InlineData("dispose", true)]
+    public Task Exit_save_failure_cancels_until_retry_or_confirmed_discard(string exitPath, bool discard) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        using var shell = fixture.Shell();
+        using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+        shell.ConfigureMeetingsShutdown(lifetime);
+        // Keep completion on the real shell disposal path without stopping the shared headless dispatcher.
+        typeof(AppShell).GetField("_lifetime", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(shell, null);
+        var store = new FaultStore(fixture.Store) { FailAudioOnce = true };
+        var window = new MeetingsWindow(fixture.Host with { Store = store });
+        typeof(AppShell).GetField("_meetingsWindow", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(shell, window);
+        bool Disposed() => (bool)typeof(AppShell).GetField("_disposed", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(shell)!;
+        window.Show(); window.BeginAgreement(); Click(window, PLACEHOLDER_Start);
+        var id = Assert.Single(fixture.Store.List()).Id;
+        window.WindowState = WindowState.Minimized;
+        window.Hide();
+        if (exitPath == "session")
+        {
+            var request = new ShutdownRequestedEventArgs();
+            var handler = (EventHandler<ShutdownRequestedEventArgs>)typeof(ClassicDesktopStyleApplicationLifetime)
+                .GetField("ShutdownRequested", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(lifetime)!;
+            handler(lifetime, request);
+            Assert.True(request.Cancel);
+        }
+        else if (exitPath == "dispose") shell.Dispose();
+        else shell.Quit();
+        Assert.False(Disposed());
+        Assert.Equal(1, store.AudioAttempts);
+        Assert.True(window.IsVisible);
+        Assert.Equal(WindowState.Normal, window.WindowState);
+        Assert.Contains(All<TextBlock>(window), text => text.Text == PROPOSED_AudioSaveFailed && AutomationProperties.GetLiveSetting(text) == AutomationLiveSetting.Polite);
+        Assert.True(Find(window, PROPOSED_Retry).IsEffectivelyEnabled);
+        window.Close(); Assert.True(window.IsVisible);
+        if (discard)
+        {
+            Click(window, PROPOSED_Discard);
+            Click(Assert.Single(window.OwnedWindows), PROPOSED_Cancel);
+            Assert.False(Disposed()); Assert.Single(fixture.Store.List());
+            Click(window, PROPOSED_Discard);
+            Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        }
+        else Click(window, PROPOSED_Retry);
+        await Until(Disposed);
+        Assert.False(window.IsVisible);
+        Assert.True(Disposed());
+        Assert.Equal(discard ? 1 : 2, store.AudioAttempts);
+        Assert.Equal(discard ? 1 : 0, store.Deletes);
+        if (discard) Assert.Empty(fixture.Store.List());
+        else
+        {
+            using var audio = fixture.Store.OpenAudio(id, Channel.You);
+            Assert.True(AudioBytes(audio).Length > 44);
+        }
+        Assert.Equal(1, fixture.Capture.Stops);
+        return true;
     });
 
     [Theory]

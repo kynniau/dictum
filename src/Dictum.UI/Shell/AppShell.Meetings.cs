@@ -1,3 +1,5 @@
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using Dictum.Llm;
 using Dictum.Meetings;
 using Dictum.Settings;
@@ -8,6 +10,27 @@ namespace Dictum.UI.Shell;
 public sealed partial class AppShell
 {
     private MeetingsWindow? _meetingsWindow;
+    internal void ConfigureMeetingsShutdown(IClassicDesktopStyleApplicationLifetime? lifetime)
+    {
+        _lifetime = lifetime;
+        if (lifetime is null) return;
+        // ShutdownRequested is the first-chance veto, including Windows logout/shutdown.
+        lifetime.ShutdownRequested += (_, request) =>
+        {
+            if (!TryShutdownMeetings()) request.Cancel = true;
+        };
+    }
+
+    private bool TryShutdownMeetings()
+    {
+        if (_meetingsWindow is not { } window) return true;
+        window.ShutdownReady -= ResumeMeetingsExit;
+        window.ShutdownReady += ResumeMeetingsExit;
+        return window.Shutdown();
+    }
+
+    private void ResumeMeetingsExit() => Dispatcher.UIThread.Post(Quit);
+
     internal MeetingsSettings MeetingsSettings => SettingsLoader.LoadFile(Paths.SettingsFile).Meetings;
     internal MeetingsHost CreateMeetingsHost() => MeetingsHost.Create(Paths, () => MeetingsSettings, Platform.Credentials,
         new MeetingTranscriberFactory(cancellation => _speech.GetAsync(cancellation), _voiceGates.Get,

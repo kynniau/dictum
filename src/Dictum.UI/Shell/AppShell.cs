@@ -188,7 +188,7 @@ public sealed partial class AppShell : IDisposable
     /// </summary>
     public bool Start(IClassicDesktopStyleApplicationLifetime? lifetime)
     {
-        _lifetime = lifetime;
+        ConfigureMeetingsShutdown(lifetime);
         var file = SettingsLoader.LoadFile(Paths.SettingsFile);
         var (askSpeech, askCleanup) = AppRules.FirstRunQuestions(file);
         OnboardingFlow? onboarding = null;
@@ -322,6 +322,7 @@ public sealed partial class AppShell : IDisposable
     public void Quit()
     {
         if (DeferQuitForMove()) return; // model files are moving: quit once the move has stopped (AppShell.ModelMove)
+        if (!TryShutdownMeetings()) return;
         if (_lifetime is not null) _lifetime.Shutdown();
         else Dispose();
     }
@@ -340,6 +341,7 @@ public sealed partial class AppShell : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        if (!TryShutdownMeetings()) return;
         _disposed = true;
         Models.CancelDownload(DownloadCancelReason.Quit); // a download still running at quit stops and deletes its .part
         _reloadsStopped = true;
@@ -349,7 +351,6 @@ public sealed partial class AppShell : IDisposable
         Access.Dispose();
         _hook?.Dispose();
         _fixHook?.Dispose();
-        _meetingsWindow?.Shutdown();
         CloseWindows();
         _speech.Retire(); // quitting: a cloud speech request under way stops, and none starts, before the models and the provider client go
         _controller?.Dispose();

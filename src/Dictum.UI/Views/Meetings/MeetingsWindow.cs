@@ -26,6 +26,8 @@ internal sealed class MeetingsWindow : Window
     private MeetingId? _recording;
     private bool _paused, _busy;
     private bool _shuttingDown, _ending, _transcriptionFailed;
+    private bool _exitPending;
+    internal event Action? ShutdownReady;
     private TextBlock? _elapsed;
     private ProgressBar? _meter;
     private string _search = "";
@@ -369,6 +371,12 @@ internal sealed class MeetingsWindow : Window
         }
         catch { ShowSaveFailure(); return; }
         ReleaseRecording();
+        if (_exitPending)
+        {
+            _exitPending = false;
+            ShutdownReady?.Invoke();
+            return;
+        }
         if (discard) { ShowList(); return; }
         ShowMeeting(id);
         if (_transcriptionFailed) { Say(PROPOSED_TranscriptionFailed); return; }
@@ -378,9 +386,10 @@ internal sealed class MeetingsWindow : Window
 
     // AppShell disposal is synchronous. Drain without capturing the UI context;
     // transcript persistence runs on the worker and display callbacks are posted.
-    internal void Shutdown()
+    internal bool Shutdown()
     {
-        if (_shuttingDown) return;
+        if (_shuttingDown) return true;
+        if (_exitPending) { PresentSaveFailure(); return false; }
         _shuttingDown = true;
         try
         {
@@ -394,12 +403,23 @@ internal sealed class MeetingsWindow : Window
             }
             ReleaseRecording();
             Close();
+            return true;
         }
         catch
         {
             _shuttingDown = false;
-            ShowSaveFailure();
+            _exitPending = true;
+            PresentSaveFailure();
+            return false;
         }
+    }
+
+    private void PresentSaveFailure()
+    {
+        if (!IsVisible) Show();
+        WindowState = WindowState.Normal;
+        Activate();
+        ShowSaveFailure();
     }
 
     internal void ShowMeeting(MeetingId id)
