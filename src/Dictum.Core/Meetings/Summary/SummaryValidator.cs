@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Text.RegularExpressions;
 using MeetingSummary = Dictum.Meetings.Summary;
 
@@ -10,33 +9,51 @@ public static class SummaryValidator
     // Detect triggers, not a list of permitted formats. Unknown notation containing
     // a trigger is retained, so an unfamiliar format cannot evade validation.
     private const string NumberWords = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety";
-    private static readonly Dictionary<string, string> SimpleNumbers = NumberWords.Split(' ')
-        .Select((word, index) => (word, value: index < 20 ? index : (index - 18) * 10))
-        .ToDictionary(pair => pair.word, pair => pair.value.ToString(CultureInfo.InvariantCulture));
+    private const string OrdinalWords = "first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth twentieth twenty-first twenty-second twenty-third twenty-fourth twenty-fifth twenty-sixth twenty-seventh twenty-eighth twenty-ninth thirtieth thirty-first";
+    private static readonly string CurrencyCodes = string.Join("|", CultureInfo.GetCultures(CultureTypes.SpecificCultures)
+        .Select(culture => new RegionInfo(culture.Name).ISOCurrencySymbol).Distinct());
+    private static readonly Regex Html = new(@"<[\p{L}/]|&(?:[a-z][a-z0-9]*|\#[^;\s]*);",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex FigureTrigger = new(
-        @"[\p{Nd}\p{Sc}%]|\b(?:" + NumberWords.Replace(" ", "|") +
-        @"|hundred|thousand|million|billion|trillion|half|quarter|AUD|USD|NZD|EUR|GBP|k|m|bn|mn|percent|per|cent|" +
+        @"[\p{N}\p{Sc}%‰‱]|\b(?:" + CurrencyCodes + "|" + NumberWords.Replace(" ", "|") + "|" + OrdinalWords.Replace(" ", "|") +
+        @"|hundred|thousand|million|billion|trillion|half|quarter|AUD|USD|NZD|EUR|GBP|CAD|CHF|JPY|CNY|HKD|SGD|INR|KRW|ZAR|BRL|MXN|SEK|NOK|DKK|RUB|AED|SAR|k|m|bn|mn|percent|per|cent|" +
         @"Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|" +
-        @"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b",
+        @"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex Words = new(@"[\p{L}\p{Nd}]+(?:['’\-][\p{L}\p{Nd}]+)*", RegexOptions.CultureInvariant);
 
     public static (MeetingSummary? Ok, string? Rejection) Validate(string reply,
         IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine)
     {
+        if (Html.IsMatch(reply)) return (null, "A figure or date was not present in the transcript.");
         if (string.IsNullOrWhiteSpace(reply)) return (null, "The response was empty.");
+        var rawLines = reply.Split('\n');
+        var lines = rawLines.Select(StripMarkdown).ToArray();
+        // Removing an interior marker must not turn arithmetic into an amount.
+        if (Regex.IsMatch(reply, @"\p{N}[*_`]+\p{N}"))
+            return (null, "A figure or date was not present in the transcript.");
         // Segment separators are hard boundaries: a figure or owner cannot be assembled across speakers.
-        var figures = transcript.SelectMany(s => FigureKeys(s.Text)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var figure in FigureKeys(reply))
-            if (!figures.Contains(figure))
+        var spoken = transcript.Select(s => NormaliseFigure(s.Text)).ToArray();
+        var summaryText = string.Join("\n", lines);
+        foreach (var figure in FigurePhrases(summaryText))
+            if (!spoken.Any(segment => segment.Contains(figure, StringComparison.Ordinal)))
                 return (null, "A figure or date was not present in the transcript.");
+        var spokenCores = transcript.SelectMany(s => FigureCores(s.Text)).ToHashSet(StringComparer.Ordinal);
+        foreach (var core in FigureCores(summaryText))
+            if (!spokenCores.Contains(core))
+                return (null, "A figure or date was not present in the transcript.");
+        // A trailing rate connector omits its unit even though the amount core matches.
+        if (Regex.Matches(summaryText, @"(?<amount>\S+)\s+per\s*(?:[.!?;:]|$)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Any(match => FigureTrigger.IsMatch(match.Groups["amount"].Value)))
+            return (null, "A figure or date was not present in the transcript.");
 
         var items = new List<ActionItem>();
         var inActions = false;
         var actionHeadingLevel = 0;
-        foreach (var rawLine in reply.Split('\n'))
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
-            var line = rawLine.Trim();
+            var line = lines[lineIndex].Trim();
             if (line.StartsWith('#'))
             {
                 var level = line.TakeWhile(c => c == '#').Count();
@@ -47,7 +64,12 @@ public static class SummaryValidator
                 if (inActions) actionHeadingLevel = level;
                 continue;
             }
-            if (line.Length == 0) continue;
+            if (line.Length == 0)
+            {
+                if (inActions && !string.IsNullOrWhiteSpace(rawLines[lineIndex]))
+                    return (null, "An action item must use Owner: action form.");
+                continue;
+            }
             var bullet = Regex.Match(line, @"^(?:[-*+] |\d+[.)]\s+)(?:\[[ xX]\]\s*)?(.*)$");
             if (!inActions && !bullet.Success) continue;
             if (inActions && !bullet.Success)
@@ -78,35 +100,60 @@ public static class SummaryValidator
         return false;
     }
 
-    private static string NormaliseDigits(string text)
+    private static string StripMarkdown(string line)
     {
-        var result = new StringBuilder(text.Length);
-        foreach (var rune in text.EnumerateRunes())
-        {
-            if (Rune.GetUnicodeCategory(rune) == UnicodeCategory.DecimalDigitNumber)
-                result.Append((int)Rune.GetNumericValue(rune));
-            else result.Append(rune.ToString());
-        }
-        return result.ToString();
+        // Retain the list structure when an asterisk is a bullet rather than emphasis.
+        var content = Regex.Replace(line, @"^(\s*)\*\s+", "$1- ");
+        return Regex.Replace(content, @"[*_`]+", "");
     }
 
-    private static IEnumerable<string> FigureKeys(string text)
+    private static IEnumerable<string> FigurePhrases(string text)
     {
-        // Only transcript segments are hard boundaries. A line wrap must not
-        // detach a magnitude or unit. Include the next unknown word as a possible
-        // unit, conservatively (e.g. kg).
-        var run = new List<string>();
-        foreach (Match match in Regex.Matches(NormaliseDigits(text), @"\S+"))
+        var pieces = Regex.Matches(text, @"\S+").Select(m => m.Value).ToArray();
+        for (var i = 0; i < pieces.Length; i++)
         {
-            // Strip only outer Markdown markers. Interior punctuation may be
-            // arithmetic, and parentheses may denote a negative amount.
-            var piece = match.Value.Trim('*', '`', '_', '#')
-                .Trim('.', ',', ';', ':', '!', '?');
-            if (piece.Length == 0) continue;
-            if (FigureTrigger.IsMatch(piece)) run.Add(piece);
-            else if (run.Count > 0)
+            if (!FigureTrigger.IsMatch(pieces[i])) continue;
+            var start = i > 0 && Regex.IsMatch(pieces[i - 1], @"^(?:[-−–+±]|minus|negative)$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) ? i - 1 : i;
+            var phrase = new List<string>();
+            for (var j = start; j < pieces.Length && j <= i + 3; j++)
             {
+                var piece = pieces[j];
+                // Sentence punctuation ends lookahead. A point touching a numeric
+                // character may be a decimal point, including a leading or trailing one.
+                var boundary = Regex.Match(piece, @"(?<!\p{N})\.(?!\p{N})|[!?;:]");
+                if (boundary.Success)
+                {
+                    // Never discard a trigger following punctuation in the same word.
+                    if (FigureTrigger.IsMatch(piece[boundary.Index..])) phrase.Add(piece);
+                    else if (boundary.Index > 0) phrase.Add(piece[..boundary.Index]);
+                    break;
+                }
+                phrase.Add(piece);
+            }
+            yield return NormaliseFigure(string.Join(" ", phrase));
+        }
+    }
+
+    private static IEnumerable<string> FigureCores(string text)
+    {
+        var pieces = Regex.Matches(NormaliseFigure(text), @"\S+").Select(m => m.Value).ToArray();
+        var run = new List<string>();
+        for (var i = 0; i < pieces.Length; i++)
+        {
+            var piece = pieces[i].TrimEnd('.', ',', '!', '?', ';', ':');
+            // "per" is a trigger only as part of "per cent"; rate units are
+            // still protected by the phrase check.
+            var isTrigger = FigureTrigger.IsMatch(piece) &&
+                (piece != "per" || i + 1 < pieces.Length && pieces[i + 1].TrimEnd('.', ',', '!', '?', ';', ':') == "cent");
+            if (isTrigger)
+            {
+                if (run.Count == 0 && i > 0 && Regex.IsMatch(pieces[i - 1], @"^(?:[-−–+±]|minus|negative)$"))
+                    run.Add(pieces[i - 1]);
                 run.Add(piece);
+            }
+            if ((!isTrigger || Regex.IsMatch(pieces[i], @"[.!?;:]$")) && run.Count > 0)
+            {
                 yield return NormaliseFigure(string.Join(" ", run));
                 run.Clear();
             }
@@ -117,13 +164,7 @@ public static class SummaryValidator
     private static string NormaliseFigure(string figure)
     {
         var normal = figure.ToLowerInvariant();
-        normal = Regex.Replace(normal, @"\b[a-z]+\b", match =>
-            SimpleNumbers.GetValueOrDefault(match.Value, match.Value));
-        normal = Regex.Replace(normal, @"\bper\s+cent\b|\bpercent\b", "%");
-        // Keep decimal points, signs, date separators, magnitude and currency
-        // position: 1.5%, 1.5$, $1.5 and 1/5 must have distinct keys.
-        normal = Regex.Replace(normal, @"(?<=\d)[, \u00a0](?=\d{3}(?:\D|$))", "");
-        normal = Regex.Replace(normal, @"(?<=\p{Sc})\s+|\s+(?=[%\p{Sc}])", "");
-        return normal;
+        normal = Regex.Replace(normal, @"(?<=\p{Nd})[, \u00a0](?=\p{Nd}{3}(?:[^\p{Nd}]|$))", "");
+        return Regex.Replace(normal, @"\s+", " ").Trim();
     }
 }

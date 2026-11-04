@@ -11,6 +11,52 @@ public sealed class MeetingSummaryTests
         new Segment(TimeSpan.FromSeconds(i), TimeSpan.FromSeconds(i + 1), Channel.You, value)).ToArray();
 
     [Theory]
+    [InlineData("15%", ".15%")]
+    [InlineData("$100", "− $100")]
+    [InlineData("15 Australian cents", "15 Australian dollars")]
+    [InlineData("March", "fourth March")]
+    [InlineData("Revenue discussed.", "⅔ of revenue")]
+    [InlineData("$100", "minus $100")]
+    [InlineData("$100", "negative $100")]
+    [InlineData("$100", "± $100")]
+    [InlineData("15%", "15.%")]
+    [InlineData("March", "thirty-first March")]
+    [InlineData("Revenue discussed.", "² of revenue")]
+    public void Figure_phrases_must_occur_verbatim_in_one_segment(string spoken, string figure)
+    {
+        var result = SummaryValidator.Validate("## Summary\n" + figure, Transcript(spoken), General, "Local");
+        Assert.Null(result.Ok);
+        Assert.Equal("A figure or date was not present in the transcript.", result.Rejection);
+    }
+
+    [Theory]
+    [InlineData("<span>15%</span>")]
+    [InlineData("15&percnt;")]
+    [InlineData("15&#37;")]
+    [InlineData("15&#x25;")]
+    [InlineData("<span>Budget discussed.</span>")]
+    public void Html_is_rejected_even_when_the_raw_text_was_spoken(string reply)
+    {
+        Assert.Null(SummaryValidator.Validate(reply, Transcript(reply), General, "Local").Ok);
+    }
+
+    [Fact]
+    public void Thousands_separators_and_sentence_punctuation_are_accepted()
+    {
+        Assert.NotNull(SummaryValidator.Validate("The budget is $1,500 for March.",
+            Transcript("the budget is $1500 for March"), General, "Local").Ok);
+    }
+
+    [Fact]
+    public void Emphasis_is_removed_before_checking_figures_and_action_owners()
+    {
+        var result = SummaryValidator.Validate("## **Action items**\n* __A. Example__: Review the `$1,500` budget for **March**.",
+            Transcript("A. Example discussed the $1500 budget for March."), General, "Local");
+        Assert.NotNull(result.Ok);
+        Assert.Equal("A. Example", Assert.Single(result.Ok.Items).Owner);
+    }
+
+    [Theory]
     [InlineData("Budget discussed", "$1.5k")]
     [InlineData("Budget discussed", "USD 1500")]
     [InlineData("Budget discussed", "fifteen per cent")]
@@ -36,9 +82,7 @@ public sealed class MeetingSummaryTests
     [InlineData("Budget discussed", "nineteen")]
     [InlineData("Budget discussed", "ninety")]
     [InlineData("$1.5", "$1.5 million")]
-    [InlineData("$1.5 million", "$1.5")]
     [InlineData("$1.5", "$1.5\nmillion")]
-    [InlineData("$1.5\nmillion", "$1.5")]
     [InlineData("5", "5\nkg")]
     [InlineData("$1.5", "1.5%")]
     [InlineData("1.5%", "$1.5")]
@@ -66,14 +110,43 @@ public sealed class MeetingSummaryTests
 
     [Theory]
     [InlineData("1,500", "1500")]
-    [InlineData("fifteen per cent", "15%")]
-    [InlineData("15%", "fifteen percent")]
     [InlineData("USD 1500", "USD 1500")]
     [InlineData("$1.5k", "$1.5k")]
     public void Equivalent_figure_notation_is_accepted(string spoken, string figure)
     {
         Assert.NotNull(SummaryValidator.Validate("## Summary\n" + figure,
             Transcript(spoken), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("fifteen per cent", "15%")]
+    [InlineData("15%", "fifteen percent")]
+    [InlineData("$ 100", "$100")]
+    [InlineData("5 %", "5%")]
+    [InlineData("٥%", "5%")]
+    public void Nonverbatim_equivalent_figures_are_rejected(string spoken, string figure)
+    {
+        Assert.Null(SummaryValidator.Validate("## Summary\n" + figure,
+            Transcript(spoken), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("$1.5 million", "$1.5")]
+    [InlineData("$1.5\nmillion", "$1.5")]
+    [InlineData("15 Australian cents", "15 cents")]
+    [InlineData("$1,500 per month", "$1,500 per")]
+    public void A_shortened_figure_is_rejected(string spoken, string figure)
+    {
+        var result = SummaryValidator.Validate(figure, Transcript(spoken), General, "Local");
+        Assert.Null(result.Ok);
+        Assert.Equal("A figure or date was not present in the transcript.", result.Rejection);
+    }
+
+    [Fact]
+    public void A_complete_figure_with_different_surrounding_words_passes()
+    {
+        Assert.NotNull(SummaryValidator.Validate("The fit-out is $1.5 million.",
+            Transcript("we agreed $1.5 million for the fit-out"), General, "Local").Ok);
     }
 
     [Theory]
@@ -234,9 +307,6 @@ public sealed class MeetingSummaryTests
     [InlineData("$1,000", "$1000")]
     [InlineData("$1 000", "$1000")]
     [InlineData("$1,000,000.50", "$1000000.50")]
-    [InlineData("$ 100", "$100")]
-    [InlineData("5 %", "5%")]
-    [InlineData("٥%", "5%")]
     [InlineData("14/11/2026", "14/11/2026")]
     [InlineData("14 November 2026", "14 November 2026")]
     [InlineData("November 14, 2026", "November 14, 2026")]
@@ -255,6 +325,7 @@ public sealed class MeetingSummaryTests
 
     [Theory]
     [InlineData("## Action items\n- B. Invented: Review the budget.")]
+    [InlineData("## **Action items**\n- B. Invented: Review the budget.")]
     [InlineData("## Action items\n- **B. Invented**: Review the budget.")]
     [InlineData("## Action items\n- [ ] B. Invented: Review the budget.")]
     [InlineData("## Action items\n1. B. Invented: Review the budget.")]
