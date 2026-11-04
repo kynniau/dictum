@@ -10,6 +10,180 @@ public sealed class MeetingSummaryTests
     private static Segment[] Transcript(params string[] text) => text.Select((value, i) =>
         new Segment(TimeSpan.FromSeconds(i), TimeSpan.FromSeconds(i + 1), Channel.You, value)).ToArray();
 
+    [Theory]
+    [InlineData("Budget discussed", "$1.5k")]
+    [InlineData("Budget discussed", "USD 1500")]
+    [InlineData("Budget discussed", "fifteen per cent")]
+    [InlineData("Budget discussed", "1500")]
+    [InlineData("Budget discussed", "half")]
+    [InlineData("Budget discussed", "quarter")]
+    [InlineData("Budget discussed", "AUD")]
+    [InlineData("Budget discussed", "bn")]
+    [InlineData("Budget discussed", "NZD")]
+    [InlineData("Budget discussed", "GBP")]
+    [InlineData("Budget discussed", "€")]
+    [InlineData("Budget discussed", "£")]
+    [InlineData("Budget discussed", "¥")]
+    [InlineData("Budget discussed", "A$")]
+    [InlineData("Budget discussed", "US$")]
+    [InlineData("Budget discussed", "%")]
+    [InlineData("Budget discussed", "million")]
+    [InlineData("Budget discussed", "thousand")]
+    [InlineData("Budget discussed", "billion")]
+    [InlineData("Budget discussed", "hundred")]
+    [InlineData("Budget discussed", "trillion")]
+    [InlineData("Budget discussed", "zero")]
+    [InlineData("Budget discussed", "nineteen")]
+    [InlineData("Budget discussed", "ninety")]
+    [InlineData("$1.5", "$1.5 million")]
+    [InlineData("$1.5 million", "$1.5")]
+    [InlineData("$1.5", "$1.5\nmillion")]
+    [InlineData("$1.5\nmillion", "$1.5")]
+    [InlineData("5", "5\nkg")]
+    [InlineData("$1.5", "1.5%")]
+    [InlineData("1.5%", "$1.5")]
+    [InlineData("$1.5", "1.5k")]
+    [InlineData("1.5k", "$1.5")]
+    [InlineData("1.5%", "1.5$")]
+    [InlineData("1.5$", "1.5%")]
+    [InlineData("3/4", "4 March")]
+    [InlineData("4 March", "3/4")]
+    [InlineData("1.5", "1/5")]
+    [InlineData("1/5", "1.5")]
+    [InlineData("5 kg", "5 km")]
+    [InlineData("USD 1500", "EUR 1500")]
+    [InlineData("1.5 mn", "1.5 bn")]
+    [InlineData("ten thousand", "ten million")]
+    [InlineData("510", "5*10")]
+    [InlineData("15", "1_5")]
+    [InlineData("100", "(100)")]
+    public void Figure_keys_preserve_magnitude_unit_and_date_notation(string spoken, string figure)
+    {
+        var result = SummaryValidator.Validate("## Summary\n" + figure, Transcript(spoken), General, "Local");
+        Assert.Null(result.Ok);
+        Assert.Equal("A figure or date was not present in the transcript.", result.Rejection);
+    }
+
+    [Theory]
+    [InlineData("1,500", "1500")]
+    [InlineData("fifteen per cent", "15%")]
+    [InlineData("15%", "fifteen percent")]
+    [InlineData("USD 1500", "USD 1500")]
+    [InlineData("$1.5k", "$1.5k")]
+    public void Equivalent_figure_notation_is_accepted(string spoken, string figure)
+    {
+        Assert.NotNull(SummaryValidator.Validate("## Summary\n" + figure,
+            Transcript(spoken), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("## $1.5k")]
+    [InlineData("| Budget | USD 1500 |")]
+    [InlineData("- fifteen per cent")]
+    [InlineData("```\n1500\n```")]
+    public void Figures_in_every_markdown_context_are_checked(string reply)
+    {
+        Assert.Null(SummaryValidator.Validate(reply, Transcript("Budget discussed."), General, "Local").Ok);
+    }
+
+    [Fact]
+    public void A_figure_cannot_be_assembled_across_transcript_segments()
+    {
+        Assert.Null(SummaryValidator.Validate("$1.5 million", Transcript("$1.5", "million"), General, "Local").Ok);
+        Assert.Null(SummaryValidator.Validate("$1.5\nmillion", Transcript("$1.5", "million"), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("A. Example: Review the budget.")]
+    [InlineData("Plain paragraph.")]
+    [InlineData("### Follow up\n- A. Example: Review the budget.")]
+    [InlineData("| Owner | Action |\n| A. Example | Review the budget. |")]
+    [InlineData("None.")]
+    [InlineData("- None.")]
+    [InlineData("```\n- A. Example: Review the budget.\n```")]
+    public void Every_action_section_line_must_be_an_owner_action_list_item(string content)
+    {
+        var result = SummaryValidator.Validate("## Action items\n" + content,
+            Transcript("A. Example discussed the budget."), General, "Local");
+        Assert.Null(result.Ok);
+        Assert.Equal("An action item must use Owner: action form.", result.Rejection);
+    }
+
+    [Fact]
+    public void Valid_actions_end_at_a_sibling_heading()
+    {
+        var result = SummaryValidator.Validate("## Action items\n- A. Example: Review the budget.\n- Others: Check it.\n## Discussion\nBudget review.",
+            Transcript("A. Example discussed the budget."), General, "Local");
+        Assert.NotNull(result.Ok);
+        Assert.Equal(2, result.Ok.Items.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Directory_links_cannot_escape_the_template_directory(bool linkAncestor)
+    {
+        using var fixture = new MeetingFixture();
+        var config = Path.Combine(fixture.Root, "config");
+        var outside = Path.Combine(fixture.Root, "meeting-templates-outside");
+        Directory.CreateDirectory(config);
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "general.md"), "Untrusted override");
+        var templates = Path.Combine(config, "meeting-templates");
+        var link = linkAncestor ? Path.Combine(templates, "linked") : templates;
+        if (linkAncestor) Directory.CreateDirectory(templates);
+        CreateDirectoryLinkOrSkip(link, outside);
+        try
+        {
+            if (linkAncestor)
+                CreateFileLinkOrSkip(Path.Combine(templates, "general.md"), Path.Combine(link, "general.md"));
+            Assert.Equal(General.Markdown, SummaryTemplates.Get("general", config).Markdown);
+        }
+        finally
+        {
+            if (linkAncestor) File.Delete(Path.Combine(templates, "general.md"));
+            Directory.Delete(link);
+        }
+    }
+
+    [Fact]
+    public void File_links_cannot_escape_the_template_directory()
+    {
+        using var fixture = new MeetingFixture();
+        var templates = Path.Combine(fixture.Root, "meeting-templates");
+        Directory.CreateDirectory(templates);
+        var outside = Path.Combine(fixture.Root, "outside.md");
+        File.WriteAllText(outside, "Untrusted override");
+        var link = Path.Combine(templates, "general.md");
+        CreateFileLinkOrSkip(link, outside);
+        try { Assert.Equal(General.Markdown, SummaryTemplates.Get("general", fixture.Root).Markdown); }
+        finally { File.Delete(link); }
+    }
+
+    private static void CreateFileLinkOrSkip(string link, string target)
+    {
+        try { File.CreateSymbolicLink(link, target); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            Assert.Skip("The OS refused a file symbolic link: " + error.Message);
+        }
+    }
+
+    private static void CreateDirectoryLinkOrSkip(string link, string target)
+    {
+        try { Directory.CreateSymbolicLink(link, target); return; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            if (!OperatingSystem.IsWindows()) Assert.Skip("The OS refused a directory symbolic link: " + error.Message);
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
+                $"/c mklink /J \"{link}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true });
+            process!.WaitForExit();
+            if (process.ExitCode != 0)
+                Assert.Skip("The OS refused both a directory symbolic link and a junction: " + error.Message);
+        }
+    }
+
     [Fact]
     public void Chunks_break_only_on_segment_boundaries_and_overlap()
     {
