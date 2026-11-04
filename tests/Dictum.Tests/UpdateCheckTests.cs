@@ -48,7 +48,7 @@ public class UpdateCheckTests
     // APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword. The bullet was "... to download a model, to check for updates in the
     // direct-download version, or, if you switch it on, to send text to a cloud clean-up service, or your voice to a cloud speech service, or a server you choose."
     // (APPROVED 22/10/2026 22:52 AEDT); the policy now covers the Mac beta's update check too.
-    private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or to check for updates in the direct download for Windows and in the Mac beta. If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose.</li>";
+    private const string ProposedShortVersionBullet = "<li><strong>Dictum goes online only when you ask it to:</strong> to download a model, or to check for updates in the direct download for Windows and in the Mac beta. If you switch them on, it also sends text to a cloud clean-up service, your voice to a cloud speech service, or either to a server you choose. If you press Check this key beside a key you added, it sends that key, and nothing you dictated or wrote, to the same address your dictations go to.</li>"; // bullet 3 gained its last sentence (APPROVED 04/11/2026 17:28 AEDT)
 
     private const string DownloadPage = "https://github.com/kynniau/dictum/releases/latest";
 

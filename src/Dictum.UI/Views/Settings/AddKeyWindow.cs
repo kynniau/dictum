@@ -18,40 +18,40 @@ namespace Dictum.UI.Views.Settings;
 /// </summary>
 internal sealed class AddKeyWindow : DialogWindow
 {
-    // PROPOSED 04/11/2026 (approve-api-keys.md rows 17 to 22): the dialog's own words.
+    // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (approve-api-keys.md rows 17 to 22): the dialog's own words.
 
-    /// <summary>PROPOSED 04/11/2026 (row 17): the dialog's heading.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 17): the dialog's heading.</summary>
     internal const string HeadingText = "Add a key";
 
-    /// <summary>PROPOSED 04/11/2026 (row 18): the line under the heading.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 18): the line under the heading.</summary>
     internal static string Intro(string service, string store) =>
         $"For {service}. Paste the API key you created on its website. Dictum keeps it in {store}, never writes it to a file, and never shows it again.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 19): the Label field's caption and accessible name.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 19): the Label field's caption and accessible name.</summary>
     internal const string LabelCaption = "Label";
 
-    /// <summary>PROPOSED 04/11/2026 (row 19): the hint under the Label field.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 19): the hint under the Label field.</summary>
     internal const string LabelHint = "A name for this key, such as Work or Personal. It is shown in the list; the key never is.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 20): the Key field's caption.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 20): the Key field's caption.</summary>
     internal const string KeyCaption = "Key";
 
     /// <summary>
-    /// PROPOSED 04/11/2026 (row 20): the Key field's accessible name. What the field holds is masked for automation clients (screen
+    /// APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 20): the Key field's accessible name. What the field holds is masked for automation clients (screen
     /// readers included) as on screen: <see cref="MaskedKeyBox"/>. Whether a screen reader also says "password" is not verified.
     /// </summary>
     internal const string KeyName = "API key, hidden as you paste";
 
-    /// <summary>PROPOSED 04/11/2026 (row 20): the Key field's placeholder.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 20): the Key field's placeholder.</summary>
     internal const string KeyWatermark = "Paste your key here";
 
-    /// <summary>PROPOSED 04/11/2026 (row 21).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 21).</summary>
     internal const string SaveLabel = "Save";
 
-    /// <summary>PROPOSED 04/11/2026 (row 21).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 21).</summary>
     internal const string CancelLabel = "Cancel";
 
-    /// <summary>PROPOSED 04/11/2026 (row 22): the link to the site help page's section for this service.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 22): the link to the site help page's section for this service.</summary>
     internal const string HowLabel = "How do I get a key?";
 
     /// <summary>

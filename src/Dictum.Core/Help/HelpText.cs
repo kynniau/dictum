@@ -115,13 +115,23 @@ public static class HelpText
     /// waiting-for-key line and the tray line (<see cref="CloudPolicy.TrayLine"/>) are quoted word for word from the app's own copy;
     /// the variable names are SecretStore's. Steps 2 to 4 and 7 to 15 are one action each, in the cloud-cleanup demo's caption order.
     /// </summary>
-    public static readonly IReadOnlyList<string> CloudAnswer =
+    public static readonly IReadOnlyList<string> CloudAnswer = CloudAnswerFor(PlatformWords.Windows);
+
+    /// <summary>
+    /// <see cref="CloudAnswer"/> in this platform's words (<see cref="PlatformWords"/>): where the platform can add a key in Dictum, row 40 above the
+    /// key-file paragraph, row 44 as the last paragraph and row 45 as the key-check sentence, all APPROVED by the owner 04/11/2026 16:51 AEDT
+    /// (Windows only); the waiting line is <see cref="CloudPolicy.WaitingForKeyLine(string, PlatformWords)"/>. Where it cannot yet (the Mac until K-Mac),
+    /// the approved 22/10/2026 paragraph and sentences below stay as they were.
+    /// </summary>
+    public static IReadOnlyList<string> CloudAnswerFor(PlatformWords words) =>
     [
         "Cloud clean-up is an advanced option, and it is off unless you turn it on. If you turn on cloud clean-up, the text of each dictation and the words in your dictionary leave this PC and go to the service you choose, to be tidied; your voice still stays here unless you also turn on cloud speech. " +
         "Most people do not need it: Tidy my words runs on this PC.",
         "Before Dictum sends text to a service off this PC, it shows a warning. For Anthropic, it says: \"" + CloudPolicy.ConsentWarning(CloudExampleHost) + "\"",
         "Dictum can use Anthropic, OpenAI, Google Gemini or your own server. For Anthropic, OpenAI and Google Gemini, you need your own account with that service and an API key.",
         "To get a key, sign in to the service's website and create an API key. The key is like a password: keep it to yourself.",
+        // APPROVED 04/11/2026 16:51 AEDT (row 40, Windows only; PlatformWords.HelpAddKeyParagraph): the easiest way, directly above the approved paragraph below.
+        .. Optional(words.HelpAddKeyParagraph),
         // APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword: the first paragraph is the own-instructions lane's Help sentence for the
         // Create the key file… button (PR #60), verbatim; the second keeps the Notepad steps below as the fallback and is this lane's. True only
         // once the button is on Settings > Clean-up (PR #60, merged at 672f85b into main 4a4072a).
@@ -149,26 +159,21 @@ public static class HelpText
         "16. Go back to Settings > Clean-up and click Use cloud clean-up… to switch it on. For a service off this PC, Dictum then says what it will send and to whom, with the warning above. Read it. " +
         "Click Allow cloud clean-up only if you agree. Nothing is sent until you do.",
         "When Dictum has found your key, the Cloud clean-up card on that page starts with \"On: the text of each dictation is sent to\" and names the service, and the Dictum menu says \"" + CloudPolicy.TrayLine + "\". " +
-        "Dictum cannot check that the key itself is right: if your dictations come back only lightly tidied, check the key.",
-        "If the card says \"On, but waiting for your …\", Dictum cannot find your key. For OpenAI, for example, it says \"" + CloudPolicy.WaitingForKeyLine(SecretStore.OpenAiKey) + "\" " +
+        // The last sentence: APPROVED 04/11/2026 16:51 AEDT (row 45, Windows only; PlatformWords.HelpKeyCheck) replaces the approved 22/10/2026 sentence, which a Mac keeps.
+        (words.HelpKeyCheck ?? "Dictum cannot check that the key itself is right: if your dictations come back only lightly tidied, check the key."),
+        // The line quoted is the platform's: APPROVED 04/11/2026 17:14 AEDT on Windows, the 16/10/2026 line on a Mac.
+        "If the card says \"On, but waiting for your …\", Dictum cannot find your key. For OpenAI, for example, it says \"" + CloudPolicy.WaitingForKeyLine(SecretStore.OpenAiKey, words) + "\" " +
         "Check the file's name, and the line in it.",
         "To turn it off, open Settings > Clean-up and click Switch cloud clean-up off. Your dictations are tidied on this PC again.",
-        "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
+        // The last paragraph: APPROVED 04/11/2026 16:51 AEDT (row 44, Windows only; PlatformWords.HelpKeySources) replaces the approved 22/10/2026 paragraph, which a Mac keeps.
+        words.HelpKeySources ?? "Dictum reads your key only from the .env file (or from a Windows environment variable). It never saves the key in its settings, and never shows it on screen or writes it in its log.",
     ];
 
-    /// <summary>
-    /// PROPOSED 04/11/2026 (K-UI lane; approve-api-keys.md row 40): not shown yet. On approval it goes into <see cref="CloudAnswer"/>
-    /// directly above the APPROVED "To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key
-    /// file…." paragraph (index 4 today), with the site's help page given the same words; no approved paragraph is reworded. Kept beside,
-    /// not in place, because CloudAnswer is pinned word for word against the site (HelpPageTests) and the approved indexes (OwnerApprovalsTests).
-    /// </summary>
-    public const string ProposedPasteBoxParagraph =
-        "The easiest way to add a key: choose the service in Settings > Clean-up, press Add a key…, paste the key, and press Save. " +
-        "Dictum keeps it in Windows Credential Manager, never in a file, and uses it from the next dictation. " +
-        "You can add more than one key for a service, such as a work one and a personal one, and choose which one Dictum uses.";
+    private static string[] Optional(string? paragraph) => paragraph is null ? [] : [paragraph];
 
     /// <summary>
-    /// PROPOSED 04/11/2026 (K-UI lane; approve-api-keys.md row 41): not shown yet; on approval it follows <see cref="ProposedPasteBoxParagraph"/>.
+    /// PROPOSED 04/11/2026 (K-UI lane; approve-api-keys.md row 41), HELD for the Store uninstall check (docs/TESTING-MSIX.md §4; owner, 04/11/2026
+    /// 15:23 AEDT): not shown anywhere. When it goes in, it follows the row 40 paragraph (<see cref="PlatformWords.HelpAddKeyParagraph"/>).
     /// Inferred, not verified: CRED_PERSIST_LOCAL_MACHINE credentials belong to the user's logon on this computer, not to the package
     /// (CredentialManagerStore's Learn notes), and an MSIX uninstall removes the package's own data; no Learn page read says an uninstall
     /// removes them. docs/TESTING-MSIX.md step 4 on a packaged install is the check before this is approved.
@@ -234,8 +239,16 @@ public static class HelpText
     /// platform's words (<see cref="PlatformWords.RemoveAnswer"/>; on a Mac APPROVED by the owner 23/10/2026 14:06 AEDT (Mac copy block, row 12):
     /// do not reword). Every other entry is the same object.
     /// </summary>
-    public static IReadOnlyList<HelpEntry> QuestionsFor(PlatformWords words) =>
-        [.. Questions.Select(q => q.Question == RemoveQuestion ? q with { Answer = [.. q.Answer.SkipLast(1), words.RemoveAnswer] } : q)];
+    public static IReadOnlyList<HelpEntry> QuestionsFor(PlatformWords words)
+    {
+        var cloud = CloudAnswerFor(words);
+        return [.. Questions.Select(q => q.Question switch
+        {
+            RemoveQuestion => q with { Answer = [.. q.Answer.SkipLast(1), words.RemoveAnswer] },
+            CloudQuestion when !cloud.SequenceEqual(q.Answer) => q with { Answer = cloud }, // the keys paragraphs and sentences, where this platform's words differ
+            _ => q,
+        })];
+    }
 
     /// <summary>The questions, in order; each answer is one or more paragraphs.</summary>
     public static readonly IReadOnlyList<HelpEntry> Questions =

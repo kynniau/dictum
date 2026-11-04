@@ -1,3 +1,4 @@
+using Dictum.Platform;
 using Dictum.Settings;
 
 namespace Dictum.Llm;
@@ -134,6 +135,16 @@ public static class CloudPolicy
     /// Approved by the product owner on 16/10/2026 as written: never reword it.
     /// </summary>
     public static string WaitingForKeyLine(string variable) => $"On, but waiting for your {variable}: nothing is sent until you add it to .env.";
+
+    /// <summary>
+    /// The same line as Settings > Clean-up and Settings > Privacy show it on this platform. Where the platform can add a key in Dictum
+    /// (<see cref="PlatformWords.WaitingForKeyEnding"/>): the line APPROVED by the product owner on 04/11/2026 17:14 AEDT (Windows only),
+    /// "On, but waiting for your {VARIABLE}: nothing is sent until you add the key in Settings > Clean-up or in .env." Elsewhere (the Mac
+    /// until K-Mac): the 16/10/2026 line above, unchanged. Cloud speech keeps the 16/10/2026 line, because its keys are added under
+    /// Settings > Models, not Clean-up. Do not reword.
+    /// </summary>
+    public static string WaitingForKeyLine(string variable, PlatformWords words) =>
+        words.WaitingForKeyEnding is { } ending ? $"On, but waiting for your {variable}: nothing is sent until you {ending}" : WaitingForKeyLine(variable);
 
     /// <summary>
     /// The Settings > Clean-up state line and the Settings > Privacy summary while cloud clean-up is on but offline only

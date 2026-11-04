@@ -438,9 +438,9 @@ public class OwnerApprovalsTests
     public void The_approved_own_instructions_and_key_file_help_strings_are_pinned()
     {
         Assert.Equal("To add a key for cloud clean-up, choose the service in Settings > Clean-up and press Create the key file…. Dictum makes the file and opens it: put your key in place of your-key-here, save, and Dictum reads it. If you already have a key file, Dictum opens it as it is.",
-            HelpText.CloudAnswer[4]);
-        Assert.Equal("If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.", HelpText.CloudAnswer[5]);
-        Assert.StartsWith("1. Open Settings > Clean-up.", HelpText.CloudAnswer[6]); // the sixteen steps follow, unchanged
+            HelpText.CloudAnswer[5]); // [4] is row 40 (APPROVED 04/11/2026 16:51 AEDT), directly above it
+        Assert.Equal("If the button does not work for you, make the key file yourself with steps 2 to 15 below; steps 1 and 16 are the same either way.", HelpText.CloudAnswer[6]);
+        Assert.StartsWith("1. Open Settings > Clean-up.", HelpText.CloudAnswer[7]); // the sixteen steps follow, unchanged
         Assert.Equal("Can I give the clean-up my own instructions?", HelpText.OwnInstructionsQuestion);
         Assert.Equal(
         [

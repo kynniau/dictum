@@ -32,8 +32,8 @@ public sealed record KeyCheckTarget(string Variable, string Host, Uri Url, KeyCh
 /// record (the settings in use carry consent.json's entries, <see cref="CloudConsentFile.Apply"/>), and it goes to that host alone,
 /// to the cheapest authenticated request each service has that carries no user text: listing its models. A GET with no body, so no
 /// dictation, dictionary word, instruction or recording can go with it. Never automatic and never on by default: the page asks it
-/// once per click. It runs through the provider client (<see cref="OfflineGuardHandler"/>, no redirects), so offline only refuses it,
-/// and a plain http:// address off this PC is refused here before anything is sent. What it says names the status code and the
+/// once per click. It runs through the provider client (<see cref="OfflineGuardHandler"/>, no redirects), so offline only refuses it
+/// unless the address is on this PC (loopback; <c>offlineOnly &amp;&amp; !url.IsLoopback</c> in <see cref="RunAsync"/>), and a plain http:// address off this PC is refused here before anything is sent. What it says names the status code and the
 /// service's own message with every key-like token hidden (<see cref="Redact"/>); nothing of the key is ever in it.
 /// </summary>
 /// <remarks>
@@ -70,13 +70,13 @@ public static class KeyCheck
     /// <summary>The most of a service's message shown.</summary>
     private const int MaxMessageLength = 300;
 
-    // PROPOSED 04/11/2026 (approve-api-keys.md rows 30 to 35): what a check says.
+    // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (approve-api-keys.md rows 30 to 35): what a check says.
 
-    /// <summary>PROPOSED 04/11/2026 (row 30): a named service (Anthropic, OpenAI, Google Gemini, Azure OpenAI, Groq) accepted the key.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 30): a named service (Anthropic, OpenAI, Google Gemini, Azure OpenAI, Groq) accepted the key.</summary>
     public const string Works = "The key works.";
 
     /// <summary>
-    /// PROPOSED 04/11/2026 (row 30a; PR #87 lens, MINOR 8; widened on the re-lens): a server the user names answered 200. One that
+    /// APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 30a; PR #87 lens, MINOR 8; widened on the re-lens): a server the user names answered 200. One that
     /// ignores keys answers 200 to any key, so this says what happened, not that the key works.
     /// </summary>
     public static string Accepted(string host) => $"{host} accepted the request.";
@@ -91,23 +91,23 @@ public static class KeyCheck
         target.Variable is SecretStore.LlmKey or SecretStore.SpeechKey
         || (target.Auth == KeyCheckAuth.Anthropic && !string.Equals(target.Host.TrimEnd('.'), new Uri(AnthropicLlmClient.DefaultBaseUrl).Host, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>PROPOSED 04/11/2026 (row 31): the service answered with an error. The message is the service's own, key-like tokens hidden.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 31): the service answered with an error. The message is the service's own, key-like tokens hidden.</summary>
     public static string Refused(string host, int code, string? reason, string? message) =>
         $"The key did not work: {host} answered {code}{(string.IsNullOrWhiteSpace(reason) ? "" : " " + reason)}." + (message is { Length: > 0 } m ? $" {host} says: {m}" : "");
 
-    /// <summary>PROPOSED 04/11/2026 (row 32): offline only refused the check.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 32): offline only refused the check.</summary>
     public const string OfflineRefused = "Offline only is on, so the key was not checked.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 33): a plain http:// address off this PC; nothing was sent.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 33): a plain http:// address off this PC; nothing was sent.</summary>
     public static string PlainHttpRefused(string host) => $"The key was not checked: {host} uses http://, which would send the key unencrypted.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 34): no answer in time.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 34): no answer in time.</summary>
     public static string NoAnswer(string host) => $"The key was not checked: {host} did not answer within {Timeout.TotalSeconds:0} seconds.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 35): the request could not be made (no network, a name that does not resolve).</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 35): the request could not be made (no network, a name that does not resolve).</summary>
     public static string NotReached(string host, string reason) => $"The key was not checked: {host} could not be reached ({reason}).";
 
-    /// <summary>PROPOSED 04/11/2026 (row 36): what stands in for each hidden token in a service's message.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 36): what stands in for each hidden token in a service's message.</summary>
     public const string Hidden = "[hidden]";
 
     /// <summary>

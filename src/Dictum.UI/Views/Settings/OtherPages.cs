@@ -138,7 +138,7 @@ internal sealed class CleanupPage : SettingsPage
         // The last "On, but" line is for whatever else leaves nothing sent although cloud was agreed to, such as an address refused as insecure,
         // or text that is not English, where switching offline only off would send nothing (OfflineOnlyIsWhyNothingIsSent).
         return server is not null && !shell.NothingLeaves ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
-            : shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
+            : shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor, shell.Platform.Words)
             : OfflineOnlyIsWhyNothingIsSent(shell) ? CloudPolicy.OfflineOnlyLine
             : shell.NothingLeaves ? CloudPolicy.NothingSentLine
             : $"On: the text of each dictation is sent to {host} ({s.Llm.Provider}, model {s.Llm.Model}). You agreed to this host in the consent step. {CloudPolicy.StateLineWarning}";
@@ -263,22 +263,22 @@ internal sealed class PrivacyPage : SettingsPage
             KeysCard(Shell, Say));
     }
 
-    // PROPOSED 04/11/2026 (approve-api-keys.md row 38): the API keys card on Settings > Privacy.
+    // APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (approve-api-keys.md row 38): the API keys card on Settings > Privacy.
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): the card's title.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): the card's title.</summary>
     internal const string KeysTitle = "API keys";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): the card's line, naming the store.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): the card's line, naming the store.</summary>
     internal static string KeysLine(string store) =>
         $"Keys you add in Dictum are kept in {store} for your account on this computer, until you remove them.";
 
     /// <summary>
-    /// PROPOSED 04/11/2026 (row 38a), NOT SHOWN (PR #87 lens, MINOR 7): Inferred, not verified. It follows <see cref="KeysLine"/> once
+    /// PROPOSED 04/11/2026 (row 38a), NOT SHOWN, HELD for the Store uninstall check (owner, 04/11/2026 15:23 AEDT; PR #87 lens, MINOR 7): Inferred, not verified. It follows <see cref="KeysLine"/> once
     /// docs/TESTING-MSIX.md §4's Credential Manager step confirms that the entries outlive an uninstall, as HelpText row 41 is held back.
     /// </summary>
     internal const string ProposedKeysUninstallSentence = "They stay there also if you uninstall Dictum.";
 
-    /// <summary>PROPOSED 04/11/2026 (row 38): the button.</summary>
+    /// <summary>APPROVED 04/11/2026 16:50 AEDT (proposed 04/11/2026; do not reword) (row 38): the button.</summary>
     internal const string RemoveAllLabel = "Remove all keys…";
 
     /// <summary>
@@ -307,7 +307,7 @@ internal sealed class PrivacyPage : SettingsPage
         _speechSummary.Text = SpeechSummary(Shell) ?? "";
         _speechSummary.IsVisible = _speechSummary.Text.Length > 0;
         // Cloud clean-up that is on but sends nothing says why first, decided as on the Clean-up page.
-        var cleanup = Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor)
+        var cleanup = Shell.CleanupWaitingForKey is { } waitingFor ? CloudPolicy.WaitingForKeyLine(waitingFor, Shell.Platform.Words)
             : CleanupPage.OfflineOnlyIsWhyNothingIsSent(Shell) ? CloudPolicy.OfflineOnlyLine
             : Shell.NothingLeaves ? speechSends ? null : NothingLeavesLine(Shell.Platform.Words)
             : server is not null ? CloudPolicy.LocalServerLine(server, s.Llm.Model)
