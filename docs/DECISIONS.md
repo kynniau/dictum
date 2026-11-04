@@ -6934,8 +6934,8 @@ Next: Kyle re-answers the orchestrator question; Fable writes the interfaces, st
 
 ## Release 1.4.0 prepared (05/11/2026, branch release/1.4.0)
 
-PROPOSED: the 1.4.0 release copy in STORE.md, release-notes-preamble.md and version.json is awaiting the owner's approval. Earlier approved release text is retained unchanged beside the new proposals. Publication dates in version.json and the Help page are DD/MM/YYYY for the owner to fill in at release. The Terms (legal edition in force, unchanged) and Privacy (unchanged since 04/11/2026) pages keep their dates; the orchestrator reverted a placeholder on both on 05/11/2026.
+The 1.4.0 release copy in STORE.md, release-notes-preamble.md and version.json was APPROVED by the owner 05/11/2026 09:38 AEDT. Earlier approved release text is retained unchanged beside it. Publication dates in version.json and the Help page are DD/MM/YYYY for the owner to fill in at release. The Terms (legal edition in force, unchanged) and Privacy (unchanged since 04/11/2026) pages keep their dates; the orchestrator reverted a placeholder on both on 05/11/2026.
 
-PROPOSED: Directory.Build.props supplies version 1.4.0 to the projects; package-msix.ps1 derives Identity Version 1.4.0.0 through AppxManifest.template.xml. About and the update check read the assembly version. Existing Mac download links still name the published mac-v1.3.1 tag; the version-free Mac release preamble is unchanged, as in the 1.3.1 preparation.
+Directory.Build.props supplies version 1.4.0 to the projects; package-msix.ps1 derives Identity Version 1.4.0.0 through AppxManifest.template.xml. About and the update check read the assembly version. Existing Mac download links still name the published mac-v1.3.1 tag; the version-free Mac release preamble is unchanged, as in the 1.3.1 preparation.
 
-PROPOSED: no MSIX was built and nothing was tagged, published, deployed, committed or pushed. Tests were not run: the requested LOCALAPPDATA/Microsoft/dotnet/dotnet.exe was unavailable in this sandbox.
+No MSIX was built and nothing was tagged, published, deployed, committed or pushed. Tests were not run: the requested LOCALAPPDATA/Microsoft/dotnet/dotnet.exe was unavailable in this sandbox.

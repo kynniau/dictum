@@ -155,7 +155,7 @@ Delete models, recordings and logs from Settings, or remove everything at once
 
 ### What's new in this version (1.4.0)
 
-PROPOSED: all wording in the following block, for the owner's approval before submission.
+APPROVED by the owner 05/11/2026 09:38 AEDT: all wording in the following block.
 
 ```text
 Settings > Clean-up and Settings > Models now have Add a key, a key list and Check this key. Keys you add in Dictum are kept in Windows Credential Manager. You can keep several keys for a service and choose which one to use. Check this key sends the key to that service only when you press it, after consent; it sends nothing you dictated or wrote. Create the key file now includes the full template, and the Help page on the website has guides for getting and adding keys. Settings > Privacy can remove all keys you added in Dictum. Calibration now confirms when Use this takes effect and marks the row In use; with cloud speech on, it says the chosen model is the fallback. The voice activity gate model file is downloaded only with Dictum.exe --download-model silero-v6.2.0.
@@ -401,9 +401,9 @@ CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.1 adds a Terms of Use step. On the
 Everything else is as in the notes for 1.3.0 above: cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
 ```
 
-### Notes for certification: PROPOSED for 1.4.0
+### Notes for certification for 1.4.0 (APPROVED by the owner 05/11/2026 09:38 AEDT)
 
-PROPOSED: all wording in the following block, for the owner's approval before submission.
+APPROVED by the owner 05/11/2026 09:38 AEDT: all wording in the following block.
 
 ```text
 Notes written DD/MM/YYYY for Dictum 1.4.0.
@@ -524,7 +524,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 23/10/2026 | Store package Dictum-1.3.0-store.msix built from b8b072d: 240,138,818 bytes, SHA-256 C9F759E471802A99AEB22C18B46BD073DEC79FD7FFC9AFEB931EC5BE346210C2, manifest 1.3.0.0, unsigned (the Store signs); staged for the owner's upload. Tester notes CHANGED paragraph still PROPOSED. Store screenshot 1 and the landing-page panel are still to be captured by the owner on a PC with a microphone. |
 | 23/10/2026 | Dictum 1.3.0 (Submission 4) passed certification and is live in the Store (about 08:30 AEDT, as reported to this lane by the orchestrator's Partner Center check that day; this lane could not read Partner Center and did not re-check it). |
 | 23/10/2026 | Dictum 1.3.1 prepared (version bump, GitHub release notes, tester notes and What's new); the What's new and tester notes were approved by the owner 23/10/2026 15:53 AEDT. Contents: the Terms of Use acceptance on first start (upgrades included), the Store licence field, About's Terms of use and Third-party notices buttons, Storage naming its folders more precisely, Calibration's Downloading wording, Qwen2.5-3B removed from the catalogue, the Offline only description, the cloud consent dialogs saying what hands-free mode sends, the command-line Terms gate, the installer licence page, the rewritten Privacy Policy and the Terms page. "Additional license terms" is still to be set in Partner Center at submission. |
-| DD/MM/YYYY | PROPOSED: Dictum 1.4.0 prepared (version bump, GitHub release notes, tester notes and What's new); all new wording is PROPOSED until the owner approves it. Contents: API key controls and Windows Credential Manager storage, the full key-file template, Help guides and Calibration's Use this feedback. The voice activity gate model file is downloaded only with `Dictum.exe --download-model silero-v6.2.0`. |
+| 05/11/2026 | Dictum 1.4.0 prepared (version bump, GitHub release notes, tester notes and What's new); all new wording APPROVED by the owner 05/11/2026 09:38 AEDT. Contents: API key controls and Windows Credential Manager storage, the full key-file template, Help guides and Calibration's Use this feedback. The voice activity gate model file is downloaded only with `Dictum.exe --download-model silero-v6.2.0`. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
