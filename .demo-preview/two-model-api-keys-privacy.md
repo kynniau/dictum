@@ -193,3 +193,5 @@ Raw outputs: `keys-wording\fable-verdict.md` and `gpt-keys\run.last.md` in this 
 
 All wording for 1.4 API keys is decided except the held uninstall items (rows 38a, 41, 42 and the §10 paragraph 2
 pointer, with D2–D4), which wait for the Store uninstall check in docs/TESTING-MSIX.md §4.
+
+- **Lens finding 1, website key-file download: DROPPED for 1.4.** Kyle, 04/11/2026 20:42 AEDT ("Drop the download"). The download's header was false for the site copy. The K-Docs lane deleted site/dictum-keys.env, its .gitignore exception, its test and the help.html §9 download sentence (b0a7869). "Create the key file…" in the app is unchanged. Opus re-lens on b0a7869: Approve. PR 88 merged 04/11/2026 21:10 AEDT as 2bd53c1.

@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictum Meetings mock</title>
+<!--
+  Clickable UX mock for the proposed Meetings mode (docs/MEETINGS-BRIEF.md, DRAFT 04/11/2026).
+  Self-contained: no external scripts, fonts or images. Nothing is recorded, no microphone is opened,
+  no file is read or written. All names, firms, amounts and files are fictional sample content.
+-->
+<style>
+:root{
+  --win:#F4F6FA;--surf:#FFFFFF;--line:#E2E8F0;--ctlb:#CBD5E1;--text:#0F172A;--text2:#334155;--muted:#64748B;
+  --accent:#2457E6;--accentH:#1A43B8;--rec:#E5484D;--work:#F5A524;--done:#30A46C;--ink:#0B1220;
+  --dsurf:#141C2B;--dtext:#E6EAF2;--dtext2:#C7D0E0;--dmuted:#9AA6BA;--dfaint:#7E8AA0;--dbtn:#1F2A3F;
+  --dline:rgba(255,255,255,.08);--dctl:rgba(255,255,255,.12);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;line-height:20px;color:var(--text);background:#1B2436}
+.display{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,sans-serif}
+button,input,select,textarea{font:inherit}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dark :focus-visible{outline-color:#8AB4FF}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* desktop */
+#desk{position:fixed;left:0;right:0;top:0;bottom:56px;display:flex;flex-direction:column;background:#1B2436}
+#stage{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px;gap:24px}
+#stage.corner{align-items:flex-end;justify-content:flex-end}
+#taskbar{height:44px;flex:none;background:rgba(20,28,43,.96);border-top:1px solid var(--dline);display:flex;align-items:center;justify-content:center;gap:18px;position:relative;color:var(--dtext2);font-size:12px}
+.tb-app{width:22px;height:22px;border-radius:4px;background:#334155;display:inline-block}
+.tb-app.first{background:var(--accent)}
+.tb-tray{position:absolute;right:10px;top:0;bottom:0;display:flex;align-items:center;gap:8px}
+.trayicon{width:36px;height:36px;border:0;border-radius:6px;background:transparent;display:grid;place-items:center;cursor:pointer}
+.trayicon:hover{background:rgba(255,255,255,.08)}
+.deskhint{color:var(--dtext2);font-size:13px;background:rgba(11,18,32,.85);border:1px solid var(--dline);border-radius:12px;padding:12px 16px;max-width:360px}
+
+/* mock chrome: the scene strip is NOT app UI */
+#strip{position:fixed;left:0;right:0;bottom:0;height:56px;background:#FFFFFF;border-top:2px dashed #94A3B8;display:flex;align-items:center;gap:6px;padding:0 12px;overflow-x:auto;z-index:80}
+#strip .lbl{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-right:4px;white-space:nowrap}
+#strip button{height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--ctlb);background:#fff;color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap}
+#strip button[aria-current="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+#strip .sep{flex:1;min-width:8px}
+
+/* buttons, as Theme/Controls.axaml: primary, secondary, danger, quiet; radius 8, height 36 */
+.btn{height:36px;padding:0 14px;border-radius:8px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;border:1px solid transparent;color:var(--text);background:transparent}
+.btn.primary{background:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:var(--accentH)}
+.btn.secondary{background:#fff;border-color:var(--ctlb)}
+.btn.secondary:hover{background:#F8FAFC}
+.btn.danger{background:var(--rec);color:#fff;font-weight:600}
+.btn.danger:hover{background:#C83A3F}
+.btn.quiet{color:var(--muted)}
+.btn.quiet:hover{color:var(--text)}
+.btn.link{color:var(--accent);padding:0 2px;height:auto;min-height:24px}
+.btn.big{height:44px;font-size:14px;padding:0 18px}
+.dark .btn.secondary{background:var(--dbtn);border-color:var(--dctl);color:var(--dtext)}
+.dark .btn.secondary:hover{background:#26334C}
+.dark .btn.quiet{color:var(--dmuted)}
+.dark .btn.quiet:hover{color:var(--dtext)}
+.dot{width:10px;height:10px;border-radius:5px;background:var(--rec);display:inline-block;flex:none}
+.dot.white{background:#fff}
+.dot.amber{background:var(--work)}
+.breathe{animation:breathe 1.2s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+.fade{animation:fade .15s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion: reduce){.breathe,.fade{animation:none}}
+
+/* windows, as Calibrate.dc.html */
+.win{background:var(--win);border:1px solid #D5DCE6;border-radius:10px;box-shadow:0 20px 50px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden;max-width:100%;max-height:100%}
+.titlebar{height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 8px 0 16px;background:#fff;border-bottom:1px solid var(--line)}
+.titlebar .t{font-size:13px;font-weight:600}
+.titlebar .sp{flex:1}
+.footbar{min-height:56px;flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 20px;background:#fff;border-top:1px solid var(--line)}
+.footbar .sp{flex:1}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+.overline{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.caption{font-size:12px;line-height:17px;color:var(--muted)}
+.body2{font-size:13px;line-height:19px;color:var(--text2)}
+.h1{font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.3px;margin:0}
+.h2{font-size:16px;line-height:22px;font-weight:600;margin:0}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:10px}
+.tabnum{font-variant-numeric:tabular-nums}
+.badge{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:11px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.share{background:#E8EEFD;color:#1A43B8}
+.badge.zoom{background:#EEF1F5;color:#334155}
+.badge.video{background:#EEF1F5;color:#334155}
+.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#334155;background:#E9EDF3;border-radius:4px;padding:1px 6px;vertical-align:middle}
+
+/* PLACEHOLDER and PROPOSED markers: copy that is not approved */
+.ph{border:1.5px dashed #B7791F;background:#FFF8E6;border-radius:8px;padding:10px 12px}
+.tagph{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7A4B00;background:#FDE7B0;border-radius:4px;padding:1px 6px;vertical-align:middle;text-transform:uppercase}
+.dark .tagph{color:#3B2600;background:#F5C76A}
+.ref{display:none;font-size:10px;font-weight:700;color:#5B21B6;background:#EDE9FE;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px}
+body.refs .ref{display:inline-block}
+
+/* inputs */
+.input{height:36px;border-radius:8px;border:1px solid var(--ctlb);background:#fff;color:var(--text);padding:0 10px;font-size:13px}
+select.input{padding:0 8px}
+.switch{width:40px;height:22px;accent-color:var(--accent);margin:0;cursor:pointer}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend{padding:0;font-size:13px;font-weight:600;margin-bottom:6px}
+.radio{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:13px;cursor:pointer}
+.radio input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--accent);flex:none}
+.check{display:flex;align-items:center;gap:8px;min-height:32px;font-size:13px;cursor:pointer}
+.check input{width:18px;height:18px;margin:0;accent-color:var(--accent);flex:none}
+.line{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+
+/* flyout, as Flyout.dc.html */
+.flyout{width:380px;max-width:100%;padding:16px;background:var(--dsurf);color:var(--dtext);border:1px solid var(--dline);border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:14px}
+.flyout .muted{color:var(--dmuted)}
+.flyout select{height:36px;border-radius:8px;border:1px solid var(--dctl);background:#0B1220;color:var(--dtext);font-size:13px;padding:0 10px;width:100%}
+.flyout .seg2{display:flex;background:#0B1220;border-radius:8px;padding:3px;gap:3px}
+.flyout .seg2 button{flex:1;height:36px;border:0;border-radius:6px;background:transparent;color:var(--dtext2);font-size:13px;cursor:pointer}
+.flyout .seg2 button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
+.flyout .tog{display:flex;align-items:center;justify-content:space-between;height:36px;font-size:13px;cursor:pointer}
+.flyout .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.flyout .grid2 .btn{height:40px;width:100%}
+.flyout .meetbox{display:flex;flex-direction:column;gap:8px;padding:10px;background:#0B1220;border-radius:8px}
+.flyout .meetbox .btn{height:40px;width:100%}
+.flyout .foot{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--dline)}
+
+/* toast (Dictum floating surface) */
+.ztoast{width:380px;max-width:100%;padding:14px 16px;background:var(--dsurf);color:var(--dtext);border:1px solid var(--dline);border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:10px}
+#toasts{position:fixed;right:16px;bottom:112px;display:flex;flex-direction:column;gap:8px;z-index:90;max-width:calc(100vw - 32px)}
+.toast{width:360px;max-width:100%;padding:12px 14px;background:var(--dsurf);color:var(--dtext);border:1px solid var(--dline);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.4);font-size:13px;line-height:18px;display:flex;flex-direction:column;gap:8px}
+
+/* illustration of a call window */
+.callwin{width:520px;max-width:100%;height:330px;background:#0F1626;border:1px solid var(--dline);border-radius:10px;box-shadow:0 20px 50px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden;color:var(--dtext2);font-size:12px}
+.callwin .cbar{height:36px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--dline)}
+.callwin .tiles{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+.callwin .tile{background:#1F2A3F;border-radius:8px;display:grid;place-items:center;color:var(--dmuted)}
+
+/* recording window */
+.meterrow{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px}
+.meter{display:flex;gap:3px;height:18px;align-items:stretch}
+.seg{flex:1;max-width:12px;border-radius:2px;background:#CBD5E1}
+.seg.on{background:var(--done)}
+.seg.hot{background:var(--work)}
+.tlist{flex:1;min-height:120px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.trow{display:grid;grid-template-columns:56px 64px 1fr;gap:8px;align-items:baseline;padding:5px 4px;border-radius:6px;font-size:13px;line-height:19px}
+.trow.sys{grid-template-columns:56px 1fr;color:var(--muted);font-size:12px}
+.tt{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+button.tt{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;color:var(--accent)}
+button.tt:hover{text-decoration:underline}
+.tag{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:0 6px;line-height:18px;justify-self:start}
+.tag.you{background:#E8EEFD;color:#1A43B8}
+.tag.oth{background:#EEF1F5;color:#334155}
+.systext{font-style:italic}
+
+/* meeting window */
+.mhead{display:flex;align-items:flex-start;gap:16px;padding:16px 20px 12px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.titlein{width:100%;border:1px solid transparent;border-radius:8px;background:transparent;font-size:22px;line-height:30px;font-weight:600;letter-spacing:-.3px;padding:2px 6px;margin-left:-7px;color:var(--text)}
+.titlein:hover{border-color:var(--line)}
+.titlein:focus-visible{border-color:var(--ctlb);background:#fff}
+.meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:4px}
+.mbody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;padding:16px 20px}
+.col{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.player{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pbar{flex:1;min-width:80px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.pbar>div{height:100%;background:var(--accent)}
+.sumsec{display:flex;flex-direction:column;gap:2px}
+.sumsec h4{margin:0;font-size:13px;font-weight:600}
+.sumsec p{margin:0;font-size:13px;line-height:19px;color:var(--text2)}
+.sumsec p.empty{color:var(--muted);font-style:italic}
+.owner{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.owner h5{margin:0;font-size:12px;font-weight:600;color:var(--text2)}
+.owner ul{margin:0;padding-left:18px;font-size:13px;line-height:19px;color:var(--text2)}
+.honest{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;background:var(--win);border:1px solid var(--line);border-radius:8px;font-size:12px;line-height:17px;color:var(--text2)}
+.banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 20px 0;padding:10px 14px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;font-size:13px}
+.menu{position:absolute;right:0;top:40px;z-index:20;width:300px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:6px;display:flex;flex-direction:column}
+.menu button{height:36px;text-align:left;border:0;background:transparent;border-radius:6px;padding:0 10px;font-size:13px;cursor:pointer;color:var(--text)}
+.menu button:hover{background:var(--win)}
+.status{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);padding:12px;background:var(--win);border-radius:8px}
+.spin{width:16px;height:16px;flex:none}
+
+/* list */
+.mlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mrow{width:100%;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;cursor:pointer;color:var(--text)}
+.mrow:hover{border-color:var(--ctlb)}
+.mrow .mt{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow .mm{font-size:12px;color:var(--muted);grid-column:1}
+.mrow .bd{grid-column:2;grid-row:1 / span 2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mrow .snip{grid-column:1 / -1;font-size:12px;color:var(--text2)}
+
+/* settings */
+.snav{width:180px;flex:none;background:#fff;border-right:1px solid var(--line);padding:16px 8px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.snav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.snav button{width:100%;height:34px;text-align:left;border:0;background:transparent;border-radius:6px;padding:0 10px;font-size:13px;cursor:pointer;color:var(--text)}
+.snav button:hover{background:var(--win)}
+.snav button[aria-current="page"]{background:#E8EEFD;color:#1A43B8;font-weight:600}
+.spage{flex:1;overflow:auto;padding:24px 28px}
+.spage .inner{max-width:620px;display:flex;flex-direction:column;gap:14px}
+.member{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}
+.avatar{width:24px;height:24px;border-radius:12px;background:#E9EDF3;color:#334155;font-size:11px;font-weight:600;display:grid;place-items:center;flex:none}
+
+/* dialogs */
+#layer .scrim{position:fixed;left:0;right:0;top:0;bottom:56px;background:rgba(11,18,32,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:60}
+.dialog{width:540px}
+.dialog .dbody{padding:18px 20px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+pre.md{margin:0;padding:12px;background:var(--win);border:1px solid var(--line);border-radius:8px;font-family:Consolas,"Cascadia Mono",monospace;font-size:12px;line-height:18px;white-space:pre-wrap}
+textarea.input{height:140px;padding:8px 10px;resize:vertical;width:100%}
+.filebtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:13px;color:var(--text)}
+.filebtn:hover{border-color:var(--ctlb)}
+
+@media (max-width:900px){
+  .mbody{grid-template-columns:1fr;overflow:auto}
+  .col{overflow:visible}
+  .snav{width:140px}
+}
+@media (max-width:640px){
+  .snav{display:none}
+  #stage{padding:12px}
+}
+</style>
+</head>
+<body>
+<noscript><p style="color:#fff;padding:24px">This mock needs JavaScript to be clickable. It makes no network requests.</p></noscript>
+<div id="desk">
+  <main id="stage" aria-label="Mock desktop"></main>
+  <div id="taskbar" class="dark" aria-label="Taskbar (illustration)">
+    <span class="tb-app first" aria-hidden="true"></span><span class="tb-app" aria-hidden="true"></span><span class="tb-app" aria-hidden="true"></span><span class="tb-app" aria-hidden="true"></span>
+    <div class="tb-tray"><button type="button" class="trayicon" id="trayBtn" data-act="tray"></button><span id="tbClock" class="tabnum"></span></div>
+  </div>
+</div>
+<div id="layer"></div>
+<div id="toasts" aria-live="polite"></div>
+<nav id="strip" aria-label="Mock scenes (not part of the app)"></nav>
+
+<script>
+'use strict';
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const fmtDate = d => pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+const fmtClock = d => pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+const fmtHM = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+const fmtT = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? h + ':' + pad(m) + ':' + pad(x) : m + ':' + pad(x); };
+const fmtDur = s => s < 60 ? Math.max(1, Math.round(s)) + ' sec' : s < 3600 ? Math.round(s / 60) + ' min' : Math.floor(s / 3600) + ' h ' + pad(Math.round(s % 3600 / 60)) + ' min';
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ref = s => '<span class="ref">Brief ' + esc(s) + '</span>';
+const PH = '<span class="tagph">Placeholder · counsel\'s words to come</span>';
+const PROP = '<span class="tagph">Proposed wording, not approved</span>';
+
+const MARK = s => '<svg aria-hidden="true" width="' + s + '" height="' + s + '" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="52" rx="14" fill="#0B1220"/><path d="M14 50 L14 63 L27 50 Z" fill="#0B1220"/><rect x="18" y="24" width="6" height="16" rx="3" fill="#FFFFFF"/><rect x="29" y="15" width="6" height="34" rx="3" fill="#FFFFFF"/><rect x="40" y="21" width="6" height="22" rx="3" fill="#FFFFFF"/></svg>';
+const TRAY_IDLE = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="5" width="3" height="6" rx="1.5" fill="#FFFFFF"/><rect x="6.5" y="2" width="3" height="12" rx="1.5" fill="#FFFFFF"/><rect x="11" y="4" width="3" height="8" rx="1.5" fill="#FFFFFF"/></svg>';
+const TRAY_REC = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="#E5484D"/><rect x="3" y="5.5" width="2.5" height="5" rx="1.25" fill="#FFFFFF"/><rect x="6.75" y="3.5" width="2.5" height="9" rx="1.25" fill="#FFFFFF"/><rect x="10.5" y="5" width="2.5" height="6" rx="1.25" fill="#FFFFFF"/></svg>';
+const LOCK = c => '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+const SPIN = '<svg class="spin" aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="rgba(245,165,36,0.35)" stroke-width="2.5"/><path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="#F5A524" stroke-width="2.5" stroke-linecap="round"/></svg>';
+const INFO = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>';
+
+/* ---------- sample content (all fictional) ---------- */
+const TPL = {
+  general:  { name: 'General meeting',          sections: ['Summary', 'Decisions'] },
+  filenote: { name: 'Client meeting file note', sections: ['Client', 'What the client wants', 'Documents asked for', 'Next steps', 'Recording'] },
+  lender:   { name: 'Lender or supplier call',  sections: ['Who we spoke to', 'What we asked', 'What they told us'] },
+  standup:  { name: 'Stand-up',                 sections: ['Done since last time', 'Today', 'Blockers'] }
+};
+/* need = index of the last spoken line the sentence relies on; a sentence is shown only once that line is in the
+   transcript, so a meeting stopped early never shows a summary of things nobody said (brief D5 figure honesty). */
+const I = (t, need) => ({ t: t, need: need || 0 });
+const CONTENT = {
+  client: { title: 'Client meeting: A. Example', defTpl: 'filenote', dur: 1920, size: '38 MB',
+    lines: [
+      ['You', "Thanks for coming in. I'm recording this so I can write up the file note, and you've both said that's fine.", 5],
+      ['Others', "Yes, that's fine with us.", 14],
+      ['You', "So, A. Example, you're looking to buy at around $800,000?", 95],
+      ['Others', "That's right. We've saved a $160,000 deposit, so we'd like to borrow $640,000.", 160],
+      ['You', "Okay. I'll need your last two payslips and three months of bank statements.", 300],
+      ['Others', "I can send those by Friday.", 352],
+      ['You', "And the same two payslips from B. Example, please.", 470],
+      ['Others', "No problem, B. Example will send them too.", 515],
+      ['You', "Thanks. I'll compare three lenders and send you the options next week.", 900],
+      ['Others', "Can we talk again after that?", 1210],
+      ['You', "Yes. I'll book a follow-up call for Wednesday.", 1260],
+      ['Others', "Wednesday works for us.", 1290]
+    ],
+    marks: [296],
+    sum: {
+      general: { 'Summary': [I('A. Example is looking to buy at around $800,000.', 2), I('They have saved a $160,000 deposit and would like to borrow $640,000.', 3), I('Payslips and bank statements were asked for.', 4), I('A follow-up call is planned for Wednesday.', 10)],
+                 'Decisions': [I('You will compare three lenders before the next call.', 8)] },
+      filenote: { 'Client': [I('A. Example', 2), I('and B. Example.', 6)],
+                  'What the client wants': [I('To buy at around $800,000.', 2), I('Deposit saved: $160,000. Loan wanted: $640,000.', 3)],
+                  'Documents asked for': [I('Last two payslips and three months of bank statements from A. Example', 4), I('(by Friday).', 5), I('Last two payslips from B. Example.', 6)],
+                  'Next steps': [I('Compare three lenders and send the options next week.', 8), I('Follow-up call on Wednesday.', 10)] },
+      lender: {},
+      standup: { 'Today': [I('You: compare three lenders and send the options next week.', 8)] }
+    },
+    actions: { 'You': [I('Compare three lenders and send the options next week.', 8), I('Book a follow-up call for Wednesday.', 10)],
+               'A. Example': [I('Send the last two payslips and three months of bank statements by Friday.', 5)],
+               'B. Example': [I('Send the last two payslips.', 7)] } },
+  lender: { title: 'Lender call: Example Bank', defTpl: 'lender', dur: 1080, size: '120 MB',
+    lines: [
+      ['You', "Hi, I'm calling about the application for A. Example.", 6],
+      ['Others', "Thanks. We have the payslips. We still need three months of bank statements.", 20],
+      ['You', "I'll send the bank statements today.", 61],
+      ['Others', "Good. Is the loan amount still $640,000?", 130],
+      ['You', "Yes, $640,000 over 30 years.", 142],
+      ['Others', "Then we should have an answer for you next week.", 410],
+      ['You', "Great, thank you.", 422]
+    ],
+    sum: {
+      general: { 'Summary': [I('The lender has the payslips for A. Example and still needs three months of bank statements. The loan amount is still $640,000 over 30 years. An answer is expected next week.')] },
+      lender: { 'Who we spoke to': [I('Others (no name was said on the call).')],
+                'What we asked': [I('About the application for A. Example, and whether the loan amount is still $640,000.')],
+                'What they told us': [I('They have the payslips and still need three months of bank statements. An answer is expected next week.')] },
+      filenote: { 'Client': [I('A. Example.')], 'Next steps': [I('Send three months of bank statements today. Wait for the answer next week.')] },
+      standup: {}
+    },
+    actions: { 'You': [I('Send three months of bank statements today.')], 'Others': [I('Give an answer next week.')] } },
+  standup: { title: 'Team stand-up', defTpl: 'standup', dur: 720, size: '14 MB',
+    lines: [
+      ['You', "Yesterday I sent the A. Example documents to the lender.", 8],
+      ['Others', "I finished the C. Sample file note.", 30],
+      ['You', "Today I'm comparing three lenders for A. Example.", 52],
+      ['Others', "Nothing is blocking me.", 75]
+    ],
+    sum: {
+      standup: { 'Done since last time': [I('You sent the A. Example documents to the lender. Others finished the C. Sample file note.')], 'Today': [I('You: compare three lenders for A. Example.')], 'Blockers': [I('None mentioned.')] },
+      general: { 'Summary': [I('A short update on the A. Example and C. Sample files.')] }, filenote: {}, lender: {}
+    },
+    actions: { 'You': [I('Compare three lenders for A. Example.')] } },
+  webinar: { title: 'Webinar: Example Bank broker update', defTpl: 'general', dur: 3600, size: '600 MB',
+    lines: [
+      ['Others', "Welcome to the Example Bank broker update.", 12],
+      ['Others', "Today we'll cover three changes to our application forms.", 40],
+      ['Others', "We'll take questions at the end.", 95]
+    ],
+    sum: {
+      general: { 'Summary': [I('Example Bank ran a broker update about three changes to its application forms, with questions at the end.')] },
+      lender: { 'Who we spoke to': [I('Example Bank (named on the call).')], 'What they told us': [I('Three changes to their application forms.')] },
+      filenote: {}, standup: {}
+    },
+    actions: {} },
+  supplier: { title: 'Supplier call: Demo Software', defTpl: 'lender', dur: 1200, size: '24 MB',
+    lines: [
+      ['You', "We'd like to renew the Demo Software licence.", 9],
+      ['Others', "The renewal is $1,200 for the year.", 25],
+      ['You', "Please send the invoice.", 41],
+      ['Others', "I'll send it today.", 48]
+    ],
+    sum: {
+      lender: { 'Who we spoke to': [I('Others (no name was said on the call).')], 'What we asked': [I('To renew the Demo Software licence.')], 'What they told us': [I('The renewal is $1,200 for the year. They will send the invoice today.')] },
+      general: { 'Summary': [I('Renewal of the Demo Software licence: $1,200 for the year. The invoice is coming today.')] },
+      filenote: {}, standup: {}
+    },
+    actions: { 'Others': [I('Send the invoice today.')] } }
+};
+const TEAM = ['J. Sample', 'K. Demo', 'L. Trial', 'M. Test'];
+const ENGINE = { local: 'On this computer', ollama: 'Ollama on this PC', cloud: 'Your own Claude or OpenAI key' };
+const KEEP = { keep: 'Keep until I delete', d30: 'Delete audio after 30 days', d90: 'Delete audio after 90 days' };
+const SHAREDEF = { team: 'My team', nobody: 'Nobody', ask: 'Ask me' };
+const HOW_LIVE = ['Out loud on the call', 'In writing before the meeting'];
+const HOW_IMPORT = ['Out loud on the call', 'In writing before the meeting', "The meeting app announced the recording (for example Zoom's notice)"];
+const FILES = [
+  { name: 'video1.mp4', where: 'Documents\\Zoom', key: 'lender', source: 'zoom', video: true, size: '120 MB' },
+  { name: 'audio1.m4a', where: 'Documents\\Zoom', key: 'lender', source: 'zoom', video: false, size: '17 MB' },
+  { name: 'phone-call.wav', where: 'Downloads', key: 'supplier', source: 'file', video: false, size: '24 MB' }
+];
+
+function buildMeeting(id, key, o) {
+  const c = CONTENT[key];
+  const lines = c.lines.map(l => ({ t: l[2], ch: l[0], text: l[1] }));
+  (c.marks || []).forEach(t => lines.push({ t: t, sys: 'mark' }));
+  lines.sort((a, b) => a.t - b.t);
+  return Object.assign({ id: id, content: key, title: c.title, date: fmtDate(new Date()), dur: c.dur, size: c.size, shared: false,
+    source: null, file: null, video: false, consent: null, tpl: c.defTpl, lines: lines }, o || {});
+}
+
+/* ---------- state ---------- */
+const S = {
+  scene: 'tray', dialog: 'intro', dlg: {}, meetingsOn: true, engine: 'local', keepAudio: 'keep', folderAlt: false,
+  team: false, shareDefault: 'ask', zoomMode: 'ask', zoomVariant: 'a', consentMode: 'live', how: HOW_LIVE[0],
+  current: 'm0', search: '', rec: null, proc: null, banner: null, pos: 0, playing: false, exportOpen: false,
+  settingsPage: 'Meetings', mic: 'Headset Microphone', refs: false, focusNext: null, returnFocus: null, n: 0,
+  meetings: [
+    buildMeeting('m0', 'client', { consent: { ack: fmtDate(new Date()) + ' 09:30:12', how: HOW_LIVE[0], joins: [] } }),
+    buildMeeting('m1', 'lender', { date: '03/11/2026', shared: true, source: 'zoom', file: 'video1.mp4', video: true,
+      consent: { imported: '03/11/2026 15:10', how: HOW_IMPORT[2] } }),
+    buildMeeting('m2', 'standup', { date: '03/11/2026', consent: { ack: '03/11/2026 08:45:02', how: HOW_LIVE[0], joins: [] } }),
+    buildMeeting('m3', 'webinar', { date: '30/10/2026', source: 'zoom', file: 'video1.mp4', video: true,
+      consent: { imported: '30/10/2026 12:05', how: HOW_IMPORT[2] } }),
+    buildMeeting('m4', 'supplier', { date: '29/10/2026', source: 'file', file: 'phone-call.wav',
+      consent: { imported: '29/10/2026 16:40', how: HOW_IMPORT[0] } })
+  ]
+};
+const cur = () => S.meetings.find(m => m.id === S.current);
+
+/* ---------- shared pieces ---------- */
+function titlebar(title, extra) {
+  return '<div class="titlebar">' + MARK(20) + '<span class="t">' + esc(title) + '</span><span class="sp"></span>' + (extra || '') +
+    '<button type="button" class="btn quiet" aria-label="Close window" data-act="closeWin" style="width:32px;padding:0;font-size:16px">×</button></div>';
+}
+function badges(m) {
+  let b = '';
+  if (m.shared) b += '<span class="badge share">Shared with team</span>';
+  if (m.source === 'zoom') b += '<span class="badge zoom">Imported from Zoom</span>';
+  if (m.source === 'file') b += '<span class="badge zoom">Imported</span>';
+  if (m.video) b += '<span class="badge video">Video kept</span>';
+  return b;
+}
+function sysText(l) {
+  if (l.sys === 'mark') return '◆ Marked moment';
+  if (l.sys === 'join') return 'Someone joined. Reminder shown again; acknowledged at ' + esc(l.ack) + '.';
+  if (l.sys === 'pause') return 'Paused. Nothing recorded until resumed.';
+  if (l.sys === 'resume') return 'Resumed.';
+  return '';
+}
+function rowsHTML(lines, clickable) {
+  if (!lines.length) return '<div class="caption" style="padding:8px 4px">Waiting for the first words…</div>';
+  return lines.map(l => {
+    if (l.sys) return '<div class="trow sys"><span class="tt">' + fmtT(l.t) + '</span><span class="systext">' + sysText(l) + '</span></div>';
+    const tt = clickable
+      ? '<button type="button" class="tt" data-act="seek" data-arg="' + l.t + '" aria-label="Play from ' + fmtT(l.t) + '">' + fmtT(l.t) + '</button>'
+      : '<span class="tt">' + fmtT(l.t) + '</span>';
+    return '<div class="trow">' + tt + '<span class="tag ' + (l.ch === 'You' ? 'you' : 'oth') + '">' + l.ch + '</span><span>' + esc(l.text) + '</span></div>';
+  }).join('');
+}
+function meterHTML(id, label) {
+  let segs = '';
+  for (let i = 0; i < 16; i++) segs += '<span class="seg"></span>';
+  return '<div class="meter" id="' + id + '" role="meter" aria-label="' + label + ' sound level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' + segs + '</div>';
+}
+function keepWords() {
+  return S.keepAudio === 'keep' ? 'until you delete it'
+    : 'the sound for ' + (S.keepAudio === 'd30' ? '30' : '90') + ' days; the transcript and summary until you delete them';
+}
+
+/* ---------- scenes ---------- */
+const SCENES = {};
+
+SCENES.desk = () => '<div class="deskhint fade">Nothing is open. Click the Dictum icon in the taskbar, or pick a scene below.</div>';
+
+SCENES.tray = () => {
+  const rec = S.rec;
+  let meet = '';
+  if (S.meetingsOn) {
+    meet = '<div class="meetbox">' +
+      (rec
+        ? '<button type="button" class="btn secondary" id="flyOpenRec" data-act="go" data-arg="rec"><span class="dot breathe"></span>Recording a meeting · <span id="flyRecTime" class="tabnum">' + fmtT(rec.elapsed) + '</span></button>'
+        : '<button type="button" class="btn secondary" id="flyStart" data-act="startMeeting"><span class="dot"></span>Start a meeting</button>') +
+      '<button type="button" class="btn secondary" id="flyList" data-act="go" data-arg="list">Meetings</button>' +
+      '<div class="caption" style="color:var(--dfaint)">Shown because Meetings is on in Settings.' + ref('D9') + '</div></div>';
+  }
+  const foot = S.engine === 'cloud'
+    ? '<div class="row" style="gap:6px;font-size:12px;color:var(--dmuted)">Meeting summaries use your own key: their text leaves this PC. ' + PROP + '</div>'
+    : '<div class="row" style="gap:6px;font-size:12px;color:var(--dmuted)">' + LOCK('#9AA6BA') + 'Nothing leaves this PC</div>';
+  return '<section class="flyout dark fade" aria-label="Dictum tray menu">' +
+    '<div class="row" style="gap:10px;flex-wrap:nowrap">' + MARK(28) +
+      '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">Dictum</div><div style="font-size:12px" class="muted">medium.en · Vulkan · Qwen 1.5B · Right Ctrl</div></div>' +
+      '<div class="row muted" style="gap:6px;font-size:12px;flex-wrap:nowrap"><span class="dot" style="background:#30A46C;width:8px;height:8px"></span>Ready</div>' +
+      '<label class="tog" style="height:auto"><input type="checkbox" role="switch" checked class="switch" id="flyOn"><span class="sr">Dictation on</span></label></div>' +
+    '<div class="stack" style="gap:6px"><div style="font-size:12px" class="muted">Mode</div><div class="seg2"><button type="button" aria-pressed="false" data-act="mock" data-arg="Dictation mode">Light</button><button type="button" aria-pressed="true" data-act="mock" data-arg="Dictation mode">Full</button></div></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="stack" style="gap:6px"><label for="flySpeech" style="font-size:12px" class="muted">Speech model</label><select id="flySpeech"><option>large-v3-turbo</option><option>medium.en</option></select></div>' +
+      '<div class="stack" style="gap:6px"><label for="flyClean" style="font-size:12px" class="muted">Clean-up</label><select id="flyClean"><option>Qwen2.5 1.5B · local</option><option>Rule-based tidy</option></select></div></div>' +
+    meet +
+    '<div class="grid2"><button type="button" class="btn secondary" data-act="mock" data-arg="Calibrate my voice">Calibrate my voice</button><button type="button" class="btn secondary" data-act="mock" data-arg="Dictionary">Dictionary</button>' +
+      '<button type="button" class="btn secondary" data-act="mock" data-arg="Fix last dictation">Fix last dictation</button><button type="button" class="btn secondary" id="flySettings" data-act="go" data-arg="settings">Settings</button></div>' +
+    '<div class="foot">' + foot + '<button type="button" class="btn quiet" data-act="mock" data-arg="Quit">Quit</button></div>' +
+  '</section>';
+};
+
+SCENES.zoom = () => {
+  const a = S.zoomVariant === 'a';
+  const call = '<div class="callwin" aria-hidden="true"><div class="cbar">' + (a ? '<span class="dot breathe"></span>Recording' : 'Meeting ended') + '<span style="flex:1"></span>Your video call app (illustration)</div>' +
+    '<div class="tiles"><div class="tile">You</div><div class="tile">A. Example</div><div class="tile">B. Example</div><div class="tile">' + (a ? '' : 'Saving the recording…') + '</div></div></div>';
+  const body = a
+    ? '<div style="font-size:14px;font-weight:600">Zoom is recording to your computer.</div><div class="body2" style="color:var(--dtext2)">Import it into Dictum when it finishes?</div>'
+    : '<div style="font-size:14px;font-weight:600">A new Zoom recording finished. Import?</div><div class="body2" style="color:var(--dtext2)">In Documents\\Zoom: video1.mp4</div>';
+  const t = '<section class="ztoast dark fade" role="dialog" aria-labelledby="zt-h" aria-describedby="zt-b">' +
+    '<div class="row" style="gap:8px;flex-wrap:nowrap">' + MARK(18) + '<span id="zt-h" style="font-size:12px;font-weight:600;color:var(--dmuted)">Dictum · Meetings</span><span style="flex:1"></span>' +
+      '<button type="button" class="btn quiet" style="width:28px;height:28px;padding:0" aria-label="Not this time" data-act="zoomNo">×</button></div>' +
+    '<div id="zt-b" class="stack" style="gap:4px">' + body + '</div>' +
+    '<div class="row"><button type="button" class="btn primary" id="zYes" data-act="zoomYes">Yes</button><button type="button" class="btn secondary" id="zNo" data-act="zoomNo">Not this time</button><button type="button" class="btn secondary" id="zAlways" data-act="zoomAlways">Always for Zoom</button></div>' +
+    '<div class="caption" style="color:var(--dfaint)">Dictum never starts or imports a recording without you choosing it. ' + ref('D11, §7.2.2') + '</div>' +
+  '</section>';
+  return '<div style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;width:100%">' + call + t + '</div>';
+};
+
+SCENES.consent = () => {
+  const zoom = S.consentMode === 'zoom';
+  const share = S.team && S.shareDefault === 'team' ? 'you, and your team (' + TEAM.length + ' people), as set in Settings'
+    : S.team && S.shareDefault === 'ask' ? 'only you, unless you choose to share it with your team afterwards'
+    : 'only you';
+  const summ = S.engine === 'cloud' ? 'It is turned into text on this computer, and the text is sent to your own Claude or OpenAI key for the summary.'
+    : S.engine === 'ollama' ? 'It is turned into text and summarised on this computer (by Ollama).'
+    : 'It is turned into text and summarised on this computer.';
+  const radios = HOW_LIVE.map((h, i) => '<label class="radio"><input type="radio" name="how" id="how' + i + '" data-change="how" value="' + esc(h) + '"' + (S.how === h ? ' checked' : '') + '>' + esc(h) + '</label>').join('');
+  return '<section class="win fade" style="width:640px" aria-labelledby="cons-h">' + titlebar(zoom ? 'Zoom recording' : 'Start a meeting') +
+    '<div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;overflow:auto">' +
+      '<h1 id="cons-h" class="h1 display">' + (zoom ? 'Before Dictum imports this Zoom recording' : 'Before you record') + ref('§7.2.1, §7.2.8, D10') + '</h1>' +
+      '<div class="ph stack" style="gap:8px">' + PH +
+        (zoom ? '<div class="body2">Zoom shows everyone a recording sign. That is not the same as their agreement.</div>' : '') +
+        '<div class="display" style="font-size:20px;line-height:28px;font-weight:600">Tell everyone you are recording, and get their agreement.</div>' +
+        '<ul class="body2" style="margin:0;padding-left:18px">' +
+          '<li>What is recorded: ' + (zoom ? "Zoom's recording of the call." : 'your microphone, and everything this computer plays.') + '</li>' +
+          '<li>' + summ + '</li>' +
+          '<li>Who can open it: ' + share + '.' + (S.team ? ' Team members may work in other countries.' : '') + '</li>' +
+          '<li>How long it is kept: ' + keepWords() + '.</li>' +
+        '</ul></div>' +
+      '<fieldset><legend>How are they agreeing?</legend>' + radios + '<div class="caption">Saved with the meeting, with the time you press the button.' + ref('§7.2.6') + '</div></fieldset>' +
+      '<div class="caption">' + (zoom ? 'Nothing is imported until you press the button.' : 'Nothing is recorded until you press the button.') + ' The button records that you were reminded; it does not prove that anyone agreed.</div>' +
+    '</div>' +
+    '<div class="footbar"><button type="button" class="btn quiet" id="saidNo" data-act="openDialog" data-arg="refuse">Someone said no</button><span class="sp"></span>' +
+      '<button type="button" class="btn secondary" id="consCancel" data-act="consentCancel">Cancel</button>' +
+      '<button type="button" class="btn ' + (zoom ? 'primary' : 'danger') + ' big" id="consOk" data-act="consentOk">' + (zoom ? '' : '<span class="dot white"></span>') + (zoom ? "I've told everyone. Import when Zoom finishes" : "I've told everyone. Start recording") + '</button></div>' +
+  '</section>';
+};
+
+SCENES.rec = () => {
+  const r = S.rec;
+  if (!r) return SCENES.desk();
+  const state = r.paused
+    ? '<span class="dot amber"></span><span style="font-size:13px;font-weight:600">Paused</span>'
+    : '<span class="dot breathe"></span><span style="font-size:13px;font-weight:600">Recording</span>';
+  return '<section class="win fade" style="width:700px;height:min(640px,100%)" aria-labelledby="rec-h">' +
+    titlebar('Meeting', state + '<span id="elapsed" class="tabnum" style="font-size:13px;margin:0 8px 0 4px;min-width:44px" aria-label="Elapsed time">' + fmtT(r.elapsed) + '</span>') +
+    '<div style="flex:1;min-height:0;padding:16px 20px;display:flex;flex-direction:column;gap:12px">' +
+      '<h1 id="rec-h" class="sr">Recording a meeting</h1>' +
+      (r.skipped ? '<div class="ph caption" style="color:#7A4B00">Mock only: you jumped here from the scene strip, so the agreement step was skipped this once. In the app it can never be skipped.</div>' : '') +
+      '<div class="card stack" style="gap:10px">' +
+        '<div class="meterrow"><div><div style="font-size:13px;font-weight:600">You</div><div class="caption">' + esc(S.mic) + '</div></div>' + meterHTML('mYou', 'You') + '</div>' +
+        '<div class="meterrow"><div><div style="font-size:13px;font-weight:600">Others</div><div class="caption">This PC\'s sound</div></div>' + meterHTML('mOth', 'Others') + '</div>' +
+        '<div class="caption">"Others" is everything this computer plays: the call, and also notification sounds or music. Close what you don\'t want recorded.' + ref('D3') + '</div>' +
+      '</div>' +
+      '<div class="caption">Agreement reminder acknowledged at ' + fmtClock(r.ack) + ' on ' + fmtDate(r.ack) + ' · ' + esc(r.how) + '</div>' +
+      '<div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px"><div class="row"><span class="overline">Live transcript</span><span class="caption">a few seconds behind</span>' + ref('D4') + '</div>' +
+        '<div id="tlist" class="tlist" data-keep role="log" aria-label="Live transcript">' + rowsHTML(r.lines, false) + '</div></div>' +
+    '</div>' +
+    '<div class="footbar">' +
+      '<button type="button" class="btn secondary" id="markBtn" data-act="mark">◆ Mark this moment</button>' +
+      '<button type="button" class="btn secondary" id="joinBtn" data-act="openDialog" data-arg="join">Someone joined</button>' +
+      '<button type="button" class="btn secondary" id="pauseBtn" data-act="pause">' + (r.paused ? 'Resume' : 'Pause') + '</button>' +
+      '<span class="sp"></span>' +
+      '<button type="button" class="btn quiet" id="discardBtn" data-act="openDialog" data-arg="discard">Stop and delete</button>' +
+      '<button type="button" class="btn primary" id="stopBtn" data-act="stop"><span style="width:10px;height:10px;background:#fff;border-radius:2px;display:inline-block"></span>Stop</button>' +
+    '</div></section>';
+};
+
+function summaryHTML(m) {
+  const proc = S.proc && S.proc.id === m.id ? S.proc.step : null;
+  const tplSel = '<label for="tplSel" class="sr">Summary template</label><select id="tplSel" class="input" data-change="tpl">' +
+    Object.keys(TPL).map(k => '<option value="' + k + '"' + (m.tpl === k ? ' selected' : '') + '>' + TPL[k].name + '</option>').join('') + '</select>';
+  const head = '<div class="row"><span class="overline" style="flex:1">Summary</span>' + tplSel +
+    '<button type="button" class="btn secondary" id="regenBtn" data-act="regen"' + (proc ? ' disabled' : '') + '>Regenerate</button></div>';
+  if (proc === 'import' || proc === 'transcript') return head + '<div class="status">' + SPIN + 'The summary starts when the transcript is finished.</div>';
+  if (proc === 'summary') return head + '<div class="status" role="status">' + SPIN + (S.engine === 'cloud' ? 'Sending the transcript text to your own key\'s service and writing the summary…' : S.engine === 'ollama' ? 'Ollama on this PC is writing the summary…' : 'Writing the summary on this computer…') + '</div>';
+  const c = CONTENT[m.content];
+  const spoken = m.lines.filter(l => l.ch).length;
+  const data = (c.sum[m.tpl]) || {};
+  const ok = it => it.need < spoken;
+  let secs = TPL[m.tpl].sections.map(sec => {
+    if (sec === 'Recording') {
+      return '<div class="sumsec"><h4>Recording</h4><p>' + consentLine(m) + '</p><p class="caption">From the meeting record, not written by the model.</p></div>';
+    }
+    const txt = (data[sec] || []).filter(ok).map(i => esc(i.t)).join(' ');
+    return '<div class="sumsec"><h4>' + esc(sec) + '</h4>' + (txt ? '<p>' + txt + '</p>' : '<p class="empty">Nothing in the transcript for this section.</p>') + '</div>';
+  }).join('');
+  const owners = Object.keys(c.actions).map(o => {
+    const items = c.actions[o].filter(ok);
+    return items.length ? '<div class="owner"><h5>' + esc(o) + '</h5><ul>' + items.map(i => '<li>' + esc(i.t) + '</li>').join('') + '</ul></div>' : '';
+  }).join('');
+  const eng = m.engine || 'local'; // the engine that wrote this meeting's summary, not today's setting
+  const caption = eng === 'local'
+    ? 'Summary generated locally by a small model. Check it against the transcript before relying on it.'
+    : eng === 'ollama'
+      ? 'Summary generated by the model Ollama runs on this PC. Check it against the transcript before relying on it. ' + PROP
+      : 'Summary generated through your own Claude or OpenAI key: the transcript text left this PC for that service. Check it against the transcript before relying on it. ' + PROP;
+  return head + '<div class="caption">Made with: ' + ENGINE[eng] + ' · template: ' + TPL[m.tpl].name + '</div>' + secs +
+    '<div class="sumsec"><h4>Action items</h4>' + (owners || '<p class="empty">No action items found.</p>') + '</div>' +
+    '<div class="honest" role="note">' + INFO + '<span>' + caption + ref('D5') + '</span></div>';
+}
+function consentLine(m) {
+  const k = m.consent || {};
+  if (k.imported) return 'Imported by you on ' + esc(k.imported) + '. How they agreed: ' + esc(k.how) + '.';
+  let s = 'Agreement reminder acknowledged ' + esc(k.ack || '') + '. How they agreed: ' + esc(k.how || '') + '.';
+  if (k.joins && k.joins.length) s += ' Someone joined at ' + k.joins.map(fmtT).join(', ') + '; reminder shown again.';
+  return s;
+}
+
+SCENES.meeting = () => {
+  const m = cur();
+  if (!m) return SCENES.list();
+  const proc = S.proc && S.proc.id === m.id ? S.proc.step : null;
+  const pct = Math.min(100, m.dur ? S.pos / m.dur * 100 : 0);
+  let banner = '';
+  if (S.banner && S.banner.id === m.id && !proc) {
+    banner = S.banner.kind === 'shared'
+      ? '<div class="banner fade" role="status"><span style="flex:1;min-width:200px">Shared with your team (' + TEAM.length + ' people), as you set in Settings.</span><button type="button" class="btn secondary" id="undoShare" data-act="undoShare">Undo</button></div>'
+      : '<div class="banner fade" role="status"><span style="flex:1;min-width:200px">Share this meeting with your team?' + ref('D10') + '</span><button type="button" class="btn primary" id="bannerShare" data-act="openDialog" data-arg="share">Share…</button><button type="button" class="btn secondary" id="bannerNo" data-act="bannerNo">Not now</button></div>';
+  }
+  const transcript = (proc === 'import' || proc === 'transcript')
+    ? '<div class="status" role="status">' + SPIN + (proc === 'import' ? 'Copying the recording into Dictum and locking it to your sign-in…' : 'Finishing the transcript on this computer…') + '</div>'
+    : '<div class="player"><button type="button" class="btn secondary" id="playBtn" data-act="play">' + (S.playing ? 'Pause' : '▶ Play') + '</button><span class="tabnum caption" style="color:var(--text2)">' + fmtT(S.pos) + ' / ' + fmtT(m.dur) + '</span><div class="pbar" aria-hidden="true"><div style="width:' + pct + '%"></div></div>' +
+        (m.video ? '<button type="button" class="btn secondary" data-act="mock" data-arg="Open video">Open video</button>' : '') + '</div>' +
+      '<div class="caption">Mock: no sound plays. Click a time to jump there.</div>' +
+      '<div id="mtl" class="tlist" data-keep aria-label="Transcript">' + rowsHTML(m.lines, true) + '</div>';
+  const exportMenu = S.exportOpen
+    ? '<div class="menu" role="menu" aria-label="Export">' +
+        '<button type="button" role="menuitem" id="exMd" data-act="export" data-arg="md">Markdown file (.md)</button>' +
+        '<button type="button" role="menuitem" id="exTxt" data-act="export" data-arg="txt">Text file (.txt)</button>' +
+        '<button type="button" role="menuitem" id="exCopy" data-act="export" data-arg="copy">Copy to clipboard</button>' +
+        '<div class="ph caption" style="margin-top:6px;color:#7A4B00">' + PH + '<br>Sharing a recording or transcript may need the other people\'s agreement. Every export includes this line and the summary caption.' + ref('§7.2.3') + '</div></div>'
+    : '';
+  const k = m.consent || {};
+  const record = '<div class="card stack" style="gap:6px"><span class="overline">Meeting record</span>' +
+    (k.imported
+      ? '<div class="body2">Imported ' + (m.source === 'zoom' ? 'from Zoom ' : '') + 'by you on ' + esc(k.imported) + '.</div><div class="body2">File: ' + esc(m.file || '') + ' (the original stays where it was).</div><div class="body2">How they agreed: ' + esc(k.how) + '</div>'
+      : '<div class="body2">Agreement reminder acknowledged: ' + esc(k.ack || '') + '</div><div class="body2">How they agreed: ' + esc(k.how || '') + '</div>' +
+        (k.joins && k.joins.length ? '<div class="body2">Someone joined at ' + k.joins.map(fmtT).join(', ') + ' (reminder shown again)</div>' : '') +
+        (k.skipped ? '<div class="caption" style="color:#7A4B00">Mock: agreement step skipped from the scene strip.</div>' : '')) +
+    '<div class="caption">Written when it happened, not by the summary model.' + ref('§7.2.5, §7.2.6') + '</div></div>';
+  return '<section class="win fade" style="width:1100px;height:min(720px,100%)" aria-label="Meeting">' +
+    titlebar('Meeting', '<button type="button" class="btn quiet" id="backList" data-act="go" data-arg="list">‹ All meetings</button>') +
+    '<div class="mhead"><div style="flex:1;min-width:260px"><label for="mtitle" class="sr">Meeting title</label><input id="mtitle" class="titlein display" value="' + esc(m.title) + '" data-input="title" autocomplete="off">' +
+      '<div class="meta"><span>' + esc(m.date) + '</span><span aria-hidden="true">·</span><span>' + fmtDur(m.dur) + '</span><span aria-hidden="true">·</span><span>' + esc(m.size) + '</span>' + badges(m) + '</div></div>' +
+      '<div class="row" style="position:relative">' +
+        '<button type="button" class="btn secondary" id="exportBtn" data-act="exportToggle" aria-haspopup="menu" aria-expanded="' + (S.exportOpen ? 'true' : 'false') + '">Export ▾</button>' + exportMenu +
+        '<button type="button" class="btn primary" id="shareBtn" data-act="openDialog" data-arg="share">' + (m.shared ? 'Shared with my team' : 'Share with my team') + '</button>' +
+        '<button type="button" class="btn secondary" id="delBtn" data-act="openDialog" data-arg="delete">Delete</button>' +
+      '</div></div>' + banner +
+    '<div class="mbody"><div class="col"><div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px"><div class="row"><span class="overline">Transcript</span><span class="caption">You = your microphone · Others = this PC\'s sound</span>' + ref('D8') + '</div>' + transcript + '</div></div>' +
+      '<div class="col"><div class="card stack" id="sumCard">' + summaryHTML(m) + '</div>' + record + '</div></div>' +
+  '</section>';
+};
+
+SCENES.list = () => {
+  if (!S.meetingsOn) {
+    return '<section class="win fade" style="width:560px">' + titlebar('Meetings') + '<div style="padding:24px" class="stack"><h1 class="h1 display">Meetings is off</h1><div class="body2">Turn it on in Settings to record or import meetings.</div><div><button type="button" class="btn primary" data-act="go" data-arg="settings">Open Settings</button></div></div></section>';
+  }
+  const q = S.search.trim().toLowerCase();
+  const rows = S.meetings.filter(m => !q || m.title.toLowerCase().indexOf(q) >= 0 || m.lines.some(l => l.text && l.text.toLowerCase().indexOf(q) >= 0));
+  const total = S.meetings.reduce((a, m) => a + (parseFloat(m.size) || 0), 0);
+  const items = rows.map(m => {
+    let snip = '';
+    if (q && m.title.toLowerCase().indexOf(q) < 0) {
+      const l = m.lines.find(x => x.text && x.text.toLowerCase().indexOf(q) >= 0);
+      if (l) snip = '<span class="snip">In the transcript at ' + fmtT(l.t) + ': "' + esc(l.text) + '"</span>';
+    }
+    return '<li><button type="button" class="mrow" id="row-' + m.id + '" data-act="open" data-arg="' + m.id + '"><span class="mt">' + esc(m.title) + '</span><span class="bd">' + badges(m) + '</span>' +
+      '<span class="mm">' + esc(m.date) + ' · ' + fmtDur(m.dur) + ' · ' + esc(m.size) + '</span>' + snip + '</button></li>';
+  }).join('');
+  return '<section class="win fade" style="width:900px;height:min(640px,100%)" aria-labelledby="list-h">' + titlebar('Meetings') +
+    '<div style="padding:16px 20px 8px;display:flex;flex-direction:column;gap:12px">' +
+      '<div class="row"><h1 id="list-h" class="h1 display" style="flex:1">Meetings</h1>' +
+        '<button type="button" class="btn secondary" id="importBtn" data-act="openDialog" data-arg="picker">Import a recording</button>' +
+        (S.rec ? '<button type="button" class="btn secondary" data-act="go" data-arg="rec"><span class="dot breathe"></span>Back to the recording</button>'
+               : '<button type="button" class="btn danger" id="listStart" data-act="startMeeting"><span class="dot white"></span>Start a meeting</button>') + '</div>' +
+      '<div class="row"><label for="search" class="sr">Search meetings</label><input id="search" type="search" class="input" style="flex:1;min-width:200px" placeholder="Search titles and transcripts" value="' + esc(S.search) + '" data-input="search" autocomplete="off">' + ref('D9, §10.2 search') + '</div>' +
+    '</div>' +
+    '<div style="flex:1;min-height:0;overflow:auto;padding:4px 20px 16px">' +
+      (items ? '<ul class="mlist">' + items + '</ul>' : '<div class="caption" style="padding:16px 0">No meetings match "' + esc(S.search) + '".</div>') +
+    '</div>' +
+    '<div class="footbar"><span class="caption" style="flex:1;min-width:240px">' + S.meetings.length + ' meetings · ' + Math.round(total) + ' MB on this computer. Locked to your sign-in. Moving to a new computer? Export first.</span>' +
+      '<button type="button" class="btn secondary" data-act="mock" data-arg="Export meetings">Export…</button></div>' +
+  '</section>';
+};
+
+const SNAV = ['General', 'Mode', 'Models', 'Storage', 'Microphone', 'Clean-up', 'Meetings', 'Privacy', 'About', 'See how it works', 'Help'];
+SCENES.settings = () => {
+  const nav = '<nav class="snav" aria-label="Settings pages"><div class="row" style="padding:0 6px;flex-wrap:nowrap">' + MARK(22) + '<span class="h2">Dictum</span></div><ul>' +
+    SNAV.map(n => '<li><button type="button" id="nav-' + n.replace(/\W/g, '') + '" data-act="spage" data-arg="' + n + '"' + (S.settingsPage === n ? ' aria-current="page"' : '') + '>' + n + (n === 'Meetings' ? ' <span class="chip">new</span>' : '') + '</button></li>').join('') + '</ul></nav>';
+  let page;
+  if (S.settingsPage !== 'Meetings') {
+    page = '<div class="inner"><h1 class="h1 display">' + esc(S.settingsPage) + '</h1><div class="card body2">This page exists in Dictum today and is not part of this mock. The new Meetings page sits between Clean-up and Privacy.</div></div>';
+  } else {
+    page = '<div class="inner"><h1 class="h1 display">Meetings</h1>' + meetingsSettings() + '</div>';
+  }
+  return '<section class="win fade" style="width:880px;height:min(680px,100%)" aria-label="Dictum settings">' + titlebar('Dictum settings') +
+    '<div style="flex:1;min-height:0;display:flex">' + nav + '<div class="spage" id="spage" data-keep>' + page + '</div></div></section>';
+};
+function radioGroup(name, map, val, change) {
+  return Object.keys(map).map(k => '<label class="radio"><input type="radio" name="' + name + '" id="' + name + '-' + k + '" value="' + k + '" data-change="' + change + '"' + (val === k ? ' checked' : '') + '><span>' + map[k] + '</span></label>').join('');
+}
+function meetingsSettings() {
+  const on = S.meetingsOn;
+  let h = '<div class="card stack">' +
+    '<label class="line" style="cursor:pointer"><span class="h2">Turn on Meetings</span><input type="checkbox" role="switch" class="switch" id="mOn" data-change="meetingsOn"' + (on ? ' checked' : '') + '></label>' +
+    (on
+      ? '<div class="body2">Your meetings are locked to your sign-in on this computer. Nobody else who uses this computer can open them. If you move to a new computer, export the meetings you want to keep first.' + ref('§8 decision 2') + '</div>' +
+        '<div class="ph caption" style="color:#7A4B00">' + PROP + ' It does not protect against harmful software running while you are signed in.' + ref('D2') + '</div>'
+      : '<div class="body2">Meetings records and keeps calls you choose, with a transcript and summary. Dictation is not affected either way.</div>' +
+        '<div class="ph caption" style="color:#7A4B00">' + PROP + ' Meetings you already have stay locked on this computer while Meetings is off. (Not decided in the brief.)</div>') +
+    '</div>';
+  if (!on) return h;
+  h += '<div class="card stack"><span class="h2">Where meetings are kept</span>' +
+    '<div class="line"><div><div style="font-size:13px;font-weight:600">Meetings folder</div><div class="caption">' + (S.folderAlt ? 'D:\\Dictum meetings' : 'This computer, in Dictum\'s own folder') + '</div></div><button type="button" class="btn secondary" id="folderBtn" data-act="folder">Change</button></div>' +
+    '<fieldset><legend>Keep audio</legend>' + radioGroup('keep', KEEP, S.keepAudio, 'keep') + '<div class="caption">The transcript and summary are always kept until you delete them.' + ref('D2 retention') + '</div></fieldset>' +
+    '</div>';
+  h += '<div class="card stack"><span class="h2">What to record</span>' +
+    '<div class="line"><label for="micSel" style="font-size:13px;font-weight:600">You (microphone)</label><select id="micSel" class="input" data-change="mic"><option' + (S.mic === 'Headset Microphone' ? ' selected' : '') + '>Headset Microphone</option><option' + (S.mic === 'Remote Audio (default)' ? ' selected' : '') + '>Remote Audio (default)</option></select></div>' +
+    '<div class="line"><span style="font-size:13px;font-weight:600">Others (this PC\'s sound)</span><span class="caption">Everything this computer plays</span></div>' +
+    '<div class="caption">That includes notification sounds and music, so close what you don\'t want recorded.' + ref('D3, D9') + '</div></div>';
+  h += '<div class="card stack"><span class="h2">Zoom recordings</span>' +
+    '<fieldset><legend>When Zoom saves a recording to this computer</legend>' + radioGroup('zm', { ask: 'Ask me each time', auto: 'Import it automatically (the agreement reminder still shows each time)', off: 'Do nothing' }, S.zoomMode, 'zoomMode') + '</fieldset>' +
+    '<div class="line"><div><div style="font-size:13px;font-weight:600">Zoom folder</div><div class="caption">Documents\\Zoom</div></div><button type="button" class="btn secondary" data-act="mock" data-arg="Change Zoom folder">Change</button></div>' +
+    '<div class="caption">In Zoom, click Record, then Record on this Computer. Dictum never starts a recording by itself.' + ref('D11') + '</div></div>';
+  h += '<div class="card stack"><div class="row"><span class="h2" style="flex:1">Team folder</span><span class="chip">phase 2</span>' + ref('D10') + '</div>';
+  if (!S.team) {
+    h += '<div class="body2">Share meetings with your team through a folder you already share, such as a OneDrive or SharePoint folder. No accounts and no Dictum server.</div>' +
+      '<div><button type="button" class="btn secondary" id="teamBtn" data-act="chooseTeam">Choose folder</button></div>';
+  } else {
+    h += '<div class="line"><div><div style="font-size:13px;font-weight:600">Sample Broking › Shared › Dictum meetings</div><div class="caption">You and ' + TEAM.length + ' team members</div></div><button type="button" class="btn secondary" data-act="mock" data-arg="Change team folder">Change</button></div>' +
+      '<div>' + TEAM.map(n => '<div class="member"><span class="avatar" aria-hidden="true">' + n[0] + '</span>' + esc(n) + '</div>').join('') + '</div>' +
+      '<fieldset><legend>Share new meetings with</legend>' + radioGroup('sd', SHAREDEF, S.shareDefault, 'shareDefault') + '</fieldset>' +
+      '<div class="ph caption" style="color:#7A4B00">' + PROP + ' Removing someone stops new meetings being shared with them. Meetings they could already open stay on their computer. If this folder is in OneDrive or SharePoint, a locked copy sits in Microsoft\'s cloud; the keys never do.</div>' +
+      '<div><button type="button" class="btn link" data-act="mock" data-arg="Check member keys">Check member keys</button></div>';
+  }
+  h += '</div>';
+  h += '<div class="card stack"><span class="h2">Summary</span><fieldset><legend>Summary engine</legend>' +
+    '<label class="radio"><input type="radio" name="eng" id="eng-local" value="local" data-change="engine"' + (S.engine === 'local' ? ' checked' : '') + '><span>On this computer (default)</span></label>' +
+    '<label class="radio"><input type="radio" name="eng" id="eng-ollama" value="ollama" data-change="engine"' + (S.engine === 'ollama' ? ' checked' : '') + '><span>Ollama on this PC</span></label>' +
+    '<label class="radio"><input type="radio" name="eng" id="eng-cloud" value="cloud" data-change="engine"' + (S.engine === 'cloud' ? ' checked' : '') + '><span>My own Claude or OpenAI key (text leaves this PC; under your own terms with that provider)</span></label>' +
+    '<div class="caption" style="padding-left:26px">Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.' + ref('D5, CloudPolicy') + '</div>' +
+    '</fieldset>' +
+    '<div class="line"><div><div style="font-size:13px;font-weight:600">Templates</div><div class="caption">General meeting, Client meeting file note, Lender or supplier call, Stand-up</div></div><button type="button" class="btn secondary" id="tplEdit" data-act="openDialog" data-arg="templates">Edit</button></div>' +
+    '</div>';
+  return h;
+}
+
+/* ---------- dialogs ---------- */
+const DIALOGS = {};
+function dlg(title, body, foot, labelId) {
+  return '<section class="win dialog fade" role="dialog" aria-modal="true" aria-labelledby="' + labelId + '">' +
+    '<div class="titlebar">' + MARK(20) + '<span class="t" id="' + labelId + '">' + title + '</span><span class="sp"></span><button type="button" class="btn quiet" aria-label="Close" data-act="closeDialog" style="width:32px;padding:0;font-size:16px">×</button></div>' +
+    '<div class="dbody">' + body + '</div><div class="footbar"><span class="sp"></span>' + foot + '</div></section>';
+}
+DIALOGS.intro = () => dlg('What you are looking at',
+  '<div class="body2"><strong>This is a clickable mock of Dictum Meetings, not the app.</strong> Nothing is recorded, no microphone is opened, nothing is read from or written to your computer, and nothing is sent anywhere. Every name, firm, amount and file is made up.</div>' +
+  '<div class="body2">The strip at the bottom (dashed line) is not part of the app: use it to jump between screens. Escape closes any dialog.</div>' +
+  '<div class="stack" style="gap:4px"><span class="overline">Try these, in order</span><ol class="body2" style="margin:0;padding-left:20px">' +
+    '<li>Tray menu → Start a meeting → read the agreement step → Start recording.</li>' +
+    '<li>While it records: Mark this moment, Someone joined, Pause, then Stop.</li>' +
+    '<li>On the meeting: change the template, Export, Share with my team.</li>' +
+    '<li>Zoom prompt (scene 2): Yes → agreement → "Zoom finished now".</li>' +
+    '<li>Meetings list: search "payslips", then Import a recording.</li>' +
+    '<li>Settings → Meetings: switch the summary engine and see the caption change.</li></ol></div>' +
+  '<div class="ph caption" style="color:#7A4B00">Copy in dashed boxes is not approved: <strong>Placeholder</strong> means counsel\'s words to come; <strong>Proposed</strong> means draft wording for Kyle. "Brief refs" in the strip shows which brief section each piece comes from.</div>',
+  '<button type="button" class="btn primary" data-autofocus data-act="closeDialog">Start</button>', 'dl-intro');
+DIALOGS.enable = () => dlg('Turn on Meetings?',
+  '<div class="body2">Meetings records the calls you choose, keeps the recording, and writes a transcript and summary on this computer.</div>' +
+  '<div class="body2">Your meetings are locked to your sign-in on this computer. Nobody else who uses this computer can open them. If you move to a new computer, export the meetings you want to keep first.</div>' +
+  '<div class="ph caption" style="color:#7A4B00">' + PROP + ' Dictation still keeps nothing. Only meetings you start or import are kept.' + ref('D1') + '</div>' +
+  '<div class="caption">Nothing to set up: no password, no key to keep.</div>',
+  '<button type="button" class="btn secondary" data-act="closeDialog">Not now</button><button type="button" class="btn primary" data-autofocus data-act="enableOk">Turn on Meetings</button>', 'dl-en');
+DIALOGS.join = () => dlg('Someone joined',
+  '<div class="ph stack" style="gap:6px">' + PH + '<div class="display" style="font-size:18px;line-height:26px;font-weight:600">Tell the person who joined that you are recording, and get their agreement.</div></div>' +
+  '<div class="caption">The recording keeps going. The time you press the button is saved with the meeting.' + ref('§7.2.7') + '</div>',
+  '<button type="button" class="btn secondary" data-act="openDialog" data-arg="discard">They said no: stop and delete</button><button type="button" class="btn primary" data-autofocus data-act="joinOk">They agreed. Carry on</button>', 'dl-join');
+DIALOGS.discard = () => dlg('Stop and delete this meeting?',
+  '<div class="body2">The sound and transcript so far are deleted from this computer. Nothing from this meeting is kept.</div>',
+  '<button type="button" class="btn secondary" data-autofocus data-act="closeDialog">Keep recording</button><button type="button" class="btn danger" data-act="discardOk">Stop and delete</button>', 'dl-dis');
+DIALOGS.refuse = () => dlg('Take notes instead',
+  '<div class="body2">Nothing is being recorded. You can write notes for this meeting instead.' + ref('§7.2.7') + '</div>' +
+  '<label for="notes" class="sr">Notes</label><textarea id="notes" class="input" data-autofocus placeholder="Notes"></textarea>',
+  '<button type="button" class="btn secondary" data-act="closeDialog">Close</button><button type="button" class="btn primary" data-act="notesSave">Save notes</button>', 'dl-ref');
+DIALOGS.delete = () => {
+  const m = cur();
+  return dlg('Delete this meeting?',
+    '<div class="body2"><strong>' + esc(m ? m.title : '') + '</strong></div><div class="body2">This deletes the sound' + (m && m.video ? ', the video' : '') + ', the transcript and the summary from this computer. It cannot be undone.</div>' +
+    (m && m.source ? '<div class="caption">The original file you imported is left where it was.' + ref('D6') + '</div>' : '') +
+    (m && m.shared ? '<div class="ph caption" style="color:#7A4B00">' + PROP + ' Team members who already opened it may still have it on their computers.</div>' : ''),
+    '<button type="button" class="btn secondary" data-autofocus data-act="closeDialog">Cancel</button><button type="button" class="btn danger" data-act="deleteOk">Delete</button>', 'dl-del');
+};
+DIALOGS.share = () => {
+  const m = cur();
+  if (!S.team) {
+    return dlg('Share with my team',
+      '<div class="body2">First, choose the folder your team already shares, such as a OneDrive or SharePoint folder. Dictum puts a locked copy there that only the people you pick can open. You do this once.' + ref('D10') + '</div>' +
+      '<div class="caption">Nothing to type and no passwords: each person\'s Dictum looks after its own key.</div>',
+      '<button type="button" class="btn secondary" data-act="closeDialog">Cancel</button><button type="button" class="btn primary" data-autofocus data-act="chooseTeamShare">Choose team folder</button>', 'dl-sh');
+  }
+  const sel = S.dlg.sel || (S.dlg.sel = TEAM.slice());
+  const all = sel.length === TEAM.length;
+  return dlg('Share with my team',
+    '<div class="body2"><strong>' + esc(m ? m.title : '') + '</strong></div>' +
+    '<fieldset><legend>Who can open it</legend>' +
+      '<label class="check"><input type="checkbox" id="shAll" data-change="shareAll"' + (all ? ' checked' : '') + ' data-autofocus><strong>My team</strong>&nbsp;(everyone)</label>' +
+      '<div style="padding-left:26px">' + TEAM.map((n, i) => '<label class="check"><input type="checkbox" id="sh' + i + '" data-change="shareOne" value="' + esc(n) + '"' + (sel.indexOf(n) >= 0 ? ' checked' : '') + '>' + esc(n) + '</label>').join('') + '</div>' +
+    '</fieldset>' +
+    '<div class="ph caption" style="color:#7A4B00">' + PH + '<br>Sharing a recording may need the other parties\' agreement.' + ref('§7.2.3') + '</div>' +
+    '<div class="caption">They see it in their own Dictum, through Sample Broking › Shared › Dictum meetings.</div>',
+    '<button type="button" class="btn secondary" data-act="closeDialog">Cancel</button><button type="button" class="btn primary" id="shareOk" data-act="shareOk"' + (sel.length ? '' : ' disabled') + '>Share with ' + sel.length + (sel.length === 1 ? ' person' : ' people') + '</button>', 'dl-sh');
+};
+DIALOGS.templates = () => {
+  const k = S.dlg.tpl || 'filenote';
+  return dlg('Templates',
+    '<div class="body2">Each template is a plain Markdown file. The summary fills in each heading from the transcript.' + ref('D5') + '</div>' +
+    '<div class="row">' + Object.keys(TPL).map(t => '<button type="button" class="btn ' + (t === k ? 'primary' : 'secondary') + '" id="tp-' + t + '" data-act="tplShow" data-arg="' + t + '">' + TPL[t].name + '</button>').join('') + '</div>' +
+    '<pre class="md">' + esc('# ' + TPL[k].name + '\n\n' + TPL[k].sections.map(s => '## ' + s).join('\n\n') + '\n\n## Action items\n(grouped by the person who said they would do it)') + '</pre>',
+    '<button type="button" class="btn secondary" data-act="mock" data-arg="Open template in text editor">Open in text editor</button><button type="button" class="btn primary" data-autofocus data-act="closeDialog">Done</button>', 'dl-tp');
+};
+DIALOGS.picker = () => dlg('Choose a recording',
+  '<div class="caption">Mock file picker. In the app this is the normal Windows or Mac open-file window.' + ref('D6') + '</div>' +
+  FILES.map((f, i) => '<button type="button" class="filebtn" id="file' + i + '"' + (i === 0 ? ' data-autofocus' : '') + ' data-act="pick" data-arg="' + i + '"><span style="font-weight:600">' + esc(f.name) + '</span><span class="caption" style="flex:1">' + esc(f.where) + '</span><span class="caption">' + esc(f.size) + '</span></button>').join(''),
+  '<button type="button" class="btn secondary" data-act="closeDialog">Cancel</button>', 'dl-pick');
+DIALOGS.importConsent = () => {
+  const f = FILES[S.dlg.file || 0];
+  const howVal = S.dlg.how || HOW_IMPORT[0];
+  return dlg('Import a recording',
+    '<div class="body2"><strong>' + esc(f.name) + '</strong> · ' + esc(f.where) + '</div>' +
+    '<div class="ph stack" style="gap:6px">' + PH + '<div class="body2">Only import recordings that everyone agreed to. A meeting app\'s recording notice may not be the same as agreement.</div></div>' +
+    '<fieldset><legend>How did everyone agree?</legend>' + HOW_IMPORT.map((h, i) => '<label class="radio"><input type="radio" name="ihow" id="ihow' + i + '" data-change="ihow" value="' + esc(h) + '"' + (howVal === h ? ' checked' : '') + (i === 0 ? ' data-autofocus' : '') + '>' + esc(h) + '</label>').join('') + '</fieldset>' +
+    '<div class="caption">Dictum saves that you imported it, and when. The original file stays where it is.' + ref('§7.2.5, §7.2.6') + '</div>',
+    '<button type="button" class="btn secondary" data-act="closeDialog">Cancel</button><button type="button" class="btn primary" data-act="importOk">Import</button>', 'dl-ic');
+};
+DIALOGS.cloud = () => dlg('Use your own key for summaries?',
+  '<div class="body2">Advanced option: your text leaves this PC. Dictum does not validate or certify how that service handles it.</div>' +
+  '<div class="ph caption" style="color:#7A4B00"><span class="tagph">Placeholder</span> The app\'s existing cloud agreement step (the one cloud clean-up uses) goes here, unchanged, with the service and address it will send to.</div>' +
+  '<div class="caption">Uses a key you have already added under Clean-up.</div>',
+  '<button type="button" class="btn secondary" data-autofocus data-act="cloudNo">Cancel</button><button type="button" class="btn primary" data-act="cloudOk">I agree</button>', 'dl-cl');
+
+/* ---------- render ---------- */
+const stage = $('#stage'), layer = $('#layer');
+let lastScene = null, lastDialog = null;
+function render() {
+  const ae = document.activeElement;
+  const fid = ae && ae.id;
+  let selS = null, selE = null;
+  try { if (ae && (ae.type === 'text' || ae.type === 'search' || ae.tagName === 'TEXTAREA')) { selS = ae.selectionStart; selE = ae.selectionEnd; } } catch (e) {}
+  const keep = {};
+  document.querySelectorAll('[data-keep]').forEach(e => { keep[e.id] = e.scrollTop; });
+  stage.className = (S.scene === 'tray' || S.scene === 'zoom' || S.scene === 'desk') ? 'corner' : '';
+  stage.innerHTML = SCENES[S.scene]();
+  layer.innerHTML = S.dialog ? '<div class="scrim">' + DIALOGS[S.dialog]() + '</div>' : '';
+  // fade only when the scene or dialog changes, never on an ordinary re-render
+  const sceneKey = S.scene + '|' + (S.scene === 'meeting' ? S.current : S.scene === 'zoom' ? S.zoomVariant : '');
+  if (sceneKey === lastScene) stage.querySelectorAll('.fade').forEach(e => e.classList.remove('fade'));
+  if (S.dialog === lastDialog) layer.querySelectorAll('.fade').forEach(e => e.classList.remove('fade'));
+  lastScene = sceneKey; lastDialog = S.dialog;
+  stage.inert = !!S.dialog;
+  $('#taskbar').inert = !!S.dialog;
+  $('#trayBtn').innerHTML = S.rec ? TRAY_REC : TRAY_IDLE;
+  $('#trayBtn').setAttribute('aria-label', S.rec ? 'Dictum: recording a meeting. Open the tray menu' : 'Dictum: open the tray menu');
+  drawStrip();
+  Object.keys(keep).forEach(id => { const e = document.getElementById(id); if (e) e.scrollTop = keep[id]; });
+  const tl = $('#tlist'); if (tl && keep.tlist === undefined) tl.scrollTop = tl.scrollHeight;
+  if (S.rec) meters();
+  if (S.focusNext) {
+    const e = document.querySelector(S.focusNext); S.focusNext = null;
+    if (e) { e.focus(); return; }
+  }
+  if (fid) {
+    const e = document.getElementById(fid);
+    if (e) { e.focus(); if (selS !== null) { try { e.setSelectionRange(selS, selE); } catch (x) {} } return; }
+  }
+  if (S.dialog) { const d = document.querySelector('.dialog [data-autofocus]') || document.querySelector('.dialog button'); if (d) d.focus(); }
+}
+const STRIP = [['tray', '1 Tray menu'], ['zoomA', '2 Zoom: recording'], ['zoomB', '2b Zoom: finished'], ['consent', '3 Agreement step'], ['rec', '4 Recording'],
+  ['meeting', '5 Meeting'], ['share', '5b Share'], ['list', '6 Meetings list'], ['settings', '7 Settings']];
+function activeStrip() {
+  if (S.scene === 'zoom') return S.zoomVariant === 'a' ? 'zoomA' : 'zoomB';
+  if (S.scene === 'meeting' && S.dialog === 'share') return 'share';
+  return S.scene;
+}
+function drawStrip() {
+  const a = activeStrip();
+  $('#strip').innerHTML = '<span class="lbl">Mock scenes</span>' + STRIP.map(s => '<button type="button" id="st-' + s[0] + '" data-act="strip" data-arg="' + s[0] + '" aria-current="' + (a === s[0]) + '">' + s[1] + '</button>').join('') +
+    '<span class="sep"></span><button type="button" id="st-refs" data-act="refs" aria-pressed="' + S.refs + '">' + (S.refs ? 'Hide' : 'Show') + ' brief refs</button><button type="button" id="st-about" data-act="openDialog" data-arg="intro">About this mock</button>';
+}
+
+/* ---------- toasts ---------- */
+function toast(msg, acts) {
+  const host = $('#toasts');
+  const t = document.createElement('div');
+  t.className = 'toast dark fade';
+  t.innerHTML = '<div>' + msg + '</div>' + (acts ? '<div class="row">' + acts.map(a => '<button type="button" class="btn secondary" data-act="' + a.act + '">' + esc(a.label) + '</button>').join('') + '<button type="button" class="btn quiet" data-act="toastClose">Dismiss</button></div>' : '');
+  host.appendChild(t);
+  if (!acts) setTimeout(() => t.remove(), 5000);
+  while (host.children.length > 3) host.firstChild.remove();
+}
+
+/* ---------- recording ---------- */
+let tickT = null, meterT = null;
+function startRec(how, skipped) {
+  S.rec = { elapsed: 0, paused: false, lines: [], idx: 0, ack: new Date(), how: how, skipped: !!skipped, joins: [] };
+  if (!tickT) tickT = setInterval(tick, 1000);
+  if (!meterT) meterT = setInterval(meters, reduceMotion ? 500 : 140);
+  S.scene = 'rec';
+  S.focusNext = '#markBtn';
+}
+function tick() {
+  const r = S.rec;
+  if (!r) return;
+  if (!r.paused) {
+    r.elapsed++;
+    const src = CONTENT.client.lines;
+    if (r.idx < src.length && r.elapsed >= 3 + 3 * r.idx) {
+      r.lines.push({ t: Math.max(0, r.elapsed - 2), ch: src[r.idx][0], text: src[r.idx][1] });
+      r.idx++;
+      const box = $('#tlist');
+      if (box) {
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+        box.innerHTML = rowsHTML(r.lines, false);
+        if (atBottom) box.scrollTop = box.scrollHeight;
+      }
+    }
+  }
+  const e1 = $('#elapsed'); if (e1) e1.textContent = fmtT(r.elapsed);
+  const e2 = $('#flyRecTime'); if (e2) e2.textContent = fmtT(r.elapsed);
+}
+function setMeter(id, lv) {
+  const m = document.getElementById(id); if (!m) return;
+  const n = Math.round(lv * 16);
+  Array.prototype.forEach.call(m.children, (s, i) => { s.className = 'seg' + (i < n ? (i >= 13 ? ' hot' : ' on') : ''); });
+  m.setAttribute('aria-valuenow', String(Math.round(lv * 100)));
+}
+function meters() {
+  const r = S.rec; if (!r) return;
+  const next = CONTENT.client.lines[r.idx];
+  const who = next ? next[0] : null;
+  const live = !r.paused;
+  const you = live ? (who === 'You' ? 0.45 + Math.random() * 0.45 : Math.random() * 0.12) : 0;
+  const oth = live ? (who === 'Others' ? 0.4 + Math.random() * 0.5 : 0.05 + Math.random() * 0.1) : 0;
+  setMeter('mYou', you); setMeter('mOth', oth);
+}
+function stopRec() {
+  const r = S.rec; if (!r) return;
+  const id = 'live' + (++S.n);
+  const start = new Date(r.ack.getTime());
+  const m = buildMeeting(id, 'client', {
+    title: 'Meeting, ' + fmtDate(start) + ' ' + fmtHM(start), date: fmtDate(start), dur: r.elapsed,
+    size: r.elapsed < 60 ? 'under 1 MB' : Math.max(1, Math.round(r.elapsed / 50)) + ' MB',
+    consent: { ack: fmtDate(r.ack) + ' ' + fmtClock(r.ack), how: r.how, joins: r.joins.slice(), skipped: r.skipped }
+  });
+  m.lines = r.lines.slice();
+  S.meetings.unshift(m);
+  S.rec = null;
+  clearInterval(tickT); tickT = null; clearInterval(meterT); meterT = null;
+  openMeeting(id);
+  process(id, ['transcript', 'summary']);
+}
+function process(id, steps) {
+  let i = 0;
+  S.proc = { id: id, step: steps[0] };
+  const next = () => {
+    i++;
+    if (i < steps.length) { S.proc = { id: id, step: steps[i] }; render(); setTimeout(next, 1600); return; }
+    S.proc = null;
+    const m = S.meetings.find(x => x.id === id);
+    if (m) m.engine = S.engine;
+    if (m && S.team && S.shareDefault === 'team') { m.shared = true; S.banner = { id: id, kind: 'shared' }; }
+    else if (m && S.shareDefault === 'ask') S.banner = { id: id, kind: 'ask' };
+    render();
+  };
+  setTimeout(next, 1400);
+}
+function openMeeting(id) { S.current = id; S.scene = 'meeting'; S.pos = 0; S.playing = false; S.exportOpen = false; }
+function runImport(fileIdx, how, ack) {
+  const f = FILES[fileIdx];
+  const id = 'imp' + (++S.n);
+  const now = new Date();
+  const m = buildMeeting(id, f.key, { date: fmtDate(now), source: f.source, file: f.name, video: f.video, size: f.size,
+    consent: { imported: fmtDate(now) + ' ' + fmtHM(now), how: how + (ack ? ' (reminder acknowledged ' + ack + ')' : '') } });
+  S.meetings.unshift(m);
+  openMeeting(id);
+  process(id, ['import', 'transcript', 'summary']);
+}
+
+/* ---------- actions ---------- */
+function go(scene) {
+  S.dialog = null; S.exportOpen = false;
+  if (scene === 'zoomA' || scene === 'zoomB') { S.scene = 'zoom'; S.zoomVariant = scene === 'zoomA' ? 'a' : 'b'; S.focusNext = '#zYes'; }
+  else if (scene === 'consent') { S.consentMode = 'live'; S.how = HOW_LIVE[0]; S.scene = 'consent'; S.focusNext = '#consOk'; }
+  else if (scene === 'rec') { if (!S.rec) startRec(HOW_LIVE[0], true); S.scene = 'rec'; }
+  else if (scene === 'meeting') { if (!cur()) S.current = S.meetings[0] && S.meetings[0].id; if (!S.current) { S.scene = 'list'; } else openMeeting(S.current); }
+  else if (scene === 'share') { if (!cur()) S.current = S.meetings[0] && S.meetings[0].id; if (!S.current) { S.scene = 'list'; } else { openMeeting(S.current); S.dialog = 'share'; S.dlg = {}; } }
+  else if (scene === 'settings') { S.scene = 'settings'; S.settingsPage = 'Meetings'; S.focusNext = '#nav-Meetings'; }
+  else if (scene === 'list') { S.scene = 'list'; S.focusNext = '#search'; }
+  else S.scene = scene;
+  render();
+}
+function openDialog(name, data) {
+  S.returnFocus = document.activeElement && document.activeElement.id;
+  S.dialog = name; S.dlg = data || {}; S.exportOpen = false;
+  render();
+  const d = document.querySelector('.dialog [data-autofocus]'); if (d) d.focus();
+}
+function closeDialog() {
+  const rf = S.returnFocus;
+  S.dialog = null; S.dlg = {};
+  if (rf) S.focusNext = '#' + CSS.escape(rf);
+  render();
+}
+const ACT = {
+  tray: () => go(S.scene === 'tray' ? 'desk' : 'tray'),
+  closeWin: () => go('desk'),
+  strip: a => go(a),
+  go: a => go(a),
+  refs: () => { S.refs = !S.refs; document.body.classList.toggle('refs', S.refs); drawStrip(); $('#st-refs').focus(); },
+  mock: a => toast('Mock: "' + esc(a) + '" is not part of this mock.'),
+  openDialog: a => {
+    if (a === 'discard' && S.dialog) { S.dialog = 'discard'; render(); return; }
+    openDialog(a);
+  },
+  closeDialog: () => closeDialog(),
+  toastClose: (a, el) => { const t = el.closest('.toast'); if (t) t.remove(); },
+  startMeeting: () => { if (S.rec) { go('rec'); return; } S.consentMode = 'live'; S.how = HOW_LIVE[0]; S.scene = 'consent'; S.focusNext = '#consOk'; render(); },
+  consentCancel: () => go(S.consentMode === 'zoom' ? 'desk' : 'tray'),
+  consentOk: () => {
+    if (S.consentMode === 'zoom') {
+      const ack = new Date();
+      S.zoomAck = { how: S.how, at: fmtDate(ack) + ' ' + fmtClock(ack) };
+      go('desk');
+      toast('Reminder acknowledged at ' + fmtClock(ack) + '. Dictum will import the Zoom recording when Zoom finishes.', [{ label: 'Mock: Zoom finished now', act: 'zoomFinish' }]);
+      return;
+    }
+    startRec(S.how, false); render();
+  },
+  notesSave: () => { closeDialog(); toast('Mock: the notes would be saved as a meeting with no recording.'); },
+  mark: () => { const r = S.rec; if (!r) return; r.lines.push({ t: r.elapsed, sys: 'mark' }); render(); toast('Moment marked at ' + fmtT(r.elapsed) + '.'); },
+  joinOk: () => { const r = S.rec; if (r) { const now = new Date(); r.joins.push(r.elapsed); r.lines.push({ t: r.elapsed, sys: 'join', ack: fmtClock(now) }); } closeDialog(); },
+  pause: () => { const r = S.rec; if (!r) return; r.paused = !r.paused; r.lines.push({ t: r.elapsed, sys: r.paused ? 'pause' : 'resume' }); render(); },
+  stop: () => stopRec(),
+  discardOk: () => {
+    S.rec = null; clearInterval(tickT); tickT = null; clearInterval(meterT); meterT = null;
+    S.dialog = null; S.scene = 'tray'; render(); toast('Stopped and deleted. Nothing from this meeting was kept.');
+  },
+  zoomYes: () => { if (S.zoomVariant === 'a') { S.consentMode = 'zoom'; S.how = HOW_LIVE[0]; S.scene = 'consent'; S.focusNext = '#consOk'; render(); } else openDialog('importConsent', { file: 0, how: HOW_IMPORT[2] }); },
+  zoomAlways: () => {
+    S.zoomMode = 'auto';
+    toast('From now on Dictum imports each Zoom recording without this question. The agreement reminder still shows every time.');
+    ACT.zoomYes();
+  },
+  zoomNo: () => go('desk'),
+  zoomFinish: (a, el) => {
+    const t = el.closest('.toast'); if (t) t.remove();
+    const z = S.zoomAck || { how: HOW_LIVE[0], at: '' };
+    S.dialog = null; runImport(0, z.how, z.at); render();
+  },
+  open: id => { openMeeting(id); S.focusNext = '#mtitle'; render(); },
+  seek: t => { S.pos = Number(t); render(); },
+  play: () => { S.playing = !S.playing; render(); },
+  exportToggle: () => { S.exportOpen = !S.exportOpen; S.focusNext = S.exportOpen ? '#exMd' : '#exportBtn'; render(); },
+  export: a => {
+    const m = cur(); S.exportOpen = false; S.focusNext = '#exportBtn'; render();
+    const name = (m ? m.title : 'meeting').replace(/[\\/:*?"<>|]/g, '');
+    toast(a === 'copy' ? 'Mock: the transcript and summary would be copied, with the summary caption and the sharing reminder.' : 'Mock: would save "' + esc(name) + '.' + a + '" where you choose, with the summary caption and the sharing reminder. Nothing was written.');
+  },
+  regen: () => { const m = cur(); if (!m) return; S.proc = { id: m.id, step: 'summary' }; render(); setTimeout(() => { S.proc = null; m.engine = S.engine; render(); toast('Summary written again.'); }, 1500); },
+  deleteOk: () => {
+    const m = cur(); S.meetings = S.meetings.filter(x => x !== m); S.current = null; S.dialog = null; S.scene = 'list'; S.focusNext = '#search'; render();
+    toast('Deleted "' + esc(m ? m.title : '') + '" from this computer.');
+  },
+  undoShare: () => { const m = cur(); if (m) m.shared = false; S.banner = null; S.focusNext = '#shareBtn'; render(); toast('Not shared.'); },
+  bannerNo: () => { S.banner = null; S.focusNext = '#shareBtn'; render(); },
+  chooseTeam: () => { S.team = true; S.shareDefault = 'team'; render(); toast('Mock: team folder chosen. Your Dictum added its public key to the folder; nothing to type.'); },
+  chooseTeamShare: () => { S.team = true; S.shareDefault = 'team'; S.dlg = {}; render(); const d = $('#shAll'); if (d) d.focus(); },
+  shareOk: () => {
+    const m = cur(); const n = (S.dlg.sel || []).length;
+    if (m) m.shared = true;
+    if (S.banner && S.banner.id === (m && m.id)) S.banner = null;
+    S.dialog = null; S.focusNext = '#shareBtn'; render();
+    toast('Shared with ' + n + (n === 1 ? ' person' : ' people') + '. They see it in their own Dictum.');
+  },
+  pick: i => { S.dialog = 'importConsent'; S.dlg = { file: Number(i), how: FILES[Number(i)].source === 'zoom' ? HOW_IMPORT[2] : HOW_IMPORT[0] }; render(); const d = document.querySelector('.dialog input:checked'); if (d) d.focus(); },
+  importOk: () => { const f = S.dlg.file || 0, how = S.dlg.how || HOW_IMPORT[0]; S.dialog = null; runImport(f, how, null); render(); },
+  spage: n => { S.settingsPage = n; render(); },
+  folder: () => { S.folderAlt = !S.folderAlt; render(); toast('Mock: in the app this opens a folder picker.'); },
+  enableOk: () => { S.meetingsOn = true; S.dialog = null; S.focusNext = '#mOn'; render(); },
+  tplShow: t => { S.dlg.tpl = t; render(); },
+  cloudOk: () => { S.engine = 'cloud'; S.dialog = null; S.focusNext = '#eng-cloud'; render(); },
+  cloudNo: () => { S.dialog = null; S.focusNext = '#eng-' + S.engine; render(); }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) {
+    if (S.exportOpen && !e.target.closest('.menu') && !e.target.closest('#exportBtn')) { S.exportOpen = false; render(); }
+    return;
+  }
+  const f = ACT[el.dataset.act];
+  if (f) f(el.dataset.arg, el, e);
+});
+document.addEventListener('change', e => {
+  const el = e.target, k = el.dataset && el.dataset.change;
+  if (!k) return;
+  if (k === 'how') { S.how = el.value; return; }
+  if (k === 'ihow') { S.dlg.how = el.value; return; }
+  if (k === 'tpl') { const m = cur(); if (m) m.tpl = el.value; render(); return; }
+  if (k === 'keep') { S.keepAudio = el.value; render(); return; }
+  if (k === 'mic') { S.mic = el.value; return; }
+  if (k === 'zoomMode') { S.zoomMode = el.value; return; }
+  if (k === 'shareDefault') { S.shareDefault = el.value; return; }
+  if (k === 'engine') {
+    if (el.value === 'cloud') { openDialog('cloud'); return; }
+    S.engine = el.value; render(); return;
+  }
+  if (k === 'meetingsOn') {
+    if (el.checked) { el.checked = false; openDialog('enable'); }
+    else { S.meetingsOn = false; render(); }
+    return;
+  }
+  if (k === 'shareAll') { S.dlg.sel = el.checked ? TEAM.slice() : []; render(); return; }
+  if (k === 'shareOne') {
+    const sel = S.dlg.sel || TEAM.slice();
+    const i = sel.indexOf(el.value);
+    if (el.checked && i < 0) sel.push(el.value); else if (!el.checked && i >= 0) sel.splice(i, 1);
+    S.dlg.sel = TEAM.filter(n => sel.indexOf(n) >= 0); render(); return;
+  }
+});
+document.addEventListener('input', e => {
+  const k = e.target.dataset && e.target.dataset.input;
+  if (k === 'search') { S.search = e.target.value; render(); }
+  else if (k === 'title') { const m = cur(); if (m) m.title = e.target.value; }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (S.exportOpen) { S.exportOpen = false; S.focusNext = '#exportBtn'; render(); e.preventDefault(); return; }
+    if (S.dialog) { if (S.dialog === 'cloud') ACT.cloudNo(); else closeDialog(); e.preventDefault(); return; }
+    if (S.scene === 'zoom') { ACT.zoomNo(); e.preventDefault(); return; }
+    if (S.scene === 'consent') { ACT.consentCancel(); e.preventDefault(); return; }
+    if (S.scene === 'tray') { go('desk'); $('#trayBtn').focus(); e.preventDefault(); return; }
+    return;
+  }
+  if (e.key === 'Tab' && S.dialog) {
+    const f = Array.prototype.filter.call(document.querySelectorAll('.dialog button, .dialog input, .dialog select, .dialog textarea'), x => !x.disabled);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (!e.target.closest('.dialog')) { e.preventDefault(); first.focus(); return; }
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+function clock() { $('#tbClock').textContent = fmtHM(new Date()); }
+clock(); setInterval(clock, 15000);
+render();
+</script>
+</body>
+</html>
