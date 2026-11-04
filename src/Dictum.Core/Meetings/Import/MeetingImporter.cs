@@ -31,10 +31,13 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
                 cancellationToken.ThrowIfCancellationRequested();
                 var hasVideo = Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase);
                 using var wav = AudioWithOriginal(audio, hasVideo ? null : original, cancellationToken);
-                id = store.Create(new(MeetingId.New(), Path.GetFileNameWithoutExtension(path),
+                // Claim the id before Create: Create can persist metadata and then fail (initial transcript, index), and that half-made
+                // meeting must still be rolled back. Delete tolerates a meeting that was never written.
+                var newId = MeetingId.New();
+                created = newId;
+                id = store.Create(new(newId, Path.GetFileNameWithoutExtension(path),
                     (timeProvider ?? TimeProvider.System).GetUtcNow(), audio.Duration, source,
                     agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null));
-                created = id;
                 progress?.Report("Saving encrypted recording");
                 cancellationToken.ThrowIfCancellationRequested();
                 store.WriteAudio(id, Channel.Mixed, wav);

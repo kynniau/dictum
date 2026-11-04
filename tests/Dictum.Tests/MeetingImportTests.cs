@@ -68,6 +68,19 @@ public sealed class MeetingImportTests
     }
 
     [Fact]
+    public async Task A_create_that_fails_after_writing_its_metadata_is_rolled_back()
+    {
+        using var fixture = new MeetingFixture();
+        var wav = WriteTone(fixture);
+        var expected = new IOException("index rebuild failed");
+        var store = new FaultStore(fixture.Store()) { CreateError = expected };
+        var error = await Assert.ThrowsAsync<IOException>(() =>
+            Importer(store, new FixedDecoder(wav)).ImportAsync(wav, MeetingSource.ImportedFile, ImportAgreement));
+        Assert.Same(expected, error);
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
     public async Task A_cleanup_failure_carries_both_errors()
     {
         using var fixture = new MeetingFixture();
@@ -406,7 +419,14 @@ public sealed class MeetingImportTests
     {
         public Exception? VideoError { get; init; }
         public Exception? DeleteError { get; init; }
-        public MeetingId Create(MeetingMeta meta) => inner.Create(meta);
+        /// <summary>Persists the meeting through the real store, then throws: Create failing after its metadata was written.</summary>
+        public Exception? CreateError { get; init; }
+        public MeetingId Create(MeetingMeta meta)
+        {
+            var id = inner.Create(meta);
+            if (CreateError is not null) throw CreateError;
+            return id;
+        }
         public void WriteAudio(MeetingId id, Channel channel, Stream wav16k) => inner.WriteAudio(id, channel, wav16k);
         public void WriteVideo(MeetingId id, string sourcePath)
         {
