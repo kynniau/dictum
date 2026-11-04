@@ -34,7 +34,8 @@ public static class SummaryValidator
     // A contraction stays one word, so "didn't" is seen whole as a negation.
     private static readonly Regex ContextWords = new(@"[\p{L}\p{N}]+(?:['\u2019][\p{L}]+)*|[-\u2013\u2212]", RegexOptions.CultureInvariant);
     private static readonly Regex Qualifier = new(
-        @"^(?:to|through|-|and|or|per|not|no|never|none|cannot|without|up|at|least|most|about|around|approximately|roughly|under|over|below|above|less|more|than|between|nearly|almost|only|maximum|minimum|max|min|\p{L}+n['\u2019]t)$",
+        // A qualifier keeps its meaning with a contracted suffix ("maximum's", "there're"), so the suffix is allowed.
+        @"^(?:(?:to|through|-|and|or|per|not|no|never|none|cannot|without|up|at|least|most|about|around|approximately|roughly|under|over|below|above|less|more|than|between|nearly|almost|only|maximum|minimum|max|min)(?:['\u2019]\p{L}+)?|\p{L}+n['\u2019]t)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex Continuation = new(
         @"[\p{N}\p{Sc}%\u2030\u2031]|\b(?:kg|mg|g|km|cm|mm|metres?|meters?|miles?|litres?|liters?|hours?|minutes?|seconds?|days?|weeks?|months?|years?|millions?|billions?|trillions?|thousands?|hundreds?|bps|basis|points?|degrees?|ounces?|tonnes?|tons?|feet|inches|kilograms?|milligrams?|grams?|kilometres?|kilometers?|kilowatts?|watts?|mph|kph|Australian|US|Canadian|New Zealand)\b",

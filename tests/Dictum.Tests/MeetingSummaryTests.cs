@@ -123,6 +123,15 @@ public sealed class MeetingSummaryTests
         Assert.NotNull(SummaryValidator.Validate(reply, Transcript("500 dollars payable please kindly " + context), General, "Local").Ok);
     }
 
+    [Fact]
+    public void A_qualifier_with_a_contracted_suffix_still_makes_a_quote_incomplete()
+    {
+        const string reply = "- \"500 dollars\" [00:00 You]";
+        Assert.Null(SummaryValidator.Validate(reply, Transcript("The maximum's now 500 dollars."), General, "Local").Ok);
+        Assert.Null(SummaryValidator.Validate(reply, Transcript("The maximum’s now 500 dollars."), General, "Local").Ok);
+        Assert.NotNull(SummaryValidator.Validate(reply, Transcript("The fee's now 500 dollars."), General, "Local").Ok);
+    }
+
     [Theory]
     [InlineData("1_00 dollars")]
     [InlineData("1*00 dollars")]
