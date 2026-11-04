@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Audio;
 using Dictum.Calibration;
 using Dictum.Core;
@@ -133,14 +134,17 @@ internal sealed partial class CalibrationWindow : Window
         {
             _hotkey ??= shell.RedirectHotkey(OnHotkey); // the hotkey records here only while this window is active
             CheckMicrophone(); // one plugged in while the person was elsewhere turns Record back on
+            ShowInUse(); // the model or decoding may have been changed on Settings > Models meanwhile
         };
         Deactivated += (_, _) =>
         {
             _hotkey?.Dispose();
             _hotkey = null;
         };
+        Opened += (_, _) => shell.Changed += OnModelStateChanged; // as the Settings and tray windows follow it; undone at Closed
         Closed += (_, _) =>
         {
+            shell.Changed -= OnModelStateChanged;
             _hotkey?.Dispose();
             _takeLimit.Stop();
             _runCts?.Cancel();
@@ -354,11 +358,29 @@ internal sealed partial class CalibrationWindow : Window
         _progress.Text = OpenRecordingsFailed;
     }
 
-    private void WriteGrammar(bool on)
+    private bool _restoringGrammar; // the box is being put back to the saved value: that change is not a choice to write
+
+    /// <summary>
+    /// The grammar box was ticked or unticked. A file that cannot be written is a false from Write, not an exception
+    /// (ModelCoordinator.Write returns false after its balloon), so the window says it too and puts the box back to what
+    /// settings.json holds, without writing again. The catch stays: a write that succeeds then reloads, and the reload can throw.
+    /// </summary>
+    private void WriteGrammar(CheckBox box)
     {
+        if (_restoringGrammar) return;
         try
         {
-            _host.Write([("llm.grammar_assist", JsonValue.Create(on))]);
+            if (_host.Write([("llm.grammar_assist", JsonValue.Create(box.IsChecked == true))])) return;
+            _progress.Text = ModelCoordinator.WriteFailed;
+            _restoringGrammar = true;
+            try
+            {
+                box.IsChecked = _host.Settings().Llm.GrammarAssist;
+            }
+            finally
+            {
+                _restoringGrammar = false;
+            }
         }
         catch (Exception ex)
         {

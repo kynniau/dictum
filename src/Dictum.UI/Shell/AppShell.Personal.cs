@@ -12,7 +12,11 @@ public sealed partial class AppShell
         DownloadSpeechModel: (name, agreed, then, finished) => Personal.DownloadForCalibration(name, agreed, then, finished),
         AddDictionaryTerms: Personal.AddDictionaryTerms,
         AddCorrections: Personal.AddCorrections,
-        MovingFiles: () => Models.MovingFiles);
+        MovingFiles: () => Models.MovingFiles,
+        CurrentModel: () => Models.CurrentName,
+        SpeechLoadProblem: () => SpeechLoadProblem,
+        CloudSpeechHost: () => SpeechSendsAudio ? Speech.Host : null, // as Settings > Models asks it (ModelPages: cloudHost)
+        SpeechReady: () => SpeechReady);
 
     /// <summary>Fix last dictation → Copy: the clipboard, kept out of clipboard history unless insert.clipboard_history is on.</summary>
     public void CopyText(string text) => Platform.Clipboard.SetText(text, keepOutOfHistory: !_settings.Insert.ClipboardHistory);

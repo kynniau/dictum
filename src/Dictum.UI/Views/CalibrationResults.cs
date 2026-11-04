@@ -5,8 +5,10 @@ using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Dictum.App;
 using Dictum.Calibration;
 using Dictum.Personal;
+using Dictum.UI.Views.Settings;
 
 namespace Dictum.UI.Views;
 
@@ -15,6 +17,7 @@ internal sealed partial class CalibrationWindow
 {
     private readonly Grid ResultsGrid = new() { ColumnDefinitions = new ColumnDefinitions("1.6*,1.2*,0.7*,Auto"), ColumnSpacing = 10, RowSpacing = 6 };
     private readonly StackPanel MissingList = new() { Spacing = 6 };
+    private readonly List<(ComboResult Combo, Button Use, bool Best)> _useButtons = []; // the buttons RenderResults drew, for ShowInUse
     private readonly StackPanel SuggestionList = new() { Spacing = 4 };
 
     private async Task RunAsync(IReadOnlyList<SpeechCandidate> models)
@@ -85,6 +88,7 @@ internal sealed partial class CalibrationWindow
     {
         ResultsGrid.Children.Clear();
         ResultsGrid.RowDefinitions.Clear();
+        _useButtons.Clear();
         if (_session.Results.Count == 0)
         {
             ResultsGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
@@ -103,11 +107,113 @@ internal sealed partial class CalibrationWindow
             if (best) name.FontWeight = FontWeight.SemiBold;
             var errors = Ui.Text(combo.ErrorsText, slow ? "caption" : "body");
             var time = Ui.Text(slow ? $"{combo.AverageSeconds:0.0} s (too slow here)" : $"{combo.AverageSeconds:0.0} s", slow ? "caption" : "body");
-            var use = Ui.Button("Use this", best ? "primary" : "secondary", () => _host.Write([("whisper.model", JsonValue.Create(combo.Model)), ("whisper.beam_size", JsonValue.Create(combo.BeamSize))]),
-                Failed, name: $"Use {combo.Model} with {combo.Decoding}{(best ? " (recommended)" : "")}");
+            var use = Ui.Button(UseLabel, best ? "primary" : "secondary", () => Use(combo), Failed, name: UseName(combo, best, inUse: false));
             use.MinHeight = 30;
+            _useButtons.Add((combo, use, best));
             AddCells(row++, [name, errors, time, use]);
         }
+        ShowInUse();
+    }
+
+    /// <summary>
+    /// Use this: writes the combination's model and decoding, and says what that means. The settings are read back through the same
+    /// questions the "In use" mark asks (<see cref="CalibrationHost.InUse"/>), so a line is only said when this is the model the app
+    /// holds and its load has not failed: a refusal, a failed write and a load that already failed each say that instead.
+    /// When it takes effect (verified in ModelCoordinator.TryWrite, AppShell.Reload and ModelManager.SetDecoding, 04/11/2026): at
+    /// once, with no restart. A new model loads in the background and the hotkey is ignored until it has (AppShell: hotkeyBlocked is
+    /// "not ready"); a changed decoding alone rebuilds the decoder in the background and loads no model. A load that fails after
+    /// the click is caught when it finishes (<see cref="OnModelStateChanged"/>).
+    /// </summary>
+    private void Use(ComboResult combo)
+    {
+        if (_host.InUse(combo)) return; // already what dictation uses: nothing to write, and the button says so
+        if (_host.Refusal() is { } refused) // model files are moving: nothing is loaded now, so nothing is claimed
+        {
+            _progress.Text = refused;
+            return;
+        }
+        // Before the write: a changed model loads and a changed decoding alone does not, but the same model still loading (an earlier
+        // press) keeps the hotkey ignored until it has, so that too is waiting for a load.
+        var loads = !_host.ModelInUse(combo.Model) || _host.SpeechReady?.Invoke() == false;
+        if (!_host.Write([("whisper.model", JsonValue.Create(combo.Model)), ("whisper.beam_size", JsonValue.Create(combo.BeamSize))]))
+        {
+            _progress.Text = ModelCoordinator.WriteFailed; // the tray's balloon says it too; nothing was written or reloaded
+            return;
+        }
+        ShowInUse(); // the same buttons, so the one pressed keeps the keyboard focus
+        Say(combo, loads);
+    }
+
+    /// <summary>What Use this says once the write went through: the tray's text if the load has already failed, else the line (if the app holds this model).</summary>
+    private void Say(ComboResult combo, bool loads)
+    {
+        if (_host.SpeechLoadProblem?.Invoke() is { } problem) // a load has failed: the tray's own text, and no claim, but only for the model it was
+        {
+            // The failure is the app's latest one, not this row's: pressing a model whose file is gone starts no load (Ensure only
+            // balloons), so base.en's old failure must not be reported against it.
+            if (_host.HoldsModel(combo.Model)) _progress.Text = problem;
+            return;
+        }
+        if (!_host.InUse(combo)) return;
+        _progress.Text = UsingLine(combo, loads, _host.CloudSpeechHost?.Invoke());
+        _claim = (combo, _progress.Text);
+    }
+
+    /// <summary>The line Use this said, while it is still the status line: a load that fails after it was said replaces it.</summary>
+    private (ComboResult Combo, string Line)? _claim;
+
+    /// <summary>
+    /// The app's model state changed (a load started, finished or failed: AppShell.Changed, subscribed while the window is open).
+    /// The marks follow it; and a success line still showing for a load that has now failed is replaced by the tray's own text for
+    /// that failure, because the line was said when the click came, before the background load had ended.
+    /// </summary>
+    private void OnModelStateChanged()
+    {
+        ShowInUse();
+        if (_claim is not { } claim || _progress.Text != claim.Line || _host.SpeechLoadProblem?.Invoke() is not { } problem) return;
+        _progress.Text = problem;
+        _claim = null;
+    }
+
+    /// <summary>
+    /// Marks the row in use (<see cref="CalibrationHost.InUse"/>): its button reads "In use" (Settings > Models' label) and its
+    /// name says so; the others read "Use this". The buttons are changed, not rebuilt, so keyboard focus stays on the one pressed.
+    /// </summary>
+    private void ShowInUse()
+    {
+        foreach (var (combo, use, best) in _useButtons)
+        {
+            var inUse = _host.InUse(combo);
+            use.Content = inUse ? ModelsPage.InUseLabel : UseLabel;
+            AutomationProperties.SetName(use, UseName(combo, best, inUse));
+        }
+    }
+
+    private const string UseLabel = "Use this";
+
+    /// <summary>
+    /// The button's name: as it always was ("Use small.en with greedy (recommended)"); on the row in use the state replaces the verb
+    /// ("small.en with greedy (recommended): in use"). APPROVED 04/11/2026 22:49 AEDT (owner): do not reword (approve-calibration-use.md row 4).
+    /// </summary>
+    private static string UseName(ComboResult combo, bool best, bool inUse)
+    {
+        var what = $"{combo.Model} with {combo.Decoding}{(best ? " (recommended)" : "")}";
+        return inUse ? $"{what}: in use" : $"Use {what}";
+    }
+
+    /// <summary>
+    /// The status line after Use this took effect. approve-calibration-use.md rows 1 to 3. Local, a new model or one still loading ("loads": the hotkey is ignored until it
+    /// has) and local, the same model with other decoding (nothing loads), are APPROVED 04/11/2026 22:49 AEDT (owner): do not reword.
+    /// Cloud speech on, where the audio goes to <paramref name="cloudHost"/> and the model here is only the fallback, so no claim that
+    /// it hears dictation, is APPROVED 04/11/2026 22:48 AEDT (row 3, below).
+    /// </summary>
+    internal static string UsingLine(ComboResult combo, bool loads, string? cloudHost)
+    {
+        var model = $"{combo.Model} ({combo.Decoding})";
+        // APPROVED 04/11/2026 22:48 AEDT (owner; GPT 6.1 sol's wording from the two-model check, .demo-preview/two-model-calibration-cloud-line.md): do not reword.
+        if (cloudHost is not null)
+            return $"Saved: {model} is now the fallback. Cloud speech is on, so each recording is sent to {cloudHost} to turn your voice into words; Dictum uses this model only if the cloud request fails.";
+        return loads ? $"Dictum now uses {model} from the next dictation, once the model has loaded." : $"Dictum now uses {model} from the next dictation."; // APPROVED 04/11/2026 22:49 AEDT (owner): do not reword (rows 1 and 2)
     }
 
     private void AddCells(int row, Control[] cells)
@@ -179,7 +285,7 @@ internal sealed partial class CalibrationWindow
         }
         var grammar = new CheckBox { Content = "Grammar assist for this user", IsChecked = _host.Settings().Llm.GrammarAssist };
         ToolTip.SetTip(grammar, "For speakers whose first language is not English: the clean-up also fixes articles, tenses, prepositions and word order, keeping every fact and name.");
-        grammar.IsCheckedChanged += (_, _) => WriteGrammar(grammar.IsChecked == true);
+        grammar.IsCheckedChanged += (_, _) => WriteGrammar(grammar);
         boxes.Add(grammar);
         var note = recommended is null
             ? Ui.Text(_session.Results.Count == 0 ? "Run the test to see suggestions." : "No combination is under the latency ceiling, so there is nothing to base suggestions on.", "caption")
