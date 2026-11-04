@@ -160,6 +160,13 @@ public sealed partial class AppShell : IDisposable
 
     public string? SpeechError => _models.LastError;
 
+    /// <summary>
+    /// The tray balloon's text (<see cref="LoadBalloon"/>) for the speech model's latest load while it has failed
+    /// (<see cref="ModelManager.LoadFailed"/>: the model it replaced, if any, keeps hearing dictation), else null. The calibration window's
+    /// "In use" mark and its status line ask this, because the model's path is set at once and a fault does not reset it.
+    /// </summary>
+    internal string? SpeechLoadProblem => _models.LoadFailed && _models.LastError is { } error ? LoadBalloon(error, "Speech model", bothShown: false) : null;
+
     public bool CleanupLoading => _llm.IsLoading;
 
     public bool CleanupReady => _llm.Ready is not null;

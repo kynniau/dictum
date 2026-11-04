@@ -116,12 +116,13 @@ internal sealed partial class CalibrationWindow
     }
 
     /// <summary>
-    /// Use this: writes the combination's model and decoding, and says it took effect. The settings file is read back through the
-    /// same question the "In use" mark asks (<see cref="CalibrationHost.InUse"/>), so the line is only said when the model is the
-    /// one loaded or loading: a refusal, a failed write and a model that could not be switched to each say nothing of the kind.
+    /// Use this: writes the combination's model and decoding, and says what that means. The settings are read back through the same
+    /// questions the "In use" mark asks (<see cref="CalibrationHost.InUse"/>), so a line is only said when this is the model the app
+    /// holds and its load has not failed: a refusal, a failed write and a load that already failed each say that instead.
     /// When it takes effect (verified in ModelCoordinator.TryWrite, AppShell.Reload and ModelManager.SetDecoding, 04/11/2026): at
-    /// once, with no restart. The new model loads in the background and the hotkey is ignored until it has (AppShell: hotkeyBlocked
-    /// is "not ready"); a changed decoding rebuilds the decoder in the background.
+    /// once, with no restart. A new model loads in the background and the hotkey is ignored until it has (AppShell: hotkeyBlocked is
+    /// "not ready"); a changed decoding alone rebuilds the decoder in the background and loads no model. A load that fails after
+    /// the click is caught when it finishes (<see cref="OnModelStateChanged"/>).
     /// </summary>
     private void Use(ComboResult combo)
     {
@@ -131,13 +132,43 @@ internal sealed partial class CalibrationWindow
             _progress.Text = refused;
             return;
         }
+        var loads = !_host.ModelInUse(combo.Model); // before the write: a changed model loads, a changed decoding alone does not
         if (!_host.Write([("whisper.model", JsonValue.Create(combo.Model)), ("whisper.beam_size", JsonValue.Create(combo.BeamSize))]))
         {
             _progress.Text = ModelCoordinator.WriteFailed; // the tray's balloon says it too; nothing was written or reloaded
             return;
         }
         ShowInUse(); // the same buttons, so the one pressed keeps the keyboard focus
-        if (_host.InUse(combo)) _progress.Text = UsingLine(combo);
+        Say(combo, loads);
+    }
+
+    /// <summary>What Use this says once the write went through: the tray's text if the load has already failed, else the line (if the app holds this model).</summary>
+    private void Say(ComboResult combo, bool loads)
+    {
+        if (_host.SpeechLoadProblem?.Invoke() is { } problem) // the load already failed: the tray's own text, and no claim
+        {
+            _progress.Text = problem;
+            return;
+        }
+        if (!_host.InUse(combo)) return;
+        _progress.Text = UsingLine(combo, loads, _host.CloudSpeechHost?.Invoke());
+        _claim = (combo, _progress.Text);
+    }
+
+    /// <summary>The line Use this said, while it is still the status line: a load that fails after it was said replaces it.</summary>
+    private (ComboResult Combo, string Line)? _claim;
+
+    /// <summary>
+    /// The app's model state changed (a load started, finished or failed: AppShell.Changed, subscribed while the window is open).
+    /// The marks follow it; and a success line still showing for a load that has now failed is replaced by the tray's own text for
+    /// that failure, because the line was said when the click came, before the background load had ended.
+    /// </summary>
+    private void OnModelStateChanged()
+    {
+        ShowInUse();
+        if (_claim is not { } claim || _progress.Text != claim.Line || _host.SpeechLoadProblem?.Invoke() is not { } problem) return;
+        _progress.Text = problem;
+        _claim = null;
     }
 
     /// <summary>
@@ -158,7 +189,7 @@ internal sealed partial class CalibrationWindow
 
     /// <summary>
     /// The button's name: as it always was ("Use small.en with greedy (recommended)"); on the row in use the state replaces the verb
-    /// ("small.en with greedy (recommended): in use"). PROPOSED (not yet approved) 04/11/2026: approve-calibration-use.md row 2.
+    /// ("small.en with greedy (recommended): in use"). PROPOSED (not yet approved) 04/11/2026: approve-calibration-use.md row 4.
     /// </summary>
     private static string UseName(ComboResult combo, bool best, bool inUse)
     {
@@ -166,8 +197,28 @@ internal sealed partial class CalibrationWindow
         return inUse ? $"{what}: in use" : $"Use {what}";
     }
 
-    /// <summary>The status line after Use this took effect. PROPOSED (not yet approved) 04/11/2026: approve-calibration-use.md row 1.</summary>
-    internal static string UsingLine(ComboResult combo) => $"Dictum now uses {combo.Model} ({combo.Decoding}) from the next dictation, once the model has loaded.";
+    /// <summary>
+    /// The status line after Use this took effect. PROPOSED (not yet approved) 04/11/2026, approve-calibration-use.md rows 1 to 3 (in row 3 only the frame is proposed):
+    /// local, a new model ("loads": the hotkey is ignored until it has); local, the same model with other decoding (nothing loads);
+    /// cloud speech on, where the audio goes to <paramref name="cloudHost"/> and the model here is only the fallback, so no claim that
+    /// it hears dictation, and the clause about the fallback is the owner's APPROVED wording, taken from the sentence itself.
+    /// </summary>
+    internal static string UsingLine(ComboResult combo, bool loads, string? cloudHost)
+    {
+        var model = $"{combo.Model} ({combo.Decoding})";
+        if (cloudHost is not null) return $"Saved: {model} is the speech model on this PC; {CloudFallbackClause(cloudHost)}."; // PROPOSED frame, row 3
+        return loads ? $"Dictum now uses {model} from the next dictation, once the model has loaded." : $"Dictum now uses {model} from the next dictation."; // PROPOSED, rows 1 and 2
+    }
+
+    /// <summary>
+    /// "with cloud speech on, {host} does this and the model here is the fallback": APPROVED 22/10/2026 18:41 AEDT (owner), the second
+    /// half of <see cref="ModelsPage.SpeechIntroCloudSentence"/>, cut from it so the words cannot drift from the approved ones.
+    /// </summary>
+    internal static string CloudFallbackClause(string host)
+    {
+        var sentence = ModelsPage.SpeechIntroCloudSentence(host);
+        return sentence[(sentence.IndexOf("; ", StringComparison.Ordinal) + 2)..].TrimEnd('.');
+    }
 
     private void AddCells(int row, Control[] cells)
     {

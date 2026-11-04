@@ -141,8 +141,10 @@ internal sealed partial class CalibrationWindow : Window
             _hotkey?.Dispose();
             _hotkey = null;
         };
+        Opened += (_, _) => shell.Changed += OnModelStateChanged; // as the Settings and tray windows follow it; undone at Closed
         Closed += (_, _) =>
         {
+            shell.Changed -= OnModelStateChanged;
             _hotkey?.Dispose();
             _takeLimit.Stop();
             _runCts?.Cancel();

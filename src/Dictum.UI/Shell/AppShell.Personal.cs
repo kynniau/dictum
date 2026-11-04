@@ -13,7 +13,9 @@ public sealed partial class AppShell
         AddDictionaryTerms: Personal.AddDictionaryTerms,
         AddCorrections: Personal.AddCorrections,
         MovingFiles: () => Models.MovingFiles,
-        CurrentModel: () => Models.CurrentName);
+        CurrentModel: () => Models.CurrentName,
+        SpeechLoadProblem: () => SpeechLoadProblem,
+        CloudSpeechHost: () => SpeechSendsAudio ? Speech.Host : null); // as Settings > Models asks it (ModelPages: cloudHost)
 
     /// <summary>Fix last dictation → Copy: the clipboard, kept out of clipboard history unless insert.clipboard_history is on.</summary>
     public void CopyText(string text) => Platform.Clipboard.SetText(text, keepOutOfHistory: !_settings.Insert.ClipboardHistory);

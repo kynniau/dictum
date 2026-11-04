@@ -17,7 +17,16 @@ namespace Dictum.Calibration;
 /// </param>
 /// <param name="CurrentModel">
 /// The speech model loaded or loading (<see cref="App.ModelCoordinator.CurrentName"/>): it sees a --model or DICTUM_MODEL_PATH
-/// override, and a switch that could not load (the old model stays). Null: settings.json's whisper.model.
+/// override. It names a model whose load then failed too (ModelManager.BeginLoad sets its path at once and a fault does not reset
+/// it), which is why <paramref name="SpeechLoadProblem"/> is asked as well. Null: settings.json's whisper.model.
+/// </param>
+/// <param name="SpeechLoadProblem">
+/// The tray's text for a failed speech model load while the latest load has failed (<c>ModelManager.LoadFailed</c>, with the text
+/// the tray balloon shows), else null. A model whose load failed is not in use: the old one keeps hearing dictation. Null: never failed.
+/// </param>
+/// <param name="CloudSpeechHost">
+/// The host each recording goes to while cloud speech is on (<c>CloudSpeech.SendsAudio</c>; the local model is then only the
+/// fallback), else null. Null: never.
 /// </param>
 /// <param name="DownloadSpeechModel">Asks, downloads through the app's downloader (refused under offline_only), then calls back, in
 /// this order: whether the download goes ahead (true once agreed, false when the question is declined; not called when it is
@@ -38,11 +47,16 @@ internal sealed record CalibrationHost(
     Action<IReadOnlyList<CorrectionRule>> AddCorrections,
     Func<string, WhisperSettings, DecodeOptions, ISpeechEngine>? LoadSpeech = null,
     Func<bool>? MovingFiles = null,
-    Func<string>? CurrentModel = null)
+    Func<string>? CurrentModel = null,
+    Func<string?>? SpeechLoadProblem = null,
+    Func<string?>? CloudSpeechHost = null)
 {
-    /// <summary>Whether this combination is what dictation uses now: the model loaded or loading, and the decoding settings.json holds (greedy is whisper.beam_size 0).</summary>
-    public bool InUse(ComboResult combo) =>
-        string.Equals(CurrentModel?.Invoke() ?? Settings().Whisper.Model, combo.Model, StringComparison.OrdinalIgnoreCase) && Settings().Whisper.BeamSize == combo.BeamSize;
+    /// <summary>Whether this model is the one dictation uses now: the one named (<see cref="CurrentModel"/>), and its latest load has not failed (<see cref="SpeechLoadProblem"/>).</summary>
+    public bool ModelInUse(string model) =>
+        SpeechLoadProblem?.Invoke() is null && string.Equals(CurrentModel?.Invoke() ?? Settings().Whisper.Model, model, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether this combination is what dictation uses now: <see cref="ModelInUse"/>, and the decoding settings.json holds (greedy is whisper.beam_size 0).</summary>
+    public bool InUse(ComboResult combo) => ModelInUse(combo.Model) && Settings().Whisper.BeamSize == combo.BeamSize;
 
     /// <summary>Why calibration cannot run now (model files are moving: <see cref="App.ModelCoordinator.MovingRefusal"/>), or null.</summary>
     public string? Refusal() => MovingFiles?.Invoke() == true ? App.ModelCoordinator.MovingRefusal : null;

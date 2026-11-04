@@ -42,12 +42,12 @@ public class CalibrationUseTests
     /// Three results: tiny.en greedy (what the profile uses), tiny.en with beam search, and base.en greedy, which has the fewest
     /// errors, so it is the recommended one. Both models are on disk (empty, of the catalogue's sizes), so a switch to either loads.
     /// </summary>
-    private static (AppShell Shell, CalibrationWindow Window) Open(Scratch scratch, ILog? log = null)
+    private static (AppShell Shell, CalibrationWindow Window) Open(Scratch scratch, ILog? log = null, ModelManager? models = null, HttpMessageHandler? providers = null)
     {
         File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
         Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
         Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", ModelCatalog.Find("base.en")!.Bytes);
-        var (shell, _, _) = scratch.Shell(SpeechModels(), log: log);
+        var (shell, _, _) = scratch.Shell(models ?? SpeechModels(), log: log, providerHandler: providers);
         shell.Reload(userRequested: false);
         var window = new CalibrationWindow(shell);
         window.Show();
@@ -191,23 +191,26 @@ public class CalibrationUseTests
 
     /// <summary>
     /// Pin 6: "in use" is the model the app has loaded or is loading, not only what settings.json says: with a different model
-    /// running (a launch override, or a switch that could not load), the row for the file's model is not marked.
+    /// running (a launch override), the row for the file's model is not marked; and a model whose load has failed is not marked at all.
     /// </summary>
     [Fact]
     public void In_use_is_the_model_the_app_holds_not_only_the_file()
     {
         using var scratch = new Scratch();
         var settings = new AppSettings { Whisper = new WhisperSettings { Model = "tiny.en", BeamSize = 0 } };
-        CalibrationHost Host(Func<string>? current) => new(scratch.Paths, () => settings, () => PersonalText.Empty,
+        CalibrationHost Host(Func<string>? current, Func<string?>? problem = null) => new(scratch.Paths, () => settings, () => PersonalText.Empty,
             new ModelIntegrity(Path.Combine(scratch.Root.FullName, "verified-models.json"), NullLog.Instance), NullLog.Instance,
             FindSpeechModel: _ => null, Write: _ => true, DownloadSpeechModel: (_, _, _, _) => { }, AddDictionaryTerms: _ => { }, AddCorrections: _ => { },
-            CurrentModel: current);
+            CurrentModel: current, SpeechLoadProblem: problem);
 
         Assert.True(Host(null).InUse(Combo("tiny.en", 0, 0))); // no app to ask: the file's model
         Assert.False(Host(null).InUse(Combo("tiny.en", 5, 0)));
         Assert.True(Host(() => "tiny.en").InUse(Combo("tiny.en", 0, 0)));
         Assert.False(Host(() => "base.en").InUse(Combo("tiny.en", 0, 0))); // the file says tiny.en, the app runs base.en
         Assert.True(Host(() => "base.en").InUse(Combo("base.en", 0, 0)));
+        Assert.False(Host(() => "base.en", () => "Model failed").InUse(Combo("base.en", 0, 0))); // the app names it, but its load failed
+        Assert.False(Host(() => "base.en", () => "Model failed").ModelInUse("base.en"));
+        Assert.True(Host(() => "base.en", () => null).InUse(Combo("base.en", 0, 0)));
     }
 
     private const string GrammarOn = """{ "hotkey": "F24", "whisper": { "model": "tiny.en", "beam_size": 0 }, "llm": { "provider": "none", "grammar_assist": true } }""";
@@ -259,6 +262,156 @@ public class CalibrationUseTests
         Assert.False(shell.Settings.Llm.GrammarAssist);
         Assert.DoesNotContain(ModelCoordinator.WriteFailed, Texts(window));
         window.Close();
+        shell.Dispose();
+    });
+
+    // ---- the line's three wordings, and a load that fails after the click ----
+
+    private const string SpeechHost = "speech.example.com";
+
+    private const string CloudProfile = $$"""{ "hotkey": "F24", "whisper": { "model": "tiny.en", "beam_size": 0 }, "llm": { "provider": "none" }, "speech": { "provider": "openai-compatible", "base_url": "https://{{SpeechHost}}/v1", "model": "speech-model" } }""";
+
+    /// <summary>Fails any request: these pins never make one.</summary>
+    private sealed class NoRequests : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("no request is expected");
+    }
+
+    private static bool Eventually(Func<bool> condition)
+    {
+        for (var i = 0; i < 500; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            if (condition()) return true;
+            Thread.Sleep(10);
+        }
+        return condition();
+    }
+
+    /// <summary>
+    /// A speech model manager whose loader throws for base.en once <paramref name="release"/> is set (tiny.en, the profile's model,
+    /// loads at once): a real faulted load through ModelManager, which sets its path first and does not reset it on a fault.
+    /// </summary>
+    private static ModelManager FailingBase(ManualResetEventSlim release) => new(NullLog.Instance, loader: (path, _, decode) =>
+    {
+        if (!path.EndsWith("ggml-base.en.bin", StringComparison.Ordinal)) return new HoldingSpeechEngine(path, decode);
+        release.Wait(TestContext.Current.CancellationToken);
+        throw new InvalidOperationException("the file is damaged");
+    }, gpuInUse: () => false);
+
+    /// <summary>
+    /// Pin 8 (copy, lens minor 3): when only the decoding changes no model loads, so the line does not say "once the model has
+    /// loaded" (the hotkey is not ignored: IsReady stays true). With the model changing it does (pin 1).
+    /// </summary>
+    [Fact]
+    public Task Use_this_with_only_the_decoding_changed_does_not_wait_for_a_model() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Profile);
+        var (shell, window) = Open(scratch);
+
+        Click(Row(window, $"Use {TinyBeam}"));
+
+        Assert.Contains("Dictum now uses tiny.en (beam search (5)) from the next dictation.", Texts(window).Split('\n'));
+        Assert.DoesNotContain("once the model has loaded", Texts(window));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin 9 (privacy, lens major 1): while cloud speech sends each recording to a service, the line does not say Dictum uses the
+    /// model (the service hears dictation; the model is the fallback). It says what was saved and uses the owner's APPROVED words
+    /// for the fallback (Settings > Models, 22/10/2026 18:41 AEDT), byte for byte.
+    /// </summary>
+    [Fact]
+    public Task Use_this_while_cloud_speech_is_on_does_not_claim_the_model_hears_dictation() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(CloudProfile);
+        CloudConsentFile.WriteSpeech(scratch.Paths.ConsentFile, new CloudConsentRecord(SpeechSettings.OpenAiCompatible, SpeechHost, DateTimeOffset.UtcNow, "test"));
+        var (shell, window) = Open(scratch, providers: new NoRequests());
+        Assert.True(shell.SpeechSendsAudio);
+
+        Click(Row(window, $"Use {BaseGreedy}"));
+
+        var lines = Texts(window).Split('\n');
+        Assert.Contains("Saved: base.en (greedy) is the speech model on this PC; with cloud speech on, speech.example.com does this and the model here is the fallback.", lines);
+        Assert.DoesNotContain("Dictum now uses", Texts(window));
+        Assert.Equal("with cloud speech on, speech.example.com does this and the model here is the fallback", CalibrationWindow.CloudFallbackClause(SpeechHost));
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Pin 10 (honesty, lens major 2): a model whose load fails AFTER the click is not "in use". Through a real faulted load: the
+    /// line said at the click is replaced by the tray's own text for the failure, the row goes back to Use this, and the row of
+    /// the model still running (tiny.en, kept by ModelManager) is not claimed either.
+    /// </summary>
+    [Fact]
+    public Task A_load_that_fails_after_the_click_replaces_the_line_and_the_mark() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Profile);
+        using var release = new ManualResetEventSlim();
+        var (shell, window) = Open(scratch, models: FailingBase(release));
+
+        Click(Row(window, $"Use {BaseGreedy}"));
+        Assert.Contains("Dictum now uses base.en (greedy) from the next dictation, once the model has loaded.", Texts(window).Split('\n')); // said at the click
+        Assert.Equal("In use", Row(window, $"{BaseGreedy}: in use").Content);
+
+        release.Set(); // the load now fails, in the background
+        Assert.True(Eventually(() => !Texts(window).Contains("Dictum now uses")), "the success line was never replaced");
+
+        Assert.NotNull(shell.SpeechLoadProblem);
+        Assert.Contains(shell.SpeechLoadProblem!, Texts(window).Split('\n')); // the tray balloon's text, not new words
+        Assert.Contains("(Speech model: Settings > Models)", shell.SpeechLoadProblem);
+        Assert.Equal("Use this", Row(window, $"Use {BaseGreedy}").Content);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// The same failure when it has finished before the click's own check (a load can fail within microseconds): what Use this says
+    /// after its write is the failure, never the success line, and the row is not marked. The check is run here once the failure
+    /// has happened and the status line is cleared, because the real timing cannot be held still.
+    /// </summary>
+    [Fact]
+    public Task A_load_that_has_already_failed_is_never_marked_in_use() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Profile);
+        using var release = new ManualResetEventSlim(initialState: true); // fails as soon as it starts
+        var (shell, window) = Open(scratch, models: FailingBase(release));
+        Click(Row(window, $"Use {BaseGreedy}"));
+        Assert.True(Eventually(() => shell.SpeechLoadProblem is not null), "the load never failed");
+        Dispatcher.UIThread.RunJobs();
+        var progress = (TextBlock)typeof(CalibrationWindow).GetField("_progress", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+        progress.Text = "";
+
+        var combo = Combo("base.en", 0, 3);
+        typeof(CalibrationWindow).GetMethod("Say", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, [combo, true]);
+
+        Assert.Equal(shell.SpeechLoadProblem, progress.Text);
+        Assert.DoesNotContain("Dictum now uses", Texts(window));
+        Assert.Equal("Use this", Row(window, $"Use {BaseGreedy}").Content);
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>Pin 11: the window stops following the app's model state when it is closed (no call after close, nothing leaks).</summary>
+    [Fact]
+    public Task A_closed_window_does_not_follow_a_later_load_failure() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(Profile);
+        using var release = new ManualResetEventSlim();
+        var (shell, window) = Open(scratch, models: FailingBase(release));
+        Click(Row(window, $"Use {BaseGreedy}"));
+        var said = "Dictum now uses base.en (greedy) from the next dictation, once the model has loaded.";
+        Assert.Contains(said, Texts(window).Split('\n'));
+        window.Close();
+
+        release.Set();
+        Assert.True(Eventually(() => shell.SpeechLoadProblem is not null), "the load never failed");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Contains(said, Texts(window).Split('\n')); // untouched: the closed window was not told
         shell.Dispose();
     });
 }
