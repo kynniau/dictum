@@ -164,6 +164,80 @@ public class MeetingStoreTests
     }
 
     [Fact]
+    public void Damaged_metadata_is_skipped_and_can_still_be_deleted()
+    {
+        using var fixture = new MeetingFixture();
+        var store = fixture.Store(new() { KeepAudio = KeepAudio.Days30 });
+        var damaged = fixture.Populate(store); var other = fixture.Populate(store);
+        // Match a delete interrupted after its in-place scrub, before folder removal.
+        File.WriteAllBytes(fixture.At(damaged, "meta.json"), new byte[128]);
+        Assert.Equal(other, Assert.Single(store.List()).Id);
+        Assert.Equal(other, Assert.Single(store.Search("budget")).Item1.Id);
+        store.ApplyRetention(MeetingFixture.Started.AddDays(100));
+        Assert.True(File.Exists(fixture.At(damaged, "audio-you.wav.enc")));
+        Assert.False(File.Exists(fixture.At(other, "audio-you.wav.enc")));
+        File.Delete(Path.Combine(fixture.Root, "index.json"));
+        Assert.Equal(other, Assert.Single(fixture.Store().List()).Id);
+        store.Delete(damaged);
+        Assert.False(Directory.Exists(Path.Combine(fixture.Root, damaged.ToString())));
+        Assert.DoesNotContain(damaged.ToString(), File.ReadAllText(Path.Combine(fixture.Root, "index.json")), StringComparison.Ordinal);
+        Assert.Equal(other, Assert.Single(store.List()).Id);
+    }
+
+    [Fact]
+    public void Unreadable_metadata_is_skipped_without_blocking_other_meetings()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var damaged = fixture.Populate(store); var other = fixture.Populate(store);
+        using var locked = new FileStream(fixture.At(damaged, "meta.json"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.Equal(other, Assert.Single(store.List()).Id);
+        Assert.Equal(other, Assert.Single(store.Search("budget")).Item1.Id);
+        fixture.Store(new() { KeepAudio = KeepAudio.Days30 }).ApplyRetention(MeetingFixture.Started.AddDays(100));
+    }
+
+    [Fact]
+    public void Persisted_index_contains_no_key_wrap_bytes()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store(); var id = fixture.Populate(store);
+        var wraps = store.Read(id).Wraps;
+        Assert.NotEmpty(wraps);
+        // Exercise both initial index persistence and a fresh rebuild.
+        for (var pass = 0; pass < 2; pass++)
+        {
+            var bytes = File.ReadAllBytes(Path.Combine(fixture.Root, "index.json"));
+            using var json = JsonDocument.Parse(bytes);
+            Assert.False(Assert.Single(json.RootElement.EnumerateArray()).TryGetProperty("Wraps", out _));
+            foreach (var wrap in wraps)
+            {
+                Assert.DoesNotContain(Convert.ToBase64String(wrap.WrappedKey), Encoding.UTF8.GetString(bytes), StringComparison.Ordinal);
+                Assert.True(bytes.AsSpan().IndexOf(wrap.WrappedKey) < 0);
+            }
+            fixture.Store().List();
+        }
+    }
+
+    [Fact]
+    public void Quick_appends_preserve_order_with_durable_increasing_batch_numbers()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store(); var id = store.Create(fixture.Meta());
+        var expected = Enumerable.Range(0, 40)
+            .Select(i => new Segment(TimeSpan.Zero, TimeSpan.FromSeconds(1), Channel.You, $"Append {i}")).ToArray();
+        for (var i = 0; i < expected.Length; i++)
+        {
+            // A new store must continue the sequence, including after snapshot cleanup.
+            fixture.Store().AppendSegments(id, [expected[i]]);
+            foreach (var path in Directory.GetFiles(Path.Combine(fixture.Root, id.ToString()), "transcript-batch-*.json.enc"))
+            {
+                var number = Path.GetFileName(path)["transcript-batch-".Length..^".json.enc".Length];
+                Assert.Equal(19, number.Length);
+                Assert.All(number, c => Assert.True(char.IsAsciiDigit(c)));
+                Assert.InRange(long.Parse(number, System.Globalization.CultureInfo.InvariantCulture), 1, i + 1);
+            }
+        }
+        Assert.Equal(expected, fixture.Store().ReadTranscript(id));
+    }
+
+    [Fact]
     public void Delete_removes_the_folder_and_the_index_entry()
     {
         using var fixture = new MeetingFixture(); var store = fixture.Store(); var id = fixture.Populate(store);

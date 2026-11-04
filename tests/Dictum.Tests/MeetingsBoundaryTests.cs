@@ -27,7 +27,7 @@ public class MeetingsBoundaryTests
                 foreach (var operand in Operands(method))
                 {
                     if (operand is MethodBase crypto && crypto.DeclaringType == typeof(MeetingCrypto)
-                        && crypto.Name is nameof(MeetingCrypto.EncryptFile) or nameof(MeetingCrypto.DecryptFile) or nameof(MeetingCrypto.OpenDecrypted))
+                        && crypto.Name is nameof(MeetingCrypto.Encrypt) or nameof(MeetingCrypto.EncryptFile) or nameof(MeetingCrypto.DecryptFile) or nameof(MeetingCrypto.OpenDecrypted))
                         violations.Add($"{type.FullName}.{method.Name}: meeting crypto reference ({crypto.Name})");
                     if (operand is Type referenced && ReferencesStore(referenced) || operand is MemberInfo member && member.DeclaringType is { } declaring && ReferencesStore(declaring))
                         violations.Add($"{type.FullName}.{method.Name}: store reference");

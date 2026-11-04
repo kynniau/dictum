@@ -123,7 +123,12 @@ public sealed class FileMeetingStore : IMeetingStore
             if (added.Count == 0) return true;
             // Durable encrypted batches avoid buffering uncommitted transcript in memory. A snapshot
             // records incorporated batch names before cleanup, making interruption of cleanup harmless.
-            var batch = $"transcript-batch-{DateTime.UtcNow.Ticks:D19}-{Guid.NewGuid():N}.json.enc";
+            // Included names retain the sequence high-water mark after batch cleanup and restart.
+            var previous = EncryptedRead<TranscriptSnapshot>(id, FileAt(id, "transcript.json.enc"), key);
+            var sequence = previous.IncludedBatches.Concat(Batches(id).Select(Path.GetFileName))
+                .Select(name => long.Parse(name!.Split('-')[2].Split('.')[0], System.Globalization.CultureInfo.InvariantCulture))
+                .DefaultIfEmpty(0).Max();
+            var batch = $"transcript-batch-{checked(sequence + 1):D19}.json.enc";
             EncryptedWrite(id, FileAt(id, batch), added, key);
             var path = FileAt(id, "transcript.json.enc");
             var now = Stopwatch.GetTimestamp();
@@ -181,10 +186,18 @@ public sealed class FileMeetingStore : IMeetingStore
         {
             var name = Path.GetFileName(directory);
             if (name.Length != 32 || name.Any(c => !char.IsAsciiHexDigitLower(c))) continue;
-            if (File.Exists(Path.Combine(directory, "meta.json"))) meetings.Add(Read(new MeetingId(name)));
+            try { meetings.Add(Read(new MeetingId(name))); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            {
+                // An interrupted delete or damaged metadata must not hide other meetings.
+            }
         }
         meetings = meetings.OrderBy(m => m.StartedAt).ThenBy(m => m.Id).ToList();
-        JsonWrite(Path.Combine(Root, "index.json"), meetings);
+        // Persist only listing/search metadata. Key wraps belong exclusively in meta.json.
+        JsonWrite(Path.Combine(Root, "index.json"), meetings.Select(m => new
+        {
+            m.Id, m.Title, m.StartedAt, m.Duration, m.Source, m.HasVideo, m.SummaryEngine, m.SummaryTemplate
+        }).ToArray());
         return meetings;
     }
     public IReadOnlyList<MeetingMeta> List()
@@ -226,21 +239,19 @@ public sealed class FileMeetingStore : IMeetingStore
     {
         lock (Gate)
         {
-            var meta = Read(id);
-            var scrubbed = meta with { Wraps = meta.Wraps.Select(w => new KeyWrap(w.RecipientId, new byte[w.WrappedKey.Length])).ToArray() };
-            // Overwrite the original key material in place before the atomic metadata replacement.
-            // simplification: logical overwrites cannot erase SSD snapshots/backups; retire if a
-            // platform supplies guaranteed secure erasure. Existing external copies cannot be revoked.
-            using (var stream = new FileStream(FileAt(id, "meta.json"), FileMode.Open, FileAccess.Write, FileShare.None))
-            {
-                var zeros = new byte[checked((int)stream.Length)];
-                stream.Write(zeros); stream.Flush(true);
-            }
-            JsonWrite(FileAt(id, "meta.json"), scrubbed);
             var folder = Folder(id);
             if (!Path.GetFullPath(folder).StartsWith(Root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Invalid meeting folder.");
-            Directory.Delete(folder, true);
+            // Scrub without parsing, so deletion can resume after damaged or zero-filled metadata.
+            // simplification: logical overwrites cannot erase SSD snapshots/backups; retire if a
+            // platform supplies guaranteed secure erasure. Existing external copies cannot be revoked.
+            if (File.Exists(FileAt(id, "meta.json")))
+            {
+                using var stream = new FileStream(FileAt(id, "meta.json"), FileMode.Open, FileAccess.Write, FileShare.None);
+                var zeros = new byte[checked((int)stream.Length)];
+                stream.Write(zeros); stream.Flush(true);
+            }
+            if (Directory.Exists(folder)) Directory.Delete(folder, true);
             LastSnapshot.Remove(FileAt(id, "transcript.json.enc"));
             RebuildIndex();
         }
