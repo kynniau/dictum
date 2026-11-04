@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using MeetingSummary = Dictum.Meetings.Summary;
 
@@ -10,13 +11,15 @@ public static class SummaryValidator
     // a trigger is retained, so an unfamiliar format cannot evade validation.
     private const string NumberWords = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety";
     private const string OrdinalWords = "first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth twentieth twenty-first twenty-second twenty-third twenty-fourth twenty-fifth twenty-sixth twenty-seventh twenty-eighth twenty-ninth thirtieth thirty-first";
+    private const string QuantityWords = "dozen dozens score gross pair couple twice thrice double triple quadruple half halves quarter quarters single once several multiple";
     private static readonly string CurrencyCodes = string.Join("|", CultureInfo.GetCultures(CultureTypes.SpecificCultures)
         .Select(culture => new RegionInfo(culture.Name).ISOCurrencySymbol).Distinct());
     private static readonly Regex Html = new(@"<[\p{L}/]|&(?:[a-z][a-z0-9]*|\#[^;\s]*);",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex FigureTrigger = new(
         @"[\p{N}\p{Sc}%‰‱]|\b(?:" + CurrencyCodes + "|" + NumberWords.Replace(" ", "|") + "|" + OrdinalWords.Replace(" ", "|") +
-        @"|hundred|thousand|million|billion|trillion|half|quarter|AUD|USD|NZD|EUR|GBP|CAD|CHF|JPY|CNY|HKD|SGD|INR|KRW|ZAR|BRL|MXN|SEK|NOK|DKK|RUB|AED|SAR|k|m|bn|mn|percent|per|cent|" +
+        "|" + QuantityWords.Replace(" ", "|") +
+        @"|hundred|thousand|million|billion|trillion|AUD|USD|NZD|EUR|GBP|CAD|CHF|JPY|CNY|HKD|SGD|INR|KRW|ZAR|BRL|MXN|SEK|NOK|DKK|RUB|AED|SAR|k|m|bn|mn|percent|per|cent|" +
         @"Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|" +
         @"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -24,8 +27,13 @@ public static class SummaryValidator
 
     private const string FigureRejection = "A figure or date was not present in the transcript.";
     private static readonly Regex Quotation = new(
-        """(?:"(?<text>[^"]+)"|\u201c(?<text>[^\u201c\u201d]+)\u201d)[ \t]+\[(?<time>(?:[0-9]+:[0-5][0-9]|[0-9]{2,}):[0-5][0-9])\]""",
+        """(?:"(?<text>[^"]+)"|\u201c(?<text>[^\u201c\u201d]+)\u201d)[ \t]+\[(?<time>(?:[0-9]+:[0-5][0-9]|[0-9]{2,}):[0-5][0-9]) (?<channel>You|Others|Mixed)\]""",
         RegexOptions.CultureInvariant);
+    private static readonly Regex QuoteSpan = new("\"[^\"]*\"|\u201c[^\u201c\u201d]*\u201d", RegexOptions.CultureInvariant);
+    private static readonly Regex ContextWords = new(@"[\p{L}\p{N}]+|[-\u2013\u2212]", RegexOptions.CultureInvariant);
+    private static readonly Regex Qualifier = new(
+        @"^(?:to|through|-|and|or|per|not|no|never|none|up|at|least|most|about|around|approximately|roughly|under|over|below|above|less|more|than|between|nearly|almost|only|maximum|minimum|max|min)$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex Continuation = new(
         @"[\p{N}\p{Sc}%\u2030\u2031]|\b(?:kg|mg|g|km|cm|mm|metres?|meters?|miles?|litres?|liters?|hours?|minutes?|seconds?|days?|weeks?|months?|years?|millions?|billions?|trillions?|thousands?|hundreds?|bps|basis|points?|degrees?|ounces?|tonnes?|tons?|feet|inches|kilograms?|milligrams?|grams?|kilometres?|kilometers?|kilowatts?|watts?|mph|kph|Australian|US|Canadian|New Zealand)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -37,7 +45,12 @@ public static class SummaryValidator
         IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine)
     {
         if (string.IsNullOrWhiteSpace(reply)) return (null, "The response was empty.");
-        var lines = reply.Split('\n').Select(StripMarkdown).ToArray();
+        if (reply.EnumerateRunes().Any(r => Rune.GetUnicodeCategory(r) == UnicodeCategory.Format) || HasMixedScriptWord(reply))
+            return (null, "Invisible formatting and mixed-script words are not permitted.");
+        // Inspect the original characters before any Markdown is removed.
+        if (QuoteSpan.Matches(reply).Any(m => m.Value.IndexOfAny(['*', '_', '`', '\\']) >= 0))
+            return (null, "Quotes must not contain Markdown markers or escapes.");
+        var lines = reply.Split('\n');
         var items = new List<ActionItem>();
         var inActions = false;
         var actionHeadingLevel = 0;
@@ -52,7 +65,12 @@ public static class SummaryValidator
             var bullet = Regex.Match(line, @"^(?:[-*+] |[0-9]+[.)] +)(?:\[[ xX]\]\s*)?(.*)$");
             if (!heading.Success && !bullet.Success)
                 return (null, "Use only Markdown headings and list items.");
-            var content = heading.Success ? heading.Groups[1].Value.Trim().TrimEnd('#').Trim() : bullet.Groups[1].Value;
+            var originalContent = heading.Success ? heading.Groups[1].Value.Trim().TrimEnd('#').Trim() : bullet.Groups[1].Value;
+            var ownerContent = QuoteSpan.Replace(originalContent, match => new string(' ', match.Length));
+            var ownerPrefix = bullet.Success ? Regex.Match(ownerContent, @"^(?<owner>.+?):\s+(?<text>.+)$") : Match.Empty;
+            if (ownerPrefix.Success && Regex.IsMatch(ownerPrefix.Groups["owner"].Value, @"[^\p{L}\p{Nd}\s.'\u2019\-]"))
+                return (null, "An action-item owner must not contain markup.");
+            var content = StripMarkdown(originalContent);
             var invalidQuote = false;
             var remainder = Quotation.Replace(content, match =>
             {
@@ -70,7 +88,7 @@ public static class SummaryValidator
                 if (inActions) actionHeadingLevel = level;
                 continue;
             }
-            var action = Regex.Match(content, @"^(?<owner>[\p{L}\p{Nd}\s.'\u2019\-]+?):\s+(?<text>.+)$");
+            var action = ownerPrefix.Success ? Regex.Match(content, @"^(?<owner>.+?):\s+(?<text>.+)$") : Match.Empty;
             if (!action.Success)
             {
                 if (inActions) return (null, "An action item must use Owner: action form.");
@@ -96,7 +114,8 @@ public static class SummaryValidator
         if (quote.Length == 0) return false;
         foreach (var segment in transcript)
         {
-            if (seconds < Math.Floor(segment.Start.TotalSeconds) || seconds >= Math.Floor(segment.End.TotalSeconds)) continue;
+            if (segment.Channel.ToString() != quotation.Groups["channel"].Value ||
+                seconds < Math.Floor(segment.Start.TotalSeconds) || seconds >= Math.Floor(segment.End.TotalSeconds)) continue;
             var spoken = CollapseWhitespace(segment.Text);
             for (var start = spoken.IndexOf(quote, StringComparison.Ordinal); start >= 0;
                  start = spoken.IndexOf(quote, start + 1, StringComparison.Ordinal))
@@ -107,6 +126,9 @@ public static class SummaryValidator
                 var before = Regex.Match(spoken[..start], @"\S+\s*$").Value.Trim();
                 var after = Regex.Match(spoken[end..], """^[\s,.;:!?()\[\]"\u2019\u201d]*([^\s,.;:!?()\[\]"\u2019\u201d]+)""").Groups[1].Value;
                 if (Prefix.IsMatch(before) || FigureTrigger.IsMatch(after) || Continuation.IsMatch(after)) continue;
+                if (FigureTrigger.IsMatch(quote) && ContextWords.Matches(spoken[..start]).TakeLast(3)
+                    .Concat(ContextWords.Matches(spoken[end..]).Take(3))
+                    .Any(m => FigureTrigger.IsMatch(m.Value) || Qualifier.IsMatch(m.Value) || Continuation.IsMatch(m.Value))) continue;
                 return true;
             }
         }
@@ -131,7 +153,36 @@ public static class SummaryValidator
 
     private static string StripMarkdown(string line)
     {
-        var content = Regex.Replace(line, @"^( {0,3})\* ", "$1- ");
-        return Regex.Replace(content, @"[*_]+", "");
+        // Quotes are copied verbatim; only text outside them may lose emphasis.
+        var result = new StringBuilder();
+        var position = 0;
+        foreach (Match span in QuoteSpan.Matches(line))
+        {
+            result.Append(Regex.Replace(line[position..span.Index], @"[*_]+", ""));
+            result.Append(span.Value);
+            position = span.Index + span.Length;
+        }
+        return result.Append(Regex.Replace(line[position..], @"[*_]+", "")).ToString();
     }
+
+    private static bool HasMixedScriptWord(string text)
+    {
+        var scripts = new HashSet<int>();
+        foreach (var letter in text.EnumerateRunes())
+        {
+            if (Rune.IsLetter(letter))
+            {
+                var script = UnicodeLetterScripts.Get(letter.Value);
+                if (script < 0) return true;
+                if (script != 0) scripts.Add(script);
+                if (scripts.Count > 1) return true;
+            }
+            else if (Rune.GetUnicodeCategory(letter) is not (UnicodeCategory.NonSpacingMark or
+                UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark or
+                UnicodeCategory.DecimalDigitNumber or UnicodeCategory.ConnectorPunctuation))
+                scripts.Clear();
+        }
+        return false;
+    }
+
 }

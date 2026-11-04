@@ -8,7 +8,7 @@ public static class TranscriptChunker
         if (overlapTokens < 0 || overlapTokens >= maxTokens)
             throw new ArgumentOutOfRangeException(nameof(overlapTokens));
         var rendered = transcript.Select(s => includeTimestamps
-            ? $"[{(long)s.Start.TotalMinutes:00}:{s.Start.Seconds:00}] {s.Text}" : s.Text).ToArray();
+            ? $"[{(long)s.Start.TotalMinutes:00}:{s.Start.Seconds:00} {s.Channel}] {s.Text}" : s.Text).ToArray();
         var chunks = new List<string>();
         var start = 0;
         while (start < transcript.Count)

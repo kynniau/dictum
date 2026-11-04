@@ -42,7 +42,7 @@ public sealed class MeetingSummaryTests
     [InlineData("we paid: $100", "we paid: $100")]
     public void A_verbatim_quoted_figure_with_a_timestamp_passes(string spoken, string quote)
     {
-        var reply = "## Summary\n- \"" + quote + "\" [00:00]";
+        var reply = "## Summary\n- \"" + quote + "\" [00:00 You]";
         var result = SummaryValidator.Validate(reply, Transcript(spoken), General, "Ollama");
         Assert.Null(result.Rejection);
         Assert.Equal(reply, Assert.IsType<Dictum.Meetings.Summary>(result.Ok).Markdown);
@@ -66,16 +66,162 @@ public sealed class MeetingSummaryTests
     [InlineData("Fridayish", "Friday")]
     [InlineData("5 milligrams", "5")]
     [InlineData("5, kg", "5")]
+    [InlineData("10 to 20 dollars", "10")]
+    [InlineData("10 metric tonnes", "10")]
+    [InlineData("do not pay 500 dollars", "500 dollars")]
+    [InlineData("up to 500 dollars", "500 dollars")]
     public void Nonverbatim_or_incomplete_quotes_are_rejected(string spoken, string quote)
     {
-        Assert.Null(SummaryValidator.Validate("- \"" + quote + "\" [00:00]", Transcript(spoken), General, "Local").Ok);
+        Assert.Null(SummaryValidator.Validate("- \"" + quote + "\" [00:00 You]", Transcript(spoken), General, "Local").Ok);
     }
 
     [Theory]
-    [InlineData("- \"$100\" [00:01]")]
-    [InlineData("- \"$100\" [00:02]")]
-    [InlineData("- \"$100 million\" [00:00]")]
-    [InlineData("- \"$100\" [00:60]")]
+    [InlineData("to")]
+    [InlineData("through")]
+    [InlineData("-")]
+    [InlineData("and")]
+    [InlineData("or")]
+    [InlineData("per")]
+    [InlineData("not")]
+    [InlineData("no")]
+    [InlineData("never")]
+    [InlineData("none")]
+    [InlineData("up")]
+    [InlineData("at")]
+    [InlineData("least")]
+    [InlineData("most")]
+    [InlineData("about")]
+    [InlineData("around")]
+    [InlineData("approximately")]
+    [InlineData("roughly")]
+    [InlineData("under")]
+    [InlineData("over")]
+    [InlineData("below")]
+    [InlineData("above")]
+    [InlineData("less")]
+    [InlineData("more")]
+    [InlineData("than")]
+    [InlineData("between")]
+    [InlineData("nearly")]
+    [InlineData("almost")]
+    [InlineData("only")]
+    [InlineData("maximum")]
+    [InlineData("minimum")]
+    [InlineData("max")]
+    [InlineData("min")]
+    [InlineData("20")]
+    [InlineData("dozen")]
+    public void Figure_context_checks_three_words_in_both_directions(string context)
+    {
+        const string reply = "- \"500 dollars\" [00:00 You]";
+        Assert.Null(SummaryValidator.Validate(reply, Transcript(context + " please pay 500 dollars"), General, "Local").Ok);
+        Assert.Null(SummaryValidator.Validate(reply, Transcript("500 dollars payable please " + context), General, "Local").Ok);
+        Assert.NotNull(SummaryValidator.Validate(reply, Transcript(context + " please kindly pay 500 dollars"), General, "Local").Ok);
+        Assert.NotNull(SummaryValidator.Validate(reply, Transcript("500 dollars payable please kindly " + context), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("1_00 dollars")]
+    [InlineData("1*00 dollars")]
+    [InlineData("`100 dollars`")]
+    [InlineData("100\\ dollars")]
+    [InlineData("\\100 dollars")]
+    public void Quotes_with_markdown_or_escapes_are_rejected_even_if_spoken(string quote)
+    {
+        Assert.Null(SummaryValidator.Validate("- \"" + quote + "\" [00:00 You]", Transcript(quote), General, "Local").Ok);
+    }
+
+    [Fact]
+    public void Markdown_cannot_rewrite_a_quote_to_match_the_transcript()
+    {
+        Assert.Null(SummaryValidator.Validate("- \"1_00 dollars\" [00:00 You]", Transcript("100 dollars"), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("dozen")]
+    [InlineData("dozens")]
+    [InlineData("score")]
+    [InlineData("gross")]
+    [InlineData("pair")]
+    [InlineData("couple")]
+    [InlineData("twice")]
+    [InlineData("thrice")]
+    [InlineData("double")]
+    [InlineData("triple")]
+    [InlineData("quadruple")]
+    [InlineData("half")]
+    [InlineData("halves")]
+    [InlineData("quarter")]
+    [InlineData("quarters")]
+    [InlineData("single")]
+    [InlineData("once")]
+    [InlineData("several")]
+    [InlineData("multiple")]
+    public void Quantity_words_require_checked_quotes(string quantity)
+    {
+        Assert.Null(SummaryValidator.Validate("- " + quantity, Transcript(quantity), General, "Local").Ok);
+        Assert.NotNull(SummaryValidator.Validate("- \"" + quantity + "\" [00:00 You]", Transcript(quantity), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("Budget\u200B review")]
+    [InlineData("Budget\u200D review")]
+    [InlineData("Budget\u202E review")]
+    [InlineData("Budget\u2066 review")]
+    [InlineData("B\u0443dget review")]
+    [InlineData("B\u03C5dget review")]
+    [InlineData("\u03B1\u2C81")]
+    [InlineData("\u0627\u0780")]
+    public void Invisible_formatting_and_mixed_script_words_are_rejected(string text)
+    {
+        Assert.Null(SummaryValidator.Validate("- " + text, Transcript(text), General, "Local").Ok);
+        Assert.Null(SummaryValidator.Validate("- \"" + text + "\" [00:00 You]", Transcript(text), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("B. Invented")]
+    [InlineData("`A. Example`")]
+    [InlineData("**A. Example**")]
+    [InlineData("__A. Example__")]
+    public void Owner_prefixes_are_checked_in_every_section_and_cannot_contain_markup(string owner)
+    {
+        foreach (var heading in new[] { "", "## Discussion\n", "## Action items\n" })
+            Assert.Null(SummaryValidator.Validate(heading + "- " + owner + ": Review the budget.",
+                Transcript("A. Example discussed the budget."), General, "Local").Ok);
+    }
+
+    [Fact]
+    public void A_spoken_owner_in_a_non_action_section_passes()
+    {
+        Assert.NotNull(SummaryValidator.Validate("## Discussion\n- A. Example: Review the budget.",
+            Transcript("A. Example discussed the budget."), General, "Local").Ok);
+    }
+
+    [Theory]
+    [InlineData("You")]
+    [InlineData("Mixed")]
+    [InlineData("")]
+    public void A_quote_cannot_use_another_channel_or_omit_its_channel(string channel)
+    {
+        var segments = new[] { new Segment(TimeSpan.Zero, TimeSpan.FromSeconds(1), Channel.Others, "The fee is 10 to 20 dollars.") };
+        var citation = channel.Length == 0 ? "[00:00]" : "[00:00 " + channel + "]";
+        Assert.Null(SummaryValidator.Validate("- \"fee is 10 to 20 dollars\" " + citation, segments, General, "Local").Ok);
+    }
+
+    [Fact]
+    public void A_complete_range_with_the_matching_channel_passes()
+    {
+        const string reply = "- \"fee is 10 to 20 dollars\" [00:00 Others]";
+        var segments = new[] { new Segment(TimeSpan.Zero, TimeSpan.FromSeconds(1), Channel.Others, "The fee is 10 to 20 dollars.") };
+        var result = SummaryValidator.Validate(reply, segments, General, "Local");
+        Assert.Equal(reply, Assert.IsType<Dictum.Meetings.Summary>(result.Ok).Markdown);
+    }
+
+    [Theory]
+    [InlineData("- \"$100\" [00:01 You]")]
+    [InlineData("- \"$100\" [00:02 You]")]
+    [InlineData("- \"$100 million\" [00:00 You]")]
+    [InlineData("- \"$100\" [00:60 You]")]
     [InlineData("- \"$100\"")]
     public void Quotes_require_a_timestamp_in_the_single_matching_segment(string reply)
     {
@@ -86,9 +232,9 @@ public sealed class MeetingSummaryTests
     public void Curly_quotes_and_hour_timestamps_use_segment_start_inclusively_and_end_exclusively()
     {
         var segments = new[] { new Segment(TimeSpan.FromSeconds(3723), TimeSpan.FromSeconds(3725), Channel.You, "$100") };
-        Assert.NotNull(SummaryValidator.Validate("- \u201c$100\u201d [1:02:03]", segments, General, "Local").Ok);
-        Assert.NotNull(SummaryValidator.Validate("- \u201c$100\u201d [62:04]", segments, General, "Local").Ok);
-        Assert.Null(SummaryValidator.Validate("- \u201c$100\u201d [1:02:05]", segments, General, "Local").Ok);
+        Assert.NotNull(SummaryValidator.Validate("- \u201c$100\u201d [1:02:03 You]", segments, General, "Local").Ok);
+        Assert.NotNull(SummaryValidator.Validate("- \u201c$100\u201d [62:04 You]", segments, General, "Local").Ok);
+        Assert.Null(SummaryValidator.Validate("- \u201c$100\u201d [1:02:05 You]", segments, General, "Local").Ok);
     }
 
     [Theory]
@@ -110,8 +256,8 @@ public sealed class MeetingSummaryTests
 
     [Theory]
     [InlineData("## $100")]
-    [InlineData("- Review \"$100\" [00:00] and 5%.")]
-    [InlineData("- Review \"$100\" [00:00] and \"$101\" [00:00].")]
+    [InlineData("- Review \"$100\" [00:00 You] and 5%.")]
+    [InlineData("- Review \"$100\" [00:00 You] and \"$101\" [00:00 You].")]
     public void Figures_in_headings_or_beside_valid_quotes_are_rejected(string reply)
     {
         Assert.Null(SummaryValidator.Validate(reply, Transcript("$100"), General, "Local").Ok);
@@ -126,7 +272,7 @@ public sealed class MeetingSummaryTests
     [Fact]
     public void A_spoken_owner_can_have_a_quoted_figure_action()
     {
-        var result = SummaryValidator.Validate("## **Action items**\n* __A. Example__: Review \"$100\" [00:00].",
+        var result = SummaryValidator.Validate("## **Action items**\n* A. Example: Review \"$100\" [00:00 You].",
             Transcript("A. Example discussed $100"), General, "Local");
         Assert.NotNull(result.Ok);
         Assert.Equal("A. Example", Assert.Single(result.Ok.Items).Owner);
@@ -390,17 +536,17 @@ public sealed class MeetingSummaryTests
     }
 
     [Fact]
-    public async Task Chunk_prompts_include_each_segment_start_timestamp()
+    public async Task Chunk_prompts_include_each_segment_start_timestamp_and_channel()
     {
         var client = new ScriptedClient("## Summary", "## Summary");
         var segments = new[]
         {
             new Segment(TimeSpan.FromSeconds(723), TimeSpan.FromSeconds(725), Channel.You, "Budget review."),
-            new Segment(TimeSpan.FromSeconds(3723), TimeSpan.FromSeconds(3725), Channel.You, "Scope review.")
+            new Segment(TimeSpan.FromSeconds(3723), TimeSpan.FromSeconds(3725), Channel.Mixed, "Scope review.")
         };
         await new MeetingSummariser().SummariseAsync(MeetingId.New(), segments, General, client, "Local", default);
-        Assert.Contains("[12:03] Budget review.", client.Calls[0].User);
-        Assert.Contains("[62:03] Scope review.", client.Calls[0].User);
+        Assert.Contains("[12:03 You] Budget review.", client.Calls[0].User);
+        Assert.Contains("[62:03 Mixed] Scope review.", client.Calls[0].User);
         Assert.Contains("Use only headings and list items.", client.Calls[0].System);
         Assert.Contains("Never state a figure in your own words.", client.Calls[0].System);
     }
