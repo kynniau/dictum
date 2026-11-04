@@ -125,6 +125,7 @@ public static class SettingsFile
             ["sounds"] = new JsonObject { ["enabled"] = d.Sounds.Enabled },
             ["profanity"] = new JsonObject { ["mode"] = d.Profanity.Mode },
             ["ui"] = new JsonObject { ["view"] = d.Ui.View },
+            ["meetings"] = MeetingsJson(new Dictum.Meetings.MeetingsSettings()),
             ["fix_hotkey"] = null,
             ["log_level"] = d.LogLevel,
             ["log_transcripts"] = d.LogTranscripts,
@@ -132,6 +133,14 @@ public static class SettingsFile
         };
         return root.ToJsonString(WriteOptions);
     }
+
+    public static JsonObject MeetingsJson(Dictum.Meetings.MeetingsSettings settings) => new()
+    {
+        ["enabled"] = settings.Enabled, ["folder"] = settings.Folder,
+        ["keep_audio"] = settings.KeepAudio.ToString(), ["zoom_import"] = settings.ZoomImport.ToString(),
+        ["zoom_folder"] = settings.ZoomFolder, ["summary_engine"] = settings.SummaryEngine.ToString(),
+        ["summary_template"] = settings.SummaryTemplate, ["share_default"] = settings.ShareDefault.ToString(),
+    };
 
     /// <summary>Writes the default file if none exists. Returns true if it was created.</summary>
     public static bool CreateIfMissing(string path, string model, string? cleanupProvider = null, string? cleanupModel = null)

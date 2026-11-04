@@ -349,6 +349,7 @@ public sealed partial class AppShell : IDisposable
         Access.Dispose();
         _hook?.Dispose();
         _fixHook?.Dispose();
+        _meetingsWindow?.Shutdown();
         CloseWindows();
         _speech.Retire(); // quitting: a cloud speech request under way stops, and none starts, before the models and the provider client go
         _controller?.Dispose();

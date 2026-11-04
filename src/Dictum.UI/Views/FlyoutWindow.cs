@@ -29,6 +29,7 @@ internal sealed class FlyoutWindow : Window
     private static readonly string[] IndicatorLabels = ["Off", "Orb", "Edge", "Both"];
 
     private readonly AppShell _shell;
+    private readonly Meetings.MeetingsEntries _meetings;
     // One line, never wrapped (1.2 polish round 2: "Right" and "Ctrl" fell on two lines). It has the header's width under
     // "Dictum", the state and the switch; a line longer than that (a custom model's file name) ends in an ellipsis, whole in
     // its tooltip.
@@ -160,6 +161,7 @@ internal sealed class FlyoutWindow : Window
         var footerBox = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 10, 0, 0), Child = footer };
         footerBox[!Border.BorderBrushProperty] = new DynamicResourceExtension("HairlineBrush");
 
+        _meetings = new Meetings.MeetingsEntries(() => shell.MeetingsSettings, () => shell.OpenMeetings(start: true), () => shell.OpenMeetings());
         var body = Ui.Stack(14,
             header,
             _problemBox,
@@ -173,6 +175,7 @@ internal sealed class FlyoutWindow : Window
                 Ui.Line("Grammar assist", _grammar),
                 Ui.Line("Start and stop sounds", _sounds)),
             actions,
+            _meetings,
             footerBox);
         var panel = new Border
         {
@@ -233,6 +236,7 @@ internal sealed class FlyoutWindow : Window
 
     private void Refresh()
     {
+        _meetings.Refresh();
         _refreshing = true;
         try
         {
