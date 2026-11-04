@@ -328,7 +328,7 @@ duplicate: `IAudioCapture`, `CapturedAudio`, `AudioFiles.ReadWav`, `SpeechSegmen
 style, `ICredentialStore` (+ the tests' `FakeCredentialStore`), `AppPaths.ForRoots`, `ILog`.
 Namespaces: `Dictum.Audio`, `Dictum.Platform`, `Dictum.Llm`, `Dictum.Settings`, `Dictum.Storage`;
 new code lives in `Dictum.Meetings.*`. Test fixtures are synthesised (sine tones, silence,
-invented transcripts, names like "A. Example"); nothing real, nothing from `E:\Dictum private`.
+invented transcripts, names like "A. Example"); nothing real, nothing from the owner's private folder.
 Every lane runs `dotnet test` and reports the output verbatim; no "should pass".
 
 ### 13.1 Shared records (`Dictum.Meetings`)
