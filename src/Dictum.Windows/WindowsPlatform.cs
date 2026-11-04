@@ -85,6 +85,10 @@ public sealed class WindowsPlatform : IPlatform, IDisposable
 
     public IAudioCapture CreateCapture(ILog log) => new WasapiCapture(log);
 
+    public IAudioCapture? CreateLoopbackCapture(ILog log) => new LoopbackCapture(log);
+
+    public IAudioDecoder AudioDecoder { get; } = new MediaFoundationDecoder();
+
     public IReadOnlyList<AudioDeviceInfo> ListCaptureDevices() => CaptureDevices.List();
 
     public IStartupRegistration Startup => _startup.Value;

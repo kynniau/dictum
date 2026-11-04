@@ -66,6 +66,12 @@ public interface IPlatform
 
     IAudioCapture CreateCapture(ILog log);
 
+    /// <summary>A separate system-output track for meetings; null when the platform has no implementation.</summary>
+    IAudioCapture? CreateLoopbackCapture(ILog log);
+
+    /// <summary>The platform's existing recording-file decoder.</summary>
+    IAudioDecoder AudioDecoder { get; }
+
     IReadOnlyList<AudioDeviceInfo> ListCaptureDevices();
 
     // ---- Startup registration and single instance --------------------------------------------------------------------
