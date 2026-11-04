@@ -20,80 +20,109 @@ public static class SummaryValidator
         @"Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|" +
         @"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex Words = new(@"[\p{L}\p{Nd}]+(?:['’\-][\p{L}\p{Nd}]+)*", RegexOptions.CultureInvariant);
+    private static readonly Regex Words = new(@"[\p{L}\p{Nd}]+(?:['\u2019\-][\p{L}\p{Nd}]+)*", RegexOptions.CultureInvariant);
+
+    private const string FigureRejection = "A figure or date was not present in the transcript.";
+    private static readonly Regex Quotation = new(
+        """(?:"(?<text>[^"]+)"|\u201c(?<text>[^\u201c\u201d]+)\u201d)[ \t]+\[(?<time>(?:[0-9]+:[0-5][0-9]|[0-9]{2,}):[0-5][0-9])\]""",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex Continuation = new(
+        @"[\p{N}\p{Sc}%\u2030\u2031]|\b(?:kg|mg|g|km|cm|mm|metres?|meters?|miles?|litres?|liters?|hours?|minutes?|seconds?|days?|weeks?|months?|years?|millions?|billions?|trillions?|thousands?|hundreds?|bps|basis|points?|degrees?|ounces?|tonnes?|tons?|feet|inches|kilograms?|milligrams?|grams?|kilometres?|kilometers?|kilowatts?|watts?|mph|kph|Australian|US|Canadian|New Zealand)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex Prefix = new(
+        @"[\p{N}\p{Sc}+\u2212\u2013\u00b1-]|\b(?:minus|negative|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?|" + CurrencyCodes + @")\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static (MeetingSummary? Ok, string? Rejection) Validate(string reply,
         IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine)
     {
-        if (Html.IsMatch(reply)) return (null, "A figure or date was not present in the transcript.");
         if (string.IsNullOrWhiteSpace(reply)) return (null, "The response was empty.");
-        var rawLines = reply.Split('\n');
-        var lines = rawLines.Select(StripMarkdown).ToArray();
-        // Removing an interior marker must not turn arithmetic into an amount.
-        if (Regex.IsMatch(reply, @"\p{N}[*_`]+\p{N}"))
-            return (null, "A figure or date was not present in the transcript.");
-        // Segment separators are hard boundaries: a figure or owner cannot be assembled across speakers.
-        var spoken = transcript.Select(s => NormaliseFigure(s.Text)).ToArray();
-        var summaryText = string.Join("\n", lines);
-        foreach (var figure in FigurePhrases(summaryText))
-            if (!spoken.Any(segment => segment.Contains(figure, StringComparison.Ordinal)))
-                return (null, "A figure or date was not present in the transcript.");
-        var spokenCores = transcript.SelectMany(s => FigureCores(s.Text)).ToHashSet(StringComparer.Ordinal);
-        foreach (var core in FigureCores(summaryText))
-            if (!spokenCores.Contains(core))
-                return (null, "A figure or date was not present in the transcript.");
-        // A trailing rate connector omits its unit even though the amount core matches.
-        if (Regex.Matches(summaryText, @"(?<amount>\S+)\s+per\s*(?:[.!?;:]|$)",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
-            .Any(match => FigureTrigger.IsMatch(match.Groups["amount"].Value)))
-            return (null, "A figure or date was not present in the transcript.");
-
+        var lines = reply.Split('\n').Select(StripMarkdown).ToArray();
         var items = new List<ActionItem>();
         var inActions = false;
         var actionHeadingLevel = 0;
-        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        foreach (var rawLine in lines)
         {
-            var line = lines[lineIndex].Trim();
-            if (line.StartsWith('#'))
+            if (string.IsNullOrWhiteSpace(rawLine)) continue;
+            if (rawLine.StartsWith("    ") || rawLine.StartsWith('\t') || Html.IsMatch(rawLine) ||
+                Regex.IsMatch(rawLine, @"<[^>]*>|&[^;\s]+;|!?\[[^\]]*\]\s*(?:\(|\[)|\[[^\]]+\]:|[|]|\x60{3}|~{3}"))
+                return (null, "Use only Markdown headings and list items.");
+            var line = rawLine.Trim();
+            var heading = Regex.Match(line, @"^#+(.*)$");
+            var bullet = Regex.Match(line, @"^(?:[-*+] |[0-9]+[.)] +)(?:\[[ xX]\]\s*)?(.*)$");
+            if (!heading.Success && !bullet.Success)
+                return (null, "Use only Markdown headings and list items.");
+            var content = heading.Success ? heading.Groups[1].Value.Trim().TrimEnd('#').Trim() : bullet.Groups[1].Value;
+            var invalidQuote = false;
+            var remainder = Quotation.Replace(content, match =>
+            {
+                if (QuoteIsSpoken(match, transcript)) return "";
+                invalidQuote = true;
+                return match.Value;
+            });
+            if (invalidQuote || FigureTrigger.IsMatch(remainder)) return (null, FigureRejection);
+            if (heading.Success)
             {
                 var level = line.TakeWhile(c => c == '#').Count();
                 if (inActions && level > actionHeadingLevel)
                     return (null, "An action item must use Owner: action form.");
-                var heading = line.TrimStart('#').Trim().TrimEnd('#').Trim();
-                inActions = Regex.IsMatch(heading, @"^(?:action(?: items|s)?|next steps|tasks)\b", RegexOptions.IgnoreCase);
+                inActions = Regex.IsMatch(content, @"^(?:action(?: items|s)?|next steps|tasks)\b", RegexOptions.IgnoreCase);
                 if (inActions) actionHeadingLevel = level;
                 continue;
             }
-            if (line.Length == 0)
-            {
-                if (inActions && !string.IsNullOrWhiteSpace(rawLines[lineIndex]))
-                    return (null, "An action item must use Owner: action form.");
-                continue;
-            }
-            var bullet = Regex.Match(line, @"^(?:[-*+] |\d+[.)]\s+)(?:\[[ xX]\]\s*)?(.*)$");
-            if (!inActions && !bullet.Success) continue;
-            if (inActions && !bullet.Success)
-                return (null, "An action item must use Owner: action form.");
-            var content = bullet.Success ? bullet.Groups[1].Value : line;
-            var action = Regex.Match(content, @"^(?:\*\*)?(?<owner>[^:]+?)(?:\*\*)?:(?:\*\*)?\s+(?<text>.+)$");
+            var action = Regex.Match(content, @"^(?<owner>[\p{L}\p{Nd}\s.'\u2019\-]+?):\s+(?<text>.+)$");
             if (!action.Success)
             {
                 if (inActions) return (null, "An action item must use Owner: action form.");
                 continue;
             }
-            var owner = action.Groups["owner"].Value.Trim().Trim('*');
+            var owner = action.Groups["owner"].Value.Trim();
             if (owner != "Others" && !transcript.Any(s => ContainsWordSequence(s.Text, owner)))
                 return (null, "An action-item owner was not present in the transcript.");
             items.Add(new(owner, action.Groups["text"].Value));
         }
-        // simplification: validation checks figures and named owners, not semantic entailment; retire when a measured claim verifier is available.
+        // simplification: quote lookup checks figures and named owners, not semantic entailment.
         return (new MeetingSummary(reply, engine, template.Id, DateTimeOffset.UtcNow, items), null);
     }
+
+    private static bool QuoteIsSpoken(Match quotation, IReadOnlyList<Segment> transcript)
+    {
+        var parts = quotation.Groups["time"].Value.Split(':');
+        if (!long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var leading)) return false;
+        var seconds = parts.Length == 3
+            ? leading * 3600.0 + int.Parse(parts[1], CultureInfo.InvariantCulture) * 60 + int.Parse(parts[2], CultureInfo.InvariantCulture)
+            : leading * 60.0 + int.Parse(parts[1], CultureInfo.InvariantCulture);
+        var quote = CollapseWhitespace(quotation.Groups["text"].Value);
+        if (quote.Length == 0) return false;
+        foreach (var segment in transcript)
+        {
+            if (seconds < Math.Floor(segment.Start.TotalSeconds) || seconds >= Math.Floor(segment.End.TotalSeconds)) continue;
+            var spoken = CollapseWhitespace(segment.Text);
+            for (var start = spoken.IndexOf(quote, StringComparison.Ordinal); start >= 0;
+                 start = spoken.IndexOf(quote, start + 1, StringComparison.Ordinal))
+            {
+                var end = start + quote.Length;
+                if (start > 0 && IsWordCharacter(spoken[start - 1]) ||
+                    end < spoken.Length && IsWordCharacter(spoken[end])) continue;
+                var before = Regex.Match(spoken[..start], @"\S+\s*$").Value.Trim();
+                var after = Regex.Match(spoken[end..], """^[\s,.;:!?()\[\]"\u2019\u201d]*([^\s,.;:!?()\[\]"\u2019\u201d]+)""").Groups[1].Value;
+                if (Prefix.IsMatch(before) || FigureTrigger.IsMatch(after) || Continuation.IsMatch(after)) continue;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsWordCharacter(char value) => char.IsLetterOrDigit(value) || value == '_' ||
+        CharUnicodeInfo.GetUnicodeCategory(value) is UnicodeCategory.NonSpacingMark or
+            UnicodeCategory.SpacingCombiningMark or UnicodeCategory.OtherNumber;
+
+    private static string CollapseWhitespace(string value) => Regex.Replace(value, @"\s+", " ").Trim();
 
     private static bool ContainsWordSequence(string text, string owner)
     {
         var name = Words.Matches(owner).Select(m => m.Value).ToArray();
-        if (name.Length == 0 || !Regex.IsMatch(owner, @"^[\p{L}\p{Nd}\s.'’\-]+$")) return false;
+        if (name.Length == 0 || !Regex.IsMatch(owner, @"^[\p{L}\p{Nd}\s.'\u2019\-]+$")) return false;
         var words = Words.Matches(text).Select(m => m.Value).ToArray();
         for (var i = 0; i <= words.Length - name.Length; i++)
             if (words.Skip(i).Take(name.Length).SequenceEqual(name, StringComparer.OrdinalIgnoreCase)) return true;
@@ -102,69 +131,7 @@ public static class SummaryValidator
 
     private static string StripMarkdown(string line)
     {
-        // Retain the list structure when an asterisk is a bullet rather than emphasis.
-        var content = Regex.Replace(line, @"^(\s*)\*\s+", "$1- ");
-        return Regex.Replace(content, @"[*_`]+", "");
-    }
-
-    private static IEnumerable<string> FigurePhrases(string text)
-    {
-        var pieces = Regex.Matches(text, @"\S+").Select(m => m.Value).ToArray();
-        for (var i = 0; i < pieces.Length; i++)
-        {
-            if (!FigureTrigger.IsMatch(pieces[i])) continue;
-            var start = i > 0 && Regex.IsMatch(pieces[i - 1], @"^(?:[-−–+±]|minus|negative)$",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) ? i - 1 : i;
-            var phrase = new List<string>();
-            for (var j = start; j < pieces.Length && j <= i + 3; j++)
-            {
-                var piece = pieces[j];
-                // Sentence punctuation ends lookahead. A point touching a numeric
-                // character may be a decimal point, including a leading or trailing one.
-                var boundary = Regex.Match(piece, @"(?<!\p{N})\.(?!\p{N})|[!?;:]");
-                if (boundary.Success)
-                {
-                    // Never discard a trigger following punctuation in the same word.
-                    if (FigureTrigger.IsMatch(piece[boundary.Index..])) phrase.Add(piece);
-                    else if (boundary.Index > 0) phrase.Add(piece[..boundary.Index]);
-                    break;
-                }
-                phrase.Add(piece);
-            }
-            yield return NormaliseFigure(string.Join(" ", phrase));
-        }
-    }
-
-    private static IEnumerable<string> FigureCores(string text)
-    {
-        var pieces = Regex.Matches(NormaliseFigure(text), @"\S+").Select(m => m.Value).ToArray();
-        var run = new List<string>();
-        for (var i = 0; i < pieces.Length; i++)
-        {
-            var piece = pieces[i].TrimEnd('.', ',', '!', '?', ';', ':');
-            // "per" is a trigger only as part of "per cent"; rate units are
-            // still protected by the phrase check.
-            var isTrigger = FigureTrigger.IsMatch(piece) &&
-                (piece != "per" || i + 1 < pieces.Length && pieces[i + 1].TrimEnd('.', ',', '!', '?', ';', ':') == "cent");
-            if (isTrigger)
-            {
-                if (run.Count == 0 && i > 0 && Regex.IsMatch(pieces[i - 1], @"^(?:[-−–+±]|minus|negative)$"))
-                    run.Add(pieces[i - 1]);
-                run.Add(piece);
-            }
-            if ((!isTrigger || Regex.IsMatch(pieces[i], @"[.!?;:]$")) && run.Count > 0)
-            {
-                yield return NormaliseFigure(string.Join(" ", run));
-                run.Clear();
-            }
-        }
-        if (run.Count > 0) yield return NormaliseFigure(string.Join(" ", run));
-    }
-
-    private static string NormaliseFigure(string figure)
-    {
-        var normal = figure.ToLowerInvariant();
-        normal = Regex.Replace(normal, @"(?<=\p{Nd})[, \u00a0](?=\p{Nd}{3}(?:[^\p{Nd}]|$))", "");
-        return Regex.Replace(normal, @"\s+", " ").Trim();
+        var content = Regex.Replace(line, @"^( {0,3})\* ", "$1- ");
+        return Regex.Replace(content, @"[*_]+", "");
     }
 }

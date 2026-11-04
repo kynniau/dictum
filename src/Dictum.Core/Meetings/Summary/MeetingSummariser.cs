@@ -20,7 +20,7 @@ public sealed class MeetingSummariser
         SummaryTemplate template, ILlmClient client, string engineLabel, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var chunks = TranscriptChunker.Chunk(transcript, _maxTokens, _overlapTokens);
+        var chunks = TranscriptChunker.Chunk(transcript, _maxTokens, _overlapTokens, includeTimestamps: true);
         if (chunks.Count == 0) return Unwritten(template, engineLabel);
         var system = SummaryPrompt.System(template);
         var drafts = new List<string>();
