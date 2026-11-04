@@ -185,6 +185,74 @@ public class MeetingStoreTests
     }
 
     [Fact]
+    public void Null_metadata_is_skipped_without_hiding_other_meetings()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var damaged = store.Create(fixture.Meta()); var other = store.Create(fixture.Meta());
+        File.WriteAllText(fixture.At(damaged, "meta.json"), "null");
+        Assert.Equal(other, Assert.Single(fixture.Store().List()).Id);
+    }
+
+    [Fact]
+    public void Metadata_with_a_different_id_is_skipped_without_hiding_other_meetings()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var damaged = store.Create(fixture.Meta()); var other = store.Create(fixture.Meta());
+        var meta = store.Read(damaged) with { Id = other };
+        File.WriteAllText(fixture.At(damaged, "meta.json"), JsonSerializer.Serialize(meta));
+        Assert.Equal(other, Assert.Single(fixture.Store().List()).Id);
+    }
+
+    [Fact]
+    public void Missing_transcript_is_empty_and_does_not_block_search()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var missing = store.Create(fixture.Meta()); var other = fixture.Populate(store);
+        File.Delete(fixture.At(missing, "transcript.json.enc"));
+        var reopened = fixture.Store();
+        Assert.Empty(reopened.ReadTranscript(missing));
+        Assert.Equal(other, Assert.Single(reopened.Search("budget")).Item1.Id);
+    }
+
+    [Fact]
+    public void Encrypted_video_is_reported_when_the_metadata_flag_is_stale()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var id = store.Create(fixture.Meta());
+        var stale = store.Read(id);
+        Assert.False(stale.HasVideo);
+        var source = Path.Combine(fixture.Root, "invented.mp4");
+        File.WriteAllBytes(source, [0, 1, 2, 3]);
+        store.WriteVideo(id, source);
+        File.WriteAllText(fixture.At(id, "meta.json"), JsonSerializer.Serialize(stale));
+        var reopened = fixture.Store();
+        Assert.True(reopened.Read(id).HasVideo);
+        Assert.True(Assert.Single(reopened.List()).HasVideo);
+    }
+
+    [Fact]
+    public void Delete_removes_leftover_metadata_temps_before_scrubbing_metadata()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var id = store.Create(fixture.Meta());
+        var metadata = fixture.At(id, "meta.json");
+        var temp = metadata + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        File.Copy(metadata, temp);
+        Assert.NotEmpty(JsonSerializer.Deserialize<MeetingMeta>(File.ReadAllText(temp))!.Wraps);
+        var otherTemp = fixture.At(id, "transcript.json.enc.leftover.tmp");
+        File.WriteAllBytes(otherTemp, [1, 2, 3]);
+        using (var locked = new FileStream(metadata, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.Throws<IOException>(() => store.Delete(id));
+            Assert.False(File.Exists(temp));
+            Assert.False(File.Exists(otherTemp));
+        }
+        store.Delete(id);
+        Assert.False(File.Exists(temp));
+        Assert.False(Directory.Exists(Path.Combine(fixture.Root, id.ToString())));
+    }
+
+    [Fact]
     public void Unreadable_metadata_is_skipped_without_blocking_other_meetings()
     {
         using var fixture = new MeetingFixture(); var store = fixture.Store();

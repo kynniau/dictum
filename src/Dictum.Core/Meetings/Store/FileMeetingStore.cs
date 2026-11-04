@@ -87,7 +87,7 @@ public sealed class FileMeetingStore : IMeetingStore
         {
             var meta = JsonRead<MeetingMeta>(FileAt(id, "meta.json"));
             if (meta.Id != id) throw new InvalidDataException("Meeting id mismatch.");
-            return meta;
+            return meta with { HasVideo = meta.HasVideo || Directory.EnumerateFiles(Folder(id), "video.*.enc").Any() };
         }
     }
     private static string Identity(MeetingId id, string fileName) => $"{id.Value}/{fileName}";
@@ -109,7 +109,8 @@ public sealed class FileMeetingStore : IMeetingStore
     private string[] Batches(MeetingId id) => Directory.GetFiles(Folder(id), "transcript-batch-*.json.enc").Order(StringComparer.Ordinal).ToArray();
     private TranscriptSnapshot Transcript(MeetingId id, byte[] key)
     {
-        var snapshot = EncryptedRead<TranscriptSnapshot>(id, FileAt(id, "transcript.json.enc"), key);
+        var path = FileAt(id, "transcript.json.enc");
+        var snapshot = File.Exists(path) ? EncryptedRead<TranscriptSnapshot>(id, path, key) : new TranscriptSnapshot([], []);
         var included = snapshot.IncludedBatches.ToHashSet(StringComparer.Ordinal);
         foreach (var batch in Batches(id))
             if (!included.Contains(Path.GetFileName(batch))) snapshot.Segments.AddRange(EncryptedRead<List<Segment>>(id, batch, key));
@@ -187,7 +188,7 @@ public sealed class FileMeetingStore : IMeetingStore
             var name = Path.GetFileName(directory);
             if (name.Length != 32 || name.Any(c => !char.IsAsciiHexDigitLower(c))) continue;
             try { meetings.Add(Read(new MeetingId(name))); }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
             {
                 // An interrupted delete or damaged metadata must not hide other meetings.
             }
@@ -242,19 +243,30 @@ public sealed class FileMeetingStore : IMeetingStore
             var folder = Folder(id);
             if (!Path.GetFullPath(folder).StartsWith(Root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Invalid meeting folder.");
+            // Remove crash leftovers first: metadata temp files can contain valid key wraps.
+            if (Directory.Exists(folder))
+                foreach (var temp in Directory.GetFiles(folder, "*.tmp"))
+                {
+                    Scrub(temp);
+                    File.Delete(temp);
+                }
             // Scrub without parsing, so deletion can resume after damaged or zero-filled metadata.
             // simplification: logical overwrites cannot erase SSD snapshots/backups; retire if a
             // platform supplies guaranteed secure erasure. Existing external copies cannot be revoked.
             if (File.Exists(FileAt(id, "meta.json")))
             {
-                using var stream = new FileStream(FileAt(id, "meta.json"), FileMode.Open, FileAccess.Write, FileShare.None);
-                var zeros = new byte[checked((int)stream.Length)];
-                stream.Write(zeros); stream.Flush(true);
+                Scrub(FileAt(id, "meta.json"));
             }
             if (Directory.Exists(folder)) Directory.Delete(folder, true);
             LastSnapshot.Remove(FileAt(id, "transcript.json.enc"));
             RebuildIndex();
         }
+    }
+    private static void Scrub(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
+        var zeros = new byte[checked((int)stream.Length)];
+        stream.Write(zeros); stream.Flush(true);
     }
     public string ExportMarkdown(MeetingId id)
     {
