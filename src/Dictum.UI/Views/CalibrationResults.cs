@@ -238,7 +238,7 @@ internal sealed partial class CalibrationWindow
         }
         var grammar = new CheckBox { Content = "Grammar assist for this user", IsChecked = _host.Settings().Llm.GrammarAssist };
         ToolTip.SetTip(grammar, "For speakers whose first language is not English: the clean-up also fixes articles, tenses, prepositions and word order, keeping every fact and name.");
-        grammar.IsCheckedChanged += (_, _) => WriteGrammar(grammar.IsChecked == true);
+        grammar.IsCheckedChanged += (_, _) => WriteGrammar(grammar);
         boxes.Add(grammar);
         var note = recommended is null
             ? Ui.Text(_session.Results.Count == 0 ? "Run the test to see suggestions." : "No combination is under the latency ceiling, so there is nothing to base suggestions on.", "caption")

@@ -42,12 +42,12 @@ public class CalibrationUseTests
     /// Three results: tiny.en greedy (what the profile uses), tiny.en with beam search, and base.en greedy, which has the fewest
     /// errors, so it is the recommended one. Both models are on disk (empty, of the catalogue's sizes), so a switch to either loads.
     /// </summary>
-    private static (AppShell Shell, CalibrationWindow Window) Open(Scratch scratch)
+    private static (AppShell Shell, CalibrationWindow Window) Open(Scratch scratch, ILog? log = null)
     {
         File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
         Create(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin", TinyEnBytes);
         Create(scratch.Paths.DefaultModelsDir, "ggml-base.en.bin", ModelCatalog.Find("base.en")!.Bytes);
-        var (shell, _, _) = scratch.Shell(SpeechModels());
+        var (shell, _, _) = scratch.Shell(SpeechModels(), log: log);
         shell.Reload(userRequested: false);
         var window = new CalibrationWindow(shell);
         window.Show();
@@ -209,4 +209,56 @@ public class CalibrationUseTests
         Assert.False(Host(() => "base.en").InUse(Combo("tiny.en", 0, 0))); // the file says tiny.en, the app runs base.en
         Assert.True(Host(() => "base.en").InUse(Combo("base.en", 0, 0)));
     }
+
+    private const string GrammarOn = """{ "hotkey": "F24", "whisper": { "model": "tiny.en", "beam_size": 0 }, "llm": { "provider": "none", "grammar_assist": true } }""";
+
+    private static CheckBox Grammar(ILogical window) => All<CheckBox>(window).Single(c => c.Content as string == "Grammar assist for this user");
+
+    /// <summary>
+    /// Pin 7 (sibling caller of Write): when settings.json cannot be written, unticking "Grammar assist for this user" says the
+    /// write-failed text in the status line and puts the box back to the saved value (ticked), and that put-back is not written
+    /// again: the writer's refusal ("Notice: ...", logged once per refusal) is seen exactly once.
+    /// </summary>
+    [Fact]
+    public Task Grammar_box_when_the_file_cannot_be_written_says_so_and_goes_back_to_the_saved_value() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(GrammarOn);
+        var log = new RecordingLog();
+        var (shell, window) = Open(scratch, log);
+        var box = Grammar(window);
+        Assert.True(box.IsChecked);
+        File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.ReadOnly);
+        try
+        {
+            box.IsChecked = false;
+
+            Assert.Contains(ModelCoordinator.WriteFailed, Texts(window));
+            Assert.True(box.IsChecked); // the saved value, not the unsaved choice
+            Assert.True(shell.Settings.Llm.GrammarAssist);
+            Assert.Equal(1, log.Lines.Count(l => l.Message == $"Notice: {ModelCoordinator.WriteFailed}")); // the put-back did not write again
+        }
+        finally
+        {
+            File.SetAttributes(scratch.Paths.SettingsFile, FileAttributes.Normal);
+        }
+        window.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>The control for pin 7: with a writable file the same untick is saved, the box stays unticked and nothing is said.</summary>
+    [Fact]
+    public Task Grammar_box_when_the_file_is_written_stays_as_chosen() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch(GrammarOn);
+        var (shell, window) = Open(scratch);
+        var box = Grammar(window);
+
+        box.IsChecked = false;
+
+        Assert.False(box.IsChecked);
+        Assert.False(shell.Settings.Llm.GrammarAssist);
+        Assert.DoesNotContain(ModelCoordinator.WriteFailed, Texts(window));
+        window.Close();
+        shell.Dispose();
+    });
 }
