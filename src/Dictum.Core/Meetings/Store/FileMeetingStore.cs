@@ -35,15 +35,15 @@ public sealed class FileMeetingStore : IMeetingStore
     private string FileAt(MeetingId id, string name) => Path.Combine(Folder(id), name);
     private static void JsonWrite<T>(string path, T value) => AtomicFile.Write(path, s => JsonSerializer.Serialize(s, value));
     private static T JsonRead<T>(string path) => JsonSerializer.Deserialize<T>(File.ReadAllBytes(path)) ?? throw new InvalidDataException("Invalid meeting data.");
-    private void EncryptedWrite<T>(string path, T value, byte[] key)
+    private void EncryptedWrite<T>(MeetingId id, string path, T value, byte[] key)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value);
-        try { using var input = new MemoryStream(bytes); MeetingCrypto.Encrypt(input, path, key); }
+        try { using var input = new MemoryStream(bytes); MeetingCrypto.Encrypt(input, path, key, Identity(id, Path.GetFileName(path))); }
         finally { CryptographicOperations.ZeroMemory(bytes); }
     }
-    private static T EncryptedRead<T>(string path, byte[] key)
+    private static T EncryptedRead<T>(MeetingId id, string path, byte[] key)
     {
-        using var input = MeetingCrypto.OpenDecrypted(path, key);
+        using var input = MeetingCrypto.OpenDecrypted(path, key, Identity(id, Path.GetFileName(path)));
         return JsonSerializer.Deserialize<T>(input) ?? throw new InvalidDataException("Invalid meeting data.");
     }
     private T WithKey<T>(MeetingId id, Func<byte[], T> action)
@@ -73,7 +73,7 @@ public sealed class FileMeetingStore : IMeetingStore
                 var wrap = MeetingCrypto.Wrap(content, owner, "owner");
                 Directory.CreateDirectory(folder);
                 JsonWrite(FileAt(meta.Id, "meta.json"), meta with { Wraps = [wrap] });
-                EncryptedWrite(FileAt(meta.Id, "transcript.json.enc"), new TranscriptSnapshot([], []), content);
+                EncryptedWrite(meta.Id, FileAt(meta.Id, "transcript.json.enc"), new TranscriptSnapshot([], []), content);
                 RebuildIndex();
                 return meta.Id;
             }
@@ -90,6 +90,7 @@ public sealed class FileMeetingStore : IMeetingStore
             return meta;
         }
     }
+    private static string Identity(MeetingId id, string fileName) => $"{id.Value}/{fileName}";
     private static string AudioName(Channel channel) => channel switch
     {
         Channel.You => "audio-you.wav.enc", Channel.Others => "audio-others.wav.enc",
@@ -97,21 +98,21 @@ public sealed class FileMeetingStore : IMeetingStore
     };
     public void WriteAudio(MeetingId id, Channel channel, Stream wav16k)
     {
-        lock (Gate) WithKey(id, key => { MeetingCrypto.Encrypt(wav16k, FileAt(id, AudioName(channel)), key); return true; });
+        lock (Gate) WithKey(id, key => { MeetingCrypto.Encrypt(wav16k, FileAt(id, AudioName(channel)), key, Identity(id, AudioName(channel))); return true; });
     }
     public Stream OpenAudio(MeetingId id, Channel channel)
     {
-        lock (Gate) return WithKey(id, key => MeetingCrypto.OpenDecrypted(FileAt(id, AudioName(channel)), key));
+        lock (Gate) return WithKey(id, key => MeetingCrypto.OpenDecrypted(FileAt(id, AudioName(channel)), key, Identity(id, AudioName(channel))));
     }
 
     private sealed record TranscriptSnapshot(List<Segment> Segments, List<string> IncludedBatches);
     private string[] Batches(MeetingId id) => Directory.GetFiles(Folder(id), "transcript-batch-*.json.enc").Order(StringComparer.Ordinal).ToArray();
     private TranscriptSnapshot Transcript(MeetingId id, byte[] key)
     {
-        var snapshot = EncryptedRead<TranscriptSnapshot>(FileAt(id, "transcript.json.enc"), key);
+        var snapshot = EncryptedRead<TranscriptSnapshot>(id, FileAt(id, "transcript.json.enc"), key);
         var included = snapshot.IncludedBatches.ToHashSet(StringComparer.Ordinal);
         foreach (var batch in Batches(id))
-            if (!included.Contains(Path.GetFileName(batch))) snapshot.Segments.AddRange(EncryptedRead<List<Segment>>(batch, key));
+            if (!included.Contains(Path.GetFileName(batch))) snapshot.Segments.AddRange(EncryptedRead<List<Segment>>(id, batch, key));
         return snapshot;
     }
     public void AppendSegments(MeetingId id, IEnumerable<Segment> segments)
@@ -123,7 +124,7 @@ public sealed class FileMeetingStore : IMeetingStore
             // Durable encrypted batches avoid buffering uncommitted transcript in memory. A snapshot
             // records incorporated batch names before cleanup, making interruption of cleanup harmless.
             var batch = $"transcript-batch-{DateTime.UtcNow.Ticks:D19}-{Guid.NewGuid():N}.json.enc";
-            EncryptedWrite(FileAt(id, batch), added, key);
+            EncryptedWrite(id, FileAt(id, batch), added, key);
             var path = FileAt(id, "transcript.json.enc");
             var now = Stopwatch.GetTimestamp();
             if (!LastSnapshot.TryGetValue(path, out var last) || Stopwatch.GetElapsedTime(last, now) >= TimeSpan.FromSeconds(1))
@@ -131,7 +132,7 @@ public sealed class FileMeetingStore : IMeetingStore
                 var all = Transcript(id, key);
                 var batches = Batches(id);
                 var snapshot = new TranscriptSnapshot(all.Segments, batches.Select(Path.GetFileName).Select(n => n!).ToList());
-                EncryptedWrite(path, snapshot, key);
+                EncryptedWrite(id, path, snapshot, key);
                 LastSnapshot[path] = now;
                 foreach (var file in batches) File.Delete(file);
             }
@@ -150,7 +151,7 @@ public sealed class FileMeetingStore : IMeetingStore
     {
         lock (Gate) WithKey(id, key =>
         {
-            EncryptedWrite(FileAt(id, "summary.md.enc"), summary, key);
+            EncryptedWrite(id, FileAt(id, "summary.md.enc"), summary, key);
             JsonWrite(FileAt(id, "meta.json"), Read(id) with { SummaryEngine = summary.Engine, SummaryTemplate = summary.Template });
             RebuildIndex();
             return true;
@@ -158,7 +159,7 @@ public sealed class FileMeetingStore : IMeetingStore
     }
     public Summary? ReadSummary(MeetingId id)
     {
-        lock (Gate) return WithKey(id, key => File.Exists(FileAt(id, "summary.md.enc")) ? EncryptedRead<Summary>(FileAt(id, "summary.md.enc"), key) : null);
+        lock (Gate) return WithKey(id, key => File.Exists(FileAt(id, "summary.md.enc")) ? EncryptedRead<Summary>(id, FileAt(id, "summary.md.enc"), key) : null);
     }
     public void WriteVideo(MeetingId id, string sourcePath)
     {
@@ -166,7 +167,7 @@ public sealed class FileMeetingStore : IMeetingStore
         if (extension.Length == 0 || extension.Any(c => !char.IsAsciiLetterOrDigit(c))) throw new ArgumentException("Invalid video extension.");
         lock (Gate) WithKey(id, key =>
         {
-            MeetingCrypto.EncryptFile(sourcePath, FileAt(id, $"video.{extension}.enc"), key);
+            MeetingCrypto.EncryptFile(sourcePath, FileAt(id, $"video.{extension}.enc"), key, Identity(id, $"video.{extension}.enc"));
             JsonWrite(FileAt(id, "meta.json"), Read(id) with { HasVideo = true });
             RebuildIndex();
             return true;

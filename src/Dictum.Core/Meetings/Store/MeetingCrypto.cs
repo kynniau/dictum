@@ -51,15 +51,17 @@ public static class MeetingCrypto
         catch { CryptographicOperations.ZeroMemory(key); throw; }
     }
 
-    public static void EncryptFile(string plainPath, string cipherPath, byte[] contentKey)
+    public static void EncryptFile(string plainPath, string cipherPath, byte[] contentKey, string identity)
     {
         using var input = File.OpenRead(plainPath);
-        Encrypt(input, cipherPath, contentKey);
+        Encrypt(input, cipherPath, contentKey, identity);
     }
 
-    internal static void Encrypt(Stream input, string cipherPath, byte[] key) => AtomicFile.Write(cipherPath, output =>
+    internal static void Encrypt(Stream input, string cipherPath, byte[] key, string identity) => AtomicFile.Write(cipherPath, output =>
     {
-        // The authenticated header binds chunks to this file. Sequence and a mandatory terminal
+        ArgumentException.ThrowIfNullOrWhiteSpace(identity);
+        // The caller's identity binds the meeting and file role; the random header binds this
+        // particular encryption. Sequence and a mandatory terminal
         // chunk detect reordering, splicing and truncation, including exact chunk boundaries.
         var header = Magic.Concat(RandomNumberGenerator.GetBytes(16)).ToArray();
         output.Write(header);
@@ -71,7 +73,7 @@ public static class MeetingCrypto
             while (true)
             {
                 var length = input.ReadAtLeast(plain, ChunkSize, false);
-                var aad = Aad(header, sequence++, length);
+                var aad = Aad(header, sequence++, length, identity);
                 var nonce = RandomNumberGenerator.GetBytes(12);
                 var cipher = new byte[length];
                 var tag = new byte[16];
@@ -86,36 +88,42 @@ public static class MeetingCrypto
         finally { CryptographicOperations.ZeroMemory(plain); }
     });
 
-    private static byte[] Aad(byte[] header, long sequence, int length)
+    private static byte[] Aad(byte[] header, long sequence, int length, string identity)
     {
-        var aad = new byte[header.Length + 12];
+        var identityBytes = Encoding.UTF8.GetBytes(identity);
+        var aad = new byte[header.Length + 12 + identityBytes.Length];
         header.CopyTo(aad, 0);
         BinaryPrimitives.WriteInt64LittleEndian(aad.AsSpan(header.Length), sequence);
         BinaryPrimitives.WriteInt32LittleEndian(aad.AsSpan(header.Length + 8), length);
+        identityBytes.CopyTo(aad, header.Length + 12);
         return aad;
     }
 
-    public static void DecryptFile(string cipherPath, string plainPath, byte[] contentKey)
+    public static void DecryptFile(string cipherPath, string plainPath, byte[] contentKey, string identity)
     {
-        using var input = OpenDecrypted(cipherPath, contentKey);
+        using var input = OpenDecrypted(cipherPath, contentKey, identity);
         AtomicFile.Write(plainPath, input.CopyTo);
     }
 
-    public static Stream OpenDecrypted(string cipherPath, byte[] contentKey) => new DecryptedStream(cipherPath, contentKey);
+    public static Stream OpenDecrypted(string cipherPath, byte[] contentKey, string identity) => new DecryptedStream(cipherPath, contentKey, identity);
 
     private sealed class DecryptedStream : Stream
     {
         private readonly FileStream _input;
         private readonly AesGcm _aes;
         private readonly byte[] _header = new byte[24];
+        private readonly string _identity;
+        private bool _verified;
         private byte[] _plain = [];
         private int _position;
         private long _sequence;
         private bool _ended;
         private bool _failed;
 
-        public DecryptedStream(string path, byte[] key)
+        public DecryptedStream(string path, byte[] key, string identity)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identity);
+            _identity = identity;
             _aes = new AesGcm(key, 16);
             _input = File.OpenRead(path);
             try
@@ -132,28 +140,22 @@ public static class MeetingCrypto
             if (destination.IsEmpty || _ended) return 0;
             try
             {
+                if (!_verified)
+                {
+                    // simplification: two passes over the file; retire if a single-pass committing format is adopted
+                    while (!_ended) ReadChunk();
+                    CryptographicOperations.ZeroMemory(_plain);
+                    _plain = [];
+                    _input.Position = _header.Length;
+                    _sequence = 0;
+                    _position = 0;
+                    _ended = false;
+                    _verified = true;
+                }
                 if (_position == _plain.Length)
                 {
-                    CryptographicOperations.ZeroMemory(_plain);
-                    Span<byte> size = stackalloc byte[4];
-                    _input.ReadExactly(size);
-                    var length = BinaryPrimitives.ReadInt32LittleEndian(size);
-                    if (length < 0 || length > ChunkSize) throw new CryptographicException("Invalid encrypted chunk length.");
-                    var nonce = new byte[12];
-                    _input.ReadExactly(nonce);
-                    var cipher = new byte[length];
-                    _input.ReadExactly(cipher);
-                    var tag = new byte[16];
-                    _input.ReadExactly(tag);
-                    _plain = new byte[length];
-                    _position = 0;
-                    _aes.Decrypt(nonce, cipher, tag, _plain, Aad(_header, _sequence++, length));
-                    if (length == 0)
-                    {
-                        if (_input.ReadByte() != -1) throw new CryptographicException("Trailing encrypted data.");
-                        _ended = true;
-                        return 0;
-                    }
+                    ReadChunk();
+                    if (_ended) return 0;
                 }
                 var n = Math.Min(destination.Length, _plain.Length - _position);
                 _plain.AsSpan(_position, n).CopyTo(destination);
@@ -165,6 +167,28 @@ public static class MeetingCrypto
                 _failed = true;
                 CryptographicOperations.ZeroMemory(_plain);
                 throw new CryptographicException("Encrypted chunk authentication failed.", e);
+            }
+        }
+        private void ReadChunk()
+        {
+            CryptographicOperations.ZeroMemory(_plain);
+            Span<byte> size = stackalloc byte[4];
+            _input.ReadExactly(size);
+            var length = BinaryPrimitives.ReadInt32LittleEndian(size);
+            if (length < 0 || length > ChunkSize) throw new CryptographicException("Invalid encrypted chunk length.");
+            var nonce = new byte[12];
+            _input.ReadExactly(nonce);
+            var cipher = new byte[length];
+            _input.ReadExactly(cipher);
+            var tag = new byte[16];
+            _input.ReadExactly(tag);
+            _plain = new byte[length];
+            _position = 0;
+            _aes.Decrypt(nonce, cipher, tag, _plain, Aad(_header, _sequence++, length, _identity));
+            if (length == 0)
+            {
+                if (_input.ReadByte() != -1) throw new CryptographicException("Trailing encrypted data.");
+                _ended = true;
             }
         }
         protected override void Dispose(bool disposing)

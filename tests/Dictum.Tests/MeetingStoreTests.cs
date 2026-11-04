@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using Dictum.Meetings;
 using Dictum.Meetings.Store;
 using Dictum.Settings;
@@ -60,6 +61,33 @@ internal sealed class MeetingFixture : IDisposable
 
 public class MeetingStoreTests
 {
+    [Fact]
+    public void Swapping_audio_files_within_a_meeting_is_rejected()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store(); var id = fixture.Populate(store);
+        var you = fixture.At(id, "audio-you.wav.enc"); var others = fixture.At(id, "audio-others.wav.enc");
+        var saved = File.ReadAllBytes(you);
+        File.WriteAllBytes(you, File.ReadAllBytes(others)); File.WriteAllBytes(others, saved);
+        foreach (var channel in new[] { Channel.You, Channel.Others })
+        {
+            using var input = store.OpenAudio(id, channel);
+            Assert.Throws<CryptographicException>(() => input.ReadByte());
+        }
+    }
+
+    [Fact]
+    public void A_file_copied_from_another_meeting_is_rejected_even_with_its_key_wrap()
+    {
+        using var fixture = new MeetingFixture(); var store = fixture.Store();
+        var first = fixture.Populate(store); var second = fixture.Populate(store);
+        // Copy the wrap too so failure proves meeting identity binding, independent of key separation.
+        var meta = store.Read(second) with { Wraps = store.Read(first).Wraps };
+        File.WriteAllText(fixture.At(second, "meta.json"), JsonSerializer.Serialize(meta));
+        File.Copy(fixture.At(first, "audio-you.wav.enc"), fixture.At(second, "audio-you.wav.enc"), true);
+        using var input = store.OpenAudio(second, Channel.You);
+        Assert.Throws<CryptographicException>(() => input.ReadByte());
+    }
+
     [Fact]
     public void A_meeting_round_trips_meta_transcript_summary_and_audio()
     {
