@@ -152,7 +152,10 @@ public sealed class LoopbackCapture : ITimestampedCapture, IDisposable
                     if (!_running || _failed) return;
                     FlushPackets();
                     var now = Now;
-                    // simplification: fixed idle threshold and packet grace; retire after device latency measurements
+                    // simplification: fixed idle threshold and packet grace; retire after device latency measurements.
+                    // Known limit: a packet batch delayed longer than the 250 ms grace (for example a near-second stall under heavy
+                    // load) lands after this synthesised silence, so its speech is kept but shifted later by the excess delay, and the
+                    // track can run that much past Stop. Retire when the segmenter can cut pauses from the clock without zeros.
                     if (_anchored && _packets.Count == 0 && now - _audio!.End > TimeSpan.FromMilliseconds(500))
                         _audio.FillSilence(now - TimeSpan.FromMilliseconds(250));
                 }
