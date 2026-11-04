@@ -81,6 +81,19 @@ public sealed class MeetingImportTests
     }
 
     [Fact]
+    public async Task An_id_already_held_by_another_meeting_is_never_deleted_by_the_rollback()
+    {
+        using var fixture = new MeetingFixture();
+        var wav = WriteTone(fixture);
+        var foreign = new MeetingMeta(MeetingId.New(), "Someone else's meeting", MeetingFixture.Started.AddDays(-3), TimeSpan.FromMinutes(5),
+            MeetingSource.Recorded, null, [], [], false, null, null);
+        var store = new FaultStore(fixture.Store()) { ForeignHolder = foreign };
+        await Assert.ThrowsAsync<IOException>(() =>
+            Importer(store, new FixedDecoder(wav)).ImportAsync(wav, MeetingSource.ImportedFile, ImportAgreement));
+        Assert.Equal(0, store.DeleteCalls);
+    }
+
+    [Fact]
     public async Task A_cleanup_failure_carries_both_errors()
     {
         using var fixture = new MeetingFixture();
@@ -421,8 +434,16 @@ public sealed class MeetingImportTests
         public Exception? DeleteError { get; init; }
         /// <summary>Persists the meeting through the real store, then throws: Create failing after its metadata was written.</summary>
         public Exception? CreateError { get; init; }
+        /// <summary>Create refuses the id because a different meeting already holds it; Read of that id returns this foreign meeting.</summary>
+        public MeetingMeta? ForeignHolder { get; set; }
+        public int DeleteCalls { get; private set; }
         public MeetingId Create(MeetingMeta meta)
         {
+            if (ForeignHolder is not null)
+            {
+                ForeignHolder = ForeignHolder with { Id = meta.Id };
+                throw new IOException("Meeting already exists.");
+            }
             var id = inner.Create(meta);
             if (CreateError is not null) throw CreateError;
             return id;
@@ -435,13 +456,14 @@ public sealed class MeetingImportTests
         }
         public void Delete(MeetingId id)
         {
+            DeleteCalls++;
             if (DeleteError is not null) throw DeleteError;
             inner.Delete(id);
         }
         public void AppendSegments(MeetingId id, IEnumerable<Segment> segments) => inner.AppendSegments(id, segments);
         public void AddMarker(MeetingId id, Marker marker) => inner.AddMarker(id, marker);
         public void WriteSummary(MeetingId id, Summary summary) => inner.WriteSummary(id, summary);
-        public MeetingMeta Read(MeetingId id) => inner.Read(id);
+        public MeetingMeta Read(MeetingId id) => ForeignHolder is { } foreign && foreign.Id == id ? foreign : inner.Read(id);
         public IReadOnlyList<Segment> ReadTranscript(MeetingId id) => inner.ReadTranscript(id);
         public Summary? ReadSummary(MeetingId id) => inner.ReadSummary(id);
         public Stream OpenAudio(MeetingId id, Channel channel) => inner.OpenAudio(id, channel);

@@ -17,7 +17,7 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
             throw new ArgumentOutOfRangeException(nameof(source), "Choose an imported meeting source.");
         path = Path.GetFullPath(path);
         // Keep the recording unchanged while decoding and copying it; concurrent writers must finish first.
-        MeetingId? created = null;
+        MeetingMeta? created = null;
         try
         {
             CapturedAudio audio;
@@ -31,13 +31,13 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
                 cancellationToken.ThrowIfCancellationRequested();
                 var hasVideo = Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase);
                 using var wav = AudioWithOriginal(audio, hasVideo ? null : original, cancellationToken);
-                // Claim the id before Create: Create can persist metadata and then fail (initial transcript, index), and that half-made
-                // meeting must still be rolled back. Delete tolerates a meeting that was never written.
-                var newId = MeetingId.New();
-                created = newId;
-                id = store.Create(new(newId, Path.GetFileNameWithoutExtension(path),
+                // Claim the meeting before Create: Create can persist metadata and then fail (initial transcript, index), and that
+                // half-made meeting must still be rolled back. The rollback deletes only a meeting that is provably this one.
+                var meta = new MeetingMeta(MeetingId.New(), Path.GetFileNameWithoutExtension(path),
                     (timeProvider ?? TimeProvider.System).GetUtcNow(), audio.Duration, source,
-                    agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null));
+                    agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null);
+                created = meta;
+                id = store.Create(meta);
                 progress?.Report("Saving encrypted recording");
                 cancellationToken.ThrowIfCancellationRequested();
                 store.WriteAudio(id, Channel.Mixed, wav);
@@ -52,14 +52,25 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
         }
         catch (Exception error)
         {
-            if (created is { } id) DeleteFailedImport(id, error);
+            if (created is { } meta) DeleteFailedImport(meta, error);
             throw;
         }
     }
 
-    private void DeleteFailedImport(MeetingId id, Exception error)
+    private void DeleteFailedImport(MeetingMeta meta, Exception error)
     {
-        try { store.Delete(id); }
+        try
+        {
+            // An id that already belonged to another meeting (Create refused it) must never be deleted: if readable metadata
+            // exists under the id and is not the one this import wrote, leave it alone. Unreadable or absent metadata can only
+            // be this import's own partial write, or nothing at all, which Delete tolerates.
+            MeetingMeta? stored = null;
+            try { stored = store.Read(meta.Id); }
+            catch (Exception readError) when (readError is IOException or UnauthorizedAccessException or System.Text.Json.JsonException
+                                              or InvalidDataException) { }
+            if (stored is not null && (stored.StartedAt != meta.StartedAt || stored.Title != meta.Title)) return;
+            store.Delete(meta.Id);
+        }
         catch (Exception deleteError) { throw new AggregateException("Import failed and its meeting could not be deleted.", error, deleteError); }
     }
 
