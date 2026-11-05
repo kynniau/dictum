@@ -29,4 +29,20 @@ public sealed class MeetingsApprovedWordingTests
         Assert.DoesNotContain("What Kynni receives.", privacy);
         Assert.DoesNotContain("PLACEHOLDER", string.Join("\n", values));
     }
+
+    [Fact]
+    public void The_privacy_policy_carries_every_approved_meetings_paragraph_word_for_word()
+    {
+        var fixtures = Path.Combine(FixBatchDownloadTests.RepoRoot(), "tests", "Dictum.Tests", "Fixtures", "Meetings");
+        var approved = File.ReadAllText(Path.Combine(fixtures, "privacy-section.md")).Replace("\r\n", "\n");
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "privacy.html")).Replace("\r\n", "\n");
+        var paragraphs = approved.Split("\n\n").Select(block => block.Trim())
+            .Where(block => block.Length > 0 && !block.StartsWith("<!--", StringComparison.Ordinal) && !block.StartsWith('#')).ToArray();
+        Assert.Equal(19, paragraphs.Length);
+        var heading = html.IndexOf("<h3 id=\"meetings\">Meetings</h3>", StringComparison.Ordinal);
+        Assert.True(heading > html.IndexOf("<h2 id=\"where\">", StringComparison.Ordinal) && heading < html.IndexOf("<h2 id=\"network\">", StringComparison.Ordinal),
+            "the Meetings section sits inside section 3");
+        foreach (var paragraph in paragraphs)
+            Assert.Contains("<p>" + paragraph.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;") + "</p>", html, StringComparison.Ordinal);
+    }
 }

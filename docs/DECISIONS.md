@@ -6939,3 +6939,11 @@ The 1.4.0 release copy in STORE.md, release-notes-preamble.md and version.json w
 Directory.Build.props supplies version 1.4.0 to the projects; package-msix.ps1 derives Identity Version 1.4.0.0 through AppxManifest.template.xml. About and the update check read the assembly version. Existing Mac download links still name the published mac-v1.3.1 tag; the version-free Mac release preamble is unchanged, as in the 1.3.1 preparation.
 
 No MSIX was built and nothing was tagged, published, deployed, committed or pushed. Tests were not run: the requested LOCALAPPDATA/Microsoft/dotnet/dotnet.exe was unavailable in this sandbox.
+
+## Release 1.5.0 prepared (05/11/2026, branch release/1.5.0)
+
+The 1.5.0 release copy in STORE.md, release-notes-preamble.md and version.json was APPROVED by the owner 05/11/2026 13:39 AEDT, with one added sentence on the privacy policy (owner decision 05/11/2026 13:39 AEDT, to keep privacy policy section 11). Earlier approved release text is retained unchanged beside it.
+
+The approved Meetings privacy section (05/11/2026 09:13 AEDT) is placed word for word in site/privacy.html as a sub-heading at the end of section 3, so the approved legal blocks of sections 11 and 12 keep their numbers. The page date is 05/11/2026.
+
+Directory.Build.props supplies version 1.5.0 to the projects; package-msix.ps1 derives Identity Version 1.5.0.0 through AppxManifest.template.xml.

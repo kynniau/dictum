@@ -156,7 +156,7 @@ public class KeysDocsTests
 
         Assert.Contains("That deletes everything Dictum has stored: models, recordings, logs, settings, consent records, dictionary, corrections, snippets, <code>.env</code> and the API keys you added in Dictum. It also deletes", html, StringComparison.Ordinal);
         Assert.Contains("or either to a server you choose. If you press Check this key beside a key you added, it sends that key, and nothing you dictated or wrote, to the same address your dictations go to.</li>", html, StringComparison.Ordinal);
-        Assert.Contains("Last updated <time datetime=\"2026-11-04\">04/11/2026</time>", html, StringComparison.Ordinal);
+        Assert.Contains("Last updated <time datetime=\"2026-11-05\">05/11/2026</time>", html, StringComparison.Ordinal);
 
         // Held for the Store uninstall check (owner, 04/11/2026 15:23 AEDT): rows 38a, 41, 42 and the section 10 pointer.
         foreach (var held in new[] { "Uninstalling Dictum, from the Store", "Uninstalling does not remove API keys", "They stay there also if you uninstall", "are not in those folders", "Unnamed key", "Remove all keys" })
