@@ -387,6 +387,26 @@ Every lane runs `dotnet test` and reports the output verbatim; no "should pass".
   `video.<ext>.enc`, plus `<root>/index.json` rebuilt from folders when missing or stale.
   Writes are atomic (temp file + rename). Segments append without rewriting the whole
   transcript more than once per second (`// simplification:` note allowed).
+- Live audio uses `IMeetingAudioWriter BeginAudio(MeetingId, Channel)`, with
+  `Append(float[] samples16kMono)`, `Complete()` and `Dispose()`. Dispose closes without
+  completing, preserving crash recovery. Begin marks the channel in metadata's
+  `IncompleteAudioChannels`; `AudioIncomplete` stays true until all channels complete.
+  Each track is `audio-<channel>.chunks.enc`: 8-byte `DCTMAUD\x01` magic/version,
+  16 random stream-identity bytes, followed by records of little-endian int32 PCM byte
+  length, 12-byte framing nonce and 16-byte framing tag, then a separate 12-byte random
+  payload nonce, PCM16 ciphertext and 16-byte AES-GCM tag. Both tags use the same AAD;
+  framing seals an empty payload so a damaged length cannot masquerade as a torn write. AAD is the
+  complete 24-byte header, little-endian int64 zero-based record index, int32 length,
+  and UTF-8 `<meeting-id>/audio-<channel>.chunks.enc`. Existing owner-envelope handling
+  is shared. Append flushes each record with `FileStream.Flush(true)`; Complete appends
+  an authenticated zero-length terminal record and clears that channel's metadata flag.
+  OpenAudio verifies the captured file snapshot before releasing even its synthesized
+  16 kHz mono PCM16 WAV header, then streams a second authenticated pass. An incomplete
+  channel accepts EOF or a partial final record; invalid lengths, full records failing
+  authentication, sequence gaps/reordering, cross-meeting/channel substitution and
+  trailing data after completion fail. Completed channels require the terminal record.
+  Recovery lists and opens incomplete meetings, retaining transcript batches. Delete
+  and retention include chunked audio. WriteAudio retains the import format.
 - **Tests (`MeetingStoreTests.cs`, `MeetingCryptoTests.cs`, `MeetingsBoundaryTests.cs`):**
   `A_meeting_round_trips_meta_transcript_summary_and_audio`;
   `Files_on_disk_are_ciphertext_and_contain_no_transcript_words`;

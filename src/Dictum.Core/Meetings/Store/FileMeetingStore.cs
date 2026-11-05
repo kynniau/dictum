@@ -102,7 +102,28 @@ public sealed class FileMeetingStore : IMeetingStore
     }
     public Stream OpenAudio(MeetingId id, Channel channel)
     {
-        lock (Gate) return WithKey(id, key => MeetingCrypto.OpenDecrypted(FileAt(id, AudioName(channel)), key, Identity(id, AudioName(channel))));
+        lock (Gate) return WithKey(id, content => File.Exists(FileAt(id, ChunkName(channel)))
+            ? MeetingCrypto.OpenChunkedAudio(FileAt(id, ChunkName(channel)), content, Identity(id, ChunkName(channel)), Read(id).IncompleteAudioChannels.Contains(channel))
+            : MeetingCrypto.OpenDecrypted(FileAt(id, AudioName(channel)), content, Identity(id, AudioName(channel))));
+    }
+    private static string ChunkName(Channel channel) => AudioName(channel).Replace(".wav.enc", ".chunks.enc", StringComparison.Ordinal);
+    public IMeetingAudioWriter BeginAudio(MeetingId id, Channel channel)
+    {
+        lock (Gate) return WithKey(id, content =>
+        {
+            var path = FileAt(id, ChunkName(channel));
+            if (File.Exists(path) || File.Exists(FileAt(id, AudioName(channel)))) throw new IOException("Audio already exists.");
+            var meta = Read(id);
+            JsonWrite(FileAt(id, "meta.json"), meta with { IncompleteAudioChannels = [.. meta.IncompleteAudioChannels, channel] });
+            return MeetingCrypto.BeginAudio(path, content, Identity(id, ChunkName(channel)), () =>
+            {
+                lock (Gate)
+                {
+                    var current = Read(id);
+                    JsonWrite(FileAt(id, "meta.json"), current with { IncompleteAudioChannels = current.IncompleteAudioChannels.Where(c => c != channel).ToArray() });
+                }
+            });
+        });
     }
 
     private sealed record TranscriptSnapshot(List<Segment> Segments, List<string> IncludedBatches);
@@ -197,7 +218,7 @@ public sealed class FileMeetingStore : IMeetingStore
         // Persist only listing/search metadata. Key wraps belong exclusively in meta.json.
         JsonWrite(Path.Combine(Root, "index.json"), meetings.Select(m => new
         {
-            m.Id, m.Title, m.StartedAt, m.Duration, m.Source, m.HasVideo, m.SummaryEngine, m.SummaryTemplate
+            m.Id, m.Title, m.StartedAt, m.Duration, m.Source, m.HasVideo, m.SummaryEngine, m.SummaryTemplate, m.AudioIncomplete
         }).ToArray());
         return meetings;
     }
@@ -230,11 +251,18 @@ public sealed class FileMeetingStore : IMeetingStore
     }
     public void ApplyRetention(DateTimeOffset now)
     {
-        var days = _settings.KeepAudio switch { KeepAudio.Forever => int.MaxValue, KeepAudio.Days30 => 30, KeepAudio.Days90 => 90, _ => throw new InvalidOperationException() };
-        if (days == int.MaxValue) return;
+        ApplyRetention(now, _ => null);
+    }
+    internal void ApplyRetention(DateTimeOffset now, Func<MeetingId, KeepAudio?> confirmedRetention)
+    {
         lock (Gate)
-            foreach (var meta in List().Where(m => now - (m.StartedAt + m.Duration) >= TimeSpan.FromDays(days)))
-                foreach (var audio in Directory.GetFiles(Folder(meta.Id), "audio-*.wav.enc")) File.Delete(audio);
+            foreach (var meta in List())
+            {
+                var keep = confirmedRetention(meta.Id) ?? meta.Agreement?.Confirmation?.Route?.KeepAudio ?? _settings.KeepAudio;
+                var days = keep switch { KeepAudio.Forever => int.MaxValue, KeepAudio.Days30 => 30, KeepAudio.Days90 => 90, _ => throw new InvalidOperationException() };
+                if (days != int.MaxValue && now - (meta.StartedAt + meta.Duration) >= TimeSpan.FromDays(days))
+                    foreach (var audio in Directory.GetFiles(Folder(meta.Id), "audio-*.enc")) File.Delete(audio);
+            }
     }
     public void Delete(MeetingId id)
     {

@@ -20,7 +20,7 @@ internal sealed class SettingsWindow : Window
     private readonly ListBox _nav = new() { Width = 180 };
     private readonly ContentControl _host = new();
     private readonly Dictionary<string, SettingsPage> _pages = [];
-    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", "Privacy", "About", Dictum.Core.HowItWorksText.PageTitle, HelpText.PageTitle];
+    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", Meetings.MeetingsText.PROPOSED_Meetings, "Privacy", "About", Dictum.Core.HowItWorksText.PageTitle, HelpText.PageTitle];
 
     public SettingsWindow(AppShell shell)
     {
@@ -81,6 +81,7 @@ internal sealed class SettingsWindow : Window
         "Storage" => new StoragePage(_shell),
         "Microphone" => new MicrophonePage(_shell),
         "Clean-up" => new CleanupPage(_shell),
+        Meetings.MeetingsText.PROPOSED_Meetings => new MeetingsPage(_shell),
         "Privacy" => new PrivacyPage(_shell),
         "About" => new AboutPage(_shell),
         Dictum.Core.HowItWorksText.PageTitle => new HowItWorksPage(_shell),

@@ -107,6 +107,83 @@ public static class MeetingCrypto
 
     public static Stream OpenDecrypted(string cipherPath, byte[] contentKey, string identity) => new DecryptedStream(cipherPath, contentKey, identity);
 
+    internal static IMeetingAudioWriter BeginAudio(string path, byte[] content, string identity, Action completed) => new AudioWriter(path, content, identity, completed);
+    internal static Stream OpenChunkedAudio(string path, byte[] content, string identity, bool incomplete) => new DecryptedStream(path, content, identity, true, incomplete);
+
+    private sealed class AudioWriter : IMeetingAudioWriter
+    {
+        private readonly FileStream _output;
+        private readonly AesGcm _aes;
+        private readonly byte[] _header = "DCTMAUD\u0001"u8.ToArray().Concat(RandomNumberGenerator.GetBytes(16)).ToArray();
+        private readonly string _identity;
+        private readonly Action _completed;
+        private long _sequence;
+        private bool _ended, _failed, _completionMarked;
+        private long? _terminalStart;
+        internal AudioWriter(string path, byte[] content, string identity, Action completed)
+        {
+            _identity = identity; _completed = completed;
+            _aes = new AesGcm(content, 16);
+            try
+            {
+                _output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                _output.Write(_header); _output.Flush(true);
+            }
+            catch { _aes.Dispose(); throw; }
+        }
+        public void Append(float[] samples)
+        {
+            if (_ended || _failed) throw new IOException("Audio writer is closed or failed.");
+            // Each record is at most 1 MiB, matching the existing encrypted-file bound.
+            foreach (var part in samples.Chunk(ChunkSize / 2))
+            {
+                var pcm = new byte[part.Length * 2];
+                try
+                {
+                    for (var i = 0; i < part.Length; i++) BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), (short)(Math.Clamp(part[i], -1f, 1f) * 32767));
+                    Write(pcm);
+                }
+                finally { CryptographicOperations.ZeroMemory(pcm); Array.Clear(part); }
+            }
+        }
+        private void Write(byte[] plain)
+        {
+            try
+            {
+                var aad = Aad(_header, _sequence, plain.Length, _identity);
+                var nonce = RandomNumberGenerator.GetBytes(12);
+                var cipher = new byte[plain.Length]; var tag = new byte[16];
+                _aes.Encrypt(nonce, plain, cipher, tag, aad);
+                // Authenticate framing before treating a short payload as a torn final write.
+                var frameNonce = RandomNumberGenerator.GetBytes(12); var frameTag = new byte[16];
+                _aes.Encrypt(frameNonce, ReadOnlySpan<byte>.Empty, Span<byte>.Empty, frameTag, aad);
+                _output.Write(aad.AsSpan(_header.Length + 8, 4));
+                _output.Write(frameNonce); _output.Write(frameTag);
+                _output.Write(nonce); _output.Write(cipher); _output.Write(tag);
+                _output.Flush(true); _sequence++;
+            }
+            catch { _failed = true; throw; }
+        }
+        public void Complete()
+        {
+            if (_completionMarked) return;
+            if (_failed) throw new IOException("Audio writer failed.");
+            if (!_ended)
+            {
+                // The PCM is durable. A failed terminal write can be rebuilt on retry,
+                // unlike an append whose input may already have left the capture queue.
+                _terminalStart ??= _output.Position;
+                _output.SetLength(_terminalStart.Value);
+                _output.Position = _terminalStart.Value;
+                try { Write([]); }
+                catch { _failed = false; throw; }
+                _ended = true; _output.Dispose();
+            }
+            _completed(); _completionMarked = true;
+        }
+        public void Dispose() { _ended = true; _output.Dispose(); _aes.Dispose(); }
+    }
+
     private sealed class DecryptedStream : Stream
     {
         private readonly FileStream _input;
@@ -119,17 +196,26 @@ public static class MeetingCrypto
         private long _sequence;
         private bool _ended;
         private bool _failed;
+        private readonly bool _audio;
+        private readonly bool _incomplete;
+        private readonly long _end;
+        private byte[] _wavHeader = [];
+        private int _wavPosition;
+        private long _pcmLength;
 
-        public DecryptedStream(string path, byte[] key, string identity)
+        public DecryptedStream(string path, byte[] key, string identity, bool audio = false, bool incomplete = false)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identity);
             _identity = identity;
+            _audio = audio;
+            _incomplete = incomplete;
             _aes = new AesGcm(key, 16);
-            _input = File.OpenRead(path);
+            _input = new FileStream(path, FileMode.Open, FileAccess.Read, audio && incomplete ? FileShare.ReadWrite : FileShare.Read);
+            _end = _input.Length;
             try
             {
                 _input.ReadExactly(_header);
-                if (!_header.AsSpan(0, 8).SequenceEqual(Magic)) throw new CryptographicException("Invalid encrypted file header.");
+                if (!_header.AsSpan(0, 8).SequenceEqual(audio ? "DCTMAUD\u0001"u8 : Magic)) throw new CryptographicException("Invalid encrypted file header.");
             }
             catch { _input.Dispose(); _aes.Dispose(); throw; }
         }
@@ -151,6 +237,22 @@ public static class MeetingCrypto
                     _position = 0;
                     _ended = false;
                     _verified = true;
+                    if (_audio)
+                    {
+                        // simplification: standard RIFF PCM is limited to 4 GiB; retire with RF64 for longer recordings.
+                        if (_pcmLength > uint.MaxValue - 36) throw new InvalidDataException("Audio exceeds RIFF capacity.");
+                        using var header = new MemoryStream();
+                        using var writer = new BinaryWriter(header, Encoding.UTF8, true);
+                        writer.Write("RIFF"u8); writer.Write((uint)(_pcmLength + 36)); writer.Write("WAVEfmt "u8);
+                        writer.Write(16); writer.Write((short)1); writer.Write((short)1); writer.Write(16000); writer.Write(32000);
+                        writer.Write((short)2); writer.Write((short)16); writer.Write("data"u8); writer.Write((uint)_pcmLength);
+                        _wavHeader = header.ToArray();
+                    }
+                }
+                if (_wavPosition < _wavHeader.Length)
+                {
+                    var copied = Math.Min(destination.Length, _wavHeader.Length - _wavPosition);
+                    _wavHeader.AsSpan(_wavPosition, copied).CopyTo(destination); _wavPosition += copied; return copied;
                 }
                 if (_position == _plain.Length)
                 {
@@ -172,10 +274,20 @@ public static class MeetingCrypto
         private void ReadChunk()
         {
             CryptographicOperations.ZeroMemory(_plain);
+            if (_audio && _incomplete && _end - _input.Position < 4) { _ended = true; return; }
             Span<byte> size = stackalloc byte[4];
             _input.ReadExactly(size);
             var length = BinaryPrimitives.ReadInt32LittleEndian(size);
             if (length < 0 || length > ChunkSize) throw new CryptographicException("Invalid encrypted chunk length.");
+            if (_audio && (length % 2 != 0)) throw new CryptographicException("Invalid PCM chunk length.");
+            if (_audio)
+            {
+                if (_incomplete && _end - _input.Position < 28) { _ended = true; return; }
+                var frameNonce = new byte[12]; var frameTag = new byte[16];
+                _input.ReadExactly(frameNonce); _input.ReadExactly(frameTag);
+                _aes.Decrypt(frameNonce, ReadOnlySpan<byte>.Empty, frameTag, Span<byte>.Empty, Aad(_header, _sequence, length, _identity));
+            }
+            if (_audio && _incomplete && _end - _input.Position < length + 28L) { _ended = true; return; }
             var nonce = new byte[12];
             _input.ReadExactly(nonce);
             var cipher = new byte[length];
@@ -185,9 +297,10 @@ public static class MeetingCrypto
             _plain = new byte[length];
             _position = 0;
             _aes.Decrypt(nonce, cipher, tag, _plain, Aad(_header, _sequence++, length, _identity));
+            if (!_verified) _pcmLength = checked(_pcmLength + length);
             if (length == 0)
             {
-                if (_input.ReadByte() != -1) throw new CryptographicException("Trailing encrypted data.");
+                if (_input.Position != _end) throw new CryptographicException("Trailing encrypted data.");
                 _ended = true;
             }
         }

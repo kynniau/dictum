@@ -7,7 +7,8 @@ using Dictum.Platform;
 namespace Dictum.Meetings.Import;
 
 public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber transcriber,
-    IAudioDecoder decoder, TimeProvider? timeProvider = null)
+    IAudioDecoder decoder, TimeProvider? timeProvider = null,
+    Action<MeetingId, Agreement>? saveConfirmation = null)
 {
     public async Task<MeetingId> ImportAsync(string path, MeetingSource source, Agreement agreement,
         IProgress<string>? progress = null, CancellationToken cancellationToken = default)
@@ -15,6 +16,12 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
         ArgumentNullException.ThrowIfNull(agreement);
         if (source is not (MeetingSource.ImportedFile or MeetingSource.ImportedZoom))
             throw new ArgumentOutOfRangeException(nameof(source), "Choose an imported meeting source.");
+        if (agreement.Confirmation is not { Kind: AgreementKind.Import, Route.KeepAudio: not null } confirmation
+            || string.IsNullOrWhiteSpace(confirmation.Script) || string.IsNullOrWhiteSpace(confirmation.ImporterIdentity)
+            || string.IsNullOrWhiteSpace(confirmation.Answer) || string.IsNullOrWhiteSpace(confirmation.ScriptVersion))
+            throw new ArgumentException("A complete import confirmation is required.", nameof(agreement));
+        if (saveConfirmation is null) throw new InvalidOperationException("Confirmation storage is required.");
+        MeetingProcessingConsent.Check(cancellationToken);
         path = Path.GetFullPath(path);
         // Keep the recording unchanged while decoding and copying it; concurrent writers must finish first.
         MeetingMeta? created = null;
@@ -38,6 +45,8 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
                     agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null);
                 created = meta;
                 id = store.Create(meta);
+                saveConfirmation(id, agreement);
+                MeetingProcessingConsent.Check(cancellationToken);
                 progress?.Report("Saving encrypted recording");
                 cancellationToken.ThrowIfCancellationRequested();
                 store.WriteAudio(id, Channel.Mixed, wav);
@@ -46,6 +55,7 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report("Transcribing recording");
             cancellationToken.ThrowIfCancellationRequested();
+            MeetingProcessingConsent.Check(cancellationToken);
             await transcriber.RunAsync(id, new FileSource(audio), _ => { }, cancellationToken).ConfigureAwait(false);
             progress?.Report("Import complete");
             return id;

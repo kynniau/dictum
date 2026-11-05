@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Dictum.Hotkey;
+using Dictum.Meetings;
 
 namespace Dictum.Settings;
 
@@ -9,7 +10,10 @@ namespace Dictum.Settings;
 /// <param name="NamesCleanupModel">The file chooses cleanup: llm.model, or a provider other than local.</param>
 /// <param name="NamesCleanupProvider">The file sets llm.provider (a first run with base.en on this PC keeps it: ModelCoordinator.FirstRun).</param>
 public sealed record SettingsLoadResult(AppSettings Settings, IReadOnlyList<string> Warnings, bool FileExisted, bool Usable = true,
-    bool NamesSpeechModel = true, bool NamesCleanupModel = true, bool NamesCleanupProvider = false);
+    bool NamesSpeechModel = true, bool NamesCleanupModel = true, bool NamesCleanupProvider = false)
+{
+    public MeetingsSettings Meetings { get; init; } = new();
+}
 
 /// <summary>
 /// Tolerant settings.json reader: every key is validated on its own. An unknown key or a malformed value
@@ -69,13 +73,36 @@ public static class SettingsLoader
                 warnings.Add(NotAnObject);
                 return new SettingsLoadResult(new AppSettings(), warnings, true, Usable: false);
             }
-            var settings = Bind(new ObjectReader(root, "", warnings));
+            var reader = new ObjectReader(root, "", warnings);
+            var meetings = BindMeetings(reader.Child("meetings"));
+            var settings = Bind(reader);
             var namesSpeech = HasString(root, "whisper", "model");
             var namesProvider = HasString(root, "llm", "provider");
             var namesCleanup = HasString(root, "llm", "model")
                 || (namesProvider && !string.Equals(settings.Llm.Provider, LlmSettings.Local, StringComparison.Ordinal));
-            return new SettingsLoadResult(settings, warnings, true, Usable: true, namesSpeech, namesCleanup, namesProvider);
+            return new SettingsLoadResult(settings, warnings, true, Usable: true, namesSpeech, namesCleanup, namesProvider) { Meetings = meetings };
         }
+    }
+
+    private static MeetingsSettings BindMeetings(ObjectReader? r)
+    {
+        var d = new MeetingsSettings();
+        if (r is null) return d;
+        T Choice<T>(string name, T fallback) where T : struct, Enum =>
+            Enum.Parse<T>(r.String(name, fallback.ToString(), OneOf(Enum.GetNames<T>())), true);
+        // Unknown Meetings keys are deliberately ignored for forwards compatibility.
+        return d with
+        {
+            Enabled = r.Bool("enabled", d.Enabled),
+            Folder = r.NullableString("folder", FolderProblem),
+            KeepAudio = Choice("keep_audio", d.KeepAudio),
+            ZoomImport = Choice("zoom_import", d.ZoomImport),
+            ZoomFolder = r.NullableString("zoom_folder", FolderProblem),
+            SummaryEngine = Choice("summary_engine", d.SummaryEngine),
+            SummaryTemplate = r.String("summary_template", d.SummaryTemplate,
+                OneOf("general", "client-file-note", "lender-call", "stand-up")),
+            ShareDefault = Choice("share_default", d.ShareDefault),
+        };
     }
 
     private static bool HasString(JsonElement root, string section, string key) =>
