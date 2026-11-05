@@ -7,7 +7,8 @@ using Dictum.Platform;
 namespace Dictum.Meetings.Import;
 
 public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber transcriber,
-    IAudioDecoder decoder, TimeProvider? timeProvider = null)
+    IAudioDecoder decoder, TimeProvider? timeProvider = null,
+    Action<MeetingId, Agreement>? saveConfirmation = null)
 {
     public async Task<MeetingId> ImportAsync(string path, MeetingSource source, Agreement agreement,
         IProgress<string>? progress = null, CancellationToken cancellationToken = default)
@@ -38,6 +39,8 @@ public sealed class MeetingImporter(IMeetingStore store, IMeetingTranscriber tra
                     agreement with { Kind = AgreementKind.Import }, [], [], hasVideo, null, null);
                 created = meta;
                 id = store.Create(meta);
+                if (agreement.Confirmation is { } confirmation)
+                    (saveConfirmation ?? throw new InvalidOperationException("Confirmation storage is required."))(id, agreement);
                 progress?.Report("Saving encrypted recording");
                 cancellationToken.ThrowIfCancellationRequested();
                 store.WriteAudio(id, Channel.Mixed, wav);

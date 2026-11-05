@@ -45,6 +45,13 @@ internal sealed record MeetingsHost(
     public Action EnableImports { get; init; } = () => { };
     public Func<string?> SummaryHost { get; init; } = () => null;
     public Action<MeetingId, MeetingConfirmation> SaveConfirmation { get; init; } = (_, _) => throw new InvalidOperationException("Confirmation storage is required.");
+    public Func<MeetingId, IReadOnlyList<MeetingConfirmation>> ReadConfirmations { get; init; } = _ => [];
+    public MeetingProcessingRoute ProcessingRoute()
+    {
+        var engine = Settings().SummaryEngine;
+        return new(CloudSpeechHost(), engine, engine == SummaryEngine.Local ? null : SummaryHost());
+    }
+    public IDisposable UseConfirmedRoute(MeetingProcessingRoute route) => MeetingProcessingConsent.Enter(() => ProcessingRoute() == route);
     // simplification: team sharing and team-folder access/logging do not exist; keep them unavailable.
     // simplification: there is no audio-off setting yet; always use the saved-audio retention notices.
     // simplification: Ollama model forwarding is not reliably detectable; show the approved conditional notice.
@@ -57,7 +64,8 @@ internal sealed record MeetingsHost(
         var root = snapshot.Folder ?? Path.Combine(paths.LocalDir, "meetings");
         var store = new CurrentSettingsStore(root, settings, new MeetingKeyring(credentials));
         var transcriber = factory.Create(store);
-        var importer = new MeetingImporter(store, transcriber, decoder);
+        var importer = new MeetingImporter(store, transcriber, decoder,
+            saveConfirmation: (id, agreement) => store.WriteConfirmation(id, agreement.Confirmation!));
         var computer = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Environment.MachineName)));
         const string dismissal = "DICTUM_MEETINGS_DRIVE_WARNING";
         return new(paths, settings, store,
@@ -76,6 +84,7 @@ internal sealed record MeetingsHost(
             ImportsEnabled = () => credentials.Read("DICTUM_MEETINGS_IMPORTS", "owner") == "approved-2026-11-05",
             EnableImports = () => credentials.Write("DICTUM_MEETINGS_IMPORTS", "owner", "approved-2026-11-05"),
             SaveConfirmation = store.WriteConfirmation,
+            ReadConfirmations = store.ReadConfirmations,
         };
     }
 
@@ -140,12 +149,14 @@ internal sealed record MeetingsHost(
         public string ExportMarkdown(MeetingId id) => Current().ExportMarkdown(id);
     }
 
-    public async Task Regenerate(MeetingId id, string template, CancellationToken cancellation)
+    public async Task Regenerate(MeetingId id, string template, CancellationToken cancellation, MeetingProcessingRoute? confirmedRoute = null)
     {
+        if (confirmedRoute is not null && confirmedRoute != ProcessingRoute()) throw new OperationCanceledException();
         var engine = Settings().SummaryEngine;
         var client = await SummaryClient(engine, cancellation);
         try
         {
+            if (confirmedRoute is not null && confirmedRoute != ProcessingRoute()) throw new OperationCanceledException();
             var summary = await new MeetingSummariser().SummariseAsync(id, Store.ReadTranscript(id),
                 SummaryTemplates.Get(template, Paths.ConfigDir), client,
                 engine == SummaryEngine.OwnKey ? "OwnKey:" + client.Name : engine.ToString(), cancellation);
@@ -200,10 +211,20 @@ internal sealed class MeetingTranscriberFactory(Func<CancellationToken, Task<ITr
         public DecodeOptions Decode => DecodeOptions.Default;
         public void Reconfigure(DecodeOptions decode) { }
         public void Dispose() { }
-        public async Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken) =>
-            await (await speech(cancellationToken)).TranscribeAsync(samples16kMono, cancellationToken);
-        public async Task<string> TranscribeAsync(float[] samples16kMono, string? carried, CancellationToken cancellationToken) =>
-            await (await speech(cancellationToken)).TranscribeAsync(samples16kMono, carried, cancellationToken);
+        public async Task<string> TranscribeAsync(float[] samples16kMono, CancellationToken cancellationToken)
+        {
+            MeetingProcessingConsent.Check(cancellationToken);
+            var engine = await speech(cancellationToken);
+            MeetingProcessingConsent.Check(cancellationToken);
+            return await engine.TranscribeAsync(samples16kMono, cancellationToken);
+        }
+        public async Task<string> TranscribeAsync(float[] samples16kMono, string? carried, CancellationToken cancellationToken)
+        {
+            MeetingProcessingConsent.Check(cancellationToken);
+            var engine = await speech(cancellationToken);
+            MeetingProcessingConsent.Check(cancellationToken);
+            return await engine.TranscribeAsync(samples16kMono, carried, cancellationToken);
+        }
     }
     private sealed class GateAdapter(Func<IVoiceGate?> gate, Func<double> threshold) : IVoiceGate
     {
@@ -301,7 +322,31 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
 }
 
 internal sealed record MeetingConfirmation(string Answer, DateTimeOffset At, AgreementKind Kind,
-    string ScriptVersion, string Script, string? ImporterIdentity = null);
+    string ScriptVersion, string Script, string? ImporterIdentity = null, MeetingProcessingRoute? Route = null);
+
+internal sealed record MeetingProcessingRoute(string? SpeechHost, SummaryEngine SummaryEngine, string? SummaryHost);
+
+// The worker checks again after acquiring a speech client: settings can change on
+// another thread before the window receives its settings notification.
+internal static class MeetingProcessingConsent
+{
+    private static readonly AsyncLocal<Func<bool>?> Current = new();
+    public static IDisposable Enter(Func<bool> matches)
+    {
+        var previous = Current.Value;
+        Current.Value = matches;
+        return new Scope(previous);
+    }
+    public static void Check(CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (Current.Value is { } matches && !matches()) throw new OperationCanceledException();
+    }
+    private sealed class Scope(Func<bool>? previous) : IDisposable
+    {
+        public void Dispose() => Current.Value = previous;
+    }
+}
 
 internal interface IHostMeetingSource : IMeetingAudioSource, IDisposable
 {

@@ -24,6 +24,7 @@ public record Marker(TimeSpan At, MarkerKind Kind);
 public enum AgreementKind { Live, Import }
 public record Agreement
 {
+    internal MeetingConfirmation? Confirmation { get; init; }
     public DateTimeOffset AcknowledgedAt { get; init; }
     public string How { get; init; }
     public string ScriptVersion { get; init; }

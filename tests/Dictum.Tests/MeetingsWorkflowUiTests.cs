@@ -67,7 +67,8 @@ public sealed class MeetingsWorkflowUiTests
             Directory.CreateDirectory(Paths.ExeDir);
             Store = new MeetingsHost.CurrentSettingsStore(Path.Combine(Files.Root, "meetings"), () => Settings, Files.Keyring);
             var transcriber = Transcriber = new TestTranscriber(Store);
-            var importer = new MeetingImporter(Store, transcriber, new WavOnlyDecoder());
+            var importer = new MeetingImporter(Store, transcriber, new WavOnlyDecoder(),
+                saveConfirmation: (id, agreement) => ((MeetingsHost.CurrentSettingsStore)Store).WriteConfirmation(id, agreement.Confirmation!));
             Host = new(Paths, () => Settings, Store, async (path, agreement, cancellation) =>
             {
                 Imports++;
@@ -78,6 +79,7 @@ public sealed class MeetingsWorkflowUiTests
                 ImportsEnabled = () => ImportsEnabled,
                 EnableImports = () => ImportsEnabled = true,
                 SaveConfirmation = ((MeetingsHost.CurrentSettingsStore)Store).WriteConfirmation,
+                ReadConfirmations = ((MeetingsHost.CurrentSettingsStore)Store).ReadConfirmations,
                 SummaryHost = () => "summary.example",
             };
         }
@@ -288,7 +290,7 @@ public sealed class MeetingsWorkflowUiTests
 
     private sealed class FaultStore(IMeetingStore inner) : IMeetingStore
     {
-        public bool FailCreate, FailAppend, FailAudioOnce, FailChunk, ForeignOwner, Unreadable;
+        public bool FailCreate, FailAppend, FailAudioOnce, FailChunk, ForeignOwner, Unreadable, FailMarker, FailDelete;
         public int AudioAttempts, Deletes;
         public MeetingId Create(MeetingMeta meta)
         {
@@ -324,8 +326,12 @@ public sealed class MeetingsWorkflowUiTests
             inner.AppendSegments(id, segments);
         }
         public MeetingMeta Read(MeetingId id) => Unreadable ? throw new InvalidDataException("Synthetic unreadable metadata") : inner.Read(id);
-        public void Delete(MeetingId id) { Deletes++; inner.Delete(id); }
-        public void AddMarker(MeetingId id, Marker marker) => inner.AddMarker(id, marker);
+        public void Delete(MeetingId id) { Deletes++; if (FailDelete) throw new IOException("Synthetic delete failure"); inner.Delete(id); }
+        public void AddMarker(MeetingId id, Marker marker)
+        {
+            if (FailMarker) throw new IOException("Synthetic marker failure");
+            inner.AddMarker(id, marker);
+        }
         public void WriteSummary(MeetingId id, Summary summary) => inner.WriteSummary(id, summary);
         public void WriteVideo(MeetingId id, string path) => inner.WriteVideo(id, path);
         public IReadOnlyList<Segment> ReadTranscript(MeetingId id) => inner.ReadTranscript(id);
@@ -1054,6 +1060,268 @@ public sealed class MeetingsWorkflowUiTests
         await Until(() => fixture.Store.List().Count == 0);
         Assert.Empty(Directory.GetFiles(fixture.Files.Root, "*.chunks.enc", SearchOption.AllDirectories));
         window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Recording_route_change_pauses_until_fresh_confirmation_is_saved() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        string speech = "first.example";
+        var failSave = false;
+        var host = fixture.Host with
+        {
+            CloudSpeechHost = () => speech,
+            SaveConfirmation = (id, confirmation) =>
+            {
+                if (failSave) throw new IOException("Synthetic confirmation failure");
+                fixture.Host.SaveConfirmation(id, confirmation);
+            },
+        };
+        var window = new MeetingsWindow(host); window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        var id = Assert.Single(fixture.Store.List()).Id;
+        Assert.Equal("first.example", Assert.Single(Confirmations(fixture, id)).Route!.SpeechHost);
+        speech = "second.example"; window.RefreshSettings();
+        Assert.False(fixture.Capture.Active);
+        var notice = Assert.Single(window.OwnedWindows);
+        Assert.Contains(string.Format(APPROVED_CloudSpeech, speech), Texts(notice));
+        failSave = true; Click(notice, APPROVED_Continue);
+        Assert.False(fixture.Capture.Active); Assert.True(notice.IsVisible);
+        Assert.Contains(PROPOSED_Error, Texts(window));
+        failSave = false; Click(notice, APPROVED_Continue);
+        await Until(() => fixture.Capture.Active);
+        Assert.Equal(speech, Confirmations(fixture, id).Last().Route!.SpeechHost);
+        window.Shutdown(); return true;
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Stop_and_regenerate_require_saved_current_summary_route(bool regenerate) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var summaryHost = "first.example";
+        var sends = 0;
+        var host = fixture.Host with
+        {
+            SummaryHost = () => summaryHost,
+            SummaryClient = (_, _) => { sends++; return Task.FromResult<ILlmClient>(new TestLlm()); },
+        };
+        var window = new MeetingsWindow(host); window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        fixture.Settings = fixture.Settings with { SummaryEngine = SummaryEngine.OwnKey };
+        if (regenerate)
+        {
+            // Confirm the first changed route, then change its host for Regenerate.
+            window.RefreshSettings(); Click(Assert.Single(window.OwnedWindows), APPROVED_Continue);
+            await Until(() => fixture.Capture.Active);
+        }
+        Click(window, PROPOSED_Stop);
+        if (regenerate)
+        {
+            await Until(() => sends == 1 && Find(window, PROPOSED_Regenerate).IsEffectivelyEnabled);
+            summaryHost = "second.example";
+            Click(window, PROPOSED_Regenerate);
+        }
+        await Until(() => window.OwnedWindows.Count() == 1 && Assert.Single(window.OwnedWindows).IsEnabled);
+        Assert.Equal(regenerate ? 1 : 0, sends);
+        var notice = Assert.Single(window.OwnedWindows);
+        Assert.Contains(string.Format(APPROVED_OwnKey, summaryHost), Texts(notice));
+        Click(notice, APPROVED_Continue);
+        await Until(() => sends == (regenerate ? 2 : 1));
+        var id = Assert.Single(fixture.Store.List()).Id;
+        Assert.Equal(summaryHost, Confirmations(fixture, id).Last().Route!.SummaryHost);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Anthropic_notice_uses_the_effective_custom_endpoint() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture(); using var shell = fixture.Shell();
+        var configured = SettingsLoader.LoadFile(fixture.Paths.SettingsFile).Settings;
+        configured = configured with { Llm = configured.Llm with { Provider = LlmSettings.Anthropic, BaseUrl = "https://summary.example/v1" } };
+        typeof(AppShell).GetField("_settings", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(shell, configured);
+        Assert.Equal("summary.example", shell.CreateMeetingsHost().SummaryHost());
+    });
+
+    private sealed class ControlledTranscriber : IMeetingTranscriber
+    {
+        public readonly TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly TaskCompletionSource Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Ended;
+        public bool DelayCancellation;
+        public async Task RunAsync(MeetingId id, IMeetingAudioSource source, Action<Segment> onSegment, CancellationToken cancellationToken)
+        {
+            Entered.TrySetResult();
+            try { if (DelayCancellation) await Release.Task; else await Release.Task.WaitAsync(cancellationToken); }
+            finally { Ended = true; }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Shutdown_failed_or_timed_out_drain_vetoes_until_user_decides(bool timeout) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var controlled = new ControlledTranscriber(); var failing = new FailingTranscriber();
+        var window = new MeetingsWindow(fixture.Host with { Transcriber = timeout ? controlled : failing }) { DrainTimeout = TimeSpan.FromMilliseconds(20) };
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        if (timeout) await controlled.Entered.Task; else failing.Fail.TrySetResult();
+        Assert.False(window.Shutdown());
+        if (timeout) Assert.True(controlled.Ended);
+        Assert.True(window.IsVisible); Assert.Single(fixture.Store.List());
+        Assert.Contains(PROPOSED_TranscriptionFailed, Texts(window));
+        Assert.True(Find(window, PROPOSED_SaveAudioStop).IsEffectivelyEnabled);
+        Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        await Until(() => fixture.Store.List().Count == 0);
+        window.Shutdown(); return true;
+    });
+
+    // A shutdown that skips the active stop blocks on the drain; the timeout turns that hang into a failure.
+    [Fact(Timeout = 30000)]
+    public Task Shutdown_awaits_confirmed_discard_and_never_saves_it() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var controlled = new ControlledTranscriber();
+        var store = new FaultStore(fixture.Store);
+        var window = new MeetingsWindow(fixture.Host with { Store = store, Transcriber = controlled });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start); await controlled.Entered.Task;
+        var ready = false; window.ShutdownReady += () => ready = true;
+        Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        Assert.False(window.Shutdown()); Assert.False(ready); Assert.Single(fixture.Store.List());
+        controlled.Release.TrySetResult();
+        await Until(() => ready);
+        Assert.Empty(fixture.Store.List()); Assert.Equal(0, store.AudioAttempts);
+        Assert.True(controlled.Ended); window.Shutdown(); return true;
+    });
+
+    [Fact]
+    public Task Shutdown_during_stop_drain_failure_waits_for_save_audio_decision() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var failing = new FailingTranscriber();
+        var store = new FaultStore(fixture.Store);
+        var window = new MeetingsWindow(fixture.Host with { Store = store, Transcriber = failing });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        var ready = false; window.ShutdownReady += () => ready = true;
+        Click(window, PROPOSED_Stop); Assert.False(window.Shutdown());
+        failing.Fail.TrySetResult();
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_SaveAudioStop && b.IsEffectivelyEnabled));
+        Assert.False(ready); Assert.Equal(0, store.AudioAttempts);
+        Click(window, PROPOSED_SaveAudioStop); await Until(() => ready);
+        Assert.Single(fixture.Store.List()); Assert.Equal(1, store.AudioAttempts);
+        window.Shutdown(); return true;
+    });
+
+    [Fact]
+    public Task Declining_route_notice_while_worker_ends_stops_without_resuming() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var controlled = new ControlledTranscriber { DelayCancellation = true };
+        var window = new MeetingsWindow(fixture.Host with { Transcriber = controlled });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start); await controlled.Entered.Task;
+        fixture.Settings = fixture.Settings with { SummaryEngine = SummaryEngine.OwnKey };
+        window.RefreshSettings(); var notice = Assert.Single(window.OwnedWindows);
+        Click(notice, APPROVED_Continue); Click(notice, APPROVED_Cancel);
+        controlled.Release.TrySetResult();
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+        Assert.False(fixture.Capture.Active); Assert.Equal(1, fixture.Capture.Starts);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Shutdown_cancels_import_and_awaits_rollback_with_identity_saved_before_transcription() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var controlled = new ControlledTranscriber();
+        fixture.ImportsEnabled = true;
+        var importer = new MeetingImporter(fixture.Store, controlled, new WavOnlyDecoder(),
+            saveConfirmation: (id, agreement) => fixture.Host.SaveConfirmation(id, agreement.Confirmation!));
+        var host = fixture.Host with { Import = (path, agreement, cancellation) => importer.ImportAsync(path, MeetingSource.ImportedFile, agreement, cancellationToken: cancellation) };
+        var path = Path.Combine(fixture.Files.Root, "import.wav"); File.WriteAllBytes(path, MeetingFixture.Wav());
+        var window = new MeetingsWindow(host); window.Show(); window.BeginImportAgreement(path); Click(window, APPROVED_Import);
+        await controlled.Entered.Task;
+        var id = Assert.Single(fixture.Store.List()).Id;
+        Assert.Equal(Environment.UserName, Assert.Single(Confirmations(fixture, id)).ImporterIdentity);
+        var ready = false; window.ShutdownReady += () => ready = true;
+        Assert.False(window.Shutdown());
+        await Until(() => ready);
+        Assert.True(controlled.Ended); Assert.Empty(fixture.Store.List());
+        window.Shutdown(); return true;
+    });
+
+    [Fact]
+    public Task Failed_import_confirmation_rolls_back_before_transcription() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var controlled = new ControlledTranscriber();
+        fixture.ImportsEnabled = true;
+        var importer = new MeetingImporter(fixture.Store, controlled, new WavOnlyDecoder(),
+            saveConfirmation: (_, _) => throw new IOException("Synthetic confirmation failure"));
+        var host = fixture.Host with { Import = (path, agreement, cancellation) => importer.ImportAsync(path, MeetingSource.ImportedFile, agreement, cancellationToken: cancellation) };
+        var path = Path.Combine(fixture.Files.Root, "import.wav"); File.WriteAllBytes(path, MeetingFixture.Wav());
+        var window = new MeetingsWindow(host); window.Show(); window.BeginImportAgreement(path); Click(window, APPROVED_Import);
+        await Until(() => Texts(window).Contains(PROPOSED_Error));
+        Assert.False(controlled.Entered.Task.IsCompleted); Assert.Empty(fixture.Store.List());
+        Assert.Equal(MeetingFixture.Wav(), File.ReadAllBytes(path)); window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Failed_discard_delete_preserves_discard_intent_on_retry() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var store = new FaultStore(fixture.Store) { FailDelete = true };
+        var window = new MeetingsWindow(fixture.Host with { Store = store });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Retry && b.IsEffectivelyEnabled));
+        Assert.False(fixture.Capture.Active); Assert.Single(fixture.Store.List());
+        store.FailDelete = false; Click(window, PROPOSED_Retry);
+        await Until(() => fixture.Store.List().Count == 0);
+        Assert.Equal(0, store.AudioAttempts); window.Close(); return true;
+    });
+
+    [Theory]
+    [InlineData("mark")]
+    [InlineData("cancel")]
+    [InlineData("discard")]
+    [InlineData("delete")]
+    public Task Synchronous_storage_failures_are_contained_and_actions_remain_available(string action) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var failAnswer = false;
+        var store = new FaultStore(fixture.Store);
+        var window = new MeetingsWindow(fixture.Host with
+        {
+            Store = store,
+            SaveConfirmation = (id, confirmation) =>
+            {
+                if (failAnswer) throw new IOException("Synthetic confirmation failure");
+                fixture.Host.SaveConfirmation(id, confirmation);
+            },
+        });
+        window.Show();
+        if (action == "delete")
+        {
+            var id = store.Create(fixture.Files.Meta()); window.ShowMeeting(id);
+            store.FailDelete = true;
+            Click(window, PROPOSED_Delete); Click(Assert.Single(window.OwnedWindows), PROPOSED_Delete);
+            Assert.Single(store.List()); Assert.Contains(PROPOSED_Error, Texts(window));
+            store.FailDelete = false;
+            Click(window, PROPOSED_Delete); Click(Assert.Single(window.OwnedWindows), PROPOSED_Delete);
+            Assert.Empty(store.List()); window.Close(); return true;
+        }
+        window.BeginAgreement(); Click(window, APPROVED_Start);
+        if (action == "mark")
+        {
+            store.FailMarker = true; Click(window, PROPOSED_Mark);
+            Assert.True(fixture.Capture.Active);
+        }
+        else
+        {
+            Click(window, PROPOSED_Joined); failAnswer = true;
+            var dialog = Assert.Single(window.OwnedWindows);
+            Click(dialog, action == "cancel" ? APPROVED_Cancel : PROPOSED_Discard);
+            Assert.False(fixture.Capture.Active); Assert.True(dialog.IsVisible);
+            failAnswer = false; Click(dialog, APPROVED_Cancel);
+        }
+        Assert.Contains(PROPOSED_Error, Texts(window));
+        Click(window, APPROVED_Refused);
+        Assert.True(Find(window, PROPOSED_SaveNotes).IsEffectivelyEnabled);
+        Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
+        await Until(() => store.List().Count == 0); window.Close(); return true;
     });
 
 }

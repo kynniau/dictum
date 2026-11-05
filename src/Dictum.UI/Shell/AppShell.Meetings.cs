@@ -40,7 +40,7 @@ public sealed partial class AppShell
             Log = _log,
             LoopbackCapture = () => Platform.CreateLoopbackCapture(_log),
             SummaryHost = () => _settings.Llm.Provider == LlmSettings.Anthropic
-                ? new Uri(AnthropicLlmClient.DefaultBaseUrl).Host
+                ? new Uri(_settings.Llm.BaseUrl ?? AnthropicLlmClient.DefaultBaseUrl).Host
                 : CloudPolicy.CloudHost(_settings.Llm) ?? CloudPolicy.LocalServerHost(_settings.Llm),
             MicrophoneDevice = () => _settings.Audio.Device,
             SilenceThreshold = () => _settings.SilenceThreshold,
