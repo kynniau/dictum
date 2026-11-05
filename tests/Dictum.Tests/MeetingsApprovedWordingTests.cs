@@ -9,11 +9,10 @@ public sealed class MeetingsApprovedWordingTests
     [Fact]
     public void Every_recommended_final_matches_the_approved_document_exactly()
     {
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, ".demo-preview", "approve-meetings-wording.md"))) root = root.Parent;
-        Assert.NotNull(root);
-        var document = File.ReadAllText(Path.Combine(root.FullName, ".demo-preview", "approve-meetings-wording.md")).Replace("\r\n", "\n");
-        var privacy = File.ReadAllText(Path.Combine(root.FullName, ".demo-preview", "meetings-privacy-section.md")).Replace("\r\n", "\n");
+        // The fixtures hold only the approved final texts; the drafting record stays out of the repository.
+        var fixtures = Path.Combine(FixBatchDownloadTests.RepoRoot(), "tests", "Dictum.Tests", "Fixtures", "Meetings");
+        var document = File.ReadAllText(Path.Combine(fixtures, "approved-wording.md")).Replace("\r\n", "\n");
+        var privacy = File.ReadAllText(Path.Combine(fixtures, "privacy-section.md")).Replace("\r\n", "\n");
         var values = typeof(MeetingsText).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(field => field.Name.StartsWith("APPROVED_", StringComparison.Ordinal))
             .Select(field => (string)field.GetRawConstantValue()!).ToArray();
