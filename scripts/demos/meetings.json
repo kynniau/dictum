@@ -1,0 +1,436 @@
+{
+  "name": "meetings",
+  "title": "Meetings: a short synthetic recording",
+  "copyStatus": "PROPOSED",
+  "summary": "PROPOSED. Dictum 1.5.0: turn Meetings on, read setup and import notices, import synthetic speech, read the transcript and summary, and open the sharing reminder. Uses imports because the recorder sandbox has no microphone input. No live capture or real voices. Not recorded or validated yet. Requires a locally available qwen2.5-1.5b model, installed Windows speech synthesis, and the 1.5.0 installer. No network downloads.",
+  "environment": {
+    "extraModels": [
+      "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    ]
+  },
+  "prepare": [
+    {
+      "do": "plainDesktop"
+    },
+    {
+      "do": "installSilently"
+    },
+    {
+      "do": "modelsFromHost"
+    },
+    {
+      "do": "key",
+      "keys": "Win+R"
+    },
+    {
+      "do": "type",
+      "text": "powershell.exe -NoProfile -WindowStyle Hidden -Command \"Add-Type -AssemblyName System.Speech; $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; $speaker.SetOutputToWaveFile('C:\\demo\\meetings-synthetic.wav'); $speaker.Speak('This is a synthetic meeting for the Dictum guide. We will check the garden plan on Friday. Alex will bring the plan. Sam will check the list. We will meet again next week.'); $speaker.Dispose()\""
+    },
+    {
+      "do": "key",
+      "keys": "Enter"
+    },
+    {
+      "do": "wait",
+      "seconds": 10
+    },
+    {
+      "do": "launch"
+    },
+    {
+      "do": "click",
+      "target": {
+        "window": "^Welcome to Dictum$",
+        "type": "Button",
+        "name": "Continue",
+        "timeout": 120
+      }
+    },
+    {
+      "do": "wait",
+      "seconds": 1.5
+    },
+    {
+      "do": "click",
+      "target": {
+        "window": "^Welcome to Dictum$",
+        "type": "Button",
+        "name": "Next"
+      }
+    },
+    {
+      "do": "wait",
+      "seconds": 1.5
+    },
+    {
+      "do": "click",
+      "target": {
+        "window": "^Welcome to Dictum$",
+        "type": "Button",
+        "name": "Next"
+      }
+    },
+    {
+      "do": "wait",
+      "seconds": 1.5
+    },
+    {
+      "do": "click",
+      "target": {
+        "window": "^Welcome to Dictum$",
+        "type": "Button",
+        "name": "Use this hotkey"
+      }
+    },
+    {
+      "do": "wait",
+      "seconds": 1.5
+    },
+    {
+      "do": "click",
+      "target": {
+        "window": "^Welcome to Dictum$",
+        "type": "Button",
+        "name": "Next"
+      }
+    },
+    {
+      "do": "wait",
+      "seconds": 1.5
+    },
+    {
+      "do": "click",
+      "target": {
+        "window": "^Welcome to Dictum$",
+        "type": "Button",
+        "name": "Finish",
+        "timeout": 60
+      }
+    },
+    {
+      "do": "wait",
+      "seconds": 10
+    }
+  ],
+  "steps": [
+    {
+      "id": "arrow",
+      "caption": "Click the little up-arrow near the clock, at the bottom right of the screen.",
+      "skipIf": {
+        "windowClass": "Shell_TrayWnd",
+        "type": "Button",
+        "name": "Dictum",
+        "match": "prefix"
+      },
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "windowClass": "Shell_TrayWnd",
+            "type": "Button",
+            "name": "Show Hidden Icons"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tray",
+      "caption": "Click the Dictum icon.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "type": "Button",
+            "name": "Dictum",
+            "match": "prefix"
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "caption": "Click Settings.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Dictum$",
+            "type": "Button",
+            "name": "Settings"
+          }
+        }
+      ]
+    },
+    {
+      "id": "models",
+      "caption": "Choose Models to check the local clean-up model.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Dictum settings$",
+            "type": "ListItem",
+            "name": "Models"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-cleanup",
+      "caption": "Choose Add AI clean-up if it is shown. The model is already on this test PC.",
+      "optional": true,
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Dictum settings$",
+            "type": "Button",
+            "name": "Add AI clean-up",
+            "match": "prefix"
+          }
+        }
+      ],
+      "after": 30
+    },
+    {
+      "id": "meetings-settings",
+      "caption": "Choose Meetings in Settings.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Dictum settings$",
+            "type": "ListItem",
+            "name": "Meetings"
+          }
+        }
+      ]
+    },
+    {
+      "id": "enable",
+      "caption": "Switch on Turn on Meetings.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Dictum settings$",
+            "type": "CheckBox",
+            "name": "Turn on Meetings"
+          }
+        }
+      ]
+    },
+    {
+      "id": "setup-notice",
+      "caption": "Read the setup notice before you continue.",
+      "do": [
+        {
+          "do": "point",
+          "target": {
+            "window": "^Turn on Meetings$",
+            "type": "Text",
+            "name": "Meetings saves recordings",
+            "match": "prefix"
+          }
+        }
+      ],
+      "after": 5
+    },
+    {
+      "id": "setup-confirm",
+      "caption": "Choose I understand. Turn on Meetings.",
+      "do": [
+        {
+          "do": "invokeClick",
+          "target": {
+            "window": "^Turn on Meetings$",
+            "type": "Button",
+            "name": "I understand. Turn on Meetings"
+          }
+        }
+      ]
+    },
+    {
+      "id": "open",
+      "caption": "Choose Open existing meetings.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Dictum settings$",
+            "type": "Button",
+            "name": "Open existing meetings"
+          }
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "caption": "This demo uses computer-made speech. Choose Import a recording.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Button",
+            "name": "Import a recording"
+          }
+        }
+      ]
+    },
+    {
+      "id": "choose-file",
+      "caption": "Open the short synthetic meeting recording.",
+      "do": [
+        {
+          "do": "type",
+          "text": "C:\\demo\\meetings-synthetic.wav"
+        },
+        {
+          "do": "key",
+          "keys": "Enter"
+        }
+      ]
+    },
+    {
+      "id": "imports-notice",
+      "caption": "Read Before you turn on imports.",
+      "do": [
+        {
+          "do": "point",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Text",
+            "name": "Before you turn on imports"
+          }
+        }
+      ],
+      "after": 5
+    },
+    {
+      "id": "imports-on",
+      "caption": "Choose I understand. Turn on imports.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Button",
+            "name": "I understand. Turn on imports"
+          }
+        }
+      ],
+      "scrollFirst": true
+    },
+    {
+      "id": "agreement",
+      "caption": "Read Before you import. This demo has no recorded people.",
+      "do": [
+        {
+          "do": "point",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Text",
+            "name": "Before you import"
+          }
+        }
+      ],
+      "after": 5
+    },
+    {
+      "id": "import-confirm",
+      "caption": "Choose I confirm that everyone agreed. Import.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Button",
+            "name": "I confirm that everyone agreed. Import"
+          }
+        }
+      ],
+      "scrollFirst": true,
+      "after": 2
+    },
+    {
+      "id": "transcript",
+      "caption": "Read the Transcript. Check the words.",
+      "do": [
+        {
+          "do": "waitFor",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Button",
+            "name": "Regenerate",
+            "timeout": 180
+          }
+        },
+        {
+          "do": "point",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Text",
+            "name": "Transcript"
+          }
+        }
+      ],
+      "after": 4
+    },
+    {
+      "id": "summary",
+      "caption": "Read the Summary. Check it against the transcript.",
+      "do": [
+        {
+          "do": "point",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Text",
+            "name": "Summary"
+          }
+        }
+      ],
+      "after": 4,
+      "poster": true
+    },
+    {
+      "id": "copy",
+      "caption": "Choose Copy to see the sharing reminder.",
+      "do": [
+        {
+          "do": "click",
+          "target": {
+            "window": "^Meetings$",
+            "type": "Button",
+            "name": "Copy"
+          }
+        }
+      ],
+      "scrollFirst": true
+    },
+    {
+      "id": "sharing",
+      "caption": "Read the sharing reminder. This demo chooses Cancel.",
+      "do": [
+        {
+          "do": "point",
+          "target": {
+            "window": "^I understand\\. Continue$",
+            "type": "Text",
+            "name": "You are about to copy, export or share meeting content.",
+            "match": "prefix"
+          }
+        },
+        {
+          "do": "invokeClick",
+          "target": {
+            "window": "^I understand\\. Continue$",
+            "type": "Button",
+            "name": "Cancel"
+          }
+        }
+      ],
+      "after": 3
+    }
+  ]
+}
