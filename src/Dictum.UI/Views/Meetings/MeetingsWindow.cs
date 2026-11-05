@@ -506,7 +506,7 @@ internal sealed class MeetingsWindow : Window
 
     private void ShowSaveFailure()
     {
-        Screen(Ui.Heading(PROPOSED_AudioSaveFailed), SafeButton(PROPOSED_Retry, () => _ = Work(() => StopRecording(false))),
+        Screen(Ui.Heading(PROPOSED_AudioSaveFailed), SafeButton(_source?.RecordingFailed == true ? PROPOSED_SaveAudioStop : PROPOSED_Retry, () => _ = Work(() => StopRecording(false))),
             SafeButton(APPROVED_Refused, TakeNotes), SafeButton(PROPOSED_Discard, ConfirmDiscard));
         Say(PROPOSED_AudioSaveFailed);
     }
@@ -646,7 +646,10 @@ internal sealed class MeetingsWindow : Window
             _ => APPROVED_Local,
         };
         return (route.SpeechHost is { } speech ? string.Format(APPROVED_CloudSpeech, speech) : APPROVED_LocalSpeech)
-            + Environment.NewLine + summary + Environment.NewLine + APPROVED_ConfirmationNote;
+            + Environment.NewLine + summary + Environment.NewLine
+            + (route.KeepAudio == KeepAudio.Forever ? APPROVED_KeepForever
+                : string.Format(APPROVED_KeepDays, route.KeepAudio == KeepAudio.Days30 ? 30 : 90))
+            + Environment.NewLine + APPROVED_ConfirmationNote;
     }
 
     private async Task Regenerate(MeetingId id, string template)

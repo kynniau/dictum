@@ -48,8 +48,9 @@ internal sealed record MeetingsHost(
     public Func<MeetingId, IReadOnlyList<MeetingConfirmation>> ReadConfirmations { get; init; } = _ => [];
     public MeetingProcessingRoute ProcessingRoute()
     {
-        var engine = Settings().SummaryEngine;
-        return new(CloudSpeechHost(), engine, engine == SummaryEngine.Local ? null : SummaryHost());
+        var settings = Settings();
+        var engine = settings.SummaryEngine;
+        return new(CloudSpeechHost(), engine, engine == SummaryEngine.Local ? null : SummaryHost(), settings.KeepAudio);
     }
     public IDisposable UseConfirmedRoute(MeetingProcessingRoute route) => MeetingProcessingConsent.Enter(() => ProcessingRoute() == route);
     // simplification: team sharing and team-folder access/logging do not exist; keep them unavailable.
@@ -145,7 +146,8 @@ internal sealed record MeetingsHost(
         public IReadOnlyList<(MeetingMeta, string Snippet)> Search(string text) => Current().Search(text);
         public void Delete(MeetingId id) => Current().Delete(id);
         public long SizeOf(MeetingId id) => Current().SizeOf(id);
-        public void ApplyRetention(DateTimeOffset now) => Current().ApplyRetention(now);
+        public void ApplyRetention(DateTimeOffset now) => Current().ApplyRetention(now, id =>
+            ReadConfirmations(id).LastOrDefault(c => c.Route?.KeepAudio is not null)?.Route?.KeepAudio);
         public string ExportMarkdown(MeetingId id) => Current().ExportMarkdown(id);
     }
 
@@ -305,6 +307,7 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
         }
     }
     public IReadOnlyList<Channel> Tracks => [Channel.You];
+    public bool RecordingFailed => saving?.RecordingFailed ?? false;
     public void CompleteAudio() => saving?.Complete();
     public Stream Audio(Channel channel = Channel.You)
     {
@@ -324,7 +327,7 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
 internal sealed record MeetingConfirmation(string Answer, DateTimeOffset At, AgreementKind Kind,
     string ScriptVersion, string Script, string? ImporterIdentity = null, MeetingProcessingRoute? Route = null);
 
-internal sealed record MeetingProcessingRoute(string? SpeechHost, SummaryEngine SummaryEngine, string? SummaryHost);
+internal sealed record MeetingProcessingRoute(string? SpeechHost, SummaryEngine SummaryEngine, string? SummaryHost, KeepAudio? KeepAudio = null);
 
 // The worker checks again after acquiring a speech client: settings can change on
 // another thread before the window receives its settings notification.
@@ -359,6 +362,7 @@ internal interface IHostMeetingSource : IMeetingAudioSource, IDisposable
     void Resume();
     void Stop();
     Stream Audio(Channel channel = Channel.You);
+    bool RecordingFailed => false;
     void CompleteAudio();
 }
 
@@ -442,6 +446,7 @@ internal sealed class TwoTrackMeetingSource(IAudioCapture microphone, IAudioCapt
         await _pump.ConfigureAwait(false);
         _parts.Writer.TryComplete();
     }
+    public bool RecordingFailed => saving?.RecordingFailed ?? false;
     public void CompleteAudio() => saving?.Complete();
     public Stream Audio(Channel channel = Channel.You)
     {

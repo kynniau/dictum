@@ -251,11 +251,18 @@ public sealed class FileMeetingStore : IMeetingStore
     }
     public void ApplyRetention(DateTimeOffset now)
     {
-        var days = _settings.KeepAudio switch { KeepAudio.Forever => int.MaxValue, KeepAudio.Days30 => 30, KeepAudio.Days90 => 90, _ => throw new InvalidOperationException() };
-        if (days == int.MaxValue) return;
+        ApplyRetention(now, _ => null);
+    }
+    internal void ApplyRetention(DateTimeOffset now, Func<MeetingId, KeepAudio?> confirmedRetention)
+    {
         lock (Gate)
-            foreach (var meta in List().Where(m => now - (m.StartedAt + m.Duration) >= TimeSpan.FromDays(days)))
-                foreach (var audio in Directory.GetFiles(Folder(meta.Id), "audio-*.enc")) File.Delete(audio);
+            foreach (var meta in List())
+            {
+                var keep = confirmedRetention(meta.Id) ?? meta.Agreement?.Confirmation?.Route?.KeepAudio ?? _settings.KeepAudio;
+                var days = keep switch { KeepAudio.Forever => int.MaxValue, KeepAudio.Days30 => 30, KeepAudio.Days90 => 90, _ => throw new InvalidOperationException() };
+                if (days != int.MaxValue && now - (meta.StartedAt + meta.Duration) >= TimeSpan.FromDays(days))
+                    foreach (var audio in Directory.GetFiles(Folder(meta.Id), "audio-*.enc")) File.Delete(audio);
+            }
     }
     public void Delete(MeetingId id)
     {

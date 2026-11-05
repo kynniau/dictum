@@ -119,6 +119,7 @@ public static class MeetingCrypto
         private readonly Action _completed;
         private long _sequence;
         private bool _ended, _failed, _completionMarked;
+        private long? _terminalStart;
         internal AudioWriter(string path, byte[] content, string identity, Action completed)
         {
             _identity = identity; _completed = completed;
@@ -167,7 +168,17 @@ public static class MeetingCrypto
         {
             if (_completionMarked) return;
             if (_failed) throw new IOException("Audio writer failed.");
-            if (!_ended) { Write([]); _ended = true; _output.Dispose(); }
+            if (!_ended)
+            {
+                // The PCM is durable. A failed terminal write can be rebuilt on retry,
+                // unlike an append whose input may already have left the capture queue.
+                _terminalStart ??= _output.Position;
+                _output.SetLength(_terminalStart.Value);
+                _output.Position = _terminalStart.Value;
+                try { Write([]); }
+                catch { _failed = false; throw; }
+                _ended = true; _output.Dispose();
+            }
             _completed(); _completionMarked = true;
         }
         public void Dispose() { _ended = true; _output.Dispose(); _aes.Dispose(); }

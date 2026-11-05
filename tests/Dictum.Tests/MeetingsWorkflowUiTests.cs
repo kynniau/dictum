@@ -1015,7 +1015,16 @@ public sealed class MeetingsWorkflowUiTests
         var host = Create();
         Assert.False(host.ImportsEnabled()); host.EnableImports(); Assert.True(Create().ImportsEnabled());
         var path = Path.Combine(fixture.Files.Root, "decoded.mp3"); File.WriteAllBytes(path, [1, 2, 3]);
-        var id = await host.Import(path, new(DateTimeOffset.UtcNow, "written", ApprovedScriptVersion, AgreementKind.Import), TestContext.Current.CancellationToken);
+        var agreement = new Agreement(DateTimeOffset.UtcNow, "written", ApprovedScriptVersion, AgreementKind.Import)
+        {
+            Confirmation = new("written", DateTimeOffset.UtcNow, AgreementKind.Import, ApprovedScriptVersion,
+                APPROVED_ImportAgreement, Environment.UserName, host.ProcessingRoute()),
+        };
+        var id = await host.Import(path, agreement, TestContext.Current.CancellationToken);
+        var confirmation = Assert.Single(Create().ReadConfirmations(id));
+        Assert.Equal(Environment.UserName, confirmation.ImporterIdentity);
+        Assert.Equal(APPROVED_ImportAgreement, confirmation.Script);
+        Assert.Equal(host.ProcessingRoute(), confirmation.Route);
         Assert.Equal(1, decoder.Calls);
         Assert.True(Directory.Exists(Path.Combine(folder, id.Value)));
         Assert.NotNull(fixture.Files.Credentials.Read(MeetingKeyring.Variable, "owner"));
@@ -1246,6 +1255,28 @@ public sealed class MeetingsWorkflowUiTests
     });
 
     [Fact]
+    public Task Retention_change_cancels_import_and_requires_fresh_notice() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var controlled = new ControlledTranscriber();
+        fixture.ImportsEnabled = true;
+        var importer = new MeetingImporter(fixture.Store, controlled, new WavOnlyDecoder(),
+            saveConfirmation: (id, agreement) => fixture.Host.SaveConfirmation(id, agreement.Confirmation!));
+        var host = fixture.Host with { Import = (path, agreement, cancellation) => importer.ImportAsync(path, MeetingSource.ImportedFile, agreement, cancellationToken: cancellation) };
+        var path = Path.Combine(fixture.Files.Root, "import.wav"); File.WriteAllBytes(path, MeetingFixture.Wav());
+        var window = new MeetingsWindow(host); window.Show(); window.BeginImportAgreement(path); Click(window, APPROVED_Import);
+        await controlled.Entered.Task;
+        var id = Assert.Single(fixture.Store.List()).Id;
+        Assert.Equal(Environment.UserName, Assert.Single(Confirmations(fixture, id)).ImporterIdentity);
+        fixture.Settings = fixture.Settings with { KeepAudio = KeepAudio.Days30 };
+        window.RefreshSettings();
+        await Until(() => controlled.Ended && fixture.Store.List().Count == 0 && Find(window, APPROVED_Import).IsEffectivelyEnabled);
+        window.BeginImportAgreement(path);
+        Assert.Contains(string.Format(APPROVED_KeepDays, 30), Texts(window));
+        Assert.Contains(APPROVED_ImportAgreement, Texts(window));
+        Assert.True(window.Shutdown()); return true;
+    });
+
+    [Fact]
     public Task Failed_import_confirmation_rolls_back_before_transcription() => UiSession.RunAsync(async () =>
     {
         using var fixture = new Fixture(); var controlled = new ControlledTranscriber();
@@ -1323,5 +1354,97 @@ public sealed class MeetingsWorkflowUiTests
         Click(window, PROPOSED_Discard); Click(Assert.Single(window.OwnedWindows), PROPOSED_Discard);
         await Until(() => store.List().Count == 0); window.Close(); return true;
     });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Append_failure_keeps_partial_audio_and_transcript_without_retry(bool notes) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture(); var store = new FaultStore(fixture.Store);
+        var window = new MeetingsWindow(fixture.Host with { Store = store });
+        try
+        {
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        fixture.Capture.Emit();
+        var id = Assert.Single(fixture.Store.List()).Id;
+        await Until(() => fixture.Store.ReadTranscript(id).Count > 0);
+        // Wait for the first durable part before failing a later append.
+        await Until(() => { using var audio = fixture.Store.OpenAudio(id, Channel.You); return AudioBytes(audio).Length > 44; });
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        store.FailChunk = true; fixture.Capture.Emit();
+        await Until(() => Texts(window).Contains(PROPOSED_AudioSaveFailed) && window.IsEnabled);
+        Assert.DoesNotContain(All<Button>(window), b => AutomationProperties.GetName(b) == PROPOSED_Retry);
+        if (notes)
+        {
+            Click(window, APPROVED_Refused);
+            All<TextBox>(window).Single().Text = "Additional notes";
+            Click(window, PROPOSED_SaveNotes);
+        }
+        else Click(window, PROPOSED_SaveAudioStop);
+        await Until(() => Texts(window).Contains(PROPOSED_Transcript) && window.IsEnabled);
+        Assert.True(fixture.Store.Read(id).AudioIncomplete);
+        using var saved = fixture.Store.OpenAudio(id, Channel.You);
+        Assert.True(AudioBytes(saved).Length > 44);
+        Assert.NotEmpty(fixture.Store.ReadTranscript(id));
+        if (notes) Assert.Contains(fixture.Store.ReadTranscript(id), segment => segment.Text == "Additional notes");
+        Assert.True(window.Shutdown()); return true;
+
+        }
+        finally { window.Shutdown(); }
+    });
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("identity")]
+    [InlineData("notice")]
+    [InlineData("route")]
+    [InlineData("retention")]
+    public async Task Import_rejects_incomplete_confirmation_before_decoding(string missing)
+    {
+        using var fixture = new Fixture(); var decoder = new Decoder();
+        var importer = new MeetingImporter(fixture.Store, fixture.Transcriber, decoder, saveConfirmation: (_, _) => { });
+        var path = Path.Combine(fixture.Files.Root, "input.mp3"); File.WriteAllBytes(path, [1, 2, 3]);
+        var confirmation = new MeetingConfirmation("written", DateTimeOffset.UtcNow, AgreementKind.Import,
+            ApprovedScriptVersion, APPROVED_ImportAgreement, Environment.UserName, fixture.Host.ProcessingRoute());
+        confirmation = missing switch
+        {
+            "identity" => confirmation with { ImporterIdentity = " " },
+            "notice" => confirmation with { Script = " " },
+            "route" => confirmation with { Route = null },
+            "retention" => confirmation with { Route = confirmation.Route! with { KeepAudio = null } },
+            _ => confirmation,
+        };
+        var agreement = new Agreement(DateTimeOffset.UtcNow, "written", ApprovedScriptVersion, AgreementKind.Import)
+            { Confirmation = missing == "missing" ? null : confirmation };
+        await Assert.ThrowsAsync<ArgumentException>(() => importer.ImportAsync(path, MeetingSource.ImportedFile, agreement));
+        Assert.Equal(0, decoder.Calls); Assert.Equal(0, fixture.Transcriber.Finished); Assert.Empty(fixture.Store.List());
+    }
+
+    [Fact]
+    public Task Retention_change_pauses_capture_and_preserves_confirmed_retention_until_agreed() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host); try
+        {
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        var id = Assert.Single(fixture.Store.List()).Id;
+        fixture.Settings = fixture.Settings with { KeepAudio = KeepAudio.Days30 };
+        window.RefreshSettings(); Assert.False(fixture.Capture.Active);
+        var notice = Assert.Single(window.OwnedWindows);
+        Assert.Contains(string.Format(APPROVED_KeepDays, 30), Texts(notice));
+        fixture.Store.ApplyRetention(DateTimeOffset.UtcNow.AddDays(100));
+        using (var audio = fixture.Store.OpenAudio(id, Channel.You)) Assert.True(AudioBytes(audio).Length >= 44);
+        Assert.Equal(KeepAudio.Forever, Assert.Single(Confirmations(fixture, id)).Route!.KeepAudio);
+        Click(notice, APPROVED_Continue); await Until(() => fixture.Capture.Active);
+        Assert.Equal(KeepAudio.Days30, Confirmations(fixture, id).Last().Route!.KeepAudio);
+        Assert.True(window.Shutdown());
+        fixture.Store.ApplyRetention(DateTimeOffset.UtcNow.AddDays(100));
+        Assert.Throws<FileNotFoundException>(() => fixture.Store.OpenAudio(id, Channel.You));
+        return true;
+
+        }
+        finally { window.Shutdown(); }
+    });
+
 
 }

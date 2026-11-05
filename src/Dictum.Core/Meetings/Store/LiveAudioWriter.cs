@@ -20,6 +20,7 @@ internal sealed class LiveAudioWriter : IDisposable
     private long _queued;
     private Exception? _failure;
     private int _disposed;
+    internal bool RecordingFailed => _failure is not null;
     public event Action<Exception>? Failed;
 
     internal LiveAudioWriter(IMeetingStore store, MeetingId id, params Channel[] tracks)
@@ -79,7 +80,13 @@ internal sealed class LiveAudioWriter : IDisposable
     internal void Complete()
     {
         _queue.Writer.TryComplete(); _worker.GetAwaiter().GetResult();
-        if (_failure is not null) throw _failure;
+        if (RecordingFailed)
+        {
+            // Keep the authenticated prefix and the store's incomplete flag after a failed append.
+            // A terminal record would falsely mark the truncated recording as complete.
+            foreach (var writer in _writers.Values) writer.Dispose();
+            return;
+        }
         foreach (var writer in _writers.Values) writer.Complete();
     }
     internal Stream Audio(Channel track) => _store.OpenAudio(_id, track);

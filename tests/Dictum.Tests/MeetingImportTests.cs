@@ -32,7 +32,7 @@ public sealed class MeetingImportTests
             cancel.Cancel();
         });
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            new MeetingImporter(store, transcriber, new WavOnlyDecoder()).ImportAsync(path,
+            Importer(store, transcriber: transcriber).ImportAsync(path,
                 MeetingSource.ImportedFile, ImportAgreement, progress, cancel.Token));
         Assert.Empty(store.List());
     }
@@ -46,7 +46,7 @@ public sealed class MeetingImportTests
         var expected = new InvalidOperationException("transcription failed");
         var transcriber = new StubTranscriber((_, _) => Task.FromException(expected));
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new MeetingImporter(store, transcriber, new WavOnlyDecoder()).ImportAsync(path,
+            Importer(store, transcriber: transcriber).ImportAsync(path,
                 MeetingSource.ImportedFile, ImportAgreement));
         Assert.Same(expected, error);
         Assert.Empty(store.List());
@@ -102,8 +102,8 @@ public sealed class MeetingImportTests
         var cleanup = new IOException("delete failed");
         var store = new FaultStore(fixture.Store()) { DeleteError = cleanup };
         var error = await Assert.ThrowsAsync<AggregateException>(() =>
-            new MeetingImporter(store, new StubTranscriber((_, _) => Task.FromException(expected)),
-                new WavOnlyDecoder()).ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement));
+            Importer(store, transcriber: new StubTranscriber((_, _) => Task.FromException(expected)))
+                .ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement));
         Assert.Equal(new Exception[] { expected, cleanup }, error.InnerExceptions);
     }
 
@@ -120,7 +120,7 @@ public sealed class MeetingImportTests
             entered.SetResult();
             await release.Task.WaitAsync(cancellation);
         });
-        var importing = new MeetingImporter(store, transcriber, new WavOnlyDecoder())
+        var importing = Importer(store, transcriber: transcriber)
             .ImportAsync(path, MeetingSource.ImportedFile, ImportAgreement);
         try
         {
@@ -310,8 +310,26 @@ public sealed class MeetingImportTests
         Assert.Empty(store.List());
     }
 
-    private static MeetingImporter Importer(IMeetingStore store, IAudioDecoder? decoder = null) =>
-        new(store, new MeetingTranscriber(new ToneEngine(), new ToneGate(), store), decoder ?? new WavOnlyDecoder());
+    private static ConfirmedImporter Importer(IMeetingStore store, IAudioDecoder? decoder = null,
+        IMeetingTranscriber? transcriber = null)
+    {
+        var confirmations = new Dictionary<MeetingId, MeetingConfirmation>();
+        return new(new MeetingImporter(store, transcriber ?? new MeetingTranscriber(new ToneEngine(), new ToneGate(), store),
+            decoder ?? new WavOnlyDecoder(),
+            saveConfirmation: (id, agreement) => confirmations.Add(id, agreement.Confirmation!)));
+    }
+
+    private sealed class ConfirmedImporter(MeetingImporter importer)
+    {
+        public Task<MeetingId> ImportAsync(string path, MeetingSource source, Agreement agreement,
+            IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
+            importer.ImportAsync(path, source, agreement with
+            {
+                Confirmation = new MeetingConfirmation(agreement.How, agreement.AcknowledgedAt, AgreementKind.Import,
+                    agreement.ScriptVersion, "I confirm that everyone agreed to this recording and its import for transcription.",
+                    "Synthetic importer", new MeetingProcessingRoute(null, SummaryEngine.Local, null, KeepAudio.Forever))
+            }, progress, cancellationToken);
+    }
 
     private static string WriteTone(MeetingFixture fixture)
     {
