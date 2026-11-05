@@ -32,6 +32,25 @@ public sealed class MeetingsChunkedAudioTests
         Assert.True(Assert.Single(reopened.List()).AudioIncomplete);
         Assert.Equal(MeetingFixture.Segments, reopened.ReadTranscript(id));
     }
+    [Fact]
+    public void Maximum_length_parts_on_both_tracks_are_saved_without_failing()
+    {
+        // The segmenter cuts unbroken speech at LimitBlocks (30 s); at Stop both tracks hand over a tail at once.
+        using var files = new MeetingFixture(); var store = files.Store(); var id = store.Create(files.Meta());
+        var longest = SpeechSegmenter.LimitBlocks * CaptureBuffer.BlockSamples;
+        Exception? failure = null;
+        using (var saving = new LiveAudioWriter(store, id, Channel.You, Channel.Others))
+        {
+            saving.Failed += error => failure = error;
+            saving.Enqueue(Channel.You, new float[longest], TimeSpan.Zero);
+            saving.Enqueue(Channel.Others, new float[longest], TimeSpan.Zero);
+            saving.Complete();
+        }
+        Assert.Null(failure);
+        Assert.Equal(44 + longest * 2, Read(store, id, Channel.You).Length);
+        Assert.Equal(44 + longest * 2, Read(store, id, Channel.Others).Length);
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(3)]
