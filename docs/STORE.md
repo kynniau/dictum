@@ -120,6 +120,9 @@ MAKE IT HEAR YOU
 FOR WORK
 Runs on PCs without a graphics card and on Windows virtual machines over Remote Desktop with microphone redirection. Models, recordings and logs can be deleted from Settings, or everything removed in one step.
 
+MEETINGS
+Record and transcribe meetings on your PC. Meetings is off until you turn it on. Before each recording, Dictum shows what to tell everyone and asks you to confirm that each person agreed; if someone joins, recording pauses until you confirm they agreed too, and it stops at once if anyone says no. Dictum records your microphone, and your computer's sound when Windows allows it, shows a live transcript and saves the meeting encrypted on your PC. The summary is written on your PC unless you choose Ollama or a cloud service with your own key, and Dictum names that service before you start. You can also import a recording. Rules for recording, importing and sharing can differ between places. Check the rules that apply to you and the other people involved.
+
 GOOD TO KNOW
 - Windows 10 or 11, 64-bit (x64). A graphics card is optional but makes the larger, more accurate models fast.
 - Windows does not let Dictum paste into apps running as administrator, or into sign-in and UAC screens.
@@ -131,6 +134,8 @@ Free: no subscription, no account, no ads, no analytics, no telemetry. The base 
 Free and open source under the MIT licence, by Kynni Pty Ltd.
 ```
 
+APPROVED by the owner 05/11/2026 14:21 AEDT (1.5.0 listing): the MEETINGS section, placed after FOR WORK and before GOOD TO KNOW. Its last two sentences reuse the approved Meetings wording of 05/11/2026 09:13 AEDT. Set in Partner Center on Submission 7.
+
 The last sentence of PRIVATE BY DESIGN ("Dictum is free and open source under the MIT licence, and its Terms of Use apply; if you choose a cloud service, you take responsibility for what is sent to it.") is APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword. It replaced the sentence approved 22/10/2026 17:36 AEDT (plain-words statement, section 3), whose "provided as is" read as rights taken away (legal block, section C row O11). Plain text, no URL. Paste the whole description again on the next submission.
 
 **Additional license terms (legal block, section D item 6).** At the release that carries the Terms of Use acceptance in the Welcome window, and not before it (section D item 0: until then the Terms say Dictum asks on first start when no installed copy does), set Partner Center's "Additional license terms" field to https://dictum.kynni.au/terms, once that page is live. Owner or orchestrator; not done by a build lane. With it, the Terms replace Microsoft's Standard Application License Terms for Dictum (Terms section 15).
@@ -139,12 +144,15 @@ APPROVED 22/10/2026 22:52 AEDT (proposed 22/10/2026): do not reword, for the 1.3
 
 ### Product features (one per line, no bullets: the Store adds them)
 
+The line "Meetings: record, transcribe and summarise, with everyone's agreement" is APPROVED by the owner 05/11/2026 14:21 AEDT (1.5.0 listing), set in Partner Center on Submission 7.
+
 ```text
 Hold a key, talk and let go: your words are pasted at the cursor in any app
 Speech recognition runs on your PC by default with whisper.cpp and works offline
 Optional local clean-up removes filler words and fixes punctuation
 Hands-free mode types each sentence as you pause: double-tap to start, tap to stop
 Calibration finds the installed model that hears you best
+Meetings: record, transcribe and summarise, with everyone's agreement
 Personal dictionary and corrections for names and jargon
 Grammar assist for speakers whose first language is not English
 Offline-only mode: no connection to anything outside your PC
@@ -545,6 +553,7 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 05/11/2026 | Dictum 1.4.0 prepared (version bump, GitHub release notes, tester notes and What's new); all new wording APPROVED by the owner 05/11/2026 09:38 AEDT. Contents: API key controls and Windows Credential Manager storage, the full key-file template, Help guides and Calibration's Use this feedback. The voice activity gate model file is downloaded only with `Dictum.exe --download-model silero-v6.2.0`. |
 | 05/11/2026 | Dictum 1.4.0 submitted as Submission 6 (package 1.4.0.0 from main 6ace156): the owner uploaded the MSIX; What's new and the certification notes were set to the approved 1.4.0 text and the submission sent for certification. |
 | 05/11/2026 | Dictum 1.5.0 prepared (version bump, GitHub release notes, tester notes, What's new and the Meetings section of the privacy policy); all new wording APPROVED by the owner 05/11/2026 13:39 AEDT. Contents: Meetings, off by default, with the owner-approved consent steps, live transcript, encrypted audio saved while recording, local or chosen-service summaries, confirmed imports and a sharing reminder. |
+| 05/11/2026 | Dictum 1.4.0 (Submission 6) passed certification and is live in the Store (seen in Partner Center 14:05 AEDT). Dictum 1.5.0 submitted as Submission 7 (package 1.5.0.0 from main c8abc32, the same files as release PR 99's head dbbdd45): the owner uploaded the MSIX; What's new, the certification notes and the 1.5.0 listing additions (MEETINGS section, one feature line) were set to the approved text and the submission sent for certification. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
