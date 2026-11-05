@@ -1,6 +1,6 @@
 # Dictum: Microsoft Store submission kit
 
-Written 15/10/2026 for version 1.0.0 and updated DD/MM/YYYY for 1.4.0 (SPEC §18.4). Everything Partner Center asks for, in the order
+Written 15/10/2026 for version 1.0.0 and updated 05/11/2026 for 1.5.0 (SPEC §18.4). Everything Partner Center asks for, in the order
 it asks, plus the risks to clear first.
 
 **Provenance.** Microsoft rules are quoted or paraphrased from Microsoft Learn pages retrieved on
@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.4.0, so the package is 1.4.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 to 1.3.1 on 23/10/2026 and to 1.4.0 on DD/MM/YYYY, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.5.0, so the package is 1.5.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 to 1.3.1 on 23/10/2026, to 1.4.0 on 05/11/2026 and to 1.5.0 on 05/11/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -151,6 +151,14 @@ Offline-only mode: no connection to anything outside your PC
 Free: no subscription, no account, no ads, no analytics, no telemetry.
 Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
+```
+
+### What's new in this version (1.5.0)
+
+APPROVED by the owner 05/11/2026 13:39 AEDT: all wording in the following block. The last sentence was added on the owner's decision of 05/11/2026 13:39 AEDT, because privacy policy section 11 promises that the release notes say when a version changes what Dictum stores.
+
+```text
+Dictum 1.5.0 adds Meetings. It is off until you turn it on in Settings > Meetings and confirm the setup notice. Before each recording, Dictum shows what to tell everyone and asks you to confirm that each person agreed, spoken or in writing. If someone joins, recording pauses until you confirm they agreed too, and it stops at once if anyone says no. Dictum records your microphone, and your computer's sound when Windows allows it, shows a live transcript, and saves the audio in encrypted pieces as it goes. Before you start, Dictum names every service your audio or transcript will go to; summaries are written on this computer unless you choose Ollama or a cloud service with your own key. You can also import a recording once you turn imports on. Copy and Export show a sharing reminder first. Saved recordings stay until you delete them, or you can have the audio deleted after 30 or 90 days. The privacy policy on the website now has a Meetings section.
 ```
 
 ### What's new in this version (1.4.0)
@@ -292,7 +300,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.4.0 (set DD/MM/YYYY; 1.3.1 from 23/10/2026, 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.5.0 (set 05/11/2026; 1.4.0 from 05/11/2026, 1.3.1 from 23/10/2026, 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -399,6 +407,16 @@ Notes written 23/10/2026 for Dictum 1.3.1.
 CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.1 adds a Terms of Use step. On the first start, including the first start after an upgrade from an earlier version, Dictum shows its Terms of Use before anything else: the Welcome window's first step has a Continue button, and pressing Continue accepts the Terms. Closing the window, or pressing Esc on that step, quits Dictum and nothing is recorded as accepted; the later steps are as before. The command-line modes --transcribe and --bench-cleanup refuse to run until the Terms have been accepted once. Settings > About has two new buttons, Terms of use and Third-party notices. Settings > Storage names its folders more precisely, Calibration says Downloading only after the download question has been agreed, and the Offline only description names Check for updates and cloud speech. The two cloud consent dialogs (clean-up and speech) now say what hands-free mode sends with each part (for clean-up, up to ten words of what the user said just before; for speech, the closing words). The Qwen2.5-3B clean-up model is no longer offered. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as the user has pressed Continue on the Terms step; larger speech models and AI clean-up are optional downloads.
 
 Everything else is as in the notes for 1.3.0 above: cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
+```
+
+### Notes for certification for 1.5.0 (APPROVED by the owner 05/11/2026 13:39 AEDT)
+
+APPROVED by the owner 05/11/2026 13:39 AEDT: all wording in the following block. In Partner Center it replaces the 1.4.0 header and the paragraphs before "No API key"; the rest of the notes stay as they are.
+
+```text
+Notes written 05/11/2026 for Dictum 1.5.0.
+
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.5.0 adds Meetings, a meeting recorder and transcriber that is off by default. To test it, open Settings > Meetings, turn Meetings on and press "I understand. Turn on Meetings". Open Meetings from the Dictum panel and press Start a meeting. Read the notice, choose how everyone agreed and press "I confirm that I explained this and everyone agreed. Start recording". Speak for a few seconds: the live transcript fills in. Press Someone joined to see recording pause until you confirm; press Stop to save. Recordings, transcripts and summaries are encrypted on this computer. Nothing is sent anywhere unless the user has chosen cloud speech or a cloud summary, each with its own consent, and the notice names that service before recording starts.
 ```
 
 ### Notes for certification for 1.4.0 (APPROVED by the owner 05/11/2026 09:38 AEDT)
@@ -525,8 +543,10 @@ Learn, retrieved 15/10/2026), cited as CF #n, and the Store Policies (7.20).
 | 23/10/2026 | Dictum 1.3.0 (Submission 4) passed certification and is live in the Store (about 08:30 AEDT, as reported to this lane by the orchestrator's Partner Center check that day; this lane could not read Partner Center and did not re-check it). |
 | 23/10/2026 | Dictum 1.3.1 prepared (version bump, GitHub release notes, tester notes and What's new); the What's new and tester notes were approved by the owner 23/10/2026 15:53 AEDT. Contents: the Terms of Use acceptance on first start (upgrades included), the Store licence field, About's Terms of use and Third-party notices buttons, Storage naming its folders more precisely, Calibration's Downloading wording, Qwen2.5-3B removed from the catalogue, the Offline only description, the cloud consent dialogs saying what hands-free mode sends, the command-line Terms gate, the installer licence page, the rewritten Privacy Policy and the Terms page. "Additional license terms" is still to be set in Partner Center at submission. |
 | 05/11/2026 | Dictum 1.4.0 prepared (version bump, GitHub release notes, tester notes and What's new); all new wording APPROVED by the owner 05/11/2026 09:38 AEDT. Contents: API key controls and Windows Credential Manager storage, the full key-file template, Help guides and Calibration's Use this feedback. The voice activity gate model file is downloaded only with `Dictum.exe --download-model silero-v6.2.0`. |
+| 05/11/2026 | Dictum 1.4.0 submitted as Submission 6 (package 1.4.0.0 from main 6ace156): the owner uploaded the MSIX; What's new and the certification notes were set to the approved 1.4.0 text and the submission sent for certification. |
+| 05/11/2026 | Dictum 1.5.0 prepared (version bump, GitHub release notes, tester notes, What's new and the Meetings section of the privacy policy); all new wording APPROVED by the owner 05/11/2026 13:39 AEDT. Contents: Meetings, off by default, with the owner-approved consent steps, live transcript, encrypted audio saved while recording, local or chosen-service summaries, confirmed imports and a sharing reminder. |
 
 Sources: the 16/10/2026 failures and the 17/10/2026 08:10 AEDT resubmission are as reported by the product
 owner in the session briefs, and the 19/10/2026 failure as relayed by the orchestrator; they are not re-read from Partner Center, which this record cannot reach. The
 fixes are in sections 4, 6 and 9 (rows 6, 11 and 22). The packaged self-test of section 10, step 4 was not run
-for 1.1.0, 1.1.1, 1.1.2, 1.2.0, 1.2.1, 1.3.0, 1.3.1 or 1.4.0 (no packaged run on a clean PC yet).
+for 1.1.0, 1.1.1, 1.1.2, 1.2.0, 1.2.1, 1.3.0, 1.3.1, 1.4.0 or 1.5.0 (no packaged run on a clean PC yet).
