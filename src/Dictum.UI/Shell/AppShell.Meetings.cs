@@ -1,6 +1,7 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Dictum.Llm;
+using Dictum.Core;
 using Dictum.Meetings;
 using Dictum.Meetings.Summaries;
 using Dictum.Settings;
@@ -12,6 +13,18 @@ public sealed partial class AppShell
 {
     private MeetingsWindow? _meetingsWindow;
     private readonly SemaphoreSlim _meetingSummaryGate = new(1, 1);
+    private Func<float>? _meetingLevel;
+    internal bool MeetingOwnsPill => Volatile.Read(ref _meetingLevel) is not null;
+    internal void PresentMeeting(Func<float>? level, PillView view)
+    {
+        Volatile.Write(ref _meetingLevel, level);
+        (_overlays ??= new Overlays.OverlayPresenter(this)).Show(new PillState(view, Environment.TickCount64));
+    }
+    internal void PauseMeetingFromPill() => _meetingsWindow?.PauseFromPill();
+    internal void StopMeetingFromPill() => _meetingsWindow?.StopFromPill();
+    internal MeetingsWindow CreateMeetingsWindow(MeetingsHost host) =>
+        _meetingsWindow = new MeetingsWindow(host, () => DictationIdle, PresentMeeting);
+
     internal void ConfigureMeetingsShutdown(IClassicDesktopStyleApplicationLifetime? lifetime)
     {
         _lifetime = lifetime;
@@ -116,7 +129,7 @@ public sealed partial class AppShell
         if (start && !MeetingsSettings.Enabled) return;
         if (_meetingsWindow is null)
         {
-            _meetingsWindow = new MeetingsWindow(CreateMeetingsHost());
+            _meetingsWindow = CreateMeetingsWindow(CreateMeetingsHost());
             var opened = _meetingsWindow;
             Changed += opened.RefreshSettings;
             _meetingsWindow.Closed += (_, _) => { Changed -= opened.RefreshSettings; _meetingsWindow = null; };

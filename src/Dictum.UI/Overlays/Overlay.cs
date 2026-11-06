@@ -16,6 +16,9 @@ namespace Dictum.UI.Overlays;
 /// </summary>
 internal static class Overlay
 {
+    public static bool IsRecording(Dictum.Core.PillView view) =>
+        view == Dictum.Core.PillView.MeetingRecording || Dictum.Core.PillText.IsRecording(view);
+
     public static void Prepare(Window window, IPlatform? platform)
     {
         if (platform is null) return; // a headless test has no native window to style

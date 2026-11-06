@@ -16,6 +16,9 @@ using Dictum.Meetings.Summaries;
 using Dictum.Meetings.Transcribe;
 using Dictum.Settings;
 using Dictum.UI.Shell;
+using Dictum.UI.Overlays;
+using Dictum.Hotkey;
+using Dictum.Transcribe;
 using Dictum.UI.Views;
 using Dictum.UI.Views.Meetings;
 using Dictum.UI.Views.Settings;
@@ -204,7 +207,8 @@ public sealed class MeetingsWorkflowUiTests
         private Action<CapturedAudio, CutReason>? _part;
         public void SegmentAtPauses(double silenceThreshold, Action<CapturedAudio, CutReason> part) => _part = part;
         public void Emit() => _part?.Invoke(new(new float[1600], .2f), default);
-        public float CurrentLevel => Active ? 0.5f : 0;
+        public float Level = 0.5f;
+        public float CurrentLevel => Active ? Level : 0;
         public event Action<Exception>? Failed { add { } remove { } }
         public void Start(string? deviceSetting, long keyDownStamp) { if (FailStart) throw new IOException("Synthetic start failure"); Active = true; Starts++; }
         public CapturedAudio Stop() { Active = false; Stops++; return new(Enumerable.Range(0, 1600).Select(i => (float)(0.2 * Math.Sin(i * 0.2))).ToArray(), 0.2f); }
@@ -224,6 +228,173 @@ public sealed class MeetingsWorkflowUiTests
             Interlocked.Increment(ref Finished);
         }
     }
+
+    [Fact]
+    public Task Meeting_pill_pause_toggles_halo_and_stop_saves_normally() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        using var shell = fixture.Shell();
+        var system = new TestCapture { Level = 0.8f };
+        var window = shell.CreateMeetingsWindow(fixture.Host with { LoopbackCapture = () => system });
+        window.Show(); window.BeginAgreement();
+        Assert.Contains(PROPOSED_HeadphonesTip, Texts(window));
+        Click(window, APPROVED_Start);
+        var overlays = shell.Overlays!;
+        var pill = overlays.Pill!;
+        Assert.Equal(PillView.MeetingRecording, pill.View);
+        Assert.Equal(PROPOSED_MeetingRecording, pill.Text);
+        Assert.True(overlays.EdgesShown);
+        Assert.Equal(0.8f, shell.CurrentLevel);
+        system.Level = 0.1f;
+        Assert.Equal(0.5f, shell.CurrentLevel);
+        Assert.True(shell.MeetingOwnsPill);
+        Assert.False(pill.ShowActivated);
+        Assert.True(pill.Focusable);
+        Assert.True(pill.IsHitTestVisible);
+        Assert.True(Find(pill, PROPOSED_Pause).Focusable);
+        Assert.True(Find(pill, PROPOSED_Pause).Focus(NavigationMethod.Tab));
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(pill.FindControl<TextBlock>("Label")!));
+        Click(pill, PROPOSED_Pause);
+        Assert.Equal(PillView.MeetingPaused, pill.View);
+        Assert.Equal(PROPOSED_MeetingPaused, pill.Text);
+        Assert.False(overlays.EdgesShown);
+        Assert.False(fixture.Capture.Active);
+        Assert.True(shell.MeetingOwnsPill);
+        Click(pill, PROPOSED_Resume);
+        Assert.Equal(PillView.MeetingRecording, pill.View);
+        Assert.True(overlays.EdgesShown);
+        Assert.True(fixture.Capture.Active);
+        var meta = Assert.Single(fixture.Store.List());
+        window.WindowState = WindowState.Minimized;
+        Click(pill, PROPOSED_Stop);
+        Assert.Equal(WindowState.Normal, window.WindowState);
+        Assert.Equal(PillView.Hidden, pill.View);
+        Assert.False(overlays.EdgesShown);
+        Assert.False(shell.MeetingOwnsPill);
+        Assert.Equal(0, shell.CurrentLevel);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+        Assert.Equal(meta.Id, Assert.Single(fixture.Store.List()).Id);
+        Assert.NotEmpty(fixture.Store.ReadTranscript(meta.Id));
+        Assert.Contains(fixture.Store.Read(meta.Id).Markers, m => m.Kind == MarkerKind.Paused);
+        Assert.Contains(fixture.Store.Read(meta.Id).Markers, m => m.Kind == MarkerKind.Resumed);
+        Assert.Equal(1, fixture.Transcriber.Finished);
+        window.Close();
+        return true;
+    });
+
+    [Fact]
+    public Task Meeting_pill_uses_orb_and_reduced_motion_and_hides_meeting_controls_for_dictation() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "indicator": { "mode": "both" } }""");
+        var (shell, platform, _) = scratch.Shell();
+        using (shell)
+        using (var overlays = new OverlayPresenter(shell))
+        {
+            shell.Reload(userRequested: false);
+            platform.Flags.Reduced = true;
+            overlays.Show(new(PillView.MeetingRecording, 0));
+            Assert.Equal(PillView.MeetingRecording, overlays.Orb!.View);
+            Assert.Empty(overlays.Pill!.FindControl<Border>("Pill")!.Transitions ?? []);
+            overlays.Show(new(PillView.MeetingPaused, 0));
+            Assert.False(overlays.EdgesShown);
+            Assert.False(overlays.Orb.IsVisible);
+            overlays.Show(new(PillView.Hidden, 0));
+            Assert.False(overlays.Pill!.IsVisible);
+            overlays.Show(new(PillView.RecordingHold, 0));
+            Assert.False(overlays.Pill.MeetingControls);
+            Assert.False(overlays.Pill.IsHitTestVisible);
+            Assert.False(overlays.Pill.FindControl<Button>("MeetingPause")!.IsVisible);
+            Assert.False(overlays.Pill.FindControl<Button>("MeetingStop")!.IsVisible);
+        }
+    });
+
+    [Fact]
+    public Task Dictation_hotkey_during_meeting_is_busy_and_keeps_meeting_pill() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" } }""");
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
+        File.WriteAllText(model, "");
+        var models = new ModelManager(NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+        var log = new RecordingLog();
+        var (shell, platform, _) = scratch.Shell(models, new ShellOptions(ModelOverride: model), log: log);
+        using (shell)
+        {
+            Assert.True(shell.Start(null));
+            await Until(() => shell.SpeechReady);
+            var window = shell.CreateMeetingsWindow(fixture.Host);
+            window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+            var pill = shell.Overlays!.Pill!;
+            platform.LastListener!.Post(new HookEvent(HotkeySignal.Down, Environment.TickCount64));
+            await Until(() => log.All.Contains("Hotkey ignored:"));
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(shell.DictationIdle);
+            Assert.True(fixture.Capture.Active);
+            Assert.Equal(PillView.MeetingRecording, pill.View);
+            Assert.True(shell.Overlays.EdgesShown);
+            Click(pill, PROPOSED_Pause);
+            platform.LastListener.Post(new HookEvent(HotkeySignal.Down, Environment.TickCount64));
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(shell.DictationIdle);
+            Assert.Equal(PillView.MeetingPaused, pill.View);
+            Click(pill, PROPOSED_Stop);
+            await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+            window.Close();
+        }
+        return true;
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Meeting_pill_resume_keeps_route_and_arrival_agreement_checks(bool arrival) => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        using var shell = fixture.Shell();
+        var speech = "first.example";
+        var window = shell.CreateMeetingsWindow(fixture.Host with { CloudSpeechHost = () => speech });
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        var pill = shell.Overlays!.Pill!;
+        if (arrival)
+        {
+            Click(window, PROPOSED_Joined);
+            Click(Assert.Single(window.OwnedWindows), APPROVED_Cancel);
+        }
+        else
+        {
+            Click(pill, PROPOSED_Pause);
+            speech = "second.example";
+        }
+        Click(pill, PROPOSED_Resume);
+        Assert.False(fixture.Capture.Active);
+        Assert.Equal(PillView.MeetingPaused, pill.View);
+        Assert.False(shell.Overlays.EdgesShown);
+        Click(Assert.Single(window.OwnedWindows), APPROVED_Continue);
+        await Until(() => fixture.Capture.Active);
+        Assert.Equal(PillView.MeetingRecording, pill.View);
+        Click(pill, PROPOSED_Stop);
+        await Until(() => All<Button>(window).Any(b => AutomationProperties.GetName(b) == PROPOSED_Regenerate && b.IsEffectivelyEnabled));
+        window.Close();
+        return true;
+    });
+
+    [Fact]
+    public Task Meeting_start_refuses_active_dictation_including_after_agreement_opens() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var idle = false;
+        var window = new MeetingsWindow(fixture.Host, () => idle);
+        window.Show(); window.BeginAgreement();
+        Assert.Contains(PROPOSED_DictationBusy, Texts(window));
+        Assert.Equal(0, fixture.Capture.Starts);
+        idle = true; window.BeginAgreement();
+        idle = false; Click(window, APPROVED_Start);
+        Assert.Contains(PROPOSED_DictationBusy, Texts(window));
+        Assert.Equal(0, fixture.Capture.Starts);
+        Assert.Empty(fixture.Store.List());
+        window.Close();
+    });
 
     [Fact]
     public Task Agreement_blocks_capture_until_acknowledged_and_pause_releases_the_microphone() => UiSession.RunAsync(async () =>
@@ -1021,8 +1192,10 @@ public sealed class MeetingsWorkflowUiTests
         {
             using var audio = fixture.Store.OpenAudio(id, channel);
             Assert.True(AudioBytes(audio).Length > 44);
-            Assert.Contains(fixture.Store.ReadTranscript(id), line => line.Channel == channel);
         }
+        // The fixture returns identical speech for both tracks: retain only loopback text.
+        Assert.Contains(fixture.Store.ReadTranscript(id), line => line.Channel == Channel.Others);
+        Assert.DoesNotContain(fixture.Store.ReadTranscript(id), line => line.Channel == Channel.You);
         window.Close(); return true;
     });
 

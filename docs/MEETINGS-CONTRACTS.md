@@ -514,6 +514,28 @@ Every lane runs `dotnet test` and reports the output verbatim; no "should pass".
   segments interleaved by `offset`, `IVoiceGate` before each part (skip silence), results
   appended through `IMeetingStore.AppendSegments` and raised through `onSegment` in time order.
   Dictionary feeds the initial prompt exactly as dictation does.
+- Echo suppression (`EchoDeduplicator`) always keeps Others. A You segment is eligible
+  only when its interval overlaps Others with at most 2 seconds of separation, inclusive.
+  Text is lowercased invariantly; punctuation is removed (apostrophes joined, other
+  punctuation separates words), and the filler words um, uh, erm, er, hmm are removed.
+  Nonempty identical word sequences match. Otherwise both sequences need at least three
+  words and a shorter/longer word-count ratio of at least 0.8. Whole-word containment
+  then matches, or token Levenshtein similarity `1 - distance / max(counts)` must be at
+  least 0.8 (unit insertion, deletion and substitution costs). Word order matters.
+  Short acknowledgements inside longer speech and substantial partial overlaps survive
+  whole. Text alone cannot distinguish independently spoken near-identical sentences or
+  small additions within the threshold; retire this simplification with capture-path
+  echo cancellation.
+- The append-only live callback has no retraction operation. Completed You segments and
+  following lines are held before persistence and display until the source watermark is
+  strictly beyond their end plus 2 seconds. Incoming Others removes matching pending
+  You segments; incoming You is compared with a recent Others window. EOF drains survivors.
+  Thus no provisional echo is appended or displayed, and no removal API is needed.
+  Unordered sources hold provisional lines until EOF. Mixed segments are unaffected.
+- `FileMeetingStore.ReadTranscript` filters the fully authenticated transcript in memory,
+  without rewriting historical encrypted data, covering display, export and summary reads.
+  `TranscriptChunker.Chunk` also filters caller-supplied transcripts before rendering.
+  This makes old recordings clean on read; existing stored summaries are not regenerated.
 - **Tests (`MeetingTranscriberTests.cs`)** with a fake `ISpeechEngine` that returns the text
   embedded in a synthetic fixture (tone pattern → text map) and a fake gate:
   `Two_tracks_interleave_by_time_not_by_arrival`; `Silent_parts_never_reach_the_engine`;

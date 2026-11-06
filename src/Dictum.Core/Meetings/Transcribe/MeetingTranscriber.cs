@@ -20,25 +20,37 @@ public sealed class MeetingTranscriber(ISpeechEngine engine, IVoiceGate gate, IM
             // The per-call prompt leaves the shared dictation decoder unchanged.
             var queue = new PriorityQueue<(Channel Channel, CapturedAudio Part, TimeSpan Offset), (TimeSpan, long)>();
             long sequence = 0;
+            var recentOthers = new List<Segment>();
+            var pending = new List<Segment>();
             ExceptionDispatchInfo? sourceError = null;
             await using var reader = source.ReadAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
-            while (true)
+            try
             {
-                bool more;
-                try { more = await reader.MoveNextAsync().ConfigureAwait(false); }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                while (true)
                 {
-                    sourceError = ExceptionDispatchInfo.Capture(ex);
-                    break;
+                    bool more;
+                    try { more = await reader.MoveNextAsync().ConfigureAwait(false); }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        sourceError = ExceptionDispatchInfo.Capture(ex);
+                        break;
+                    }
+                    if (!more) break;
+                    var part = reader.Current;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (part.Part.Samples.Length != 0) queue.Enqueue(part, (part.Offset, sequence++));
+                    await Drain(source.Watermark).ConfigureAwait(false);
                 }
-                if (!more) break;
-                var part = reader.Current;
+                await Drain(TimeSpan.MaxValue).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (part.Part.Samples.Length != 0) queue.Enqueue(part, (part.Offset, sequence++));
-                await Drain(source.Watermark).ConfigureAwait(false);
+                sourceError?.Throw();
             }
-            await Drain(TimeSpan.MaxValue).ConfigureAwait(false);
-            sourceError?.Throw();
+            catch (OperationCanceledException)
+            {
+                // Keep completed inference on cancellation; no untranscribed audio is processed.
+                Publish(TimeSpan.MaxValue);
+                throw;
+            }
 
             async Task Drain(TimeSpan through)
             {
@@ -51,6 +63,31 @@ public sealed class MeetingTranscriber(ISpeechEngine engine, IVoiceGate gate, IM
                     if (string.IsNullOrWhiteSpace(text)) continue;
                     // Persist a completed inference even if cancellation arrived as it returned.
                     var segment = new Segment(part.Offset, part.Offset + part.Part.Duration, part.Channel, text);
+                    recentOthers.RemoveAll(s => segment.Start > s.End && segment.Start - s.End > EchoDeduplicator.Slack);
+                    if (segment.Channel == Channel.Others)
+                    {
+                        recentOthers.Add(segment);
+                        pending.RemoveAll(s => EchoDeduplicator.IsEcho(s, segment));
+                    }
+                    if (segment.Channel != Channel.You || !recentOthers.Any(s => EchoDeduplicator.IsEcho(segment, s)))
+                        pending.Add(segment);
+                    // The next queued part also constrains what can safely be published.
+                    var safeThrough = queue.TryPeek(out var next, out _) && next.Offset < through ? next.Offset : through;
+                    Publish(safeThrough);
+                }
+                Publish(through);
+            }
+
+            void Publish(TimeSpan through)
+            {
+                while (pending.Count != 0)
+                {
+                    var segment = pending[0];
+                    // The append-only live callback cannot retract a line. Hold You (and following
+                    // lines for ordering) until no future Others can overlap its slack window.
+                    if (segment.Channel == Channel.You && through != TimeSpan.MaxValue &&
+                        (through <= segment.End || through - segment.End <= EchoDeduplicator.Slack)) break;
+                    pending.RemoveAt(0);
                     store.AppendSegments(id, [segment]);
                     onSegment(segment);
                 }

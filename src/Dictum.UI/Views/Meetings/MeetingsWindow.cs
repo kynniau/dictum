@@ -49,9 +49,15 @@ internal sealed class MeetingsWindow : Window
     private MeetingsEntries? _entries;
     private Button? _importButton;
 
-    public MeetingsWindow(MeetingsHost host)
+    private readonly Func<bool> _canRecord;
+    private readonly Action<Func<float>?, PillView> _presentRecording;
+
+    public MeetingsWindow(MeetingsHost host, Func<bool>? canRecord = null,
+        Action<Func<float>?, PillView>? presentRecording = null)
     {
         _host = host;
+        _canRecord = canRecord ?? (() => true);
+        _presentRecording = presentRecording ?? ((_, _) => { });
         Title = PROPOSED_Meetings;
         Width = 860; Height = 680; MinWidth = 640; MinHeight = 420;
         AutomationProperties.SetName(this, PROPOSED_Meetings);
@@ -213,7 +219,11 @@ internal sealed class MeetingsWindow : Window
         }
         Agreement(path);
     }
-    internal void BeginAgreement() { if (_recording is null && !_busy && _host.Settings().Enabled) Agreement(null); }
+    internal void BeginAgreement()
+    {
+        if (!_canRecord()) { Say(PROPOSED_DictationBusy); return; }
+        if (_recording is null && !_busy && _host.Settings().Enabled) Agreement(null);
+    }
     private void Agreement(string? importPath)
     {
         var importing = importPath is not null;
@@ -266,6 +276,7 @@ internal sealed class MeetingsWindow : Window
         }));
         Screen(Ui.Heading(importing ? APPROVED_BeforeImport : APPROVED_Before),
             Ui.Card(Ui.Stack(8, Ui.Text(script))),
+            new TextBlock { Text = PROPOSED_HeadphonesTip, TextWrapping = Avalonia.Media.TextWrapping.Wrap, IsVisible = !importing },
             Ui.Text(APPROVED_How), how, SafeButton(APPROVED_Refused, TakeNotes), Ui.Row(8, SafeButton(APPROVED_Cancel, ShowList), acknowledge));
     }
 
@@ -297,6 +308,7 @@ internal sealed class MeetingsWindow : Window
 
     private void StartRecording(Agreement agreement, string script)
     {
+        if (!_canRecord()) { Say(PROPOSED_DictationBusy); return; }
         var meta = new MeetingMeta(MeetingId.New(), PROPOSED_Meetings, agreement.AcknowledgedAt, TimeSpan.Zero,
             MeetingSource.Recorded, agreement, [], [], false, null, null);
         try
@@ -327,25 +339,11 @@ internal sealed class MeetingsWindow : Window
                 if (error is AudioSaveException) { StopCapture(); await DrainTranscription(); ShowSaveFailure(); }
                 else { await StopRecording(false); Say(PROPOSED_Error); }
             }));
+            _presentRecording(() => _source?.Level ?? 0, PillView.MeetingRecording);
             _source.Start();
             var source = _source;
-            var pause = SafeButton(PROPOSED_Pause, () => { });
+            var pause = SafeButton(PROPOSED_Pause, PauseFromPill);
             _pauseButton = pause; _captureState = state;
-            pause.Click += (_, _) =>
-            {
-                try
-                {
-                    if (_confirmedRoute != _host.ProcessingRoute()) { ShowRouteNotice(id, true, null); return; }
-                    if (_awaitingArrival) { ShowJoined(); return; }
-                    if (_paused) _source.Resume(); else _source.Pause();
-                    _paused = !_paused;
-                    pause.Content = _paused ? PROPOSED_Resume : PROPOSED_Pause;
-                    AutomationProperties.SetName(pause, _paused ? PROPOSED_Resume : PROPOSED_Pause);
-                    state.Text = _paused ? PROPOSED_Paused : PROPOSED_Recording;
-                    _host.Store.AddMarker(id, new(_source.Elapsed, _paused ? MarkerKind.Paused : MarkerKind.Resumed));
-                }
-                catch { Say(PROPOSED_Error); }
-            };
             // The controls come before the live transcript, so Pause and Stop stay in view however long the transcript grows.
             Screen(Ui.Heading(PROPOSED_Recording), state, elapsed,
                 Ui.Row(8, SafeButton(PROPOSED_Mark, () => { _host.Store.AddMarker(id, new(_source.Elapsed, MarkerKind.Moment)); Say(PROPOSED_Marked); }),
@@ -466,8 +464,33 @@ internal sealed class MeetingsWindow : Window
             }));
         _ = dialog.ShowDialog(this);
     }
+    internal void PauseFromPill()
+    {
+        if (_busy || _ending || _recording is not { } id || _source is null) return;
+        try
+        {
+            if (_confirmedRoute != _host.ProcessingRoute()) { Activate(); ShowRouteNotice(id, true, null); return; }
+            if (_awaitingArrival) { Activate(); ShowJoined(); return; }
+            if (_paused) _source.Resume(); else _source.Pause();
+            _paused = !_paused;
+            UpdatePauseState();
+            _host.Store.AddMarker(id, new(_source.Elapsed, _paused ? MarkerKind.Paused : MarkerKind.Resumed));
+        }
+        catch { Say(PROPOSED_Error); }
+    }
+
+    internal void StopFromPill()
+    {
+        if (_recording is null) return;
+        WindowState = WindowState.Normal;
+        Show(); Activate();
+        _ = Work(() => StopRecording(false));
+    }
+
     private void UpdatePauseState()
     {
+        if (!_ending && _source is not null)
+            _presentRecording(() => _source?.Level ?? 0, _paused ? PillView.MeetingPaused : PillView.MeetingRecording);
         if (_pauseButton is not null)
         {
             _pauseButton.Content = _paused ? PROPOSED_Resume : PROPOSED_Pause;
@@ -485,6 +508,7 @@ internal sealed class MeetingsWindow : Window
     private void StopCapture()
     {
         _ending = true;
+        _presentRecording(null, PillView.Hidden);
         _timer.Stop();
         _elapsed = null; _meter = null;
         _source?.Stop();
@@ -508,6 +532,7 @@ internal sealed class MeetingsWindow : Window
 
     private void ReleaseRecording()
     {
+        if (!_ending) _presentRecording(null, PillView.Hidden);
         _source?.Dispose(); _source = null; _recording = null; _paused = false;
         _transcription = null; _ending = false; _awaitingArrival = false;
         _recordingCancellation?.Dispose(); _recordingCancellation = null;

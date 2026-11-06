@@ -114,9 +114,16 @@ public sealed class MeetingsChunkedAudioTests
         await Task.Delay(2500, TestContext.Current.CancellationToken);
         Assert.Equal(1, capture.Starts); Assert.Equal(0, capture.Stops);
         source.Pause();
-        // Drain queued work before asserting the paused file stays unchanged.
-        await Task.Delay(100, TestContext.Current.CancellationToken);
-        var size = new FileInfo(files.At(id, "audio-you.chunks.enc")).Length;
+        // Pause hands its tail to the background writer; wait until the file has been still for 500 ms (a fixed
+        // 100 ms wait failed on a slow CI runner on 07/11/2026), then assert nothing more arrives while paused.
+        long size = -1;
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            var now = new FileInfo(files.At(id, "audio-you.chunks.enc")).Length;
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            if (now == new FileInfo(files.At(id, "audio-you.chunks.enc")).Length) { size = now; break; }
+        }
+        Assert.True(size >= 0, "the paused file never settled");
         await Task.Delay(500, TestContext.Current.CancellationToken);
         Assert.Equal(size, new FileInfo(files.At(id, "audio-you.chunks.enc")).Length);
         source.Stop(); source.CompleteAudio(); Assert.False(store.Read(id).AudioIncomplete);

@@ -7,6 +7,7 @@ using Dictum.Storage;
 using Dictum.Transcribe;
 using Dictum.UI;
 using Dictum.UI.Shell;
+using Dictum.Windows.Audio;
 
 namespace Dictum.Windows;
 
@@ -32,6 +33,12 @@ public static class Program
         var ggmlEnvironment = GgmlEnvironment.Apply();
         WhisperEngine.VulkanLoaderPresent = GgmlEnvironment.VulkanLoaderLoads;
         var (options, error) = CliOptions.Parse(args);
+        // Hidden Windows-only diagnostic, handled before shared CLI errors (no model or UI needed).
+        if (args is ["--capture-check"])
+        {
+            WindowsPlatform.AttachConsoleIfNeeded();
+            return CaptureCheck.Run(Console.Out, Console.Error);
+        }
         if (options is null || options.Mode != CliMode.Tray) WindowsPlatform.AttachConsoleIfNeeded();
         if (options is null)
         {
@@ -47,6 +54,7 @@ public static class Program
 
         using var platform = new WindowsPlatform();
         var paths = platform.ResolvePaths(options.ConfigDir);
+        WasapiCapture.ReadSettings = new MicrophoneSettingsReader(paths.SettingsFile).Read;
         var legacy = platform.LegacyFolders();
         var redactor = new SecretRedactor();
         var initialLevel = LogExtensions.ParseLevel(SettingsLoader.LoadFile(paths.SettingsFile).Settings.LogLevel);

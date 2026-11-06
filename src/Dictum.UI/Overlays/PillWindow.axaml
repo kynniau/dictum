@@ -39,6 +39,8 @@
       </StackPanel>
       <TextBlock x:Name="Label" FontSize="13" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
       <TextBlock x:Name="Detail" FontSize="13" Foreground="{StaticResource OverlaySecondaryBrush}" VerticalAlignment="Center" IsVisible="False" />
+      <Button x:Name="MeetingPause" IsVisible="False" MinHeight="28" Padding="8,2" />
+      <Button x:Name="MeetingStop" IsVisible="False" MinHeight="28" Padding="8,2" />
       <TextBlock x:Name="Hint" FontSize="11" Foreground="{StaticResource OverlayMutedBrush}" VerticalAlignment="Center" IsVisible="False" />
     </StackPanel>
   </Border>
