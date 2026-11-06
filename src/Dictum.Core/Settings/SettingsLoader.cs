@@ -257,7 +257,7 @@ public static class SettingsLoader
     private static AudioSettings BindAudio(ObjectReader? r)
     {
         if (r is null) return new AudioSettings();
-        var s = new AudioSettings { Device = r.NullableString("device") };
+        var s = new AudioSettings { Device = r.NullableString("device"), ProcessedCapture = r.Bool("processed_capture", false) };
         r.WarnUnknown();
         return s;
     }
