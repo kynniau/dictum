@@ -6947,3 +6947,9 @@ The 1.5.0 release copy in STORE.md, release-notes-preamble.md and version.json w
 The approved Meetings privacy section (05/11/2026 09:13 AEDT) is placed word for word in site/privacy.html as a sub-heading at the end of section 3, so the approved legal blocks of sections 11 and 12 keep their numbers. The page date is 05/11/2026.
 
 Directory.Build.props supplies version 1.5.0 to the projects; package-msix.ps1 derives Identity Version 1.5.0.0 through AppxManifest.template.xml.
+
+## Release 1.5.1 prepared (07/11/2026, branch release/1.5.1)
+
+The 1.5.1 release copy in STORE.md, release-notes-preamble.md and version.json was APPROVED by the owner 07/11/2026 00:36 AEDT. The 40 new UI strings were APPROVED by the owner 07/11/2026 00:30 AEDT (.demo-preview/approve-1.5.1-wording.md). Earlier approved text is retained unchanged beside it.
+
+Directory.Build.props supplies version 1.5.1 to the projects; package-msix.ps1 derives Identity Version 1.5.1.0 through AppxManifest.template.xml.
