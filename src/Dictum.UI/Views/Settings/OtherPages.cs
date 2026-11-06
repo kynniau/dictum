@@ -25,6 +25,9 @@ internal sealed class CleanupPage : SettingsPage
     private readonly TextBlock _now = Ui.Text("");
     private readonly Segments _profanity;
     private readonly ToggleSwitch _grammar;
+    public const string PROPOSED_ParagraphPauseLabel = "Paragraph pause (seconds)";
+    public const string PROPOSED_ParagraphPauseHelp = "Start a new paragraph when you pause for this long after a full stop. 0 turns it off.";
+    private readonly NumericUpDown _paragraphPause = new() { Width = 110, Minimum = 0, Maximum = 30, Increment = 0.5m, FormatString = "0.##" };
     private readonly StackPanel _cloudOn = new() { Spacing = 10 };
     private readonly StackPanel _cloudOff = new() { Spacing = 10 };
     private readonly TextBlock _cloudState = Ui.Text("");
@@ -52,6 +55,13 @@ internal sealed class CleanupPage : SettingsPage
         _profanity.Width = 300;
         _profanity.HorizontalAlignment = HorizontalAlignment.Left;
         _grammar = Ui.Switch(false, on => Write(("llm.grammar_assist", Json(on))));
+        AutomationProperties.SetName(_paragraphPause, PROPOSED_ParagraphPauseLabel);
+        AutomationProperties.SetHelpText(_paragraphPause, PROPOSED_ParagraphPauseHelp);
+        _paragraphPause.LostFocus += (_, _) => SaveParagraphPause();
+        _paragraphPause.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Key.Enter) SaveParagraphPause();
+        }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
         _keys = new KeysPanel(Shell, Shell.Vault, Say);
         _provider.SelectionChanged += (_, _) => DefaultsForProvider();
         _baseUrl.TextChanged += (_, _) => ShowAddressHints();
@@ -75,6 +85,7 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Card(Ui.Stack(8, _profanity,
                 Ui.Text("Mask keeps the first letter (f***); Remove drops the word. The clean-up model keeps every word you said, swear words included: this setting is the only thing that changes them.", "caption")), "Profanity filter"),
             Ui.Card(Ui.Line("Grammar assist", _grammar, "For speakers whose first language is not English: also fixes articles, tenses, prepositions and word order, keeping every fact and name."), "Grammar"),
+            Ui.Line(PROPOSED_ParagraphPauseLabel, _paragraphPause, PROPOSED_ParagraphPauseHelp),
             _own.View,
             Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff, _keys.View), "Cloud clean-up"));
     }
@@ -101,6 +112,7 @@ internal sealed class CleanupPage : SettingsPage
     /// <summary>Leaving the page (another page, or the window closed) saves your own instructions if they changed.</summary>
     public override void Leave()
     {
+        SaveParagraphPause();
         _own.Save();
         base.Leave();
     }
@@ -111,6 +123,7 @@ internal sealed class CleanupPage : SettingsPage
         _now.Text = Shell.CleanupStatus;
         _profanity.Select(Math.Max(0, Array.IndexOf([ProfanitySettings.Off, ProfanitySettings.Mask, ProfanitySettings.Remove], s.Profanity.Mode)));
         Ui.SetQuietly(_grammar, s.Llm.GrammarAssist);
+        if (!_paragraphPause.IsKeyboardFocusWithin) _paragraphPause.Value = (decimal)s.Cleanup.ParagraphPauseSeconds;
         _own.Redraw(s);
         // On for anthropic or openai-compatible: a host off this PC the user agreed to, or a server on this PC (no consent step).
         var host = CloudPolicy.CloudHost(s.Llm);
@@ -123,6 +136,15 @@ internal sealed class CleanupPage : SettingsPage
         _enable.IsEnabled = !s.OfflineOnly;
         _offline.Text = s.OfflineOnly ? "Offline only is on (Privacy), so cloud clean-up cannot be switched on." : "";
         ShowKeys();
+    }
+
+    private void SaveParagraphPause()
+    {
+        if (Refreshing || _paragraphPause.Value is not decimal value) return;
+        var seconds = value == 0 ? 0 : Math.Clamp((double)value, 0.5, 30);
+        if (seconds != Shell.Settings.Cleanup.ParagraphPauseSeconds)
+            Write(("cleanup.paragraph_pause_seconds", System.Text.Json.Nodes.JsonValue.Create(seconds)));
+        _paragraphPause.Value = (decimal)seconds;
     }
 
     /// <summary>The card's state line while cloud clean-up is on (a host agreed to, or a server on this PC).</summary>

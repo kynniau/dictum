@@ -134,7 +134,8 @@ public sealed class DictationPipeline
         var separator = "";
         if (part?.Before is { } before && text.Length > 0)
         {
-            (separator, text) = SegmentJoin.Join(before, raw, text, settings.Insert.TrailingSpace, _names(), keepCase: cleaner.IsPlain);
+            (separator, text) = SegmentJoin.Join(before, raw, text, settings.Insert.TrailingSpace, _names(), keepCase: cleaner.IsPlain,
+                quietBefore: audio.QuietBefore, paragraphPauseSeconds: settings.Cleanup.ParagraphPauseSeconds);
         }
         var spoken = text; // what was said: the next part's carried words come from this, never from the finished text below
         var finished = _finish(text);

@@ -3,6 +3,12 @@ namespace Dictum.Audio;
 /// <summary>A finished recording: 16 kHz mono float32 plus the loudest block level seen.</summary>
 public sealed record CapturedAudio(float[] Samples, float PeakLevel)
 {
+    /// <summary>
+    /// Quiet before this part's first speech block, measured by SpeechSegmenter's 20 ms audio clock across cuts.
+    /// Null for the first part, an unsegmented capture, or a part with no speech. Includes quiet on both sides of a cut.
+    /// </summary>
+    public TimeSpan? QuietBefore { get; init; }
+
     public static readonly CapturedAudio Empty = new([], 0f);
 
     public TimeSpan Duration => TimeSpan.FromSeconds(Samples.Length / (double)MonoResampler.WhisperRate);
@@ -152,7 +158,7 @@ public sealed class CaptureBuffer
         _samples.CopyTo(0, part, 0, count);
         _samples.RemoveRange(0, count);
         _firstBlock = cut.Block;
-        _onPart!(new CapturedAudio(part, cut.Peak), cut.Reason);
+        _onPart!(new CapturedAudio(part, cut.Peak) { QuietBefore = cut.QuietBefore }, cut.Reason);
     }
 
     /// <summary>Stops accepting audio and returns everything captured (in hands-free, what follows the last cut).</summary>
@@ -162,7 +168,7 @@ public sealed class CaptureBuffer
         {
             _sealed = true;
             Volatile.Write(ref _level, 0f);
-            return new CapturedAudio([.. _samples], _segmenter?.TailPeak ?? _peak);
+            return new CapturedAudio([.. _samples], _segmenter?.TailPeak ?? _peak) { QuietBefore = _segmenter?.TailQuietBefore };
         }
     }
 }

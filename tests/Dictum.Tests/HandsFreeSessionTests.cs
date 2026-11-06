@@ -112,9 +112,10 @@ public class HandsFreeSessionTests
     /// <param name="log">Where the controller and the pipeline log; nowhere by default.</param>
     /// <param name="cleaners">The clean-up each part is given, when it changes between parts (every settings reload builds a new one); else <paramref name="cleaner"/>.</param>
     private static Rig Make(PartTranscriber whisper, TranscriptCleaner? cleaner = null, StateMachineOptions? options = null, bool trailingSpace = false,
-        Func<string, string>? finish = null, ILog? log = null, Func<TranscriptCleaner>? cleaners = null)
+        Func<string, string>? finish = null, ILog? log = null, Func<TranscriptCleaner>? cleaners = null, double paragraphPauseSeconds = 2)
     {
-        var settings = new AppSettings { Insert = new InsertSettings { TrailingSpace = trailingSpace } };
+        var settings = new AppSettings { Insert = new InsertSettings { TrailingSpace = trailingSpace },
+            Cleanup = new CleanupSettings { ParagraphPauseSeconds = paragraphPauseSeconds } };
         var capture = new CuttingCapture();
         var pasted = new ConcurrentQueue<string>();
         var remembered = new ConcurrentQueue<string>();
@@ -158,6 +159,23 @@ public class HandsFreeSessionTests
 
     private static TranscriptCleaner ModelCleaner(ILlmClient client) =>
         new(client, CleanupPrompt.Default, TimeSpan.FromSeconds(2), NullLog.Instance, "fake", deadline: _ => TimeSpan.FromSeconds(2));
+
+    [Theory]
+    [InlineData(2, "\n\n")]
+    [InlineData(0, " ")]
+    [InlineData(4, " ")]
+    public async Task Capture_quiet_metadata_reaches_the_join_for_queued_parts_and_the_stop_tail(double threshold, string separator)
+    {
+        using var rig = Make(new PartTranscriber("first topic finished", "second topic finished", "third topic finished"),
+            paragraphPauseSeconds: threshold);
+        await StartHandsFree(rig);
+        rig.Capture.Cut(Part(0));
+        rig.Capture.Cut(Part(1) with { QuietBefore = TimeSpan.FromSeconds(3) });
+        rig.Capture.Rest = Part(2) with { QuietBefore = TimeSpan.FromSeconds(3) };
+        StopTap(rig);
+        await WaitUntil(() => rig.Ui.Pills.Contains(PillView.Done), "all parts including the stop tail");
+        Assert.Equal(["First topic finished.", separator + "Second topic finished.", separator + "Third topic finished."], rig.Pasted);
+    }
 
     [Fact]
     public async Task Parts_are_typed_in_order_while_recording_goes_on()

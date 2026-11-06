@@ -19,7 +19,10 @@ public enum CutReason
 /// </param>
 /// <param name="Reason">Why the part ended.</param>
 /// <param name="Peak">The loudest block RMS of the part that ends here (what <see cref="RecordingGate"/> compares with silence_threshold).</param>
-public readonly record struct SegmentCut(long Block, CutReason Reason, float Peak);
+public readonly record struct SegmentCut(long Block, CutReason Reason, float Peak)
+{
+    public TimeSpan? QuietBefore { get; init; }
+}
 
 /// <summary>
 /// Hands-free "segments as you speak" (product owner, 16/10/2026): reads the 20 ms block levels <see cref="CaptureBuffer"/>
@@ -71,6 +74,8 @@ public sealed class SpeechSegmenter
     private readonly float _threshold;
     private readonly float[] _rms = new float[LookBackBlocks];
     private readonly bool[] _quiet = new bool[LookBackBlocks];
+    private readonly int[] _quietBeforeBlocks = new int[LookBackBlocks];
+    private TimeSpan? _quietBefore;
     private long _block;        // blocks fed so far (the next block's index)
     private long _start;        // the first block of the current part
     private int _speech;        // blocks above the floor in the current part
@@ -94,6 +99,9 @@ public sealed class SpeechSegmenter
     /// <summary>The loudest block since the last cut: the peak of what the stop hands over.</summary>
     public float TailPeak => PeakOf(_start, _block);
 
+    /// <summary>The full quiet run before the tail's first speech block; unknown until speech arrives.</summary>
+    public TimeSpan? TailQuietBefore => _quietBefore;
+
     /// <summary>The level below which the next block counts as quiet.</summary>
     public float Floor => Math.Max(_threshold, RelativeFloor * _level);
 
@@ -103,6 +111,7 @@ public sealed class SpeechSegmenter
         var slot = Slot(_block);
         if (_block - LookBackBlocks >= _start) _earlierPeak = Math.Max(_earlierPeak, _rms[slot]); // leaving the ring, still in this part
         var quiet = rms < Floor;
+        _quietBeforeBlocks[slot] = _quietRun;
         _rms[slot] = rms;
         _quiet[slot] = quiet;
         _level = Math.Max(rms, _level * LevelDecay);
@@ -113,6 +122,7 @@ public sealed class SpeechSegmenter
         }
         else
         {
+            if (_speech == 0 && _start > 0) _quietBefore = QuietTime(_quietRun);
             _quietRun = 0;
             _speech++;
         }
@@ -147,16 +157,24 @@ public sealed class SpeechSegmenter
     private SegmentCut Cut(long boundary, CutReason reason)
     {
         var peak = PeakOf(_start, boundary);
+        var quietBefore = _quietBefore;
+        _quietBefore = null;
         var speech = 0; // the next part's speech so far: voiced blocks after the boundary (a 30 s cut can leave some)
         for (var b = boundary; b < _block; b++)
         {
-            if (!_quiet[Slot(b)]) speech++;
+            if (!_quiet[Slot(b)])
+            {
+                if (speech == 0) _quietBefore = QuietTime(_quietBeforeBlocks[Slot(b)]);
+                speech++;
+            }
         }
         _start = boundary;
         _speech = speech;
         _earlierPeak = 0f;
-        return new SegmentCut(boundary, reason, peak);
+        return new SegmentCut(boundary, reason, peak) { QuietBefore = quietBefore };
     }
+
+    private static TimeSpan QuietTime(int blocks) => TimeSpan.FromMilliseconds((long)blocks * BlockMs);
 
     /// <summary>The loudest block in [from, to) of the current part: the blocks gone from the rings, then the rings.</summary>
     private float PeakOf(long from, long to)

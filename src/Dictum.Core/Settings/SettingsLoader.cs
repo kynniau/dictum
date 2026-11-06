@@ -134,6 +134,7 @@ public static class SettingsLoader
             Speech = BindSpeech(r.Child("speech")),
             Models = BindModels(r.Child("models")),
             Llm = BindLlm(r.Child("llm")),
+            Cleanup = BindCleanup(r.Child("cleanup")),
             Insert = BindInsert(r.Child("insert")),
             Pill = BindPill(r.Child("pill")),
             Indicator = BindIndicator(r.Child("indicator")),
@@ -176,6 +177,16 @@ public static class SettingsLoader
         var s = new ModelsSettings { Folder = r.NullableString("folder", FolderProblem) };
         r.WarnUnknown();
         return s;
+    }
+
+    private static CleanupSettings BindCleanup(ObjectReader? r)
+    {
+        var d = new CleanupSettings();
+        if (r is null) return d;
+        var seconds = r.Double("paragraph_pause_seconds", d.ParagraphPauseSeconds, -double.MaxValue, double.MaxValue);
+        var settings = EffectiveSettings.ParagraphPause(d with { ParagraphPauseSeconds = seconds }, r.Warn);
+        r.WarnUnknown();
+        return settings;
     }
 
     private static ProfanitySettings BindProfanity(ObjectReader? r)
