@@ -1446,5 +1446,27 @@ public sealed class MeetingsWorkflowUiTests
         finally { window.Shutdown(); }
     });
 
-
+    // Bug 06/11/2026 (the owner's first real meeting): the live transcript grew until Pause and Stop were pushed below the
+    // window and could not be reached, because the screen's ScrollViewer sat in a StackPanel and never got a bounded height.
+    [Fact]
+    public Task Stop_and_pause_stay_inside_the_window_however_long_the_live_transcript_grows() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var window = new MeetingsWindow(fixture.Host) { Width = 860, Height = 680 };
+        window.Show(); window.BeginAgreement(); Click(window, APPROVED_Start);
+        var live = All<TextBlock>(window).Single(t => AutomationProperties.GetName(t) == PROPOSED_Live);
+        live.Text = string.Join(Environment.NewLine, Enumerable.Range(0, 600).Select(i => $"00:{i / 60:00}:{i % 60:00} You: line {i} of a long meeting transcript."));
+        window.UpdateLayout(); Dispatcher.UIThread.RunJobs();
+        foreach (var name in new[] { PROPOSED_Stop, PROPOSED_Pause, PROPOSED_Discard })
+        {
+            var button = All<Button>(window).Single(b => AutomationProperties.GetName(b) == name);
+            var top = button.TranslatePoint(new Point(0, 0), window);
+            Assert.NotNull(top);
+            Assert.True(top!.Value.Y >= 0 && top.Value.Y + button.Bounds.Height <= window.ClientSize.Height,
+                $"{name} is outside the window (top {top.Value.Y}, window {window.ClientSize.Height})");
+        }
+        var scroller = Avalonia.VisualTree.VisualExtensions.GetVisualAncestors(live).OfType<ScrollViewer>().First();
+        Assert.True(scroller.Viewport.Height < scroller.Extent.Height, "the screen scrolls to show the rest of the transcript");
+        window.Shutdown(); return true;
+    });
 }

@@ -59,8 +59,12 @@ internal sealed class MeetingsWindow : Window
         Content = new DockPanel
         {
             Margin = new Thickness(24), LastChildFill = true,
-            Children = { Ui.Stack(12, _status, _screen) },
+            Children = { _status, _screen },
         };
+        // The screen fills the space below the status line so its ScrollViewer has a bounded height and scrolls.
+        // In a StackPanel it got unlimited height, never scrolled, and a growing live transcript pushed Stop off the window.
+        DockPanel.SetDock(_status, Dock.Top);
+        _status.Margin = new Thickness(0, 0, 0, 12);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _timer.Tick += (_, _) =>
         {
@@ -338,12 +342,15 @@ internal sealed class MeetingsWindow : Window
                 }
                 catch { Say(PROPOSED_Error); }
             };
-            Screen(Ui.Heading(PROPOSED_Recording), Ui.Text(_source.Tracks.Count == 2 ? APPROVED_CaptureSystem : APPROVED_MicOnly),
-                Ui.Text(string.Format(APPROVED_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())), state, elapsed,
-                Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_You), meter)), Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Live), lines)),
+            // The controls come before the live transcript, so Pause and Stop stay in view however long the transcript grows.
+            Screen(Ui.Heading(PROPOSED_Recording), state, elapsed,
                 Ui.Row(8, SafeButton(PROPOSED_Mark, () => { _host.Store.AddMarker(id, new(_source.Elapsed, MarkerKind.Moment)); Say(PROPOSED_Marked); }),
                     SafeButton(PROPOSED_Joined, ShowJoined), pause),
-                Ui.Row(8, SafeButton(APPROVED_Refused, RefuseRecording), SafeButton(PROPOSED_Discard, ConfirmDiscard), SafeButton(PROPOSED_Stop, () => _ = Work(() => StopRecording(false)))));
+                Ui.Row(8, SafeButton(APPROVED_Refused, RefuseRecording), SafeButton(PROPOSED_Discard, ConfirmDiscard), SafeButton(PROPOSED_Stop, () => _ = Work(() => StopRecording(false)))),
+                Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_You), meter)),
+                Ui.Text(_source.Tracks.Count == 2 ? APPROVED_CaptureSystem : APPROVED_MicOnly),
+                Ui.Text(string.Format(APPROVED_Acknowledged, agreement.AcknowledgedAt.ToLocalTime())),
+                Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Live), lines)));
             _elapsed = elapsed;
             _meter = meter;
             _timer.Start();
