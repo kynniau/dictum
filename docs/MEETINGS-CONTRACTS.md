@@ -439,22 +439,24 @@ Every lane runs `dotnet test` and reports the output verbatim; no "should pass".
   segments interleaved by `offset`, `IVoiceGate` before each part (skip silence), results
   appended through `IMeetingStore.AppendSegments` and raised through `onSegment` in time order.
   Dictionary feeds the initial prompt exactly as dictation does.
-- Echo suppression (`EchoDeduplicator`) always keeps Others. A You segment is eligible
-  only when its interval overlaps Others with at most 2 seconds of separation, inclusive.
-  Text is lowercased invariantly; punctuation is removed (apostrophes joined, other
-  punctuation separates words), and the filler words um, uh, erm, er, hmm are removed.
-  Nonempty identical word sequences match. Otherwise both sequences need at least three
-  words and a shorter/longer word-count ratio of at least 0.8. Whole-word containment
-  then matches, or token Levenshtein similarity `1 - distance / max(counts)` must be at
-  least 0.8 (unit insertion, deletion and substitution costs). Word order matters.
-  Short acknowledgements inside longer speech and substantial partial overlaps survive
-  whole. Text alone cannot distinguish independently spoken near-identical sentences or
-  small additions within the threshold; retire this simplification with capture-path
-  echo cancellation.
+- Echo suppression (`EchoDeduplicator`) always keeps Others. Concatenate normalised
+  words from all Others intervals overlapping You plus 2 seconds of slack on each side,
+  in time order. Lowercase invariantly, keep letters and digits (join apostrophes), and
+  remove um, uh, erm, er, hmm. Cap at 400 words nearest the You interval, using
+  interpolated word times and preserving order. Compare contiguous reference windows
+  of 80?120% of the You word count with token Levenshtein similarity
+  `1 - distance / max(counts)`. With at least three You words, suppress at >= 0.8,
+  or >= 0.5 when an Others onset is within 0.5 seconds inclusive and the shorter/longer
+  word-count ratio is >= 0.75. Shorter You sequences require verbatim contiguous words
+  in order; empty sequences never match. Computation is O(n*m*k) over candidate windows,
+  with k the maximum candidate length. This text-only simplification drops a user
+  repeating remote words at the same instant and keeps very differently transcribed
+  echoes without matching onsets. Retire it with the user voice print planned for 1.6.
 - The append-only live callback has no retraction operation. Completed You segments and
   following lines are held before persistence and display until the source watermark is
   strictly beyond their end plus 2 seconds. Incoming Others removes matching pending
-  You segments; incoming You is compared with a recent Others window. EOF drains survivors.
+  You segments by rechecking the whole recent Others window; incoming You uses that
+  window too. Retain earlier Others while an overlapping You remains pending. EOF drains survivors.
   Thus no provisional echo is appended or displayed, and no removal API is needed.
   Unordered sources hold provisional lines until EOF. Mixed segments are unaffected.
 - `FileMeetingStore.ReadTranscript` filters the fully authenticated transcript in memory,

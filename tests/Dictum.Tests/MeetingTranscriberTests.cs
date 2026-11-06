@@ -40,6 +40,37 @@ public class MeetingTranscriberTests
         Assert.Equal(seen, store.ReadTranscript(id));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Live_window_alignment_spans_two_Others_segments_in_both_arrival_orders(bool othersFirst)
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        const string firstText = "Please review the revised budget before lunch";
+        const string secondText = "Then send the final agenda to everyone";
+        var first = (Channel.Others, Tone(880, 1), TimeSpan.Zero);
+        var you = (Channel.You, Tone(440, 8), TimeSpan.FromSeconds(.1));
+        var second = (Channel.Others, Tone(880, 2), TimeSpan.FromSeconds(6));
+        var engine = new ToneEngine
+        {
+            Outputs = new Queue<string>(othersFirst
+                ? new[] { firstText, firstText + " " + secondText, secondText }
+                : new[] { firstText + " " + secondText, firstText, secondText })
+        };
+        var seen = new List<Segment>();
+        await new MeetingTranscriber(engine, new Gate(), store).RunAsync(id,
+            new AdvancingParts(othersFirst ? [first, you, second] : [you, first, second]), segment =>
+            {
+                Assert.Equal(Channel.Others, segment.Channel);
+                seen.Add(segment);
+            }, default);
+        Assert.Equal(3, engine.Frequencies.Count);
+        Assert.Equal(new[] { firstText, secondText }, seen.Select(s => s.Text));
+        Assert.Equal(seen, store.ReadTranscript(id));
+    }
+
     [Fact]
     public async Task Microphone_only_live_segments_are_untouched()
     {
@@ -460,6 +491,7 @@ public class MeetingTranscriberTests
         public List<string?> Prompts { get; } = [];
         public List<DecodeOptions> Decoders { get; } = [];
         public string? Output;
+        public Queue<string>? Outputs;
         public Task<string> TranscribeAsync(float[] samples16kMono, string? carried, CancellationToken cancellationToken)
         {
             Prompts.Add(carried);
@@ -491,7 +523,7 @@ public class MeetingTranscriberTests
                 }
                 var frequency = Power(440) > Power(880) ? 440 : 880;
                 Frequencies.Add(frequency);
-                return Output ?? (frequency == 440 ? First : Second);
+                return Outputs?.Dequeue() ?? Output ?? (frequency == 440 ? First : Second);
             }
             finally { Interlocked.Decrement(ref _active); }
         }
