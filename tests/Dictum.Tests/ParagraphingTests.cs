@@ -70,19 +70,23 @@ public class ParagraphingTests
         Assert.True(SentenceStart.EndsSentence("Finished…"));
     }
 
-    [Fact]
-    public void A_click_inside_a_pause_does_not_decide_the_quiet_before_the_next_speech()
+    [Theory]
+    [InlineData(1, 3.0)]   // one voiced block (a click) at 1.0 s is ignored
+    [InlineData(2, 3.0)]   // two blocks (40 ms) are still under ConfirmBlocks
+    [InlineData(3, 1.0)]   // three blocks (60 ms) count as speech: the gap is 1.0 s
+    public void A_click_inside_a_pause_does_not_decide_the_quiet_before_the_next_speech(int clickBlocks, double expectedSeconds)
     {
         var segmenter = new SpeechSegmenter(0.01);
         void Feed(float level, int blocks) { for (var i = 0; i < blocks; i++) segmenter.Add(level); }
         Feed(0.2f, 120);   // "Finished."
         Feed(0.001f, 50);  // the pause cuts the part at 0.7 s; quiet to 1.0 s
-        Feed(0.2f, 1);     // one voiced block (a click) at 1.0 s
-        Feed(0.001f, 99);  // quiet to 3.0 s in all
+        Feed(0.2f, clickBlocks);          // a click, or a short burst, at 1.0 s
+        Feed(0.001f, 100 - clickBlocks);  // quiet to 3.0 s in all
         Feed(0.2f, 120);   // real speech
         var quietBefore = segmenter.TailQuietBefore!.Value;
-        Assert.Equal(3.0, quietBefore.TotalSeconds, 0.05);
-        Assert.Equal("\n\n", SegmentJoin.Join("Finished.", "Next topic", "Next topic.", false, [], false, quietBefore, 2).Separator);
+        Assert.Equal(expectedSeconds, quietBefore.TotalSeconds, 0.05);
+        Assert.Equal(expectedSeconds >= 2 ? "\n\n" : " ",
+            SegmentJoin.Join("Finished.", "Next topic", "Next topic.", false, [], false, quietBefore, 2).Separator);
     }
 
     [Fact]

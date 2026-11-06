@@ -129,7 +129,9 @@ public sealed class SpeechSegmenter
         }
         else
         {
-            // simplification: a voiced run under 3 blocks inside a pause is ignored; retire if a user's quick "yes" is lost at a paragraph boundary.
+            // simplification: a voiced run under 3 blocks inside a pause is ignored, and soft speech that only reaches the floor in
+            // 1-2 block bursts lengthens the measured pause; retire if a user's quick "yes" is lost at a paragraph boundary or a
+            // false paragraph appears after quiet speech on a real recording.
             if (waiting && ++_voicedRun >= ConfirmBlocks) _quietBefore = QuietTime(_gap);
             _quietRun = 0;
             _speech++;
