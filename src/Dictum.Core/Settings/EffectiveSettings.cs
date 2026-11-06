@@ -16,7 +16,7 @@ public static class EffectiveSettings
     public static CleanupSettings ParagraphPause(CleanupSettings settings, Action<string> warn)
     {
         var seconds = settings.ParagraphPauseSeconds;
-        var clamped = seconds == 0 ? 0 : Math.Clamp(seconds, 0.5, 30);
+        var clamped = seconds <= 0 ? 0 : Math.Clamp(seconds, 0.5, 30);
         if (seconds == clamped) return settings;
         warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, PROPOSED_ParagraphPauseClamped, seconds, clamped));
         return settings with { ParagraphPauseSeconds = clamped };

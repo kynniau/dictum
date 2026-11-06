@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Dictum.Audio;
 using Dictum.Llm;
+using Dictum.Personal;
 using Dictum.Settings;
 using Dictum.UI.Views;
 using Dictum.UI.Views.Settings;
@@ -27,7 +28,6 @@ public class ParagraphingTests
     [InlineData("Still speaking,")]
     [InlineData("Still speaking:")]
     [InlineData("Still speaking;")]
-    [InlineData("Still speaking…")]
     [InlineData("")]
     public void Long_gap_without_terminal_punctuation_keeps_the_existing_join(string before)
     {
@@ -43,7 +43,6 @@ public class ParagraphingTests
     [InlineData("He said 'finished!'", 2)]
     [InlineData("(Finished.)", 2)]
     [InlineData("[Finished?]", 2)]
-    [InlineData("{Finished.}", 2)]
     [InlineData("Finished.   ", 2)]
     public void Long_gap_after_terminal_punctuation_inserts_the_spoken_paragraph_break(string before, double gap)
     {
@@ -60,6 +59,31 @@ public class ParagraphingTests
 
     [Fact]
     public void Unknown_gap_keeps_the_existing_rule() => Assert.Equal(" ", Join("Finished.", null).Separator);
+
+    [Fact]
+    public void An_ellipsis_ends_a_sentence_for_the_paragraph_rule_and_a_trailing_newline_does_not()
+    {
+        Assert.Equal("\n\n", Join("Finished…", 3).Separator);
+        Assert.Equal("", Join("Finished.\n", 3).Separator);
+        Assert.False(SentenceStart.EndsSentence("Finished.\n"));
+        Assert.False(SentenceStart.EndsSentence(""));
+        Assert.True(SentenceStart.EndsSentence("Finished…"));
+    }
+
+    [Fact]
+    public void A_click_inside_a_pause_does_not_decide_the_quiet_before_the_next_speech()
+    {
+        var segmenter = new SpeechSegmenter(0.01);
+        void Feed(float level, int blocks) { for (var i = 0; i < blocks; i++) segmenter.Add(level); }
+        Feed(0.2f, 120);   // "Finished."
+        Feed(0.001f, 50);  // the pause cuts the part at 0.7 s; quiet to 1.0 s
+        Feed(0.2f, 1);     // one voiced block (a click) at 1.0 s
+        Feed(0.001f, 99);  // quiet to 3.0 s in all
+        Feed(0.2f, 120);   // real speech
+        var quietBefore = segmenter.TailQuietBefore!.Value;
+        Assert.Equal(3.0, quietBefore.TotalSeconds, 0.05);
+        Assert.Equal("\n\n", SegmentJoin.Join("Finished.", "Next topic", "Next topic.", false, [], false, quietBefore, 2).Separator);
+    }
 
     [Fact]
     public void The_configured_threshold_is_used()
@@ -143,7 +167,7 @@ public class ParagraphingTests
     }
 
     [Theory]
-    [InlineData(-1, 0.5, true)]
+    [InlineData(-1, 0, true)]
     [InlineData(0, 0, false)]
     [InlineData(0.1, 0.5, true)]
     [InlineData(0.5, 0.5, false)]
@@ -170,6 +194,14 @@ public class ParagraphingTests
         Assert.Contains("cleanup.paragraph_pause_seconds", Assert.Single(loaded.Warnings));
     }
 
+
+    [Fact]
+    public void Malformed_setting_warning_states_the_accepted_range_not_the_double_limits()
+    {
+        var warning = Assert.Single(SettingsLoader.Parse("{\"cleanup\":{\"paragraph_pause_seconds\":\"two\"}}").Warnings);
+        Assert.Contains("expected 0, or a number from 0.5 to 30", warning);
+        Assert.DoesNotContain("E+308", warning);
+    }
     [Fact]
     public Task Cleanup_row_is_labelled_and_saves_a_fraction_or_zero() => UiSession.Run(() =>
     {

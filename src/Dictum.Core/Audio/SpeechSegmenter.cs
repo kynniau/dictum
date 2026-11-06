@@ -49,6 +49,9 @@ public sealed class SpeechSegmenter
     /// <summary>2 s of speech before a pause may end a part: enough words for whisper to transcribe well on its own.</summary>
     public const int MinSpeechBlocks = 100;
 
+    /// <summary>60 ms of consecutive voiced blocks confirm speech after a cut; a shorter run (a click, a cough) inside a pause belongs to the pause.</summary>
+    public const int ConfirmBlocks = 3;
+
     /// <summary>30 s, whisper's own window: a part with no pause is cut here.</summary>
     public const int LimitBlocks = 1500;
 
@@ -80,6 +83,8 @@ public sealed class SpeechSegmenter
     private long _start;        // the first block of the current part
     private int _speech;        // blocks above the floor in the current part
     private int _quietRun;      // quiet blocks ending at the latest block
+    private int _gap;           // after a cut: quiet blocks since the last real speech, isolated voiced blocks included
+    private int _voicedRun;     // after a cut: consecutive voiced blocks ending at the latest block
     private float _level;       // the recent speech level
     private float _earlierPeak; // the loudest block of the current part no longer in the rings
 
@@ -116,13 +121,16 @@ public sealed class SpeechSegmenter
         _quiet[slot] = quiet;
         _level = Math.Max(rms, _level * LevelDecay);
         _block++;
+        var waiting = _start > 0 && _quietBefore is null; // after a cut, before the new part's speech is confirmed
         if (quiet)
         {
             _quietRun++;
+            if (waiting) { _gap += _voicedRun + 1; _voicedRun = 0; }
         }
         else
         {
-            if (_speech == 0 && _start > 0) _quietBefore = QuietTime(_quietRun);
+            // simplification: a voiced run under 3 blocks inside a pause is ignored; retire if a user's quick "yes" is lost at a paragraph boundary.
+            if (waiting && ++_voicedRun >= ConfirmBlocks) _quietBefore = QuietTime(_gap);
             _quietRun = 0;
             _speech++;
         }
@@ -169,6 +177,7 @@ public sealed class SpeechSegmenter
             }
         }
         _start = boundary;
+        (_gap, _voicedRun) = (_quietRun, 0); // no speech after the boundary: the quiet run so far is the gap
         _speech = speech;
         _earlierPeak = 0f;
         return new SegmentCut(boundary, reason, peak) { QuietBefore = quietBefore };

@@ -27,6 +27,8 @@ internal sealed class CleanupPage : SettingsPage
     private readonly ToggleSwitch _grammar;
     public const string PROPOSED_ParagraphPauseLabel = "Paragraph pause (seconds)";
     public const string PROPOSED_ParagraphPauseHelp = "Start a new paragraph when you pause for this long after a full stop. 0 turns it off.";
+    // The owner chooses between PROPOSED_ParagraphPauseHelp (used by the UI) and this hands-free wording.
+    public const string PROPOSED_ParagraphPauseHelpHandsFree = "In hands-free, start a new paragraph when you pause for this long after a full stop. 0 turns it off.";
     private readonly NumericUpDown _paragraphPause = new() { Width = 110, Minimum = 0, Maximum = 30, Increment = 0.5m, FormatString = "0.##" };
     private readonly StackPanel _cloudOn = new() { Spacing = 10 };
     private readonly StackPanel _cloudOff = new() { Spacing = 10 };
@@ -140,7 +142,12 @@ internal sealed class CleanupPage : SettingsPage
 
     private void SaveParagraphPause()
     {
-        if (Refreshing || _paragraphPause.Value is not decimal value) return;
+        if (Refreshing) return;
+        if (_paragraphPause.Value is not decimal value)
+        {
+            _paragraphPause.Value = (decimal)Shell.Settings.Cleanup.ParagraphPauseSeconds; // a cleared box never stays blank
+            return;
+        }
         var seconds = value == 0 ? 0 : Math.Clamp((double)value, 0.5, 30);
         if (seconds != Shell.Settings.Cleanup.ParagraphPauseSeconds)
             Write(("cleanup.paragraph_pause_seconds", System.Text.Json.Nodes.JsonValue.Create(seconds)));

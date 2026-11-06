@@ -103,18 +103,11 @@ public static class SegmentJoin
         bool keepCase = false, TimeSpan? quietBefore = null, double paragraphPauseSeconds = 2.0)
     {
         if (LeadingBreak(raw, cleaned) is { } spokenBreak) return (spokenBreak, keepCase ? cleaned : Capitalised(cleaned));
-        if (paragraphPauseSeconds > 0 && quietBefore?.TotalSeconds >= paragraphPauseSeconds && EndsWithTerminal(before))
+        if (paragraphPauseSeconds > 0 && quietBefore?.TotalSeconds >= paragraphPauseSeconds && SentenceStart.EndsSentence(before))
             return (ParagraphBreak, keepCase ? cleaned : Capitalised(cleaned));
         var separator = before.Length == 0 || char.IsWhiteSpace(before[^1]) || trailingSpace ? "" : " ";
         if (keepCase) return (separator, cleaned);
         return (separator, SentenceStart.At(before, before.Length) ? Capitalised(cleaned) : Continued(cleaned, names));
-    }
-
-    private static bool EndsWithTerminal(string text)
-    {
-        var end = text.Length - 1;
-        while (end >= 0 && text[end] is ' ' or '\t' or '"' or '\'' or '”' or '’' or '»' or ')' or ']' or '}') end--;
-        return end >= 0 && text[end] is '.' or '!' or '?';
     }
 
     /// <summary>A plain lower-case first word gets its capital; anything else ("iPhone", "3pm", a quote) is left as it is.</summary>
