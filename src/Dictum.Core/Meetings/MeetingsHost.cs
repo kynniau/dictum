@@ -25,6 +25,13 @@ internal sealed record MeetingsHost(
     public const string PROPOSED_UnrecordedProvider = "the service used for this summary (provider not recorded)";
     public const string PROPOSED_ExportReminder = "Sharing a recording or transcript may need the other people's agreement.";
     public string Export(MeetingId id) => Store.ExportMarkdown(id) + Environment.NewLine + PROPOSED_ExportReminder + Environment.NewLine;
+    public Func<Summary, string> SummaryAttribution { get; init; } = s => s.TemplateName + " · " + s.Model;
+    public string Export(MeetingId id, string? summaryId)
+    {
+        var summary = summaryId is null ? Store.ReadSummary(id) : Store.ReadSummaries(id).Single(s => s.Id == summaryId);
+        return Store.ExportMarkdown(id, summaryId) + Environment.NewLine +
+            (summary is null ? "" : SummaryAttribution(summary) + Environment.NewLine) + PROPOSED_ExportReminder + Environment.NewLine;
+    }
     public static string Caption(string storedEngine)
     {
         // Summary has no provider field. New own-key summaries retain the client identity in Engine,
@@ -44,13 +51,19 @@ internal sealed record MeetingsHost(
     public Func<bool> ImportsEnabled { get; init; } = () => false;
     public Action EnableImports { get; init; } = () => { };
     public Func<string?> SummaryHost { get; init; } = () => null;
+    public Func<string?> LocalSummaryModel { get; init; } = () => null;
+    public Func<string?> RemoteSummaryModel { get; init; } = () => null;
+    public Func<CancellationToken, Task<ILlmClient>>? LocalSummaryClient { get; init; }
+    public Func<bool> SummaryModelInstalled { get; init; } = () => true;
+    public Action OpenModels { get; init; } = () => { };
     public Action<MeetingId, MeetingConfirmation> SaveConfirmation { get; init; } = (_, _) => throw new InvalidOperationException("Confirmation storage is required.");
     public Func<MeetingId, IReadOnlyList<MeetingConfirmation>> ReadConfirmations { get; init; } = _ => [];
     public MeetingProcessingRoute ProcessingRoute()
     {
         var settings = Settings();
         var engine = settings.SummaryEngine;
-        return new(CloudSpeechHost(), engine, engine == SummaryEngine.Local ? null : SummaryHost(), settings.KeepAudio);
+        return new(CloudSpeechHost(), engine, engine == SummaryEngine.Local ? null : SummaryHost(), settings.KeepAudio,
+            engine == SummaryEngine.Local ? settings.SummaryModel ?? LocalSummaryModel() : RemoteSummaryModel());
     }
     public IDisposable UseConfirmedRoute(MeetingProcessingRoute route) => MeetingProcessingConsent.Enter(() => ProcessingRoute() == route);
     // simplification: team sharing and team-folder access/logging do not exist; keep them unavailable.
@@ -141,6 +154,9 @@ internal sealed record MeetingsHost(
         public MeetingMeta Read(MeetingId id) => Current().Read(id);
         public IReadOnlyList<Segment> ReadTranscript(MeetingId id) => Current().ReadTranscript(id);
         public Summary? ReadSummary(MeetingId id) => Current().ReadSummary(id);
+        public IReadOnlyList<Summary> ReadSummaries(MeetingId id) => Current().ReadSummaries(id);
+        public void EditSummary(MeetingId id, string summaryId, string markdown) => Current().EditSummary(id, summaryId, markdown);
+        public void DeleteSummary(MeetingId id, string summaryId) => Current().DeleteSummary(id, summaryId);
         public Stream OpenAudio(MeetingId id, Channel channel) => Current().OpenAudio(id, channel);
         public IReadOnlyList<MeetingMeta> List() => Current().List();
         public IReadOnlyList<(MeetingMeta, string Snippet)> Search(string text) => Current().Search(text);
@@ -149,22 +165,40 @@ internal sealed record MeetingsHost(
         public void ApplyRetention(DateTimeOffset now) => Current().ApplyRetention(now, id =>
             ReadConfirmations(id).LastOrDefault(c => c.Route?.KeepAudio is not null)?.Route?.KeepAudio);
         public string ExportMarkdown(MeetingId id) => Current().ExportMarkdown(id);
+        public string ExportMarkdown(MeetingId id, string? summaryId) => Current().ExportMarkdown(id, summaryId);
     }
 
     public async Task Regenerate(MeetingId id, string template, CancellationToken cancellation, MeetingProcessingRoute? confirmedRoute = null)
     {
         if (confirmedRoute is not null && confirmedRoute != ProcessingRoute()) throw new OperationCanceledException();
         var engine = Settings().SummaryEngine;
-        var client = await SummaryClient(engine, cancellation);
+        var route = confirmedRoute ?? ProcessingRoute();
+        using var consent = UseConfirmedRoute(route);
+        var client = engine == SummaryEngine.Local && LocalSummaryClient is { } local
+            ? await local(cancellation) : await SummaryClient(engine, cancellation);
         try
         {
             if (confirmedRoute is not null && confirmedRoute != ProcessingRoute()) throw new OperationCanceledException();
+            var type = SummaryTemplates.Get(template, Paths.ConfigDir);
             var summary = await new MeetingSummariser().SummariseAsync(id, Store.ReadTranscript(id),
-                SummaryTemplates.Get(template, Paths.ConfigDir), client,
+                type, new RouteCheckedClient(client),
                 engine == SummaryEngine.OwnKey ? "OwnKey:" + client.Name : engine.ToString(), cancellation);
-            Store.WriteSummary(id, summary);
+            MeetingProcessingConsent.Check(cancellation);
+            Store.WriteSummary(id, summary with { TemplateName = type.Name, Model = route.SummaryModel ?? client.Name });
         }
         finally { (client as IDisposable)?.Dispose(); }
+    }
+
+    private sealed class RouteCheckedClient(ILlmClient client) : ILlmClient
+    {
+        public string Name => client.Name;
+        public async Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, CancellationToken cancellationToken)
+        {
+            MeetingProcessingConsent.Check(cancellationToken);
+            var reply = await client.CompleteAsync(systemPrompt, rawTranscript, cancellationToken);
+            MeetingProcessingConsent.Check(cancellationToken);
+            return reply;
+        }
     }
 
     private static async Task<bool?> BitLockerStatus(string folder)
@@ -327,7 +361,7 @@ internal sealed class MicrophoneMeetingSource(IAudioCapture capture, string? dev
 internal sealed record MeetingConfirmation(string Answer, DateTimeOffset At, AgreementKind Kind,
     string ScriptVersion, string Script, string? ImporterIdentity = null, MeetingProcessingRoute? Route = null);
 
-internal sealed record MeetingProcessingRoute(string? SpeechHost, SummaryEngine SummaryEngine, string? SummaryHost, KeepAudio? KeepAudio = null);
+internal sealed record MeetingProcessingRoute(string? SpeechHost, SummaryEngine SummaryEngine, string? SummaryHost, KeepAudio? KeepAudio = null, string? SummaryModel = null);
 
 // The worker checks again after acquiring a speech client: settings can change on
 // another thread before the window receives its settings notification.

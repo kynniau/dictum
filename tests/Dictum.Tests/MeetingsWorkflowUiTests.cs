@@ -25,6 +25,112 @@ namespace Dictum.Tests;
 
 public sealed class MeetingsWorkflowUiTests
 {
+    [Fact]
+    public Task Settings_custom_types_create_edit_and_confirm_delete_with_builtins_read_only() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture(); using var shell = fixture.Shell();
+        var page = new MeetingsPage(shell, fixture.Host);
+        var window = new Window { Content = page, Width = 900, Height = 1000 }; window.Show(); page.Refresh();
+        Assert.Contains(string.Format(PROPOSED_BuiltinType, "General meeting"), Texts(page));
+        Assert.Empty(All<Button>(page).Where(b => AutomationProperties.GetName(b) == PROPOSED_EditType));
+        Click(page, PROPOSED_NewType);
+        var dialog = Assert.Single(window.OwnedWindows);
+        All<TextBox>(dialog).Single(t => AutomationProperties.GetName(t) == PROPOSED_TypeName).Text = "Review";
+        All<TextBox>(dialog).Single(t => AutomationProperties.GetName(t) == PROPOSED_TypeInstructions).Text = "Focus on decisions.";
+        Click(dialog, PROPOSED_SaveType);
+        var type = Assert.Single(SummaryTemplates.Load(fixture.Paths.ConfigDir).Where(t => !t.IsBuiltin));
+        Assert.Equal("Focus on decisions.", type.Instructions);
+        Click(page, PROPOSED_EditType); dialog = Assert.Single(window.OwnedWindows);
+        All<TextBox>(dialog).Single(t => AutomationProperties.GetName(t) == PROPOSED_TypeName).Text = "Revised review";
+        Click(dialog, PROPOSED_SaveType);
+        Assert.Equal("Revised review", SummaryTemplates.Get(type.Id, fixture.Paths.ConfigDir).Name);
+        Click(page, PROPOSED_DeleteType); Click(Assert.Single(window.OwnedWindows), APPROVED_Cancel);
+        Assert.Equal(5, SummaryTemplates.Load(fixture.Paths.ConfigDir).Count);
+        Click(page, PROPOSED_DeleteType); Click(Assert.Single(window.OwnedWindows), PROPOSED_DeleteType);
+        Assert.Equal(4, SummaryTemplates.Load(fixture.Paths.ConfigDir).Count);
+        window.Close();
+    });
+
+    [Fact]
+    public Task Summary_flow_creates_another_edits_shows_original_and_exports_selected() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        fixture.Settings = fixture.Settings with { SummaryModel = "invented.gguf" };
+        var id = fixture.Store.Create(fixture.Files.Meta());
+        fixture.Store.AppendSegments(id, MeetingFixture.Segments);
+        var original = MeetingFixture.Summary() with { TemplateName = "Original type", Model = "original.gguf" };
+        fixture.Store.WriteSummary(id, original);
+        fixture.Host.SaveConfirmation(id, new("agreed", DateTimeOffset.UtcNow, AgreementKind.Live, ApprovedScriptVersion, "Synthetic notice", Route: fixture.Host.ProcessingRoute()));
+        var window = new MeetingsWindow(fixture.Host); window.Show(); window.ShowMeeting(id);
+        Click(window, PROPOSED_NewSummary);
+        await Until(() => fixture.Store.ReadSummaries(id).Count == 2 && Find(window, PROPOSED_NewSummary).IsEffectivelyEnabled);
+        var latest = fixture.Store.ReadSummary(id)!;
+        Assert.Equal("invented.gguf", latest.Model);
+        Click(window, PROPOSED_EditSummary);
+        var editor = All<TextBox>(window).Single(t => AutomationProperties.GetName(t) == PROPOSED_SummaryEditor);
+        Assert.True(editor.IsFocused);
+        editor.Text = "## User revision\n- Revised discussion";
+        Click(window, PROPOSED_SaveSummary);
+        Assert.Equal(latest.Markdown, fixture.Store.ReadSummary(id)!.Markdown);
+        Assert.Contains("Revised discussion", Texts(window));
+        Click(window, PROPOSED_ShowOriginal);
+        Assert.Contains(latest.Markdown, Texts(window));
+        Assert.DoesNotContain("Revised discussion", Texts(window));
+        Click(window, PROPOSED_Copy);
+        Click(Assert.Single(window.OwnedWindows), APPROVED_ShareContinue);
+        Assert.Contains("Revised discussion", fixture.Copied);
+        Assert.Contains(string.Format(PROPOSED_SummaryAttribution, "General meeting", latest.Model, latest.At), fixture.Copied);
+        Assert.Contains("Edited by you:", fixture.Copied);
+        var list = All<ComboBox>(window).Single(c => AutomationProperties.GetName(c) == PROPOSED_SummaryList);
+        list.SelectedIndex = 1;
+        Click(window, PROPOSED_Copy);
+        Click(Assert.Single(window.OwnedWindows), APPROVED_ShareContinue);
+        Assert.Contains(original.Markdown, fixture.Copied);
+        Assert.DoesNotContain("Revised discussion", fixture.Copied);
+        Click(window, PROPOSED_DeleteSummary);
+        Click(Assert.Single(window.OwnedWindows), APPROVED_Cancel);
+        Assert.Equal(2, fixture.Store.ReadSummaries(id).Count);
+        Click(window, PROPOSED_DeleteSummary);
+        Click(Assert.Single(window.OwnedWindows), PROPOSED_DeleteSummary);
+        Assert.Single(fixture.Store.ReadSummaries(id));
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Local_summary_model_change_requires_a_fresh_named_notice() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        fixture.Settings = fixture.Settings with { SummaryModel = "first.gguf" };
+        var id = fixture.Store.Create(fixture.Files.Meta()); fixture.Store.AppendSegments(id, MeetingFixture.Segments);
+        var before = fixture.Host.ProcessingRoute();
+        fixture.Host.SaveConfirmation(id, new("agreed", DateTimeOffset.UtcNow, AgreementKind.Live, ApprovedScriptVersion, "Synthetic notice", Route: before));
+        fixture.Settings = fixture.Settings with { SummaryModel = "second.gguf" };
+        Assert.NotEqual(before, fixture.Host.ProcessingRoute());
+        var window = new MeetingsWindow(fixture.Host); window.Show(); window.ShowMeeting(id);
+        Click(window, PROPOSED_NewSummary);
+        var notice = Assert.Single(window.OwnedWindows);
+        Assert.Contains(string.Format(PROPOSED_LocalSummaryModel, "second.gguf"), Texts(notice));
+        Assert.Empty(fixture.Store.ReadSummaries(id));
+        Click(notice, APPROVED_Continue);
+        await Until(() => fixture.Store.ReadSummary(id) is not null && Find(window, PROPOSED_NewSummary).IsEffectivelyEnabled);
+        Assert.Equal("second.gguf", fixture.Store.ReadSummary(id)!.Model);
+        window.Close(); return true;
+    });
+
+    [Fact]
+    public Task Missing_summary_model_offers_settings_without_summarising() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture(); var opened = false;
+        var host = fixture.Host with { SummaryModelInstalled = () => false, OpenModels = () => opened = true };
+        var id = fixture.Store.Create(fixture.Files.Meta());
+        var window = new MeetingsWindow(host); window.Show(); window.ShowMeeting(id);
+        Click(window, PROPOSED_NewSummary);
+        var dialog = Assert.Single(window.OwnedWindows);
+        Assert.Contains(PROPOSED_ModelMissing, Texts(dialog));
+        Click(dialog, PROPOSED_OpenModels);
+        Assert.True(opened); Assert.Empty(fixture.Store.ReadSummaries(id));
+        window.Close();
+    });
     private static IEnumerable<T> All<T>(ILogical root) => root.GetLogicalDescendants().OfType<T>();
     private static Button Find(ILogical root, string name) => All<Button>(root).Single(b => AutomationProperties.GetName(b) == name);
     private static void Click(ILogical root, string name)

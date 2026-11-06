@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Dictum.Hotkey;
 using Dictum.Meetings;
+using Dictum.Meetings.Summaries;
 
 namespace Dictum.Settings;
 
@@ -43,7 +44,7 @@ public static class SettingsLoader
         {
             return new SettingsLoadResult(new AppSettings(), [$"Could not read {path} ({ex.GetType().Name})."], true, Usable: false);
         }
-        var result = Parse(text);
+        var result = Parse(text, Path.GetDirectoryName(Path.GetFullPath(path)));
         return result with { FileExisted = true };
     }
 
@@ -51,7 +52,7 @@ public static class SettingsLoader
     /// A file that does not parse is not usable (<see cref="SettingsLoadResult.Usable"/>): its values are unknown, so the
     /// callers fail closed (<see cref="ConfigLoader"/>) instead of quietly running on defaults.
     /// </summary>
-    public static SettingsLoadResult Parse(string json)
+    public static SettingsLoadResult Parse(string json, string? configDirectory = null)
     {
         var warnings = new List<string>();
         JsonDocument doc;
@@ -74,7 +75,7 @@ public static class SettingsLoader
                 return new SettingsLoadResult(new AppSettings(), warnings, true, Usable: false);
             }
             var reader = new ObjectReader(root, "", warnings);
-            var meetings = BindMeetings(reader.Child("meetings"));
+            var meetings = BindMeetings(reader.Child("meetings"), configDirectory);
             var settings = Bind(reader);
             var namesSpeech = HasString(root, "whisper", "model");
             var namesProvider = HasString(root, "llm", "provider");
@@ -84,7 +85,7 @@ public static class SettingsLoader
         }
     }
 
-    private static MeetingsSettings BindMeetings(ObjectReader? r)
+    private static MeetingsSettings BindMeetings(ObjectReader? r, string? configDirectory)
     {
         var d = new MeetingsSettings();
         if (r is null) return d;
@@ -99,8 +100,13 @@ public static class SettingsLoader
             ZoomImport = Choice("zoom_import", d.ZoomImport),
             ZoomFolder = r.NullableString("zoom_folder", FolderProblem),
             SummaryEngine = Choice("summary_engine", d.SummaryEngine),
-            SummaryTemplate = r.String("summary_template", d.SummaryTemplate,
-                OneOf("general", "client-file-note", "lender-call", "stand-up")),
+            SummaryModel = r.NullableString("summary_model", v =>
+                v.Length > ".gguf".Length && v.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase)
+                && v.IndexOfAny(['/', '\\', ':']) < 0 && v.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+                    ? null : "expected a .gguf file name without a path"),
+            SummaryTemplate = r.String(r.Has("summary_type") ? "summary_type" : "summary_template", d.SummaryTemplate,
+                v => SummaryTemplates.Load(configDirectory).Any(t => t.Id == v)
+                    ? null : "expected an available meeting summary type id"),
             ShareDefault = Choice("share_default", d.ShareDefault),
         };
     }
@@ -352,6 +358,8 @@ public static class SettingsLoader
     private sealed class ObjectReader(JsonElement obj, string path, List<string> warnings)
     {
         private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
+
+        public bool Has(string name) => obj.TryGetProperty(name, out _);
 
         private bool TryGet(string key, out JsonElement value)
         {

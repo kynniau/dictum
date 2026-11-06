@@ -1,7 +1,42 @@
 namespace Dictum.UI.Views.Meetings;
 
+// The PROPOSED_ strings added for 1.5.1 (pill labels, headphones tip, summaries screens) were APPROVED by the owner 07/11/2026 00:30 AEDT (.demo-preview/approve-1.5.1-wording.md): do not reword.
 internal static class MeetingsText
 {
+    public const string PROPOSED_SummaryModel = "Summary model";
+    public const string PROPOSED_DefaultSummaryModel = "Use the clean-up model, or the recommended model";
+    public const string PROPOSED_ModelMissing = "This summary model is not installed. Open Settings > Models to download it.";
+    public const string PROPOSED_OpenModels = "Open Settings > Models";
+    public const string PROPOSED_ModelLoading = "Loading the summary model…";
+    public const string PROPOSED_ModelLoadFailed = "The summary model could not load within two minutes. Try again or choose another model in Settings > Meetings.";
+    public const string PROPOSED_LocalSummaryModel = "Summary model on this computer: {0}";
+    public const string PROPOSED_CurrentSummaryModel = "Model for new summaries: {0}";
+    public const string PROPOSED_ModelNotRecorded = "Model not recorded";
+    public const string PROPOSED_SummaryTypes = "Summary types";
+    public const string PROPOSED_BuiltinType = "{0} (built-in, read-only)";
+    public const string PROPOSED_NewType = "New summary type";
+    public const string PROPOSED_EditType = "Edit summary type";
+    public const string PROPOSED_DeleteType = "Delete summary type";
+    public const string PROPOSED_DeleteTypeQuestion = "Delete this summary type? Existing summaries will stay.";
+    public const string PROPOSED_TypeName = "Name";
+    public const string PROPOSED_TypeInstructions = "Instructions";
+    public const string PROPOSED_TypeFileCaption = "Your summary types are Markdown files in the config folder's meetings/summary-types folder. You can edit them in Notepad. Figures still require verbatim transcript quotes with time and channel; only headings and list items are allowed, with no HTML.";
+    public const string PROPOSED_NewSummary = "New summary";
+    public const string PROPOSED_SummaryList = "Saved summaries";
+    public const string PROPOSED_SummaryRow = "{0} · {1} · {2:g}";
+    public const string PROPOSED_EditSummary = "Edit summary";
+    public const string PROPOSED_SummaryEditor = "Summary text";
+    public const string PROPOSED_SaveSummary = "Save summary";
+    public const string PROPOSED_SaveType = "Save summary type";
+    public const string PROPOSED_ShowOriginal = "Show original";
+    public const string PROPOSED_ShowEdited = "Show edited summary";
+    public const string PROPOSED_DeleteSummary = "Delete summary";
+    public const string PROPOSED_DeleteSummaryQuestion = "Delete this summary and its edit? Other summaries will stay.";
+    public const string PROPOSED_SummarySelected = "Summary selected.";
+    public const string PROPOSED_SummaryEdited = "Edited summary saved. The original is still available.";
+    public const string PROPOSED_SummaryDeleted = "Summary deleted.";
+    public const string PROPOSED_SummaryAttribution = "Summary type: {0}. Model: {1}. Generated: {2:g}.";
+    public const string PROPOSED_EditedAttribution = "Edited by you: {0:g}.";
     public const string ApprovedScriptVersion = "APPROVED-2026-11-05-0913-AEDT-v1";
     public const string PROPOSED_UnconfiguredProvider = "the summary service (configure its host in Settings > Clean-up)";
     public const string PROPOSED_SummaryHost = "Summary service host: {0}";

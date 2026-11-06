@@ -12,6 +12,10 @@ public interface IMeetingStore
     MeetingMeta Read(MeetingId id);
     IReadOnlyList<Segment> ReadTranscript(MeetingId id);
     Summary? ReadSummary(MeetingId id);
+    IReadOnlyList<Summary> ReadSummaries(MeetingId id) => ReadSummary(id) is { } summary ? [summary] : [];
+    void EditSummary(MeetingId id, string summaryId, string markdown) => throw new NotSupportedException();
+    void DeleteSummary(MeetingId id, string summaryId) => throw new NotSupportedException();
+    string ExportMarkdown(MeetingId id, string? summaryId) => ExportMarkdown(id);
     Stream OpenAudio(MeetingId id, Channel channel);
     IReadOnlyList<MeetingMeta> List();
     IReadOnlyList<(MeetingMeta, string Snippet)> Search(string text);
