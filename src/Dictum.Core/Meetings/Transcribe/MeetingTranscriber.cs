@@ -63,13 +63,15 @@ public sealed class MeetingTranscriber(ISpeechEngine engine, IVoiceGate gate, IM
                     if (string.IsNullOrWhiteSpace(text)) continue;
                     // Persist a completed inference even if cancellation arrived as it returned.
                     var segment = new Segment(part.Offset, part.Offset + part.Part.Duration, part.Channel, text);
-                    recentOthers.RemoveAll(s => segment.Start > s.End && segment.Start - s.End > EchoDeduplicator.Slack);
+                    var earliest = pending.Where(s => s.Channel == Channel.You).Select(s => s.Start)
+                        .Append(segment.Start).Min();
+                    recentOthers.RemoveAll(s => earliest > s.End && earliest - s.End > EchoDeduplicator.Slack);
                     if (segment.Channel == Channel.Others)
                     {
                         recentOthers.Add(segment);
-                        pending.RemoveAll(s => EchoDeduplicator.IsEcho(s, segment));
+                        pending.RemoveAll(s => EchoDeduplicator.IsEcho(s, recentOthers));
                     }
-                    if (segment.Channel != Channel.You || !recentOthers.Any(s => EchoDeduplicator.IsEcho(segment, s)))
+                    if (segment.Channel != Channel.You || !EchoDeduplicator.IsEcho(segment, recentOthers))
                         pending.Add(segment);
                     // The next queued part also constrains what can safely be published.
                     var safeThrough = queue.TryPeek(out var next, out _) && next.Offset < through ? next.Offset : through;
