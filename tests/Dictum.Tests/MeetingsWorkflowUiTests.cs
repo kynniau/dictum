@@ -1086,8 +1086,10 @@ public sealed class MeetingsWorkflowUiTests
         {
             using var audio = fixture.Store.OpenAudio(id, channel);
             Assert.True(AudioBytes(audio).Length > 44);
-            Assert.Contains(fixture.Store.ReadTranscript(id), line => line.Channel == channel);
         }
+        // The fixture returns identical speech for both tracks: retain only loopback text.
+        Assert.Contains(fixture.Store.ReadTranscript(id), line => line.Channel == Channel.Others);
+        Assert.DoesNotContain(fixture.Store.ReadTranscript(id), line => line.Channel == Channel.You);
         window.Close(); return true;
     });
 
