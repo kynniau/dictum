@@ -1,4 +1,6 @@
 using Avalonia;
+using Avalonia.Automation;
+using Dictum.UI.Views.Meetings;
 using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -11,7 +13,7 @@ namespace Dictum.UI.Overlays;
 
 /// <summary>
 /// The pill (SPEC §7, docs/design/Pill.dc.html): bottom-centre of the monitor with the focused window, 48 px above the
-/// taskbar. Never activates and is click-through (see <see cref="Overlay"/>). Recording: the breathing red dot and five
+/// taskbar. Showing never activates; meeting controls accept input, dictation is click-through. Recording: the red dot and five
 /// bars following the microphone; working: a turning arc (blue transcribing, amber polishing); done: a green check with
 /// the word count; cancelled: a grey cross. Under reduced motion the dot does not breathe, the arc does not turn and
 /// nothing fades.
@@ -43,17 +45,27 @@ public partial class PillWindow : Window
     {
     }
 
-    public PillWindow(IPlatform? platform)
+    public PillWindow(IPlatform? platform, bool meetingControls = false)
     {
         _platform = platform;
         InitializeComponent();
         _bars = [.. Meter.Children.OfType<Rectangle>()];
-        Overlay.Prepare(this, platform);
+        MeetingControls = meetingControls;
+        // Meeting controls use normal native input flags; showing still never activates.
+        if (!meetingControls) Overlay.Prepare(this, platform);
+        Focusable = IsHitTestVisible = meetingControls;
+        AutomationProperties.SetLiveSetting(Label, AutomationLiveSetting.Polite);
+        MeetingPause.Click += (_, _) => PauseMeeting?.Invoke();
+        MeetingStop.Click += (_, _) => StopMeeting?.Invoke();
         _frame = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Render, (_, _) => OnFrame()) { IsEnabled = false };
         _flash = new DispatcherTimer { IsEnabled = false };
         _flash.Tick += (_, _) => OnFlashElapsed();
         SpinnerArc.RenderTransform = new RotateTransform();
     }
+
+    public bool MeetingControls { get; }
+    public event Action? PauseMeeting;
+    public event Action? StopMeeting;
 
     public PillView View => _state.View;
 
@@ -99,7 +111,7 @@ public partial class PillWindow : Window
             _flash.Interval = TimeSpan.FromMilliseconds(ms);
             _flash.Start();
         }
-        _frame.IsEnabled = PillText.IsRecording(state.View) || (PillText.IsProcessing(state.View) && !ReducedMotion);
+        _frame.IsEnabled = Overlay.IsRecording(state.View) || (PillText.IsProcessing(state.View) && !ReducedMotion);
     }
 
     private void Render()
@@ -112,7 +124,13 @@ public partial class PillWindow : Window
         Detail.IsVisible = detail is not null;
         Hint.Text = PillText.HandsFreeHint;
         Hint.IsVisible = view == PillView.RecordingHandsFree;
-        var recording = PillText.IsRecording(view);
+        var meeting = view is PillView.MeetingRecording or PillView.MeetingPaused;
+        MeetingPause.IsVisible = MeetingStop.IsVisible = meeting;
+        MeetingPause.Content = view == PillView.MeetingPaused ? MeetingsText.PROPOSED_Resume : MeetingsText.PROPOSED_Pause;
+        AutomationProperties.SetName(MeetingPause, (string)MeetingPause.Content);
+        MeetingStop.Content = MeetingsText.PROPOSED_Stop;
+        AutomationProperties.SetName(MeetingStop, MeetingsText.PROPOSED_Stop);
+        var recording = Overlay.IsRecording(view);
         Meter.IsVisible = recording;
         Dot.IsVisible = DotRing.IsVisible = recording;
         Spinner.IsVisible = PillText.IsProcessing(view) || view == PillView.Busy;
@@ -148,7 +166,7 @@ public partial class PillWindow : Window
             SpinnerArc.RenderTransformOrigin = new RelativePoint(8, 8, RelativeUnit.Absolute);
             return;
         }
-        if (!PillText.IsRecording(view))
+        if (!Overlay.IsRecording(view))
         {
             _frame.IsEnabled = false;
             return;

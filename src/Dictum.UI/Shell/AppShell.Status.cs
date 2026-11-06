@@ -263,7 +263,15 @@ public sealed partial class AppShell
     /// <summary>What the controller needs from the UI; never blocks the caller.</summary>
     private sealed class UiBridge(AppShell shell) : IDictationUi
     {
-        public void ShowPill(PillState state) => Dispatcher.UIThread.Post(() => shell._overlays?.Show(state));
+        public void ShowPill(PillState state)
+        {
+            // Drop meeting-time Busy effects before queuing: a delayed callback must not reappear after Stop.
+            if (shell.MeetingOwnsPill) return;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (!shell.MeetingOwnsPill) shell._overlays?.Show(state);
+            });
+        }
 
         public void SetTrayState(TrayState state) => shell.SetTrayState(state);
 

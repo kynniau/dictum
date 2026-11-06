@@ -2,6 +2,10 @@ namespace Dictum.UI.Views.Meetings;
 
 internal static class MeetingsText
 {
+    public const string PROPOSED_MeetingRecording = "Meeting: recording";
+    public const string PROPOSED_MeetingPaused = "Meeting: paused";
+    public const string PROPOSED_DictationBusy = "Finish dictation before starting a meeting.";
+    public const string PROPOSED_HeadphonesTip = "Tip: wear headphones so the other people's voices are not picked up twice by your microphone.";
     public const string ApprovedScriptVersion = "APPROVED-2026-11-05-0913-AEDT-v1";
     public const string PROPOSED_UnconfiguredProvider = "the summary service (configure its host in Settings > Clean-up)";
     public const string PROPOSED_SummaryHost = "Summary service host: {0}";
