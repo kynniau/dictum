@@ -5,8 +5,8 @@ namespace Dictum.UI.Overlays;
 
 /// <summary>
 /// Shows each dictation state on what the settings ask for: the pill (pill.enabled), the orb and the screen-edge glow
-/// (indicator.mode: off, orb, edge or both). Windows are made on first use and kept; all of them are click-through and
-/// never activated. UI thread only.
+/// (indicator.mode: off, orb, edge or both). Meetings always show the pill and halo. The meeting pill accepts input;
+/// other overlays stay click-through. Showing never activates them. UI thread only.
 /// </summary>
 internal sealed class OverlayPresenter(AppShell shell) : IDisposable
 {
@@ -25,20 +25,33 @@ internal sealed class OverlayPresenter(AppShell shell) : IDisposable
     public void Show(PillState state)
     {
         var settings = shell.Settings;
-        if (settings.Pill.Enabled) (_pill ??= NewPill()).Present(state);
+        var meeting = state.View is PillView.MeetingRecording or PillView.MeetingPaused;
+        if (state.View != PillView.Hidden && _pill is not null && _pill.MeetingControls != meeting)
+        {
+            _pill.Close();
+            _pill = null;
+        }
+        if (settings.Pill.Enabled || meeting) (_pill ??= NewPill(meeting)).Present(state);
         else _pill?.Present(new PillState(PillView.Hidden, 0));
 
         if (settings.Indicator.ShowsOrb) (_orb ??= NewOrb()).Present(state.View, settings.Indicator.OrbCorner);
         else _orb?.Present(PillView.Hidden, settings.Indicator.OrbCorner);
 
-        if (state.View != PillView.Busy) ShowEdges(settings.Indicator.ShowsEdge && PillText.IsRecording(state.View));
+        if (state.View != PillView.Busy) ShowEdges((settings.Indicator.ShowsEdge || meeting) && Overlay.IsRecording(state.View));
     }
 
-    private PillWindow NewPill()
+    private PillWindow NewPill(bool meeting)
     {
-        var pill = new PillWindow(shell.Platform);
+        var pill = new PillWindow(shell.Platform, meeting);
         pill.SetLevelSource(() => shell.CurrentLevel);
-        pill.SetLabelSource(shell.PillLabel); // cloud speech: "Hearing… (cloud)", and the fallback line after a failed request
+        pill.PauseMeeting += shell.PauseMeetingFromPill;
+        pill.StopMeeting += shell.StopMeetingFromPill;
+        pill.SetLabelSource(view => view switch
+        {
+            PillView.MeetingRecording => Dictum.UI.Views.Meetings.MeetingsText.PROPOSED_MeetingRecording,
+            PillView.MeetingPaused => Dictum.UI.Views.Meetings.MeetingsText.PROPOSED_MeetingPaused,
+            _ => shell.PillLabel(view),
+        }); // cloud speech: "Hearing… (cloud)", and the fallback line after a failed request
         return pill;
     }
 

@@ -485,6 +485,17 @@ Ctrl+V.
   a grey stop-square badge.
 - Respect reduced motion (`SystemParameters.ClientAreaAnimation` false → no pulse/fade).
 
+### 7.1 Meeting recording indicators (06/11/2026)
+
+A live meeting owns the pill and screen-edge halo, including when Meetings is behind other windows.
+MeetingRecording uses the recording dot, combined meeting-source level and configured orb; MeetingPaused
+keeps the pill and hides the halo and orb. The meeting pill stays available even when dictation indicators
+are disabled. Its keyboard-accessible Pause/Resume and Stop controls share the recording window's checks
+and normal save path; Stop brings Meetings forward. Showing the pill does not activate it. Reduced motion
+keeps the existing still-dot and no-fade behaviour. Dictation hotkeys are refused while a meeting owns the
+pill; starting a meeting during dictation is refused. Stopping capture hides the pill and releases its level
+source. Labels and the separate headphones tip after the agreement notice are PROPOSED copy.
+
 ## 8. Tray
 
 Icon with states: idle, disabled, recording, processing, error. Tooltip:

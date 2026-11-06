@@ -78,7 +78,7 @@ public sealed class OrbWindow : Window
     /// <summary>Shows the orb for a live dictation (recording or processing) in <paramref name="corner"/>; hides it otherwise.</summary>
     public void Present(PillView view, string corner)
     {
-        var live = PillText.IsRecording(view) || PillText.IsProcessing(view);
+        var live = Overlay.IsRecording(view) || PillText.IsProcessing(view);
         if (view == PillView.Busy) return; // a refused key press changes nothing here
         _view = live ? view : PillView.Hidden;
         if (!live)
@@ -93,17 +93,17 @@ public sealed class OrbWindow : Window
             Place(corner);
             Show();
         }
-        _frame.IsEnabled = PillText.IsRecording(view) && !ReducedMotion;
+        _frame.IsEnabled = Overlay.IsRecording(view) && !ReducedMotion;
     }
 
     private void Paint()
     {
-        var colour = PillText.IsRecording(_view) ? Red : _view == PillView.Transcribing ? Blue : Amber;
+        var colour = Overlay.IsRecording(_view) ? Red : _view == PillView.Transcribing ? Blue : Amber;
         var brush = new SolidColorBrush(colour);
         _capsule.Fill = brush;
         _glyph.Stroke = brush;
         // The design's rings, 6 px at 35% and 14 px at 15%, grow with the voice while recording (-50..-10 dBFS → 0..1).
-        var norm = PillText.IsRecording(_view) && !ReducedMotion ? Math.Clamp((20 * Math.Log10(Math.Max(_level(), 1e-6f)) + 50) / 40, 0, 1) : 0;
+        var norm = Overlay.IsRecording(_view) && !ReducedMotion ? Math.Clamp((20 * Math.Log10(Math.Max(_level(), 1e-6f)) + 50) / 40, 0, 1) : 0;
         _badge.BoxShadow = new BoxShadows(
             new BoxShadow { Spread = 6 + 8 * norm, Color = Color.FromArgb(0x59, colour.R, colour.G, colour.B) },
             [

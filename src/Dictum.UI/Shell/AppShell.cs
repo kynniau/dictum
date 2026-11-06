@@ -48,6 +48,7 @@ public sealed partial class AppShell : IDisposable
     private IClassicDesktopStyleApplicationLifetime? _lifetime;
     private ITrayHost? _tray;
     private OverlayPresenter? _overlays;
+    internal OverlayPresenter? Overlays => _overlays;
     private IHotkeyListener? _hook;
     private bool _hookUsesMouse; // the dictation listener's hotkey names a mouse button (ApplyHookEnabled)
     private IHotkeyListener? _fixHook;
@@ -139,7 +140,7 @@ public sealed partial class AppShell : IDisposable
     public bool GpuMachine => _gpuMachine();
 
     /// <summary>The microphone's level now (0-1), for the meters; 0 when not recording.</summary>
-    public float CurrentLevel => _capture.CurrentLevel;
+    public float CurrentLevel => Volatile.Read(ref _meetingLevel)?.Invoke() ?? _capture.CurrentLevel;
 
     /// <summary>The clean-up step's own description ("local/qwen2.5-1.5b on this PC (nothing leaves it)").</summary>
     public string CleanupStatus => _cleaner.Status;
@@ -228,7 +229,7 @@ public sealed partial class AppShell : IDisposable
         _tray = Platform.CreateTray(point => Dispatcher.UIThread.Post(() => ToggleFlyout(point)), _log);
 
         var machine = new DictationStateMachine(AppRules.Options(_settings), _settings.Enabled);
-        _controller = new DictationController(machine, _capture, Pipeline, new UiBridge(this), () => _settings, _log, hotkeyBlocked: () => !_models.IsReady,
+        _controller = new DictationController(machine, _capture, Pipeline, new UiBridge(this), () => _settings, _log, hotkeyBlocked: () => MeetingOwnsPill || !_models.IsReady,
             microphoneListed: () => Platform.ListCaptureDevices().Count > 0);
         StartHook();
         ApplyFixHotkey(_settings, reinstall: false);
