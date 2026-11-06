@@ -7,6 +7,7 @@ public static class TranscriptChunker
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTokens);
         if (overlapTokens < 0 || overlapTokens >= maxTokens)
             throw new ArgumentOutOfRangeException(nameof(overlapTokens));
+        transcript = Transcribe.EchoDeduplicator.Filter(transcript);
         var rendered = transcript.Select(s => includeTimestamps
             ? $"[{(long)s.Start.TotalMinutes:00}:{s.Start.Seconds:00} {s.Channel}] {s.Text}" : s.Text).ToArray();
         var chunks = new List<string>();

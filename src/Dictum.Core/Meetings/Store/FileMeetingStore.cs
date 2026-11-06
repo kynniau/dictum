@@ -168,7 +168,7 @@ public sealed class FileMeetingStore : IMeetingStore
     }
     public IReadOnlyList<Segment> ReadTranscript(MeetingId id)
     {
-        lock (Gate) return WithKey(id, key => (IReadOnlyList<Segment>)Transcript(id, key).Segments);
+        lock (Gate) return WithKey(id, content => Transcribe.EchoDeduplicator.Filter(Transcript(id, content).Segments));
     }
     public void AddMarker(MeetingId id, Marker marker)
     {
