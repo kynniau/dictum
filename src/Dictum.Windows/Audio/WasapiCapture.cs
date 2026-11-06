@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Dictum.Audio;
 using Dictum.Core;
+using Dictum.Settings;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
@@ -13,6 +14,9 @@ namespace Dictum.Windows.Audio;
 public sealed class WasapiCapture : IAudioCapture, IDisposable
 {
     private readonly ILog _log;
+    private readonly Func<AudioSettings> _settings;
+    // simplification: one settings profile per process; retire this provider when the platform factory accepts settings per capture.
+    internal static Func<AudioSettings> ReadSettings { get; set; } = () => new AudioSettings();
     private readonly object _gate = new();
     private WasapiRecorder? _recorder;
     private MMDeviceEnumerator? _enumerator;
@@ -21,7 +25,8 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
     private long _keyDownStamp;
     private int _firstPacketLogged;
 
-    public WasapiCapture(ILog log) => _log = log;
+    public WasapiCapture(ILog log) : this(log, () => ReadSettings()) { }
+    internal WasapiCapture(ILog log, Func<AudioSettings> settings) { _log = log; _settings = settings; }
 
     public event Action<Exception>? Failed;
 
@@ -48,12 +53,14 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
             {
                 _enumerator = new MMDeviceEnumerator();
                 _device = CaptureDevices.Resolve(_enumerator, deviceSetting, _log);
-                var recorder = new WasapiRecorderBuilder()
+                var mode = new MicrophoneCaptureMode(_settings().ProcessedCapture);
+                var builder = new WasapiRecorderBuilder()
                     .WithDevice(_device)
                     .WithSharedMode()
                     .WithEventSync()
-                    .WithBufferLength(50)
-                    .Build();
+                    .WithBufferLength(50);
+                mode.Configure(category => builder.WithCommunicationsMode());
+                var recorder = builder.Build();
                 var format = recorder.WaveFormat;
                 var buffer = new CaptureBuffer(SampleDecoder.EncodingOf(format), format.Channels, format.SampleRate, () => SoundHeard?.Invoke());
                 recorder.DataAvailable += OnData;
@@ -61,6 +68,7 @@ public sealed class WasapiCapture : IAudioCapture, IDisposable
                 Volatile.Write(ref _buffer, buffer);
                 _recorder = recorder;
                 recorder.StartRecording();
+                mode.LogStarted(_log);
                 _log.Info($"Capture started in {sw.ElapsedMilliseconds} ms ({Stopwatch.GetElapsedTime(keyDownStamp).TotalMilliseconds:0} ms after key-down) on \"{_device.FriendlyName}\" {format.SampleRate} Hz {format.Channels} ch {format.BitsPerSample}-bit, latency {recorder.LatencyMilliseconds} ms.");
             }
             catch

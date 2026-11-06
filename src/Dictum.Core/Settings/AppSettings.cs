@@ -62,6 +62,7 @@ public sealed record AudioSettings
 {
     /// <summary>Null = Windows default capture device; otherwise a device ID or (part of) its friendly name.</summary>
     public string? Device { get; init; }
+    public bool ProcessedCapture { get; init; }
 }
 
 public sealed record WhisperSettings

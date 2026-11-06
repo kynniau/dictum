@@ -67,6 +67,7 @@ public static class SettingsFile
                 // PROPOSED 04/11/2026 (.demo-preview/approve-vad.md row 9): the vad note.
                 ["vad"] = "auto: when ggml-silero-v6.2.0.bin is in a model folder (Dictum.exe --download-model silero-v6.2.0), a voice detector on this PC checks each recording for speech first, and one with none is discarded; silence_threshold then no longer decides silence. off: silence_threshold decides, as without the file.",
                 ["audio.device"] = "null = the system's default microphone, or a device ID / part of its name (see Settings > Microphone or Dictum.exe --selftest).",
+                ["audio.processed_capture"] = "Ask Windows to remove echo and background noise from the microphone. Off until verified on your PC.",
                 ["whisper"] = "model: short name (small.en, medium.en, medium.en-q5_0, large-v3-turbo, or the multilingual small, medium, large-v3...) looked up as ggml-<name>.bin in the model folders (see models), or an absolute path. language: a whisper code (en, es, de, ja...) or auto to detect it; anything but en needs a multilingual model (no .en). translate: true writes English whatever language is spoken (multilingual model; large-v3-turbo cannot translate). gpu: auto | vulkan | cpu (change needs a restart). threads: 0 = auto. beam_size: 0 = greedy decoding (fastest), 1-8 = beam search (Calibrate my voice can set it).",
                 // The speech note (cloud speech): APPROVED 22/10/2026 17:22 AEDT (proposed 22/10/2026): do not reword.
                 ["speech"] = "Absent = local. provider: local (the speech model in whisper, on this PC: nothing leaves it) | openai-compatible (each recording, or each hands-free part, is sent as audio to the service at base_url, which Dictum appends /audio/transcriptions to; your dictionary terms go with it as a hint). base_url and model are required for openai-compatible (for Azure OpenAI, model is your deployment name; https:// only, also for a server on this PC). timeout_ms: the deadline for one request (1000-120000). Cloud speech runs only after its own consent step, which records it in consent.json; settings.json cannot switch it on, and offline_only refuses it. The language hint is whisper.language (none for auto); with whisper.translate on, cloud speech is not used. Any failure (no key, an HTTP error, the deadline) uses the speech model on this PC for that recording.",
@@ -90,7 +91,7 @@ public static class SettingsFile
             ["hands_free_max_seconds"] = d.HandsFreeMaxSeconds,
             ["silence_threshold"] = d.SilenceThreshold,
             ["vad"] = d.Vad,
-            ["audio"] = new JsonObject { ["device"] = null },
+            ["audio"] = new JsonObject { ["device"] = null, ["processed_capture"] = false },
             ["whisper"] = new JsonObject
             {
                 ["model"] = model,

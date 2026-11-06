@@ -192,6 +192,25 @@ Hold-to-talk stays one recording, and calibration takes are never cut.
 
 Processing shows the pill states "Transcribing…" → "Polishing…" → brief "Done" then hide.
 
+### Windows microphone processing (06/11/2026)
+
+`audio.processed_capture` defaults to `false`. When true, dictation and meeting microphones request
+Windows' Communications processing through `IAudioClient2::SetClientProperties` before initialization,
+with no raw stream option. Echo cancellation, noise suppression and automatic gain depend on the endpoint's
+installed effects; this cannot guarantee removal of colleagues' speech. Off preserves the existing capture path.
+Loopback is unchanged. Each successful microphone start logs `microphone: processed (communications)` or
+`microphone: raw` (the latter names the existing path, not a request to bypass device effects).
+
+Hidden Windows command `Dictum.exe --capture-check` uses the default microphone and output for two five-second
+in-memory trials, first existing capture, then Communications. Each plays a 1 kHz tone at amplitude 0.1 for
+three seconds between silent lead/tail periods. Recordings are discarded, never written. Keep output volume
+and microphone placement fixed and stay quiet. It prints exactly `raw: <ratio>` then
+`processed (communications): <ratio>`, with six decimal places and invariant decimal points. Each ratio is
+microphone tone-band mean-square divided by the generated tone's nominal mean-square, including silence
+(0.003); lower means less tone leakage. This is a narrow-band diagnostic, not proof of speech cancellation;
+mute output can yield two near-zero numbers. Failures print an error to stderr and exit 1, with no ratios.
+Leave the setting off until checked on the owner's hardware.
+
 ## 5. LLM cleanup
 
 **Default provider is `local`** (decided 15/10/2026): a small open-weight
