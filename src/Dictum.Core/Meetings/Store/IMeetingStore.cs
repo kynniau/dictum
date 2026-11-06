@@ -23,6 +23,7 @@ public interface IMeetingStore
     long SizeOf(MeetingId id);
     void ApplyRetention(DateTimeOffset now);
     string ExportMarkdown(MeetingId id);
+    void ExportBundle(MeetingId id, string destinationPath, string transferCode) => throw new NotSupportedException();
 }
 
 public interface IMeetingAudioWriter : IDisposable

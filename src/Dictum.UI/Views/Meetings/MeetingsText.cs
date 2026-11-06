@@ -3,6 +3,18 @@ namespace Dictum.UI.Views.Meetings;
 // The PROPOSED_ strings added for 1.5.1 (pill labels, headphones tip, summaries screens) were APPROVED by the owner 07/11/2026 00:30 AEDT (.demo-preview/approve-1.5.1-wording.md): do not reword.
 internal static class MeetingsText
 {
+    public const string PROPOSED_MoveToAnotherDevice = "Move to another device";
+    public const string PROPOSED_ImportBundle = "Import a .dictum file";
+    public const string PROPOSED_TransferCode = "Transfer code";
+    public const string PROPOSED_CopyCode = "Copy the code";
+    public const string PROPOSED_BundleNeedsCode = "The file is useless without this code.";
+    public const string PROPOSED_SendCodeSeparately = "Send the code another way than the file.";
+    public const string PROPOSED_BundleInfo = "{0} files · {1:N0} bytes · {2} · Dictum {3}";
+    public const string PROPOSED_CodeWord = "Transfer code word {0}";
+    public const string PROPOSED_CheckBundle = "Check the meeting";
+    public const string PROPOSED_BundleFailed = "The meeting could not be imported. Check the transfer code and the .dictum file.";
+    public const string PROPOSED_Done = "Done";
+    public const string PROPOSED_BundleSlug = "meeting";
     public const string PROPOSED_SummaryModel = "Summary model";
     public const string PROPOSED_DefaultSummaryModel = "Use the clean-up model, or the recommended model";
     public const string PROPOSED_ModelMissing = "This summary model is not installed. Open Settings > Models to download it.";

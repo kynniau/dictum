@@ -47,6 +47,11 @@ internal sealed record MeetingsHost(
     public Func<double> SilenceThreshold { get; init; } = () => 0.01;
     public Func<string?> CloudSpeechHost { get; init; } = () => null;
     public Func<Task<string?>>? ChooseImport { get; init; }
+    public Func<Task<string?>>? ChooseBundle { get; init; }
+    public Func<string, Task<string?>>? ChooseBundleDestination { get; init; }
+    internal BundleImporter CreateBundleImporter(Func<BundleInfo, string, CancellationToken, Task<Agreement?>> confirm) =>
+        new(Store is CurrentSettingsStore current ? current.BundleStore : (FileMeetingStore)Store, Transcriber, confirm,
+            agreement => UseConfirmedRoute(agreement.Confirmation!.Route!));
     public Func<IAudioCapture?> LoopbackCapture { get; init; } = () => null;
     public Func<bool> ImportsEnabled { get; init; } = () => false;
     public Action EnableImports { get; init; } = () => { };
@@ -144,6 +149,8 @@ internal sealed record MeetingsHost(
             }
         }
         private FileMeetingStore Current() => new(root, settings() with { Folder = root }, ring, Caption);
+        internal FileMeetingStore BundleStore => Current();
+        public void ExportBundle(MeetingId id, string destinationPath, string transferCode) => Current().ExportBundle(id, destinationPath, transferCode);
         public MeetingId Create(MeetingMeta meta) => Current().Create(meta);
         public void WriteAudio(MeetingId id, Channel channel, Stream audio) => Current().WriteAudio(id, channel, audio);
         public IMeetingAudioWriter BeginAudio(MeetingId id, Channel channel) => Current().BeginAudio(id, channel);

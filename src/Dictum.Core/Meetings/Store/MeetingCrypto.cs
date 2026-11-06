@@ -57,7 +57,10 @@ public static class MeetingCrypto
         Encrypt(input, cipherPath, contentKey, identity);
     }
 
-    internal static void Encrypt(Stream input, string cipherPath, byte[] key, string identity) => AtomicFile.Write(cipherPath, output =>
+    internal static void Encrypt(Stream input, string cipherPath, byte[] key, string identity) =>
+        AtomicFile.Write(cipherPath, output => Encrypt(input, output, key, identity));
+
+    internal static void Encrypt(Stream input, Stream output, byte[] key, string identity)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
         // The caller's identity binds the meeting and file role; the random header binds this
@@ -86,7 +89,7 @@ public static class MeetingCrypto
             }
         }
         finally { CryptographicOperations.ZeroMemory(plain); }
-    });
+    }
 
     private static byte[] Aad(byte[] header, long sequence, int length, string identity)
     {
