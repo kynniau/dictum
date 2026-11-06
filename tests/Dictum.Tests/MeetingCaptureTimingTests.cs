@@ -145,9 +145,10 @@ public class MeetingCaptureTimingTests
         {
             clock.Advance(5, false);
             mic.Emit(Audio, TimeSpan.FromSeconds(4));
-            mic.Progress = new(CaptureActivity.Idle, TimeSpan.FromSeconds(5));
-            other.Progress = new(CaptureActivity.Silent, TimeSpan.FromSeconds(5));
-            clock.Advance(1);
+            // Clear the microphone segment's end plus the two-second echo window.
+            mic.Progress = new(CaptureActivity.Idle, TimeSpan.FromSeconds(8));
+            other.Progress = new(CaptureActivity.Silent, TimeSpan.FromSeconds(8));
+            clock.Advance(3);
             var segment = await emitted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(TimeSpan.FromSeconds(4), segment.Start);
             Assert.Equal(segment, Assert.Single(store.ReadTranscript(id)));

@@ -15,6 +15,82 @@ public class MeetingTranscriberTests
     private const string First = "A. Example said the budget moves to Friday";
     private const string Second = "B. Example agreed to review on Monday";
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Live_echo_is_never_stored_or_displayed_in_either_arrival_order(bool othersFirst)
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var seen = new List<Segment>();
+        var first = othersFirst ? Channel.Others : Channel.You;
+        var second = othersFirst ? Channel.You : Channel.Others;
+        var engine = new ToneEngine { Output = First };
+        await new MeetingTranscriber(engine, new Gate(), store).RunAsync(id,
+            new AdvancingParts([(first, Tone(440), TimeSpan.Zero),
+                (second, Tone(440), TimeSpan.FromSeconds(1.5))]), segment =>
+            {
+                seen.Add(segment);
+                Assert.Equal(Channel.Others, segment.Channel);
+                Assert.All(store.ReadTranscript(id), s => Assert.Equal(Channel.Others, s.Channel));
+            }, default);
+        Assert.Equal(2, engine.Frequencies.Count);
+        Assert.Equal(Channel.Others, Assert.Single(seen).Channel);
+        Assert.Equal(seen, store.ReadTranscript(id));
+    }
+
+    [Fact]
+    public async Task Microphone_only_live_segments_are_untouched()
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        var seen = new List<Segment>();
+        await new MeetingTranscriber(new ToneEngine(), new Gate(), store).RunAsync(id,
+            new AdvancingParts([(Channel.You, Tone(440), TimeSpan.Zero),
+                (Channel.You, Tone(440), TimeSpan.FromSeconds(1))]), seen.Add, default);
+        Assert.Equal(2, seen.Count);
+        Assert.All(seen, segment => Assert.Equal(Channel.You, segment.Channel));
+        Assert.Equal(seen, store.ReadTranscript(id));
+    }
+
+    [Fact]
+    public async Task Cancellation_preserves_completed_inference_waiting_for_the_echo_window()
+    {
+        using var f = new MeetingFixture();
+        var store = f.Store();
+        var id = store.Create(f.Meta());
+        using var cancel = new CancellationTokenSource();
+        var seen = new List<Segment>();
+        var engine = new ToneEngine();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new MeetingTranscriber(engine, new Gate(), store).RunAsync(id,
+                new AdvancingParts([(Channel.You, Tone(440), TimeSpan.Zero)], cancel.Cancel), seen.Add, cancel.Token));
+        Assert.Single(engine.Frequencies);
+        Assert.Equal(First, Assert.Single(seen).Text);
+        Assert.Equal(seen, store.ReadTranscript(id));
+    }
+
+    private sealed class AdvancingParts((Channel Channel, CapturedAudio Part, TimeSpan Offset)[] parts,
+        Action? afterPart = null) : IMeetingAudioSource
+    {
+        public TimeSpan Watermark { get; private set; }
+        public async IAsyncEnumerable<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> ReadAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            foreach (var part in parts)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Watermark = part.Offset;
+                yield return part;
+                afterPart?.Invoke();
+                cancellationToken.ThrowIfCancellationRequested();
+                await Task.Yield();
+            }
+        }
+    }
+
     [Fact]
     public async Task Two_tracks_interleave_by_time_not_by_arrival()
     {
@@ -111,9 +187,10 @@ public class MeetingTranscriberTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             new MeetingTranscriber(engine, new Gate(), store).RunAsync(id,
                 new FileSource(Tone(440), Tone(880)), s => { seen.Add(s); cancel.Cancel(); }, cancel.Token));
-        Assert.Equal(First, Assert.Single(seen).Text);
+        // Both inferences finish while the first You line waits for the echo window.
+        Assert.Equal(new[] { First, Second }, seen.Select(segment => segment.Text));
         Assert.Equal(seen, store.ReadTranscript(id));
-        Assert.Single(engine.Frequencies);
+        Assert.Equal(2, engine.Frequencies.Count);
     }
 
     [Fact]
@@ -188,7 +265,8 @@ public class MeetingTranscriberTests
         var id = store.Create(f.Meta());
         var mic = new Capture();
         var other = new Capture();
-        var source = new LiveTwoTrackSource(mic, other);
+        var clock = new ManualTime();
+        var source = new LiveTwoTrackSource(mic, other, timeProvider: clock);
         var emitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var run = new MeetingTranscriber(new ToneEngine(), new Gate(), store).RunAsync(id, source,
             _ => emitted.TrySetResult(), default);
@@ -197,6 +275,7 @@ public class MeetingTranscriberTests
         {
             // A maximum-length cut starts at zero, the idle track's floored watermark.
             mic.Emit(Tone(440, SpeechSegmenter.LimitBlocks * SpeechSegmenter.BlockMs / 1000.0));
+            clock.Advance(TimeSpan.FromSeconds(70));
             await emitted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.False(mic.Stopped);
             Assert.False(other.Stopped);
@@ -261,7 +340,7 @@ public class MeetingTranscriberTests
             await observed.PartConsumed.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.False(emitted.Task.IsCompleted);
             // Neither capture sends another part. Only clock progress can release the buffered audio.
-            clock.Advance(TimeSpan.FromSeconds(35));
+            clock.Advance(TimeSpan.FromSeconds(38));
             var segment = await emitted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(TimeSpan.FromSeconds(4.9), segment.Start);
             Assert.Equal(First, segment.Text);
@@ -309,7 +388,8 @@ public class MeetingTranscriberTests
         var id = store.Create(f.Meta());
         var mic = new Capture { Tail = Tone(440) };
         var other = new Capture { Tail = Tone(880) };
-        var source = new LiveTwoTrackSource(mic, other);
+        var clock = new ManualTime();
+        var source = new LiveTwoTrackSource(mic, other, timeProvider: clock);
         var emitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var seen = new List<Segment>();
         var run = new MeetingTranscriber(new ToneEngine(), new Gate(), store).RunAsync(id, source,
@@ -319,6 +399,7 @@ public class MeetingTranscriberTests
         {
             mic.Emit(Tone(440));
             other.Emit(Tone(880));
+            clock.Advance(TimeSpan.FromSeconds(35));
             await emitted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.False(mic.Stopped);
         }
