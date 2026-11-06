@@ -178,7 +178,10 @@ public sealed class FileMeetingStore : IMeetingStore
     {
         lock (Gate) WithKey(id, key =>
         {
-            EncryptedWrite(id, FileAt(id, "summary.md.enc"), summary, key);
+            var summaries = ReadSummaries(id).ToList();
+            if (summaries.Any(s => s.Id == summary.Id)) throw new InvalidOperationException("Duplicate summary id.");
+            summaries.Add(summary);
+            EncryptedWrite(id, FileAt(id, "summary.md.enc"), new SummarySnapshot(2, summaries), key);
             JsonWrite(FileAt(id, "meta.json"), Read(id) with { SummaryEngine = summary.Engine, SummaryTemplate = summary.Template });
             RebuildIndex();
             return true;
@@ -186,7 +189,51 @@ public sealed class FileMeetingStore : IMeetingStore
     }
     public Summary? ReadSummary(MeetingId id)
     {
-        lock (Gate) return WithKey(id, key => File.Exists(FileAt(id, "summary.md.enc")) ? EncryptedRead<Summary>(id, FileAt(id, "summary.md.enc"), key) : null);
+        return ReadSummaries(id).LastOrDefault();
+    }
+    private sealed record SummarySnapshot(int Version, IReadOnlyList<Summary> Summaries);
+    public IReadOnlyList<Summary> ReadSummaries(MeetingId id)
+    {
+        lock (Gate) return WithKey(id, content =>
+        {
+            var path = FileAt(id, "summary.md.enc");
+            if (!File.Exists(path)) return (IReadOnlyList<Summary>)Array.Empty<Summary>();
+            var document = EncryptedRead<JsonElement>(id, path, content);
+            if (document.TryGetProperty("Version", out var version))
+            {
+                if (version.GetInt32() != 2) throw new InvalidDataException("Unknown summary version.");
+                var snapshot = document.Deserialize<SummarySnapshot>() ?? throw new InvalidDataException();
+                if (snapshot.Summaries is null || snapshot.Summaries.Any(s => string.IsNullOrWhiteSpace(s.Id)) ||
+                    snapshot.Summaries.Select(s => s.Id).Distinct(StringComparer.Ordinal).Count() != snapshot.Summaries.Count)
+                    throw new InvalidDataException("Invalid summary identities.");
+                return snapshot.Summaries;
+            }
+            // Migrate in memory only. A stable identity lets an explicit edit/delete address a legacy summary.
+            var legacy = document.Deserialize<Summary>() ?? throw new InvalidDataException();
+            return [legacy with { Id = "legacy-" + id.Value }];
+        });
+    }
+    public void EditSummary(MeetingId id, string summaryId, string markdown)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+        ChangeSummary(id, summaryId, summary => summary with { Edited = new(markdown, DateTimeOffset.UtcNow) });
+    }
+    public void DeleteSummary(MeetingId id, string summaryId) => ChangeSummary(id, summaryId, _ => null);
+    private void ChangeSummary(MeetingId id, string summaryId, Func<Summary, Summary?> change)
+    {
+        lock (Gate) WithKey(id, content =>
+        {
+            var summaries = ReadSummaries(id).ToList();
+            var index = summaries.FindIndex(s => s.Id == summaryId);
+            if (index < 0) throw new ArgumentException("Unknown summary id.", nameof(summaryId));
+            var updated = change(summaries[index]);
+            if (updated is null) summaries.RemoveAt(index); else summaries[index] = updated;
+            EncryptedWrite(id, FileAt(id, "summary.md.enc"), new SummarySnapshot(2, summaries), content);
+            var latest = summaries.LastOrDefault();
+            JsonWrite(FileAt(id, "meta.json"), Read(id) with { SummaryEngine = latest?.Engine, SummaryTemplate = latest?.Template });
+            RebuildIndex();
+            return true;
+        });
     }
     public void WriteVideo(MeetingId id, string sourcePath)
     {
@@ -299,14 +346,15 @@ public sealed class FileMeetingStore : IMeetingStore
         for (var left = stream.Length; left > 0; left -= ScrubChunk) stream.Write(zeros, 0, (int)Math.Min(left, ScrubChunk));
         stream.Flush(true);
     }
-    public string ExportMarkdown(MeetingId id)
+    public string ExportMarkdown(MeetingId id) => ExportMarkdown(id, null);
+    public string ExportMarkdown(MeetingId id, string? summaryId)
     {
         lock (Gate)
         {
             var meta = Read(id);
-            var summary = ReadSummary(id);
+            var summary = summaryId is null ? ReadSummary(id) : ReadSummaries(id).Single(s => s.Id == summaryId);
             var result = new StringBuilder().Append("# ").AppendLine(meta.Title).AppendLine();
-            if (summary is not null) result.AppendLine(summary.Markdown).AppendLine().AppendLine(_captionFor(summary.Engine)).AppendLine();
+            if (summary is not null) result.AppendLine(summary.DisplayMarkdown).AppendLine().AppendLine(_captionFor(summary.Engine)).AppendLine();
             foreach (var segment in ReadTranscript(id)) result.Append('[').Append(segment.Start).Append("] ").Append(segment.Channel).Append(": ").AppendLine(segment.Text);
             return result.ToString();
         }

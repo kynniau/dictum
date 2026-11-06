@@ -1,5 +1,80 @@
 # Meetings mode: contracts for the phase 1 lanes
 
+## Summary history and custom types (06/11/2026)
+
+`Summary` retains its original constructor for callers from 1.5.0 and adds `Id`,
+`TemplateName`, `Model`, and nullable `Edited` (`Markdown`, `At`). `Markdown`, `At`,
+`Items`, engine and type attribution always describe the original generation.
+`DisplayMarkdown` chooses the edit when present. An edit is user-authored and is
+not presented as newly validated model output; the original remains available.
+
+`summary.md.enc` now encrypts a JSON envelope `{ "Version": 2, "Summaries": [...] }`
+in append order. Each entry holds all the fields above and the original template id
+in `Template`. `WriteSummary` appends, `ReadSummaries` returns the list,
+`ReadSummary` returns its latest entry, `EditSummary(meetingId, summaryId, markdown)`
+changes only `Edited`, and `DeleteSummary` removes just that entry. All changes are
+atomic under the store gate. The owner envelope, AES-GCM framing, identity-bound AAD
+`<meeting-id>/summary.md.enc` and verify-before-release decrypt path are unchanged.
+An old single-summary JSON object is upgraded only in memory on read, with stable id
+`legacy-<meeting-id>`; reads never rewrite it. The first explicit append/edit/delete
+persists the versioned list. Unknown versions and duplicate ids are rejected.
+Exports may select a summary id and use its edited text when present. The meeting
+window adds the saved type name, model, generation time and explicit edit time, plus
+the engine's honesty caption and the existing sharing reminder.
+
+Custom types use `<ConfigDir>/meetings/summary-types/<id>.md`. IDs use lowercase
+ASCII letters, digits and hyphens; built-in ids cannot be replaced or deleted here.
+The deliberately small front block is not a general YAML parser. Name occupies one
+line, `instructions: |` introduces lines indented by two spaces, and the second
+`---` ends the front block. Subsequent Markdown headings are optional. For example:
+
+```markdown
+---
+name: Decisions and actions
+instructions: |
+  Focus on decisions and follow-up actions.
+  Leave unsupported sections empty.
+---
+## Decisions
+## Action items
+```
+
+These files can be edited in Notepad. New/Edit/Delete in Settings > Meetings uses
+the same `SummaryTemplates.Load/Get(configDirectory)` loader as generation; built-ins
+are marked read-only in the UI. Existing `meeting-templates` overrides still read.
+Unsafe linked files and malformed custom files are ignored. User instructions and
+optional headings precede the fixed system honesty rules. Every model output still
+passes `SummaryValidator`: no HTML, only headings/list items, figures only inside
+verbatim transcript quotations followed by their timestamp and You/Others/Mixed.
+Custom instructions cannot relax validation.
+
+`MeetingsSettings.SummaryModel` is a local catalogue filename, null for the clean-up
+model in use or the recommended catalogue model when clean-up is not local. The
+picker reuses `CleanupCatalog.Entries.Where(Models.IsCleanupDownloaded)` and the
+existing `ModelFolders` resolution. The selected filename is included in the saved
+processing route and the notice; changing it invalidates the old route. Each local
+summary loads through a dedicated `LocalLlmManager.BeginLoad`, waits for `IsLoading`
+to finish and requires `Ready`, with cancellation and a two-minute deadline. The
+window's existing work state disables controls and announces loading. Missing files
+offer a named Settings > Models button before generation. Ollama and own-provider
+clients retain their existing consent and transport checks; every completion also
+checks the confirmed route before and after sending. Dictation's manager is never
+unloaded or replaced. Memory ceiling (`// simplification` in the shell): speech,
+clean-up and one additional summary model plus their contexts may coexist; release
+the summary manager after generation. Native allocation may outlive a cancelled
+wait until the load finishes and releases its stale engine. A shell gate remains held
+until that release completes, so another request cannot accumulate more models.
+
+The canonical `SettingsLoader` binds `meetings.summary_model` and
+`meetings.summary_type`; `SettingsFile.MeetingsJson` writes both. The existing
+Settings > Meetings writer continues to update those fields in settings.json.
+`summary_model` defaults to null and accepts only a .gguf file name without a path;
+invalid values produce the normal settings warning and use null. `summary_type`
+defaults to `general` and takes precedence over the older `summary_template` name.
+`LoadFile` validates type ids against `SummaryTemplates.Load` using the settings
+file's directory; `Parse` accepts an optional config directory for the same check.
+Unknown ids produce one settings warning and use `general`.
+
 Public extract, made by the Dictum orchestrator on 04/11/2026 from the Meetings brief. The full brief, with Kyle's
 decisions as quoted and the legal leads for counsel, is kept off this public repository (Kyle, 04/11/2026 23:35 AEDT).
 This file carries what the lanes build from: the architecture decisions (section 2), the lane table (from section 4),

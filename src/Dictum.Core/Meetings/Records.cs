@@ -44,7 +44,15 @@ public record MeetingMeta(MeetingId Id, string Title, DateTimeOffset StartedAt, 
     public bool AudioIncomplete => IncompleteAudioChannels.Count != 0;
 }
 public record KeyWrap(string RecipientId, byte[] WrappedKey);
-public record Summary(string Markdown, string Engine, string Template, DateTimeOffset At, IReadOnlyList<ActionItem> Items);
+public record Summary(string Markdown, string Engine, string Template, DateTimeOffset At, IReadOnlyList<ActionItem> Items)
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string TemplateName { get; init; } = "";
+    public string Model { get; init; } = "";
+    public SummaryEdit? Edited { get; init; }
+    [JsonIgnore] public string DisplayMarkdown => Edited?.Markdown ?? Markdown;
+}
+public record SummaryEdit(string Markdown, DateTimeOffset At);
 public record ActionItem(string Owner, string Text);
 public enum KeepAudio { Forever, Days30, Days90 }
 public enum ZoomImport { Ask, Always, Never }
@@ -58,6 +66,7 @@ public record MeetingsSettings
     public ZoomImport ZoomImport { get; init; } = ZoomImport.Ask;
     public string? ZoomFolder { get; init; }
     public SummaryEngine SummaryEngine { get; init; } = SummaryEngine.Local;
+    public string? SummaryModel { get; init; }
     public string SummaryTemplate { get; init; } = "general";
     public ShareDefault ShareDefault { get; init; } = ShareDefault.Nobody;
 }

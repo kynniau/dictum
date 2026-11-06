@@ -47,6 +47,23 @@ public sealed class MeetingsSettingsTests
     }
 
     [Fact]
+    public void Summary_type_accepts_custom_and_legacy_ids_and_unknown_ids_warn_once()
+    {
+        using var fixture = new MeetingFixture();
+        Dictum.Meetings.Summaries.SummaryTemplates.Save(fixture.Root,
+            new("custom-review", "Review", "## Discussion") { IsBuiltin = false });
+        var legacy = SettingsLoader.Parse("""{"meetings":{"summary_template":"custom-review"}}""", fixture.Root);
+        Assert.Equal("custom-review", legacy.Meetings.SummaryTemplate);
+        Assert.Empty(legacy.Warnings);
+        var preferred = SettingsLoader.Parse("""{"meetings":{"summary_type":"custom-review","summary_template":"unknown"}}""", fixture.Root);
+        Assert.Equal("custom-review", preferred.Meetings.SummaryTemplate);
+        Assert.Empty(preferred.Warnings);
+        var unknown = SettingsLoader.Parse("""{"meetings":{"summary_type":"missing","summary_template":"custom-review"}}""", fixture.Root);
+        Assert.Equal("general", unknown.Meetings.SummaryTemplate);
+        Assert.Contains("meetings.summary_type", Assert.Single(unknown.Warnings));
+    }
+
+    [Fact]
     public void Default_file_contains_the_disabled_meetings_section()
     {
         Assert.Equal(new MeetingsSettings(), SettingsLoader.Parse(SettingsFile.DefaultJson("tiny.en")).Meetings);

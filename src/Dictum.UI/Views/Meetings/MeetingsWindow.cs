@@ -18,6 +18,7 @@ internal sealed class MeetingsWindow : Window
 {
     private readonly MeetingsHost _host;
     private readonly ContentControl _screen = new();
+    private Action? _refreshSummaryChoices;
     private readonly TextBlock _status = Ui.Text("", "caption");
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DispatcherTimer _timer;
@@ -177,6 +178,7 @@ internal sealed class MeetingsWindow : Window
 
     internal void RefreshSettings()
     {
+        _refreshSummaryChoices?.Invoke();
         _entries?.Refresh();
         if (_importButton is not null) _importButton.IsVisible = _host.Settings().Enabled;
         if (_recording is { } id && !_ending && _confirmedRoute != _host.ProcessingRoute())
@@ -235,6 +237,8 @@ internal sealed class MeetingsWindow : Window
         var summaryRoute = settings.SummaryEngine switch { SummaryEngine.Ollama => APPROVED_Ollama, SummaryEngine.OwnKey => string.Format(APPROVED_OwnKey, summaryHostAtNotice ?? PROPOSED_UnconfiguredProvider), _ => APPROVED_Local };
         if (settings.SummaryEngine == SummaryEngine.Ollama && summaryHostAtNotice is not null)
             summaryRoute += Environment.NewLine + string.Format(PROPOSED_SummaryHost, summaryHostAtNotice);
+        if (settings.SummaryEngine == SummaryEngine.Local && routeAtNotice.SummaryModel is { } localModel)
+            summaryRoute += Environment.NewLine + string.Format(PROPOSED_LocalSummaryModel, localModel);
         summaryRoute = (speechHostAtNotice is { } speechHost ? string.Format(APPROVED_CloudSpeech, speechHost)
             : APPROVED_LocalSpeech) + Environment.NewLine + summaryRoute;
         var retention = settings.KeepAudio == KeepAudio.Forever ? APPROVED_KeepForever
@@ -245,7 +249,7 @@ internal sealed class MeetingsWindow : Window
         var acknowledge = SafeButton(importing ? APPROVED_Import : APPROVED_Start, () => _ = Work(async () =>
         {
             if (!_host.Settings().Enabled) { ShowList(); return; }
-            if (_host.Settings() != settings || _host.CloudSpeechHost() != speechHostAtNotice || _host.SummaryHost() != summaryHostAtNotice)
+            if (_host.Settings() != settings || _host.ProcessingRoute() != routeAtNotice || _host.CloudSpeechHost() != speechHostAtNotice || _host.SummaryHost() != summaryHostAtNotice)
             { Agreement(importPath); return; }
             if (importing && !_host.ImportsEnabled()) { BeginImportAgreement(importPath!); return; }
             var agreement = new Agreement(DateTimeOffset.UtcNow,
@@ -677,6 +681,8 @@ internal sealed class MeetingsWindow : Window
             SummaryEngine.OwnKey => string.Format(APPROVED_OwnKey, route.SummaryHost ?? PROPOSED_UnconfiguredProvider),
             _ => APPROVED_Local,
         };
+        if (route.SummaryEngine == SummaryEngine.Local && route.SummaryModel is { } model)
+            summary += Environment.NewLine + string.Format(PROPOSED_LocalSummaryModel, model);
         return (route.SpeechHost is { } speech ? string.Format(APPROVED_CloudSpeech, speech) : APPROVED_LocalSpeech)
             + Environment.NewLine + summary + Environment.NewLine
             + (route.KeepAudio == KeepAudio.Forever ? APPROVED_KeepForever
@@ -686,13 +692,25 @@ internal sealed class MeetingsWindow : Window
 
     private async Task Regenerate(MeetingId id, string template)
     {
+        if (_host.Settings().SummaryEngine == SummaryEngine.Local && !_host.SummaryModelInstalled())
+        {
+            var missing = new Window { Title = PROPOSED_SummaryModel, Width = 480, SizeToContent = SizeToContent.Height };
+            missing.Content = DialogContent(missing, Ui.Text(PROPOSED_ModelMissing),
+                SafeButton(PROPOSED_OpenModels, () => { _host.OpenModels(); missing.Close(); }),
+                SafeButton(APPROVED_Cancel, () => missing.Close()));
+            _ = missing.ShowDialog(this);
+            Say(PROPOSED_ModelMissing);
+            return;
+        }
         var route = _host.ProcessingRoute();
         if (!_host.ReadConfirmations(id).Any(c => c.Route == route))
         {
             ShowRouteNotice(id, false, template);
             return;
         }
-        await _host.Regenerate(id, template, _lifetime.Token, route);
+        if (route.SummaryEngine == SummaryEngine.Local) Say(PROPOSED_ModelLoading);
+        try { await _host.Regenerate(id, template, _lifetime.Token, route); }
+        catch (TimeoutException) when (route.SummaryEngine == SummaryEngine.Local) { Say(PROPOSED_ModelLoadFailed); return; }
         ShowMeeting(id);
     }
 
@@ -771,24 +789,85 @@ internal sealed class MeetingsWindow : Window
         ShowSaveFailure();
     }
 
-    internal void ShowMeeting(MeetingId id)
+    internal static string SummaryAttribution(Summary summary) =>
+        string.Format(PROPOSED_SummaryAttribution, string.IsNullOrEmpty(summary.TemplateName) ? summary.Template : summary.TemplateName,
+            string.IsNullOrEmpty(summary.Model) ? PROPOSED_ModelNotRecorded : summary.Model, summary.At) + (summary.Edited is { } edit ? Environment.NewLine + string.Format(PROPOSED_EditedAttribution, edit.At) : "");
+
+    internal void ShowMeeting(MeetingId id, string? selectedId = null)
     {
         var meta = _host.Store.Read(id);
-        var summary = _host.Store.ReadSummary(id);
-        var template = Named(new ComboBox { ItemsSource = PROPOSED_TemplateNames,
-            SelectedIndex = Math.Max(0, Array.IndexOf(TemplateIds, summary?.Template ?? _host.Settings().SummaryTemplate)) }, PROPOSED_Template);
+        var summaries = _host.Store.ReadSummaries(id).Reverse().ToArray();
+        var summary = summaries.FirstOrDefault(s => s.Id == selectedId) ?? summaries.FirstOrDefault();
+        var types = SummaryTemplates.Load(_host.Paths.ConfigDir);
+        var template = Named(new ComboBox { ItemsSource = types.Select(t => t.Name).ToArray(),
+            SelectedIndex = Math.Max(0, types.ToList().FindIndex(t => t.Id == _host.Settings().SummaryTemplate)) }, PROPOSED_Template);
+        var modelLabel = Ui.Text("", "caption");
+        void RefreshChoices()
+        {
+            var chosen = template.SelectedIndex >= 0 && template.SelectedIndex < types.Count ? types[template.SelectedIndex].Id : _host.Settings().SummaryTemplate;
+            types = SummaryTemplates.Load(_host.Paths.ConfigDir);
+            template.ItemsSource = types.Select(t => t.Name).ToArray();
+            template.SelectedIndex = Math.Max(0, types.ToList().FindIndex(t => t.Id == chosen));
+            modelLabel.Text = string.Format(_host.Settings().SummaryEngine == SummaryEngine.Local ? PROPOSED_LocalSummaryModel : PROPOSED_CurrentSummaryModel,
+                _host.ProcessingRoute().SummaryModel ?? "");
+        }
+        RefreshChoices();
+        _refreshSummaryChoices = () => { if (_screen.GetLogicalDescendants().Contains(template)) RefreshChoices(); };
         var transcriptCard = Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Transcript), Ui.Text(string.Join(Environment.NewLine, _host.Store.ReadTranscript(id).Select(FormatSegment))),
                 Ui.Text(string.Join(Environment.NewLine, meta.Markers.Select(marker => string.Format(PROPOSED_Marker, marker.At,
                     marker.Kind switch { MarkerKind.Moment => PROPOSED_Mark, MarkerKind.Joined => PROPOSED_Joined, MarkerKind.Paused => PROPOSED_Paused, _ => PROPOSED_Resume }))))));
+        var details = Ui.Stack(8);
+        void Display(bool original = false)
+        {
+            details.Children.Clear();
+            if (summary is null) { details.Children.Add(Ui.Text(PROPOSED_NoSummary)); return; }
+            details.Children.Add(Ui.Text(MeetingsHost.Caption(summary.Engine), "caption"));
+            details.Children.Add(Ui.Text(SummaryAttribution(summary), "caption"));
+            details.Children.Add(Ui.Text(original ? summary.Markdown : summary.DisplayMarkdown));
+            details.Children.Add(SafeButton(PROPOSED_EditSummary, () =>
+            {
+                var editor = Named(new TextBox { Text = summary.DisplayMarkdown, AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 180 }, PROPOSED_SummaryEditor);
+                details.Children.Clear();
+                details.Children.Add(editor);
+                details.Children.Add(Ui.Row(8, SafeButton(PROPOSED_SaveSummary, () =>
+                {
+                    _host.Store.EditSummary(id, summary.Id, editor.Text ?? "");
+                    ShowMeeting(id, summary.Id); Say(PROPOSED_SummaryEdited);
+                    Dispatcher.UIThread.Post(() => _screen.GetLogicalDescendants().OfType<Button>()
+                        .FirstOrDefault(b => AutomationProperties.GetName(b) == PROPOSED_EditSummary)?.Focus(), DispatcherPriority.Background);
+                }), SafeButton(APPROVED_Cancel, () => { Display(); FocusSummaryEdit(); })));
+                Dispatcher.UIThread.Post(() => editor.Focus());
+            }));
+            if (summary.Edited is not null)
+                details.Children.Add(SafeButton(original ? PROPOSED_ShowEdited : PROPOSED_ShowOriginal, () =>
+                {
+                    Display(!original);
+                    Say(!original ? PROPOSED_ShowOriginal : PROPOSED_ShowEdited);
+                    Dispatcher.UIThread.Post(() => details.GetLogicalDescendants().OfType<Button>().FirstOrDefault()?.Focus());
+                }));
+            details.Children.Add(SafeButton(PROPOSED_DeleteSummary, () => Confirm(PROPOSED_DeleteSummaryQuestion, PROPOSED_DeleteSummary, () =>
+            {
+                _host.Store.DeleteSummary(id, summary.Id); ShowMeeting(id); Say(PROPOSED_SummaryDeleted);
+            })));
+        }
+        void FocusSummaryEdit() => Dispatcher.UIThread.Post(() => details.GetLogicalDescendants().OfType<Button>().FirstOrDefault()?.Focus());
+        var list = Named(new ComboBox { ItemsSource = summaries.Select(s => string.Format(PROPOSED_SummaryRow,
+            string.IsNullOrEmpty(s.TemplateName) ? s.Template : s.TemplateName, string.IsNullOrEmpty(s.Model) ? PROPOSED_ModelNotRecorded : s.Model, s.At.ToLocalTime())).ToArray(),
+            SelectedIndex = Array.IndexOf(summaries, summary), IsEnabled = summaries.Length != 0 }, PROPOSED_SummaryList);
+        list.SelectionChanged += (_, _) => { if (list.SelectedIndex < 0) return; summary = summaries[list.SelectedIndex]; Display(); Say(PROPOSED_SummarySelected); };
+        Display();
         var summaryCard = Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Summary), template,
-                SafeButton(PROPOSED_Regenerate, () => _ = Work(() => Regenerate(id, TemplateIds[template.SelectedIndex]))),
-                Ui.Text(summary is null ? PROPOSED_NoSummary : MeetingsHost.Caption(summary.Engine), "caption"), Ui.Text(summary?.Markdown ?? "")));
+                modelLabel,
+                SafeButton(PROPOSED_NewSummary, () => _ = Work(() => Regenerate(id, types[template.SelectedIndex].Id))),
+                SafeButton(PROPOSED_Regenerate, () => _ = Work(() => Regenerate(id, types[template.SelectedIndex].Id))), list, details));
+        string ExportSelected() => _host.Store.ExportMarkdown(id, summary?.Id) + Environment.NewLine +
+            (summary is null ? "" : SummaryAttribution(summary) + Environment.NewLine) + MeetingsHost.PROPOSED_ExportReminder + Environment.NewLine;
         var record = meta.Agreement is { } agreement ? Ui.Text(string.Format(APPROVED_Record,
             agreement.Kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind, agreement.AcknowledgedAt.ToLocalTime(),
             agreement.How switch { "written" => APPROVED_Written, "platform-announced" => PROPOSED_Platform, _ => APPROVED_Spoken })) : Ui.Text(PROPOSED_NotesText);
         Screen(Ui.Row(8, SafeButton(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title), Ui.Text(meta.AudioIncomplete ? PROPOSED_AudioRecovered : ""),
             Ui.Text(string.Format(PROPOSED_ListRow, meta.Title, meta.StartedAt.ToLocalTime(), meta.Duration, _host.Store.SizeOf(id))),
-            Ui.Columns(2, 16, transcriptCard, Ui.Stack(12, summaryCard, Ui.Card(record, PROPOSED_Record))),
+            transcriptCard, summaryCard, Ui.Card(record, PROPOSED_Record),
             Ui.Row(8, SafeButton(PROPOSED_Export, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = Work(async () =>
             {
                 var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = PROPOSED_Export, DefaultExtension = "md" });
@@ -796,8 +875,8 @@ internal sealed class MeetingsWindow : Window
                 await using var stream = await file.OpenWriteAsync();
                 stream.SetLength(0);
                 await using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(_host.Export(id)); Say(PROPOSED_Saved);
-            }))), SafeButton(PROPOSED_Copy, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => { _host.Copy(_host.Export(id)); Say(PROPOSED_Copied); })),
+                await writer.WriteAsync(ExportSelected()); Say(PROPOSED_Saved);
+            }))), SafeButton(PROPOSED_Copy, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => { _host.Copy(ExportSelected()); Say(PROPOSED_Copied); })),
                 SafeButton(PROPOSED_Delete, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Delete, () => { _host.Store.Delete(id); ShowList(); }))));
     }
     private static string FormatSegment(Segment segment) => string.Format(PROPOSED_Segment, segment.Start,

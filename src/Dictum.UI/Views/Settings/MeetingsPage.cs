@@ -2,6 +2,8 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Dictum.Meetings;
+using Dictum.Meetings.Summaries;
+using Dictum.Settings;
 using Dictum.UI.Shell;
 using Dictum.UI.Views.Meetings;
 using static Dictum.UI.Views.Meetings.MeetingsText;
@@ -16,6 +18,10 @@ internal sealed class MeetingsPage : SettingsPage
     private readonly ComboBox _retention = MeetingsWindow.Named(new ComboBox { ItemsSource = new[] { PROPOSED_Forever, PROPOSED_Days30, PROPOSED_Days90 } }, PROPOSED_Retention);
     private readonly ComboBox _engine = MeetingsWindow.Named(new ComboBox { ItemsSource = new[] { APPROVED_LocalEngine, APPROVED_OllamaEngine, APPROVED_OwnKeyEngine } }, PROPOSED_Engine);
     private readonly ComboBox _template = MeetingsWindow.Named(new ComboBox { ItemsSource = PROPOSED_TemplateNames }, PROPOSED_Template);
+    private readonly ComboBox _model = MeetingsWindow.Named(new ComboBox(), PROPOSED_SummaryModel);
+    private readonly StackPanel _typesList = Ui.Stack(8);
+    private IReadOnlyList<SummaryTemplate> _types = [];
+    private string[] _modelFiles = [];
     private readonly StackPanel _warning;
     private int _warningVersion;
 
@@ -34,7 +40,8 @@ internal sealed class MeetingsPage : SettingsPage
         });
         _retention.SelectionChanged += (_, _) => { if (_retention.SelectedIndex >= 0) Write(("meetings.keep_audio", Json(((KeepAudio)_retention.SelectedIndex).ToString()))); };
         _engine.SelectionChanged += (_, _) => { if (_engine.SelectedIndex >= 0) Write(("meetings.summary_engine", Json(((SummaryEngine)_engine.SelectedIndex).ToString()))); };
-        _template.SelectionChanged += (_, _) => { if (_template.SelectedIndex >= 0) Write(("meetings.summary_template", Json(TemplateIds[_template.SelectedIndex]))); };
+        _template.SelectionChanged += (_, _) => { if (!Refreshing && _template.SelectedIndex >= 0 && _template.SelectedIndex < _types.Count) Write(("meetings.summary_type", Json(_types[_template.SelectedIndex].Id))); };
+        _model.SelectionChanged += (_, _) => { if (!Refreshing && _model.SelectedIndex >= 0) Write(("meetings.summary_model", Json(_model.SelectedIndex == 0 ? null : _modelFiles[_model.SelectedIndex - 1]))); };
         _warning = Ui.Stack(8, Ui.Text(APPROVED_DriveWarning), MeetingsWindow.Button(APPROVED_Dismiss, () =>
         {
             try { _host.DismissWarning(); _warning!.IsVisible = false; }
@@ -46,7 +53,10 @@ internal sealed class MeetingsPage : SettingsPage
             Ui.Card(Ui.Stack(8, Ui.Text(PROPOSED_Folder), _folder, Ui.Text(PROPOSED_FolderNote, "caption"), MeetingsWindow.Button(PROPOSED_Change, () => _ = ChangeFolder()),
                 Ui.Line(PROPOSED_Retention, _retention))),
             _warning, Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Engine, _engine),
-                Ui.Text(APPROVED_EngineNote), Ui.Text(PROPOSED_ConfigureSummary, "caption"), Ui.Line(PROPOSED_Template, _template))),
+                Ui.Text(APPROVED_EngineNote), Ui.Text(PROPOSED_ConfigureSummary, "caption"), Ui.Line(PROPOSED_SummaryModel, _model),
+                MeetingsWindow.Button(PROPOSED_OpenModels, () => shell.OpenSettings("Models")), Ui.Line(PROPOSED_Template, _template))),
+            Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_SummaryTypes), Ui.Text(PROPOSED_TypeFileCaption, "caption"), _typesList,
+                MeetingsWindow.Button(PROPOSED_NewType, () => EditType(null)))),
             MeetingsWindow.Button(PROPOSED_Existing, () => shell.OpenMeetings()));
     }
     protected override void Redraw()
@@ -56,8 +66,66 @@ internal sealed class MeetingsPage : SettingsPage
         _folder.Text = settings.Folder ?? Path.Combine(_host.Paths.LocalDir, "meetings");
         _retention.SelectedIndex = (int)settings.KeepAudio;
         _engine.SelectedIndex = (int)settings.SummaryEngine;
-        _template.SelectedIndex = Math.Max(0, Array.IndexOf(TemplateIds, settings.SummaryTemplate));
+        _types = SummaryTemplates.Load(_host.Paths.ConfigDir);
+        _template.ItemsSource = _types.Select(t => t.Name).ToArray();
+        _template.SelectedIndex = Math.Max(0, _types.ToList().FindIndex(t => t.Id == settings.SummaryTemplate));
+        var installed = CleanupCatalog.Entries.Where(Shell.Models.IsCleanupDownloaded).ToArray();
+        _modelFiles = installed.Select(m => m.FileName).ToArray();
+        if (settings.SummaryModel is { } selected && !_modelFiles.Contains(selected)) _modelFiles = [.. _modelFiles, selected];
+        _model.ItemsSource = new[] { PROPOSED_DefaultSummaryModel }.Concat(_modelFiles.Select(file =>
+            installed.FirstOrDefault(m => m.FileName == file)?.Name ?? file + " · " + PROPOSED_ModelMissing)).ToArray();
+        _model.SelectedIndex = settings.SummaryModel is null ? 0 : Array.IndexOf(_modelFiles, settings.SummaryModel) + 1;
+        _model.IsEnabled = settings.SummaryEngine == SummaryEngine.Local;
+        _typesList.Children.Clear();
+        foreach (var type in _types)
+        {
+            if (type.IsBuiltin) _typesList.Children.Add(Ui.Text(string.Format(PROPOSED_BuiltinType, type.Name)));
+            else _typesList.Children.Add(Ui.Stack(6, Ui.Text(type.Name),
+                MeetingsWindow.Button(PROPOSED_EditType, () => EditType(type)),
+                MeetingsWindow.Button(PROPOSED_DeleteType, () => DeleteType(type))));
+        }
         _ = RefreshWarning(++_warningVersion, _folder.Text);
+    }
+    private void EditType(SummaryTemplate? type)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        var dialog = new Window { Title = type is null ? PROPOSED_NewType : PROPOSED_EditType, Width = 520, SizeToContent = SizeToContent.Height };
+        var name = MeetingsWindow.Named(new TextBox { Text = type?.Name ?? "" }, PROPOSED_TypeName);
+        var instructions = MeetingsWindow.Named(new TextBox { Text = type?.Instructions ?? "", AcceptsReturn = true, MinHeight = 160, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, PROPOSED_TypeInstructions);
+        var error = Ui.Text("");
+        AutomationProperties.SetLiveSetting(error, AutomationLiveSetting.Polite);
+        dialog.Content = MeetingsWindow.DialogContent(dialog, Ui.Text(PROPOSED_TypeName), name, Ui.Text(PROPOSED_TypeInstructions), instructions, error,
+            MeetingsWindow.Button(PROPOSED_SaveType, () =>
+            {
+                try
+                {
+                    SummaryTemplates.Save(_host.Paths.ConfigDir, new(type?.Id ?? "custom-" + Guid.NewGuid().ToString("N"), name.Text ?? "", type?.Markdown ?? "")
+                    { Instructions = instructions.Text ?? "", IsBuiltin = false });
+                    Shell.Reload(userRequested: false);
+                    dialog.Close(); Refresh(); Say(PROPOSED_Saved);
+                }
+                catch { error.Text = PROPOSED_Error; }
+            }), MeetingsWindow.Button(APPROVED_Cancel, () => dialog.Close()));
+        dialog.Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => name.Focus(), Avalonia.Threading.DispatcherPriority.Background);
+        _ = dialog.ShowDialog(owner);
+    }
+    private void DeleteType(SummaryTemplate type)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        var dialog = new Window { Title = PROPOSED_DeleteType, Width = 480, SizeToContent = SizeToContent.Height };
+        dialog.Content = MeetingsWindow.DialogContent(dialog, Ui.Text(PROPOSED_DeleteTypeQuestion),
+            MeetingsWindow.Button(PROPOSED_DeleteType, () =>
+            {
+                try
+                {
+                    SummaryTemplates.Delete(_host.Paths.ConfigDir, type.Id);
+                    Shell.Reload(userRequested: false);
+                    if (_host.Settings().SummaryTemplate == type.Id) Write(("meetings.summary_type", Json("general")));
+                    dialog.Close(); Refresh(); Say(PROPOSED_Saved);
+                }
+                catch { Say(PROPOSED_Error); }
+            }), MeetingsWindow.Button(APPROVED_Cancel, () => dialog.Close()));
+        _ = dialog.ShowDialog(owner);
     }
     internal async Task RefreshWarning(int version, string folder)
     {
