@@ -1,5 +1,6 @@
 namespace Dictum.UI.Views.Meetings;
 
+// The PROPOSED_ strings added for 1.5.1 (pill labels, headphones tip, summaries screens) were APPROVED by the owner 07/11/2026 00:30 AEDT (.demo-preview/approve-1.5.1-wording.md): do not reword.
 internal static class MeetingsText
 {
     public const string PROPOSED_MeetingRecording = "Meeting: recording";
