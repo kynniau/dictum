@@ -897,5 +897,9 @@ writer needs the final sizes in its first record, so it could only seal at Stop 
 plaintext held in memory or a temporary file; `audio-mixed.wav.enc` is accepted but
 not recommended for phones. The synthetic phone fixture
 `tests/Dictum.Tests/Fixtures/Bundles/phone-sample.dictum` (byte hashes in its adjacent
-notes) covers the WAV form; a chunked-form fixture follows in its own change. 14.A.1 does not describe the transcript, summary or video plaintext; a phone
+notes) covers the WAV form. The recommended chunked form is covered by
+`phone-sample-chunked.dictum` (complete stream) and
+`phone-sample-chunked-incomplete.dictum` (cut short: `IncompleteAudioChannels` `[2]`, no
+terminal record), both in the same folder, with every fixed value, the DCTMAUD header
+and record-0 AAD in hex, and every hash in `phone-sample-chunked.README.md`. 14.A.1 does not describe the transcript, summary or video plaintext; a phone
 bundle carries none of them (Dictum transcribes and summarises after import).

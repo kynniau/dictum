@@ -62,6 +62,28 @@ internal sealed class MeetingFixture : IDisposable
 public class MeetingStoreTests
 {
     [Fact]
+    public void Discarding_staging_zero_fills_metadata_before_removal()
+    {
+        using var files = new MeetingFixture();
+        var staging = Path.Combine(files.Root, ".import-" + MeetingId.New().Value);
+        Directory.CreateDirectory(staging);
+        var names = new[] { "meta.json", "meta.json.0123.tmp", "other.tmp" };
+        // Span the scrub buffer boundary as well as a short file; retain length to reject truncation as a substitute.
+        var original = Enumerable.Repeat((byte)0x5a, FileMeetingStore.ScrubChunk + 17).ToArray();
+        foreach (var name in names) File.WriteAllBytes(Path.Combine(staging, name), name == "meta.json" ? original : original[..71]);
+        var observed = new Dictionary<string, byte[]>();
+        files.Store().DiscardStagingObservedForTest(staging, folder =>
+        {
+            Assert.Equal(staging, folder);
+            foreach (var name in names) observed.Add(name, File.ReadAllBytes(Path.Combine(folder, name)));
+        });
+        Assert.False(Directory.Exists(staging));
+        Assert.Equal(names.Length, observed.Count);
+        foreach (var name in names)
+            Assert.Equal(new byte[name == "meta.json" ? original.Length : 71], observed[name]);
+    }
+
+    [Fact]
     public void Swapping_audio_files_within_a_meeting_is_rejected()
     {
         using var fixture = new MeetingFixture(); var store = fixture.Store(); var id = fixture.Populate(store);
