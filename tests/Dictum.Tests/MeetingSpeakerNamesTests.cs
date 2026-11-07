@@ -159,6 +159,66 @@ public sealed class MeetingSpeakerNamesTests
         Assert.Equal("Other 1", SpeakerNameSwap.WithoutNames(named)!.Label(1));
     }
 
+    // An unnamed speaker's "Other n" label is not a figure; every other number still is (figure rule unchanged).
+    private const string FigureRejection = "A figure or date was not present in the transcript.";
+    private static readonly SummaryTemplate General = SummaryTemplates.Get("general");
+
+    private static (Summary? Ok, string? Rejection) Check(string bullet, MeetingSpeakers? speakers) =>
+        SummaryValidator.Validate("# Summary\n- " + bullet, Transcript, General, "Local", speakers);
+
+    [Fact]
+    public void An_unnamed_speaker_label_does_not_trip_the_figure_rule()
+    {
+        var result = Check("Other 2 will send the agenda.", Speakers(3, new()));
+        Assert.Null(result.Rejection);
+        // Masking is for the check only: the summary keeps the label as written.
+        Assert.Equal("# Summary\n- Other 2 will send the agenda.", Assert.IsType<Summary>(result.Ok).Markdown);
+    }
+
+    [Fact]
+    public void A_label_beyond_the_speaker_count_is_still_a_figure()
+    {
+        Assert.Equal(FigureRejection, Check("Other 7 will send the agenda.", Speakers(3, new())).Rejection);
+        Assert.Equal(FigureRejection, Check("Other 0 will send the agenda.", Speakers(3, new())).Rejection);
+    }
+
+    [Fact]
+    public void A_real_figure_next_to_a_label_is_still_rejected() =>
+        Assert.Equal(FigureRejection, Check("Other 2 promised 40 units.", Speakers(3, new())).Rejection);
+
+    [Fact]
+    public void Without_speakers_nothing_is_masked() =>
+        Assert.Equal(FigureRejection, Check("Other 2 will send the agenda.", null).Rejection);
+
+    [Fact]
+    public void Other_1_inside_Other_10_is_not_masked_as_Other_1()
+    {
+        Assert.Equal(FigureRejection, Check("Other 10 will send the agenda.", Speakers(2, new())).Rejection);
+        Assert.Null(Check("Other 10 will send the agenda.", Speakers(10, new())).Rejection);
+    }
+
+    [Theory]
+    [InlineData("Others 2 will send the agenda.")]
+    [InlineData("AnOther 2 will send the agenda.")]
+    [InlineData("Other 2x will send the agenda.")]
+    [InlineData("Other 02 will send the agenda.")]
+    [InlineData("They said \"Other 2 will send it\" without a citation.")]
+    // Removing a checked quote must not join "Other " and a stray digit into a label.
+    [InlineData("Other \"Other 2 options are fine\" [00:03 Others]2 agreed.")]
+    public void Only_a_whole_label_outside_a_quote_is_masked(string bullet) =>
+        Assert.Equal(FigureRejection, Check(bullet, Speakers(3, new())).Rejection);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_summary_naming_unnamed_speakers_is_written(bool inProcessEngine)
+    {
+        var summary = await new MeetingSummariser().SummariseAsync(MeetingId.New(), Transcript, General, new CapturingClient(), "Local",
+            TestContext.Current.CancellationToken, Speakers(2, new()), inProcessEngine);
+        Assert.DoesNotContain(MeetingSummariser.NotWritten, summary.Markdown);
+        Assert.Contains("- Other 1 agreed the plan.", summary.Markdown);
+    }
+
     internal sealed class CapturingClient : ILlmClient
     {
         public List<(string System, string User)> Requests { get; } = [];

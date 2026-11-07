@@ -29,19 +29,38 @@ internal static class SpeakerNameSwap
     {
         if (speakers is null || speakers.Names.Count == 0 || text.Length == 0) return text;
         // Per line, as the validator reads quotes per line: an unpaired quote mark cannot shield the lines after it.
-        return string.Join("\n", text.Split('\n').Select(line => RestoreLine(line, speakers)));
+        return string.Join("\n", text.Split('\n').Select(line => OutsideQuotes(line, part => Swap(part, speakers))));
     }
 
-    private static string RestoreLine(string line, MeetingSpeakers speakers)
+    /// <summary>
+    /// For the validator's figure rule only (never stored or shown): one line with each whole label of this meeting's own speakers,
+    /// "Other 1" to "Other {Count}" exactly as <see cref="MeetingSpeakers.Label"/> writes it, replaced by a digit-free word. Any other
+    /// number ("Other 7" in a three-speaker meeting, "Other 02") and any text inside a quotation stay as they are, so they are
+    /// still checked. Without a speakers file nothing is masked.
+    /// </summary>
+    public static string MaskLabels(string line, MeetingSpeakers? speakers)
+    {
+        if (speakers is null || speakers.Count == 0 || line.Length == 0) return line;
+        var count = speakers.Count;
+        return OutsideQuotes(line, part => Label.Replace(part, match =>
+            int.TryParse(match.Groups["n"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var speaker) &&
+            speaker >= 1 && speaker <= count && speaker.ToString(CultureInfo.InvariantCulture) == match.Groups["n"].Value
+                ? MaskedLabel : match.Value));
+    }
+
+    // Not a figure-rule trigger and contains no digit; the validator reads it, nobody sees it.
+    private const string MaskedLabel = "Speaker";
+
+    private static string OutsideQuotes(string line, Func<string, string> change)
     {
         var result = new StringBuilder(line.Length);
         var position = 0;
         foreach (Match quote in SummaryValidator.QuoteSpan.Matches(line))
         {
-            result.Append(Swap(line[position..quote.Index], speakers)).Append(quote.Value);
+            result.Append(change(line[position..quote.Index])).Append(quote.Value);
             position = quote.Index + quote.Length;
         }
-        return result.Append(Swap(line[position..], speakers)).ToString();
+        return result.Append(change(line[position..])).ToString();
     }
 
     private static string Swap(string text, MeetingSpeakers speakers) => Label.Replace(text, match =>

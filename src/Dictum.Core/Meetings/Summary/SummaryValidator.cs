@@ -44,8 +44,10 @@ public static class SummaryValidator
         @"[\p{N}\p{Sc}+\u2212\u2013\u00b1-]|\b(?:minus|negative|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?|" + CurrencyCodes + @")\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    /// <param name="speakers">The meeting's speakers file, if it has one: its own "Other n" labels are not figures (see
+    /// <see cref="SpeakerNameSwap.MaskLabels"/>). Null masks nothing.</param>
     public static (MeetingSummary? Ok, string? Rejection) Validate(string reply,
-        IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine)
+        IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine, Speakers.MeetingSpeakers? speakers = null)
     {
         if (string.IsNullOrWhiteSpace(reply)) return (null, "The response was empty.");
         if (reply.EnumerateRunes().Any(r => Rune.GetUnicodeCategory(r) == UnicodeCategory.Format) || HasMixedScriptWord(reply))
@@ -75,7 +77,8 @@ public static class SummaryValidator
                 return (null, "An action-item owner must not contain markup.");
             var content = StripMarkdown(originalContent);
             var invalidQuote = false;
-            var remainder = Quotation.Replace(content, match =>
+            // Labels are masked before verified quotes are removed, so text either side of a removed quote cannot join into a label.
+            var remainder = Quotation.Replace(SpeakerNameSwap.MaskLabels(content, speakers), match =>
             {
                 if (QuoteIsSpoken(match, transcript)) return "";
                 invalidQuote = true;

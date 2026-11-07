@@ -52,7 +52,7 @@ public sealed class MeetingSummariser
                 // Names go back before the check, so a cloud summary is validated exactly as a local one with names would be;
                 // the rejection text sent back on a retry is fixed wording and never carries a name.
                 : SummaryValidator.Validate(inProcessEngine ? reply.Text ?? "" : SpeakerNameSwap.Restore(reply.Text ?? "", speakers),
-                    transcript, template, engineLabel);
+                    transcript, template, engineLabel, speakers);
             if (result.Ok is not null) return result.Ok;
             combine = SummaryPrompt.CombineUser(drafts, template) + "\nValidation rejection: " + result.Rejection +
                 "\nTry again using only transcript-supported facts, figures and owners.";

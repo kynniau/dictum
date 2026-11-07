@@ -21,11 +21,14 @@ public class PublicCopyNeutralityTests
     ];
 
     /// <summary>
-    /// Exact identifiers (case-sensitive, matched as exact substrings) that happen to contain one of the words across a letter boundary and are
-    /// Apple's own API names, not copy: they are cut out of a file's text before the sweep. The bare word still fails
-    /// (pinned below); a new identifier is added here on purpose, never by widening the match to word boundaries.
+    /// Exact strings (case-sensitive, matched as exact substrings) that happen to contain one of the words across a letter boundary and are
+    /// not Dictum's copy: they are cut out of a file's text before the sweep. Apple's own API names, and one copyright line
+    /// that must ship verbatim inside ONNX Runtime's ThirdPartyNotices (packaging/notices/onnxruntime-ThirdPartyNotices.txt,
+    /// an Open MPI copyright; allowed by the owner, 07/11/2026). The bare word still fails (pinned below); a new entry is
+    /// added here on purpose, never by widening the match to word boundaries.
     /// </summary>
-    internal static readonly string[] AllowedIdentifiers = ["CGEventSourceButtonState", "EventSourceButtonState"];
+    internal static readonly string[] AllowedIdentifiers =
+        ["CGEventSourceButtonState", "EventSourceButtonState", "Trustees of Indiana University and Indiana"];
 
     private static readonly string[] BinaryExtensions = [".png", ".ico", ".jpg", ".jpeg", ".gif", ".dll", ".exe", ".bin", ".zip", ".msix", ".pdb", ".woff", ".woff2", ".mp4"];
 
