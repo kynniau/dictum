@@ -621,3 +621,119 @@ adversarial lens; Opus verdict line only; the Dictum orchestrator merges. Each l
 names only the files in its table row (§4) and this section; hot files (README, help, privacy,
 THIRD-PARTY notices, CloudPolicy, approved strings) are off limits to every lane.
 
+### 14.A Portable bundle
+
+Design A uses one ZIP archive per meeting, with extension `.dictum`. The UI suggests
+`meeting-<yyyy-MM-dd>-<first 8 hex characters of the id>.dictum`, where the date is the
+meeting's local start date. The file name carries no title, names or other words from the
+meeting: a file name is visible wherever the bundle travels, outside its encryption.
+ZIP entry names are case-sensitive, flat and unique (including case-insensitive
+uniqueness). No directory entries, path separators, alternate streams or extra
+attachments are accepted. ZIP compression may be stored or deflated. Export uses
+`System.IO.Compression.ZipArchive`, writes a temporary archive beside the destination,
+flushes it and renames it. Existing meeting files are never rewritten or deleted.
+
+The sole plaintext entry is `manifest.json`, UTF-8 JSON with camel-case keys:
+
+```json
+{"format":"dictum-bundle","version":1,"meeting":"0123456789abcdef0123456789abcdef","createdBy":{"app":"Dictum","version":"1.5.1.0","platform":"windows"},"transfer":{"kdf":"pbkdf2-hmac-sha256","iterations":600000,"salt":"<base64:16 bytes>","wrap":"<base64:60 bytes>"},"files":[{"name":"meta.json.enc","bytes":1234}]}
+```
+
+`createdBy.version` is the Core assembly version; `platform` is `windows` or `mac`.
+The manifest contains no title, people, transcript, audio or transfer code. `files`
+lists every payload, including encrypted metadata, with its exact uncompressed ZIP
+entry length. The manifest itself is excluded from `files`. The reader limits the
+manifest to 1 MiB and rejects missing, additional, duplicate or mismatched entries.
+It checks both central-directory lengths and streamed extraction lengths. There is
+no manifest signature; individual payload identities and bytes are authenticated.
+Wrong format, any version other than 1, unknown KDF, an iteration count other than
+600000, or an unknown optional `transfer.kind` are refused. Export omits `kind`;
+readers accept absence or the value `transfer-code` only.
+
+Allowed payload names are exactly:
+
+- `meta.json.enc`, `confirmations.json.enc`, `transcript.json.enc`, `summary.md.enc`;
+- `transcript-batch-<19 decimal digits>.json.enc`;
+- `audio-you.wav.enc`, `audio-others.wav.enc`, `audio-mixed.wav.enc`, and the same
+  channel names with `.chunks.enc` in place of `.wav.enc`;
+- `video.<extension>.enc`, where extension contains lowercase ASCII letters or digits.
+
+Names are at most 255 characters. `meta.json.enc` is mandatory. Older meetings may
+lack confirmations; imports then start an empty confirmation history before appending
+the new import confirmation. Transcripts and audio are optional.
+
+All existing `.enc` files are copied byte for byte. The additional `meta.json.enc`
+is the store's `System.Text.Json` representation of `MeetingMeta`, with Pascal-case
+property names, numeric enums, `MeetingId` represented by `{"Value":"<id>"}`,
+ISO-8601 dates and .NET TimeSpan strings, and `Wraps: []`. It includes
+`IncompleteAudioChannels`, preserving the store's interrupted-audio snapshot rules.
+Plaintext `meta.json` and every owner wrap are excluded from the bundle.
+
+The six-word transfer code samples six independent uniform indices from the embedded
+2048-word BIP-39 English dictionary (MIT). There is no BIP-39 checksum or seed
+derivation. `TransferCode.Normalise` splits on .NET whitespace, removes empty words,
+joins with single ASCII spaces and applies invariant lowercase. Its UTF-8 bytes feed
+PBKDF2-HMAC-SHA256 with the manifest's fresh random 16-byte salt, 600000 iterations
+and a 32-byte result. Import requires six words and at most 256 normalised characters;
+it does not require dictionary membership. The generated code is never persisted by Dictum. The existing
+`MeetingCrypto.Wrap(contentKey, transferKey, "transfer")` produces the 60-byte wrap:
+12-byte random nonce, 32-byte ciphertext, 16-byte tag, AES-GCM with UTF-8 `transfer`
+as AAD. The transfer key and unwrapped content key are cleared after use.
+
+Ordinary payloads, including encrypted metadata, use the existing `DCTMENC` framing:
+8-byte `DCTMENC\x01`, 16 random header bytes, then records containing little-endian
+int32 plaintext length, 12-byte nonce, ciphertext of that length and 16-byte tag.
+Length is at most 1048576 bytes. A mandatory zero-length terminal record ends the
+file, with no trailing data. AES-GCM AAD is the complete 24-byte header, little-endian
+int64 zero-based record sequence, little-endian int32 length, then UTF-8
+`<meeting-id>/<entry-name>`. Audio `.chunks.enc` framing and incomplete snapshot
+handling are exactly section 13.2; no cipher, AAD or audio framing changes are made.
+
+`BundleImporter.Inspect(path)` reads only the manifest payload and ZIP entry metadata,
+returning meeting id, payload count, total payload bytes, originating platform and
+app version without a code or keyring access. Inspection and import refuse an id
+already present on this computer; imports never merge or assign a replacement id.
+Import holds the source ZIP open against concurrent writes. It derives and unwraps
+before creating any destination directory, extracts ciphertext to `<root>/.import-<id>`,
+and decrypt-verifies every file through the store's existing verify-before-release
+passes, including the same incomplete chunked-audio snapshot verification as OpenAudio.
+Only then does it read the verified `meta.json.enc` and `confirmations.json.enc` and show
+the importer the recorded `Agreement` and the origin device's confirmations, in the
+existing approved record wording (no new consent text), above the existing L5 import
+agreement, including the approved script, answer, time, script version, importer
+identity and confirmed processing route. No meeting is listed before that agreement.
+The gate requires Kind Import, a spoken or written answer, matching importer identity,
+a route with retention, the exact approved script version the UI supplies, and a script
+exactly equal to the approved import notice the UI composes for the confirmed route.
+The UI supplies the unchanged approved script and checks route changes. A missing
+confirmation (refused, cancelled, the window closing, or Meetings turned off while the
+notice is open) ends the import as cancelled, with no trace left.
+
+After confirmation, import appends the encrypted confirmation history, creates an
+empty encrypted transcript snapshot if missing, removes the transfer metadata entry,
+writes local `meta.json` with a fresh owner wrap, renames to `<root>/<id>`, and rebuilds
+the index under the store gate. Staging is removed on failure or cancellation, after
+zero-filling its plaintext `meta.json` (which holds a valid owner wrap) and any
+atomic-write temporaries; a staging folder left by a killed import of the same id is
+removed the same way at the start of the next import. A failure to remove staging is
+logged with its path and never replaces the import's own error. A failure after
+publication rolls the imported meeting back. An existing transcript is retained.
+Audio with an empty or absent transcript is passed in bounded PCM parts to the existing
+transcriber under the confirmed route, reusing L5's FileSource pause segmenter in
+bounded 30-second decoded windows. A segment ends at each window boundary until
+FileSource accepts streaming blocks. A single track is Mixed; multiple tracks retain
+You/Others/Mixed channels. Stored canonical 16 kHz mono PCM16 WAV and chunked audio are
+supported. The original bundle remains unchanged. No file association, Settings,
+packaging, network service or new NuGet dependency is introduced.
+
+Origin record shown before the import notice: only the answers `spoken`, `written` and
+`platform-announced` use the approved "you said everyone agreed" record line; `refused`, `agreed`
+(the notice confirmed again after a join or a changed processing route), `unconfirmed`,
+`discard-requested` and any answer this version does not know each have their own line, so a
+recorded refusal is never shown as agreement.
+
+Known limit: if the index rebuild fails inside publication and the rename back also fails, the
+meeting stays at `<root>/<id>` (complete, owner-wrapped, its import confirmed, nothing in plaintext)
+while the user sees "could not be imported"; the next listing rebuilds the index and shows it, and a
+retry says it is already on this computer. `// simplification:` accepted at the 1.6 merge lens;
+retire if a user reports a meeting that appeared after a failed import.

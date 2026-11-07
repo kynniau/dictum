@@ -20,6 +20,8 @@ public sealed partial class AppShell
 
     /// <summary>Fix last dictation → Copy: the clipboard, kept out of clipboard history unless insert.clipboard_history is on.</summary>
     public void CopyText(string text) => Platform.Clipboard.SetText(text, keepOutOfHistory: !_settings.Insert.ClipboardHistory);
+    /// <summary>A secret (the meeting bundle transfer code): always kept out of clipboard history and cloud sync, whatever insert.clipboard_history says.</summary>
+    public void CopySecret(string text) => Platform.Clipboard.SetText(text, keepOutOfHistory: true);
 
     /// <summary>
     /// Fix last dictation → Paste fix: hands the foreground back to the window the dictation went to, then pastes through the

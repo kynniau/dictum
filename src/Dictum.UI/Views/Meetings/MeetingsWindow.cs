@@ -14,7 +14,7 @@ using static Dictum.UI.Views.Meetings.MeetingsText;
 
 namespace Dictum.UI.Views.Meetings;
 
-internal sealed class MeetingsWindow : Window
+internal sealed partial class MeetingsWindow : Window
 {
     private readonly MeetingsHost _host;
     private readonly ContentControl _screen = new();
@@ -81,7 +81,7 @@ internal sealed class MeetingsWindow : Window
         };
         Closing += (_, e) =>
         {
-            if (!_shuttingDown && (_recording is not null || _busy)) { e.Cancel = true; Say(PROPOSED_CloseRecording); }
+            if (!_shuttingDown && (_recording is not null || _busy || _activeImport is { IsCompleted: false })) { e.Cancel = true; Say(PROPOSED_CloseRecording); }
         };
         Closed += (_, _) => { _timer.Stop(); _source?.Dispose(); (_pendingLoopback as IDisposable)?.Dispose(); _lifetime.Cancel(); _lifetime.Dispose(); };
         ShowList();
@@ -172,7 +172,9 @@ internal sealed class MeetingsWindow : Window
         _entries = new MeetingsEntries(_host.Settings, BeginAgreement, ShowList);
         _importButton = SafeButton(PROPOSED_Import, () => _ = PickImport());
         _importButton.IsVisible = _host.Settings().Enabled;
-        Screen(Ui.Heading(PROPOSED_Meetings), _entries, _importButton, search, results);
+        _bundleImportButton = SafeButton(PROPOSED_ImportBundle, () => _ = PickBundle());
+        _bundleImportButton.IsVisible = _host.Settings().Enabled;
+        Screen(Ui.Heading(PROPOSED_Meetings), _entries, _importButton, _bundleImportButton, search, results);
         Search();
     }
 
@@ -181,6 +183,7 @@ internal sealed class MeetingsWindow : Window
         _refreshSummaryChoices?.Invoke();
         _entries?.Refresh();
         if (_importButton is not null) _importButton.IsVisible = _host.Settings().Enabled;
+        if (_bundleImportButton is not null) _bundleImportButton.IsVisible = _host.Settings().Enabled;
         if (_recording is { } id && !_ending && _confirmedRoute != _host.ProcessingRoute())
         {
             _routeChangePending = true;
@@ -190,7 +193,7 @@ internal sealed class MeetingsWindow : Window
             UpdatePauseState();
             ShowRouteNotice(id, true, null);
         }
-        if (_activeImport is { IsCompleted: false } && _importRoute != _host.ProcessingRoute()) _importCancellation?.Cancel();
+        if (_activeImport is { IsCompleted: false } && _importRoute is not null && _importRoute != _host.ProcessingRoute()) _importCancellation?.Cancel();
     }
 
     private async Task PickImport()
@@ -204,27 +207,32 @@ internal sealed class MeetingsWindow : Window
             FileTypeFilter = [new FilePickerFileType(PROPOSED_Import) { Patterns = ["*.wav", "*.mp3", "*.m4a", "*.mp4", "*.flac", "*.wma", "*.aac"] }] });
         if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) BeginImportAgreement(path);
     }
-    internal void BeginImportAgreement(string path)
+    internal void BeginImportAgreement(string path, Action<Agreement?>? bundleConfirmation = null, Func<Control>? origin = null)
     {
-        if (_recording is not null || _busy || !_host.Settings().Enabled) return;
+        if (_recording is not null || _busy || !_host.Settings().Enabled)
+        {
+            // A waiting bundle import is released as cancelled; it leaves the progress screen for the list.
+            if (bundleConfirmation is not null) { bundleConfirmation(null); ShowList(); }
+            return;
+        }
         if (!_host.ImportsEnabled())
         {
             Screen(Ui.Heading(APPROVED_EnableImportsTitle), Ui.Text(APPROVED_EnableImportsBody),
-                Ui.Row(8, SafeButton(APPROVED_Cancel, ShowList), SafeButton(APPROVED_EnableImports, () =>
+                Ui.Row(8, SafeButton(APPROVED_Cancel, () => { bundleConfirmation?.Invoke(null); ShowList(); }), SafeButton(APPROVED_EnableImports, () =>
                 {
-                    try { _host.EnableImports(); if (_host.ImportsEnabled()) Agreement(path); }
+                    try { _host.EnableImports(); if (_host.ImportsEnabled()) Agreement(path, bundleConfirmation, origin); }
                     catch { Say(PROPOSED_Error); }
                 })));
             return;
         }
-        Agreement(path);
+        Agreement(path, bundleConfirmation, origin);
     }
     internal void BeginAgreement()
     {
         if (!_canRecord()) { Say(PROPOSED_DictationBusy); return; }
         if (_recording is null && !_busy && _host.Settings().Enabled) Agreement(null);
     }
-    private void Agreement(string? importPath)
+    private void Agreement(string? importPath, Action<Agreement?>? bundleConfirmation = null, Func<Control>? origin = null)
     {
         var importing = importPath is not null;
         (_pendingLoopback as IDisposable)?.Dispose(); _pendingLoopback = null;
@@ -234,24 +242,13 @@ internal sealed class MeetingsWindow : Window
         var speechHostAtNotice = _host.CloudSpeechHost();
         var summaryHostAtNotice = _host.SummaryHost();
         var routeAtNotice = _host.ProcessingRoute();
-        var summaryRoute = settings.SummaryEngine switch { SummaryEngine.Ollama => APPROVED_Ollama, SummaryEngine.OwnKey => string.Format(APPROVED_OwnKey, summaryHostAtNotice ?? PROPOSED_UnconfiguredProvider), _ => APPROVED_Local };
-        if (settings.SummaryEngine == SummaryEngine.Ollama && summaryHostAtNotice is not null)
-            summaryRoute += Environment.NewLine + string.Format(PROPOSED_SummaryHost, summaryHostAtNotice);
-        if (settings.SummaryEngine == SummaryEngine.Local && routeAtNotice.SummaryModel is { } localModel)
-            summaryRoute += Environment.NewLine + string.Format(PROPOSED_LocalSummaryModel, localModel);
-        summaryRoute = (speechHostAtNotice is { } speechHost ? string.Format(APPROVED_CloudSpeech, speechHost)
-            : APPROVED_LocalSpeech) + Environment.NewLine + summaryRoute;
-        var retention = settings.KeepAudio == KeepAudio.Forever ? APPROVED_KeepForever
-            : string.Format(APPROVED_KeepDays, settings.KeepAudio == KeepAudio.Days30 ? 30 : 90);
-        var script = string.Join("\n\n", importing ? APPROVED_ImportAgreement : APPROVED_Agreement,
-            importing ? "" : (_pendingLoopback is null ? APPROVED_CaptureMicrophone : APPROVED_CaptureSystem),
-            importing ? "" : APPROVED_Uses, APPROVED_Access, summaryRoute, retention, APPROVED_ConfirmationNote);
+        var script = NoticeScript(importing, _pendingLoopback is not null, routeAtNotice);
         var acknowledge = SafeButton(importing ? APPROVED_Import : APPROVED_Start, () => _ = Work(async () =>
         {
-            if (!_host.Settings().Enabled) { ShowList(); return; }
+            if (!_host.Settings().Enabled) { bundleConfirmation?.Invoke(null); ShowList(); return; }
             if (_host.Settings() != settings || _host.ProcessingRoute() != routeAtNotice || _host.CloudSpeechHost() != speechHostAtNotice || _host.SummaryHost() != summaryHostAtNotice)
-            { Agreement(importPath); return; }
-            if (importing && !_host.ImportsEnabled()) { BeginImportAgreement(importPath!); return; }
+            { Agreement(importPath, bundleConfirmation, origin); return; }
+            if (importing && !_host.ImportsEnabled()) { BeginImportAgreement(importPath!, bundleConfirmation, origin); return; }
             var agreement = new Agreement(DateTimeOffset.UtcNow,
                 how.SelectedIndex == 1 ? "written" : "spoken", ApprovedScriptVersion,
                 importing ? AgreementKind.Import : AgreementKind.Live);
@@ -261,6 +258,7 @@ internal sealed class MeetingsWindow : Window
                     importing ? AgreementKind.Import : AgreementKind.Live, ApprovedScriptVersion, script,
                     importing ? Environment.UserName : null, routeAtNotice),
             };
+            if (bundleConfirmation is not null) { bundleConfirmation(agreement); return; }
             if (importing)
             {
                 _importCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -275,9 +273,11 @@ internal sealed class MeetingsWindow : Window
             else StartRecording(agreement, script);
         }));
         Screen(Ui.Heading(importing ? APPROVED_BeforeImport : APPROVED_Before),
+            origin?.Invoke() ?? new Panel { IsVisible = false },
             Ui.Card(Ui.Stack(8, Ui.Text(script))),
             new TextBlock { Text = PROPOSED_HeadphonesTip, TextWrapping = Avalonia.Media.TextWrapping.Wrap, IsVisible = !importing },
-            Ui.Text(APPROVED_How), how, SafeButton(APPROVED_Refused, TakeNotes), Ui.Row(8, SafeButton(APPROVED_Cancel, ShowList), acknowledge));
+            Ui.Text(APPROVED_How), how, SafeButton(APPROVED_Refused, () => { bundleConfirmation?.Invoke(null); TakeNotes(); }),
+            Ui.Row(8, SafeButton(APPROVED_Cancel, () => { bundleConfirmation?.Invoke(null); ShowList(); }), acknowledge));
     }
 
     private void TakeNotes()
@@ -862,12 +862,11 @@ internal sealed class MeetingsWindow : Window
                 SafeButton(PROPOSED_Regenerate, () => _ = Work(() => Regenerate(id, types[template.SelectedIndex].Id))), list, details));
         string ExportSelected() => _host.Store.ExportMarkdown(id, summary?.Id) + Environment.NewLine +
             (summary is null ? "" : SummaryAttribution(summary) + Environment.NewLine) + MeetingsHost.PROPOSED_ExportReminder + Environment.NewLine;
-        var record = meta.Agreement is { } agreement ? Ui.Text(string.Format(APPROVED_Record,
-            agreement.Kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind, agreement.AcknowledgedAt.ToLocalTime(),
-            agreement.How switch { "written" => APPROVED_Written, "platform-announced" => PROPOSED_Platform, _ => APPROVED_Spoken })) : Ui.Text(PROPOSED_NotesText);
+        var record = meta.Agreement is { } agreement ? Ui.Text(RecordText(agreement.Kind, agreement.AcknowledgedAt, agreement.How)) : Ui.Text(PROPOSED_NotesText);
         Screen(Ui.Row(8, SafeButton(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title), Ui.Text(meta.AudioIncomplete ? PROPOSED_AudioRecovered : ""),
             Ui.Text(string.Format(PROPOSED_ListRow, meta.Title, meta.StartedAt.ToLocalTime(), meta.Duration, _host.Store.SizeOf(id))),
             transcriptCard, summaryCard, Ui.Card(record, PROPOSED_Record),
+            SafeButton(PROPOSED_MoveToAnotherDevice, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = MoveBundle(id))),
             Ui.Row(8, SafeButton(PROPOSED_Export, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = Work(async () =>
             {
                 var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = PROPOSED_Export, DefaultExtension = "md" });

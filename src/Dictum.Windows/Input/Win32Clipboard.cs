@@ -53,8 +53,10 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
     /// <summary>What <see cref="SetText"/> puts on the clipboard: the text, and the two privacy DWORDs unless history is allowed.</summary>
     internal static IReadOnlyList<(string Format, byte[] Bytes)> Payload(string text, bool keepOutOfHistory)
     {
-        var list = new List<(string, byte[])> { ("CF_UNICODETEXT", Encoding.Unicode.GetBytes(text + "\0")) };
+        // The privacy formats go first: if a later SetClipboardData fails, the text was never on the clipboard unflagged.
+        var list = new List<(string, byte[])>();
         if (keepOutOfHistory) list.AddRange(PrivacyFormats.Select(f => (f, BitConverter.GetBytes(0u))));
+        list.Add(("CF_UNICODETEXT", Encoding.Unicode.GetBytes(text + "\0")));
         return list;
     }
 
@@ -70,6 +72,7 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
                 {
                     var error = Marshal.GetLastWin32Error();
                     NativeClipboard.GlobalFree(memory); // still ours: the system takes ownership only on success
+                    NativeClipboard.EmptyClipboard(); // never leave a partial write (text without its privacy flags) behind
                     throw new ExternalException($"SetClipboardData({format}) failed (Win32 error {error}).");
                 }
             }

@@ -6,7 +6,7 @@ using Dictum.Settings;
 
 namespace Dictum.Meetings.Store;
 
-public sealed class FileMeetingStore : IMeetingStore
+public sealed partial class FileMeetingStore : IMeetingStore
 {
     // simplification: serialize file operations in this process; retire for concurrent multi-process
     // writers (team-folder phase) with an interprocess lock and conflict resolution.

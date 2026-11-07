@@ -155,6 +155,7 @@ public sealed class FixBatchCoverageTests : IDisposable
         {
             Assert.Equal(new byte[4], kept.Single(f => f.Format == format).Bytes); // a DWORD 0: "no" to history and to cloud sync
         }
+        Assert.Equal("CF_UNICODETEXT", kept[^1].Format); // the flags are written before the text, so a failed write never leaves it unflagged
         var allowed = Win32Clipboard.Payload("secret", keepOutOfHistory: false);
         Assert.All(Win32Clipboard.PrivacyFormats, format => Assert.DoesNotContain(allowed, f => f.Format == format));
     }
