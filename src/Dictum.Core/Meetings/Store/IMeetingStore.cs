@@ -24,6 +24,15 @@ public interface IMeetingStore
     void ApplyRetention(DateTimeOffset now);
     string ExportMarkdown(MeetingId id);
     void ExportBundle(MeetingId id, string destinationPath, string transferCode) => throw new NotSupportedException();
+    /// <summary>
+    /// The meeting's speaker separation (speakers.json.enc), or null when none has run, and null for a file this version cannot
+    /// accept after it decrypts (design 1.6 B). A file that fails decryption throws.
+    /// </summary>
+    Speakers.MeetingSpeakers? ReadSpeakers(MeetingId id) => null;
+    /// <summary>Whether the meeting has a speakers file, readable by this version or not.</summary>
+    bool HasSpeakers(MeetingId id) => ReadSpeakers(id) is not null;
+    /// <summary>Replaces the meeting's speaker separation and names; only ever inside the meeting folder, sealed like its other files.</summary>
+    void WriteSpeakers(MeetingId id, Speakers.MeetingSpeakers speakers) => throw new NotSupportedException();
 }
 
 public interface IMeetingAudioWriter : IDisposable

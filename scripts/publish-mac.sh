@@ -88,6 +88,8 @@ cp "$dist/model-cache/$model_file" "$macos/models/$model_file"
 sed "s/@VERSION@/$version/g" packaging/mac/Info.plist > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >/dev/null
 cp THIRD-PARTY-NOTICES.txt "$resources/THIRD-PARTY-NOTICES.txt"
+# ONNX Runtime's own notices beside it (THIRD-PARTY-NOTICES.txt points to them): libonnxruntime.dylib ships for Identify speakers.
+cp packaging/notices/onnxruntime-ThirdPartyNotices.txt "$resources/onnxruntime-ThirdPartyNotices.txt"
 
 # 6. Required files: fail on any that is missing.
 required=(
@@ -100,11 +102,16 @@ done
 for n in libllama libggml libggml-base libggml-cpu libggml-metal libggml-blas libmtmd; do
   required+=("runtimes/osx-arm64/native/$n.dylib")
 done
+# Identify speakers: org.k2fsa.sherpa.onnx.runtime.osx-arm64 carries these in runtimes/osx-arm64/native, which a RID-specific
+# publish flattens beside Dictum.Mac.dll, as it puts the win-x64 pair beside Dictum.exe (not yet seen in a Mac publish output).
+required+=(libsherpa-onnx-c-api.dylib libonnxruntime.dylib)
 missing=()
 for f in "${required[@]}"; do [ -e "$macos/$f" ] || missing+=("$f"); done
-for f in Contents/Info.plist Contents/Resources/Dictum.icns Contents/Resources/THIRD-PARTY-NOTICES.txt; do [ -e "$app/$f" ] || missing+=("$f"); done
+for f in Contents/Info.plist Contents/Resources/Dictum.icns Contents/Resources/THIRD-PARTY-NOTICES.txt Contents/Resources/onnxruntime-ThirdPartyNotices.txt; do
+  [ -e "$app/$f" ] || missing+=("$f")
+done
 if [ ${#missing[@]} -gt 0 ]; then echo "The bundle is missing: ${missing[*]}" >&2; exit 1; fi
-echo "Required files present: ${#required[@]} under Contents/MacOS, plus Info.plist, Dictum.icns, THIRD-PARTY-NOTICES.txt"
+echo "Required files present: ${#required[@]} under Contents/MacOS, plus Info.plist, Dictum.icns, THIRD-PARTY-NOTICES.txt, onnxruntime-ThirdPartyNotices.txt"
 
 # 7. Sign. Every file under Contents/MacOS first (inside out), then the bundle, never --deep: man codesign on macOS 27 says --deep is
 #    deprecated for signing as of macOS 13.0. Hardened runtime and a secure timestamp are what notarisation requires.

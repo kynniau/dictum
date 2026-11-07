@@ -655,6 +655,7 @@ readers accept absence or the value `transfer-code` only.
 Allowed payload names are exactly:
 
 - `meta.json.enc`, `confirmations.json.enc`, `transcript.json.enc`, `summary.md.enc`;
+- `speakers.json.enc` (1.6 B speaker separation: turns and the names the user gave; optional, sealed like the rest);
 - `transcript-batch-<19 decimal digits>.json.enc`;
 - `audio-you.wav.enc`, `audio-others.wav.enc`, `audio-mixed.wav.enc`, and the same
   channel names with `.chunks.enc` in place of `.wav.enc`;

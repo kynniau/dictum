@@ -34,6 +34,10 @@
     <PackageReference Include="Anthropic" Version="12.57.0" />
     <!-- WAV reading/writing and the WDL resampler; managed (net9.0), no Windows API. NAudio.Wasapi stays in Dictum.Windows. -->
     <PackageReference Include="NAudio.Core" Version="3.1.0" />
+    <!-- Meeting speaker separation (1.6 B): the managed binding to sherpa-onnx (Apache-2.0). Unlike Whisper.net and LLamaSharp it
+         names its native runtime packages as dependencies (win-x64 and osx-arm64 among them, each carrying sherpa-onnx-c-api and
+         onnxruntime 1.28.2), so the app projects get them from here; a RID-specific publish keeps only that RID's pair. -->
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="2.0.1" />
   </ItemGroup>
 
 </Project>

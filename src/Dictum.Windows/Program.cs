@@ -85,6 +85,8 @@ public static class Program
                 return CliCommands.PrintModelsDir(paths, Console.Out, Console.Error);
             case CliMode.BenchCleanup:
                 return BenchCleanupCommand.RunAsync(options, paths, log, redactor, new SecretVault(paths, platform.Credentials)).GetAwaiter().GetResult();
+            case CliMode.SpeakerCheck:
+                return SpeakerCheckCommand.Run(options, paths, log);
             case CliMode.DownloadModel:
             case CliMode.DownloadCleanupModel:
                 return DownloadCommand.RunAsync(options, paths, log).GetAwaiter().GetResult();

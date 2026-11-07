@@ -163,4 +163,63 @@ public sealed class ThirdPartyNoticesTests
         var block = Regex.Split(Notices, @"(?m)^-{78}\r?$").Single(b => Regex.IsMatch(b, $@"^\s*Package: {Regex.Escape(package)} \S+\r?$", RegexOptions.Multiline));
         Assert.Matches($@"(?m)^Copyright \(nuspec\): [^\r\n]+\r?\nCopyright \(upstream licence\): {Regex.Escape(upstream)}\r?$", block);
     }
+
+    /// <summary>
+    /// Pin (orchestrator's sherpa-onnx licence audit, 07/11/2026): the code statically linked into sherpa-onnx-c-api 2.0.1, at the
+    /// versions sherpa-onnx's build pins at commit af2d8d81, each with its licence and its source at that version. A heading is the
+    /// line between two 78-dash rules; the entry's text is the block after it.
+    /// </summary>
+    [Theory]
+    [InlineData("kaldi-native-fbank 1.22.4 ", "Licence: Apache-2.0", "https://github.com/csukuangfj/kaldi-native-fbank/blob/v1.22.4/LICENSE")]
+    [InlineData("KISS FFT, commit febd4caeed32e33ad8b2e0bb5ea77542c40f18ec ", "Licence: BSD-3-Clause", "Copyright (c) 2003-2010 Mark Borgerding")]
+    [InlineData("kaldi-decoder 0.3.0 ", "Licence: Apache-2.0", "https://github.com/k2-fsa/kaldi-decoder/blob/v0.3.0/LICENSE")]
+    [InlineData("kaldifst 1.8.0 ", "Licence: Apache-2.0", "https://github.com/k2-fsa/kaldifst/blob/v1.8.0/LICENSE")]
+    [InlineData("OpenFst 1.8.5, csukuangfj fork tag v1.8.5-2026-07-09 ", "Licence: Apache-2.0", "Copyright 2005-2026 Google LLC.")]
+    [InlineData("Eigen 5.0.1 ", "Licence: MPL-2.0", "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz")]
+    [InlineData("simple-sentencepiece 0.7 ", "Licence: Apache-2.0", "https://github.com/pkufool/simple-sentencepiece/blob/v0.7/LICENSE")]
+    [InlineData("darts-clone, as copied into simple-sentencepiece 0.7 ", "Licence: BSD-2-Clause", "Copyright (c) 2008-2014, Susumu Yata")]
+    [InlineData("utf8proc 2.12.0 ", "Unicode data licence", "Copyright (c) 1991-2007 Unicode, Inc.")]
+    [InlineData("nlohmann/json 3.12.0 ", "Licence: MIT", "Copyright (c) 2013-2025 Niels Lohmann")]
+    public void The_code_compiled_into_sherpa_onnx_has_an_entry_with_its_licence_and_source(string heading, string licence, string source)
+    {
+        var parts = Regex.Split(Notices.Replace("\r\n", "\n"), @"(?m)^-{78}$");
+        var at = Array.FindIndex(parts, p => p.Trim().StartsWith(heading, StringComparison.Ordinal) && p.Contains("compiled into sherpa-onnx-c-api", StringComparison.Ordinal));
+        Assert.True(at > 0 && at + 1 < parts.Length, $"no '{heading.Trim()}' heading in THIRD-PARTY-NOTICES.txt");
+        Assert.Contains(licence, parts[at + 1]);
+        Assert.Contains(source, parts[at + 1]);
+    }
+
+    [Fact]
+    public void Eigen_says_where_its_exact_source_is_and_carries_the_MPL_text()
+    {
+        // MPL-2.0 section 3.2: recipients of the executable form are told where the source form is available.
+        var notices = Notices;
+        Assert.Contains("Source Code Form: Eigen's source is available at https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz", notices);
+        Assert.Contains("e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec", notices); // sherpa-onnx cmake/eigen.cmake pin
+        Assert.Contains("Mozilla Public License Version 2.0", notices);
+        Assert.Contains("Minpack Copyright Notice (1999) University of Chicago", notices);
+        Assert.Contains("Copyright (c) 2011, Intel Corporation", notices);
+    }
+
+    /// <summary>
+    /// ONNX Runtime 1.28.2's own ThirdPartyNotices.txt, from the csukuangfj/onnxruntime-libs v1.28.2 archive whose onnxruntime.dll
+    /// is the one the win-x64 package carries (identical, with LF endings, to Microsoft's v1.28.2 file), ships beside
+    /// THIRD-PARTY-NOTICES.txt in every Windows and macOS build, and THIRD-PARTY-NOTICES.txt points to it.
+    /// </summary>
+    [Fact]
+    public void ONNX_Runtime_notices_are_in_the_repository_ship_beside_THIRD_PARTY_NOTICES_and_are_pointed_to()
+    {
+        var file = Repo("packaging", "notices", "onnxruntime-ThirdPartyNotices.txt");
+        Assert.True(File.Exists(file), $"{file} is missing");
+        var text = File.ReadAllText(file).Replace("\r\n", "\n"); // the hash is of the LF form, whatever a checkout does to line endings
+        Assert.Equal("0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2",
+            Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))));
+        Assert.Contains("ships\nunchanged, except for line endings, beside this file as onnxruntime-ThirdPartyNotices.txt", Notices.Replace("\r\n", "\n"));
+        var publish = File.ReadAllText(Repo("scripts", "publish.ps1"));
+        Assert.Contains(@"Copy-Item -LiteralPath (Join-Path $root ""packaging\notices\onnxruntime-ThirdPartyNotices.txt"") -Destination $out", publish);
+        Assert.Contains(@"""THIRD-PARTY-NOTICES.txt"", ""onnxruntime-ThirdPartyNotices.txt""", publish); // in the required list: a publish without it fails
+        var mac = File.ReadAllText(Repo("scripts", "publish-mac.sh"));
+        Assert.Contains(@"cp packaging/notices/onnxruntime-ThirdPartyNotices.txt ""$resources/onnxruntime-ThirdPartyNotices.txt""", mac);
+        Assert.Contains("Contents/Resources/onnxruntime-ThirdPartyNotices.txt; do", mac);
+    }
 }
