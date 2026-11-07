@@ -29,10 +29,10 @@ public static class MeetingCrypto
     public static byte[] NewContentKey() => RandomNumberGenerator.GetBytes(32);
 
     public static KeyWrap Wrap(byte[] contentKey, byte[] recipientKey, string recipientId)
-        => Wrap(contentKey, recipientKey, recipientId, RandomNumberGenerator.GetBytes(12));
+        => WrapWithFixedNonceForFixture(contentKey, recipientKey, recipientId, RandomNumberGenerator.GetBytes(12));
 
     // Explicit deterministic seam for conformance tests; production callers always use the random overload.
-    internal static KeyWrap Wrap(byte[] contentKey, byte[] recipientKey, string recipientId, byte[] nonce)
+    internal static KeyWrap WrapWithFixedNonceForFixture(byte[] contentKey, byte[] recipientKey, string recipientId, byte[] nonce)
     {
         if (contentKey.Length != 32) throw new ArgumentException("Invalid content key.");
         ArgumentOutOfRangeException.ThrowIfNotEqual(nonce.Length, 12, nameof(nonce));
@@ -66,10 +66,10 @@ public static class MeetingCrypto
         AtomicFile.Write(cipherPath, output => Encrypt(input, output, key, identity));
 
     internal static void Encrypt(Stream input, Stream output, byte[] key, string identity)
-        => Encrypt(input, output, key, identity, RandomNumberGenerator.GetBytes);
+        => EncryptWithFixtureBytes(input, output, key, identity, RandomNumberGenerator.GetBytes);
 
     // No global RNG replacement: only test callers supply a deterministic byte source.
-    internal static void Encrypt(Stream input, Stream output, byte[] key, string identity, Func<int, byte[]> randomBytes)
+    internal static void EncryptWithFixtureBytes(Stream input, Stream output, byte[] key, string identity, Func<int, byte[]> randomBytes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
         // The caller's identity binds the meeting and file role; the random header binds this
@@ -119,21 +119,28 @@ public static class MeetingCrypto
 
     public static Stream OpenDecrypted(string cipherPath, byte[] contentKey, string identity) => new DecryptedStream(cipherPath, contentKey, identity);
 
-    internal static IMeetingAudioWriter BeginAudio(string path, byte[] content, string identity, Action completed) => new AudioWriter(path, content, identity, completed);
+    internal static IMeetingAudioWriter BeginAudio(string path, byte[] content, string identity, Action completed)
+        => BeginAudioWithFixtureBytes(path, content, identity, completed, RandomNumberGenerator.GetBytes);
+    // Deterministic conformance seam, scoped to one writer; production always uses the random overload.
+    internal static IMeetingAudioWriter BeginAudioWithFixtureBytes(string path, byte[] content, string identity, Action completed, Func<int, byte[]> randomBytes)
+        => new AudioWriter(path, content, identity, completed, randomBytes);
     internal static Stream OpenChunkedAudio(string path, byte[] content, string identity, bool incomplete) => new DecryptedStream(path, content, identity, true, incomplete);
 
     private sealed class AudioWriter : IMeetingAudioWriter
     {
         private readonly FileStream _output;
         private readonly AesGcm _aes;
-        private readonly byte[] _header = "DCTMAUD\u0001"u8.ToArray().Concat(RandomNumberGenerator.GetBytes(16)).ToArray();
+        private readonly byte[] _header;
+        private readonly Func<int, byte[]> _randomBytes;
         private readonly string _identity;
         private readonly Action _completed;
         private long _sequence;
         private bool _ended, _failed, _completionMarked;
         private long? _terminalStart;
-        internal AudioWriter(string path, byte[] content, string identity, Action completed)
+        internal AudioWriter(string path, byte[] content, string identity, Action completed, Func<int, byte[]> randomBytes)
         {
+            _randomBytes = randomBytes;
+            _header = "DCTMAUD\u0001"u8.ToArray().Concat(randomBytes(16)).ToArray();
             _identity = identity; _completed = completed;
             _aes = new AesGcm(content, 16);
             try
@@ -163,11 +170,11 @@ public static class MeetingCrypto
             try
             {
                 var aad = Aad(_header, _sequence, plain.Length, _identity);
-                var nonce = RandomNumberGenerator.GetBytes(12);
+                var nonce = _randomBytes(12);
                 var cipher = new byte[plain.Length]; var tag = new byte[16];
                 _aes.Encrypt(nonce, plain, cipher, tag, aad);
                 // Authenticate framing before treating a short payload as a torn final write.
-                var frameNonce = RandomNumberGenerator.GetBytes(12); var frameTag = new byte[16];
+                var frameNonce = _randomBytes(12); var frameTag = new byte[16];
                 _aes.Encrypt(frameNonce, ReadOnlySpan<byte>.Empty, Span<byte>.Empty, frameTag, aad);
                 _output.Write(aad.AsSpan(_header.Length + 8, 4));
                 _output.Write(frameNonce); _output.Write(frameTag);
