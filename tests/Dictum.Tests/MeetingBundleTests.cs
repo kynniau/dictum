@@ -252,6 +252,9 @@ public sealed class MeetingBundleTests
     [Fact]
     public async Task Failure_after_staging_leaves_no_plaintext_meta_behind()
     {
+        // The failure is produced by holding a file open so the folder rename fails, and the scrub is observed through a
+        // kernel32 hard link: both are Windows behaviour (on macOS an open file does not block the rename).
+        Assert.SkipWhen(!OperatingSystem.IsWindows(), TestEnv.HeldOpen);
         using var source = new MeetingFixture(); using var target = new MeetingFixture();
         var id = source.Populate(source.Store()); var path = Export(source, id);
         var staging = Path.Combine(target.Root, ".import-" + id.Value);
