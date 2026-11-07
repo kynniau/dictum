@@ -67,9 +67,31 @@ public sealed partial class FileMeetingStore
         {
             RefuseExistingBundle(meta.Id);
             JsonWrite(Path.Combine(staged, "meta.json"), meta);
+            // meta.json carries a valid owner wrap: every removal of staging goes through DiscardStaging, which scrubs it first.
             Directory.Move(staged, Folder(meta.Id));
             try { RebuildIndex(); }
             catch { Directory.Move(Folder(meta.Id), staged); throw; }
+        }
+    }
+    /// <summary>
+    /// Removes a bundle staging folder (or a stray file at its path), zero-filling plaintext metadata and atomic-write
+    /// temporaries first, as <see cref="Delete"/> does. Missing staging is not an error.
+    /// </summary>
+    internal void DiscardStaging(string staged)
+    {
+        lock (Gate)
+        {
+            var full = Path.GetFullPath(staged);
+            if (!Path.GetFileName(full).StartsWith(".import-", StringComparison.Ordinal) ||
+                !string.Equals(Path.GetDirectoryName(full), Root.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Invalid bundle staging folder.");
+            if (File.Exists(full)) { Scrub(full); File.Delete(full); return; }
+            if (!Directory.Exists(full)) return;
+            foreach (var plain in Directory.GetFiles(full, "meta.json*"))
+                Scrub(plain);
+            foreach (var temp in Directory.GetFiles(full, "*.tmp"))
+                Scrub(temp);
+            Directory.Delete(full, true);
         }
     }
 }

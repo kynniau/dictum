@@ -1,16 +1,29 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Dictum.Core;
 using Dictum.Meetings.Store;
 using Dictum.Meetings.Transcribe;
 
 namespace Dictum.Meetings.Import;
 
-public sealed record BundleInfo(MeetingId MeetingId, int FileCount, long Bytes, string Platform, string AppVersion);
+public sealed record BundleInfo(MeetingId MeetingId, int FileCount, long Bytes, string Platform, string AppVersion)
+{
+    /// <summary>The agreement recorded on the device that made the bundle (design A.6 step 3); set only after decrypt-verify.</summary>
+    public Agreement? OriginAgreement { get; init; }
+    /// <summary>The origin device's confirmation history, decrypted after verification, shown before the import confirmation.</summary>
+    internal IReadOnlyList<MeetingConfirmation> OriginConfirmations { get; init; } = [];
+}
 
-public sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber transcriber,
+/// <summary>The import notice was refused, cancelled or abandoned: the import ends as cancelled, with no trace left.</summary>
+public sealed class BundleImportDeclinedException() : OperationCanceledException("The import confirmation was not given.");
+
+/// <param name="approvedScriptVersion">The approved notice version the UI shows; the confirmation must carry exactly this.</param>
+/// <param name="approvedScript">The exact import notice the UI shows for a route; the confirmation's script must equal it for its route.</param>
+internal sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber transcriber,
     Func<BundleInfo, string, CancellationToken, Task<Agreement?>> confirmImport,
-    Func<Agreement, IDisposable>? useConfirmedRoute = null)
+    string approvedScriptVersion, Func<MeetingProcessingRoute, string> approvedScript,
+    Func<Agreement, IDisposable>? useConfirmedRoute = null, ILog? log = null)
 {
     // simplification: one staged bundle import per process; retire for concurrent import queues.
     private static readonly SemaphoreSlim ImportGate = new(1, 1);
@@ -51,7 +64,8 @@ public sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber t
             ct.ThrowIfCancellationRequested();
             owner = store.BundleOwnerKey();
             var target = Path.Combine(store.Root, ".import-" + info.MeetingId.Value);
-            if (Directory.Exists(target) || File.Exists(target)) throw BundleFormat.Invalid();
+            // A leftover from a killed import of this id: scrub its plaintext metadata, remove it and start again.
+            store.DiscardStaging(target);
             Directory.CreateDirectory(target);
             staged = target;
             progress?.Report(BundleText.PROPOSED_Verifying);
@@ -68,11 +82,13 @@ public sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber t
             var confirmations = manifest.Files.Any(f => f.Name == "confirmations.json.enc")
                 ? Read<MeetingConfirmation[]>(staged, meta.Id, "confirmations.json.enc", content) : [];
             ct.ThrowIfCancellationRequested();
-            var agreement = await confirmImport(info, importerIdentity, ct).ConfigureAwait(false);
-            var confirmation = agreement?.Confirmation;
+            var agreement = await confirmImport(info with { OriginAgreement = meta.Agreement, OriginConfirmations = confirmations },
+                importerIdentity, ct).ConfigureAwait(false);
+            if (agreement is null) throw new BundleImportDeclinedException();
+            var confirmation = agreement.Confirmation;
             if (agreement is not { Kind: AgreementKind.Import } || confirmation is not { Kind: AgreementKind.Import, Route.KeepAudio: not null } ||
                 string.IsNullOrWhiteSpace(importerIdentity) || confirmation.ImporterIdentity != importerIdentity ||
-                string.IsNullOrWhiteSpace(confirmation.Script) || string.IsNullOrWhiteSpace(confirmation.ScriptVersion) ||
+                confirmation.ScriptVersion != approvedScriptVersion || confirmation.Script != approvedScript(confirmation.Route) ||
                 confirmation.Answer is not ("spoken" or "written"))
                 throw new InvalidOperationException(BundleText.PROPOSED_ConfirmationRequired);
             using var route = useConfirmedRoute?.Invoke(agreement);
@@ -103,7 +119,15 @@ public sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber t
         {
             CryptographicOperations.ZeroMemory(content);
             if (owner is not null) CryptographicOperations.ZeroMemory(owner);
-            if (staged is not null && Directory.Exists(staged)) Directory.Delete(staged, true);
+            if (staged is not null)
+            {
+                // A cleanup failure must not replace the import's own exception.
+                try { store.DiscardStaging(staged); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    log?.Warn($"Bundle import staging could not be removed and was left at {staged} ({error.GetType().Name}).");
+                }
+            }
         }
     }
     private static T Read<T>(string folder, MeetingId id, string name, byte[] content)

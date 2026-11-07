@@ -53,6 +53,7 @@ public sealed partial class AppShell
         () => Platform.CreateCapture(_log), MeetingSummaryClient, CopyText, Platform.AudioDecoder) with
         {
             Log = _log,
+            CopyOutOfHistory = CopySecret,
             LocalSummaryModel = EffectiveMeetingSummaryModel,
             RemoteSummaryModel = () => _settings.Llm.Provider == LlmSettings.Anthropic && CleanupCatalog.IsValidSetting(_settings.Llm.Model)
                 ? LlmSettings.AnthropicDefaultModel : _settings.Llm.Model,

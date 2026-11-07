@@ -1,9 +1,11 @@
+using System.Globalization;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Dictum.Meetings;
+using Dictum.Meetings.Import;
 using Dictum.Meetings.Store;
 using static Dictum.UI.Views.Meetings.MeetingsText;
 
@@ -12,16 +14,47 @@ namespace Dictum.UI.Views.Meetings;
 internal sealed partial class MeetingsWindow
 {
     private Button? _bundleImportButton;
+
+    /// <summary>The notice text shown before recording or import; a pure function of the route, so the bundle importer can require it exactly.</summary>
+    internal static string NoticeScript(bool importing, bool systemAudio, MeetingProcessingRoute route)
+    {
+        var summaryRoute = route.SummaryEngine switch { SummaryEngine.Ollama => APPROVED_Ollama, SummaryEngine.OwnKey => string.Format(APPROVED_OwnKey, route.SummaryHost ?? PROPOSED_UnconfiguredProvider), _ => APPROVED_Local };
+        if (route.SummaryEngine == SummaryEngine.Ollama && route.SummaryHost is not null)
+            summaryRoute += Environment.NewLine + string.Format(PROPOSED_SummaryHost, route.SummaryHost);
+        if (route.SummaryEngine == SummaryEngine.Local && route.SummaryModel is { } localModel)
+            summaryRoute += Environment.NewLine + string.Format(PROPOSED_LocalSummaryModel, localModel);
+        summaryRoute = (route.SpeechHost is { } speechHost ? string.Format(APPROVED_CloudSpeech, speechHost)
+            : APPROVED_LocalSpeech) + Environment.NewLine + summaryRoute;
+        var retention = route.KeepAudio == KeepAudio.Forever ? APPROVED_KeepForever
+            : string.Format(APPROVED_KeepDays, route.KeepAudio == KeepAudio.Days30 ? 30 : 90);
+        return string.Join("\n\n", importing ? APPROVED_ImportAgreement : APPROVED_Agreement,
+            importing ? "" : (systemAudio ? APPROVED_CaptureSystem : APPROVED_CaptureMicrophone),
+            importing ? "" : APPROVED_Uses, APPROVED_Access, summaryRoute, retention, APPROVED_ConfirmationNote);
+    }
+    internal static string BundleImportScript(MeetingProcessingRoute route) => NoticeScript(true, false, route);
+
+    /// <summary>One line of a meeting record, in the approved record wording.</summary>
+    internal static string RecordText(AgreementKind kind, DateTimeOffset at, string how) => string.Format(APPROVED_Record,
+        kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind, at.ToLocalTime(),
+        how switch { "written" => APPROVED_Written, "platform-announced" => PROPOSED_Platform, _ => APPROVED_Spoken });
+
+    /// <summary>The origin device's recorded agreement and confirmations (design A.6 step 3), shown before the import notice.</summary>
+    private static Control OriginRecord(BundleInfo info)
+    {
+        var lines = info.OriginAgreement is { } agreement ? [RecordText(agreement.Kind, agreement.AcknowledgedAt, agreement.How)] : new List<string>();
+        lines.AddRange(info.OriginConfirmations.Select(c => RecordText(c.Kind, c.At, c.Answer)));
+        return Ui.Card(Ui.Stack(8, (lines.Count == 0 ? [PROPOSED_NotesText] : lines).Select(line => (Control)Ui.Text(line)).ToArray()), PROPOSED_Record);
+    }
+
+    /// <summary>The suggested bundle file name: no title, people or words from the meeting, only its local start date and a short id.</summary>
+    internal static string SuggestedBundleName(MeetingMeta meta) =>
+        PROPOSED_BundleSlug + "-" + meta.StartedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "-" + meta.Id.Value[..8] + ".dictum";
+
     private async Task MoveBundle(MeetingId id)
     {
         await Work(async () =>
         {
-            var title = _host.Store.Read(id).Title.ToLowerInvariant();
-            var slug = string.Join('-', title.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-                .Select(word => new string(word.Where(char.IsAsciiLetterOrDigit).ToArray())).Where(word => word.Length != 0));
-            if (slug.Length == 0) slug = PROPOSED_BundleSlug;
-            slug = slug[..Math.Min(slug.Length, 80)];
-            var name = slug + "-" + id.Value + ".dictum";
+            var name = SuggestedBundleName(_host.Store.Read(id));
             string? destination;
             if (_host.ChooseBundleDestination is { } choose) destination = await choose(name);
             else
@@ -39,7 +72,7 @@ internal sealed partial class MeetingsWindow
             Screen(Ui.Heading(PROPOSED_TransferCode), Named(new TextBlock
                 { Text = code, FontSize = 28, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, PROPOSED_TransferCode),
                 Ui.Text(PROPOSED_BundleNeedsCode), Ui.Text(PROPOSED_SendCodeSeparately),
-                SafeButton(PROPOSED_CopyCode, () => { _host.Copy(code); Say(PROPOSED_Copied); }),
+                SafeButton(PROPOSED_CopyCode, () => { _host.CopyOutOfHistory(code); Say(PROPOSED_Copied); }),
                 SafeButton(PROPOSED_Done, () => ShowMeeting(id)));
         });
     }
@@ -68,7 +101,7 @@ internal sealed partial class MeetingsWindow
 
     internal void ShowBundleCode(string path)
     {
-        var info = _host.CreateBundleImporter((_, _, _) => Task.FromResult<Agreement?>(null)).Inspect(path);
+        var info = _host.CreateBundleImporter((_, _, _) => Task.FromResult<Agreement?>(null), ApprovedScriptVersion, BundleImportScript).Inspect(path);
         var boxes = Enumerable.Range(1, 6).Select(i => Named(new TextBox { MinWidth = 76, MaxWidth = 120 }, string.Format(PROPOSED_CodeWord, i))).ToArray();
         for (var i = 0; i < boxes.Length; i++)
         {
@@ -94,9 +127,10 @@ internal sealed partial class MeetingsWindow
     private async Task ImportBundle(string path, string code, CancellationToken ct)
     {
         _busy = true; _screen.IsEnabled = false;
+        var declined = false;
         try
         {
-            var importer = _host.CreateBundleImporter(async (_, _, cancellation) =>
+            var importer = _host.CreateBundleImporter(async (info, _, cancellation) =>
             {
                 var answer = new TaskCompletionSource<Agreement?>(TaskCreationOptions.RunContinuationsAsynchronously);
                 using var registration = cancellation.Register(() => answer.TrySetCanceled(cancellation));
@@ -105,12 +139,13 @@ internal sealed partial class MeetingsWindow
                     _busy = false; _screen.IsEnabled = true;
                     BeginImportAgreement(path, agreement =>
                     {
+                        declined = agreement is null;
                         _importRoute = agreement?.Confirmation?.Route;
                         answer.TrySetResult(agreement);
-                    });
+                    }, () => OriginRecord(info));
                 });
                 return await answer.Task.ConfigureAwait(false);
-            });
+            }, ApprovedScriptVersion, BundleImportScript);
             var progress = new Progress<string>(text =>
             {
                 _screen.IsEnabled = true;
@@ -121,7 +156,8 @@ internal sealed partial class MeetingsWindow
             var id = await Task.Run(() => importer.ImportAsync(path, code, Environment.UserName, progress, ct), ct);
             if (!_exitPending) ShowMeeting(id);
         }
-        catch (OperationCanceledException) { if (!_exitPending) ShowList(); }
+        // A declined notice already chose the next screen (list, notes, or Meetings turned off).
+        catch (OperationCanceledException) { if (!declined && !_exitPending) ShowList(); }
         catch (InvalidOperationException error) when (error.Message == BundleText.PROPOSED_ConfirmationRequired) { }
         catch (Exception error) { BundleFailure(error); }
         finally

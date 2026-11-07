@@ -43,7 +43,7 @@ public sealed partial class MeetingsWorkflowUiTests
         Assert.True(move.Focus(NavigationMethod.Tab)); Assert.True(move.IsFocused);
         Click(window, PROPOSED_MoveToAnotherDevice); Click(Assert.Single(window.OwnedWindows), APPROVED_ShareContinue);
         await Until(() => Texts(window).Contains(PROPOSED_BundleNeedsCode) && window.IsEnabled);
-        Click(window, PROPOSED_CopyCode); var code = fixture.Copied!;
+        Click(window, PROPOSED_CopyCode); var code = fixture.CopiedOutOfHistory!; Assert.Null(fixture.Copied);
         Assert.Equal(6, code.Split(' ').Length); Assert.True(Find(window, PROPOSED_CopyCode).Focusable);
         Click(window, PROPOSED_Done); window.Close();
         var incoming = new MeetingsWindow(recipient.Host with { ChooseBundle = () => Task.FromResult<string?>(path) });
@@ -58,6 +58,8 @@ public sealed partial class MeetingsWorkflowUiTests
         await Until(() => Texts(incoming).Contains(APPROVED_EnableImportsTitle));
         Click(incoming, APPROVED_EnableImports);
         Assert.Contains(APPROVED_ImportAgreement, Texts(incoming)); Assert.Empty(recipient.Store.List());
+        var origin = fixture.Store.Read(id).Agreement!; // the origin record, in the approved record wording, above the notice
+        Assert.Contains(MeetingsWindow.RecordText(origin.Kind, origin.AcknowledgedAt, origin.How), Texts(incoming));
         Click(incoming, APPROVED_Import);
         await Until(() => Texts(incoming).Contains(PROPOSED_Transcript) && incoming.IsEnabled);
         Assert.Equal(id, Assert.Single(recipient.Store.List()).Id);
@@ -203,7 +205,7 @@ public sealed partial class MeetingsWorkflowUiTests
         public MeetingsHost Host { get; }
         public int Imports;
         public bool ImportsEnabled;
-        public string? Copied;
+        public string? Copied, CopiedOutOfHistory;
         public Fixture()
         {
             Directory.CreateDirectory(Files.Root);
@@ -222,6 +224,7 @@ public sealed partial class MeetingsWorkflowUiTests
                 (_, _) => { }, _ => Task.FromResult<bool?>(null), () => false, () => { })
             {
                 ImportsEnabled = () => ImportsEnabled,
+                CopyOutOfHistory = text => CopiedOutOfHistory = text,
                 EnableImports = () => ImportsEnabled = true,
                 SaveConfirmation = ((MeetingsHost.CurrentSettingsStore)Store).WriteConfirmation,
                 ReadConfirmations = ((MeetingsHost.CurrentSettingsStore)Store).ReadConfirmations,

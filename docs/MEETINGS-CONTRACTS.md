@@ -624,8 +624,9 @@ THIRD-PARTY notices, CloudPolicy, approved strings) are off limits to every lane
 ### 14.A Portable bundle
 
 Design A uses one ZIP archive per meeting, with extension `.dictum`. The UI suggests
-`<title-slug>-<32-lowercase-hex-id>.dictum`. Slugs contain lowercase ASCII letters,
-digits and hyphens, at most 80 characters; an empty slug becomes `meeting`.
+`meeting-<yyyy-MM-dd>-<first 8 hex characters of the id>.dictum`, where the date is the
+meeting's local start date. The file name carries no title, names or other words from the
+meeting: a file name is visible wherever the bundle travels, outside its encryption.
 ZIP entry names are case-sensitive, flat and unique (including case-insensitive
 uniqueness). No directory entries, path separators, alternate streams or extra
 attachments are accepted. ZIP compression may be stored or deflated. Export uses
@@ -696,17 +697,27 @@ Import holds the source ZIP open against concurrent writes. It derives and unwra
 before creating any destination directory, extracts ciphertext to `<root>/.import-<id>`,
 and decrypt-verifies every file through the store's existing verify-before-release
 passes, including the same incomplete chunked-audio snapshot verification as OpenAudio.
-Only then does it request the existing L5 import agreement, including the approved
-script, answer, time, script version, importer identity and confirmed processing route.
-No meeting is listed before that agreement. The gate requires Kind Import, a spoken
-or written answer, a nonblank script/version, matching importer identity and a route
-with retention. The UI supplies the unchanged approved script and checks route changes.
+Only then does it read the verified `meta.json.enc` and `confirmations.json.enc` and show
+the importer the recorded `Agreement` and the origin device's confirmations, in the
+existing approved record wording (no new consent text), above the existing L5 import
+agreement, including the approved script, answer, time, script version, importer
+identity and confirmed processing route. No meeting is listed before that agreement.
+The gate requires Kind Import, a spoken or written answer, matching importer identity,
+a route with retention, the exact approved script version the UI supplies, and a script
+exactly equal to the approved import notice the UI composes for the confirmed route.
+The UI supplies the unchanged approved script and checks route changes. A missing
+confirmation (refused, cancelled, the window closing, or Meetings turned off while the
+notice is open) ends the import as cancelled, with no trace left.
 
 After confirmation, import appends the encrypted confirmation history, creates an
 empty encrypted transcript snapshot if missing, removes the transfer metadata entry,
 writes local `meta.json` with a fresh owner wrap, renames to `<root>/<id>`, and rebuilds
-the index under the store gate. Staging is deleted on failure or cancellation; a failure
-after publication rolls the imported meeting back. An existing transcript is retained.
+the index under the store gate. Staging is removed on failure or cancellation, after
+zero-filling its plaintext `meta.json` (which holds a valid owner wrap) and any
+atomic-write temporaries; a staging folder left by a killed import of the same id is
+removed the same way at the start of the next import. A failure to remove staging is
+logged with its path and never replaces the import's own error. A failure after
+publication rolls the imported meeting back. An existing transcript is retained.
 Audio with an empty or absent transcript is passed in bounded PCM parts to the existing
 transcriber under the confirmed route, reusing L5's FileSource pause segmenter in
 bounded 30-second decoded windows. A segment ends at each window boundary until

@@ -4,7 +4,7 @@ namespace Dictum.Meetings.Store;
 
 public static class TransferCode
 {
-    // BIP-39 English word list, MIT, bitcoin/bips/bip-0039/english.txt.
+    // BIP-39 English word list, MIT, trezor/python-mnemonic src/mnemonic/wordlist/english.txt (see transfer-words.LICENSE).
     // Only the dictionary is reused; transfer codes are six independent random words, with no BIP-39 checksum.
     private static readonly string[] Words = LoadWords();
     private static string[] LoadWords()

@@ -49,9 +49,12 @@ internal sealed record MeetingsHost(
     public Func<Task<string?>>? ChooseImport { get; init; }
     public Func<Task<string?>>? ChooseBundle { get; init; }
     public Func<string, Task<string?>>? ChooseBundleDestination { get; init; }
-    internal BundleImporter CreateBundleImporter(Func<BundleInfo, string, CancellationToken, Task<Agreement?>> confirm) =>
+    internal BundleImporter CreateBundleImporter(Func<BundleInfo, string, CancellationToken, Task<Agreement?>> confirm,
+        string approvedScriptVersion, Func<MeetingProcessingRoute, string> approvedScript) =>
         new(Store is CurrentSettingsStore current ? current.BundleStore : (FileMeetingStore)Store, Transcriber, confirm,
-            agreement => UseConfirmedRoute(agreement.Confirmation!.Route!));
+            approvedScriptVersion, approvedScript, agreement => UseConfirmedRoute(agreement.Confirmation!.Route!), Log);
+    /// <summary>Copies a secret (the bundle transfer code) so it never enters clipboard history or cloud clipboard sync.</summary>
+    public Action<string> CopyOutOfHistory { get; init; } = _ => throw new InvalidOperationException("A clipboard kept out of history is required.");
     public Func<IAudioCapture?> LoopbackCapture { get; init; } = () => null;
     public Func<bool> ImportsEnabled { get; init; } = () => false;
     public Action EnableImports { get; init; } = () => { };

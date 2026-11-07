@@ -9,6 +9,8 @@ using Dictum.Meetings.Store;
 using Dictum.Meetings.Transcribe;
 using Dictum.Audio;
 using Dictum.Transcribe;
+using Dictum.Core;
+using Dictum.UI.Views.Meetings;
 using static Dictum.UI.Views.Meetings.MeetingsText;
 
 namespace Dictum.Tests;
@@ -22,14 +24,16 @@ public sealed class MeetingBundleTests
         files.Store().ExportBundle(id, path, Code);
         return path;
     }
+    private static readonly MeetingProcessingRoute Route = new(null, SummaryEngine.Local, null, KeepAudio.Forever);
     private static Agreement Confirm(string identity) => new(DateTimeOffset.UtcNow, "written", ApprovedScriptVersion, AgreementKind.Import)
     {
         Confirmation = new("written", DateTimeOffset.UtcNow, AgreementKind.Import, ApprovedScriptVersion,
-            APPROVED_ImportAgreement, identity, new(null, SummaryEngine.Local, null, KeepAudio.Forever)),
+            MeetingsWindow.BundleImportScript(Route), identity, Route),
     };
     private static BundleImporter Importer(MeetingFixture destination,
-        Func<BundleInfo, string, CancellationToken, Task<Agreement?>>? confirm = null, IMeetingTranscriber? transcriber = null) =>
-        new(destination.Store(), transcriber ?? new FakeTranscriber(destination.Store()), confirm ?? ((_, identity, _) => Task.FromResult<Agreement?>(Confirm(identity))));
+        Func<BundleInfo, string, CancellationToken, Task<Agreement?>>? confirm = null, IMeetingTranscriber? transcriber = null, ILog? log = null) =>
+        new(destination.Store(), transcriber ?? new FakeTranscriber(destination.Store()), confirm ?? ((_, identity, _) => Task.FromResult<Agreement?>(Confirm(identity))),
+            ApprovedScriptVersion, MeetingsWindow.BundleImportScript, log: log);
     private static byte[] Entry(ZipArchive zip, string name)
     {
         using var input = zip.GetEntry(name)!.Open(); using var copy = new MemoryStream(); input.CopyTo(copy); return copy.ToArray();
@@ -84,11 +88,26 @@ public sealed class MeetingBundleTests
         target.Store().ExportBundle(id, Path.Combine(target.Root, "again.dictum"), Code);
     }
 
+    private static void AssertAbsent(byte[] haystack, byte[] needle, string what) =>
+        Assert.True(haystack.AsSpan().IndexOf(needle) < 0, what + " appears in the raw bundle bytes");
+
     [Fact]
     public void Bundle_contains_no_owner_wrap_and_no_plaintext_meta()
     {
         using var source = new MeetingFixture(); var id = source.Populate(source.Store());
-        using var zip = ZipFile.OpenRead(Export(source, id));
+        var bundle = Export(source, id);
+        // The raw .dictum bytes, as anyone holding the file sees them: no title, transcript, code word or owner wrap.
+        var raw = File.ReadAllBytes(bundle);
+        AssertAbsent(raw, Encoding.UTF8.GetBytes(source.Store().Read(id).Title), "the title");
+        AssertAbsent(raw, Encoding.UTF8.GetBytes(MeetingFixture.TranscriptText), "a transcript phrase");
+        AssertAbsent(raw, Encoding.UTF8.GetBytes("budget review"), "a transcript phrase");
+        foreach (var word in Code.Split(' ')) AssertAbsent(raw, Encoding.UTF8.GetBytes(word), "the transfer code word " + word);
+        foreach (var wrap in source.Store().Read(id).Wraps)
+        {
+            AssertAbsent(raw, wrap.WrappedKey, "an owner wrap");
+            AssertAbsent(raw, Encoding.ASCII.GetBytes(Convert.ToBase64String(wrap.WrappedKey)), "an owner wrap in base64");
+        }
+        using var zip = ZipFile.OpenRead(bundle);
         Assert.Null(zip.GetEntry("meta.json"));
         var manifest = Encoding.UTF8.GetString(Entry(zip, "manifest.json"));
         Assert.DoesNotContain(source.Store().Read(id).Title, manifest);
@@ -186,13 +205,107 @@ public sealed class MeetingBundleTests
             Assert.False(File.Exists(target.At(id, "meta.json")));
             return Task.FromResult<Agreement?>(null);
         });
-        await Assert.ThrowsAsync<InvalidOperationException>(() => importer.ImportAsync(path, Code, "test"));
-        Assert.Equal(1, prompts); Assert.Empty(target.Store().List());
+        // No confirmation is a cancelled import, with no trace left.
+        await Assert.ThrowsAsync<BundleImportDeclinedException>(() => importer.ImportAsync(path, Code, "test"));
+        Assert.Equal(1, prompts); Assert.Empty(Directory.GetDirectories(target.Root)); Assert.Empty(target.Store().List());
         await Importer(target).ImportAsync(path, Code, "test");
         Assert.Equal(id, Assert.Single(target.Store().List()).Id);
         var confirmation = Assert.Single(Confirmations(target, id));
         Assert.Equal(AgreementKind.Import, confirmation.Kind); Assert.Equal("test", confirmation.ImporterIdentity);
-        Assert.Equal(APPROVED_ImportAgreement, confirmation.Script); Assert.Equal(ApprovedScriptVersion, confirmation.ScriptVersion);
+        Assert.Equal(MeetingsWindow.BundleImportScript(Route), confirmation.Script); Assert.Equal(ApprovedScriptVersion, confirmation.ScriptVersion);
+        Assert.StartsWith(APPROVED_ImportAgreement, confirmation.Script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Import_confirmation_screen_receives_the_origin_agreement_and_confirmations()
+    {
+        using var source = new MeetingFixture(); using var target = new MeetingFixture();
+        var id = source.Populate(source.Store());
+        var original = new MeetingsHost.CurrentSettingsStore(source.Root, () => new(), source.Keyring);
+        var recorded = new MeetingConfirmation("spoken", MeetingFixture.Started, AgreementKind.Live, ApprovedScriptVersion, "Synthetic original notice");
+        original.WriteConfirmation(id, recorded);
+        BundleInfo? shown = null;
+        await Importer(target, (info, identity, _) => { shown = info; return Task.FromResult<Agreement?>(Confirm(identity)); })
+            .ImportAsync(Export(source, id), Code, "test");
+        Assert.NotNull(shown);
+        Assert.Equal(source.Store().Read(id).Agreement, shown!.OriginAgreement);
+        Assert.NotNull(shown.OriginAgreement);
+        Assert.Equal(recorded, Assert.Single(shown.OriginConfirmations));
+    }
+
+    [Fact]
+    public async Task A_stale_staging_folder_from_a_killed_import_is_removed_and_the_import_succeeds()
+    {
+        using var source = new MeetingFixture(); using var target = new MeetingFixture();
+        var id = source.Populate(source.Store()); var path = Export(source, id);
+        var stale = Path.Combine(target.Root, ".import-" + id.Value);
+        Directory.CreateDirectory(stale);
+        File.WriteAllText(Path.Combine(stale, "meta.json"), "{\"synthetic\":\"left by a killed import\"}");
+        File.WriteAllBytes(Path.Combine(stale, "meta.json.0123.tmp"), [1, 2, 3]);
+        File.WriteAllBytes(Path.Combine(stale, "transcript.json.enc"), [4, 5, 6]);
+        Assert.Equal(id, await Importer(target).ImportAsync(path, Code, "test"));
+        Assert.False(Directory.Exists(stale));
+        Assert.Equal(id, Assert.Single(target.Store().List()).Id);
+        Assert.Equal(source.Store().ReadTranscript(id), target.Store().ReadTranscript(id));
+    }
+
+    [Fact]
+    public async Task Failure_after_staging_leaves_no_plaintext_meta_behind()
+    {
+        using var source = new MeetingFixture(); using var target = new MeetingFixture();
+        var id = source.Populate(source.Store()); var path = Export(source, id);
+        var staging = Path.Combine(target.Root, ".import-" + id.Value);
+        var log = new LinesLog(); FileStream? held = null;
+        try
+        {
+            // A handle held inside staging makes the rename to <root>/<id> fail (after meta.json is written) and the staging
+            // delete fail too: the rename's own error must surface, and the leftover is logged.
+            var importer = Importer(target, (_, identity, _) =>
+            {
+                held = new FileStream(Path.Combine(staging, "0-held.bin"), FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                return Task.FromResult<Agreement?>(Confirm(identity));
+            }, log: log);
+            var error = await Assert.ThrowsAnyAsync<Exception>(() => importer.ImportAsync(path, Code, "test"));
+            Assert.True(error is IOException or UnauthorizedAccessException, error.ToString());
+            Assert.Contains(".import-" + id.Value, error.Message, StringComparison.Ordinal); // the rename's error, not a cleanup error
+            Assert.False(Directory.Exists(Path.Combine(target.Root, id.Value)));
+            Assert.Contains(log.Lines, line => line.Contains(staging, StringComparison.Ordinal));
+            // Only the held file survives: no plaintext metadata or temporaries are left in the leftover staging.
+            Assert.Equal(["0-held.bin"], Directory.GetFileSystemEntries(staging).Select(Path.GetFileName));
+            Assert.Empty(target.Store().List());
+        }
+        finally { held?.Dispose(); }
+        // Removal zero-fills plaintext metadata and temporaries first: a hard link outside staging sees the same file data.
+        var leftover = Path.Combine(target.Root, ".import-" + MeetingId.New().Value);
+        Directory.CreateDirectory(leftover);
+        var links = new[] { "meta.json", "meta.json.0123.tmp" }.Select((name, i) =>
+        {
+            File.WriteAllText(Path.Combine(leftover, name), "{\"Wraps\":[\"synthetic owner wrap\"]}");
+            var link = Path.Combine(target.Root, "link-" + i);
+            Assert.True(CreateHardLink(link, Path.Combine(leftover, name), IntPtr.Zero));
+            return link;
+        }).ToArray();
+        target.Store().DiscardStaging(leftover);
+        Assert.False(Directory.Exists(leftover));
+        foreach (var link in links)
+        {
+            var bytes = File.ReadAllBytes(link);
+            Assert.NotEmpty(bytes); Assert.All(bytes, b => Assert.Equal(0, b));
+            File.Delete(link);
+        }
+        // The next import clears the earlier leftover and succeeds.
+        Assert.Equal(id, await Importer(target).ImportAsync(path, Code, "test"));
+        Assert.False(Directory.Exists(staging));
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
+
+    private sealed class LinesLog : ILog
+    {
+        public List<string> Lines { get; } = [];
+        public void Write(LogLevel level, string message) { lock (Lines) Lines.Add(message); }
     }
 
     [Fact]
@@ -281,6 +394,9 @@ public sealed class MeetingBundleTests
     [InlineData("kind")]
     [InlineData("script")]
     [InlineData("version")]
+    [InlineData("wrong-script")]
+    [InlineData("wrong-version")]
+    [InlineData("other-route-script")]
     [InlineData("route")]
     [InlineData("retention")]
     public async Task Incomplete_confirmation_is_refused_and_staging_is_removed(string missing)
@@ -294,6 +410,10 @@ public sealed class MeetingBundleTests
             "kind" => confirmation with { Kind = AgreementKind.Live },
             "script" => confirmation with { Script = " " },
             "version" => confirmation with { ScriptVersion = " " },
+            "wrong-script" => confirmation with { Script = APPROVED_ImportAgreement },
+            "wrong-version" => confirmation with { ScriptVersion = "test-v1" },
+            // The notice composed for a different route than the one confirmed.
+            "other-route-script" => confirmation with { Script = MeetingsWindow.BundleImportScript(Route with { KeepAudio = KeepAudio.Days30 }) },
             "route" => confirmation with { Route = null },
             "retention" => confirmation with { Route = confirmation.Route! with { KeepAudio = null } },
             _ => confirmation,
@@ -314,7 +434,7 @@ public sealed class MeetingBundleTests
         {
             if (!changeRoute) cancellation.Cancel();
             return Task.FromResult<Agreement?>(Confirm(identity));
-        }, _ => MeetingProcessingConsent.Enter(() => !changeRoute));
+        }, ApprovedScriptVersion, MeetingsWindow.BundleImportScript, _ => MeetingProcessingConsent.Enter(() => !changeRoute));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => importer.ImportAsync(path, Code, "test", ct: cancellation.Token));
         Assert.Empty(Directory.GetFileSystemEntries(target.Root));
     }
