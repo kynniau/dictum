@@ -104,6 +104,7 @@ public static class SettingsFile
                 ["beam_size"] = d.Whisper.BeamSize,
             },
             ["models"] = new JsonObject { ["folder"] = null },
+            ["cleanup"] = new JsonObject { ["paragraph_pause_seconds"] = d.Cleanup.ParagraphPauseSeconds },
             ["llm"] = new JsonObject
             {
                 ["provider"] = cleanupProvider ?? d.Llm.Provider,

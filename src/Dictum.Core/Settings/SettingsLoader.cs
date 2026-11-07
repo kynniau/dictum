@@ -134,6 +134,7 @@ public static class SettingsLoader
             Speech = BindSpeech(r.Child("speech")),
             Models = BindModels(r.Child("models")),
             Llm = BindLlm(r.Child("llm")),
+            Cleanup = BindCleanup(r.Child("cleanup")),
             Insert = BindInsert(r.Child("insert")),
             Pill = BindPill(r.Child("pill")),
             Indicator = BindIndicator(r.Child("indicator")),
@@ -176,6 +177,19 @@ public static class SettingsLoader
         var s = new ModelsSettings { Folder = r.NullableString("folder", FolderProblem) };
         r.WarnUnknown();
         return s;
+    }
+
+    private const string PROPOSED_ParagraphPauseExpected = "expected 0, or a number from 0.5 to 30";
+
+    private static CleanupSettings BindCleanup(ObjectReader? r)
+    {
+        var d = new CleanupSettings();
+        if (r is null) return d;
+        // Any finite number is read; EffectiveSettings clamps it (and warns) afterwards.
+        var seconds = r.Double("paragraph_pause_seconds", d.ParagraphPauseSeconds, -double.MaxValue, double.MaxValue, PROPOSED_ParagraphPauseExpected);
+        var settings = EffectiveSettings.ParagraphPause(d with { ParagraphPauseSeconds = seconds }, r.Warn);
+        r.WarnUnknown();
+        return settings;
     }
 
     private static ProfanitySettings BindProfanity(ObjectReader? r)
@@ -408,11 +422,11 @@ public static class SettingsLoader
             return Bad(key, v, $"expected a whole number from {min} to {max}", fallback);
         }
 
-        public double Double(string key, double fallback, double min, double max)
+        public double Double(string key, double fallback, double min, double max, string? expected = null)
         {
             if (!TryGet(key, out var v)) return fallback;
             if (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var x) && x >= min && x <= max && double.IsFinite(x)) return x;
-            return Bad(key, v, $"expected a number from {min.ToString(CultureInfo.InvariantCulture)} to {max.ToString(CultureInfo.InvariantCulture)}", fallback);
+            return Bad(key, v, expected ?? $"expected a number from {min.ToString(CultureInfo.InvariantCulture)} to {max.ToString(CultureInfo.InvariantCulture)}", fallback);
         }
 
         public string String(string key, string fallback, Func<string, string?>? validate = null)
