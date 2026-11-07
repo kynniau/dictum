@@ -16,11 +16,17 @@ public sealed class MeetingSummariser
         (_maxTokens, _overlapTokens) = (maxTokens, overlapTokens);
     }
 
+    /// <param name="speakers">A separated meeting's speakers, so each voice is labelled.</param>
+    /// <param name="inProcessEngine">True only for the in-process local model. Any other engine (own key, Ollama on any host) is
+    /// treated as leaving this computer: it sees "Other n" labels only, never a typed name, and the names are put back into the
+    /// reply here (<see cref="SpeakerNameSwap"/>). Defaults to false, so a caller that forgets fails closed.</param>
     public async Task<MeetingSummary> SummariseAsync(MeetingId id, IReadOnlyList<Segment> transcript,
-        SummaryTemplate template, ILlmClient client, string engineLabel, CancellationToken cancellationToken, Speakers.MeetingSpeakers? speakers = null)
+        SummaryTemplate template, ILlmClient client, string engineLabel, CancellationToken cancellationToken, Speakers.MeetingSpeakers? speakers = null,
+        bool inProcessEngine = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var chunks = TranscriptChunker.Chunk(transcript, _maxTokens, _overlapTokens, includeTimestamps: true, speakers);
+        var sent = inProcessEngine ? speakers : SpeakerNameSwap.WithoutNames(speakers);
+        var chunks = TranscriptChunker.Chunk(transcript, _maxTokens, _overlapTokens, includeTimestamps: true, sent);
         if (chunks.Count == 0) return Unwritten(template, engineLabel);
         var system = SummaryPrompt.System(template);
         var drafts = new List<string>();
@@ -43,7 +49,10 @@ public sealed class MeetingSummariser
             cancellationToken.ThrowIfCancellationRequested();
             var result = reply.IsRefusal || reply.IsTruncated
                 ? (Ok: (MeetingSummary?)null, Rejection: (string?)"The response was refused or incomplete.")
-                : SummaryValidator.Validate(reply.Text ?? "", transcript, template, engineLabel);
+                // Names go back before the check, so a cloud summary is validated exactly as a local one with names would be;
+                // the rejection text sent back on a retry is fixed wording and never carries a name.
+                : SummaryValidator.Validate(inProcessEngine ? reply.Text ?? "" : SpeakerNameSwap.Restore(reply.Text ?? "", speakers),
+                    transcript, template, engineLabel);
             if (result.Ok is not null) return result.Ok;
             combine = SummaryPrompt.CombineUser(drafts, template) + "\nValidation rejection: " + result.Rejection +
                 "\nTry again using only transcript-supported facts, figures and owners.";

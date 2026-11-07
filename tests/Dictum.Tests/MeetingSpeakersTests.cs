@@ -277,8 +277,14 @@ public sealed class MeetingSpeakersTests
         Assert.Contains("Michelle Example: Synthetic first guest", Assert.Single(TranscriptChunker.Chunk(transcript, 2048, 128, speakers: named)));
 
         var client = new CapturingClient();
-        await new MeetingSummariser().SummariseAsync(id, transcript, SummaryTemplates.Get("general", files.Root), client, "Local", TestContext.Current.CancellationToken, named);
+        await new MeetingSummariser().SummariseAsync(id, transcript, SummaryTemplates.Get("general", files.Root), client, "Local", TestContext.Current.CancellationToken, named,
+            inProcessEngine: true);
         Assert.Contains(client.Requests, r => r.Contains("Michelle Example: Synthetic first guest", StringComparison.Ordinal));
+        // Without inProcessEngine the summariser fails closed: no name is sent (MeetingSpeakerNamesTests covers the routes).
+        var unspecified = new CapturingClient();
+        await new MeetingSummariser().SummariseAsync(id, transcript, SummaryTemplates.Get("general", files.Root), unspecified, "Ollama", TestContext.Current.CancellationToken, named);
+        Assert.DoesNotContain(unspecified.Requests, r => r.Contains("Michelle", StringComparison.Ordinal));
+        Assert.Contains(unspecified.Requests, r => r.Contains("Other 1: Synthetic first guest", StringComparison.Ordinal));
     }
 
     [Fact]

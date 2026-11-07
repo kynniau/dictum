@@ -30,6 +30,16 @@ internal sealed partial class MeetingsWindow
         catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException) { return null; }
     }
 
+    /// <summary>
+    /// The delete confirmation's extra sentence about speaker names, or null when the meeting has no speakers file. A file this
+    /// version cannot read still counts: deleting the meeting deletes it either way.
+    /// </summary>
+    private string? NamesDeletedNote(MeetingId id)
+    {
+        try { return _host.Store.ReadSpeakers(id) is null ? null : PROPOSED_NamesDeleted; }
+        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException) { return PROPOSED_NamesDeleted; }
+    }
+
     private Control SpeakersCard(MeetingId id, MeetingSpeakers? speakers)
     {
         Channel? track;

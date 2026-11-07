@@ -498,11 +498,12 @@ internal sealed partial class MeetingsWindow : Window
         }
         if (_captureState is not null) _captureState.Text = _paused ? PROPOSED_Paused : PROPOSED_Recording;
     }
-    private void Confirm(string message, string accept, Action action)
+    /// <param name="note">A separate sentence shown under the message (it never rewords it), or null for none.</param>
+    private void Confirm(string message, string accept, Action action, string? note = null)
     {
         var dialog = new Window { Title = accept, Width = 500, SizeToContent = SizeToContent.Height, CanResize = false };
-        dialog.Content = DialogContent(dialog, Ui.Text(message),
-            Ui.Row(8, SafeButton(APPROVED_Cancel, dialog.Close), SafeButton(accept, () => { dialog.Close(); action(); })));
+        var buttons = Ui.Row(8, SafeButton(APPROVED_Cancel, dialog.Close), SafeButton(accept, () => { dialog.Close(); action(); }));
+        dialog.Content = note is null ? DialogContent(dialog, Ui.Text(message), buttons) : DialogContent(dialog, Ui.Text(message), Ui.Text(note), buttons);
         _ = dialog.ShowDialog(this);
     }
     private void StopCapture()
@@ -877,6 +878,7 @@ internal sealed partial class MeetingsWindow : Window
                 await using var writer = new StreamWriter(stream);
                 await writer.WriteAsync(ExportSelected()); Say(PROPOSED_Saved);
             }))), SafeButton(PROPOSED_Copy, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => { _host.Copy(ExportSelected()); Say(PROPOSED_Copied); })),
-                SafeButton(PROPOSED_Delete, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Delete, () => { _host.Store.Delete(id); ShowList(); }))));
+                SafeButton(PROPOSED_Delete, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Delete, () => { _host.Store.Delete(id); ShowList(); },
+                    NamesDeletedNote(id)))));
     }
 }

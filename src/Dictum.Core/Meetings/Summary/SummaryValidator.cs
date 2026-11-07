@@ -30,7 +30,7 @@ public static class SummaryValidator
     private static readonly Regex Quotation = new(
         """(?:"(?<text>[^"]+)"|\u201c(?<text>[^\u201c\u201d]+)\u201d)[ \t]+\[(?<time>(?:[0-9]+:[0-5][0-9]|[0-9]{2,}):[0-5][0-9]) (?<channel>You|Others|Mixed)\]""",
         RegexOptions.CultureInvariant);
-    private static readonly Regex QuoteSpan = new("\"[^\"]*\"|\u201c[^\u201c\u201d]*\u201d", RegexOptions.CultureInvariant);
+    internal static readonly Regex QuoteSpan = new("\"[^\"]*\"|\u201c[^\u201c\u201d]*\u201d", RegexOptions.CultureInvariant);
     // A contraction stays one word, so "didn't" is seen whole as a negation.
     private static readonly Regex ContextWords = new(@"[\p{L}\p{N}]+(?:['\u2019][\p{L}]+)*|[-\u2013\u2212]", RegexOptions.CultureInvariant);
     private static readonly Regex Qualifier = new(

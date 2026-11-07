@@ -5,6 +5,7 @@ using Dictum.Meetings;
 using Dictum.Meetings.Speakers;
 using Dictum.UI.Views.Meetings;
 using static Dictum.Meetings.Speakers.SpeakerText;
+using static Dictum.UI.Views.Meetings.MeetingsText;
 
 namespace Dictum.Tests;
 
@@ -60,6 +61,29 @@ public sealed partial class MeetingsWorkflowUiTests
             Assert.True(Find(page, PROPOSED_DownloadModels).IsTabStop);
             window.Close();
         }
+    });
+
+    [Fact]
+    public Task Delete_confirmation_says_speaker_names_go_too_only_when_the_meeting_has_a_speakers_file() => UiSession.Run(() =>
+    {
+        using var fixture = new Fixture();
+        var plain = fixture.Store.Create(fixture.Files.Meta());
+        var named = fixture.Store.Create(fixture.Files.Meta());
+        fixture.Store.WriteSpeakers(named, new MeetingSpeakers(MeetingSpeakers.CurrentVersion, "synthetic@00000000", MeetingSpeakers.DefaultThreshold,
+            [new SpeakerTurn(0, 2, 1)], new Dictionary<string, string> { ["1"] = "Michelle Example" }));
+        foreach (var (id, hasNames) in new[] { (plain, false), (named, true) })
+        {
+            var window = new MeetingsWindow(fixture.Host); window.Show(); window.ShowMeeting(id);
+            Click(window, PROPOSED_Delete);
+            var confirm = Assert.Single(window.OwnedWindows);
+            // The delete question is unchanged; the names sentence is a separate line beside it.
+            Assert.Contains(PROPOSED_DeleteQuestion, Texts(confirm));
+            Assert.Equal(hasNames, Texts(confirm).Contains(PROPOSED_NamesDeleted));
+            Click(confirm, PROPOSED_Delete);
+            Assert.DoesNotContain(fixture.Store.List(), m => m.Id == id);
+            window.Close();
+        }
+        Assert.Empty(Directory.GetFiles(fixture.Files.Root, "speakers*", SearchOption.AllDirectories));
     });
 
     [Fact]

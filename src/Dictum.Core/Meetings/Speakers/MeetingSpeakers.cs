@@ -25,6 +25,8 @@ public static class SpeakerText
     public const string PROPOSED_ModelsNotReady = "Speaker models: not downloaded";
     public const string PROPOSED_DownloadModels = "Download the speaker models";
     public const string PROPOSED_DownloadNote = "For Identify speakers in Meetings; the recording never leaves this computer";
+    /// <summary>Shown beside the (separately approved) delete question, only when the meeting has a speakers file.</summary>
+    public const string PROPOSED_NamesDeleted = "Names you gave the speakers in this meeting are deleted with it.";
 }
 
 /// <summary>One speaker turn: seconds from the meeting start, and its speaker (1 = the first voice heard).</summary>

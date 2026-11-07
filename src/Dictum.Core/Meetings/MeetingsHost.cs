@@ -208,7 +208,9 @@ internal sealed record MeetingsHost(
             var type = SummaryTemplates.Get(template, Paths.ConfigDir);
             var summary = await new MeetingSummariser().SummariseAsync(id, Store.ReadTranscript(id),
                 type, new RouteCheckedClient(client),
-                engine == SummaryEngine.OwnKey ? "OwnKey:" + client.Name : engine.ToString(), cancellation, Store.ReadSpeakers(id));
+                engine == SummaryEngine.OwnKey ? "OwnKey:" + client.Name : engine.ToString(), cancellation, Store.ReadSpeakers(id),
+                // Names stay on this computer (owner decision 07/11/2026): only the in-process model sees them.
+                inProcessEngine: engine == SummaryEngine.Local && route.SummaryEngine == SummaryEngine.Local);
             MeetingProcessingConsent.Check(cancellation);
             Store.WriteSummary(id, summary with { TemplateName = type.Name, Model = route.SummaryModel ?? client.Name });
         }
