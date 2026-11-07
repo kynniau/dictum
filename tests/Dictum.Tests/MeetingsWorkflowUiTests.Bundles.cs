@@ -15,6 +15,23 @@ namespace Dictum.Tests;
 
 public sealed partial class MeetingsWorkflowUiTests
 {
+    [Theory]
+    [InlineData("spoken", APPROVED_Spoken)]
+    [InlineData("written", APPROVED_Written)]
+    [InlineData("refused", APPROVED_Refused)]
+    [InlineData("agreed", "you confirmed the notice again")]
+    [InlineData("unconfirmed", "did not confirm that they agreed")]
+    [InlineData("discard-requested", "asked to discard")]
+    [InlineData("some-future-answer", "does not recognise")]
+    public void A_record_line_never_shows_agreement_for_an_answer_that_was_not_an_agreement(string answer, string expected)
+    {
+        var line = MeetingsWindow.RecordText(AgreementKind.Live, new DateTimeOffset(2026, 11, 7, 3, 2, 0, TimeSpan.Zero), answer);
+        Assert.Contains(expected, line);
+        var isAgreement = answer is "spoken" or "written";
+        Assert.Equal(isAgreement, line.Contains("you said everyone agreed"));
+        if (answer != "spoken") Assert.DoesNotContain(APPROVED_Spoken, line);
+    }
+
     [Fact]
     public Task Suggested_file_name_carries_no_title_words() => UiSession.RunAsync(async () =>
     {

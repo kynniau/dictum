@@ -149,6 +149,14 @@ internal static class MeetingsText
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.
     public const string APPROVED_Record = "{0}. At {1:g}, you said everyone agreed: {2}. This is your note. It does not prove that anyone agreed.";
     public const string PROPOSED_Record = "Meeting record";
+    // Origin-record lines for confirmations that are not an agreement (1.6 bundle import, 07/11/2026). Only "spoken",
+    // "written" and "platform-announced" may use APPROVED_Record; every other saved answer gets its own line, so a refusal
+    // is never shown as "Each person said yes". {0} = APPROVED_LiveKind or APPROVED_ImportKind, {1} = the time.
+    public const string PROPOSED_RecordRefused = "{0}. At {1:g}: " + APPROVED_Refused + ".";
+    public const string PROPOSED_RecordAgreedAgain = "{0}. At {1:g}, you confirmed the notice again.";
+    public const string PROPOSED_RecordUnconfirmed = "{0}. At {1:g}, someone joined and you did not confirm that they agreed.";
+    public const string PROPOSED_RecordDiscardRequested = "{0}. At {1:g}, you asked to discard this meeting.";
+    public const string PROPOSED_RecordUnknown = "{0}. At {1:g}, a record this version of Dictum does not recognise.";
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.
     public const string APPROVED_LiveKind = "Live recording";
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.

@@ -725,3 +725,15 @@ FileSource accepts streaming blocks. A single track is Mixed; multiple tracks re
 You/Others/Mixed channels. Stored canonical 16 kHz mono PCM16 WAV and chunked audio are
 supported. The original bundle remains unchanged. No file association, Settings,
 packaging, network service or new NuGet dependency is introduced.
+
+Origin record shown before the import notice: only the answers `spoken`, `written` and
+`platform-announced` use the approved "you said everyone agreed" record line; `refused`, `agreed`
+(the notice confirmed again after a join or a changed processing route), `unconfirmed`,
+`discard-requested` and any answer this version does not know each have their own line, so a
+recorded refusal is never shown as agreement.
+
+Known limit: if the index rebuild fails inside publication and the rename back also fails, the
+meeting stays at `<root>/<id>` (complete, owner-wrapped, its import confirmed, nothing in plaintext)
+while the user sees "could not be imported"; the next listing rebuilds the index and shows it, and a
+retry says it is already on this computer. `// simplification:` accepted at the 1.6 merge lens;
+retire if a user reports a meeting that appeared after a failed import.

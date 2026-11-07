@@ -33,10 +33,29 @@ internal sealed partial class MeetingsWindow
     }
     internal static string BundleImportScript(MeetingProcessingRoute route) => NoticeScript(true, false, route);
 
-    /// <summary>One line of a meeting record, in the approved record wording.</summary>
-    internal static string RecordText(AgreementKind kind, DateTimeOffset at, string how) => string.Format(APPROVED_Record,
-        kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind, at.ToLocalTime(),
-        how switch { "written" => APPROVED_Written, "platform-announced" => PROPOSED_Platform, _ => APPROVED_Spoken });
+    /// <summary>
+    /// One line of a meeting record. Only the three agreement answers use the approved "you said everyone agreed" wording;
+    /// every other answer (refused, agreed again, unconfirmed, discard requested, or one this version does not know) has
+    /// its own line, so a recorded refusal can never be shown as "Each person said yes".
+    /// </summary>
+    internal static string RecordText(AgreementKind kind, DateTimeOffset at, string how)
+    {
+        var kindText = kind == AgreementKind.Live ? APPROVED_LiveKind : APPROVED_ImportKind;
+        var local = at.ToLocalTime();
+        string Agreed(string answer) => string.Format(APPROVED_Record, kindText, local, answer);
+        string Line(string format) => string.Format(format, kindText, local);
+        return how switch
+        {
+            "spoken" => Agreed(APPROVED_Spoken),
+            "written" => Agreed(APPROVED_Written),
+            "platform-announced" => Agreed(PROPOSED_Platform),
+            "refused" => Line(PROPOSED_RecordRefused),
+            "agreed" => Line(PROPOSED_RecordAgreedAgain),
+            "unconfirmed" => Line(PROPOSED_RecordUnconfirmed),
+            "discard-requested" => Line(PROPOSED_RecordDiscardRequested),
+            _ => Line(PROPOSED_RecordUnknown),
+        };
+    }
 
     /// <summary>The origin device's recorded agreement and confirmations (design A.6 step 3), shown before the import notice.</summary>
     private static Control OriginRecord(BundleInfo info)
