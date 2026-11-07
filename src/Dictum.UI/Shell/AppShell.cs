@@ -189,6 +189,7 @@ public sealed partial class AppShell : IDisposable
     /// </summary>
     public bool Start(IClassicDesktopStyleApplicationLifetime? lifetime)
     {
+        DeleteVoiceEnrolmentLeftovers(); // a "Record my voice now" recording a quit or a crash left behind (design 1.6 C.1)
         ConfigureMeetingsShutdown(lifetime);
         var file = SettingsLoader.LoadFile(Paths.SettingsFile);
         var (askSpeech, askCleanup) = AppRules.FirstRunQuestions(file);
@@ -230,7 +231,7 @@ public sealed partial class AppShell : IDisposable
 
         var machine = new DictationStateMachine(AppRules.Options(_settings), _settings.Enabled);
         _controller = new DictationController(machine, _capture, Pipeline, new UiBridge(this), () => _settings, _log, hotkeyBlocked: () => MeetingOwnsPill || !_models.IsReady,
-            microphoneListed: () => Platform.ListCaptureDevices().Count > 0);
+            microphoneListed: () => Platform.ListCaptureDevices().Count > 0, voiceFilter: CreateOwnVoiceFilter());
         StartHook();
         ApplyFixHotkey(_settings, reinstall: false);
         if (!_settings.Enabled) _tray.SetState(TrayState.Disabled);
@@ -356,6 +357,7 @@ public sealed partial class AppShell : IDisposable
         _speech.Retire(); // quitting: a cloud speech request under way stops, and none starts, before the models and the provider client go
         _controller?.Dispose();
         _voiceGates.Dispose(); // after the controller: no take is being checked now
+        DisposeVoice(); // the voice filter's model, likewise after the controller
         (_capture as IDisposable)?.Dispose();
         _tray?.Dispose(); // the icon goes at once; releasing the models below can wait for a warm-up still running
         _overlays?.Dispose();

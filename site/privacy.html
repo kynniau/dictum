@@ -78,6 +78,9 @@
 
     <h3>Calibration recordings</h3>
     <p>If you use Calibrate my voice, you record ten sentences. Those ten sound files (WAV) stay on your computer so you can re-run the test later, are never uploaded, and are used only by the calibration window. Delete them any time with <strong>Delete recordings</strong>.</p>
+    <!-- APPROVED by the owner 08/11/2026 08:48 AEDT (voice print wording, two-model checked, not reviewed by a lawyer): do not reword -->
+    <h3>Your voice print</h3>
+    <p>Learn my voice makes a voice print from your calibration recordings or a new recording. The print is a list of numbers describing your voice. It is not a recording and cannot be played back. Dictum uses it for two things. In a meeting whose recording has everyone on one track, such as a phone recording, Dictum labels the parts that sound like you as You. This turns on when you make a print, and you can turn it off. While you dictate, Dictum can skip the parts that do not sound like you. This is off until you turn it on. Dictum compares how voices sound; it cannot prove who is speaking. A cold, a different microphone, a quiet voice or someone with a similar voice can cause mistakes. The print stays encrypted on your computer, using the same key as your meetings. Dictum never uploads it or includes it in meeting files or exports. With cloud speech on, dictation audio still goes to your chosen service; parts skipped by the voice filter are never sent. If you make a new recording for this feature, Dictum deletes it when the attempt to build the print ends, whether it succeeds or fails. A voice print may count as biometric information under privacy law. It never reaches Kynni. If you use Dictum for an organisation, check the rules that apply to you before you make one. Delete the print any time with <strong>Delete my voice print</strong>; Delete all app data and Remove Dictum completely delete it too.</p>
   </section>
 
   <!-- APPROVED by the owner 23/10/2026 09:50 AEDT (legal block): do not reword -->
@@ -102,6 +105,8 @@
         <li><code>models</code>: the speech and clean-up models you downloaded, unless you chose another folder for them.</li>
         <li><code>logs</code>: one file per day; the newest 14 are kept.</li>
         <li><code>calibration</code>: your calibration recordings and their list, if you made any.</li>
+        <!-- APPROVED by the owner 08/11/2026 08:48 AEDT (new edition of this list: one line added, nothing else changed): do not reword -->
+        <li><code>voiceprint.enc</code>: your voice print, encrypted, if you made one.</li>
         <li><code>verified-models.json</code>: which model files passed the fingerprint check.</li>
         <li>Working files: one while a download or a save is under way, removed when it ends; and <code>gpu-load-speech.txt</code> and <code>gpu-load-cleanup.txt</code>, which name a model while it loads on the graphics card and stay if Dictum stops during that load, so that the next start loads that model on the main processor instead.</li>
       </ul>

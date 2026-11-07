@@ -26,6 +26,8 @@ public static class SpeakerCheckCommand
         }
         new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings)).Verify(embedding);
         using var embedder = new SherpaVoiceEmbedder(embedding, Math.Clamp(Environment.ProcessorCount / 2, 1, 4));
+        if (options.PrintFolders is [var enrolment, var own, var other]) // --speaker-check --print (design 1.6 C.5)
+            return SpeakerCheck.RunPrint(enrolment, own, other, embedder, SpeakerModels.Tag(SpeakerModels.Embedding), Console.Out);
         return SpeakerCheck.Run(options.WavPath!, embedder, Console.Out);
     }
 }

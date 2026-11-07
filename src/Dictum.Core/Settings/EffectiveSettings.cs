@@ -23,6 +23,16 @@ public static class EffectiveSettings
         return settings with { ParagraphPauseSeconds = clamped };
     }
 
+    /// <summary>voice.threshold outside 0.3–0.9 is clamped into it, with one line for the log (row V17).</summary>
+    public static VoiceSettings VoiceThreshold(VoiceSettings settings, Action<string> warn)
+    {
+        var threshold = settings.Threshold;
+        var clamped = Math.Clamp(threshold, VoiceSettings.MinThreshold, VoiceSettings.MaxThreshold);
+        if (threshold == clamped) return settings;
+        warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, Meetings.Voice.VoiceText.APPROVED_ThresholdClamped, threshold, clamped));
+        return settings with { Threshold = clamped };
+    }
+
     /// <param name="anthropicKeyPresent">ANTHROPIC_API_KEY found in the environment or .env; its absence repairs Anthropic only when no consent is on file.</param>
     /// <param name="gpuRuntime">Whether a GPU runtime loads; asked only when a recommendation is needed.</param>
     /// <param name="warn">Receives one line per repair, for the log.</param>

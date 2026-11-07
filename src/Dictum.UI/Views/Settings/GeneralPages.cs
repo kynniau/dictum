@@ -52,6 +52,7 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ComboBox _insert = new() { ItemsSource = new[] { "Paste (Ctrl+V)", "Type the characters" }, Width = 200 };
     private readonly ToggleSwitch _trailing;
     private readonly ToggleSwitch _restore;
+    private readonly VoiceCard _voice; // "Your voice" (design 1.6 C and D), in VoicePage.cs
 
     /// <summary>
     /// The Remote Desktop caption under the hotkey box: it describes reaching a Windows PC from a Mac, so it is not shown on a Mac (the
@@ -93,6 +94,7 @@ internal sealed class GeneralPage : SettingsPage
         };
         _trailing = Ui.Switch(true, on => Write(("insert.trailing_space", Json(on))));
         _restore = Ui.Switch(false, on => Write(("insert.restore_clipboard", Json(on))));
+        _voice = new VoiceCard(shell, values => shell.Write(values));
         _handsFreeLimit = new HandsFreeLimit(shell.Settings.HandsFreeMaxSeconds, seconds =>
         {
             if (seconds != Shell.Settings.HandsFreeMaxSeconds) Write(("hands_free_max_seconds", Json(seconds)));
@@ -125,13 +127,15 @@ internal sealed class GeneralPage : SettingsPage
             Ui.Card(Ui.Stack(4,
                 Ui.Line("Insert text by", _insert),
                 Ui.Line("Add a space after each dictation", _trailing),
-                Ui.Line("Put the clipboard back afterwards", _restore, "Off: the dictation stays on the clipboard.")), "Pasting"));
+                Ui.Line("Put the clipboard back afterwards", _restore, "Off: the dictation stays on the clipboard.")), "Pasting"),
+            _voice);
     }
 
     protected override void Redraw()
     {
         var s = Shell.Settings;
         Ui.SetQuietly(_enabled, s.Enabled);
+        _voice.Refresh();
         Ui.SetQuietly(_login, Shell.Platform.Startup.IsEnabled());
         _loginHint.Text = $"Uses the {Shell.Platform.Startup.Mechanism}.";
         // A box the user has not captured a new key in follows settings.json (an edit in the file, a reload); one holding a

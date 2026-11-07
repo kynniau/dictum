@@ -44,6 +44,13 @@ public enum DataCategory
 
     /// <summary>What the earlier build (Dictate) left in its own folders after the migration (skipped or unmovable items).</summary>
     EarlierBuild,
+
+    /// <summary>
+    /// voiceprint.enc, the sealed voice print (design 1.6 C.2), and any voice-enrolment-* recording folder left behind: "Delete all app
+    /// data" (with or without settings) and "Remove Dictum completely" delete them (orchestrator ruling 08/11/2026); "Delete my voice
+    /// print" on the Your voice card is the print's own deletion.
+    /// </summary>
+    VoicePrint,
 }
 
 /// <summary>One place Dictum writes: a file, a set of files in a folder (by pattern), a folder, or a platform item.</summary>
@@ -86,6 +93,11 @@ public static class PathRegistry
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration recordings", "clip-*"),
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration take list", "takes.txt"),
             new(paths.LogsDir, DataCategory.Logs, "logs", "*.log"),
+            // Its name and identity live in Dictum.Meetings (the meetings boundary keeps sealed file names there); the label is row V1.
+            new(Meetings.Voice.VoicePrintStore.PathFor(paths), DataCategory.VoicePrint, Meetings.Voice.VoiceText.APPROVED_CardTitle),
+            // "Record my voice now" records into voice-enrolment-<guid> and deletes it when the attempt ends; one a quit or a crash
+            // left behind goes with the print. A folder pattern: RemovalPlan lists each matching folder and everything in it.
+            new(paths.LocalDir, DataCategory.VoicePrint, Meetings.Voice.VoiceText.APPROVED_CardTitle, Meetings.Voice.VoiceEnrolment.TemporaryPattern),
         };
         foreach (var dir in ModelFolders(paths, settings))
         {

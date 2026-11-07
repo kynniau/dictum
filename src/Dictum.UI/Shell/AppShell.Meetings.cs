@@ -83,7 +83,12 @@ public sealed partial class AppShell
         if (SpeakerModels.Locate(Paths, _settings) is not { } embedding) return null;
         Integrity.Verify(embedding);
         return new SpeakerSeparator(store, new SherpaVoiceEmbedder(embedding, Math.Clamp(Environment.ProcessorCount / 2, 1, 4)),
-            SpeakerModels.Tag(SpeakerModels.Embedding));
+            SpeakerModels.Tag(SpeakerModels.Embedding))
+        {
+            // Design 1.6 C.4: the owner's print, used by the separator on a one-track (Mixed) meeting only.
+            OwnerPrint = MeetingVoicePrint(),
+            OwnerThreshold = _settings.Voice.Threshold,
+        };
     }
 
     private string EffectiveMeetingSummaryModel() => MeetingsSettings.SummaryModel ??

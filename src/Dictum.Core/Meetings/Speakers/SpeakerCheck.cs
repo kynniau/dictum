@@ -90,19 +90,60 @@ public static class SpeakerCheck
     /// The equal error rate of same-speaker (true) and different-speaker (false) scores: the point where the share of different-speaker
     /// trials accepted equals the share of same-speaker trials rejected (the mean of the two at the closest threshold).
     /// </summary>
-    public static double EqualErrorRate(IReadOnlyList<(bool Same, double Score)> trials)
+    public static double EqualErrorRate(IReadOnlyList<(bool Same, double Score)> trials) => EqualErrorPoint(trials).Rate;
+
+    /// <summary><see cref="EqualErrorRate"/> and the threshold it is reached at (a score at or above it is accepted as the same speaker).</summary>
+    public static (double Rate, double Threshold) EqualErrorPoint(IReadOnlyList<(bool Same, double Score)> trials)
     {
         var targets = trials.Where(t => t.Same).Select(t => t.Score).ToArray();
         var others = trials.Where(t => !t.Same).Select(t => t.Score).ToArray();
         if (targets.Length == 0 || others.Length == 0) throw new ArgumentException("Trials need both same-speaker and different-speaker pairs.");
-        var best = (Gap: double.PositiveInfinity, Rate: 1.0);
+        var best = (Gap: double.PositiveInfinity, Rate: 1.0, Threshold: double.PositiveInfinity);
         foreach (var threshold in trials.Select(t => t.Score).Append(double.PositiveInfinity).Distinct().Order())
         {
             var falseReject = targets.Count(s => s < threshold) / (double)targets.Length;
             var falseAccept = others.Count(s => s >= threshold) / (double)others.Length;
-            if (Math.Abs(falseAccept - falseReject) < best.Gap) best = (Math.Abs(falseAccept - falseReject), (falseAccept + falseReject) / 2);
+            if (Math.Abs(falseAccept - falseReject) < best.Gap) best = (Math.Abs(falseAccept - falseReject), (falseAccept + falseReject) / 2, threshold);
         }
-        return best.Rate;
+        return (best.Rate, best.Threshold);
+    }
+
+    /// <summary>
+    /// --speaker-check --print (design 1.6 C.5): a print from every WAV in <paramref name="enrolment"/> (as "Record my voice now" makes
+    /// one: the gates of <see cref="Voice.VoicePrintBuilder"/> apply and their numbers are printed), then every window of the speech in
+    /// the WAVs of <paramref name="own"/> (same speaker) and <paramref name="other"/> (other speakers) is scored against it: the EER over
+    /// those windows and the threshold at the EER, and the time the dictation filter would add per part (each WAV scored as one part).
+    /// Exit 0, or 1 when there is no print or nothing to score.
+    /// </summary>
+    public static int RunPrint(string enrolment, string own, string other, IVoiceEmbedder embedder, string modelTag, TextWriter output)
+    {
+        foreach (var folder in new[] { enrolment, own, other })
+            if (!Directory.Exists(folder)) { output.WriteLine($"error: {folder} is not a folder."); return 1; }
+        float[] Read(string path) { using var input = File.OpenRead(path); return SpeakerSeparator.ReadWav(input, CancellationToken.None); }
+        string[] Wavs(string folder) => [.. Directory.GetFiles(folder, "*.wav").Order(StringComparer.OrdinalIgnoreCase)];
+        var made = Voice.VoicePrintBuilder.Build(Wavs(enrolment).Select(Read).ToList(), embedder, modelTag, DateTimeOffset.Now);
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"Enrolment: {made.Outcome}; {made.Seconds:0.0} s of speech in {made.Windows} windows (gate {Voice.VoicePrintBuilder.MinSeconds:0} s); " +
+            $"{made.ConsistentShare * 100:0.0} % of windows within cosine distance {Voice.VoicePrintBuilder.ConsistentDistance:0.00} of the mean (gate {Voice.VoicePrintBuilder.ConsistentShare * 100:0} %)."));
+        if (made.Print is not { } print) return 1;
+        var scores = new List<(bool Same, double Score)>();
+        var timing = (Parts: 0, Seconds: 0.0, Milliseconds: 0.0);
+        foreach (var (folder, same) in new[] { (own, true), (other, false) })
+            foreach (var wav in Wavs(folder))
+            {
+                var samples = Read(wav);
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                scores.AddRange(Voice.VoiceScore.SpeechScores(samples, print.Embedding, embedder).Select(score => (same, score)));
+                clock.Stop();
+                timing = (timing.Parts + 1, timing.Seconds + samples.Length / 16000.0, timing.Milliseconds + clock.Elapsed.TotalMilliseconds);
+            }
+        if (scores.Count(s => s.Same) == 0 || scores.Count(s => !s.Same) == 0) { output.WriteLine("Nothing to score: own and other need at least one window of speech each."); return 1; }
+        var (rate, threshold) = EqualErrorPoint(scores);
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"EER over {scores.Count} windows ({scores.Count(s => s.Same)} own, {scores.Count(s => !s.Same)} other): {rate * 100:0.00} % at threshold {threshold:0.000} (voice.threshold now {Settings.VoiceSettings.DefaultThreshold:0.00} by default)."));
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"Scoring time: {timing.Milliseconds / timing.Parts:0} ms per file on average over {timing.Parts} files ({timing.Milliseconds / timing.Seconds:0.0} ms per second of audio), on the CPU."));
+        return 0;
     }
 
     public static double Cosine(float[] a, float[] b)

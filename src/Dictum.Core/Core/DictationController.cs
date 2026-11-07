@@ -52,6 +52,7 @@ public sealed class DictationController : IDisposable
     private readonly ILog _log;
     private readonly Func<bool> _hotkeyBlocked;
     private readonly Func<bool> _microphoneListed; // the system lists a microphone (asked only after one could not be opened)
+    private readonly Meetings.Voice.OwnVoiceFilter? _voiceFilter; // "your voice only" (design 1.6 D); null: no gate
     private readonly Timer _ticker;
     private readonly Task _loop;
     private long _captureStartTick;
@@ -73,7 +74,9 @@ public sealed class DictationController : IDisposable
 
     private sealed record HookInput(HookEvent Event);
     private sealed record TickInput(long NowMs);
-    private sealed record DoneInput(long SessionId, ProcessingOutcome Outcome, int Words);
+    private sealed record DoneInput(long SessionId, ProcessingOutcome Outcome, int Words, bool VoiceSkipped = false);
+    private sealed record VoiceSkippedInput(long SessionId);
+    private sealed record VoiceSkippedOverInput(long SessionId);
     private sealed record CaptureLostInput(long SessionId);
     private sealed record SoundInput(long SessionId);
     private sealed record EnableInput(bool Enabled);
@@ -88,8 +91,10 @@ public sealed class DictationController : IDisposable
         Func<AppSettings> settings,
         ILog log,
         Func<bool>? hotkeyBlocked = null,
-        Func<bool>? microphoneListed = null)
+        Func<bool>? microphoneListed = null,
+        Meetings.Voice.OwnVoiceFilter? voiceFilter = null)
     {
+        _voiceFilter = voiceFilter;
         _machine = machine;
         _capture = capture;
         _pipeline = pipeline;
@@ -154,8 +159,28 @@ public sealed class DictationController : IDisposable
         PolishingInput p => _machine.State == DictationState.Processing && p.SessionId == _machine.SessionId
             ? [new PillEffect(p.View)]
             : [], // a late report for a cancelled or finished session must not replace "Cancelled"/"Done"
+        VoiceSkippedInput v => VoiceSkipped(v.SessionId),
+        // The brief "skipped" state is over: back to the hands-free pill if that session is still recording.
+        VoiceSkippedOverInput v => _machine.State == DictationState.RecordingHandsFree && v.SessionId == _machine.SessionId
+            ? [new PillEffect(PillView.RecordingHandsFree)]
+            : [],
         _ => [],
     };
+
+    /// <summary>
+    /// A hands-free part was skipped by the voice filter (design 1.6 D): the pill says so briefly (row V15), then shows the session
+    /// again while it still records. Ignored for a session that has ended.
+    /// </summary>
+    private IReadOnlyList<Effect> VoiceSkipped(long sessionId)
+    {
+        if (sessionId != _machine.SessionId || _machine.State is not (DictationState.RecordingHandsFree or DictationState.Processing)) return [];
+        if (_machine.State == DictationState.RecordingHandsFree)
+            _ = Task.Delay(VoiceSkippedShowMs).ContinueWith(_ => _inbox.Writer.TryWrite(new VoiceSkippedOverInput(sessionId)), TaskScheduler.Default);
+        return [new PillEffect(PillView.VoiceSkipped)];
+    }
+
+    /// <summary>How long the skipped state shows during a recording before the hands-free pill returns (under its 1.8 s flash).</summary>
+    internal const int VoiceSkippedShowMs = 1500;
 
     private IReadOnlyList<Effect> KeyDown(long tickMs, long stamp)
     {
@@ -173,6 +198,9 @@ public sealed class DictationController : IDisposable
     {
         _lastWords = done.Words;
         var effects = _machine.ProcessingFinished(done.SessionId, done.Outcome);
+        // Nothing typed because the voice filter skipped it (design 1.6 D): the pill says so (row V15) instead of just going.
+        if (done.VoiceSkipped && done.Outcome == ProcessingOutcome.Discarded)
+            effects = [.. effects.Select(e => e is PillEffect { View: PillView.Hidden } ? new PillEffect(PillView.VoiceSkipped) : e)];
         // The UI hears the end only after the machine's own transition (for every finished pipeline, as before). Told from
         // the pipeline task, before this message was even queued, a UI that reads IsIdle on that news (the mouse-hotkey gate,
         // AppShell.ApplyHookEnabled) could still see the dictation under way and keep a mouse button swallowed after it.
@@ -330,7 +358,7 @@ public sealed class DictationController : IDisposable
     // stops. Trigger to retire: the product owner's decision on holding parts while another window is in front, due 17/10/2026.
     private async Task TypePartsAsync(HandsFreeSession session)
     {
-        var (number, typed, dropped, failed, words) = (0, 0, 0, 0, 0);
+        var (number, typed, dropped, failed, words, skipped) = (0, 0, 0, 0, 0, 0);
         HandsFreePart? last = null;
         await foreach (var (audio, reason) in session.Parts.Reader.ReadAllAsync().ConfigureAwait(false))
         {
@@ -341,6 +369,13 @@ public sealed class DictationController : IDisposable
                 continue;
             }
             _log.Info($"Segment {number}: {audio.Duration.TotalSeconds:0.0} s, {Describe(reason)}.");
+            if (SkippedByVoice(audio))
+            {
+                // Never transcribed, never typed, and not the next part's context (last stays the part before it).
+                skipped++;
+                _inbox.Writer.TryWrite(new VoiceSkippedInput(session.SessionId));
+                continue;
+            }
             var part = new HandsFreePart(number, last);
             try
             {
@@ -364,7 +399,26 @@ public sealed class DictationController : IDisposable
         _log.Info($"Hands-free session {session.SessionId}: {number} part(s), {typed} typed, {dropped} dropped, {failed} failed.");
         if (session.Token.IsCancellationRequested) return; // Esc, disabled or quit: the machine is idle and has said so
         var result = failed > 0 ? ProcessingOutcome.Failed : typed > 0 ? ProcessingOutcome.Inserted : ProcessingOutcome.Discarded;
-        _inbox.Writer.TryWrite(new DoneInput(session.SessionId, result, words)); // Finished sets the tray state
+        _inbox.Writer.TryWrite(new DoneInput(session.SessionId, result, words, VoiceSkipped: skipped > 0)); // Finished sets the tray state
+    }
+
+    /// <summary>
+    /// The voice filter's gate (design 1.6 D), asked before a part goes to the pipeline: true when the part is dropped, with one log
+    /// line (row V16: its seconds, no words). A filter that fails lets the part through, so dictation never stops on it.
+    /// </summary>
+    private bool SkippedByVoice(CapturedAudio audio)
+    {
+        if (_voiceFilter is null) return false;
+        Meetings.Voice.OwnVoiceVerdict verdict;
+        try { verdict = _voiceFilter.Check(audio.Samples); }
+        catch (Exception ex)
+        {
+            _log.Warn($"Voice filter could not score a part ({ex.GetType().Name}); it is transcribed as usual.");
+            return false;
+        }
+        if (verdict != Meetings.Voice.OwnVoiceVerdict.Skipped) return false;
+        _log.Info(Meetings.Voice.OwnVoiceFilter.SkippedLogLine(audio.Samples));
+        return true;
     }
 
     private static string Describe(CutReason reason) => reason switch
@@ -397,6 +451,11 @@ public sealed class DictationController : IDisposable
         {
             var outcome = ProcessingOutcome.Failed;
             var words = 0;
+            if (SkippedByVoice(audio))
+            {
+                _inbox.Writer.TryWrite(new DoneInput(begin.SessionId, ProcessingOutcome.Discarded, 0, VoiceSkipped: true));
+                return;
+            }
             try
             {
                 outcome = await _pipeline.RunAsync(audio, begin.Token, view =>

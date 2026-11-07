@@ -69,4 +69,10 @@ public record MeetingsSettings
     public string? SummaryModel { get; init; }
     public string SummaryTemplate { get; init; } = "general";
     public ShareDefault ShareDefault { get; init; } = ShareDefault.Nobody;
+
+    /// <summary>
+    /// meetings.use_voice_print (design 1.6 C.4): on a one-track (Mixed) meeting, Identify speakers labels the parts that sound like
+    /// the voice print as You. Default on, so it applies once a print is made; without a print it does nothing.
+    /// </summary>
+    public bool UseVoicePrint { get; init; } = true;
 }

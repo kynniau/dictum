@@ -95,12 +95,18 @@ internal sealed class MeetingsPage : SettingsPage
     /// Downloads the speaker model, if it is missing, through the one model-download path (1.6 B): the usual question (name, size,
     /// huggingface.co), refused under offline_only, the file held to its pinned size and SHA-256.
     /// </summary>
-    private void DownloadSpeakerModels()
+    private void DownloadSpeakerModels() => DownloadSpeakerModel(Shell, Refresh);
+
+    /// <summary>
+    /// The one speaker-model download (also the Your voice card's, design 1.6 C.1: one model, one download, the same consent, offline
+    /// and hash path); <paramref name="refresh"/> runs on the UI thread when it ends, or at once when the model is already there.
+    /// </summary>
+    internal static void DownloadSpeakerModel(AppShell shell, Action refresh)
     {
-        if (SpeakerModels.Locate(Shell.Paths, Shell.Settings) is not null) { Refresh(); return; }
-        var target = Path.Combine(Shell.Paths.ModelsDir(Shell.Settings), SpeakerModels.Embedding.FileName);
-        Shell.Models.ApplyWithDownloads(SpeakerText.APPROVED_DownloadNote, [(SpeakerModels.Embedding, target)], [],
-            finished: _ => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh));
+        if (SpeakerModels.Locate(shell.Paths, shell.Settings) is not null) { refresh(); return; }
+        var target = Path.Combine(shell.Paths.ModelsDir(shell.Settings), SpeakerModels.Embedding.FileName);
+        shell.Models.ApplyWithDownloads(SpeakerText.APPROVED_DownloadNote, [(SpeakerModels.Embedding, target)], [],
+            finished: _ => Avalonia.Threading.Dispatcher.UIThread.Post(refresh));
     }
     private void EditType(SummaryTemplate? type)
     {

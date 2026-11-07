@@ -171,6 +171,7 @@ public sealed partial class AppShell
             _llm.Unload();
         }
         if (scope is RemovalScope.Logs or RemovalScope.AllData or RemovalScope.AllDataIncludingSettings) _fileLog?.Release();
+        TurnVoiceUsesOff(scope, plan);
         var result = plan.Execute();
         _modelFileChanges++;
         // APPROVED 22/10/2026 copy (proposed 17/10/2026): "(in use or not permitted)" was "(in use)"; a file Windows refuses to delete counts too.
