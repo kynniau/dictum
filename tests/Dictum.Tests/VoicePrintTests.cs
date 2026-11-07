@@ -149,11 +149,28 @@ public sealed class VoicePrintTests : IDisposable
     }
 
     [Fact]
-    public void A_delete_whose_settings_cannot_be_written_keeps_the_print()
+    public void A_delete_whose_settings_cannot_be_written_still_deletes_the_print()
     {
         Assert.Equal(EnrolmentOutcome.Made, Enrol(Embedder(), Clip(1, 6), Clip(1, 6), Clip(1, 6), Clip(1, 6)).Outcome);
-        Assert.False(VoiceEnrolment.Delete(_paths, _ => false));
-        Assert.True(File.Exists(PrintPath));
+        Assert.False(VoiceEnrolment.Delete(_paths, _ => false)); // the failed save is reported
+        Assert.False(File.Exists(PrintPath)); // but privacy favours deletion: the print is gone
+    }
+
+    [Fact]
+    public void A_leftover_folder_that_is_a_junction_is_removed_as_a_link_and_its_target_kept()
+    {
+        Assert.SkipWhen(!OperatingSystem.IsWindows(), "junctions are a Windows feature");
+        var target = Path.Combine(_paths.LocalDir, "elsewhere"); Directory.CreateDirectory(target);
+        var kept = Path.Combine(target, "keep.txt"); File.WriteAllText(kept, "mine");
+        var link = Path.Combine(_paths.LocalDir, "voice-enrolment-link");
+        var mklink = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"") { CreateNoWindow = true, UseShellExecute = false })!;
+        mklink.WaitForExit();
+        Assert.True(new DirectoryInfo(link).Attributes.HasFlag(FileAttributes.ReparsePoint));
+
+        VoiceEnrolment.DeleteLeftovers(_paths);
+
+        Assert.False(Directory.Exists(link));
+        Assert.True(File.Exists(kept));
     }
 
     [Fact]

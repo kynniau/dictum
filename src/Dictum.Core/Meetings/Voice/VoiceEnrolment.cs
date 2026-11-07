@@ -70,16 +70,15 @@ public static class VoiceEnrolment
     }
 
     /// <summary>
-    /// Delete my voice print (C.3): the file goes and both uses are turned off in settings.json (meetings.use_voice_print and
-    /// audio.your_voice_only). The settings are written first: when settings.json cannot be written, nothing changes and the card
-    /// says so, rather than the file going while both switches still read on.
+    /// Delete my voice print (C.3): the file goes first, then both uses are turned off in settings.json (meetings.use_voice_print and
+    /// audio.your_voice_only). Privacy favours deletion (merge lens 08/11/2026): when settings.json cannot be written the print is
+    /// still gone, the card reports the failed save, and a switch left on does nothing without a print.
     /// </summary>
-    /// <param name="write">Writes the settings keys; false when settings.json could not be written (the print is then kept).</param>
+    /// <param name="write">Writes the settings keys; false when settings.json could not be written (the print is deleted either way).</param>
     public static bool Delete(AppPaths paths, Func<IReadOnlyList<(string Key, bool Value)>, bool> write)
     {
-        if (!TurnUsesOff(write)) return false;
         VoicePrintStore.Delete(VoicePrintStore.PathFor(paths));
-        return true;
+        return TurnUsesOff(write);
     }
 
     /// <summary>
@@ -100,10 +99,12 @@ public static class VoiceEnrolment
 
     private static EnrolmentResult Missing() => new(EnrolmentOutcome.ModelMissing, null, 0, 0, 0);
 
+    /// <summary>A link (junction or symbolic link) is removed as a link, never followed, like RemovalPlan.</summary>
     private static void DeleteFolder(string folder)
     {
-        if (!Directory.Exists(folder)) return;
-        foreach (var file in Directory.GetFiles(folder)) File.Delete(file);
-        Directory.Delete(folder, recursive: true);
+        var info = new DirectoryInfo(folder);
+        if (!info.Exists) return;
+        if (info.Attributes.HasFlag(FileAttributes.ReparsePoint)) { info.Delete(); return; }
+        info.Delete(recursive: true);
     }
 }
