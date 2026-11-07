@@ -17,10 +17,10 @@ public sealed class MeetingSummariser
     }
 
     public async Task<MeetingSummary> SummariseAsync(MeetingId id, IReadOnlyList<Segment> transcript,
-        SummaryTemplate template, ILlmClient client, string engineLabel, CancellationToken cancellationToken)
+        SummaryTemplate template, ILlmClient client, string engineLabel, CancellationToken cancellationToken, Speakers.MeetingSpeakers? speakers = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var chunks = TranscriptChunker.Chunk(transcript, _maxTokens, _overlapTokens, includeTimestamps: true);
+        var chunks = TranscriptChunker.Chunk(transcript, _maxTokens, _overlapTokens, includeTimestamps: true, speakers);
         if (chunks.Count == 0) return Unwritten(template, engineLabel);
         var system = SummaryPrompt.System(template);
         var drafts = new List<string>();

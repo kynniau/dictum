@@ -2,6 +2,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Dictum.Meetings;
+using Dictum.Meetings.Speakers;
 using Dictum.Meetings.Summaries;
 using Dictum.Settings;
 using Dictum.UI.Shell;
@@ -23,6 +24,7 @@ internal sealed class MeetingsPage : SettingsPage
     private IReadOnlyList<SummaryTemplate> _types = [];
     private string[] _modelFiles = [];
     private readonly StackPanel _warning;
+    private readonly TextBlock _speakerModels = Ui.Text("");
     private int _warningVersion;
 
     public MeetingsPage(AppShell shell, MeetingsHost? host = null) : base(shell, PROPOSED_Meetings)
@@ -55,6 +57,8 @@ internal sealed class MeetingsPage : SettingsPage
             _warning, Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Engine, _engine),
                 Ui.Text(APPROVED_EngineNote), Ui.Text(PROPOSED_ConfigureSummary, "caption"), Ui.Line(PROPOSED_SummaryModel, _model),
                 MeetingsWindow.Button(PROPOSED_OpenModels, () => shell.OpenSettings("Models")), Ui.Line(PROPOSED_Template, _template))),
+            Ui.Card(Ui.Stack(8, Ui.Heading(SpeakerText.PROPOSED_SettingsRow), Ui.Text(SpeakerText.PROPOSED_SettingsNote, "caption"), _speakerModels,
+                MeetingsWindow.Button(SpeakerText.PROPOSED_DownloadModels, DownloadSpeakerModels))),
             Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_SummaryTypes), Ui.Text(PROPOSED_TypeFileCaption, "caption"), _typesList,
                 MeetingsWindow.Button(PROPOSED_NewType, () => EditType(null)))),
             MeetingsWindow.Button(PROPOSED_Existing, () => shell.OpenMeetings()));
@@ -84,7 +88,21 @@ internal sealed class MeetingsPage : SettingsPage
                 MeetingsWindow.Button(PROPOSED_EditType, () => EditType(type)),
                 MeetingsWindow.Button(PROPOSED_DeleteType, () => DeleteType(type))));
         }
+        _speakerModels.Text = _host.SpeakerModelsReady() ? SpeakerText.PROPOSED_ModelsReady : SpeakerText.PROPOSED_ModelsNotReady;
         _ = RefreshWarning(++_warningVersion, _folder.Text);
+    }
+    /// <summary>
+    /// Downloads whichever speaker model is missing through the one model-download path (1.6 B): the usual question (names, size,
+    /// huggingface.co), refused under offline_only, each file held to its pinned size and SHA-256.
+    /// </summary>
+    private void DownloadSpeakerModels()
+    {
+        var folder = Shell.Paths.ModelsDir(Shell.Settings);
+        var located = SpeakerModels.Locate(Shell.Paths, Shell.Settings);
+        var missing = new[] { (SpeakerModels.Segmentation, located.Segmentation), (SpeakerModels.Embedding, located.Embedding) }
+            .Where(m => m.Item2 is null).Select(m => (m.Item1, Path.Combine(folder, m.Item1.FileName))).ToList();
+        if (missing.Count == 0) { Refresh(); return; }
+        Shell.Models.ApplyWithDownloads(SpeakerText.PROPOSED_DownloadNote, missing, [], finished: _ => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh));
     }
     private void EditType(SummaryTemplate? type)
     {

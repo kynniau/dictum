@@ -24,6 +24,10 @@ public interface IMeetingStore
     void ApplyRetention(DateTimeOffset now);
     string ExportMarkdown(MeetingId id);
     void ExportBundle(MeetingId id, string destinationPath, string transferCode) => throw new NotSupportedException();
+    /// <summary>The meeting's speaker separation (speakers.json.enc), or null when none has run (design 1.6 B).</summary>
+    Speakers.MeetingSpeakers? ReadSpeakers(MeetingId id) => null;
+    /// <summary>Replaces the meeting's speaker separation and names; only ever inside the meeting folder, sealed like its other files.</summary>
+    void WriteSpeakers(MeetingId id, Speakers.MeetingSpeakers speakers) => throw new NotSupportedException();
 }
 
 public interface IMeetingAudioWriter : IDisposable

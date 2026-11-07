@@ -66,6 +66,10 @@ internal sealed record MeetingsHost(
     public Action OpenModels { get; init; } = () => { };
     public Action<MeetingId, MeetingConfirmation> SaveConfirmation { get; init; } = (_, _) => throw new InvalidOperationException("Confirmation storage is required.");
     public Func<MeetingId, IReadOnlyList<MeetingConfirmation>> ReadConfirmations { get; init; } = _ => [];
+    /// <summary>Speaker separation with the downloaded models (design 1.6 B), or null while either model is missing. The caller disposes it.</summary>
+    public Func<IMeetingStore, Speakers.SpeakerSeparator?> SpeakerSeparator { get; init; } = _ => null;
+    /// <summary>Whether both speaker models are on this computer (Settings > Meetings shows it; the meeting screen says where to get them).</summary>
+    public Func<bool> SpeakerModelsReady { get; init; } = () => false;
     public MeetingProcessingRoute ProcessingRoute()
     {
         var settings = Settings();
@@ -77,6 +81,16 @@ internal sealed record MeetingsHost(
     // simplification: team sharing and team-folder access/logging do not exist; keep them unavailable.
     // simplification: there is no audio-off setting yet; always use the saved-audio retention notices.
     // simplification: Ollama model forwarding is not reliably detectable; show the approved conditional notice.
+    /// <summary>
+    /// Separates the voices on a meeting's Others (else Mixed) track with the downloaded models and writes speakers.json.enc (1.6 B).
+    /// <paramref name="threshold"/> is the clustering cut: higher merges more voices.
+    /// </summary>
+    public async Task<Speakers.MeetingSpeakers> SeparateSpeakers(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellation)
+    {
+        using var separator = await Task.Run(() => SpeakerSeparator(Store), cancellation)
+            ?? throw new InvalidOperationException(Speakers.SpeakerText.PROPOSED_ModelsMissing);
+        return await separator.SeparateAsync(id, threshold, progress, cancellation);
+    }
     public static MeetingsHost Create(AppPaths paths, Func<MeetingsSettings> settings, ICredentialStore credentials,
         IMeetingTranscriberFactory factory, Func<IAudioCapture> capture,
         Func<SummaryEngine, CancellationToken, Task<ILlmClient>> summaryClient, Action<string> copy,
@@ -176,6 +190,8 @@ internal sealed record MeetingsHost(
             ReadConfirmations(id).LastOrDefault(c => c.Route?.KeepAudio is not null)?.Route?.KeepAudio);
         public string ExportMarkdown(MeetingId id) => Current().ExportMarkdown(id);
         public string ExportMarkdown(MeetingId id, string? summaryId) => Current().ExportMarkdown(id, summaryId);
+        public Speakers.MeetingSpeakers? ReadSpeakers(MeetingId id) => Current().ReadSpeakers(id);
+        public void WriteSpeakers(MeetingId id, Speakers.MeetingSpeakers speakers) => Current().WriteSpeakers(id, speakers);
     }
 
     public async Task Regenerate(MeetingId id, string template, CancellationToken cancellation, MeetingProcessingRoute? confirmedRoute = null)
@@ -192,7 +208,7 @@ internal sealed record MeetingsHost(
             var type = SummaryTemplates.Get(template, Paths.ConfigDir);
             var summary = await new MeetingSummariser().SummariseAsync(id, Store.ReadTranscript(id),
                 type, new RouteCheckedClient(client),
-                engine == SummaryEngine.OwnKey ? "OwnKey:" + client.Name : engine.ToString(), cancellation);
+                engine == SummaryEngine.OwnKey ? "OwnKey:" + client.Name : engine.ToString(), cancellation, Store.ReadSpeakers(id));
             MeetingProcessingConsent.Check(cancellation);
             Store.WriteSummary(id, summary with { TemplateName = type.Name, Model = route.SummaryModel ?? client.Name });
         }

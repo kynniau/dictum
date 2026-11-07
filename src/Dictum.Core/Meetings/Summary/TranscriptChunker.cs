@@ -2,14 +2,17 @@ namespace Dictum.Meetings.Summaries;
 
 public static class TranscriptChunker
 {
-    public static IReadOnlyList<string> Chunk(IReadOnlyList<Segment> transcript, int maxTokens, int overlapTokens, bool includeTimestamps = false)
+    /// <param name="speakers">A separated meeting's speakers: each segment then says its voice (the user's name for it, else "Other n") after
+    /// the timestamp and channel, which stay as they are because summary quotes cite them (SummaryValidator).</param>
+    public static IReadOnlyList<string> Chunk(IReadOnlyList<Segment> transcript, int maxTokens, int overlapTokens, bool includeTimestamps = false,
+        Speakers.MeetingSpeakers? speakers = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTokens);
         if (overlapTokens < 0 || overlapTokens >= maxTokens)
             throw new ArgumentOutOfRangeException(nameof(overlapTokens));
         transcript = Transcribe.EchoDeduplicator.Filter(transcript);
-        var rendered = transcript.Select(s => includeTimestamps
-            ? $"[{(long)s.Start.TotalMinutes:00}:{s.Start.Seconds:00} {s.Channel}] {s.Text}" : s.Text).ToArray();
+        var rendered = transcript.Select(s => (includeTimestamps ? $"[{(long)s.Start.TotalMinutes:00}:{s.Start.Seconds:00} {s.Channel}] " : "")
+            + (speakers?.LabelOf(s) is { } label ? label + ": " : "") + s.Text).ToArray();
         var chunks = new List<string>();
         var start = 0;
         while (start < transcript.Count)
