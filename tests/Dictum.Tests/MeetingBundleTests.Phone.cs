@@ -18,6 +18,32 @@ public sealed partial class MeetingBundleTests
     }
 
     [Fact]
+    public async Task An_interrupted_chunked_phone_recording_imports_and_is_transcribed_as_Mixed()
+    {
+        // The path 14.A.1 recommends to phone writers: record straight into audio-mixed.chunks.enc; a recording cut short
+        // (no terminal record) lists mixed in IncompleteAudioChannels and must still import and transcribe.
+        using var source = new MeetingFixture(); using var target = new MeetingFixture();
+        var store = source.Store();
+        var id = store.Create(source.Meta() with { Source = MeetingSource.Phone });
+        var second = Enumerable.Range(0, 16000).Select(i => (float)(0.25 * Math.Sin(2 * Math.PI * 440 * i / 16000))).ToArray();
+        using (var writer = store.BeginAudio(id, Channel.Mixed)) { writer.Append(second); writer.Append(second); } // disposed, never completed
+        Assert.Contains(Channel.Mixed, store.Read(id).IncompleteAudioChannels);
+        var transcriber = new FakeTranscriber(target.Store());
+        await Importer(target, transcriber: transcriber).ImportAsync(Export(source, id), Code, "Synthetic importer",
+            ct: TestContext.Current.CancellationToken);
+        var meta = target.Store().Read(id);
+        Assert.Equal(MeetingSource.Phone, meta.Source);
+        Assert.Contains(Channel.Mixed, meta.IncompleteAudioChannels);
+        using var audio = target.Store().OpenAudio(id, Channel.Mixed);
+        using var copy = new MemoryStream(); audio.CopyTo(copy);
+        Assert.Equal(44 + 2 * 16000 * 2, copy.Length); // two seconds of 16 kHz PCM16 behind the synthesized WAV header
+        Assert.True(transcriber.Parts >= 1);
+        var segments = target.Store().ReadTranscript(id);
+        Assert.NotEmpty(segments);
+        Assert.All(segments, segment => Assert.Equal(Channel.Mixed, segment.Channel));
+    }
+
+    [Fact]
     public async Task Plain_file_import_still_rejects_Phone()
     {
         using var target = new MeetingFixture();
