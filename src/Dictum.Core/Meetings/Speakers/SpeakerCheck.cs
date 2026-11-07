@@ -6,9 +6,11 @@ namespace Dictum.Meetings.Speakers;
 /// Dictum.exe --speaker-check &lt;folder&gt; (design 1.6 B): the measurement the owner runs on his own recordings before speaker
 /// separation is called working. The lane that built it never read a real recording; its tests use synthetic numbers only.
 /// <list type="bullet">
-/// <item>Every &lt;name&gt;.wav (16 kHz mono PCM16) with a reference &lt;name&gt;.rttm beside it is separated as a meeting would be,
-/// and scored: diarization error rate = (missed + false alarm + speaker confusion) / scored reference speech, on 10 ms frames,
-/// with a 0.25 s no-score collar either side of every reference boundary, overlapping speech scored (every active reference
+/// <item>Every &lt;name&gt;.wav (16 kHz mono PCM16) with a reference &lt;name&gt;.rttm beside it is separated as a meeting would be:
+/// its turns are the parts the meetings pause segmenter cuts it into (FileSource, as an import is cut, silence_threshold 0.01),
+/// less any part whose loudest block is below that threshold. Not applied: the voice gate and whisper (a part they would drop
+/// still counts here). Then it is scored: diarization error rate = (missed + false alarm + speaker confusion) / scored reference
+/// speech, on 10 ms frames, with a 0.25 s no-score collar either side of every reference boundary, overlapping speech scored (every active reference
 /// speaker counts), and the one-to-one speaker mapping that maximises agreement (Hungarian method).</item>
 /// <item>A trials.txt of lines "&lt;1|0&gt; &lt;enrolment.wav&gt; &lt;test.wav&gt;" (1 = same speaker; paths relative to the folder)
 /// gives the equal error rate of the cosine score between whole-file embeddings.</item>
@@ -154,12 +156,27 @@ public static class SpeakerCheck
         return mapping;
     }
 
+    /// <summary>
+    /// The turns a meeting of this audio would have, in seconds: the parts FileSource's pause segmenter cuts it into (its default
+    /// silence threshold, as imports use), less any part whose loudest block is below that threshold (no speech in it).
+    /// </summary>
+    internal static IReadOnlyList<(double Start, double End)> PauseSegments(float[] samples)
+    {
+        const float silence = 0.01f; // FileSource's default, which MeetingImporter and BundleAudioSource use
+        return
+        [
+            .. new Transcribe.FileSource(new Audio.CapturedAudio(samples, 0), silenceThreshold: silence).ReadAsync(CancellationToken.None)
+                .ToBlockingEnumerable().Where(p => p.Part.PeakLevel >= silence)
+                .Select(p => (p.Offset.TotalSeconds, (p.Offset + p.Part.Duration).TotalSeconds)),
+        ];
+    }
+
     /// <summary>Runs the check over <paramref name="folder"/> and prints the results; exit code 0, or 1 when there was nothing to score.</summary>
-    public static int Run(string folder, ISpeakerTurnFinder turns, IVoiceEmbedder embedder, TextWriter output, double threshold = MeetingSpeakers.DefaultThreshold)
+    public static int Run(string folder, IVoiceEmbedder embedder, TextWriter output, double threshold = MeetingSpeakers.DefaultThreshold)
     {
         if (!Directory.Exists(folder)) { output.WriteLine($"error: {folder} is not a folder."); return 1; }
         output.WriteLine($"Speaker check of {folder}: threshold {threshold.ToString("0.00", CultureInfo.InvariantCulture)}; DER on {Frame * 1000:0} ms frames, " +
-                         $"collar {Collar.ToString("0.00", CultureInfo.InvariantCulture)} s either side of each reference boundary, overlapping speech scored.");
+                         $"collar {Collar.ToString("0.00", CultureInfo.InvariantCulture)} s either side of each reference boundary, overlapping speech scored; turns from the pause segmenter.");
         var total = new DerScore(0, 0, 0, 0);
         var files = 0;
         foreach (var wav in Directory.GetFiles(folder, "*.wav").Order(StringComparer.OrdinalIgnoreCase))
@@ -168,7 +185,7 @@ public static class SpeakerCheck
             if (!File.Exists(rttm)) continue;
             float[] samples;
             using (var input = File.OpenRead(wav)) samples = SpeakerSeparator.ReadWav(input, CancellationToken.None);
-            var hypothesis = SpeakerSeparator.Diarize(samples, turns, embedder, threshold, null, CancellationToken.None)
+            var hypothesis = SpeakerSeparator.Diarize(samples, PauseSegments(samples), embedder, threshold, null, CancellationToken.None)
                 .Select(t => (t.Start, t.End, t.Speaker.ToString(CultureInfo.InvariantCulture))).ToArray();
             var score = Score(ReadRttm(File.ReadLines(rttm)), hypothesis);
             total += score;

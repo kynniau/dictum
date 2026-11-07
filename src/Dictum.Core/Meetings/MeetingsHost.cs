@@ -68,7 +68,7 @@ internal sealed record MeetingsHost(
     public Func<MeetingId, IReadOnlyList<MeetingConfirmation>> ReadConfirmations { get; init; } = _ => [];
     /// <summary>Speaker separation with the downloaded models (design 1.6 B), or null while either model is missing. The caller disposes it.</summary>
     public Func<IMeetingStore, Speakers.SpeakerSeparator?> SpeakerSeparator { get; init; } = _ => null;
-    /// <summary>Whether both speaker models are on this computer (Settings > Meetings shows it; the meeting screen says where to get them).</summary>
+    /// <summary>Whether the speaker model is on this computer (Settings > Meetings shows it; the meeting screen says where to get them).</summary>
     public Func<bool> SpeakerModelsReady { get; init; } = () => false;
     public MeetingProcessingRoute ProcessingRoute()
     {
@@ -82,7 +82,7 @@ internal sealed record MeetingsHost(
     // simplification: there is no audio-off setting yet; always use the saved-audio retention notices.
     // simplification: Ollama model forwarding is not reliably detectable; show the approved conditional notice.
     /// <summary>
-    /// Separates the voices on a meeting's Others (else Mixed) track with the downloaded models and writes speakers.json.enc (1.6 B).
+    /// Separates the voices on a meeting's Others (else Mixed) track with the downloaded model and writes speakers.json.enc (1.6 B).
     /// <paramref name="threshold"/> is the clustering cut: higher merges more voices.
     /// </summary>
     public async Task<Speakers.MeetingSpeakers> SeparateSpeakers(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellation)
@@ -191,6 +191,7 @@ internal sealed record MeetingsHost(
         public string ExportMarkdown(MeetingId id) => Current().ExportMarkdown(id);
         public string ExportMarkdown(MeetingId id, string? summaryId) => Current().ExportMarkdown(id, summaryId);
         public Speakers.MeetingSpeakers? ReadSpeakers(MeetingId id) => Current().ReadSpeakers(id);
+        public bool HasSpeakers(MeetingId id) => Current().HasSpeakers(id);
         public void WriteSpeakers(MeetingId id, Speakers.MeetingSpeakers speakers) => Current().WriteSpeakers(id, speakers);
     }
 

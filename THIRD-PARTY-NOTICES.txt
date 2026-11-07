@@ -5692,13 +5692,13 @@ SOFTWARE.
 
 
 ==============================================================================
-8. Meeting speaker separation: sherpa-onnx, ONNX Runtime and the speaker models
+8. Meeting speaker separation: sherpa-onnx, ONNX Runtime and the speaker model
 ==============================================================================
 
 Added 07/11/2026 for "Identify speakers" in Meetings (design 1.6 B). sherpa-onnx is the managed binding and native library
-that separates the voices; its runtime packages carry ONNX Runtime and, compiled in, the hclust-cpp clustering code. The two
-model files are not in the published folder: Dictum downloads them from huggingface.co when the user asks (Settings >
-Meetings), pinned to a commit, a size and a SHA-256. Their notices are here because the app uses them. Sources were read on
+that separates the voices; its runtime packages carry ONNX Runtime and, compiled in, the hclust-cpp clustering code. The
+model file is not in the published folder: Dictum downloads it from huggingface.co when the user asks (Settings >
+Meetings), pinned to a commit, a size and a SHA-256. Its notice is here because the app uses it. Sources were read on
 07/11/2026: each package's .nuspec in the NuGet cache, and the licence files named in each entry.
 
 ------------------------------------------------------------------------------
@@ -6009,37 +6009,6 @@ Licence: Apache License 2.0, the text given under org.k2fsa.sherpa.onnx above. S
 iic/speech_campplus_sv_en_voxceleb_16k (its API's "License" field: "Apache License 2.0",
 https://modelscope.cn/api/v1/models/iic/speech_campplus_sv_en_voxceleb_16k), and the 3D-Speaker project's LICENSE
 (Apache License 2.0, https://github.com/modelscope/3D-Speaker/blob/main/LICENSE). The Hugging Face mirror states no licence.
-
-------------------------------------------------------------------------------
-pyannote-segmentation-3.0.onnx: the speaker segmentation model (downloaded on request)
-------------------------------------------------------------------------------
-
-pyannote's segmentation-3.0 model (https://huggingface.co/pyannote/segmentation-3.0), converted to ONNX by sherpa-onnx and
-published as model.onnx at https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx
-(5,992,913 bytes, SHA-256 220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079), unmodified; Dictum saves it as
-pyannote-segmentation-3.0.onnx. Licence: MIT, the LICENSE file in that repository at that commit, reproduced unchanged:
-
-MIT License
-
-Copyright (c) 2022 CNRS
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 
 ------------------------------------------------------------------------------
 VoxCeleb (credit: the data the CAM++ model was trained on)

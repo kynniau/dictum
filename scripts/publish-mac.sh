@@ -102,6 +102,9 @@ done
 for n in libllama libggml libggml-base libggml-cpu libggml-metal libggml-blas libmtmd; do
   required+=("runtimes/osx-arm64/native/$n.dylib")
 done
+# Identify speakers: org.k2fsa.sherpa.onnx.runtime.osx-arm64 carries these in runtimes/osx-arm64/native, which a RID-specific
+# publish flattens beside Dictum.Mac.dll, as it puts the win-x64 pair beside Dictum.exe (not yet seen in a Mac publish output).
+required+=(libsherpa-onnx-c-api.dylib libonnxruntime.dylib)
 missing=()
 for f in "${required[@]}"; do [ -e "$macos/$f" ] || missing+=("$f"); done
 for f in Contents/Info.plist Contents/Resources/Dictum.icns Contents/Resources/THIRD-PARTY-NOTICES.txt Contents/Resources/onnxruntime-ThirdPartyNotices.txt; do

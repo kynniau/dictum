@@ -37,7 +37,7 @@ public sealed class ModelIntegrity(string cacheFile, ILog log, Func<IReadOnlyLis
     public static DownloadSpec? Expected(string path) =>
         ModelCatalog.FindByFile(path)?.Download ?? CleanupCatalog.FindByFile(path)?.Download
         ?? (string.Equals(Path.GetFileName(path), SileroVoiceGate.FileName, StringComparison.OrdinalIgnoreCase) ? SileroVoiceGate.Download : null)
-        ?? Meetings.Speakers.SpeakerModels.FindByFile(path); // the two speaker separation models (1.6 B)
+        ?? Meetings.Speakers.SpeakerModels.FindByFile(path); // the speaker separation model (1.6 B)
 
     /// <summary>
     /// Returns a short status for --selftest; throws <see cref="ModelIntegrityException"/> on a mismatch.

@@ -70,31 +70,20 @@ public sealed partial class AppShell
             MicrophoneDevice = () => _settings.Audio.Device,
             SilenceThreshold = () => _settings.SilenceThreshold,
             CloudSpeechHost = () => _speech.SendsAudio ? _speech.Host : null,
-            SpeakerModelsReady = () => SpeakerModels.Locate(Paths, _settings) is ({ }, { }),
+            SpeakerModelsReady = () => SpeakerModels.Locate(Paths, _settings) is not null,
             SpeakerSeparator = CreateSpeakerSeparator,
         };
 
     /// <summary>
-    /// Speaker separation over the downloaded models (1.6 B), each size- and SHA-256-checked before its first load like every model
-    /// (ModelIntegrity); null while either is missing. Runs on the CPU with up to four threads.
+    /// Speaker separation over the downloaded CAM++ model (1.6 B), size- and SHA-256-checked before its first load like every model
+    /// (ModelIntegrity); null while it is missing. Runs on the CPU with up to four threads.
     /// </summary>
     private SpeakerSeparator? CreateSpeakerSeparator(IMeetingStore store)
     {
-        if (SpeakerModels.Locate(Paths, _settings) is not ({ } segmentation, { } embedding)) return null;
-        Integrity.Verify(segmentation);
+        if (SpeakerModels.Locate(Paths, _settings) is not { } embedding) return null;
         Integrity.Verify(embedding);
-        var threads = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
-        var embedder = new SherpaVoiceEmbedder(embedding, threads);
-        try
-        {
-            return new SpeakerSeparator(store, new SherpaTurnFinder(segmentation, embedding, threads), embedder,
-                SpeakerModels.Tag(SpeakerModels.Segmentation) + "+" + SpeakerModels.Tag(SpeakerModels.Embedding));
-        }
-        catch
-        {
-            embedder.Dispose();
-            throw;
-        }
+        return new SpeakerSeparator(store, new SherpaVoiceEmbedder(embedding, Math.Clamp(Environment.ProcessorCount / 2, 1, 4)),
+            SpeakerModels.Tag(SpeakerModels.Embedding));
     }
 
     private string EffectiveMeetingSummaryModel() => MeetingsSettings.SummaryModel ??

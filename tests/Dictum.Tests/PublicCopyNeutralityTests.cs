@@ -188,6 +188,12 @@ public class PublicCopyNeutralityTests
         Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", "ceb" + "u")); // the bare word still fails
         Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", AllowedIdentifiers[0].ToLowerInvariant())); // and the identifier in another case is not the identifier
         Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", AllowedIdentifiers[0][7..])); // a piece of it is not either (the identifier without its CGEvent prefix)
+        // The ONNX Runtime copyright line is forgiven whole and exactly: in another case, or cut short, it is not that line.
+        var copyright = AllowedIdentifiers[2];
+        Assert.Empty(Offences("packaging/notices/onnxruntime-ThirdPartyNotices.txt", "Copyright line: " + copyright + "."));
+        Assert.NotEmpty(Offences("packaging/notices/onnxruntime-ThirdPartyNotices.txt", copyright.ToLowerInvariant()));
+        Assert.NotEmpty(Offences("packaging/notices/onnxruntime-ThirdPartyNotices.txt", copyright[..copyright.LastIndexOf(' ')])); // without its last word
+        Assert.NotEmpty(Offences("README.md", copyright[copyright.IndexOf(' ')..])); // without its first word
         string[] regionWords = ["ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "ceb" + "u", "dan" + "da"];
         Assert.All(regionWords, word => Assert.Contains(word, Words)); // the region words stay on the list
 

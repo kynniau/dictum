@@ -21,24 +21,10 @@ internal sealed partial class MeetingsWindow
         segment.Text);
 
     /// <summary>
-    /// The meeting's speakers, or null for none, and for a speakers file this version cannot read (one from a newer Dictum, in a
-    /// bundle): the meeting still opens, with plain channel labels. A file that fails decryption still throws (tampering is loud).
-    /// </summary>
-    private MeetingSpeakers? ReadSpeakers(MeetingId id)
-    {
-        try { return _host.Store.ReadSpeakers(id); }
-        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException) { return null; }
-    }
-
-    /// <summary>
     /// The delete confirmation's extra sentence about speaker names, or null when the meeting has no speakers file. A file this
-    /// version cannot read still counts: deleting the meeting deletes it either way.
+    /// version cannot read (the store reads it as none) still counts: deleting the meeting deletes it either way.
     /// </summary>
-    private string? NamesDeletedNote(MeetingId id)
-    {
-        try { return _host.Store.ReadSpeakers(id) is null ? null : PROPOSED_NamesDeleted; }
-        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException) { return PROPOSED_NamesDeleted; }
-    }
+    private string? NamesDeletedNote(MeetingId id) => _host.Store.HasSpeakers(id) ? PROPOSED_NamesDeleted : null;
 
     private Control SpeakersCard(MeetingId id, MeetingSpeakers? speakers)
     {
@@ -64,6 +50,14 @@ internal sealed partial class MeetingsWindow
             }
             children.Add(SafeButton(PROPOSED_SaveNames, () =>
             {
+                // One test of a name (MeetingSpeakers.IsValidName): a name the summary validator could not accept as an owner, or one
+                // shaped like "Other n", is refused here with the reason, and nothing is saved.
+                if (boxes.Values.FirstOrDefault(b => !string.IsNullOrWhiteSpace(b.Text) && !MeetingSpeakers.IsValidName(b.Text)) is { } refused)
+                {
+                    Say(PROPOSED_InvalidName);
+                    refused.Focus();
+                    return;
+                }
                 _host.Store.WriteSpeakers(id, speakers.WithNames(boxes.ToDictionary(b => b.Key, b => b.Value.Text ?? "")));
                 ShowMeeting(id); Say(PROPOSED_NamesSaved);
             }));

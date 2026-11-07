@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Dictum.Meetings.Speakers;
 
@@ -17,13 +18,15 @@ public static class SpeakerText
     public const string PROPOSED_RenameSpeaker = "Name for {0}";
     public const string PROPOSED_SaveNames = "Save names";
     public const string PROPOSED_NamesSaved = "Names saved for this meeting.";
-    public const string PROPOSED_ModelsMissing = "Download the speaker models in Settings > Meetings first.";
+    /// <summary>Said when Save names meets a name <see cref="MeetingSpeakers.IsValidName"/> refuses; nothing is saved.</summary>
+    public const string PROPOSED_InvalidName = "Use letters, numbers, spaces, full stops, hyphens and apostrophes in a name.";
+    public const string PROPOSED_ModelsMissing = "Download the speaker model in Settings > Meetings first.";
     public const string PROPOSED_NothingToSeparate = "This meeting has no recording of other people to separate.";
     public const string PROPOSED_SettingsRow = "Identify speakers";
-    public const string PROPOSED_SettingsNote = "Two models, downloaded once, let Dictum tell the other voices in a recorded meeting apart. They run on this computer.";
-    public const string PROPOSED_ModelsReady = "Speaker models: downloaded";
-    public const string PROPOSED_ModelsNotReady = "Speaker models: not downloaded";
-    public const string PROPOSED_DownloadModels = "Download the speaker models";
+    public const string PROPOSED_SettingsNote = "One model, downloaded once, lets Dictum tell the other voices in a recorded meeting apart. It runs on this computer.";
+    public const string PROPOSED_ModelsReady = "Speaker model: downloaded";
+    public const string PROPOSED_ModelsNotReady = "Speaker model: not downloaded";
+    public const string PROPOSED_DownloadModels = "Download the speaker model";
     public const string PROPOSED_DownloadNote = "For Identify speakers in Meetings; the recording never leaves this computer";
     /// <summary>Shown beside the (separately approved) delete question, only when the meeting has a speakers file.</summary>
     public const string PROPOSED_NamesDeleted = "Names you gave the speakers in this meeting are deleted with it.";
@@ -52,6 +55,29 @@ public sealed record MeetingSpeakers(
     public const double ThresholdStep = 0.1;
     public const int MaxNameLength = 80;
 
+    /// <summary>
+    /// The characters a name may hold, as the body of a regex character class: exactly the ones the summary validator accepts in an
+    /// action-item owner (letters, digits, white space, full stop, the two apostrophes, hyphen), so every saved name can own one.
+    /// </summary>
+    public const string NameCharacters = @"\p{L}\p{Nd}\s.'’\-";
+
+    private static readonly Regex NameShape = new("^[" + NameCharacters + @"]+\z", RegexOptions.CultureInvariant);
+
+    // "Other n" as Label writes it, with any number: a name shaped like a label would read as another speaker.
+    private static readonly Regex LabelShape =
+        new("^" + Regex.Escape(SpeakerText.PROPOSED_Other).Replace(@"\{0}", "[0-9]+", StringComparison.Ordinal) + @"\z", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// The one test of a typed name, used on save (<see cref="WithNames"/>), on read (<see cref="Validated"/>) and by the name box:
+    /// trimmed, 1 to <see cref="MaxNameLength"/> characters of <see cref="NameCharacters"/> with no control character, and not
+    /// shaped like "Other n".
+    /// </summary>
+    public static bool IsValidName(string? name)
+    {
+        var trimmed = name?.Trim();
+        return trimmed is { Length: >= 1 and <= MaxNameLength } && !trimmed.Any(char.IsControl) && NameShape.IsMatch(trimmed) && !LabelShape.IsMatch(trimmed);
+    }
+
     /// <summary>How many voices were found.</summary>
     [JsonIgnore] public int Count => Turns.Count == 0 ? 0 : Turns.Max(t => t.Speaker);
 
@@ -66,8 +92,7 @@ public sealed record MeetingSpeakers(
             if (turn is null || !double.IsFinite(turn.Start) || !double.IsFinite(turn.End) || turn.Start < 0 || turn.End < turn.Start || turn.Speaker < 1)
                 throw new InvalidDataException("Invalid speaker turn.");
         foreach (var (key, name) in Names)
-            if (!int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var speaker) || speaker < 1 || speaker > count ||
-                name is null || name.Length > MaxNameLength || name.Any(char.IsControl))
+            if (!int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var speaker) || speaker < 1 || speaker > count || !IsValidName(name))
                 throw new InvalidDataException("Invalid speaker name.");
         return this;
     }
@@ -87,20 +112,21 @@ public sealed record MeetingSpeakers(
         Enumerable.Range(1, Count).Select(TypedName).OfType<string>();
 
     /// <summary>
-    /// Owner decision (Kyle, 07/11/2026): true when the whole text (trimmed, any case) is one of this meeting's speakers: "Other 1" to
-    /// "Other {Count}" exactly as <see cref="Label"/> writes it, or a name typed for one of them. Nothing partial, nothing beyond the count.
+    /// Owner decision (Kyle, 07/11/2026): true when the whole text (trimmed) is exactly one of this meeting's speakers: "Other 1" to
+    /// "Other {Count}" as <see cref="Label"/> writes it, or a name as typed for one of them, compared ordinally (case counts).
+    /// Nothing partial, nothing beyond the count.
     /// </summary>
     public bool IsSpeaker(string text)
     {
         var owner = text.Trim();
-        return Enumerable.Range(1, Count).Any(n => string.Equals(owner, OtherLabel(n), StringComparison.OrdinalIgnoreCase)) ||
-            TypedNames.Any(name => string.Equals(owner, name, StringComparison.OrdinalIgnoreCase));
+        return Enumerable.Range(1, Count).Any(n => string.Equals(owner, OtherLabel(n), StringComparison.Ordinal)) ||
+            TypedNames.Any(name => string.Equals(owner, name, StringComparison.Ordinal));
     }
 
     /// <summary>
-    /// The speaker of a transcript segment: the turn it overlaps most, else the nearest turn within a second (whisper's segment
-    /// times and the segmentation's turn times are both approximate). The You track is never separated, so a You segment never
-    /// has one; null when no turn is near.
+    /// The speaker of a transcript segment: the turn it overlaps most, else the nearest turn within a second. The turns are the
+    /// separated track's own transcript segments, so a segment normally finds itself; the nearest-turn rule covers one too short
+    /// to embed. The You track is never separated, so a You segment never has one; null when no turn is near.
     /// </summary>
     public int? SpeakerOf(Segment segment)
     {
@@ -116,10 +142,14 @@ public sealed record MeetingSpeakers(
     /// <summary>The label of a transcript segment: its speaker's name or "Other n", or null to keep the channel's own label.</summary>
     public string? LabelOf(Segment segment) => SpeakerOf(segment) is { } speaker ? Label(speaker) : null;
 
-    /// <summary>This separation with these names (blank ones removed), for the store to write.</summary>
-    public MeetingSpeakers WithNames(IReadOnlyDictionary<int, string> names) => this with
+    /// <summary>
+    /// This separation with these names (blank ones removed, the rest trimmed), for the store to write. A name
+    /// <see cref="IsValidName"/> refuses throws ArgumentException: the name box checks first and says why.
+    /// </summary>
+    public MeetingSpeakers WithNames(IReadOnlyDictionary<int, string> names)
     {
-        Names = names.Where(n => !string.IsNullOrWhiteSpace(n.Value))
-            .ToDictionary(n => n.Key.ToString(CultureInfo.InvariantCulture), n => n.Value.Trim()),
-    };
+        var given = names.Where(n => !string.IsNullOrWhiteSpace(n.Value)).ToList();
+        if (given.Any(n => !IsValidName(n.Value))) throw new ArgumentException(SpeakerText.PROPOSED_InvalidName, nameof(names));
+        return this with { Names = given.ToDictionary(n => n.Key.ToString(CultureInfo.InvariantCulture), n => n.Value.Trim()) };
+    }
 }

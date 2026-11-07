@@ -814,7 +814,7 @@ internal sealed partial class MeetingsWindow : Window
         }
         RefreshChoices();
         _refreshSummaryChoices = () => { if (_screen.GetLogicalDescendants().Contains(template)) RefreshChoices(); };
-        var speakers = ReadSpeakers(id);
+        var speakers = _host.Store.ReadSpeakers(id);
         var transcriptCard = Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Transcript), Ui.Text(string.Join(Environment.NewLine, _host.Store.ReadTranscript(id).Select(s => FormatSegment(s, speakers)))),
                 Ui.Text(string.Join(Environment.NewLine, meta.Markers.Select(marker => string.Format(PROPOSED_Marker, marker.At,
                     marker.Kind switch { MarkerKind.Moment => PROPOSED_Mark, MarkerKind.Joined => PROPOSED_Joined, MarkerKind.Paused => PROPOSED_Paused, _ => PROPOSED_Resume }))))));

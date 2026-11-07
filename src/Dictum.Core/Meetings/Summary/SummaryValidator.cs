@@ -73,7 +73,7 @@ public static class SummaryValidator
             var originalContent = heading.Success ? heading.Groups[1].Value.Trim().TrimEnd('#').Trim() : bullet.Groups[1].Value;
             var ownerContent = QuoteSpan.Replace(originalContent, match => new string(' ', match.Length));
             var ownerPrefix = bullet.Success ? Regex.Match(ownerContent, @"^(?<owner>.+?):\s+(?<text>.+)$") : Match.Empty;
-            if (ownerPrefix.Success && Regex.IsMatch(ownerPrefix.Groups["owner"].Value, @"[^\p{L}\p{Nd}\s.'\u2019\-]"))
+            if (ownerPrefix.Success && Regex.IsMatch(ownerPrefix.Groups["owner"].Value, "[^" + Speakers.MeetingSpeakers.NameCharacters + "]"))
                 return (null, "An action-item owner must not contain markup.");
             var content = StripMarkdown(originalContent);
             var invalidQuote = false;

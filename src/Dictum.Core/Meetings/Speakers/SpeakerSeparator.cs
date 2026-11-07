@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using Dictum.Meetings.Store;
 
 namespace Dictum.Meetings.Speakers;
@@ -10,26 +9,40 @@ public interface IVoiceEmbedder
     float[]? Embed(float[] samples16kMono);
 }
 
-/// <summary>Where one voice hands over to another: speech turns, in seconds, in time order. Each turn holds one voice.</summary>
-public interface ISpeakerTurnFinder
-{
-    IReadOnlyList<(double Start, double End)> FindTurns(float[] samples16kMono, double threshold, IProgress<double>? progress, CancellationToken cancellationToken);
-}
-
 /// <summary>
-/// Per-meeting speaker separation (design 1.6 B): turns, one embedding per turn, clustering, speaker numbers in order of first
-/// appearance, then speakers.json.enc in the meeting folder. It runs after the meeting, on the Others track, or on Mixed when
-/// there is no Others track (imports and phone bundles). The You track is never read here.
+/// Per-meeting speaker separation (design 1.6 B), with no model of its own for turns (owner decision, 07/11/2026: pyannote's
+/// segmentation is not used). The meeting's own transcript segments on the separated track are the turns: each is cut into
+/// fixed windows, every window gets one CAM++ embedding, all windows are clustered together, and each segment takes the
+/// majority speaker of its windows. Speakers are numbered in order of first appearance, then speakers.json.enc is written in the
+/// meeting folder. It runs after the meeting, on the Others track, or on Mixed when there is no Others track (imports and phone
+/// bundles). The You track and its segments are never read here.
 /// </summary>
 // simplification: post-meeting only; live labels need a streaming clusterer; retire when a user asks for names during the meeting.
-public sealed class SpeakerSeparator(IMeetingStore store, ISpeakerTurnFinder turns, IVoiceEmbedder embedder, string modelTag) : IDisposable
+// simplification: one speaker per transcript segment. Ceiling: two people speaking in one segment, with no pause between them for
+// the pause segmenter to cut at, are labelled as one (the majority of its windows). Trigger to retire: a report of a mixed line;
+// then split a segment where its windows' speakers change.
+public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedder, string modelTag) : IDisposable
 {
-    /// <summary>Frees the native models behind the turn finder and the embedder, if they hold any.</summary>
-    public void Dispose()
-    {
-        (turns as IDisposable)?.Dispose();
-        (embedder as IDisposable)?.Dispose();
-    }
+    /// <summary>
+    /// Each window is 2 s, the next starting 1 s later (half overlapping); a segment shorter than a window is one window. The
+    /// extractor's own minimum says what it will run on, not what it judges well: on 07/11/2026 CAM++ through sherpa-onnx embedded
+    /// 80 samples (5 ms). On two synthetic voices (Windows TTS, 54 s of speech; not a quality measure) windows of 0.25 to 1 s did
+    /// not tell the voices apart (mean cosine distance between different voices 0.21 to 0.27, within the same voice 0.18 to 0.20),
+    /// 1.5 s partly (37.5 % of different-voice pairs closer than 0.5), and 2 s did (1.0 %, and no same-voice pair at 0.5 or more).
+    /// Meeting segments are cut at pauses after at least 2 s of speech (SpeechSegmenter.MinSpeechBlocks), so most hold a window.
+    /// </summary>
+    public const double WindowSeconds = 2.0, HopSeconds = 1.0;
+
+    /// <summary>
+    /// A segment under this length gets no window (its words take the nearest turn's speaker, MeetingSpeakers.SpeakerOf): shorter
+    /// windows did not separate the two synthetic voices above at all.
+    /// </summary>
+    public const double MinWindowSeconds = 1.5;
+
+    private const int Rate = 16000;
+
+    /// <summary>Frees the native model behind the embedder, if it holds one.</summary>
+    public void Dispose() => (embedder as IDisposable)?.Dispose();
 
     /// <summary>The track speaker separation reads for this meeting (Others, else Mixed), or null when it has neither.</summary>
     public static Channel? TrackFor(IMeetingStore store, MeetingId id)
@@ -46,11 +59,22 @@ public sealed class SpeakerSeparator(IMeetingStore store, ISpeakerTurnFinder tur
     public static double Step(double threshold, bool fewer) =>
         Math.Round(Math.Clamp(threshold + (fewer ? MeetingSpeakers.ThresholdStep : -MeetingSpeakers.ThresholdStep), 0.1, 0.9), 2);
 
+    /// <summary>
+    /// The transcript segments heard on the separated track, in seconds and time order: every segment but You's, and not typed notes
+    /// (zero-length Mixed segments). A bundle with one track labels its segments Mixed even when that track is Others.
+    /// </summary>
+    public static (double Start, double End)[] Turns(IEnumerable<Segment> transcript) =>
+    [
+        .. transcript.Where(s => s.Channel != Channel.You && s.End > s.Start)
+            .Select(s => (s.Start.TotalSeconds, s.End.TotalSeconds)).OrderBy(t => t.Item1),
+    ];
+
     public async Task<MeetingSpeakers> SeparateAsync(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var track = TrackFor(store, id) ?? throw new InvalidOperationException(SpeakerText.PROPOSED_NothingToSeparate);
         if (track == Channel.You) throw new InvalidOperationException("The You track is never separated.");
         var previous = store.ReadSpeakers(id);
+        var turns = Turns(store.ReadTranscript(id));
         var result = await Task.Run(() =>
         {
             var samples = ReadSamples(store, id, track, cancellationToken);
@@ -67,27 +91,49 @@ public sealed class SpeakerSeparator(IMeetingStore store, ISpeakerTurnFinder tur
         return result;
     }
 
-    /// <summary>The pipeline on samples: turns, one embedding per turn, clustering, speakers numbered by first appearance.</summary>
-    internal static SpeakerTurn[] Diarize(float[] samples, ISpeakerTurnFinder turns, IVoiceEmbedder embedder, double threshold,
-        IProgress<double>? progress, CancellationToken cancellationToken)
+    /// <summary>The sample ranges [From, To) of one segment's windows (see <see cref="WindowSeconds"/>), within the track.</summary>
+    internal static IEnumerable<(int From, int To)> Windows(double start, double end, int trackLength)
     {
-        var found = turns.FindTurns(samples, threshold, progress, cancellationToken);
-        var kept = new List<(double Start, double End)>();
+        var from = (int)Math.Clamp(Math.Round(start * Rate), 0, trackLength);
+        var to = (int)Math.Clamp(Math.Round(end * Rate), from, trackLength);
+        int window = (int)(WindowSeconds * Rate), hop = (int)(HopSeconds * Rate), floor = (int)(MinWindowSeconds * Rate);
+        if (to - from < floor) yield break;
+        if (to - from <= window) { yield return (from, to); yield break; }
+        var last = from;
+        for (var at = from; at + window <= to; at += hop) yield return (last = at, at + window);
+        if (last + window < to) yield return (to - window, to); // the tail, so the segment's last words are heard
+    }
+
+    /// <summary>
+    /// The pipeline on samples: windows of each segment, one embedding per window, clustering of all windows, the majority speaker
+    /// of each segment's windows (a tie goes to the speaker of the earliest of the tied windows), speakers numbered by first appearance.
+    /// </summary>
+    internal static SpeakerTurn[] Diarize(float[] samples, IReadOnlyList<(double Start, double End)> segments, IVoiceEmbedder embedder,
+        double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        var windows = segments.SelectMany((s, i) => Windows(s.Start, s.End, samples.Length).Select(w => (Segment: i, w.From, w.To))).ToArray();
+        var owners = new List<int>();
         var embeddings = new List<float[]>();
-        foreach (var (start, end) in found.OrderBy(t => t.Start))
+        for (var k = 0; k < windows.Length; k++)
         {
             MeetingProcessingConsent.Check(cancellationToken);
-            var from = (int)Math.Clamp(start * 16000, 0, samples.Length);
-            var to = (int)Math.Clamp(end * 16000, from, samples.Length);
-            // simplification: a turn too short for the model to embed is dropped, so its words take the nearest turn's speaker
-            // (MeetingSpeakers.SpeakerOf). Ceiling: a one-word interjection by a third voice is not counted as a voice. Trigger to
-            // retire: a report of a missed short speaker; then embed short turns with their neighbours.
-            if (embedder.Embed(samples[from..to]) is not { } embedding) continue;
-            kept.Add((start, end));
-            embeddings.Add(embedding);
+            var (segment, from, to) = windows[k];
+            if (embedder.Embed(samples[from..to]) is { } embedding) { owners.Add(segment); embeddings.Add(embedding); }
+            progress?.Report((k + 1) / (double)windows.Length);
         }
         var labels = SpeakerClustering.Cluster(embeddings, threshold);
-        return [.. kept.Select((t, i) => new SpeakerTurn(Math.Round(t.Start, 3), Math.Round(t.End, 3), labels[i] + 1))];
+        var turns = new List<(double Start, double End, int Label)>();
+        for (var i = 0; i < segments.Count; i++)
+        {
+            var heard = Enumerable.Range(0, owners.Count).Where(k => owners[k] == i).Select(k => labels[k]).ToList();
+            if (heard.Count == 0) continue;
+            // GroupBy keeps first-appearance order, so the first group with the top count holds the earliest tied window.
+            var majority = heard.GroupBy(l => l).Select(g => (Label: g.Key, Count: g.Count())).Aggregate((best, next) => next.Count > best.Count ? next : best);
+            turns.Add((segments[i].Start, segments[i].End, majority.Label));
+        }
+        var numbers = new Dictionary<int, int>();
+        foreach (var turn in turns) numbers.TryAdd(turn.Label, numbers.Count + 1);
+        return [.. turns.Select(t => new SpeakerTurn(Math.Round(t.Start, 3), Math.Round(t.End, 3), numbers[t.Label]))];
     }
 
     /// <summary>
@@ -110,56 +156,33 @@ public sealed class SpeakerSeparator(IMeetingStore store, ISpeakerTurnFinder tur
     }
 
     /// <summary>The whole track as 16 kHz mono samples (the store holds PCM16 mono 16 kHz WAV, sealed).</summary>
-    // simplification: the whole track is held in memory (an hour is about 230 MB of floats), because the segmentation needs it in
-    // one array. Ceiling: very long meetings on small machines. Trigger to retire: a meeting over two hours, or an out-of-memory
-    // report; then run the segmentation over overlapping windows.
+    // simplification: the whole track is held in memory (an hour is about 230 MB of floats), though only the segments' stretches
+    // are embedded. Ceiling: very long meetings on small machines. Trigger to retire: a meeting over two hours, or an out-of-memory
+    // report; then read only each segment's stretch.
     internal static float[] ReadSamples(IMeetingStore store, MeetingId id, Channel channel, CancellationToken cancellationToken)
     {
         using var audio = store.OpenAudio(id, channel);
         return ReadWav(audio, cancellationToken);
     }
 
-    /// <summary>A 16 kHz mono PCM16 WAV as samples; anything else is refused.</summary>
+    /// <summary>A 16 kHz mono PCM16 WAV as samples; anything else is refused (<see cref="StoreWav"/>).</summary>
     internal static float[] ReadWav(Stream audio, CancellationToken cancellationToken)
     {
-        var header = new byte[12];
-        audio.ReadExactly(header);
-        if (!header.AsSpan(0, 4).SequenceEqual("RIFF"u8) || !header.AsSpan(8, 4).SequenceEqual("WAVE"u8)) throw new InvalidDataException("Not a WAV track.");
-        var chunk = new byte[8];
-        var formatSeen = false;
-        while (true)
+        var length = StoreWav.SeekData(audio, () => new InvalidDataException("The track is not a 16 kHz mono PCM16 WAV."), cancellationToken);
+        var samples = new float[length / 2];
+        var buffer = new byte[1 << 16];
+        try
         {
-            audio.ReadExactly(chunk);
-            var length = BinaryPrimitives.ReadUInt32LittleEndian(chunk.AsSpan(4));
-            if (chunk.AsSpan(0, 4).SequenceEqual("fmt "u8))
-            {
-                if (length is < 16 or > 4096) throw new InvalidDataException("Invalid WAV format.");
-                var format = new byte[length];
-                audio.ReadExactly(format);
-                if (BinaryPrimitives.ReadUInt16LittleEndian(format) != 1 || BinaryPrimitives.ReadUInt16LittleEndian(format.AsSpan(2)) != 1 ||
-                    BinaryPrimitives.ReadUInt32LittleEndian(format.AsSpan(4)) != 16000 || BinaryPrimitives.ReadUInt16LittleEndian(format.AsSpan(14)) != 16)
-                    throw new InvalidDataException("The track is not 16 kHz mono PCM16.");
-                formatSeen = true;
-                continue;
-            }
-            if (!chunk.AsSpan(0, 4).SequenceEqual("data"u8))
-            {
-                audio.ReadExactly(new byte[length + (length & 1)]);
-                continue;
-            }
-            if (!formatSeen || length % 2 != 0) throw new InvalidDataException("Invalid WAV data.");
-            var samples = new float[length / 2];
-            var buffer = new byte[1 << 16];
             for (long done = 0; done < samples.Length;)
             {
                 MeetingProcessingConsent.Check(cancellationToken);
                 var count = (int)Math.Min(buffer.Length, (samples.Length - done) * 2);
                 audio.ReadExactly(buffer.AsSpan(0, count));
-                for (var i = 0; i < count / 2; i++) samples[done + i] = BinaryPrimitives.ReadInt16LittleEndian(buffer.AsSpan(i * 2)) / 32768f;
+                StoreWav.ToSamples(buffer.AsSpan(0, count), samples.AsSpan((int)done, count / 2));
                 done += count / 2;
             }
-            Array.Clear(buffer);
-            return samples;
         }
+        finally { Array.Clear(buffer); }
+        return samples;
     }
 }

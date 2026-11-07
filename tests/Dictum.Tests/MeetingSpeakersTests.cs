@@ -16,8 +16,8 @@ namespace Dictum.Tests;
 
 /// <summary>
 /// Synthetic "voices" for speaker separation (design 1.6 B): a voice is a run of constant samples at level voice / 10, silence (0)
-/// separates turns. <see cref="LevelTurnFinder"/> finds the runs and <see cref="LevelEmbedder"/> returns a fixed vector per level, so
-/// clustering, mapping, naming, storage and export are deterministic. No model, no real recording.
+/// separates turns. The turns are the meeting's transcript segments, and <see cref="LevelEmbedder"/> returns a fixed vector per level,
+/// so windowing, clustering, mapping, naming, storage and export are deterministic. No model, no real recording.
 /// </summary>
 internal static class SyntheticVoices
 {
@@ -60,32 +60,27 @@ internal static class SyntheticVoices
     {
         [1] = [1, 0, 0], [2] = [0.45f, (float)Math.Sqrt(1 - 0.45 * 0.45), 0], [3] = [0, 0, 1],
     };
-}
 
-internal sealed class LevelTurnFinder : ISpeakerTurnFinder
-{
-    public float[]? Heard { get; private set; }
-    public double? Threshold { get; private set; }
-    public IReadOnlyList<(double Start, double End)> FindTurns(float[] samples16kMono, double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
+    /// <summary>Replaces the meeting's speakers file with one a later Dictum might write (version 2), sealed with the meeting's own key.</summary>
+    public static void WriteNewerSpeakersFile(MeetingFixture files, IMeetingStore store, MeetingId id, string? root = null)
     {
-        (Heard, Threshold) = ((float[])samples16kMono.Clone(), threshold);
-        var turns = new List<(double, double)>();
-        for (var i = 0; i < samples16kMono.Length;)
-        {
-            if (samples16kMono[i] == 0) { i++; continue; }
-            var start = i;
-            while (i < samples16kMono.Length && samples16kMono[i] != 0) i++;
-            turns.Add((start / 16000.0, i / 16000.0));
-        }
-        progress?.Report(1);
-        return turns;
+        var key = MeetingCrypto.Unwrap(store.Read(id).Wraps.Single(), files.Keyring.OwnerKey());
+        using var json = new MemoryStream("""{"version":2,"model":"later@00000000","threshold":0.5,"turns":[{"start":0,"end":2,"speaker":1}],"names":{"1":"Michelle Example"},"voices":[[1,0]]}"""u8.ToArray());
+        MeetingCrypto.Encrypt(json, Path.Combine(root ?? files.Root, id.Value, "speakers.json.enc"), key, $"{id.Value}/speakers.json.enc");
     }
 }
 
+/// <summary>A voice per window: the level heard most often in it (silence aside), as a fixed vector. Every window it hears is kept.</summary>
 internal sealed class LevelEmbedder(Dictionary<int, float[]> voices) : IVoiceEmbedder
 {
-    public float[]? Embed(float[] samples16kMono) =>
-        samples16kMono.Length < 1600 ? null : voices[(int)Math.Round(samples16kMono.Average() * 10)];
+    public List<float[]> Heard { get; } = [];
+    public float[]? Embed(float[] samples16kMono)
+    {
+        Heard.Add(samples16kMono);
+        if (samples16kMono.Length < 1600) return null;
+        var level = samples16kMono.Where(s => s != 0).GroupBy(s => (int)Math.Round(s * 10)).MaxBy(g => g.Count())!.Key;
+        return voices[level];
+    }
 }
 
 public sealed class MeetingSpeakersTests
@@ -103,14 +98,14 @@ public sealed class MeetingSpeakersTests
     private static Segment At((int Voice, double Start, double End) turn, Channel channel, string text) =>
         new(TimeSpan.FromSeconds(turn.Start), TimeSpan.FromSeconds(turn.End), channel, text);
 
-    private static SpeakerSeparator Separator(IMeetingStore store, Dictionary<int, float[]> voices, LevelTurnFinder? finder = null) =>
-        new(store, finder ?? new LevelTurnFinder(), new LevelEmbedder(voices), "synthetic@00000000");
+    private static SpeakerSeparator Separator(IMeetingStore store, Dictionary<int, float[]> voices, LevelEmbedder? embedder = null) =>
+        new(store, embedder ?? new LevelEmbedder(voices), "synthetic@00000000");
 
     [Fact]
     public async Task Three_voices_become_Other_1_to_3_in_order_of_first_appearance()
     {
         using var files = new MeetingFixture(); var store = files.Store();
-        var (samples, turns) = SyntheticVoices.Track((2, 2), (3, 1.5), (2, 1), (1, 2));
+        var (samples, turns) = SyntheticVoices.Track((2, 2), (3, 1.5), (2, 1.5), (1, 2)); // each at least the 1.5 s window floor
         var id = Meeting(files, store, others: samples, segments: [.. turns.Select((t, i) => At(t, Channel.Others, $"Synthetic line {i}"))]);
 
         var result = await Separator(store, SyntheticVoices.Distinct()).SeparateAsync(id, MeetingSpeakers.DefaultThreshold, null, TestContext.Current.CancellationToken);
@@ -131,12 +126,14 @@ public sealed class MeetingSpeakersTests
         var (you, youTurns) = SyntheticVoices.Track((2, 1), (3, 1), (2, 1));
         var id = Meeting(files, store, others: others, you: you,
             segments: [At(youTurns[0], Channel.You, "Budget review moves to Friday"), At(otherTurns[0], Channel.Others, "Supplier contract renewal is pending")]);
-        var finder = new LevelTurnFinder();
+        var embedder = new LevelEmbedder(SyntheticVoices.Distinct());
 
-        var result = await Separator(store, SyntheticVoices.Distinct(), finder).SeparateAsync(id, 0.5, null, TestContext.Current.CancellationToken);
+        var result = await Separator(store, SyntheticVoices.Distinct(), embedder).SeparateAsync(id, 0.5, null, TestContext.Current.CancellationToken);
 
-        Assert.Equal(others.Length, finder.Heard!.Length); // the Others track (voice 1 only), never the You track (voices 2 and 3)
-        Assert.All(finder.Heard.Where(s => s != 0), s => Assert.Equal(1, Math.Round(s * 10)));
+        // The Others track (voice 1 only), never the You track (voices 2 and 3), and only the Others segment's stretch of it.
+        Assert.NotEmpty(embedder.Heard);
+        Assert.All(embedder.Heard.SelectMany(w => w).Where(s => s != 0), s => Assert.Equal(1, Math.Round(s * 10)));
+        Assert.Equal([new SpeakerTurn(Math.Round(otherTurns[0].Start, 3), Math.Round(otherTurns[0].End, 3), 1)], result.Turns);
         Assert.Equal(1, result.Count);
         var transcript = store.ReadTranscript(id);
         Assert.Null(result.LabelOf(transcript.Single(s => s.Channel == Channel.You)));
@@ -290,10 +287,9 @@ public sealed class MeetingSpeakersTests
     [Fact]
     public void Allowed_speaker_models_are_pinned()
     {
+        // One model only (owner decision, 07/11/2026): CAM++. pyannote's segmentation model is not in the catalogue, and never returns.
         var expected = new (string File, long Bytes, string Sha256, string Url)[]
         {
-            ("pyannote-segmentation-3.0.onnx", 5_992_913, "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
-                "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx"),
             ("3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx", 29_596_978, "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
                 "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/8be2a75c9ed7a590538b268e46fbb65e1aa9d208/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"),
         };
@@ -305,13 +301,15 @@ public sealed class MeetingSpeakersTests
             Assert.Matches("/resolve/[0-9a-f]{40}/", spec.Uri.AbsolutePath); // a pinned commit, never a branch
             Assert.False(spec.RequiresLogin);
             Assert.Same(spec, ModelIntegrity.Expected(Path.Combine("C:\\any", spec.FileName))); // hash-checked before first load
-            foreach (var excluded in new[] { "reverb", "diarizen", "simam", "voxblink", "redimnet", "wespeaker", "resnet" })
+            foreach (var excluded in new[] { "reverb", "diarizen", "simam", "voxblink", "redimnet", "wespeaker", "resnet", "pyannote", "segmentation" })
             {
                 Assert.DoesNotContain(excluded, spec.FileName, StringComparison.OrdinalIgnoreCase);
                 Assert.DoesNotContain(excluded, spec.Uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase);
             }
         }
-        Assert.Equal(["reverb", "diarizen", "simam", "voxblink", "redimnet"], SpeakerModels.Excluded);
+        Assert.Equal(["reverb", "diarizen", "simam", "voxblink", "redimnet", "pyannote"], SpeakerModels.Excluded);
+        Assert.Null(SpeakerModels.FindByFile("pyannote-segmentation-3.0.onnx")); // nothing downloads, verifies or keeps it
+        Assert.Null(ModelIntegrity.Expected(Path.Combine("C:\\any", "pyannote-segmentation-3.0.onnx")));
         Assert.Equal("3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx@357a834f", SpeakerModels.Tag(SpeakerModels.Embedding));
     }
 
@@ -327,6 +325,111 @@ public sealed class MeetingSpeakersTests
     }
 
     [Fact]
+    public void A_merge_exactly_at_the_threshold_is_not_made()
+    {
+        // Orthogonal voices are exactly 1 apart (1 - cosine 0), and identical ones exactly 0: cutree_cdist merges only below the threshold.
+        float[][] apart = [[1, 0], [0, 1]];
+        Assert.Equal([0, 1], SpeakerClustering.Cluster(apart, 1.0));
+        Assert.Equal([0, 0], SpeakerClustering.Cluster(apart, Math.BitIncrement(1.0)));
+        Assert.Equal([0, 1], SpeakerClustering.Cluster([[1, 0], [1, 0]], 0.0));
+    }
+
+    [Fact]
+    public void Clustering_matches_the_plain_complete_linkage_loop_on_random_voices()
+    {
+        var random = new Random(20261107);
+        for (var round = 0; round < 60; round++)
+        {
+            var points = Enumerable.Range(0, random.Next(1, 40)).Select(_ => Enumerable.Range(0, 6).Select(_ => (float)(random.NextDouble() * 2 - 1)).ToArray()).ToArray();
+            var threshold = random.NextDouble() * 1.2;
+            Assert.Equal(PlainCompleteLinkage(points, threshold), SpeakerClustering.Cluster(points, threshold));
+            var count = random.Next(1, points.Length + 1);
+            Assert.Equal(PlainCompleteLinkage(points, threshold, count), SpeakerClustering.Cluster(points, threshold, count));
+        }
+    }
+
+    // The loop SpeakerClustering replaced (07/11/2026, O(n^3) and slow for a meeting's windows): kept here as the reference it must match.
+    private static int[] PlainCompleteLinkage(float[][] embeddings, double threshold, int count = 0)
+    {
+        var n = embeddings.Length;
+        var unit = embeddings.Select(v => { var l = Math.Sqrt(v.Sum(x => (double)x * x)); return v.Select(x => (float)(x / l)).ToArray(); }).ToArray();
+        var distance = new float[n, n];
+        for (var i = 0; i < n; i++)
+            for (var j = i + 1; j < n; j++)
+                distance[i, j] = distance[j, i] = (float)Math.Max(0, 1 - unit[i].Zip(unit[j], (a, b) => (double)a * b).Sum());
+        var clusters = Enumerable.Range(0, n).Select(i => new List<int> { i }).ToList();
+        while (clusters.Count > 1 && (count <= 0 || clusters.Count > count))
+        {
+            var (a, b, height) = (-1, -1, double.PositiveInfinity);
+            for (var i = 0; i < clusters.Count; i++)
+                for (var j = i + 1; j < clusters.Count; j++)
+                {
+                    var link = clusters[i].Max(x => clusters[j].Max(y => distance[x, y]));
+                    if (link < height) (a, b, height) = (i, j, link);
+                }
+            if (count <= 0 && height >= threshold) break;
+            clusters[a].AddRange(clusters[b]);
+            clusters.RemoveAt(b);
+        }
+        var labels = new int[n];
+        var order = clusters.OrderBy(c => c.Min()).ToList();
+        for (var label = 0; label < order.Count; label++)
+            foreach (var member in order[label]) labels[member] = label;
+        return labels;
+    }
+
+    [Fact]
+    public void Each_segment_is_cut_into_overlapping_windows_and_a_short_one_into_none()
+    {
+        const int track = 16000 * 60;
+        Assert.Empty(SpeakerSeparator.Windows(0, 1.49, track)); // under the 1.5 s floor
+        Assert.Equal([(0, 24000)], SpeakerSeparator.Windows(0, 1.5, track)); // a short segment is one window
+        Assert.Equal([(16000, 48000)], SpeakerSeparator.Windows(1, 3, track));
+        Assert.Equal([(0, 32000), (16000, 48000), (32000, 64000)], SpeakerSeparator.Windows(0, 4, track)); // 2 s, every 1 s
+        Assert.Equal([(0, 32000), (8000, 40000)], SpeakerSeparator.Windows(0, 2.5, track)); // the tail window ends at the segment's end
+        Assert.Equal([(0, 30000)], SpeakerSeparator.Windows(0, 5, 30000)); // never past the track
+        Assert.Empty(SpeakerSeparator.Windows(0, 5, 20000));
+        Assert.Equal(
+            [(0.0, 2.0), (3.0, 5.0)],
+            SpeakerSeparator.Turns([new(TimeSpan.Zero, TimeSpan.FromSeconds(2), Channel.Others, "a"), new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(4), Channel.You, "b"),
+                new(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5), Channel.Mixed, "c"), new(TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(4), Channel.Mixed, "typed note")]));
+    }
+
+    [Fact]
+    public void A_segment_takes_the_majority_speaker_of_its_windows_and_a_tie_goes_to_the_earliest_window()
+    {
+        // 0-2 s voice 1 alone. 3-7 s: voice 1 for 1.2 s, then voice 2: windows 3-5 (mostly 1), 4-6 and 5-7 (voice 2): voice 2.
+        // 8-10.5 s: voice 2 for 1.25 s, then voice 1: windows 8-10 (mostly 2) and 8.5-10.5 (mostly 1), a tie the earlier window decides.
+        var samples = new float[16000 * 21 / 2];
+        void Fill(double from, double to, int voice) { for (var i = (int)(from * 16000); i < (int)(to * 16000); i++) samples[i] = voice / 10f; }
+        Fill(0, 2, 1); Fill(3, 4.2, 1); Fill(4.2, 7, 2); Fill(8, 9.25, 2); Fill(9.25, 10.5, 1);
+        var turns = SpeakerSeparator.Diarize(samples, [(0, 2), (3, 7), (8, 10.5)], new LevelEmbedder(SyntheticVoices.Distinct()), 0.5, null,
+            TestContext.Current.CancellationToken);
+        Assert.Equal([new SpeakerTurn(0, 2, 1), new SpeakerTurn(3, 7, 2), new SpeakerTurn(8, 10.5, 2)], turns);
+    }
+
+    [Fact]
+    public async Task A_speakers_file_from_a_later_version_reads_as_none_and_separating_again_replaces_it()
+    {
+        using var files = new MeetingFixture(); var store = files.Store();
+        var (samples, turns) = SyntheticVoices.Track((1, 2), (2, 2));
+        var id = Meeting(files, store, others: samples, segments: [At(turns[0], Channel.Others, "Synthetic first"), At(turns[1], Channel.Others, "Synthetic second")]);
+        SyntheticVoices.WriteNewerSpeakersFile(files, store, id);
+
+        Assert.Null(store.ReadSpeakers(id)); // plain channel labels, not an error
+        Assert.True(store.HasSpeakers(id)); // still there for Delete to mention
+        Assert.Contains("Others: Synthetic first", store.ExportMarkdown(id)); // export works
+        var separated = await Separator(store, SyntheticVoices.Distinct()).SeparateAsync(id, 0.5, null, TestContext.Current.CancellationToken);
+        Assert.Equal(separated.Turns, store.ReadSpeakers(id)!.Turns); // identify again works and writes this version's file
+        Assert.Contains("Other 2: Synthetic second", store.ExportMarkdown(id));
+
+        // A file that fails authentication is still an error: tampering is loud.
+        var path = files.At(id, "speakers.json.enc");
+        var bytes = File.ReadAllBytes(path); bytes[^1] ^= 1; File.WriteAllBytes(path, bytes);
+        Assert.ThrowsAny<System.Security.Cryptography.CryptographicException>(() => store.ReadSpeakers(id));
+    }
+
+    [Fact]
     public void A_speakers_file_with_a_bad_name_or_turn_is_refused()
     {
         var good = new MeetingSpeakers(1, "m@00000000", 0.5, [new(0, 1, 1)], new Dictionary<string, string>());
@@ -336,6 +439,44 @@ public sealed class MeetingSpeakersTests
         Assert.Throws<InvalidDataException>(() => (good with { Names = new Dictionary<string, string> { ["1"] = new string('x', 81) } }).Validated());
         Assert.Throws<InvalidDataException>(() => (good with { Version = 2 }).Validated());
         Assert.Throws<InvalidDataException>(() => (good with { Turns = [new(2, 1, 1)] }).Validated());
+        Assert.Throws<InvalidDataException>(() => (good with { Names = new Dictionary<string, string> { ["1"] = "Ana (HR)" } }).Validated());
+    }
+
+    // One name rule (MeetingSpeakers.IsValidName) for save, read and the name box: what the summary validator accepts as an owner.
+    [Theory]
+    [InlineData("Ana (HR)")]
+    [InlineData("Smith, Ana")]
+    [InlineData("Ana \"Al\" Lee")]
+    [InlineData("Re: Ana")]
+    [InlineData("Ana/Lee")]
+    [InlineData("Line\nbreak")]
+    [InlineData("Other 2")] // shaped like a label: it would read as another speaker
+    [InlineData("Other 12")]
+    [InlineData(" Other 1 ")]
+    public void A_name_the_owner_rule_would_refuse_is_refused_at_save(string name)
+    {
+        Assert.False(MeetingSpeakers.IsValidName(name));
+        var speakers = new MeetingSpeakers(1, "m@00000000", 0.5, [new(0, 1, 1), new(1, 2, 2)], new Dictionary<string, string>());
+        Assert.Throws<ArgumentException>(() => speakers.WithNames(new Dictionary<int, string> { [1] = name }));
+        Assert.Throws<InvalidDataException>(() => (speakers with { Names = new Dictionary<string, string> { ["1"] = name } }).Validated());
+    }
+
+    [Theory]
+    [InlineData("Michelle Example")]
+    [InlineData("Ana O’Neil-Ng")]
+    [InlineData("Dr. A. Sample")]
+    [InlineData("R2")]
+    [InlineData("  Priya Example  ")]
+    [InlineData("Others")] // not "Other n"
+    [InlineData("other 2")] // the label is matched exactly (ordinal), as the owner rule now is
+    public void A_name_the_owner_rule_accepts_is_saved_trimmed(string name)
+    {
+        Assert.True(MeetingSpeakers.IsValidName(name));
+        var speakers = new MeetingSpeakers(1, "m@00000000", 0.5, [new(0, 1, 1)], new Dictionary<string, string>())
+            .WithNames(new Dictionary<int, string> { [1] = name, [2] = "  " }).Validated();
+        Assert.Equal(name.Trim(), speakers.Label(1));
+        Assert.False(MeetingSpeakers.IsValidName(new string('x', MeetingSpeakers.MaxNameLength + 1)));
+        Assert.False(MeetingSpeakers.IsValidName("   "));
     }
 
     private sealed class NoTranscriber : IMeetingTranscriber

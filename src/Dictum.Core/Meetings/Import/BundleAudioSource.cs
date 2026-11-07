@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Dictum.Audio;
@@ -33,74 +32,34 @@ internal sealed class BundleAudioSource(IMeetingStore store, MeetingId id, Chann
     private async IAsyncEnumerable<(Channel Channel, CapturedAudio Part, TimeSpan Offset)> ReadTrack(Channel channel,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        using var audio = store.OpenAudio(id, channel);
+        var length = StoreWav.SeekData(audio, BundleFormat.Invalid, cancellationToken);
+        var bytes = new byte[16000 * 2 * 30];
+        long samplesRead = 0;
+        try
         {
-            using var audio = store.OpenAudio(id, channel);
-            var header = new byte[12]; audio.ReadExactly(header);
-            if (!header.AsSpan(0, 4).SequenceEqual("RIFF"u8) || !header.AsSpan(8, 4).SequenceEqual("WAVE"u8)) throw BundleFormat.Invalid();
-            var chunk = new byte[8];
-            var formatSeen = false;
-            while (true)
+            for (var left = length; left > 0;)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                audio.ReadExactly(chunk);
-                var length = BinaryPrimitives.ReadUInt32LittleEndian(chunk.AsSpan(4));
-                if (chunk.AsSpan(0, 4).SequenceEqual("fmt "u8))
+                MeetingProcessingConsent.Check(cancellationToken);
+                var count = (int)Math.Min(bytes.Length, left);
+                audio.ReadExactly(bytes.AsSpan(0, count));
+                var samples = new float[count / 2];
+                StoreWav.ToSamples(bytes.AsSpan(0, count), samples);
+                // Reuse L5's pause segmenter after PCM decoding. Bound each input window to 30 s.
+                // simplification: FileSource ends a segment at each window boundary; retire when it accepts streaming PCM blocks.
+                try
                 {
-                    if (length < 16 || length > 4096) throw BundleFormat.Invalid();
-                    var format = new byte[length]; audio.ReadExactly(format);
-                    if (BinaryPrimitives.ReadUInt16LittleEndian(format) != 1 || BinaryPrimitives.ReadUInt16LittleEndian(format.AsSpan(2)) != 1 ||
-                        BinaryPrimitives.ReadUInt32LittleEndian(format.AsSpan(4)) != 16000 || BinaryPrimitives.ReadUInt16LittleEndian(format.AsSpan(14)) != 16)
-                        throw BundleFormat.Invalid();
-                    formatSeen = true;
-                }
-                else if (chunk.AsSpan(0, 4).SequenceEqual("data"u8))
-                {
-                    if (!formatSeen || length % 2 != 0) throw BundleFormat.Invalid();
-                    var bytes = new byte[16000 * 2 * 30];
-                    long samplesRead = 0;
-                    try
+                    var source = new FileSource(new CapturedAudio(samples, 0));
+                    await foreach (var part in source.ReadAsync(cancellationToken))
                     {
-                        for (long left = length; left > 0;)
-                        {
-                            MeetingProcessingConsent.Check(cancellationToken);
-                            var count = (int)Math.Min(bytes.Length, left);
-                            audio.ReadExactly(bytes.AsSpan(0, count));
-                            var samples = new float[count / 2];
-                            for (var i = 0; i < samples.Length; i++) samples[i] = BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(i * 2)) / 32768f;
-                            // Reuse L5's pause segmenter after PCM decoding. Bound each input window to 30 s.
-                            // simplification: FileSource ends a segment at each window boundary; retire when it accepts streaming PCM blocks.
-                            try
-                            {
-                                var source = new FileSource(new CapturedAudio(samples, 0));
-                                await foreach (var part in source.ReadAsync(cancellationToken))
-                                {
-                                    try { yield return (tracks.Length == 1 ? Channel.Mixed : channel, part.Part, TimeSpan.FromSeconds(samplesRead / 16000d) + part.Offset); }
-                                    finally { Array.Clear(part.Part.Samples); }
-                                }
-                            }
-                            finally { Array.Clear(samples); }
-                            samplesRead += samples.Length; left -= count;
-                            await Task.CompletedTask;
-                        }
+                        try { yield return (tracks.Length == 1 ? Channel.Mixed : channel, part.Part, TimeSpan.FromSeconds(samplesRead / 16000d) + part.Offset); }
+                        finally { Array.Clear(part.Part.Samples); }
                     }
-                    finally { CryptographicOperations.ZeroMemory(bytes); }
-                    break;
                 }
-                else
-                {
-                    var skip = new byte[81920];
-                    try
-                    {
-                        for (long left = length; left > 0;)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var count = (int)Math.Min(skip.Length, left); audio.ReadExactly(skip.AsSpan(0, count)); left -= count;
-                        }
-                    }
-                    finally { CryptographicOperations.ZeroMemory(skip); }
-                }
-                if ((length & 1) != 0 && audio.ReadByte() == -1) throw BundleFormat.Invalid();
+                finally { Array.Clear(samples); }
+                samplesRead += samples.Length; left -= count;
             }
         }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
     }
 }

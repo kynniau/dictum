@@ -92,17 +92,15 @@ internal sealed class MeetingsPage : SettingsPage
         _ = RefreshWarning(++_warningVersion, _folder.Text);
     }
     /// <summary>
-    /// Downloads whichever speaker model is missing through the one model-download path (1.6 B): the usual question (names, size,
-    /// huggingface.co), refused under offline_only, each file held to its pinned size and SHA-256.
+    /// Downloads the speaker model, if it is missing, through the one model-download path (1.6 B): the usual question (name, size,
+    /// huggingface.co), refused under offline_only, the file held to its pinned size and SHA-256.
     /// </summary>
     private void DownloadSpeakerModels()
     {
-        var folder = Shell.Paths.ModelsDir(Shell.Settings);
-        var located = SpeakerModels.Locate(Shell.Paths, Shell.Settings);
-        var missing = new[] { (SpeakerModels.Segmentation, located.Segmentation), (SpeakerModels.Embedding, located.Embedding) }
-            .Where(m => m.Item2 is null).Select(m => (m.Item1, Path.Combine(folder, m.Item1.FileName))).ToList();
-        if (missing.Count == 0) { Refresh(); return; }
-        Shell.Models.ApplyWithDownloads(SpeakerText.PROPOSED_DownloadNote, missing, [], finished: _ => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh));
+        if (SpeakerModels.Locate(Shell.Paths, Shell.Settings) is not null) { Refresh(); return; }
+        var target = Path.Combine(Shell.Paths.ModelsDir(Shell.Settings), SpeakerModels.Embedding.FileName);
+        Shell.Models.ApplyWithDownloads(SpeakerText.PROPOSED_DownloadNote, [(SpeakerModels.Embedding, target)], [],
+            finished: _ => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh));
     }
     private void EditType(SummaryTemplate? type)
     {

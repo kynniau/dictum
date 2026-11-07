@@ -6,8 +6,8 @@ using Dictum.Transcribe;
 namespace Dictum.Cli;
 
 /// <summary>
-/// Dictum.exe --speaker-check &lt;folder&gt; (design 1.6 B): <see cref="SpeakerCheck"/> with the downloaded speaker models, each held to
-/// its pinned size and SHA-256 first. Makes no network call. Exit 0, or 1 when the models are missing or nothing could be scored.
+/// Dictum.exe --speaker-check &lt;folder&gt; (design 1.6 B): <see cref="SpeakerCheck"/> with the downloaded speaker model, held to its
+/// pinned size and SHA-256 first. Makes no network call. Exit 0, or 1 when the model is missing or nothing could be scored.
 /// </summary>
 public static class SpeakerCheckCommand
 {
@@ -18,17 +18,13 @@ public static class SpeakerCheckCommand
     public static int Run(CliOptions options, AppPaths paths, ILog log)
     {
         var settings = SettingsLoader.LoadFile(paths.SettingsFile).Settings;
-        if (SpeakerModels.Locate(paths, settings) is not ({ } segmentation, { } embedding))
+        if (SpeakerModels.Locate(paths, settings) is not { } embedding)
         {
-            Console.Error.WriteLine($"error: the speaker models are not in the models folder ({SpeakerModels.Segmentation.FileName}, {SpeakerModels.Embedding.FileName}). Download them in Settings > Meetings.");
+            Console.Error.WriteLine($"error: the speaker model is not in the models folder ({SpeakerModels.Embedding.FileName}). Download it in Settings > Meetings.");
             return 1;
         }
-        var integrity = new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings));
-        integrity.Verify(segmentation);
-        integrity.Verify(embedding);
-        var threads = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
-        using var embedder = new SherpaVoiceEmbedder(embedding, threads);
-        using var turns = new SherpaTurnFinder(segmentation, embedding, threads);
-        return SpeakerCheck.Run(options.WavPath!, turns, embedder, Console.Out);
+        new ModelIntegrity(paths.VerifiedModelsFile, log, () => ModelFolders.LookupOrder(paths, settings)).Verify(embedding);
+        using var embedder = new SherpaVoiceEmbedder(embedding, Math.Clamp(Environment.ProcessorCount / 2, 1, 4));
+        return SpeakerCheck.Run(options.WavPath!, embedder, Console.Out);
     }
 }

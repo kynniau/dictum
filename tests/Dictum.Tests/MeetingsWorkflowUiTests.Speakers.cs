@@ -15,14 +15,14 @@ public sealed partial class MeetingsWorkflowUiTests
     public Task Identify_speakers_rename_and_fewer_or_more_are_named_and_reachable_by_keyboard() => UiSession.RunAsync(async () =>
     {
         using var fixture = new Fixture();
-        var (samples, turns) = SyntheticVoices.Track((1, 2), (2, 2), (1, 1));
+        var (samples, turns) = SyntheticVoices.Track((1, 2), (2, 2), (1, 1.5));
         var id = fixture.Store.Create(fixture.Files.Meta());
         using (var audio = new MemoryStream(SyntheticVoices.Wav(samples))) fixture.Store.WriteAudio(id, Channel.Others, audio);
         fixture.Store.AppendSegments(id, [.. turns.Select((t, i) => new Segment(TimeSpan.FromSeconds(t.Start), TimeSpan.FromSeconds(t.End), Channel.Others, $"Synthetic line {i}"))]);
         var host = fixture.Host with
         {
             SpeakerModelsReady = () => true,
-            SpeakerSeparator = store => new SpeakerSeparator(store, new LevelTurnFinder(), new LevelEmbedder(SyntheticVoices.Distinct()), "synthetic@00000000"),
+            SpeakerSeparator = store => new SpeakerSeparator(store, new LevelEmbedder(SyntheticVoices.Distinct()), "synthetic@00000000"),
         };
         var window = new MeetingsWindow(host); window.Show(); window.ShowMeeting(id);
         KeyboardReach(window);
@@ -41,6 +41,13 @@ public sealed partial class MeetingsWorkflowUiTests
         Click(window, PROPOSED_SaveNames);
         Assert.Equal("Michelle Example", fixture.Store.ReadSpeakers(id)!.Label(1));
         Assert.Contains("Michelle Example: Synthetic line 2", Texts(window));
+
+        // A name the summary's owner rule could not accept is refused at Save, with the reason, and nothing is saved.
+        All<TextBox>(window).Single(b => AutomationProperties.GetName(b) == string.Format(PROPOSED_RenameSpeaker, "Other 2")).Text = "Ana (HR)";
+        Click(window, PROPOSED_SaveNames);
+        Assert.Contains(PROPOSED_InvalidName, Texts(window));
+        Assert.Equal("Other 2", fixture.Store.ReadSpeakers(id)!.Label(2));
+        Assert.Equal("Michelle Example", fixture.Store.ReadSpeakers(id)!.Label(1));
 
         Click(window, PROPOSED_FewerSpeakers);
         await Until(() => fixture.Store.ReadSpeakers(id)!.Threshold == 0.6);
@@ -69,9 +76,11 @@ public sealed partial class MeetingsWorkflowUiTests
         using var fixture = new Fixture();
         var plain = fixture.Store.Create(fixture.Files.Meta());
         var named = fixture.Store.Create(fixture.Files.Meta());
+        var later = fixture.Store.Create(fixture.Files.Meta());
         fixture.Store.WriteSpeakers(named, new MeetingSpeakers(MeetingSpeakers.CurrentVersion, "synthetic@00000000", MeetingSpeakers.DefaultThreshold,
             [new SpeakerTurn(0, 2, 1)], new Dictionary<string, string> { ["1"] = "Michelle Example" }));
-        foreach (var (id, hasNames) in new[] { (plain, false), (named, true) })
+        SyntheticVoices.WriteNewerSpeakersFile(fixture.Files, fixture.Store, later, Path.Combine(fixture.Files.Root, "meetings")); // a file this version cannot read still counts
+        foreach (var (id, hasNames) in new[] { (plain, false), (named, true), (later, true) })
         {
             var window = new MeetingsWindow(fixture.Host); window.Show(); window.ShowMeeting(id);
             Click(window, PROPOSED_Delete);

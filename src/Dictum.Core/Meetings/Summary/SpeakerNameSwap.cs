@@ -55,10 +55,15 @@ internal static class SpeakerNameSwap
 
     // One matcher: this meeting's typed names (longest first, as typed) or a label. A typed name is masked only when the only figure
     // triggers in it are digits ("R2"): a name that is itself a figure word ("June", "May Lee") stays visible to the figure rule,
-    // because masking it would also hide that month wherever it appears. Such a name fails closed: the line is refused, as before.
+    // because masking it would also hide that month wherever it appears. A name must also start with a letter: one that starts with a
+    // digit ("40", "1.5", "500k", "007") would mask that number wherever the summary states it. Either kind fails closed: the line
+    // is refused, as before.
+    private static readonly Regex StartsWithLetter = new(@"^\p{L}", RegexOptions.CultureInvariant);
+
     private static Regex Mask(MeetingSpeakers speakers)
     {
         var names = speakers.TypedNames.Distinct(StringComparer.Ordinal)
+            .Where(name => StartsWithLetter.IsMatch(name))
             .Where(name => SummaryValidator.FigureTrigger.Matches(name).All(m => m.Length == 1 && char.IsNumber(m.Value[0])))
             .OrderByDescending(name => name.Length).Select(Regex.Escape).ToList();
         var alternatives = names.Count == 0 ? LabelPattern : "(?<name>" + string.Join("|", names) + ")|" + LabelPattern;

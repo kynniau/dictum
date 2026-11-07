@@ -116,7 +116,10 @@ $native = @("whisper.dll", "ggml-whisper.dll", "ggml-base-whisper.dll", "ggml-cp
 # Batch 2 data files ship as plain text beside Dictum.exe: the profanity word list and the calibration sentences. The
 # Avalonia UI needs its Skia and HarfBuzz native libraries.
 $required = @("Dictum.exe", "profanity.txt", "calibration-sentences.txt", "libSkiaSharp.dll", "libHarfBuzzSharp.dll",
-              "models\$modelFile", "THIRD-PARTY-NOTICES.txt", "onnxruntime-ThirdPartyNotices.txt") +
+              "models\$modelFile", "THIRD-PARTY-NOTICES.txt", "onnxruntime-ThirdPartyNotices.txt",
+              # Identify speakers: sherpa-onnx's native library and the ONNX Runtime it loads, which the RID-specific publish puts
+              # beside Dictum.exe (from org.k2fsa.sherpa.onnx.runtime.win-x64's runtimes\win-x64\native).
+              "sherpa-onnx-c-api.dll", "onnxruntime.dll") +
     ($native | ForEach-Object { "runtimes\win-x64\$_" }) +
     ($native | ForEach-Object { "runtimes\noavx\win-x64\$_" }) +
     (($native + "ggml-vulkan-whisper.dll") | ForEach-Object { "runtimes\vulkan\win-x64\$_" }) +

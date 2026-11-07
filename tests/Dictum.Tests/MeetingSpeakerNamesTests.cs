@@ -31,6 +31,12 @@ public sealed class MeetingSpeakerNamesTests
             [.. Enumerable.Range(1, count).Select(n => new SpeakerTurn((n - 1) * 3, (n - 1) * 3 + 2, n))], new Dictionary<string, string>())
             .WithNames(names).Validated();
 
+    // Restore's own guards, on names the name rule now refuses at save and on read (so no stored file can hold them).
+    private static MeetingSpeakers Unchecked(int count, Dictionary<int, string> names) =>
+        new(MeetingSpeakers.CurrentVersion, "synthetic@00000000", MeetingSpeakers.DefaultThreshold,
+            [.. Enumerable.Range(1, count).Select(n => new SpeakerTurn((n - 1) * 3, (n - 1) * 3 + 2, n))],
+            names.ToDictionary(n => n.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), n => n.Value));
+
     private sealed class Harness : IDisposable
     {
         private readonly MeetingFixture _files = new();
@@ -60,7 +66,25 @@ public sealed class MeetingSpeakerNamesTests
             };
         }
 
+        public MeetingFixture Files => _files;
         public void Dispose() => _files.Dispose();
+    }
+
+    [Theory]
+    [InlineData(SummaryEngine.OwnKey)]
+    [InlineData(SummaryEngine.Local)]
+    public async Task A_speakers_file_from_a_later_version_does_not_stop_a_summary(SummaryEngine engine)
+    {
+        using var harness = new Harness(engine);
+        SyntheticVoices.WriteNewerSpeakersFile(harness.Files, harness.Store, harness.Id);
+
+        await harness.Host.Regenerate(harness.Id, "general", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(harness.Store.ReadSummary(harness.Id)); // written, with plain channel labels
+        var sent = (engine == SummaryEngine.Local ? harness.Local : harness.Cloud).Requests[0].User;
+        Assert.Contains("[00:00 Others] Synthetic first guest", sent);
+        Assert.DoesNotContain("Michelle", sent, StringComparison.Ordinal); // the later file's name is not read
+        Assert.Contains("Others: Synthetic first guest", harness.Store.ExportMarkdown(harness.Id));
     }
 
     [Theory]
@@ -125,7 +149,8 @@ public sealed class MeetingSpeakerNamesTests
     [Fact]
     public void A_name_that_reads_like_a_label_is_not_replaced_again_and_an_unnamed_speaker_keeps_its_label()
     {
-        var speakers = Speakers(3, new() { [1] = "Other 2", [2] = Second });
+        Assert.False(MeetingSpeakers.IsValidName("Other 2")); // refused at save; Restore stays safe if one ever got through
+        var speakers = Unchecked(3, new() { [1] = "Other 2", [2] = Second });
         Assert.Equal($"- Other 2 asked {Second}; Other 3 listened.", SpeakerNameSwap.Restore("- Other 1 asked Other 2; Other 3 listened.", speakers));
     }
 
@@ -133,7 +158,8 @@ public sealed class MeetingSpeakerNamesTests
     public void A_name_with_regex_or_Markdown_characters_goes_in_literally()
     {
         const string name = @"$1 (a+)* [x](y) \d _z_ $$";
-        var speakers = Speakers(2, new() { [2] = name });
+        Assert.False(MeetingSpeakers.IsValidName(name)); // refused at save; Restore stays safe if one ever got through
+        var speakers = Unchecked(2, new() { [2] = name });
         Assert.Equal($"- {name} and Other 1.", SpeakerNameSwap.Restore("- Other 2 and Other 1.", speakers));
     }
 
@@ -252,8 +278,9 @@ public sealed class MeetingSpeakerNamesTests
             TestContext.Current.CancellationToken, Speakers(2, new() { [1] = First }), inProcessEngine);
         Assert.DoesNotContain(MeetingSummariser.NotWritten, summary.Markdown);
         Assert.Equal(new ActionItem(First, "send the agenda."), Assert.Single(summary.Items));
-        // Case-insensitive like the spoken-owner rule.
-        Assert.Null(CheckAction("MICHELLE EXAMPLE", Speakers(2, new() { [1] = First })).Rejection);
+        // Exactly as typed (owner decision: ordinal): another case is not this meeting's speaker, and is not spoken either.
+        Assert.Equal(OwnerRejection, CheckAction("michelle example", Speakers(2, new() { [1] = First })).Rejection);
+        Assert.Equal(OwnerRejection, CheckAction("MICHELLE EXAMPLE", Speakers(2, new() { [1] = First })).Rejection);
     }
 
     [Theory]
@@ -272,7 +299,12 @@ public sealed class MeetingSpeakerNamesTests
         Assert.False(one.IsSpeaker("Other 2"));
         Assert.False(one.IsSpeaker("Other 0"));
         Assert.False(one.IsSpeaker("Other 01"));
-        Assert.True(one.IsSpeaker("other 1"));
+        Assert.True(one.IsSpeaker(" Other 1 "));
+        Assert.False(one.IsSpeaker("other 1")); // ordinal: exactly as Label writes it
+        Assert.False(one.IsSpeaker("OTHER 1"));
+        var named = Speakers(1, new() { [1] = First });
+        Assert.True(named.IsSpeaker(First));
+        Assert.False(named.IsSpeaker("michelle example"));
         // End to end the line is refused too (the figure rule sees "2" first, since only the meeting's own labels are masked).
         Assert.NotNull(CheckAction("Other 2", one).Rejection);
     }
@@ -301,6 +333,18 @@ public sealed class MeetingSpeakerNamesTests
         Assert.Equal(FigureRejection, Check("They said \"R2 will send it\" without a citation.", speakers).Rejection);
         Assert.Equal(FigureRejection, Check("R2 will send the agenda.", Speakers(2, new())).Rejection);
         Assert.Equal(FigureRejection, Check("R2 promised 40 units.", speakers).Rejection);
+    }
+
+    [Theory]
+    [InlineData("40", "We need 40 staff.")]
+    [InlineData("1.5", "Sales rose 1.5 times.")]
+    [InlineData("500k", "The budget is 500k.")]
+    [InlineData("007", "Room 007 is booked.")]
+    public void A_typed_name_that_starts_with_a_digit_does_not_mask_that_figure(string name, string bullet)
+    {
+        // Masking a name made of a number would hide that number wherever the summary states it; it stays a figure (fails closed).
+        Assert.True(MeetingSpeakers.IsValidName(name));
+        Assert.Equal(FigureRejection, Check(bullet, Speakers(2, new() { [2] = name })).Rejection);
     }
 
     [Fact]
