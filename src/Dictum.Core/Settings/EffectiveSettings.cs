@@ -11,14 +11,15 @@ namespace Dictum.Settings;
 /// </summary>
 public static class EffectiveSettings
 {
-    public const string PROPOSED_ParagraphPauseClamped = "cleanup.paragraph_pause_seconds {0} is outside 0 (off) or 0.5–30 seconds: using {1} seconds.";
+    // APPROVED 07/11/2026 (owner, round 1 row 21): do not reword.
+    public const string APPROVED_ParagraphPauseClamped = "cleanup.paragraph_pause_seconds {0} is outside 0 (off) or 0.5–30 seconds: using {1} seconds.";
 
     public static CleanupSettings ParagraphPause(CleanupSettings settings, Action<string> warn)
     {
         var seconds = settings.ParagraphPauseSeconds;
         var clamped = seconds <= 0 ? 0 : Math.Clamp(seconds, 0.5, 30);
         if (seconds == clamped) return settings;
-        warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, PROPOSED_ParagraphPauseClamped, seconds, clamped));
+        warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, APPROVED_ParagraphPauseClamped, seconds, clamped));
         return settings with { ParagraphPauseSeconds = clamped };
     }
 

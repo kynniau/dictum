@@ -320,7 +320,7 @@ public sealed partial class MeetingBundleTests
         var id = source.Populate(source.Store()); var path = Export(source, id);
         await Importer(target).ImportAsync(path, Code, "test");
         var before = Directory.GetFiles(target.Root, "*", SearchOption.AllDirectories).ToDictionary(p => p, File.ReadAllBytes);
-        Assert.Equal(BundleText.PROPOSED_AlreadyHere, Assert.Throws<IOException>(() => Importer(target).Inspect(path)).Message);
+        Assert.Equal(BundleText.APPROVED_AlreadyHere, Assert.Throws<IOException>(() => Importer(target).Inspect(path)).Message);
         await Assert.ThrowsAsync<IOException>(() => Importer(target).ImportAsync(path, Code, "test"));
         foreach (var (file, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(file));
         Assert.Equal(before.Count, Directory.GetFiles(target.Root, "*", SearchOption.AllDirectories).Length);

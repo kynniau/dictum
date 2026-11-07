@@ -14,7 +14,7 @@ public sealed partial class FileMeetingStore
             var first = Path.GetRelativePath(Root, destination).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[0];
             if ((first.Length == 32 && first.All(char.IsAsciiHexDigitLower)) || first.StartsWith(".import-", StringComparison.Ordinal) ||
                 destination.Equals(Path.Combine(Root, "index.json"), StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException(BundleText.PROPOSED_Invalid);
+                throw new ArgumentException(BundleText.APPROVED_Invalid);
             var salt = RandomNumberGenerator.GetBytes(16);
             var transfer = TransferCode.Derive(transferCode, salt);
             try
@@ -59,7 +59,7 @@ public sealed partial class FileMeetingStore
     internal void RefuseExistingBundle(MeetingId id)
     {
         lock (Gate)
-            if (Directory.Exists(Folder(id)) || File.Exists(Folder(id))) throw new IOException(BundleText.PROPOSED_AlreadyHere);
+            if (Directory.Exists(Folder(id)) || File.Exists(Folder(id))) throw new IOException(BundleText.APPROVED_AlreadyHere);
     }
     internal void PublishBundle(string staged, MeetingMeta meta)
     {

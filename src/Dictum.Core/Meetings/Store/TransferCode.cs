@@ -24,7 +24,7 @@ public static class TransferCode
     internal static byte[] Derive(string code, byte[] salt)
     {
         var normalised = Normalise(code);
-        if (normalised.Split(' ').Length != 6 || normalised.Length > 256) throw new ArgumentException(BundleText.PROPOSED_CodeRequired);
+        if (normalised.Split(' ').Length != 6 || normalised.Length > 256) throw new ArgumentException(BundleText.APPROVED_CodeRequired);
         // simplification: PBKDF2 instead of a memory-hard KDF (Argon2 is not in the BCL); retire when a memory-hard KDF reaches the BCL or a customer's threat model names offline cracking of a leaked bundle.
         return Rfc2898DeriveBytes.Pbkdf2(normalised, salt, 600000, HashAlgorithmName.SHA256, 32);
     }

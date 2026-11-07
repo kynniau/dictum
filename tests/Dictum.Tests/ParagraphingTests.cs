@@ -219,7 +219,7 @@ public class ParagraphingTests
             window.ShowPage("Clean-up");
             var box = window.GetLogicalDescendants().OfType<NumericUpDown>().Single();
             Assert.Equal(CleanupPage.PROPOSED_ParagraphPauseLabel, AutomationProperties.GetName(box));
-            Assert.Equal(CleanupPage.PROPOSED_ParagraphPauseHelp, AutomationProperties.GetHelpText(box));
+            Assert.Equal(CleanupPage.APPROVED_ParagraphPauseHelp, AutomationProperties.GetHelpText(box));
             box.Value = value;
             window.ShowPage("General");
             var expected = value == 0.1m ? 0.5 : (double)value;
