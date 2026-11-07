@@ -21,11 +21,14 @@ public class PublicCopyNeutralityTests
     ];
 
     /// <summary>
-    /// Exact identifiers (case-sensitive, matched as exact substrings) that happen to contain one of the words across a letter boundary and are
-    /// Apple's own API names, not copy: they are cut out of a file's text before the sweep. The bare word still fails
-    /// (pinned below); a new identifier is added here on purpose, never by widening the match to word boundaries.
+    /// Exact strings (case-sensitive, matched as exact substrings) that happen to contain one of the words across a letter boundary and are
+    /// not Dictum's copy: they are cut out of a file's text before the sweep. Apple's own API names, and one copyright line
+    /// that must ship verbatim inside ONNX Runtime's ThirdPartyNotices (packaging/notices/onnxruntime-ThirdPartyNotices.txt,
+    /// an Open MPI copyright; allowed by the owner, 07/11/2026). The bare word still fails (pinned below); a new entry is
+    /// added here on purpose, never by widening the match to word boundaries.
     /// </summary>
-    internal static readonly string[] AllowedIdentifiers = ["CGEventSourceButtonState", "EventSourceButtonState"];
+    internal static readonly string[] AllowedIdentifiers =
+        ["CGEventSourceButtonState", "EventSourceButtonState", "Trustees of Indiana University and Indiana"];
 
     private static readonly string[] BinaryExtensions = [".png", ".ico", ".jpg", ".jpeg", ".gif", ".dll", ".exe", ".bin", ".zip", ".msix", ".pdb", ".woff", ".woff2", ".mp4"];
 
@@ -185,6 +188,12 @@ public class PublicCopyNeutralityTests
         Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", "ceb" + "u")); // the bare word still fails
         Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", AllowedIdentifiers[0].ToLowerInvariant())); // and the identifier in another case is not the identifier
         Assert.NotEmpty(Offences("src/Dictum.Mac/Input/KeyState.cs", AllowedIdentifiers[0][7..])); // a piece of it is not either (the identifier without its CGEvent prefix)
+        // The ONNX Runtime copyright line is forgiven whole and exactly: in another case, or cut short, it is not that line.
+        var copyright = AllowedIdentifiers[2];
+        Assert.Empty(Offences("packaging/notices/onnxruntime-ThirdPartyNotices.txt", "Copyright line: " + copyright + "."));
+        Assert.NotEmpty(Offences("packaging/notices/onnxruntime-ThirdPartyNotices.txt", copyright.ToLowerInvariant()));
+        Assert.NotEmpty(Offences("packaging/notices/onnxruntime-ThirdPartyNotices.txt", copyright[..copyright.LastIndexOf(' ')])); // without its last word
+        Assert.NotEmpty(Offences("README.md", copyright[copyright.IndexOf(' ')..])); // without its first word
         string[] regionWords = ["ind" + "ia", "ind" + "ian", "subcon" + "tinent", "bis" + "aya", "vis" + "aya", "man" + "ila", "ceb" + "u", "dan" + "da"];
         Assert.All(regionWords, word => Assert.Contains(word, Words)); // the region words stay on the list
 

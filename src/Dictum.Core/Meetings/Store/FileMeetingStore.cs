@@ -355,7 +355,10 @@ public sealed partial class FileMeetingStore : IMeetingStore
             var summary = summaryId is null ? ReadSummary(id) : ReadSummaries(id).Single(s => s.Id == summaryId);
             var result = new StringBuilder().Append("# ").AppendLine(meta.Title).AppendLine();
             if (summary is not null) result.AppendLine(summary.DisplayMarkdown).AppendLine().AppendLine(_captionFor(summary.Engine)).AppendLine();
-            foreach (var segment in ReadTranscript(id)) result.Append('[').Append(segment.Start).Append("] ").Append(segment.Channel).Append(": ").AppendLine(segment.Text);
+            // A separated meeting names each voice (the user's name for it, else "Other n"); exports carry names only because the user chose to export.
+            var speakers = ReadSpeakers(id);
+            foreach (var segment in ReadTranscript(id))
+                result.Append('[').Append(segment.Start).Append("] ").Append(speakers?.LabelOf(segment) ?? segment.Channel.ToString()).Append(": ").AppendLine(segment.Text);
             return result.ToString();
         }
     }

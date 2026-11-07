@@ -135,7 +135,8 @@ public sealed class RemovalPlan
     private static bool Matches(string pattern, string name) => pattern switch
     {
         // The voice activity model is not in a catalogue, so the model lists never show it; Remove Dictum completely still removes it.
-        ModelFiles.Pattern => ModelFiles.IsModelFile(name) || string.Equals(name.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ? name[..^5] : name, SileroVoiceGate.FileName, StringComparison.OrdinalIgnoreCase),
+        ModelFiles.Pattern => ModelFiles.IsModelFile(name) || string.Equals(name.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ? name[..^5] : name, SileroVoiceGate.FileName, StringComparison.OrdinalIgnoreCase)
+            || Meetings.Speakers.SpeakerModels.FindByFile(name.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ? name[..^5] : name) is not null,
         "*.log" => name.EndsWith(".log", StringComparison.OrdinalIgnoreCase),
         "clip-*" => name.StartsWith("clip-", StringComparison.OrdinalIgnoreCase),
         _ => string.Equals(pattern, name, StringComparison.OrdinalIgnoreCase),

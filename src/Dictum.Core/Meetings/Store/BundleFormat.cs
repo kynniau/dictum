@@ -30,7 +30,7 @@ internal static class BundleFormat
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
     // Exact store roles only. No paths, alternate streams, case aliases or arbitrary attachments.
-    private static readonly Regex AllowedName = new(@"\A(?:meta\.json\.enc|confirmations\.json\.enc|transcript\.json\.enc|transcript-batch-[0-9]{19}\.json\.enc|summary\.md\.enc|audio-(?:you|others|mixed)\.(?:wav|chunks)\.enc|video\.[a-z0-9]+\.enc)\z", RegexOptions.CultureInvariant);
+    private static readonly Regex AllowedName = new(@"\A(?:meta\.json\.enc|confirmations\.json\.enc|transcript\.json\.enc|transcript-batch-[0-9]{19}\.json\.enc|summary\.md\.enc|speakers\.json\.enc|audio-(?:you|others|mixed)\.(?:wav|chunks)\.enc|video\.[a-z0-9]+\.enc)\z", RegexOptions.CultureInvariant);
     internal static bool Allowed(string name) => name.Length <= 255 && !name.Contains('/') && !name.Contains('\\') && AllowedName.IsMatch(name);
     internal static InvalidDataException Invalid() => new(BundleText.PROPOSED_Invalid);
     internal static BundleManifest Read(ZipArchive archive)

@@ -17,7 +17,7 @@ public static class SummaryValidator
         .Select(culture => new RegionInfo(culture.Name).ISOCurrencySymbol).Distinct());
     private static readonly Regex Html = new(@"<[\p{L}/]|&(?:[a-z][a-z0-9]*|\#[^;\s]*);",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex FigureTrigger = new(
+    internal static readonly Regex FigureTrigger = new(
         @"[\p{N}\p{Sc}%‰‱]|\b(?:" + CurrencyCodes + "|" + NumberWords.Replace(" ", "|") + "|" + OrdinalWords.Replace(" ", "|") +
         "|" + QuantityWords.Replace(" ", "|") +
         @"|hundred|thousand|million|billion|trillion|AUD|USD|NZD|EUR|GBP|CAD|CHF|JPY|CNY|HKD|SGD|INR|KRW|ZAR|BRL|MXN|SEK|NOK|DKK|RUB|AED|SAR|k|m|bn|mn|percent|per|cent|" +
@@ -30,7 +30,7 @@ public static class SummaryValidator
     private static readonly Regex Quotation = new(
         """(?:"(?<text>[^"]+)"|\u201c(?<text>[^\u201c\u201d]+)\u201d)[ \t]+\[(?<time>(?:[0-9]+:[0-5][0-9]|[0-9]{2,}):[0-5][0-9]) (?<channel>You|Others|Mixed)\]""",
         RegexOptions.CultureInvariant);
-    private static readonly Regex QuoteSpan = new("\"[^\"]*\"|\u201c[^\u201c\u201d]*\u201d", RegexOptions.CultureInvariant);
+    internal static readonly Regex QuoteSpan = new("\"[^\"]*\"|\u201c[^\u201c\u201d]*\u201d", RegexOptions.CultureInvariant);
     // A contraction stays one word, so "didn't" is seen whole as a negation.
     private static readonly Regex ContextWords = new(@"[\p{L}\p{N}]+(?:['\u2019][\p{L}]+)*|[-\u2013\u2212]", RegexOptions.CultureInvariant);
     private static readonly Regex Qualifier = new(
@@ -44,8 +44,10 @@ public static class SummaryValidator
         @"[\p{N}\p{Sc}+\u2212\u2013\u00b1-]|\b(?:minus|negative|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?|" + CurrencyCodes + @")\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    /// <param name="speakers">The meeting's speakers file, if it has one: its own "Other n" labels and typed names are not figures
+    /// (see <see cref="SpeakerNameSwap.MaskLabels"/>), and each of them may own an action item. Null masks and admits nothing.</param>
     public static (MeetingSummary? Ok, string? Rejection) Validate(string reply,
-        IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine)
+        IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine, Speakers.MeetingSpeakers? speakers = null)
     {
         if (string.IsNullOrWhiteSpace(reply)) return (null, "The response was empty.");
         if (reply.EnumerateRunes().Any(r => Rune.GetUnicodeCategory(r) == UnicodeCategory.Format) || HasMixedScriptWord(reply))
@@ -71,11 +73,12 @@ public static class SummaryValidator
             var originalContent = heading.Success ? heading.Groups[1].Value.Trim().TrimEnd('#').Trim() : bullet.Groups[1].Value;
             var ownerContent = QuoteSpan.Replace(originalContent, match => new string(' ', match.Length));
             var ownerPrefix = bullet.Success ? Regex.Match(ownerContent, @"^(?<owner>.+?):\s+(?<text>.+)$") : Match.Empty;
-            if (ownerPrefix.Success && Regex.IsMatch(ownerPrefix.Groups["owner"].Value, @"[^\p{L}\p{Nd}\s.'\u2019\-]"))
+            if (ownerPrefix.Success && Regex.IsMatch(ownerPrefix.Groups["owner"].Value, "[^" + Speakers.MeetingSpeakers.NameCharacters + "]"))
                 return (null, "An action-item owner must not contain markup.");
             var content = StripMarkdown(originalContent);
             var invalidQuote = false;
-            var remainder = Quotation.Replace(content, match =>
+            // Labels are masked before verified quotes are removed, so text either side of a removed quote cannot join into a label.
+            var remainder = Quotation.Replace(SpeakerNameSwap.MaskLabels(content, speakers), match =>
             {
                 if (QuoteIsSpoken(match, transcript)) return "";
                 invalidQuote = true;
@@ -98,7 +101,8 @@ public static class SummaryValidator
                 continue;
             }
             var owner = action.Groups["owner"].Value.Trim();
-            if (owner != "Others" && !transcript.Any(s => ContainsWordSequence(s.Text, owner)))
+            // Owner decision (Kyle, 07/11/2026): one of this meeting's own speakers may own an action item even if never spoken.
+            if (owner != "Others" && speakers?.IsSpeaker(owner) != true && !transcript.Any(s => ContainsWordSequence(s.Text, owner)))
                 return (null, "An action-item owner was not present in the transcript.");
             items.Add(new(owner, action.Groups["text"].Value));
         }

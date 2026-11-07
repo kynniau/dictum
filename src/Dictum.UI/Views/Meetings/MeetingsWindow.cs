@@ -498,11 +498,12 @@ internal sealed partial class MeetingsWindow : Window
         }
         if (_captureState is not null) _captureState.Text = _paused ? PROPOSED_Paused : PROPOSED_Recording;
     }
-    private void Confirm(string message, string accept, Action action)
+    /// <param name="note">A separate sentence shown under the message (it never rewords it), or null for none.</param>
+    private void Confirm(string message, string accept, Action action, string? note = null)
     {
         var dialog = new Window { Title = accept, Width = 500, SizeToContent = SizeToContent.Height, CanResize = false };
-        dialog.Content = DialogContent(dialog, Ui.Text(message),
-            Ui.Row(8, SafeButton(APPROVED_Cancel, dialog.Close), SafeButton(accept, () => { dialog.Close(); action(); })));
+        var buttons = Ui.Row(8, SafeButton(APPROVED_Cancel, dialog.Close), SafeButton(accept, () => { dialog.Close(); action(); }));
+        dialog.Content = note is null ? DialogContent(dialog, Ui.Text(message), buttons) : DialogContent(dialog, Ui.Text(message), Ui.Text(note), buttons);
         _ = dialog.ShowDialog(this);
     }
     private void StopCapture()
@@ -813,7 +814,8 @@ internal sealed partial class MeetingsWindow : Window
         }
         RefreshChoices();
         _refreshSummaryChoices = () => { if (_screen.GetLogicalDescendants().Contains(template)) RefreshChoices(); };
-        var transcriptCard = Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Transcript), Ui.Text(string.Join(Environment.NewLine, _host.Store.ReadTranscript(id).Select(FormatSegment))),
+        var speakers = _host.Store.ReadSpeakers(id);
+        var transcriptCard = Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_Transcript), Ui.Text(string.Join(Environment.NewLine, _host.Store.ReadTranscript(id).Select(s => FormatSegment(s, speakers)))),
                 Ui.Text(string.Join(Environment.NewLine, meta.Markers.Select(marker => string.Format(PROPOSED_Marker, marker.At,
                     marker.Kind switch { MarkerKind.Moment => PROPOSED_Mark, MarkerKind.Joined => PROPOSED_Joined, MarkerKind.Paused => PROPOSED_Paused, _ => PROPOSED_Resume }))))));
         var details = Ui.Stack(8);
@@ -865,7 +867,7 @@ internal sealed partial class MeetingsWindow : Window
         var record = meta.Agreement is { } agreement ? Ui.Text(RecordText(agreement.Kind, agreement.AcknowledgedAt, agreement.How)) : Ui.Text(PROPOSED_NotesText);
         Screen(Ui.Row(8, SafeButton(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title), Ui.Text(meta.AudioIncomplete ? PROPOSED_AudioRecovered : ""),
             Ui.Text(string.Format(PROPOSED_ListRow, meta.Title, meta.StartedAt.ToLocalTime(), meta.Duration, _host.Store.SizeOf(id))),
-            transcriptCard, summaryCard, Ui.Card(record, PROPOSED_Record),
+            transcriptCard, SpeakersCard(id, speakers), summaryCard, Ui.Card(record, PROPOSED_Record),
             SafeButton(PROPOSED_MoveToAnotherDevice, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = MoveBundle(id))),
             Ui.Row(8, SafeButton(PROPOSED_Export, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = Work(async () =>
             {
@@ -876,8 +878,7 @@ internal sealed partial class MeetingsWindow : Window
                 await using var writer = new StreamWriter(stream);
                 await writer.WriteAsync(ExportSelected()); Say(PROPOSED_Saved);
             }))), SafeButton(PROPOSED_Copy, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => { _host.Copy(ExportSelected()); Say(PROPOSED_Copied); })),
-                SafeButton(PROPOSED_Delete, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Delete, () => { _host.Store.Delete(id); ShowList(); }))));
+                SafeButton(PROPOSED_Delete, () => Confirm(PROPOSED_DeleteQuestion, PROPOSED_Delete, () => { _host.Store.Delete(id); ShowList(); },
+                    NamesDeletedNote(id)))));
     }
-    private static string FormatSegment(Segment segment) => string.Format(PROPOSED_Segment, segment.Start,
-        segment.Channel switch { Channel.You => PROPOSED_YouChannel, Channel.Others => PROPOSED_OthersChannel, _ => PROPOSED_MixedChannel }, segment.Text);
 }

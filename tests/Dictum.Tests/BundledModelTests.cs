@@ -50,5 +50,8 @@ public sealed class BundledModelTests
         Assert.Equal(model.Bytes, new FileInfo(path).Length);
         using (var stream = File.OpenRead(path)) Assert.Equal(model.Sha256, Convert.ToHexStringLower(SHA256.HashData(stream)));
         Assert.True(File.Exists(Path.Combine(layout, "THIRD-PARTY-NOTICES.txt")), "THIRD-PARTY-NOTICES.txt is missing");
+        // ONNX Runtime's own notices sit beside it wherever onnxruntime.dll ships (ThirdPartyNoticesTests pins the file).
+        if (Directory.GetFiles(layout, "onnxruntime.dll", SearchOption.AllDirectories).Length != 0)
+            Assert.True(File.Exists(Path.Combine(layout, "onnxruntime-ThirdPartyNotices.txt")), "onnxruntime-ThirdPartyNotices.txt is missing beside THIRD-PARTY-NOTICES.txt");
     }
 }

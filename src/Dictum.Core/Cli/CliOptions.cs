@@ -2,7 +2,7 @@ using Dictum.Settings;
 
 namespace Dictum.Cli;
 
-public enum CliMode { Tray, Transcribe, SelfTest, DownloadModel, DownloadCleanupModel, BenchCleanup, PrintModelsDir, Help }
+public enum CliMode { Tray, Transcribe, SelfTest, DownloadModel, DownloadCleanupModel, BenchCleanup, PrintModelsDir, Help, SpeakerCheck }
 
 /// <param name="Model">--model: one-launch override of whisper.model (short name or absolute path).</param>
 /// <param name="DownloadName">--download-model: catalogue/short name to fetch.</param>
@@ -70,6 +70,11 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
                     wav = Next();
                     if (wav is null) return (null, "--bench-cleanup needs a .txt transcript or a .wav file.");
                     if (Use(CliMode.BenchCleanup, "--bench-cleanup") is { } clashB) return (null, clashB);
+                    break;
+                case "--speaker-check":
+                    wav = Next();
+                    if (wav is null) return (null, "--speaker-check needs a folder of WAV files.");
+                    if (Use(CliMode.SpeakerCheck, "--speaker-check") is { } clashK) return (null, clashK);
                     break;
                 case "--no-llm":
                     noLlm = true;
