@@ -776,6 +776,11 @@ is used. The reader refuses other format/version/KDF/iteration/kind values, inva
 creator values, invalid ids, salt/wrap lengths, missing metadata, duplicate names,
 extra/missing ZIP entries and size mismatches. Unknown JSON properties are ignored;
 this is not a promise to reject every possible extra JSON field (`BundleFormat.Read`).
+The decrypted metadata is also checked (`BundleImporter`): property names are
+case-sensitive; `Id.Value` must equal `manifest.meeting`; `Wraps` must be `[]`;
+`IncompleteAudioChannels` must be a JSON array (not `null`; `[]` when every track is
+complete); and an `Agreement.How` must be `spoken`, `written` or `platform-announced`.
+Any other value refuses the bundle.
 
 **Transfer key** (`TransferCode.Normalise`, `TransferCode.Derive`): split on .NET
 whitespace, remove empty tokens, join using byte 0x20 (one ASCII space), then invariant
@@ -814,8 +819,11 @@ the terminal record, before releasing plaintext (`DecryptedStream.Read`).
 `length:int32LE || framingNonce:12 || framingTag:16 || payloadNonce:12 || PCM-ciphertext:length || payloadTag:16`.
 PCM is signed little-endian 16-bit mono at 16000 Hz, with no WAV header inside
 records; lengths are even, 0..1048576. Both independent AES-GCM operations use
-the same AAD formula as above, with the DCTMAUD header and exact
-`<meeting-id>/audio-<channel>.chunks.enc` identity. The framing tag authenticates
+byte-identical AAD (the formula above, with the DCTMAUD header and exact
+`<meeting-id>/audio-<channel>.chunks.enc` identity); its length field is the
+record's PCM length for BOTH operations, including the framing tag whose own
+plaintext is empty (`MeetingCrypto` chunk writer). Writing 0 there makes every
+record fail authentication. The framing tag authenticates
 empty plaintext/ciphertext; the payload tag authenticates PCM. A completed stream
 requires a zero-length record containing both nonce/tag pairs, then EOF. Section
 13.2's incomplete-channel snapshot rules apply only when that channel is listed in
@@ -869,10 +877,19 @@ ZIP entry without compression, including manifest.json. Ciphertext does not bene
 from compression, and phone writers need no deflate implementation. Readers accept
 stored and deflated entries. No ZIP64 is needed for an archive below 4 GiB whose
 entry counts, sizes and offsets fit classic ZIP limits (fewer than 65535 entries).
-Only the entry names listed in 14.A are allowed; no directories. Audio is canonical
-16000 Hz mono PCM16 RIFF WAV sealed as `audio-<channel>.wav.enc`, or the DCTMAUD
-form `audio-<channel>.chunks.enc`. AAC/M4A audio is NOT allowed inside a bundle,
-even disguised with a WAV entry name. The bundle path uses the managed PCM reader,
-never a platform decoder or decrypted temporary file. A single track is transcribed
-as Mixed. The synthetic phone fixture and its byte hashes are in
-`tests/Dictum.Tests/Fixtures/Bundles/phone-sample.dictum` and its adjacent fixture notes.
+Only the entry names listed in 14.A are allowed; no directories. Audio is a RIFF
+WAV sealed as `audio-<channel>.wav.enc`, or the DCTMAUD form
+`audio-<channel>.chunks.enc`. The WAV reader (`BundleAudioSource`) requires: `RIFF`
+and `WAVE` tags; a `fmt ` chunk of 16 to 4096 bytes BEFORE the `data` chunk; format
+tag 1 (PCM; `0xFFFE` WAVE_FORMAT_EXTENSIBLE is refused); 1 channel; 16000 Hz;
+16 bits per sample; an even `data` length. Other chunks are skipped; the RIFF size,
+byte rate and block align are not checked. AAC/M4A is NOT allowed in an `audio-*`
+entry, even disguised with a WAV entry name: the bundle path uses this managed PCM
+reader, never a platform decoder or a decrypted temporary file. A `video.<ext>.enc`
+entry is opaque: stored as the meeting's video and never transcribed, whatever its
+extension. A single track is transcribed as Mixed. Phone writers use
+`audio-mixed.wav.enc`: the synthetic phone fixture
+`tests/Dictum.Tests/Fixtures/Bundles/phone-sample.dictum` (byte hashes in its adjacent
+notes) covers that form only, and there is no conformance fixture for the DCTMAUD
+form yet. 14.A.1 does not describe the transcript, summary or video plaintext; a phone
+bundle carries none of them (Dictum transcribes and summarises after import).
