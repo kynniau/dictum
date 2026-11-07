@@ -219,14 +219,113 @@ public sealed class MeetingSpeakerNamesTests
         Assert.Contains("- Other 1 agreed the plan.", summary.Markdown);
     }
 
-    internal sealed class CapturingClient : ILlmClient
+    // Owner decision (Kyle, 07/11/2026): an action-item owner is valid if spoken, or exactly one of this meeting's own speakers:
+    // "Other 1" to "Other {count}" as Label writes it, or a name typed for one of them. Nothing else.
+    private const string OwnerRejection = "An action-item owner was not present in the transcript.";
+
+    private static (Summary? Ok, string? Rejection) CheckAction(string owner, MeetingSpeakers? speakers) =>
+        SummaryValidator.Validate($"# Summary\n- The plan was agreed.\n## Action items\n- {owner}: send the agenda.", Transcript, General,
+            "Local", speakers);
+
+    [Theory]
+    // Not "Other 2": the transcript speaks those words, so the spoken rule would admit it anyway.
+    [InlineData("Other 1")]
+    [InlineData("Other 3")]
+    [InlineData("  Other 3  ")]
+    public void An_action_item_owned_by_a_speaker_label_is_written(string owner)
+    {
+        var result = CheckAction(owner, Speakers(3, new() { [1] = First }));
+        Assert.Null(result.Rejection);
+        Assert.Equal(owner.Trim(), Assert.Single(Assert.IsType<Summary>(result.Ok).Items).Owner);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_action_item_owned_by_a_typed_name_is_written_even_if_never_spoken(bool inProcessEngine)
+    {
+        Assert.DoesNotContain(Transcript, s => s.Text.Contains("Michelle", StringComparison.OrdinalIgnoreCase));
+        // A cloud engine saw "Other 1" and writes it; Restore puts the name back before the check. The local model saw the name.
+        var owner = inProcessEngine ? First : "Other 1";
+        var summary = await new MeetingSummariser().SummariseAsync(MeetingId.New(), Transcript, General,
+            new CapturingClient($"# Summary\n- Other 1 agreed the plan.\n## Action items\n- {owner}: send the agenda.\n"), "Local",
+            TestContext.Current.CancellationToken, Speakers(2, new() { [1] = First }), inProcessEngine);
+        Assert.DoesNotContain(MeetingSummariser.NotWritten, summary.Markdown);
+        Assert.Equal(new ActionItem(First, "send the agenda."), Assert.Single(summary.Items));
+        // Case-insensitive like the spoken-owner rule.
+        Assert.Null(CheckAction("MICHELLE EXAMPLE", Speakers(2, new() { [1] = First })).Rejection);
+    }
+
+    [Theory]
+    [InlineData("Jordan Invented")]
+    [InlineData("Michelle")] // part of a typed name
+    [InlineData("Michelle Example Smith")] // a typed name inside a longer one
+    [InlineData("Ana")]
+    [InlineData("Speaker")] // the figure mask's stand-in is not an owner
+    public void An_invented_owner_is_still_refused(string owner) =>
+        Assert.Equal(OwnerRejection, CheckAction(owner, Speakers(3, new() { [1] = First, [2] = Second })).Rejection);
+
+    [Fact]
+    public void A_label_beyond_the_speaker_count_is_not_a_valid_owner()
+    {
+        var one = Speakers(1, new());
+        Assert.False(one.IsSpeaker("Other 2"));
+        Assert.False(one.IsSpeaker("Other 0"));
+        Assert.False(one.IsSpeaker("Other 01"));
+        Assert.True(one.IsSpeaker("other 1"));
+        // End to end the line is refused too (the figure rule sees "2" first, since only the meeting's own labels are masked).
+        Assert.NotNull(CheckAction("Other 2", one).Rejection);
+    }
+
+    [Fact]
+    public void Without_speakers_the_owner_rule_is_unchanged()
+    {
+        Assert.Equal(OwnerRejection, CheckAction(First, null).Rejection);
+        Assert.Null(CheckAction("Synthetic", null).Rejection); // spoken
+        Assert.Null(CheckAction("Others", null).Rejection);
+        Assert.Equal(FigureRejection, CheckAction("Other 1", null).Rejection);
+        // The same typed name is admitted only when this meeting's speakers file has it.
+        Assert.Null(CheckAction(First, Speakers(2, new() { [1] = First })).Rejection);
+    }
+
+    [Fact]
+    public void A_typed_name_with_a_digit_does_not_trip_the_figure_rule()
+    {
+        var speakers = Speakers(2, new() { [2] = "R2" });
+        Assert.Null(Check("R2 will send the agenda.", speakers).Rejection);
+        Assert.Null(CheckAction("R2", speakers).Rejection);
+        // The cloud order: "Other 2" comes back, is restored to "R2", and is then checked.
+        Assert.Null(Check(SpeakerNameSwap.Restore("Other 2 will send the agenda.", speakers), speakers).Rejection);
+        // Whole name only, outside quotes only, and only this meeting's names.
+        Assert.Equal(FigureRejection, Check("R22 will send the agenda.", speakers).Rejection);
+        Assert.Equal(FigureRejection, Check("They said \"R2 will send it\" without a citation.", speakers).Rejection);
+        Assert.Equal(FigureRejection, Check("R2 will send the agenda.", Speakers(2, new())).Rejection);
+        Assert.Equal(FigureRejection, Check("R2 promised 40 units.", speakers).Rejection);
+    }
+
+    [Fact]
+    public void A_typed_name_that_is_itself_a_figure_word_is_not_masked()
+    {
+        // Masking "June" would also hide the month wherever it appears, so the figure rule keeps seeing it (fails closed).
+        Assert.Equal(FigureRejection, Check("The launch moved to June.", Speakers(2, new() { [1] = "June" })).Rejection);
+    }
+
+    [Fact]
+    public void Other_02_is_not_restored_to_a_name()
+    {
+        var speakers = Speakers(2, new() { [2] = Second });
+        Assert.Equal($"- Other 02 and {Second} spoke; Other 002 stayed.",
+            SpeakerNameSwap.Restore("- Other 02 and Other 2 spoke; Other 002 stayed.", speakers));
+    }
+
+    internal sealed class CapturingClient(string reply = Reply) : ILlmClient
     {
         public List<(string System, string User)> Requests { get; } = [];
         public string Name => "synthetic";
         public Task<LlmReply> CompleteAsync(string systemPrompt, string rawTranscript, CancellationToken cancellationToken)
         {
             lock (Requests) Requests.Add((systemPrompt, rawTranscript));
-            return Task.FromResult(new LlmReply(Reply, "stop"));
+            return Task.FromResult(new LlmReply(reply, "stop"));
         }
     }
 

@@ -73,9 +73,29 @@ public sealed record MeetingSpeakers(
     }
 
     /// <summary>The name the user gave this speaker, else "Other n".</summary>
-    public string Label(int speaker) =>
-        Names.TryGetValue(speaker.ToString(CultureInfo.InvariantCulture), out var name) && !string.IsNullOrWhiteSpace(name)
-            ? name.Trim() : string.Format(CultureInfo.InvariantCulture, SpeakerText.PROPOSED_Other, speaker);
+    public string Label(int speaker) => TypedName(speaker) ?? OtherLabel(speaker);
+
+    /// <summary>"Other n" for any speaker number, named or not.</summary>
+    public static string OtherLabel(int speaker) => string.Format(CultureInfo.InvariantCulture, SpeakerText.PROPOSED_Other, speaker);
+
+    /// <summary>The trimmed name the user typed for this speaker, or null if none.</summary>
+    public string? TypedName(int speaker) =>
+        Names.TryGetValue(speaker.ToString(CultureInfo.InvariantCulture), out var name) && !string.IsNullOrWhiteSpace(name) ? name.Trim() : null;
+
+    /// <summary>The names typed for this meeting's speakers 1 to <see cref="Count"/>.</summary>
+    [JsonIgnore] public IEnumerable<string> TypedNames =>
+        Enumerable.Range(1, Count).Select(TypedName).OfType<string>();
+
+    /// <summary>
+    /// Owner decision (Kyle, 07/11/2026): true when the whole text (trimmed, any case) is one of this meeting's speakers: "Other 1" to
+    /// "Other {Count}" exactly as <see cref="Label"/> writes it, or a name typed for one of them. Nothing partial, nothing beyond the count.
+    /// </summary>
+    public bool IsSpeaker(string text)
+    {
+        var owner = text.Trim();
+        return Enumerable.Range(1, Count).Any(n => string.Equals(owner, OtherLabel(n), StringComparison.OrdinalIgnoreCase)) ||
+            TypedNames.Any(name => string.Equals(owner, name, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// The speaker of a transcript segment: the turn it overlaps most, else the nearest turn within a second (whisper's segment

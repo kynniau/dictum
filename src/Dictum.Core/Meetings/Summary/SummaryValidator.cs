@@ -17,7 +17,7 @@ public static class SummaryValidator
         .Select(culture => new RegionInfo(culture.Name).ISOCurrencySymbol).Distinct());
     private static readonly Regex Html = new(@"<[\p{L}/]|&(?:[a-z][a-z0-9]*|\#[^;\s]*);",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex FigureTrigger = new(
+    internal static readonly Regex FigureTrigger = new(
         @"[\p{N}\p{Sc}%‰‱]|\b(?:" + CurrencyCodes + "|" + NumberWords.Replace(" ", "|") + "|" + OrdinalWords.Replace(" ", "|") +
         "|" + QuantityWords.Replace(" ", "|") +
         @"|hundred|thousand|million|billion|trillion|AUD|USD|NZD|EUR|GBP|CAD|CHF|JPY|CNY|HKD|SGD|INR|KRW|ZAR|BRL|MXN|SEK|NOK|DKK|RUB|AED|SAR|k|m|bn|mn|percent|per|cent|" +
@@ -44,8 +44,8 @@ public static class SummaryValidator
         @"[\p{N}\p{Sc}+\u2212\u2013\u00b1-]|\b(?:minus|negative|dollars?|cents?|pounds?|euros?|yen|rupees?|pesos?|" + CurrencyCodes + @")\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    /// <param name="speakers">The meeting's speakers file, if it has one: its own "Other n" labels are not figures (see
-    /// <see cref="SpeakerNameSwap.MaskLabels"/>). Null masks nothing.</param>
+    /// <param name="speakers">The meeting's speakers file, if it has one: its own "Other n" labels and typed names are not figures
+    /// (see <see cref="SpeakerNameSwap.MaskLabels"/>), and each of them may own an action item. Null masks and admits nothing.</param>
     public static (MeetingSummary? Ok, string? Rejection) Validate(string reply,
         IReadOnlyList<Segment> transcript, SummaryTemplate template, string engine, Speakers.MeetingSpeakers? speakers = null)
     {
@@ -101,7 +101,8 @@ public static class SummaryValidator
                 continue;
             }
             var owner = action.Groups["owner"].Value.Trim();
-            if (owner != "Others" && !transcript.Any(s => ContainsWordSequence(s.Text, owner)))
+            // Owner decision (Kyle, 07/11/2026): one of this meeting's own speakers may own an action item even if never spoken.
+            if (owner != "Others" && speakers?.IsSpeaker(owner) != true && !transcript.Any(s => ContainsWordSequence(s.Text, owner)))
                 return (null, "An action-item owner was not present in the transcript.");
             items.Add(new(owner, action.Groups["text"].Value));
         }
