@@ -76,7 +76,10 @@ internal sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber
                 using var destination = new FileStream(Path.Combine(staged, file.Name), FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 BundleFormat.CopyBounded(source, destination, file.Bytes, ct);
             }
-            var meta = Read<MeetingMeta>(staged, info.MeetingId, "meta.json.enc", content);
+            MeetingMeta meta;
+            try { meta = Read<MeetingMeta>(staged, info.MeetingId, "meta.json.enc", content); }
+            // Agreement validates How in its JSON constructor; malformed origin metadata is a damaged bundle.
+            catch (ArgumentException) { throw BundleFormat.Invalid(); }
             if (meta.Id != info.MeetingId || meta.Wraps is not { Count: 0 } || meta.IncompleteAudioChannels is null) throw BundleFormat.Invalid();
             VerifyAll(staged, manifest, meta, content, ct);
             var confirmations = manifest.Files.Any(f => f.Name == "confirmations.json.enc")

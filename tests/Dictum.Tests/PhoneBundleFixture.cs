@@ -9,7 +9,7 @@ using Dictum.Meetings.Store;
 namespace Dictum.Tests;
 
 // Public synthetic conformance data only. Never used by production export.
-internal static class PhoneBundleFixture
+internal static partial class PhoneBundleFixture
 {
     internal const string Code = "abandon ability able about above absent";
     internal static readonly MeetingId Id = new("0123456789abcdef0123456789abcdef");
@@ -48,7 +48,7 @@ internal static class PhoneBundleFixture
         return stream.ToArray();
     }
 
-    internal static byte[] Generate()
+    internal static byte[] Generate(bool chunked = false, bool incomplete = false)
     {
         var content = Range(0, 32);
         var salt = Range(0x20, 16);
@@ -60,9 +60,16 @@ internal static class PhoneBundleFixture
             using (var zip = new ZipArchive(output, ZipArchiveMode.Create, true))
             {
                 var files = new List<BundleFile>();
-                Seal("audio-mixed.wav.enc", Wav(), 0x40);
+                if (chunked)
+                {
+                    var audio = ChunkedAudio(content, incomplete);
+                    files.Add(new("audio-mixed.chunks.enc", audio.Length));
+                    Add("audio-mixed.chunks.enc", audio);
+                }
+                else Seal("audio-mixed.wav.enc", Wav(), 0x40);
                 Seal("confirmations.json.enc", JsonSerializer.SerializeToUtf8Bytes(Confirmations), 0x70);
-                Seal("meta.json.enc", JsonSerializer.SerializeToUtf8Bytes(Meta), 0xa0);
+                Seal("meta.json.enc", JsonSerializer.SerializeToUtf8Bytes(
+                    Meta with { IncompleteAudioChannels = incomplete ? [Channel.Mixed] : [] }), 0xa0);
                 var manifest = new BundleManifest("dictum-bundle", 1, Id.Value, new("Dictum", "1.5.1.0", "ios"),
                     new("pbkdf2-hmac-sha256", 600000, salt, wrap.WrappedKey), files.ToArray());
                 Add("manifest.json", JsonSerializer.SerializeToUtf8Bytes(manifest, BundleFormat.Json));
