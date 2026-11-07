@@ -35,7 +35,7 @@ public record Agreement
         (AcknowledgedAt, How, ScriptVersion, Kind) = (acknowledgedAt, how, scriptVersion, kind);
     }
 }
-public enum MeetingSource { Recorded, ImportedZoom, ImportedFile }
+public enum MeetingSource { Recorded, ImportedZoom, ImportedFile, Phone }
 public record MeetingMeta(MeetingId Id, string Title, DateTimeOffset StartedAt, TimeSpan Duration,
     MeetingSource Source, Agreement? Agreement, IReadOnlyList<Marker> Markers,
     IReadOnlyList<KeyWrap> Wraps, bool HasVideo, string? SummaryEngine, string? SummaryTemplate)

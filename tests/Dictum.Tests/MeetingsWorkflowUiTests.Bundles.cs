@@ -18,6 +18,7 @@ public sealed partial class MeetingsWorkflowUiTests
     [Theory]
     [InlineData("spoken", APPROVED_Spoken)]
     [InlineData("written", APPROVED_Written)]
+    [InlineData("platform-announced", PROPOSED_Platform)]
     [InlineData("refused", APPROVED_Refused)]
     [InlineData("agreed", "you confirmed the notice again")]
     [InlineData("unconfirmed", "did not confirm that they agreed")]
@@ -27,7 +28,7 @@ public sealed partial class MeetingsWorkflowUiTests
     {
         var line = MeetingsWindow.RecordText(AgreementKind.Live, new DateTimeOffset(2026, 11, 7, 3, 2, 0, TimeSpan.Zero), answer);
         Assert.Contains(expected, line);
-        var isAgreement = answer is "spoken" or "written";
+        var isAgreement = answer is "spoken" or "written" or "platform-announced";
         Assert.Equal(isAgreement, line.Contains("you said everyone agreed"));
         if (answer != "spoken") Assert.DoesNotContain(APPROVED_Spoken, line);
     }

@@ -44,7 +44,7 @@ public sealed partial class FileMeetingStore
                         var manifest = new BundleManifest("dictum-bundle", 1, id.Value,
                             new("Dictum", typeof(FileMeetingStore).Assembly.GetName().Version!.ToString(), OperatingSystem.IsMacOS() ? "mac" : "windows"),
                             new("pbkdf2-hmac-sha256", 600000, salt, wrap.WrappedKey), files.ToArray());
-                        using var json = archive.CreateEntry("manifest.json").Open();
+                        using var json = archive.CreateEntry("manifest.json", CompressionLevel.NoCompression).Open();
                         JsonSerializer.Serialize(json, manifest, BundleFormat.Json);
                     });
                 }

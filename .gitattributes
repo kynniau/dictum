@@ -1,3 +1,8 @@
 # The hook scripts must keep LF endings in every checkout, whatever core.autocrlf says: a strict POSIX shell (dash, as on
 # Linux and macOS) cannot run a script saved with CRLF. Git for Windows' own sh happens to tolerate it.
 .githooks/* text eol=lf
+
+# The phone-bundle conformance fixture is compared byte for byte by a test in every checkout (Windows CI included):
+# its notes stay LF whatever core.autocrlf says, and the bundle itself is binary (never line-converted).
+tests/Dictum.Tests/Fixtures/Bundles/*.md text eol=lf
+*.dictum binary

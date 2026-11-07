@@ -49,7 +49,7 @@ internal static class BundleFormat
             manifest.Transfer.Kdf != "pbkdf2-hmac-sha256" || manifest.Transfer.Iterations != 600000 ||
             manifest.Transfer.Kind is not (null or "transfer-code")) throw new InvalidDataException(BundleText.PROPOSED_Unsupported);
         _ = new MeetingId(manifest.Meeting);
-        if (manifest.CreatedBy is not { App: "Dictum", Platform: "windows" or "mac" } || string.IsNullOrWhiteSpace(manifest.CreatedBy.Version) ||
+        if (manifest.CreatedBy is not { App: "Dictum", Platform: "windows" or "mac" or "ios" } || string.IsNullOrWhiteSpace(manifest.CreatedBy.Version) ||
             manifest.Transfer.Salt is not { Length: 16 } || manifest.Transfer.Wrap is not { Length: 60 } || manifest.Files is null) throw Invalid();
         if (manifest.Files.Any(f => f is null || f.Name is null || !Allowed(f.Name) || f.Bytes < 0) ||
             manifest.Files.Select(f => f.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != manifest.Files.Length ||
