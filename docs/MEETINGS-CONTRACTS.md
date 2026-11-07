@@ -887,9 +887,14 @@ byte rate and block align are not checked. AAC/M4A is NOT allowed in an `audio-*
 entry, even disguised with a WAV entry name: the bundle path uses this managed PCM
 reader, never a platform decoder or a decrypted temporary file. A `video.<ext>.enc`
 entry is opaque: stored as the meeting's video and never transcribed, whatever its
-extension. A single track is transcribed as Mixed. Phone writers use
-`audio-mixed.wav.enc`: the synthetic phone fixture
+extension. A single track is transcribed as Mixed. Phone writers SHOULD record
+straight into the DCTMAUD form `audio-mixed.chunks.enc`: it seals each record as it is
+captured, so no plaintext audio ever sits on the phone, and a recording cut short (a
+crash, the app killed during a call) stays readable: list `mixed` in
+`IncompleteAudioChannels` and omit the terminal record (section 13.2 rules). A WAV
+writer needs the final sizes in its first record, so it could only seal at Stop from
+plaintext held in memory or a temporary file; `audio-mixed.wav.enc` is accepted but
+not recommended for phones. The synthetic phone fixture
 `tests/Dictum.Tests/Fixtures/Bundles/phone-sample.dictum` (byte hashes in its adjacent
-notes) covers that form only, and there is no conformance fixture for the DCTMAUD
-form yet. 14.A.1 does not describe the transcript, summary or video plaintext; a phone
+notes) covers the WAV form; a chunked-form fixture follows in its own change. 14.A.1 does not describe the transcript, summary or video plaintext; a phone
 bundle carries none of them (Dictum transcribes and summarises after import).
