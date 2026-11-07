@@ -59,7 +59,7 @@ public sealed class YourVoiceOnlyTests
         public void Write(LogLevel level, string message) => Lines.Enqueue(message);
     }
 
-    private static Rig Make(bool yourVoiceOnly = true, bool hasPrint = true)
+    private static Rig Make(bool yourVoiceOnly = true, bool hasPrint = true, IVoiceEmbedder? scorer = null)
     {
         var settings = new AppSettings { Audio = new AudioSettings { YourVoiceOnly = yourVoiceOnly }, Insert = new InsertSettings { TrailingSpace = false } };
         var capture = new Capture();
@@ -71,7 +71,7 @@ public sealed class YourVoiceOnlyTests
         var pipeline = new DictationPipeline(_ => Task.FromResult<ITranscriber>(engine), () => TranscriptCleaner.RulesOnly("test"),
             (text, token) => { token.ThrowIfCancellationRequested(); typed.Enqueue(text); return Task.CompletedTask; },
             () => settings, log);
-        var filter = new OwnVoiceFilter(() => settings, () => hasPrint ? (Print, embedder) : null);
+        var filter = new OwnVoiceFilter(() => settings, () => hasPrint ? OwnVoiceSource.Ready(Print, scorer ?? embedder) : OwnVoiceSource.Missing(OwnVoiceSource.NoPrint), log);
         var ui = new FakeUi();
         return new Rig(new DictationController(machine, capture, pipeline, ui, () => settings, log, voiceFilter: filter), capture, engine, embedder, ui, typed, machine, log);
     }
@@ -193,5 +193,59 @@ public sealed class YourVoiceOnlyTests
             await WaitUntil(() => rig.Machine.State == DictationState.Idle, "the session to end");
             Assert.Empty(rig.Engine.Heard);
         }
+    }
+
+    /// <summary>
+    /// <see cref="LevelEmbedder"/> on a window that is mostly speech; on a window that is mostly silence, a vector unlike the owner's,
+    /// as a real extractor gives no owner-like embedding for room quiet.
+    /// </summary>
+    private sealed class SilenceSoundsLikeNobody(LevelEmbedder voices) : IVoiceEmbedder
+    {
+        public float[]? Embed(float[] samples16kMono) =>
+            samples16kMono.Count(s => s != 0) * 2 >= samples16kMono.Length ? voices.Embed(samples16kMono) : [0, 0, 1, 0];
+    }
+
+    /// <summary>
+    /// Fix round F2: the filter scores a part's speech only, as enrolment and --speaker-check --print do (VoiceScore.ScoreSpeech). A
+    /// held recording with 3 s of quiet either side of 2.5 s of the owner's voice was mostly silent windows when every window of the
+    /// part was scored, and was skipped; scored as speech it passes. Mutation: the filter scoring every window of the part again.
+    /// </summary>
+    [Fact]
+    public async Task An_own_part_with_silence_either_side_passes_the_gate()
+    {
+        float[] padded = [.. new float[3 * 16000], .. Voice(1, 2.5).Samples, .. new float[3 * 16000]];
+        var scorer = new SilenceSoundsLikeNobody(new LevelEmbedder(SyntheticVoices.Distinct()));
+        var settings = new AppSettings { Audio = new AudioSettings { YourVoiceOnly = true } };
+        Assert.Equal(OwnVoiceVerdict.Own, new OwnVoiceFilter(() => settings, () => OwnVoiceSource.Ready(Print, scorer)).Check(padded));
+
+        using var rig = Make(scorer: scorer);
+        Hold(rig, new CapturedAudio(padded, 0.1f));
+        await WaitUntil(() => rig.Ui.Pills.Contains(PillView.Done) || rig.Ui.Pills.Contains(PillView.VoiceSkipped), "the part to be decided");
+        Assert.DoesNotContain(PillView.VoiceSkipped, rig.Ui.Pills);
+        Assert.Single(rig.Engine.Heard); // transcribed, not skipped
+    }
+
+    /// <summary>
+    /// Fix round F4: the setting on but no gate possible (no speaker model, no print, a print from another model, an unreadable print)
+    /// writes one warning per session naming the reason, never words from a dictation, and leaves the setting as the user set it.
+    /// </summary>
+    [Fact]
+    public async Task With_the_setting_on_and_no_gate_one_warning_names_the_reason()
+    {
+        var settings = new AppSettings { Audio = new AudioSettings { YourVoiceOnly = true } };
+        var log = new ListLog();
+        var filter = new OwnVoiceFilter(() => settings, () => OwnVoiceSource.Missing(OwnVoiceSource.NoModel), log);
+        for (var i = 0; i < 3; i++) Assert.Equal(OwnVoiceVerdict.Off, filter.Check(Voice(2, 3).Samples));
+        Assert.Equal(["Your voice only is on, but no dictation can be checked: the speaker model is not downloaded. Everything is transcribed as usual."], log.Lines);
+        Assert.True(settings.Audio.YourVoiceOnly); // the switch is not touched
+
+        // Through the controller: two dictations without a print, one warning, both typed.
+        using var rig = Make(hasPrint: false);
+        Hold(rig, Voice(2, 3));
+        await WaitUntil(() => rig.Typed.Count == 1 && rig.Machine.State == DictationState.Idle, "the first dictation");
+        Hold(rig, Voice(2, 3));
+        await WaitUntil(() => rig.Typed.Count == 2, "the second dictation");
+        Assert.Single(rig.Log.Lines, l => l == "Your voice only is on, but no dictation can be checked: there is no voice print. Everything is transcribed as usual.");
+        Assert.DoesNotContain(rig.Log.Lines, l => l.Contains("voice 2", StringComparison.Ordinal));
     }
 }

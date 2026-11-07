@@ -133,10 +133,7 @@ public static class SpeakerCheck
             {
                 var samples = Read(wav);
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                foreach (var (start, end) in PauseSegments(samples))
-                    foreach (var (from, to) in SpeakerSeparator.Windows(start, end, samples.Length))
-                        if (embedder.Embed(samples[from..to]) is { } embedding && Array.TrueForAll(embedding, float.IsFinite))
-                            scores.Add((same, Cosine(embedding, print.Embedding)));
+                scores.AddRange(Voice.VoiceScore.SpeechScores(samples, print.Embedding, embedder).Select(score => (same, score)));
                 clock.Stop();
                 timing = (timing.Parts + 1, timing.Seconds + samples.Length / 16000.0, timing.Milliseconds + clock.Elapsed.TotalMilliseconds);
             }

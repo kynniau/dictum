@@ -264,6 +264,31 @@ public sealed class VoicePrintTests : IDisposable
         Assert.False(File.Exists(PrintPath));
     }
 
+    /// <summary>
+    /// Fix round F1: a "Record my voice now" folder that a quit or a crash left behind (a recorded clip in it, and a folder inside
+    /// that) is listed under the print's category and gone after Remove Dictum completely, which before removed the data folder only
+    /// when empty and never listed the folder.
+    /// </summary>
+    [Fact]
+    public void Remove_Dictum_deletes_a_recording_folder_left_mid_attempt()
+    {
+        var left = Path.Combine(_paths.LocalDir, "voice-enrolment-0123456789abcdef0123456789abcdef");
+        Directory.CreateDirectory(Path.Combine(left, "inner"));
+        File.WriteAllBytes(Path.Combine(left, "clip-01.wav"), Wav.Encode(Clip(1, 2)));
+        File.WriteAllText(Path.Combine(left, "inner", "note.txt"), "x");
+        var unrelated = Path.Combine(_paths.LocalDir, "not-dictum");
+        Directory.CreateDirectory(unrelated);
+
+        var plan = RemovalPlan.Build(_paths, new AppSettings(), RemovalScope.Everything);
+        Assert.Contains(plan.Items, i => i.Path == left && i.IsFolder && i.Category == DataCategory.VoicePrint);
+        Assert.Contains(plan.Items, i => i.Path == Path.Combine(left, "clip-01.wav") && !i.IsFolder && i.Category == DataCategory.VoicePrint);
+        Assert.Empty(plan.Execute().Failures);
+
+        Assert.False(Directory.Exists(left));
+        Assert.Empty(TemporaryFolders());
+        Assert.True(Directory.Exists(unrelated)); // a folder Dictum does not own stays, and so does the data folder holding it
+    }
+
     [Fact]
     public void You_is_a_valid_owner_only_when_the_meeting_has_You_turns()
     {

@@ -14,6 +14,12 @@ public static class VoiceEnrolment
     /// <summary>The prefix of the temporary recording folders under the data folder ("Record my voice now").</summary>
     private const string TemporaryPrefix = "voice-enrolment-";
 
+    /// <summary>
+    /// The temporary recording folders' names, as PathRegistry lists them (category VoicePrint), so every deletion that covers the
+    /// print also removes a folder a quit or a crash left mid-attempt; the shell also deletes any at start-up (<see cref="DeleteLeftovers"/>).
+    /// </summary>
+    public const string TemporaryPattern = TemporaryPrefix + "*";
+
     /// <summary>From the calibration recordings the user already chose to keep (current takes only); they stay exactly as they are.</summary>
     public static EnrolmentResult FromCalibration(AppPaths paths, IVoiceEmbedder? embedder, IMeetingKeyring keyring, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -39,7 +45,7 @@ public static class VoiceEnrolment
     {
         if (!Directory.Exists(paths.LocalDir)) return 0;
         var count = 0;
-        foreach (var folder in Directory.GetDirectories(paths.LocalDir, TemporaryPrefix + "*"))
+        foreach (var folder in Directory.GetDirectories(paths.LocalDir, TemporaryPattern))
         {
             DeleteFolder(folder);
             count++;
@@ -71,10 +77,16 @@ public static class VoiceEnrolment
     /// <param name="write">Writes the settings keys; false when settings.json could not be written (the print is then kept).</param>
     public static bool Delete(AppPaths paths, Func<IReadOnlyList<(string Key, bool Value)>, bool> write)
     {
-        if (!write([(UseInMeetingsKey, false), (YourVoiceOnlyKey, false)])) return false;
+        if (!TurnUsesOff(write)) return false;
         VoicePrintStore.Delete(VoicePrintStore.PathFor(paths));
         return true;
     }
+
+    /// <summary>
+    /// Writes both uses off (meetings.use_voice_print and audio.your_voice_only): <see cref="Delete"/>, and "Delete all app data"
+    /// before it removes the print (orchestrator ruling 08/11/2026). False when settings.json could not be written.
+    /// </summary>
+    public static bool TurnUsesOff(Func<IReadOnlyList<(string Key, bool Value)>, bool> write) => write([(UseInMeetingsKey, false), (YourVoiceOnlyKey, false)]);
 
     public const string UseInMeetingsKey = "meetings.use_voice_print";
     public const string YourVoiceOnlyKey = "audio.your_voice_only";

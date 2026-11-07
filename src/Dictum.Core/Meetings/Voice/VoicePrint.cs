@@ -83,18 +83,13 @@ public static class VoicePrintBuilder
         double seconds = 0;
         foreach (var clip in clips)
         {
-            foreach (var (start, end) in SpeakerCheck.PauseSegments(clip))
+            var covered = new List<(int From, int To)>();
+            foreach (var (from, to, embedding) in VoiceScore.SpeechWindows(clip, embedder, cancellationToken))
             {
-                var covered = new List<(int From, int To)>();
-                foreach (var (from, to) in SpeakerSeparator.Windows(start, end, clip.Length))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (embedder.Embed(clip[from..to]) is not { } embedding || !Array.TrueForAll(embedding, float.IsFinite)) continue;
-                    embeddings.Add(embedding);
-                    covered.Add((from, to));
-                }
-                seconds += Covered(covered) / (double)Rate;
+                embeddings.Add(embedding);
+                covered.Add((from, to));
             }
+            seconds += Covered(covered) / (double)Rate; // windows stay inside their speech part, so the union over the clip is the parts' sum
         }
         seconds = Math.Round(seconds, 1);
         if (seconds < MinSeconds || embeddings.Count == 0) return new(EnrolmentOutcome.TooLittleSpeech, null, seconds, embeddings.Count, 0);
@@ -137,20 +132,38 @@ public static class VoicePrintBuilder
 }
 
 /// <summary>
-/// Scores audio against a print (design 1.6 C.4 and D): the same windows as speaker separation, each embedded and compared by cosine
-/// (<see cref="SpeakerCheck.Cosine"/>) with the print; a window at or above the threshold sounds like the owner.
+/// The one scorer of a recording against a print (design 1.6 C.1, C.5 and D): only its speech, as the pause segmenter cuts it
+/// (<see cref="SpeakerCheck.PauseSegments"/>, the parts imports and --speaker-check use, so silence is never scored), then speaker
+/// separation's windows over each part (<see cref="SpeakerSeparator.Windows"/>), each embedded; a window whose embedding is missing or
+/// not finite is dropped. Enrolment (<see cref="VoicePrintBuilder.Build"/>), --speaker-check --print (<see cref="SpeakerCheck.RunPrint"/>)
+/// and the dictation filter (<see cref="OwnVoiceFilter"/>) all go through it, so the harness measures what the filter sees. A window
+/// whose cosine with the print (<see cref="SpeakerCheck.Cosine"/>) is at or above the threshold sounds like the owner.
 /// </summary>
 public static class VoiceScore
 {
-    /// <summary>How many of the windows of samples[from..to) embedded, and how many of those scored at or above the threshold.</summary>
-    public static (int Scored, int Own) Score(float[] samples, int from, int to, float[] print, IVoiceEmbedder embedder, double threshold)
+    /// <summary>Every embedded window of the speech in these 16 kHz mono samples, in time order.</summary>
+    public static IEnumerable<(int From, int To, float[] Embedding)> SpeechWindows(float[] samples, IVoiceEmbedder embedder, CancellationToken cancellationToken = default)
+    {
+        foreach (var (start, end) in SpeakerCheck.PauseSegments(samples))
+            foreach (var (from, to) in SpeakerSeparator.Windows(start, end, samples.Length))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (embedder.Embed(samples[from..to]) is { } embedding && Array.TrueForAll(embedding, float.IsFinite)) yield return (from, to, embedding);
+            }
+    }
+
+    /// <summary>The cosine with the print of every embedded speech window (<see cref="SpeechWindows"/>).</summary>
+    public static IEnumerable<double> SpeechScores(float[] samples, float[] print, IVoiceEmbedder embedder) =>
+        SpeechWindows(samples, embedder).Select(window => SpeakerCheck.Cosine(window.Embedding, print));
+
+    /// <summary>How many speech windows embedded, and how many of those scored at or above the threshold.</summary>
+    public static (int Scored, int Own) ScoreSpeech(float[] samples, float[] print, IVoiceEmbedder embedder, double threshold)
     {
         var (scored, own) = (0, 0);
-        foreach (var (a, b) in SpeakerSeparator.Windows(from / 16000.0, to / 16000.0, samples.Length))
+        foreach (var score in SpeechScores(samples, print, embedder))
         {
-            if (embedder.Embed(samples[a..b]) is not { } embedding || !Array.TrueForAll(embedding, float.IsFinite)) continue;
             scored++;
-            if (SpeakerCheck.Cosine(embedding, print) >= threshold) own++;
+            if (score >= threshold) own++;
         }
         return (scored, own);
     }

@@ -115,4 +115,102 @@ public sealed class VoiceCardUiTests
         Assert.True(Named<Button>(card, PROPOSED_Delete).IsTabStop); // it can still be deleted
         window.Close();
     });
+
+    /// <summary>A "Record my voice now" folder as a quit or a crash mid-attempt leaves it: one recorded take in it.</summary>
+    private static string LeaveRecordingFolder(AppPaths paths)
+    {
+        var folder = Path.Combine(paths.LocalDir, "voice-enrolment-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        File.WriteAllBytes(Path.Combine(folder, "clip-01.wav"), Dictum.Audio.Wav.Encode(new float[16000]));
+        return folder;
+    }
+
+    /// <summary>
+    /// Fix round F1: a recording folder left by a quit or a crash during "Record my voice now" is deleted when Dictum starts, before
+    /// anything else. Mutation: the start-up call removed.
+    /// </summary>
+    [Fact]
+    public Task A_recording_folder_left_mid_attempt_is_deleted_at_start_up() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "whisper": { "model": "base.en" }, "pill": { "enabled": false } }""");
+        var left = LeaveRecordingFolder(scratch.Paths);
+        var model = Path.Combine(scratch.Root.FullName, "fake-model.bin");
+        File.WriteAllText(model, "");
+        var models = new Dictum.Transcribe.ModelManager(Dictum.Core.NullLog.Instance, loader: (p, _, d) => new FakeSpeechEngine(p, d), gpuInUse: () => false);
+        var (shell, _, _) = scratch.Shell(models, new Dictum.UI.Shell.ShellOptions(ModelOverride: model));
+        try
+        {
+            Assert.True(Directory.Exists(left));
+            Assert.True(shell.Start(lifetime: null));
+            Assert.False(Directory.Exists(left));
+        }
+        finally { shell.Dispose(); }
+    });
+
+    /// <summary>
+    /// Fix round F3 (orchestrator ruling 08/11/2026): Delete all app data, with or without settings, deletes the voice print and any
+    /// recording folder left behind, and turns both uses off as Delete my voice print does. With settings kept, settings.json says
+    /// both are off; with settings deleted, settings.json is not written again, so the uses are at their defaults (your voice only
+    /// off; the meetings use has no print to act on, and a new print turns it on again in either case). Mutation: either scope
+    /// without the print's category.
+    /// </summary>
+    [Theory]
+    [InlineData(Dictum.Storage.RemovalScope.AllData)]
+    [InlineData(Dictum.Storage.RemovalScope.AllDataIncludingSettings)]
+    public Task Delete_all_app_data_deletes_the_print_and_turns_both_uses_off(Dictum.Storage.RemovalScope scope) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24", "audio": { "your_voice_only": true }, "meetings": { "use_voice_print": true } }""");
+        var (shell, _, dialogs) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        var print = VoicePrintStore.PathFor(scratch.Paths);
+        VoicePrintStore.Write(print, Print(VoicePrintStore.CurrentModel), shell.VoiceKeyring);
+        var left = LeaveRecordingFolder(scratch.Paths);
+        Assert.True(shell.Settings.Audio.YourVoiceOnly);
+
+        dialogs.Answers.Enqueue(0);
+        Assert.DoesNotContain("could not be deleted", shell.DeleteData(scope));
+
+        Assert.False(File.Exists(print));
+        Assert.False(Directory.Exists(left));
+        Assert.False(shell.Settings.Audio.YourVoiceOnly);
+        if (scope == Dictum.Storage.RemovalScope.AllData)
+        {
+            var settings = SettingsLoader.LoadFile(scratch.Paths.SettingsFile);
+            Assert.False(settings.Settings.Audio.YourVoiceOnly);
+            Assert.False(settings.Meetings.UseVoicePrint);
+        }
+        else Assert.False(File.Exists(scratch.Paths.SettingsFile)); // deleted on request and not written again
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Fix round F6: opened from "Record my voice now" the recording window is titled with row V19 and shows row V20 first, as visible
+    /// text a screen reader reads; opened for calibration it is as before.
+    /// </summary>
+    [Fact]
+    public Task The_recording_window_says_what_learning_your_voice_does_only_when_opened_for_it() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        TextBlock? Instruction(Window window) => All<TextBlock>(window).SingleOrDefault(t => t.Text == PROPOSED_LearnMyVoiceInstruction);
+
+        var learn = new CalibrationWindow(shell, VoiceEnrolment.NewTemporaryFolder(scratch.Paths));
+        learn.Show();
+        Assert.Equal("Dictum: learn my voice", learn.Title);
+        var line = Instruction(learn);
+        Assert.NotNull(line);
+        Assert.True(line.IsEffectivelyVisible);
+        Assert.Equal(PROPOSED_LearnMyVoiceInstruction, Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(line).GetName());
+        Assert.Same(line, Assert.IsType<StackPanel>(line.Parent).Children[0]); // first on the page, above the sentence card
+        learn.Close();
+
+        var calibrate = new CalibrationWindow(shell);
+        calibrate.Show();
+        Assert.Equal("Dictum: calibrate my voice", calibrate.Title);
+        Assert.Null(Instruction(calibrate));
+        calibrate.Close();
+        shell.Dispose();
+    });
 }

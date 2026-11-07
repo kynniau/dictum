@@ -189,6 +189,7 @@ public sealed partial class AppShell : IDisposable
     /// </summary>
     public bool Start(IClassicDesktopStyleApplicationLifetime? lifetime)
     {
+        DeleteVoiceEnrolmentLeftovers(); // a "Record my voice now" recording a quit or a crash left behind (design 1.6 C.1)
         ConfigureMeetingsShutdown(lifetime);
         var file = SettingsLoader.LoadFile(Paths.SettingsFile);
         var (askSpeech, askCleanup) = AppRules.FirstRunQuestions(file);

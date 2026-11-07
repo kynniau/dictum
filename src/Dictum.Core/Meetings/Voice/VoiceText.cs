@@ -57,4 +57,10 @@ public static class VoiceText
 
     /// <summary>V18: the help guide paragraph (site and in-app help place it only once approved; this lane does not touch help).</summary>
     public const string PROPOSED_HelpParagraph = "Learn my voice (Settings > General) makes a voice print from your calibration recordings or a new recording. Dictum labels parts that sound like you as You in one-track meeting recordings, including phone recordings. While dictating, you can also skip parts that do not sound like you. Both can make mistakes. The print is a list of numbers kept encrypted on this computer; it is never uploaded or included in a .dictum file. Delete it any time.";
+
+    /// <summary>V19 (added 08/11/2026 after the merge lens; Fable draft, not yet GPT-challenged): the recording window's title when opened from V4.</summary>
+    public const string PROPOSED_LearnMyVoiceTitle = "Dictum: learn my voice";
+
+    /// <summary>V20 (added 08/11/2026 after the merge lens; Fable draft, not yet GPT-challenged): the instruction line at the top of that window.</summary>
+    public const string PROPOSED_LearnMyVoiceInstruction = "Read the sentences, then close this window. Dictum makes your voice print from the recording and deletes the recording.";
 }

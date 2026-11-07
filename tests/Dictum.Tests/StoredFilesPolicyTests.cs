@@ -43,6 +43,10 @@ public sealed class StoredFilesPolicyTests
         // Design 1.6 C.2: the sealed voice print. site/privacy.html names it only once the owner approves the data-folder line drafted in
         // .demo-preview/two-model-voiceprint.md (item 2); until then The_privacy_policy_names_every_file_Dictum_stores fails, as it should.
         ["voiceprint.enc"] = "voiceprint.enc",
+        // Fix round F1 (08/11/2026): the "Record my voice now" recording folders, deleted when the attempt ends; one a quit or a crash
+        // left behind goes with the print. The drafted privacy subsection on the print describes that recording, so it goes by the
+        // print's name here; whether the data-folder line should name the folder too is the owner's call (reported).
+        ["local/voice-enrolment-*"] = "voiceprint.enc",
     };
 
     /// <summary>The registry's stored items under a scratch profile that is never created: its own folders (removed once empty) aside.</summary>

@@ -11,7 +11,7 @@ public enum RemovalScope
     Logs,
 
     /// <summary>
-    /// "Delete all app data": models, recordings, logs, the verified record; settings and personal files kept; never .env. A
+    /// "Delete all app data": models, recordings, logs, the verified record, the voice print; settings and personal files kept; never .env. A
     /// chosen models folder outside the user's profile is left alone (<see cref="DataCategory.SharedModels"/>).
     /// </summary>
     AllData,
@@ -47,9 +47,10 @@ public sealed class RemovalPlan
     {
         RemovalScope.CalibrationRecordings => [DataCategory.CalibrationRecordings],
         RemovalScope.Logs => [DataCategory.Logs],
-        RemovalScope.AllData => [DataCategory.Models, DataCategory.ModelVerification, DataCategory.CalibrationRecordings, DataCategory.Logs],
+        RemovalScope.AllData => [DataCategory.Models, DataCategory.ModelVerification, DataCategory.CalibrationRecordings, DataCategory.Logs, DataCategory.VoicePrint],
         RemovalScope.AllDataIncludingSettings =>
-            [DataCategory.Models, DataCategory.ModelVerification, DataCategory.CalibrationRecordings, DataCategory.Logs, DataCategory.Settings, DataCategory.PersonalFiles],
+            [DataCategory.Models, DataCategory.ModelVerification, DataCategory.CalibrationRecordings, DataCategory.Logs, DataCategory.VoicePrint,
+             DataCategory.Settings, DataCategory.PersonalFiles],
         _ => Enum.GetValues<DataCategory>(),
     };
 
@@ -78,6 +79,17 @@ public sealed class RemovalPlan
                 continue;
             }
             if (!Directory.Exists(location.Path)) continue;
+            if (location.Pattern == Meetings.Voice.VoiceEnrolment.TemporaryPattern)
+            {
+                // Folders, not files: each leftover recording folder with everything in it (links removed as links, never followed).
+                foreach (var folder in new DirectoryInfo(location.Path).EnumerateDirectories(location.Pattern))
+                {
+                    if (folder.Attributes.HasFlag(FileAttributes.ReparsePoint)) { Add(new RemovalItem(folder.FullName, 0, location.Category, true, IsLink: true)); continue; }
+                    Walk(folder, Add, location.Category);
+                    Add(new RemovalItem(folder.FullName, 0, location.Category, true));
+                }
+                continue;
+            }
             foreach (var file in new DirectoryInfo(location.Path).EnumerateFiles().Where(f => Matches(location.Pattern, f.Name)))
             {
                 // The backstop (lens, 17/10/2026): a model file that is in the bundled folder under another name is never listed.
@@ -103,7 +115,7 @@ public sealed class RemovalPlan
                     Add(new RemovalItem(dir.FullName, 0, DataCategory.EarlierBuild, true, IsLink: true));
                     continue;
                 }
-                Walk(dir, Add);
+                Walk(dir, Add, DataCategory.EarlierBuild);
                 Add(new RemovalItem(dir.FullName, 0, DataCategory.EarlierBuild, true));
             }
         }
@@ -112,19 +124,19 @@ public sealed class RemovalPlan
     }
 
     /// <summary>Every file and folder under <paramref name="dir"/>, without entering any junction or symbolic link (those are listed as links).</summary>
-    private static void Walk(DirectoryInfo dir, Action<RemovalItem> add)
+    private static void Walk(DirectoryInfo dir, Action<RemovalItem> add, DataCategory category)
     {
         foreach (var entry in dir.EnumerateFileSystemInfos("*", new EnumerationOptions { RecurseSubdirectories = false, AttributesToSkip = 0, IgnoreInaccessible = true }))
         {
             var link = entry.Attributes.HasFlag(FileAttributes.ReparsePoint);
             if (entry is DirectoryInfo sub)
             {
-                if (!link) Walk(sub, add);
-                add(new RemovalItem(sub.FullName, 0, DataCategory.EarlierBuild, true, link));
+                if (!link) Walk(sub, add, category);
+                add(new RemovalItem(sub.FullName, 0, category, true, link));
             }
             else
             {
-                add(new RemovalItem(entry.FullName, link ? 0 : ((FileInfo)entry).Length, DataCategory.EarlierBuild, false, link));
+                add(new RemovalItem(entry.FullName, link ? 0 : ((FileInfo)entry).Length, category, false, link));
             }
         }
     }

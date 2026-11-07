@@ -86,7 +86,7 @@ internal sealed partial class CalibrationWindow : Window
         if (enrolmentFolder is not null) _recordings = new CalibrationRecordings(enrolmentFolder, _recordings.Script);
         Enrolment = enrolmentFolder is not null;
         _capture = shell.Platform.CreateCapture(_host.Log);
-        Title = "Dictum: calibrate my voice";
+        Title = Enrolment ? Dictum.Meetings.Voice.VoiceText.PROPOSED_LearnMyVoiceTitle : "Dictum: calibrate my voice"; // row V19 for "Record my voice now"
         Width = 820;
         Height = 720;
         MinWidth = 640;
@@ -114,7 +114,9 @@ internal sealed partial class CalibrationWindow : Window
             ResultsHintStart(shell.Platform.Words) +
             "A recording shorter than 10 s counts as 10 s, because whisper's time per recording is mostly fixed.", "hint"),
             Ui.Row(8, _run, _cancel), _progress, Ui.Overline("Not installed"), MissingList), "Results so far");
-        Control top = Ui.Columns(2, 16, sentenceCard, results);
+        // "Record my voice now" shows the sentence card alone; it is never put in the columns as well (a control has one parent:
+        // adding it to both threw, so the enrolment window never opened; found by the fix round's headless test, 08/11/2026).
+        Control top = Enrolment ? sentenceCard : Ui.Columns(2, 16, sentenceCard, results);
         var missed = Ui.Card(SuggestionList, "Words it keeps missing");
 
         var save = Ui.Button("Save", "primary", AddTicked, Failed, name: "Save the ticked suggestions");
@@ -131,13 +133,14 @@ internal sealed partial class CalibrationWindow : Window
         DockPanel.SetDock(footerBar, Dock.Bottom);
         if (Enrolment)
         {
-            // Recording only: the sentence card on its own, and Close, which ends the attempt.
+            // Recording only: the sentence card on its own (above), and Close, which ends the attempt.
             framing.IsVisible = missed.IsVisible = save.IsVisible = _delete.IsVisible = false;
-            top = sentenceCard;
         }
+        // "Record my voice now": row V20 first on the page, so it is read before the sentence card.
+        var page = Enrolment ? Ui.Stack(16, Ui.Text(Dictum.Meetings.Voice.VoiceText.PROPOSED_LearnMyVoiceInstruction), framing, top, missed) : Ui.Stack(16, framing, top, missed);
         Content = new DockPanel
         {
-            Children = { header, footerBar, new ScrollViewer { Content = new Border { Padding = new Thickness(24, 20), Child = Ui.Stack(16, framing, top, missed) } } },
+            Children = { header, footerBar, new ScrollViewer { Content = new Border { Padding = new Thickness(24, 20), Child = page } } },
         };
 
         _takeLimit = new DispatcherTimer { Interval = CalibrationSession.TakeLimit };
