@@ -26,9 +26,8 @@ internal sealed class CleanupPage : SettingsPage
     private readonly Segments _profanity;
     private readonly ToggleSwitch _grammar;
     public const string PROPOSED_ParagraphPauseLabel = "Paragraph pause (seconds)";
-    public const string PROPOSED_ParagraphPauseHelp = "Start a new paragraph when you pause for this long after a full stop. 0 turns it off.";
-    // The owner chooses between PROPOSED_ParagraphPauseHelp (used by the UI) and this hands-free wording.
-    public const string PROPOSED_ParagraphPauseHelpHandsFree = "In hands-free, start a new paragraph when you pause for this long after a full stop. 0 turns it off.";
+    // APPROVED 07/11/2026 (owner, round 1 row 20 option (b)): do not reword.
+    public const string APPROVED_ParagraphPauseHelp = "In hands-free, start a new paragraph when you pause for this long after a full stop. 0 turns it off.";
     private readonly NumericUpDown _paragraphPause = new() { Width = 110, Minimum = 0, Maximum = 30, Increment = 0.5m, FormatString = "0.##" };
     private readonly StackPanel _cloudOn = new() { Spacing = 10 };
     private readonly StackPanel _cloudOff = new() { Spacing = 10 };
@@ -58,7 +57,7 @@ internal sealed class CleanupPage : SettingsPage
         _profanity.HorizontalAlignment = HorizontalAlignment.Left;
         _grammar = Ui.Switch(false, on => Write(("llm.grammar_assist", Json(on))));
         AutomationProperties.SetName(_paragraphPause, PROPOSED_ParagraphPauseLabel);
-        AutomationProperties.SetHelpText(_paragraphPause, PROPOSED_ParagraphPauseHelp);
+        AutomationProperties.SetHelpText(_paragraphPause, APPROVED_ParagraphPauseHelp);
         _paragraphPause.LostFocus += (_, _) => SaveParagraphPause();
         _paragraphPause.AddHandler(InputElement.KeyDownEvent, (_, e) =>
         {
@@ -87,7 +86,7 @@ internal sealed class CleanupPage : SettingsPage
             Ui.Card(Ui.Stack(8, _profanity,
                 Ui.Text("Mask keeps the first letter (f***); Remove drops the word. The clean-up model keeps every word you said, swear words included: this setting is the only thing that changes them.", "caption")), "Profanity filter"),
             Ui.Card(Ui.Line("Grammar assist", _grammar, "For speakers whose first language is not English: also fixes articles, tenses, prepositions and word order, keeping every fact and name."), "Grammar"),
-            Ui.Line(PROPOSED_ParagraphPauseLabel, _paragraphPause, PROPOSED_ParagraphPauseHelp),
+            Ui.Line(PROPOSED_ParagraphPauseLabel, _paragraphPause, APPROVED_ParagraphPauseHelp),
             _own.View,
             Ui.Card(Ui.Stack(10, _cloudOn, _cloudOff, _keys.View), "Cloud clean-up"));
     }

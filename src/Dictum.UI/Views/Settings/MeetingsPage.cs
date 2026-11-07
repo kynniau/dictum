@@ -57,8 +57,8 @@ internal sealed class MeetingsPage : SettingsPage
             _warning, Ui.Card(Ui.Stack(8, Ui.Line(PROPOSED_Engine, _engine),
                 Ui.Text(APPROVED_EngineNote), Ui.Text(PROPOSED_ConfigureSummary, "caption"), Ui.Line(PROPOSED_SummaryModel, _model),
                 MeetingsWindow.Button(PROPOSED_OpenModels, () => shell.OpenSettings("Models")), Ui.Line(PROPOSED_Template, _template))),
-            Ui.Card(Ui.Stack(8, Ui.Heading(SpeakerText.PROPOSED_SettingsRow), Ui.Text(SpeakerText.PROPOSED_SettingsNote, "caption"), _speakerModels,
-                MeetingsWindow.Button(SpeakerText.PROPOSED_DownloadModels, DownloadSpeakerModels))),
+            Ui.Card(Ui.Stack(8, Ui.Heading(SpeakerText.APPROVED_SettingsRow), Ui.Text(SpeakerText.APPROVED_SettingsNote, "caption"), _speakerModels,
+                MeetingsWindow.Button(SpeakerText.APPROVED_DownloadModels, DownloadSpeakerModels))),
             Ui.Card(Ui.Stack(8, Ui.Heading(PROPOSED_SummaryTypes), Ui.Text(PROPOSED_TypeFileCaption, "caption"), _typesList,
                 MeetingsWindow.Button(PROPOSED_NewType, () => EditType(null)))),
             MeetingsWindow.Button(PROPOSED_Existing, () => shell.OpenMeetings()));
@@ -88,7 +88,7 @@ internal sealed class MeetingsPage : SettingsPage
                 MeetingsWindow.Button(PROPOSED_EditType, () => EditType(type)),
                 MeetingsWindow.Button(PROPOSED_DeleteType, () => DeleteType(type))));
         }
-        _speakerModels.Text = _host.SpeakerModelsReady() ? SpeakerText.PROPOSED_ModelsReady : SpeakerText.PROPOSED_ModelsNotReady;
+        _speakerModels.Text = _host.SpeakerModelsReady() ? SpeakerText.APPROVED_ModelsReady : SpeakerText.APPROVED_ModelsNotReady;
         _ = RefreshWarning(++_warningVersion, _folder.Text);
     }
     /// <summary>
@@ -99,7 +99,7 @@ internal sealed class MeetingsPage : SettingsPage
     {
         if (SpeakerModels.Locate(Shell.Paths, Shell.Settings) is not null) { Refresh(); return; }
         var target = Path.Combine(Shell.Paths.ModelsDir(Shell.Settings), SpeakerModels.Embedding.FileName);
-        Shell.Models.ApplyWithDownloads(SpeakerText.PROPOSED_DownloadNote, [(SpeakerModels.Embedding, target)], [],
+        Shell.Models.ApplyWithDownloads(SpeakerText.APPROVED_DownloadNote, [(SpeakerModels.Embedding, target)], [],
             finished: _ => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh));
     }
     private void EditType(SummaryTemplate? type)

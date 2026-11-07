@@ -172,7 +172,7 @@ internal sealed partial class MeetingsWindow : Window
         _entries = new MeetingsEntries(_host.Settings, BeginAgreement, ShowList);
         _importButton = SafeButton(PROPOSED_Import, () => _ = PickImport());
         _importButton.IsVisible = _host.Settings().Enabled;
-        _bundleImportButton = SafeButton(PROPOSED_ImportBundle, () => _ = PickBundle());
+        _bundleImportButton = SafeButton(APPROVED_ImportBundle, () => _ = PickBundle());
         _bundleImportButton.IsVisible = _host.Settings().Enabled;
         Screen(Ui.Heading(PROPOSED_Meetings), _entries, _importButton, _bundleImportButton, search, results);
         Search();
@@ -867,8 +867,8 @@ internal sealed partial class MeetingsWindow : Window
         var record = meta.Agreement is { } agreement ? Ui.Text(RecordText(agreement.Kind, agreement.AcknowledgedAt, agreement.How)) : Ui.Text(PROPOSED_NotesText);
         Screen(Ui.Row(8, SafeButton(PROPOSED_Meetings, ShowList)), Ui.Heading(meta.Title), Ui.Text(meta.AudioIncomplete ? PROPOSED_AudioRecovered : ""),
             Ui.Text(string.Format(PROPOSED_ListRow, meta.Title, meta.StartedAt.ToLocalTime(), meta.Duration, _host.Store.SizeOf(id))),
-            transcriptCard, SpeakersCard(id, speakers), summaryCard, Ui.Card(record, PROPOSED_Record),
-            SafeButton(PROPOSED_MoveToAnotherDevice, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = MoveBundle(id))),
+            transcriptCard, SpeakersCard(id, speakers), summaryCard, Ui.Card(record, APPROVED_RecordHeading),
+            SafeButton(APPROVED_MoveToAnotherDevice, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = MoveBundle(id))),
             Ui.Row(8, SafeButton(PROPOSED_Export, () => Confirm(APPROVED_ShareReminder, APPROVED_ShareContinue, () => _ = Work(async () =>
             {
                 var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = PROPOSED_Export, DefaultExtension = "md" });

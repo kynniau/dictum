@@ -11,7 +11,8 @@ namespace Dictum.Cli;
 /// </summary>
 public static class SpeakerCheckCommand
 {
-    public const string PROPOSED_Usage =
+    // APPROVED 08/11/2026 (owner, round 2 row 43): do not reword.
+    public const string APPROVED_Usage =
         "Dictum.exe --speaker-check <folder>      separate the voices in each <name>.wav (16 kHz mono) of the folder and print the DER " +
         "against its <name>.rttm (0.25 s collar, overlap scored), and the EER of the pairs in trials.txt (\"<1|0> <a.wav> <b.wav>\")";
 
