@@ -29,10 +29,10 @@ public static class MeetingCrypto
     public static byte[] NewContentKey() => RandomNumberGenerator.GetBytes(32);
 
     public static KeyWrap Wrap(byte[] contentKey, byte[] recipientKey, string recipientId)
-        => Wrap(contentKey, recipientKey, recipientId, RandomNumberGenerator.GetBytes(12));
+        => WrapWithFixedNonceForFixture(contentKey, recipientKey, recipientId, RandomNumberGenerator.GetBytes(12));
 
     // Explicit deterministic seam for conformance tests; production callers always use the random overload.
-    internal static KeyWrap Wrap(byte[] contentKey, byte[] recipientKey, string recipientId, byte[] nonce)
+    internal static KeyWrap WrapWithFixedNonceForFixture(byte[] contentKey, byte[] recipientKey, string recipientId, byte[] nonce)
     {
         if (contentKey.Length != 32) throw new ArgumentException("Invalid content key.");
         ArgumentOutOfRangeException.ThrowIfNotEqual(nonce.Length, 12, nameof(nonce));
@@ -66,10 +66,10 @@ public static class MeetingCrypto
         AtomicFile.Write(cipherPath, output => Encrypt(input, output, key, identity));
 
     internal static void Encrypt(Stream input, Stream output, byte[] key, string identity)
-        => Encrypt(input, output, key, identity, RandomNumberGenerator.GetBytes);
+        => EncryptWithFixtureBytes(input, output, key, identity, RandomNumberGenerator.GetBytes);
 
     // No global RNG replacement: only test callers supply a deterministic byte source.
-    internal static void Encrypt(Stream input, Stream output, byte[] key, string identity, Func<int, byte[]> randomBytes)
+    internal static void EncryptWithFixtureBytes(Stream input, Stream output, byte[] key, string identity, Func<int, byte[]> randomBytes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
         // The caller's identity binds the meeting and file role; the random header binds this
@@ -120,9 +120,9 @@ public static class MeetingCrypto
     public static Stream OpenDecrypted(string cipherPath, byte[] contentKey, string identity) => new DecryptedStream(cipherPath, contentKey, identity);
 
     internal static IMeetingAudioWriter BeginAudio(string path, byte[] content, string identity, Action completed)
-        => BeginAudio(path, content, identity, completed, RandomNumberGenerator.GetBytes);
+        => BeginAudioWithFixtureBytes(path, content, identity, completed, RandomNumberGenerator.GetBytes);
     // Deterministic conformance seam, scoped to one writer; production always uses the random overload.
-    internal static IMeetingAudioWriter BeginAudio(string path, byte[] content, string identity, Action completed, Func<int, byte[]> randomBytes)
+    internal static IMeetingAudioWriter BeginAudioWithFixtureBytes(string path, byte[] content, string identity, Action completed, Func<int, byte[]> randomBytes)
         => new AudioWriter(path, content, identity, completed, randomBytes);
     internal static Stream OpenChunkedAudio(string path, byte[] content, string identity, bool incomplete) => new DecryptedStream(path, content, identity, true, incomplete);
 

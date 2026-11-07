@@ -19,7 +19,7 @@ internal static partial class PhoneBundleFixture
         Directory.CreateDirectory(files.Root);
         var path = Path.Combine(files.Root, "audio-mixed.chunks.enc");
         var call = 0;
-        using (var writer = MeetingCrypto.BeginAudio(path, content, Id.Value + "/audio-mixed.chunks.enc", () => { },
+        using (var writer = MeetingCrypto.BeginAudioWithFixtureBytes(path, content, Id.Value + "/audio-mixed.chunks.enc", () => { },
             count => Range(0x10 * call++, count)))
         {
             var wav = Wav();

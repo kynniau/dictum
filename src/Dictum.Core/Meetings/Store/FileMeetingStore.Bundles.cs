@@ -77,11 +77,11 @@ public sealed partial class FileMeetingStore
     /// Removes a bundle staging folder (or a stray file at its path), zero-filling plaintext metadata and atomic-write
     /// temporaries first, as <see cref="Delete"/> does. Missing staging is not an error.
     /// </summary>
-    internal void DiscardStaging(string staged) => DiscardStaging(staged, null);
+    internal void DiscardStaging(string staged) => DiscardStagingObservedForTest(staged, null);
 
     // Per-call test observer: invoked after durable scrubbing, immediately before folder deletion.
     // No global hook, and production callers cannot replace or bypass the scrub.
-    internal void DiscardStaging(string staged, Action<string>? beforeDelete)
+    internal void DiscardStagingObservedForTest(string staged, Action<string>? beforeDelete)
     {
         lock (Gate)
         {

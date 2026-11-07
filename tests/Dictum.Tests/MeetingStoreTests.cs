@@ -72,7 +72,7 @@ public class MeetingStoreTests
         var original = Enumerable.Repeat((byte)0x5a, FileMeetingStore.ScrubChunk + 17).ToArray();
         foreach (var name in names) File.WriteAllBytes(Path.Combine(staging, name), name == "meta.json" ? original : original[..71]);
         var observed = new Dictionary<string, byte[]>();
-        files.Store().DiscardStaging(staging, folder =>
+        files.Store().DiscardStagingObservedForTest(staging, folder =>
         {
             Assert.Equal(staging, folder);
             foreach (var name in names) observed.Add(name, File.ReadAllBytes(Path.Combine(folder, name)));

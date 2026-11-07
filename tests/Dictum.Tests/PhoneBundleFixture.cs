@@ -55,7 +55,7 @@ internal static partial class PhoneBundleFixture
         var transfer = TransferCode.Derive(Code, salt);
         try
         {
-            var wrap = MeetingCrypto.Wrap(content, transfer, "transfer", Range(0xf0, 12));
+            var wrap = MeetingCrypto.WrapWithFixedNonceForFixture(content, transfer, "transfer", Range(0xf0, 12));
             using var output = new MemoryStream();
             using (var zip = new ZipArchive(output, ZipArchiveMode.Create, true))
             {
@@ -79,7 +79,7 @@ internal static partial class PhoneBundleFixture
                     using var input = new MemoryStream(plain);
                     using var sealedBytes = new MemoryStream();
                     var call = 0;
-                    MeetingCrypto.Encrypt(input, sealedBytes, content, Id.Value + "/" + name,
+                    MeetingCrypto.EncryptWithFixtureBytes(input, sealedBytes, content, Id.Value + "/" + name,
                         count => Range(seed + 0x10 * call++, count));
                     var bytes = sealedBytes.ToArray();
                     files.Add(new(name, bytes.Length));
