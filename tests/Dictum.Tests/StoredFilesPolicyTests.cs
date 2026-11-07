@@ -40,6 +40,9 @@ public sealed class StoredFilesPolicyTests
         ["calibration/takes.txt"] = "calibration",
         ["logs/*.log"] = "logs",
         ["models/" + ModelFiles.Pattern] = "models",
+        // Design 1.6 C.2: the sealed voice print. site/privacy.html names it only once the owner approves the data-folder line drafted in
+        // .demo-preview/two-model-voiceprint.md (item 2); until then The_privacy_policy_names_every_file_Dictum_stores fails, as it should.
+        ["voiceprint.enc"] = "voiceprint.enc",
     };
 
     /// <summary>The registry's stored items under a scratch profile that is never created: its own folders (removed once empty) aside.</summary>

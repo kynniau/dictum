@@ -15,9 +15,10 @@ namespace Dictum.UI.Views.Meetings;
 /// </summary>
 internal sealed partial class MeetingsWindow
 {
-    /// <summary>A transcript line: the speaker's name or "Other n" on a separated meeting, else the channel (You, Others, Mixed).</summary>
+    /// <summary>A transcript line: the speaker's name or "Other n" on a separated meeting, else the channel (You, Others, Mixed). A turn the voice print labelled You (design 1.6 C.4) is written exactly as a You channel line.</summary>
     internal static string FormatSegment(Segment segment, MeetingSpeakers? speakers = null) => string.Format(PROPOSED_Segment, segment.Start,
-        speakers?.LabelOf(segment) ?? segment.Channel switch { Channel.You => PROPOSED_YouChannel, Channel.Others => PROPOSED_OthersChannel, _ => PROPOSED_MixedChannel },
+        speakers?.SpeakerOf(segment) == MeetingSpeakers.YouSpeaker ? PROPOSED_YouChannel
+            : speakers?.LabelOf(segment) ?? segment.Channel switch { Channel.You => PROPOSED_YouChannel, Channel.Others => PROPOSED_OthersChannel, _ => PROPOSED_MixedChannel },
         segment.Text);
 
     /// <summary>

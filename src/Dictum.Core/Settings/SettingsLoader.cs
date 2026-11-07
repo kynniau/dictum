@@ -108,6 +108,7 @@ public static class SettingsLoader
                 v => SummaryTemplates.Load(configDirectory).Any(t => t.Id == v)
                     ? null : "expected an available meeting summary type id"),
             ShareDefault = Choice("share_default", d.ShareDefault),
+            UseVoicePrint = r.Bool("use_voice_print", d.UseVoicePrint),
         };
     }
 
@@ -143,6 +144,7 @@ public static class SettingsLoader
             Ui = BindUi(r.Child("ui")),
             Terms = BindTerms(r.Child("terms")),
             Keys = BindKeys(r.Child("keys")),
+            Voice = BindVoice(r.Child("voice")),
             FixHotkey = r.NullableString("fix_hotkey", v => HotkeyParser.TryParse(v, out _, out var e) ? null : e),
             LogLevel = r.String("log_level", d.LogLevel, OneOf("debug", "info", "warning", "error")).ToLowerInvariant(),
             LogTranscripts = r.Bool("log_transcripts", d.LogTranscripts),
@@ -188,6 +190,21 @@ public static class SettingsLoader
         // Any finite number is read; EffectiveSettings clamps it (and warns) afterwards.
         var seconds = r.Double("paragraph_pause_seconds", d.ParagraphPauseSeconds, -double.MaxValue, double.MaxValue, PROPOSED_ParagraphPauseExpected);
         var settings = EffectiveSettings.ParagraphPause(d with { ParagraphPauseSeconds = seconds }, r.Warn);
+        r.WarnUnknown();
+        return settings;
+    }
+
+    /// <summary>
+    /// voice.threshold (design 1.6 C.5): any finite number is read and then clamped to 0.3–0.9 with one warning (row V17), as
+    /// cleanup.paragraph_pause_seconds is; a value that is not a number gets the usual invalid-value warning and the default.
+    /// </summary>
+    private static VoiceSettings BindVoice(ObjectReader? r)
+    {
+        var d = new VoiceSettings();
+        if (r is null) return d;
+        var threshold = r.Double("threshold", d.Threshold, -double.MaxValue, double.MaxValue,
+            $"expected a number from {VoiceSettings.MinThreshold.ToString(CultureInfo.InvariantCulture)} to {VoiceSettings.MaxThreshold.ToString(CultureInfo.InvariantCulture)}");
+        var settings = EffectiveSettings.VoiceThreshold(d with { Threshold = threshold }, r.Warn);
         r.WarnUnknown();
         return settings;
     }
@@ -277,7 +294,7 @@ public static class SettingsLoader
     private static AudioSettings BindAudio(ObjectReader? r)
     {
         if (r is null) return new AudioSettings();
-        var s = new AudioSettings { Device = r.NullableString("device"), ProcessedCapture = r.Bool("processed_capture", false) };
+        var s = new AudioSettings { Device = r.NullableString("device"), ProcessedCapture = r.Bool("processed_capture", false), YourVoiceOnly = r.Bool("your_voice_only", false) };
         r.WarnUnknown();
         return s;
     }

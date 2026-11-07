@@ -8,7 +8,7 @@ public enum DictationState { Idle, RecordingHold, PendingTap, RecordingHandsFree
 /// has given no sound (recording goes on); NoSoundEnded is the same words when the recording ends that way, or when no
 /// microphone is listed at all (21/10/2026).
 /// </summary>
-public enum PillView { Hidden, RecordingHold, RecordingHandsFree, Transcribing, Polishing, Done, Cancelled, Busy, MicError, PolishingSkipped, HandsFreeStopped, NoSound, NoSoundEnded, MeetingRecording, MeetingPaused }
+public enum PillView { Hidden, RecordingHold, RecordingHandsFree, Transcribing, Polishing, Done, Cancelled, Busy, MicError, PolishingSkipped, HandsFreeStopped, NoSound, NoSoundEnded, MeetingRecording, MeetingPaused, VoiceSkipped }
 
 /// <summary>Why the microphone gave no sound: it delivered only silence, or the system lists no microphone at all.</summary>
 public enum NoSoundCause { Silent, NoMicrophone }

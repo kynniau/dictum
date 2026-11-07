@@ -45,6 +45,7 @@ public sealed record AppSettings
     public UiSettings Ui { get; init; } = new();
     public TermsSettings Terms { get; init; } = new();
     public KeysSettings Keys { get; init; } = new();
+    public VoiceSettings Voice { get; init; } = new();
 
     /// <summary>Optional second hotkey that opens "Fix last dictation" (SPEC §16.3). Null = unset (the default).</summary>
     public string? FixHotkey { get; init; }
@@ -64,6 +65,24 @@ public sealed record AudioSettings
     /// <summary>Null = Windows default capture device; otherwise a device ID or (part of) its friendly name.</summary>
     public string? Device { get; init; }
     public bool ProcessedCapture { get; init; }
+
+    /// <summary>
+    /// audio.your_voice_only (design 1.6 D, default off): each dictated part that does not sound like the voice print is skipped
+    /// before any speech engine hears it. Without a print it does nothing (<see cref="Meetings.Voice.OwnVoiceFilter"/>).
+    /// </summary>
+    public bool YourVoiceOnly { get; init; }
+}
+
+/// <summary>voice.* (design 1.6 C.5): settings.json only, no Settings control.</summary>
+public sealed record VoiceSettings
+{
+    /// <summary>Design C.5 starting value, not measured on a real voice: the owner sets it from <c>--speaker-check --print</c> before release.</summary>
+    public const double DefaultThreshold = 0.55;
+    public const double MinThreshold = 0.3;
+    public const double MaxThreshold = 0.9;
+
+    /// <summary>The cosine score at or above which a window sounds like the voice print (meetings' You, and dictation's filter).</summary>
+    public double Threshold { get; init; } = DefaultThreshold;
 }
 
 public sealed record WhisperSettings

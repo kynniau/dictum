@@ -44,6 +44,12 @@ public enum DataCategory
 
     /// <summary>What the earlier build (Dictate) left in its own folders after the migration (skipped or unmovable items).</summary>
     EarlierBuild,
+
+    /// <summary>
+    /// voiceprint.enc, the sealed voice print (design 1.6 C.2): "Remove Dictum completely" deletes it; "Delete my voice print" on the
+    /// Your voice card is its own deletion. Not in "Delete all app data" (the design names only the complete removal).
+    /// </summary>
+    VoicePrint,
 }
 
 /// <summary>One place Dictum writes: a file, a set of files in a folder (by pattern), a folder, or a platform item.</summary>
@@ -86,6 +92,8 @@ public static class PathRegistry
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration recordings", "clip-*"),
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration take list", "takes.txt"),
             new(paths.LogsDir, DataCategory.Logs, "logs", "*.log"),
+            // Its name and identity live in Dictum.Meetings (the meetings boundary keeps sealed file names there); the label is row V1.
+            new(Meetings.Voice.VoicePrintStore.PathFor(paths), DataCategory.VoicePrint, Meetings.Voice.VoiceText.PROPOSED_CardTitle),
         };
         foreach (var dir in ModelFolders(paths, settings))
         {

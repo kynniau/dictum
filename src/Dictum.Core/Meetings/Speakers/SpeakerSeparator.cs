@@ -52,6 +52,16 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
     /// <summary>Frees the native model behind the embedder, if it holds one.</summary>
     public void Dispose() => (embedder as IDisposable)?.Dispose();
 
+    /// <summary>
+    /// Design 1.6 C.4: the owner's voice print, set only when a print made with this model exists and meetings.use_voice_print is on
+    /// (AppShell decides at each run, so "Identify speakers again" with the switch off runs without it). Used on a Mixed track only:
+    /// a two-track meeting's microphone track is already You.
+    /// </summary>
+    public float[]? OwnerPrint { get; init; }
+
+    /// <summary>voice.threshold: a window at or above this cosine score sounds like <see cref="OwnerPrint"/>.</summary>
+    public double OwnerThreshold { get; init; } = Settings.VoiceSettings.DefaultThreshold;
+
     /// <summary>The track speaker separation reads for this meeting (Others, else Mixed), or null when it has neither.</summary>
     public static Channel? TrackFor(IMeetingStore store, MeetingId id)
     {
@@ -84,14 +94,16 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
         if (track == Channel.You) throw new InvalidOperationException("The You track is never separated.");
         var previous = store.ReadSpeakers(id);
         var turns = Turns(store.ReadTranscript(id));
+        var owner = track == Channel.Mixed && OwnerPrint is { } print ? (print, OwnerThreshold) : ((float[], double)?)null;
         var result = await Task.Run(() =>
         {
             var samples = ReadSamples(store, id, track, cancellationToken);
             try
             {
-                var speakerTurns = Diarize(samples, turns, embedder, threshold, progress, cancellationToken);
-                if (speakerTurns.Length == 0) return null;
-                return new MeetingSpeakers(MeetingSpeakers.CurrentVersion, modelTag, threshold, speakerTurns, new Dictionary<string, string>());
+                var (speakerTurns, you) = Separate(samples, turns, embedder, threshold, owner, progress, cancellationToken);
+                if (speakerTurns.Length == 0 && you.Length == 0) return null;
+                return new MeetingSpeakers(MeetingSpeakers.CurrentVersion, modelTag, threshold, speakerTurns, new Dictionary<string, string>(),
+                    you.Length == 0 ? null : you);
             }
             finally { Array.Clear(samples); }
         }, cancellationToken).ConfigureAwait(false);
@@ -120,7 +132,16 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
     /// of each segment's windows (a tie goes to the speaker of the earliest of the tied windows), speakers numbered by first appearance.
     /// </summary>
     internal static SpeakerTurn[] Diarize(float[] samples, IReadOnlyList<(double Start, double End)> segments, IVoiceEmbedder embedder,
-        double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
+        double threshold, IProgress<double>? progress, CancellationToken cancellationToken) =>
+        Separate(samples, segments, embedder, threshold, null, progress, cancellationToken).Turns;
+
+    /// <summary>
+    /// <see cref="Diarize"/> with the owner's voice print (design 1.6 C.4): every embedded window is also scored against the print, and a
+    /// segment whose windows mostly score at or above the owner threshold (<see cref="Voice.VoiceScore.MostlyOwn"/>) becomes a You turn;
+    /// its windows are left out of the clustering, so "Other n" are numbered from 1 among the rest. Without a print, exactly Diarize.
+    /// </summary>
+    internal static (SpeakerTurn[] Turns, OwnerTurn[] You) Separate(float[] samples, IReadOnlyList<(double Start, double End)> segments, IVoiceEmbedder embedder,
+        double threshold, (float[] Print, double Threshold)? owner, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var windows = segments.SelectMany((s, i) => Windows(s.Start, s.End, samples.Length).Select(w => (Segment: i, w.From, w.To))).ToArray();
         var skipped = new HashSet<int>(); // segments with a window the cap left out
@@ -142,10 +163,23 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
             { owners.Add(segment); centres.Add((from + to) / 2.0 / Rate); embeddings.Add(embedding); }
             progress?.Report((k + 1) / (double)windows.Length);
         }
+        var you = new HashSet<int>();
+        if (owner is { } print)
+        {
+            // Each segment's windows scored against the print; a segment that mostly sounds like the owner is You and is not clustered.
+            for (var i = 0; i < segments.Count; i++)
+            {
+                var scores = Enumerable.Range(0, owners.Count).Where(k => owners[k] == i).Select(k => SpeakerCheck.Cosine(embeddings[k], print.Print)).ToList();
+                if (Voice.VoiceScore.MostlyOwn(scores.Count, scores.Count(s => s >= print.Threshold))) you.Add(i);
+            }
+            var kept = Enumerable.Range(0, owners.Count).Where(k => !you.Contains(owners[k])).ToList();
+            (owners, centres, embeddings) = ([.. kept.Select(k => owners[k])], [.. kept.Select(k => centres[k])], [.. kept.Select(k => embeddings[k])]);
+        }
         var labels = SpeakerClustering.Cluster(embeddings, threshold, 0, cancellationToken);
         var turns = new List<(double Start, double End, int Label)>();
         for (var i = 0; i < segments.Count; i++)
         {
+            if (you.Contains(i)) continue;
             var heard = Enumerable.Range(0, owners.Count).Where(k => owners[k] == i).Select(k => labels[k]).ToList();
             if (heard.Count == 0 && skipped.Contains(i) && centres.Count > 0)
             {
@@ -160,7 +194,8 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
         }
         var numbers = new Dictionary<int, int>();
         foreach (var turn in turns) numbers.TryAdd(turn.Label, numbers.Count + 1);
-        return [.. turns.Select(t => new SpeakerTurn(Math.Round(t.Start, 3), Math.Round(t.End, 3), numbers[t.Label]))];
+        return ([.. turns.Select(t => new SpeakerTurn(Math.Round(t.Start, 3), Math.Round(t.End, 3), numbers[t.Label]))],
+            [.. you.Order().Select(i => new OwnerTurn(Math.Round(segments[i].Start, 3), Math.Round(segments[i].End, 3)))]);
     }
 
     /// <summary>

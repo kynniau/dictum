@@ -6,7 +6,8 @@ public enum CliMode { Tray, Transcribe, SelfTest, DownloadModel, DownloadCleanup
 
 /// <param name="Model">--model: one-launch override of whisper.model (short name or absolute path).</param>
 /// <param name="DownloadName">--download-model: catalogue/short name to fetch.</param>
-public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, string? ConfigDir, string? Model = null, string? DownloadName = null, int? ExitAfterSeconds = null, string? CleanupModel = null)
+public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, string? ConfigDir, string? Model = null, string? DownloadName = null, int? ExitAfterSeconds = null, string? CleanupModel = null,
+    IReadOnlyList<string>? PrintFolders = null)
 {
     public const string Usage =
         """
@@ -45,6 +46,7 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
     {
         var mode = CliMode.Tray;
         string? wav = null, config = null, model = null, download = null, cleanupModel = null;
+        string[]? print = null;
         int? exitAfter = null;
         var noLlm = false;
         string? modeFlag = null;
@@ -72,7 +74,16 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
                     if (Use(CliMode.BenchCleanup, "--bench-cleanup") is { } clashB) return (null, clashB);
                     break;
                 case "--speaker-check":
-                    wav = Next();
+                    if (i + 1 < args.Count && string.Equals(args[i + 1], "--print", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // --speaker-check --print <enrolment> <own> <other> (design 1.6 C.5)
+                        i++;
+                        string?[] folders = [Next(), Next(), Next()];
+                        if (folders.Any(f => f is null)) return (null, "--speaker-check --print needs three folders: <enrolment> <own> <other>.");
+                        print = [.. folders.Select(f => f!)];
+                        wav = print[0];
+                    }
+                    else wav = Next();
                     if (wav is null) return (null, "--speaker-check needs a folder of WAV files.");
                     if (Use(CliMode.SpeakerCheck, "--speaker-check") is { } clashK) return (null, clashK);
                     break;
@@ -123,6 +134,6 @@ public sealed record CliOptions(CliMode Mode, string? WavPath, bool NoLlm, strin
         }
         if (noLlm && mode != CliMode.Transcribe) return (null, "--no-llm only applies to --transcribe.");
         if (exitAfter is not null && mode != CliMode.Tray) return (null, "--exit-after only applies to tray mode.");
-        return (new CliOptions(mode, wav, noLlm, config, model, download, exitAfter, cleanupModel), null);
+        return (new CliOptions(mode, wav, noLlm, config, model, download, exitAfter, cleanupModel, print), null);
     }
 }

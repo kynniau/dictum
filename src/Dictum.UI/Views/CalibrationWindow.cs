@@ -73,11 +73,18 @@ internal sealed partial class CalibrationWindow : Window
     private bool _noMicrophone; // the system lists none (CheckMicrophone)
     private bool _listFailureLogged;
 
-    public CalibrationWindow(AppShell shell)
+    /// <param name="enrolmentFolder">
+    /// "Record my voice now" (design 1.6 C.1): the same sentences and recording screen, but the takes go into this temporary folder,
+    /// which the Your voice card deletes when the attempt ends; the test, its results, the suggestions and the recordings-folder
+    /// sentence (which says the recordings are kept) are not shown, and the user's own calibration recordings are not touched.
+    /// </param>
+    public CalibrationWindow(AppShell shell, string? enrolmentFolder = null)
     {
         _shell = shell;
         _host = shell.CreateCalibrationHost();
         _recordings = CalibrationRecordings.For(_host.Paths, _host.Log.Warn);
+        if (enrolmentFolder is not null) _recordings = new CalibrationRecordings(enrolmentFolder, _recordings.Script);
+        Enrolment = enrolmentFolder is not null;
         _capture = shell.Platform.CreateCapture(_host.Log);
         Title = "Dictum: calibrate my voice";
         Width = 820;
@@ -107,7 +114,7 @@ internal sealed partial class CalibrationWindow : Window
             ResultsHintStart(shell.Platform.Words) +
             "A recording shorter than 10 s counts as 10 s, because whisper's time per recording is mostly fixed.", "hint"),
             Ui.Row(8, _run, _cancel), _progress, Ui.Overline("Not installed"), MissingList), "Results so far");
-        var top = Ui.Columns(2, 16, sentenceCard, results);
+        Control top = Ui.Columns(2, 16, sentenceCard, results);
         var missed = Ui.Card(SuggestionList, "Words it keeps missing");
 
         var save = Ui.Button("Save", "primary", AddTicked, Failed, name: "Save the ticked suggestions");
@@ -122,6 +129,12 @@ internal sealed partial class CalibrationWindow : Window
         header.Classes.Add("headerbar");
         DockPanel.SetDock(header, Dock.Top);
         DockPanel.SetDock(footerBar, Dock.Bottom);
+        if (Enrolment)
+        {
+            // Recording only: the sentence card on its own, and Close, which ends the attempt.
+            framing.IsVisible = missed.IsVisible = save.IsVisible = _delete.IsVisible = false;
+            top = sentenceCard;
+        }
         Content = new DockPanel
         {
             Children = { header, footerBar, new ScrollViewer { Content = new Border { Padding = new Thickness(24, 20), Child = Ui.Stack(16, framing, top, missed) } } },
@@ -160,6 +173,9 @@ internal sealed partial class CalibrationWindow : Window
     }
 
     private int Count => _recordings.Script.Count;
+
+    /// <summary>Opened by "Record my voice now": the takes go to a temporary folder for the voice print (design 1.6 C.1).</summary>
+    internal bool Enrolment { get; }
 
     /// <summary>The hotkey while this window is active: hold to record the sentence shown, Esc drops the take.</summary>
     private void OnHotkey(HookEvent e)

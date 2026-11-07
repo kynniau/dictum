@@ -19,6 +19,7 @@ public static class PillText
         PillView.MicError => "Mic error",
         PillView.HandsFreeStopped => HandsFreeStopped,
         PillView.NoSound or PillView.NoSoundEnded => NoSoundText.Pill,
+        PillView.VoiceSkipped => Meetings.Voice.VoiceText.PROPOSED_PillSkipped, // design 1.6 D, row V15
         _ => "",
     };
 
@@ -58,6 +59,7 @@ public static class PillText
         PillView.MicError => 1800,
         PillView.HandsFreeStopped => 1800, // a sentence to read, like "Mic error"'s flash
         PillView.NoSoundEnded => 1800, // as long as "Mic error"; the balloon carries the explanation
+        PillView.VoiceSkipped => 1800, // a sentence to read; during hands-free the controller shows the session again first
         _ => null,
     };
 

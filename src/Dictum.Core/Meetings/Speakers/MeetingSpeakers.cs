@@ -39,19 +39,41 @@ public sealed record SpeakerTurn(
     [property: JsonPropertyName("end")] double End,
     [property: JsonPropertyName("speaker")] int Speaker);
 
+/// <summary>A stretch of a one-track meeting that sounds like the owner's voice print (design 1.6 C.4): seconds from the meeting start.</summary>
+public sealed record OwnerTurn(
+    [property: JsonPropertyName("start")] double Start,
+    [property: JsonPropertyName("end")] double End);
+
 /// <summary>
 /// speakers.json.enc (design 1.6 B): who spoke when on the separated track of one meeting, and the names the user gave them.
 /// It lives only inside the meeting folder, sealed like every other file there; nothing about a guest exists outside it. No voice
 /// embedding is stored: a separation run computes them in memory and drops them.
 /// </summary>
+/// <param name="You">
+/// Design 1.6 C.4: on a one-track meeting separated with the owner's voice print, the turns that sounded like the owner; they are
+/// "You" (speaker 0, reserved) and were never clustered. Absent (null) means none; the version stays 1.
+/// </param>
 public sealed record MeetingSpeakers(
     [property: JsonPropertyName("version")] int Version,
     [property: JsonPropertyName("model")] string Model,
     [property: JsonPropertyName("threshold")] double Threshold,
     [property: JsonPropertyName("turns")] IReadOnlyList<SpeakerTurn> Turns,
-    [property: JsonPropertyName("names")] IReadOnlyDictionary<string, string> Names)
+    [property: JsonPropertyName("names")] IReadOnlyDictionary<string, string> Names,
+    [property: JsonPropertyName("you"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<OwnerTurn>? You = null)
 {
     public const int CurrentVersion = 1;
+
+    /// <summary>The speaker number of the owner's turns (design 1.6 C.4): reserved, so "Other n" keep starting at 1.</summary>
+    public const int YouSpeaker = 0;
+
+    /// <summary>
+    /// The label of the owner's turns, exactly as a You channel segment is written today (its channel name, as ExportMarkdown and the
+    /// summary chunk citations write it).
+    /// </summary>
+    public static readonly string YouLabel = Channel.You.ToString();
+
+    /// <summary>The meeting has turns labelled You by the voice print.</summary>
+    [JsonIgnore] public bool HasYou => You is { Count: > 0 };
     public const double DefaultThreshold = 0.5;
     public const double ThresholdStep = 0.1;
     public const int MaxNameLength = 80;
@@ -92,14 +114,17 @@ public sealed record MeetingSpeakers(
         foreach (var turn in Turns)
             if (turn is null || !double.IsFinite(turn.Start) || !double.IsFinite(turn.End) || turn.Start < 0 || turn.End < turn.Start || turn.Speaker < 1)
                 throw new InvalidDataException("Invalid speaker turn.");
+        foreach (var turn in You ?? [])
+            if (turn is null || !double.IsFinite(turn.Start) || !double.IsFinite(turn.End) || turn.Start < 0 || turn.End < turn.Start)
+                throw new InvalidDataException("Invalid speaker turn.");
         foreach (var (key, name) in Names)
             if (!int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var speaker) || speaker < 1 || speaker > count || !IsValidName(name))
                 throw new InvalidDataException("Invalid speaker name.");
         return this;
     }
 
-    /// <summary>The name the user gave this speaker, else "Other n".</summary>
-    public string Label(int speaker) => TypedName(speaker) ?? OtherLabel(speaker);
+    /// <summary>The name the user gave this speaker, else "Other n"; "You" for <see cref="YouSpeaker"/>.</summary>
+    public string Label(int speaker) => speaker == YouSpeaker ? YouLabel : TypedName(speaker) ?? OtherLabel(speaker);
 
     /// <summary>"Other n" for any speaker number, named or not.</summary>
     public static string OtherLabel(int speaker) => string.Format(CultureInfo.InvariantCulture, SpeakerText.PROPOSED_Other, speaker);
@@ -115,28 +140,32 @@ public sealed record MeetingSpeakers(
     /// <summary>
     /// Owner decision (Kyle, 07/11/2026): true when the whole text (trimmed) is exactly one of this meeting's speakers: "Other 1" to
     /// "Other {Count}" as <see cref="Label"/> writes it, or a name as typed for one of them, compared ordinally (case counts).
-    /// Nothing partial, nothing beyond the count.
+    /// Nothing partial, nothing beyond the count. Design 1.6 C.4: "You" too, but only when the meeting has turns the voice print
+    /// labelled You (it is the user).
     /// </summary>
     public bool IsSpeaker(string text)
     {
         var owner = text.Trim();
-        return Enumerable.Range(1, Count).Any(n => string.Equals(owner, OtherLabel(n), StringComparison.Ordinal)) ||
+        return HasYou && string.Equals(owner, YouLabel, StringComparison.Ordinal) ||
+            Enumerable.Range(1, Count).Any(n => string.Equals(owner, OtherLabel(n), StringComparison.Ordinal)) ||
             TypedNames.Any(name => string.Equals(owner, name, StringComparison.Ordinal));
     }
 
     /// <summary>
     /// The speaker of a transcript segment: the turn it overlaps most, else the nearest turn within a second. The turns are the
     /// separated track's own transcript segments, so a segment normally finds itself; the nearest-turn rule covers one too short
-    /// to embed. The You track is never separated, so a You segment never has one; null when no turn is near.
+    /// to embed. The You track is never separated, so a You segment never has one; null when no turn is near. A turn the voice print
+    /// labelled You (C.4) counts like any other, as <see cref="YouSpeaker"/>.
     /// </summary>
     public int? SpeakerOf(Segment segment)
     {
         // Typed notes are zero-length Mixed segments ("Take notes instead"): nobody spoke them, so they keep the channel label.
-        if (segment.Channel == Channel.You || segment.End <= segment.Start || Turns.Count == 0) return null;
+        var turns = Turns.Select(t => (t.Start, t.End, t.Speaker)).Concat((You ?? []).Select(t => (t.Start, t.End, Speaker: YouSpeaker))).ToList();
+        if (segment.Channel == Channel.You || segment.End <= segment.Start || turns.Count == 0) return null;
         double start = segment.Start.TotalSeconds, end = Math.Max(segment.End.TotalSeconds, start);
-        var best = Turns.Select(t => (t.Speaker, Overlap: Math.Min(end, t.End) - Math.Max(start, t.Start))).MaxBy(t => t.Overlap);
+        var best = turns.Select(t => (t.Speaker, Overlap: Math.Min(end, t.End) - Math.Max(start, t.Start))).MaxBy(t => t.Overlap);
         if (best.Overlap > 0) return best.Speaker;
-        var nearest = Turns.Select(t => (t.Speaker, Gap: t.End < start ? start - t.End : t.Start - end)).MinBy(t => t.Gap);
+        var nearest = turns.Select(t => (t.Speaker, Gap: t.End < start ? start - t.End : t.Start - end)).MinBy(t => t.Gap);
         return nearest.Gap <= 1.0 ? nearest.Speaker : null;
     }
 
