@@ -48,8 +48,8 @@ public sealed record EnrolmentResult(EnrolmentOutcome Outcome, VoicePrint? Print
     /// <summary>The card's sentence for a refusal (rows V11, V12, V14), or null when a print was made.</summary>
     public string? Refusal => Outcome switch
     {
-        EnrolmentOutcome.TooLittleSpeech => VoiceText.PROPOSED_TooShort,
-        EnrolmentOutcome.Inconsistent => VoiceText.PROPOSED_Inconsistent,
+        EnrolmentOutcome.TooLittleSpeech => VoiceText.APPROVED_TooShort,
+        EnrolmentOutcome.Inconsistent => VoiceText.APPROVED_Inconsistent,
         EnrolmentOutcome.ModelMissing => SpeakerText.APPROVED_ModelsMissing,
         _ => null,
     };

@@ -29,7 +29,7 @@ public static class EffectiveSettings
         var threshold = settings.Threshold;
         var clamped = Math.Clamp(threshold, VoiceSettings.MinThreshold, VoiceSettings.MaxThreshold);
         if (threshold == clamped) return settings;
-        warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, Meetings.Voice.VoiceText.PROPOSED_ThresholdClamped, threshold, clamped));
+        warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, Meetings.Voice.VoiceText.APPROVED_ThresholdClamped, threshold, clamped));
         return settings with { Threshold = clamped };
     }
 

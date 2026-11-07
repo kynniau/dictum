@@ -86,7 +86,7 @@ internal sealed partial class CalibrationWindow : Window
         if (enrolmentFolder is not null) _recordings = new CalibrationRecordings(enrolmentFolder, _recordings.Script);
         Enrolment = enrolmentFolder is not null;
         _capture = shell.Platform.CreateCapture(_host.Log);
-        Title = Enrolment ? Dictum.Meetings.Voice.VoiceText.PROPOSED_LearnMyVoiceTitle : "Dictum: calibrate my voice"; // row V19 for "Record my voice now"
+        Title = Enrolment ? Dictum.Meetings.Voice.VoiceText.APPROVED_LearnMyVoiceTitle : "Dictum: calibrate my voice"; // row V19 for "Record my voice now"
         Width = 820;
         Height = 720;
         MinWidth = 640;
@@ -137,7 +137,7 @@ internal sealed partial class CalibrationWindow : Window
             framing.IsVisible = missed.IsVisible = save.IsVisible = _delete.IsVisible = false;
         }
         // "Record my voice now": row V20 first on the page, so it is read before the sentence card.
-        var page = Enrolment ? Ui.Stack(16, Ui.Text(Dictum.Meetings.Voice.VoiceText.PROPOSED_LearnMyVoiceInstruction), framing, top, missed) : Ui.Stack(16, framing, top, missed);
+        var page = Enrolment ? Ui.Stack(16, Ui.Text(Dictum.Meetings.Voice.VoiceText.APPROVED_LearnMyVoiceInstruction), framing, top, missed) : Ui.Stack(16, framing, top, missed);
         Content = new DockPanel
         {
             Children = { header, footerBar, new ScrollViewer { Content = new Border { Padding = new Thickness(24, 20), Child = page } } },

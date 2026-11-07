@@ -68,5 +68,5 @@ public sealed class OwnVoiceFilter(Func<AppSettings> settings, Func<OwnVoiceSour
 
     /// <summary>The log line for a skipped part (row V16): its length in seconds, never its words.</summary>
     public static string SkippedLogLine(float[] samples16kMono) =>
-        string.Format(System.Globalization.CultureInfo.InvariantCulture, VoiceText.PROPOSED_LogSkipped, samples16kMono.Length / 16000.0);
+        string.Format(System.Globalization.CultureInfo.InvariantCulture, VoiceText.APPROVED_LogSkipped, samples16kMono.Length / 16000.0);
 }

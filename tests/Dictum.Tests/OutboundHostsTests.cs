@@ -75,7 +75,7 @@ public sealed class OutboundHostsTests
     [Fact]
     public void The_privacy_policy_names_no_host_the_app_does_not_connect_to()
     {
-        string[] fileExtensions = ["json", "txt", "env", "tmp", "log", "wav", "exe", "app", "cs", "css", "svg", "html", "xml", "md", "zip", "ps1"];
+        string[] fileExtensions = ["json", "txt", "env", "tmp", "log", "wav", "exe", "app", "cs", "css", "svg", "html", "xml", "md", "zip", "ps1", "enc"];
         // A name starts where no letter, digit, "@" or "-" comes before it, nor such a character and a dot (so "hello@kynni.com.au" yields no
         // "com.au"); "{resource}.openai.azure.com" still yields openai.azure.com.
         var named = Regex.Matches(Policy(), @"(?<![\w@-])(?<![\w@-]\.)(?:[a-z0-9-]+\.)+[a-z]{2,}(?![\w-])")

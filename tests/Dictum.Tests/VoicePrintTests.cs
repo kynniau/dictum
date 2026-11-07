@@ -118,7 +118,7 @@ public sealed class VoicePrintTests : IDisposable
         var result = Enrol(Embedder(), Clip(1, 6), Clip(1, 6), Clip(1, 6)); // 18 s of voice; the parts the segmenter cuts are 6.5 s each
         Assert.Equal(EnrolmentOutcome.TooLittleSpeech, result.Outcome);
         Assert.Equal(19.5, result.Seconds);
-        Assert.Equal(VoiceText.PROPOSED_TooShort, result.Refusal);
+        Assert.Equal(VoiceText.APPROVED_TooShort, result.Refusal);
         Assert.False(File.Exists(PrintPath));
     }
 
@@ -129,7 +129,7 @@ public sealed class VoicePrintTests : IDisposable
         var result = Enrol(new ScatterEmbedder(8), Clip(1, 6), Clip(1, 6), Clip(1, 6), Clip(1, 6));
         Assert.Equal(EnrolmentOutcome.Inconsistent, result.Outcome);
         Assert.True(result.ConsistentShare < VoicePrintBuilder.ConsistentShare);
-        Assert.Equal(VoiceText.PROPOSED_Inconsistent, result.Refusal);
+        Assert.Equal(VoiceText.APPROVED_Inconsistent, result.Refusal);
         Assert.False(File.Exists(PrintPath));
     }
 

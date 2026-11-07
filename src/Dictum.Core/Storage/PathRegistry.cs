@@ -94,10 +94,10 @@ public static class PathRegistry
             new(paths.CalibrationDir, DataCategory.CalibrationRecordings, "calibration take list", "takes.txt"),
             new(paths.LogsDir, DataCategory.Logs, "logs", "*.log"),
             // Its name and identity live in Dictum.Meetings (the meetings boundary keeps sealed file names there); the label is row V1.
-            new(Meetings.Voice.VoicePrintStore.PathFor(paths), DataCategory.VoicePrint, Meetings.Voice.VoiceText.PROPOSED_CardTitle),
+            new(Meetings.Voice.VoicePrintStore.PathFor(paths), DataCategory.VoicePrint, Meetings.Voice.VoiceText.APPROVED_CardTitle),
             // "Record my voice now" records into voice-enrolment-<guid> and deletes it when the attempt ends; one a quit or a crash
             // left behind goes with the print. A folder pattern: RemovalPlan lists each matching folder and everything in it.
-            new(paths.LocalDir, DataCategory.VoicePrint, Meetings.Voice.VoiceText.PROPOSED_CardTitle, Meetings.Voice.VoiceEnrolment.TemporaryPattern),
+            new(paths.LocalDir, DataCategory.VoicePrint, Meetings.Voice.VoiceText.APPROVED_CardTitle, Meetings.Voice.VoiceEnrolment.TemporaryPattern),
         };
         foreach (var dir in ModelFolders(paths, settings))
         {

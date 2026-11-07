@@ -49,17 +49,17 @@ public sealed class VoiceCardUiTests
         var (window, card) = General(shell);
 
         var texts = Texts(card);
-        Assert.Contains(PROPOSED_CardNoPrint, texts);
+        Assert.Contains(APPROVED_CardNoPrint, texts);
         Assert.Contains(SpeakerText.APPROVED_ModelsMissing, texts); // row V14, reused as it stands
         Assert.True(Named<Button>(card, SpeakerText.APPROVED_DownloadModels).IsTabStop);
-        Assert.False(Named<Button>(card, PROPOSED_RecordNow).IsEffectivelyVisible);
-        foreach (var name in new[] { PROPOSED_UseInMeetings, PROPOSED_YourVoiceOnly })
+        Assert.False(Named<Button>(card, APPROVED_RecordNow).IsEffectivelyVisible);
+        foreach (var name in new[] { APPROVED_UseInMeetings, APPROVED_YourVoiceOnly })
         {
             var toggle = Named<ToggleSwitch>(card, name);
             Assert.False(toggle.IsEnabled);
-            Assert.Equal(PROPOSED_CardNoPrint, AutomationProperties.GetHelpText(toggle)); // greyed, with the reason
+            Assert.Equal(APPROVED_CardNoPrint, AutomationProperties.GetHelpText(toggle)); // greyed, with the reason
         }
-        Assert.False(Named<Button>(card, PROPOSED_Delete).IsEffectivelyVisible);
+        Assert.False(Named<Button>(card, APPROVED_Delete).IsEffectivelyVisible);
         window.Close();
     });
 
@@ -74,13 +74,13 @@ public sealed class VoiceCardUiTests
         var (window, card) = General(shell);
 
         Assert.Contains("Your voice print was made on 08/11/2026 from 24 seconds of recording.", Texts(card));
-        Assert.False(Named<Button>(card, PROPOSED_UseCalibration).IsEffectivelyVisible); // no calibration recordings here
-        foreach (var name in new[] { PROPOSED_RecordNow, PROPOSED_Delete })
+        Assert.False(Named<Button>(card, APPROVED_UseCalibration).IsEffectivelyVisible); // no calibration recordings here
+        foreach (var name in new[] { APPROVED_RecordNow, APPROVED_Delete })
         {
             var button = Named<Button>(card, name);
             Assert.True(button.IsEffectivelyVisible && button.IsEffectivelyEnabled && button.IsTabStop && button.Focusable, name);
         }
-        foreach (var name in new[] { PROPOSED_UseInMeetings, PROPOSED_YourVoiceOnly })
+        foreach (var name in new[] { APPROVED_UseInMeetings, APPROVED_YourVoiceOnly })
         {
             var toggle = Named<ToggleSwitch>(card, name);
             Assert.True(toggle.IsEffectivelyEnabled && toggle.IsTabStop && toggle.Focusable, name);
@@ -94,9 +94,9 @@ public sealed class VoiceCardUiTests
         var settings = SettingsLoader.LoadFile(scratch.Paths.SettingsFile);
         Assert.False(settings.Settings.Audio.YourVoiceOnly);
         Assert.False(settings.Meetings.UseVoicePrint);
-        Assert.Contains(PROPOSED_CardNoPrint, Texts(card)); // back to un-enrolled
-        Assert.False(Named<Button>(card, PROPOSED_Delete).IsEffectivelyVisible);
-        Assert.All(new[] { PROPOSED_UseInMeetings, PROPOSED_YourVoiceOnly }, name => Assert.False(Named<ToggleSwitch>(card, name).IsEnabled));
+        Assert.Contains(APPROVED_CardNoPrint, Texts(card)); // back to un-enrolled
+        Assert.False(Named<Button>(card, APPROVED_Delete).IsEffectivelyVisible);
+        Assert.All(new[] { APPROVED_UseInMeetings, APPROVED_YourVoiceOnly }, name => Assert.False(Named<ToggleSwitch>(card, name).IsEnabled));
         window.Close();
     });
 
@@ -110,9 +110,9 @@ public sealed class VoiceCardUiTests
         VoicePrintStore.Write(VoicePrintStore.PathFor(scratch.Paths), Print("older-model.onnx@00000000"), shell.VoiceKeyring);
         var (window, card) = General(shell);
 
-        Assert.Contains(PROPOSED_OtherModel, Texts(card));
-        Assert.False(Named<ToggleSwitch>(card, PROPOSED_UseInMeetings).IsEnabled);
-        Assert.True(Named<Button>(card, PROPOSED_Delete).IsTabStop); // it can still be deleted
+        Assert.Contains(APPROVED_OtherModel, Texts(card));
+        Assert.False(Named<ToggleSwitch>(card, APPROVED_UseInMeetings).IsEnabled);
+        Assert.True(Named<Button>(card, APPROVED_Delete).IsTabStop); // it can still be deleted
         window.Close();
     });
 
@@ -194,7 +194,7 @@ public sealed class VoiceCardUiTests
         File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
         var (shell, _, _) = scratch.Shell();
         shell.Reload(userRequested: false);
-        TextBlock? Instruction(Window window) => All<TextBlock>(window).SingleOrDefault(t => t.Text == PROPOSED_LearnMyVoiceInstruction);
+        TextBlock? Instruction(Window window) => All<TextBlock>(window).SingleOrDefault(t => t.Text == APPROVED_LearnMyVoiceInstruction);
 
         var learn = new CalibrationWindow(shell, VoiceEnrolment.NewTemporaryFolder(scratch.Paths));
         learn.Show();
@@ -202,7 +202,7 @@ public sealed class VoiceCardUiTests
         var line = Instruction(learn);
         Assert.NotNull(line);
         Assert.True(line.IsEffectivelyVisible);
-        Assert.Equal(PROPOSED_LearnMyVoiceInstruction, Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(line).GetName());
+        Assert.Equal(APPROVED_LearnMyVoiceInstruction, Avalonia.Automation.Peers.ControlAutomationPeer.CreatePeerForElement(line).GetName());
         Assert.Same(line, Assert.IsType<StackPanel>(line.Parent).Children[0]); // first on the page, above the sentence card
         learn.Close();
 

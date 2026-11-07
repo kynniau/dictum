@@ -41,20 +41,20 @@ internal sealed class VoiceCard : UserControl
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
         _modelRow = Ui.Stack(8, Ui.Text(SpeakerText.APPROVED_ModelsMissing),
             Ui.Row(8, MeetingsWindow.Button(SpeakerText.APPROVED_DownloadModels, () => MeetingsPage.DownloadSpeakerModel(_shell, Refresh))));
-        _useCalibration = MeetingsWindow.Button(PROPOSED_UseCalibration, () => Guarded(() => Enrol(fromCalibration: true)));
-        _recordNow = MeetingsWindow.Button(PROPOSED_RecordNow, () => Guarded(() => Enrol(fromCalibration: false)));
+        _useCalibration = MeetingsWindow.Button(APPROVED_UseCalibration, () => Guarded(() => Enrol(fromCalibration: true)));
+        _recordNow = MeetingsWindow.Button(APPROVED_RecordNow, () => Guarded(() => Enrol(fromCalibration: false)));
         _enrolRow = Ui.Row(8, _useCalibration, _recordNow);
         _useInMeetings = Ui.Switch(true, on => Save(VoiceEnrolment.UseInMeetingsKey, on));
         _yourVoiceOnly = Ui.Switch(false, on => Save(VoiceEnrolment.YourVoiceOnlyKey, on));
-        _delete = MeetingsWindow.Button(PROPOSED_Delete, ConfirmDelete);
+        _delete = MeetingsWindow.Button(APPROVED_Delete, ConfirmDelete);
         Content = Ui.Card(Ui.Stack(10,
             _sentence,
             _modelRow,
             _enrolRow,
-            Ui.Line(PROPOSED_UseInMeetings, _useInMeetings),
-            Ui.Line(PROPOSED_YourVoiceOnly, _yourVoiceOnly, PROPOSED_YourVoiceOnlyNote),
+            Ui.Line(APPROVED_UseInMeetings, _useInMeetings),
+            Ui.Line(APPROVED_YourVoiceOnly, _yourVoiceOnly, APPROVED_YourVoiceOnlyNote),
             Ui.Row(8, _delete),
-            _status), PROPOSED_CardTitle);
+            _status), APPROVED_CardTitle);
     }
 
     /// <summary>Redraws from the print on disk, the speaker model and settings.json. Never throws: a print that cannot be read is said.</summary>
@@ -70,10 +70,10 @@ internal sealed class VoiceCard : UserControl
             var model = SpeakerModels.Locate(_shell.Paths, _shell.Settings) is not null;
             _sentence.Text = state switch
             {
-                VoicePrintState.Ready when print is not null => string.Format(CultureInfo.InvariantCulture, PROPOSED_CardPrint,
+                VoicePrintState.Ready when print is not null => string.Format(CultureInfo.InvariantCulture, APPROVED_CardPrint,
                     print.EnrolledAt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), Math.Round(print.Seconds).ToString(CultureInfo.InvariantCulture)),
-                VoicePrintState.OtherModel => PROPOSED_OtherModel,
-                _ => PROPOSED_CardNoPrint,
+                VoicePrintState.OtherModel => APPROVED_OtherModel,
+                _ => APPROVED_CardNoPrint,
             };
             _modelRow.IsVisible = !model;
             _enrolRow.IsVisible = model;
@@ -168,9 +168,9 @@ internal sealed class VoiceCard : UserControl
     private void ConfirmDelete()
     {
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
-        var dialog = new Window { Title = PROPOSED_Delete, Width = 480, SizeToContent = SizeToContent.Height };
-        dialog.Content = MeetingsWindow.DialogContent(dialog, Ui.Text(PROPOSED_DeleteConfirm),
-            MeetingsWindow.Button(PROPOSED_Delete, () =>
+        var dialog = new Window { Title = APPROVED_Delete, Width = 480, SizeToContent = SizeToContent.Height };
+        dialog.Content = MeetingsWindow.DialogContent(dialog, Ui.Text(APPROVED_DeleteConfirm),
+            MeetingsWindow.Button(APPROVED_Delete, () =>
             {
                 dialog.Close();
                 Delete();

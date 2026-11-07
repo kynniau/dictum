@@ -19,7 +19,7 @@ public static class PillText
         PillView.MicError => "Mic error",
         PillView.HandsFreeStopped => HandsFreeStopped,
         PillView.NoSound or PillView.NoSoundEnded => NoSoundText.Pill,
-        PillView.VoiceSkipped => Meetings.Voice.VoiceText.PROPOSED_PillSkipped, // design 1.6 D, row V15
+        PillView.VoiceSkipped => Meetings.Voice.VoiceText.APPROVED_PillSkipped, // design 1.6 D, row V15
         _ => "",
     };
 
