@@ -15,7 +15,7 @@ using static Dictum.UI.Views.Meetings.MeetingsText;
 
 namespace Dictum.Tests;
 
-public sealed class MeetingBundleTests
+public sealed partial class MeetingBundleTests
 {
     private const string Code = "abandon ability able about above absent";
     private static string Export(MeetingFixture files, MeetingId id)
@@ -178,6 +178,8 @@ public sealed class MeetingBundleTests
     [InlineData("folder\\transcript.json.enc")]
     [InlineData("meta.json")]
     [InlineData("audio-mixed.wav.enc:stream")]
+    [InlineData("audio-mixed.m4a.enc")]
+    [InlineData("audio-mixed.aac.enc")]
     public void An_entry_name_outside_the_allowed_set_or_with_a_path_separator_is_refused(string name)
     {
         using var source = new MeetingFixture(); using var target = new MeetingFixture();
@@ -444,6 +446,10 @@ public sealed class MeetingBundleTests
     [InlineData("version")]
     [InlineData("kind")]
     [InlineData("iterations")]
+    [InlineData("kdf")]
+    [InlineData("salt")]
+    [InlineData("wrap")]
+    [InlineData("platform")]
     [InlineData("size")]
     public void Unsupported_or_inconsistent_manifest_is_refused(string field)
     {
@@ -457,6 +463,10 @@ public sealed class MeetingBundleTests
                 case "version": json["version"] = 2; break;
                 case "kind": json["transfer"]!["kind"] = "other"; break;
                 case "iterations": json["transfer"]!["iterations"] = 1; break;
+                case "kdf": json["transfer"]!["kdf"] = "other"; break;
+                case "salt": json["transfer"]!["salt"] = Convert.ToBase64String(new byte[15]); break;
+                case "wrap": json["transfer"]!["wrap"] = Convert.ToBase64String(new byte[59]); break;
+                case "platform": json["createdBy"]!["platform"] = "other"; break;
                 case "size": json["files"]![0]!["bytes"] = 0; break;
             }
         });

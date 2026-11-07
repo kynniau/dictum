@@ -29,10 +29,15 @@ public static class MeetingCrypto
     public static byte[] NewContentKey() => RandomNumberGenerator.GetBytes(32);
 
     public static KeyWrap Wrap(byte[] contentKey, byte[] recipientKey, string recipientId)
+        => Wrap(contentKey, recipientKey, recipientId, RandomNumberGenerator.GetBytes(12));
+
+    // Explicit deterministic seam for conformance tests; production callers always use the random overload.
+    internal static KeyWrap Wrap(byte[] contentKey, byte[] recipientKey, string recipientId, byte[] nonce)
     {
         if (contentKey.Length != 32) throw new ArgumentException("Invalid content key.");
+        ArgumentOutOfRangeException.ThrowIfNotEqual(nonce.Length, 12, nameof(nonce));
         var result = new byte[60];
-        RandomNumberGenerator.Fill(result.AsSpan(0, 12));
+        nonce.CopyTo(result, 0);
         using var aes = new AesGcm(recipientKey, 16);
         aes.Encrypt(result.AsSpan(0, 12), contentKey, result.AsSpan(12, 32), result.AsSpan(44, 16), Encoding.UTF8.GetBytes(recipientId));
         return new(recipientId, result);
@@ -61,12 +66,16 @@ public static class MeetingCrypto
         AtomicFile.Write(cipherPath, output => Encrypt(input, output, key, identity));
 
     internal static void Encrypt(Stream input, Stream output, byte[] key, string identity)
+        => Encrypt(input, output, key, identity, RandomNumberGenerator.GetBytes);
+
+    // No global RNG replacement: only test callers supply a deterministic byte source.
+    internal static void Encrypt(Stream input, Stream output, byte[] key, string identity, Func<int, byte[]> randomBytes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
         // The caller's identity binds the meeting and file role; the random header binds this
         // particular encryption. Sequence and a mandatory terminal
         // chunk detect reordering, splicing and truncation, including exact chunk boundaries.
-        var header = Magic.Concat(RandomNumberGenerator.GetBytes(16)).ToArray();
+        var header = Magic.Concat(randomBytes(16)).ToArray();
         output.Write(header);
         using var aes = new AesGcm(key, 16);
         var plain = new byte[ChunkSize];
@@ -77,7 +86,7 @@ public static class MeetingCrypto
             {
                 var length = input.ReadAtLeast(plain, ChunkSize, false);
                 var aad = Aad(header, sequence++, length, identity);
-                var nonce = RandomNumberGenerator.GetBytes(12);
+                var nonce = randomBytes(12);
                 var cipher = new byte[length];
                 var tag = new byte[16];
                 aes.Encrypt(nonce, plain.AsSpan(0, length), cipher, tag, aad);

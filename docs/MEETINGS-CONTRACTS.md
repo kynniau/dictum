@@ -419,7 +419,7 @@ Every lane runs `dotnet test` and reports the output verbatim; no "should pass".
 - `MeetingMeta(MeetingId Id, string Title, DateTimeOffset StartedAt, TimeSpan Duration,
   MeetingSource Source, Agreement? Agreement, IReadOnlyList<Marker> Markers,
   IReadOnlyList<KeyWrap> Wraps, bool HasVideo, string? SummaryEngine, string? SummaryTemplate)`.
-  `MeetingSource` : `Recorded`, `ImportedZoom`, `ImportedFile`.
+  `MeetingSource` : `Recorded` (0), `ImportedZoom` (1), `ImportedFile` (2), `Phone` (3).
 - `KeyWrap(string RecipientId, byte[] WrappedKey)`; phase 1 has exactly one wrap, `RecipientId`
   = "owner".
 - `Summary(string Markdown, string Engine, string Template, DateTimeOffset At,
@@ -629,7 +629,8 @@ meeting's local start date. The file name carries no title, names or other words
 meeting: a file name is visible wherever the bundle travels, outside its encryption.
 ZIP entry names are case-sensitive, flat and unique (including case-insensitive
 uniqueness). No directory entries, path separators, alternate streams or extra
-attachments are accepted. ZIP compression may be stored or deflated. Export uses
+attachments are accepted. Writers MUST use stored entries (ZIP method 0), including
+the manifest; readers accept stored or deflated (method 8). Export uses
 `System.IO.Compression.ZipArchive`, writes a temporary archive beside the destination,
 flushes it and renames it. Existing meeting files are never rewritten or deleted.
 
@@ -639,7 +640,8 @@ The sole plaintext entry is `manifest.json`, UTF-8 JSON with camel-case keys:
 {"format":"dictum-bundle","version":1,"meeting":"0123456789abcdef0123456789abcdef","createdBy":{"app":"Dictum","version":"1.5.1.0","platform":"windows"},"transfer":{"kdf":"pbkdf2-hmac-sha256","iterations":600000,"salt":"<base64:16 bytes>","wrap":"<base64:60 bytes>"},"files":[{"name":"meta.json.enc","bytes":1234}]}
 ```
 
-`createdBy.version` is the Core assembly version; `platform` is `windows` or `mac`.
+`createdBy.version` is the Core assembly version for desktop exports; `platform` is
+`windows`, `mac` or `ios` (phone writers supply their app version).
 The manifest contains no title, people, transcript, audio or transfer code. `files`
 lists every payload, including encrypted metadata, with its exact uncompressed ZIP
 entry length. The manifest itself is excluded from `files`. The reader limits the
@@ -737,3 +739,140 @@ meeting stays at `<root>/<id>` (complete, owner-wrapped, its import confirmed, n
 while the user sees "could not be imported"; the next listing rebuilds the index and shows it, and a
 retry says it is already on this computer. `// simplification:` accepted at the 1.6 merge lens;
 retire if a user reports a meeting that appeared after a failed import.
+
+#### 14.A.1 Byte-level interoperability reference for Swift writers
+
+The following facts are checked against the named methods and records in the merged
+implementation. All byte concatenations below have no separators, BOM, terminators
+or implicit lengths beyond the fields explicitly described. AES-GCM uses a 256-bit
+content/recipient key, a 12-byte nonce and a 16-byte tag; nonces must be fresh for
+each encryption under a key. The fixed values in the synthetic fixture are test-only.
+
+**Manifest** (`BundleFormat.Read`, `BundleFormat.Json`, `FileMeetingStore.ExportBundle`):
+UTF-8 JSON object, case-sensitive camel-case property names; fields are:
+
+| Field | JSON type and accepted value |
+| --- | --- |
+| `format` | string, exactly `dictum-bundle` |
+| `version` | integer number, exactly `1` |
+| `meeting` | string, exactly 32 lowercase ASCII hex characters (`MeetingId` constructor) |
+| `createdBy` | object with the following three string fields |
+| `createdBy.app` | string, exactly `Dictum` |
+| `createdBy.version` | non-blank string; desktop assembly version or phone app version |
+| `createdBy.platform` | string, exactly `windows`, `mac` or `ios` |
+| `transfer` | object with the following fields |
+| `transfer.kdf` | string, exactly `pbkdf2-hmac-sha256` |
+| `transfer.iterations` | integer number, exactly `600000` |
+| `transfer.salt` | string, standard RFC 4648 base64 (`+` and `/`, not base64url), 16 decoded bytes |
+| `transfer.wrap` | string, same base64 encoding, 60 decoded bytes |
+| `transfer.kind` | optional string `transfer-code`; absent or JSON null also accepted; desktop export omits it |
+| `files` | array of objects, one per payload (excludes manifest), with the next two fields |
+| `files[].name` | string, one of the exact flat names listed above, at most 255 characters |
+| `files[].bytes` | non-negative int64 JSON integer, exact uncompressed ciphertext entry byte length |
+
+Writers emit standard padded base64: salt is 24 characters ending `==`; wrap is
+80 characters with no padding needed. Default System.Text.Json byte-array encoding
+is used. The reader refuses other format/version/KDF/iteration/kind values, invalid
+creator values, invalid ids, salt/wrap lengths, missing metadata, duplicate names,
+extra/missing ZIP entries and size mismatches. Unknown JSON properties are ignored;
+this is not a promise to reject every possible extra JSON field (`BundleFormat.Read`).
+
+**Transfer key** (`TransferCode.Normalise`, `TransferCode.Derive`): split on .NET
+whitespace, remove empty tokens, join using byte 0x20 (one ASCII space), then invariant
+lowercase. Whitespace is U+0009–U+000D, U+0020, U+0085, U+00A0, U+1680,
+U+2000–U+200A, U+2028, U+2029, U+202F, U+205F and U+3000. No NFC/NFKC or
+BIP-39 seed derivation occurs. For the ASCII dictionary words use ASCII lowercase;
+encode the resulting six words as UTF-8 without BOM. PBKDF2-HMAC-SHA256 takes those
+password bytes, the decoded 16-byte manifest salt, 600000 iterations and outputs
+32 bytes. Exactly six tokens and at most 256 normalised UTF-16 code units are
+required; the reader does not check dictionary membership.
+
+**Key wrap** (`MeetingCrypto.Wrap`, `MeetingCrypto.Unwrap`): the 60 bytes are
+offset 0..11 nonce, 12..43 ciphertext of the 32-byte content key, 44..59 tag.
+AES-GCM AAD is only UTF-8 recipient id: for `owner`, hex `6f776e6572`; for
+`transfer`, hex `7472616e73666572`. No id length, quotes, slash or meeting id is
+added. Owner uses the local 32-byte owner key and lives in local metadata only;
+transfer uses the derived transfer key and lives in manifest.transfer.wrap.
+
+**Single-file ciphertext** (`MeetingCrypto.Encrypt`, `MeetingCrypto.Aad`,
+`MeetingCrypto.DecryptedStream.ReadChunk`): header bytes 0..7 are hex
+`4443544d454e4301` (ASCII DCTMENC followed by version byte 01), bytes 8..23
+are 16 fresh random stream-identity bytes. Starting at offset 24, each record is
+`length:int32LE || nonce:12 || ciphertext:length || tag:16`. Length is 0..1048576;
+writers fill 1 MiB chunks except the final data chunk. After all data a mandatory
+zero-length record with its own nonce/tag ends the file; trailing bytes are refused.
+For each record, including the terminal, AAD is exactly
+`header:24 || sequence:int64LE || length:int32LE || UTF8(meeting-id + "/" + entry-name)`.
+Sequence starts at zero, increments for every record and is not stored separately.
+The filename includes `.enc`, is case-sensitive, and has no path prefix. This binds
+the header, order, length, meeting and file role. Verify the whole file, including
+the terminal record, before releasing plaintext (`DecryptedStream.Read`).
+
+**Chunked audio** (`MeetingCrypto.AudioWriter.Write/Complete`, `Aad`,
+`DecryptedStream.ReadChunk`): header is hex `4443544d41554401` (DCTMAUD, version
+01) plus 16 random stream-identity bytes. Each record is exactly
+`length:int32LE || framingNonce:12 || framingTag:16 || payloadNonce:12 || PCM-ciphertext:length || payloadTag:16`.
+PCM is signed little-endian 16-bit mono at 16000 Hz, with no WAV header inside
+records; lengths are even, 0..1048576. Both independent AES-GCM operations use
+the same AAD formula as above, with the DCTMAUD header and exact
+`<meeting-id>/audio-<channel>.chunks.enc` identity. The framing tag authenticates
+empty plaintext/ciphertext; the payload tag authenticates PCM. A completed stream
+requires a zero-length record containing both nonce/tag pairs, then EOF. Section
+13.2's incomplete-channel snapshot rules apply only when that channel is listed in
+`IncompleteAudioChannels`: EOF or a torn final record may be accepted, but an intact
+framing tag must verify before a short payload can count as torn; complete corrupt
+records fail. A reader synthesises a WAV header only after verification.
+
+**Metadata plaintext** (`Records.cs: MeetingMeta`, `FileMeetingStore.ExportBundle`,
+`BundleImporter.Read/ImportCore`): default System.Text.Json UTF-8, Pascal-case names,
+nulls included, no enum string converter. A minimal phone example is:
+
+```json
+{"Id":{"Value":"0123456789abcdef0123456789abcdef"},"Title":"Synthetic phone tone","StartedAt":"2026-01-01T12:00:00+00:00","Duration":"00:00:02","Source":3,"Agreement":{"AcknowledgedAt":"2026-01-01T12:00:00+00:00","How":"written","ScriptVersion":"synthetic-v1","Kind":1},"Markers":[],"Wraps":[],"HasVideo":false,"SummaryEngine":null,"SummaryTemplate":null,"IncompleteAudioChannels":[],"AudioIncomplete":false}
+```
+
+`Id` is an object with string `Value`; `Title` is a string; `StartedAt` is an ISO
+8601 string with offset (optional fractional seconds); `Duration` is a .NET constant
+TimeSpan string `[-][d.]hh:mm:ss[.fffffff]`. `Source` is an integer: Recorded=0,
+ImportedZoom=1, ImportedFile=2, Phone=3 (appended to preserve existing values).
+`Agreement` is null or an object: `AcknowledgedAt` date string, `How` string
+(`spoken`, `written`, `platform-announced`), `ScriptVersion` string, `Kind` integer
+(Live=0, Import=1). Internal `Confirmation` is not serialised inside Agreement.
+`Markers` is an array of objects with `At` TimeSpan string and `Kind` integer
+(Moment=0, Joined=1, Paused=2, Resumed=3). `Wraps` must be an empty array in bundles.
+`HasVideo` is boolean; `SummaryEngine` and `SummaryTemplate` are nullable strings
+(metadata SummaryEngine is not the numeric processing-route enum).
+`IncompleteAudioChannels` is an integer array (You=0, Others=1, Mixed=2);
+`AudioIncomplete` is a serialised computed boolean, true iff that array is non-empty.
+The importer preserves Source Phone; plain-file `MeetingImporter.ImportAsync`
+continues to reject it. A phone writes channel `mixed`.
+
+**Confirmation plaintext** (`MeetingsHost.cs: MeetingConfirmation`,
+`MeetingProcessingRoute`, `BundleImporter.Read/ImportCore`): an array, Pascal-case
+properties. One synthetic Import-kind record is:
+
+```json
+[{"Answer":"written","At":"2026-01-01T12:00:00+00:00","Kind":1,"ScriptVersion":"synthetic-v1","Script":"Synthetic fixture notice; no real participants.","ImporterIdentity":"Synthetic phone operator","Route":{"SpeechHost":null,"SummaryEngine":0,"SummaryHost":null,"KeepAudio":0,"SummaryModel":null}}]
+```
+
+`Answer`, `ScriptVersion`, `Script` are strings; `At` is an ISO 8601 date string
+with offset; `Kind` is Live=0 or Import=1. `ImporterIdentity` is a nullable string;
+`Route` is null or an object containing nullable strings `SpeechHost`, `SummaryHost`,
+`SummaryModel`, integer `SummaryEngine` (Local=0, Ollama=1, OwnKey=2), and nullable
+integer `KeepAudio` (Forever=0, Days30=1, Days90=2). A Live record uses Kind=0 and
+may have null identity/route. This origin history does not replace the destination's
+own import notice/confirmation; the importer appends that after verification.
+
+**Container and audio constraints** (`FileMeetingStore.ExportBundle`,
+`BundleFormat.Allowed/Read`, `BundleAudioSource.ReadTrack`): writers MUST store every
+ZIP entry without compression, including manifest.json. Ciphertext does not benefit
+from compression, and phone writers need no deflate implementation. Readers accept
+stored and deflated entries. No ZIP64 is needed for an archive below 4 GiB whose
+entry counts, sizes and offsets fit classic ZIP limits (fewer than 65535 entries).
+Only the entry names listed in 14.A are allowed; no directories. Audio is canonical
+16000 Hz mono PCM16 RIFF WAV sealed as `audio-<channel>.wav.enc`, or the DCTMAUD
+form `audio-<channel>.chunks.enc`. AAC/M4A audio is NOT allowed inside a bundle,
+even disguised with a WAV entry name. The bundle path uses the managed PCM reader,
+never a platform decoder or decrypted temporary file. A single track is transcribed
+as Mixed. The synthetic phone fixture and its byte hashes are in
+`tests/Dictum.Tests/Fixtures/Bundles/phone-sample.dictum` and its adjacent fixture notes.
