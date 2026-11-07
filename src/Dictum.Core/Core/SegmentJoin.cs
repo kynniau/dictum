@@ -58,6 +58,9 @@ public static class SegmentJoin
     // dictionary terms in the prompt). Trigger to retire: a dictionary term observed missed only in hands-free parts.
     public const int CarriedWords = 10;
 
+    /// <summary>The same output as the spoken "new paragraph" command.</summary>
+    public const string ParagraphBreak = "\n\n";
+
     /// <summary>The last <paramref name="words"/> words of <paramref name="typed"/>, on one line; null when it has none.</summary>
     public static string? Tail(string typed, int words = CarriedWords)
     {
@@ -73,7 +76,7 @@ public static class SegmentJoin
     public static string? LeadingBreak(string raw, string cleaned)
     {
         var said = Opening(raw);
-        var spoken = Starts(said, "new paragraph") ? "\n\n" : Starts(said, "new line") ? "\n" : null;
+        var spoken = Starts(said, "new paragraph") ? ParagraphBreak : Starts(said, "new line") ? "\n" : null;
         if (spoken is null) return null;
         var kept = Opening(cleaned);
         return Starts(kept, "new paragraph") || Starts(kept, "new line") ? null : spoken;
@@ -94,10 +97,14 @@ public static class SegmentJoin
     /// The clean-up is plain (<see cref="TranscriptCleaner.IsPlain"/>): text that is not English (SPEC §23) or clean-up off (§5);
     /// no letter changes case here, the text stays as whisper wrote it; the separator is chosen as for any part.
     /// </param>
+    /// <param name="quietBefore">The capture's measured quiet run before this part's first speech, or null when unknown.</param>
+    /// <param name="paragraphPauseSeconds">Minimum quiet after . ! ? (past closing quotes/brackets) for a paragraph; zero disables it.</param>
     public static (string Separator, string Text) Join(string before, string raw, string cleaned, bool trailingSpace, IEnumerable<string> names,
-        bool keepCase = false)
+        bool keepCase = false, TimeSpan? quietBefore = null, double paragraphPauseSeconds = 2.0)
     {
         if (LeadingBreak(raw, cleaned) is { } spokenBreak) return (spokenBreak, keepCase ? cleaned : Capitalised(cleaned));
+        if (paragraphPauseSeconds > 0 && quietBefore?.TotalSeconds >= paragraphPauseSeconds && SentenceStart.EndsSentence(before))
+            return (ParagraphBreak, keepCase ? cleaned : Capitalised(cleaned));
         var separator = before.Length == 0 || char.IsWhiteSpace(before[^1]) || trailingSpace ? "" : " ";
         if (keepCase) return (separator, cleaned);
         return (separator, SentenceStart.At(before, before.Length) ? Capitalised(cleaned) : Continued(cleaned, names));

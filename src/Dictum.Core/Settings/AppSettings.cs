@@ -36,6 +36,7 @@ public sealed record AppSettings
     public SpeechSettings Speech { get; init; } = new();
     public ModelsSettings Models { get; init; } = new();
     public LlmSettings Llm { get; init; } = new();
+    public CleanupSettings Cleanup { get; init; } = new();
     public InsertSettings Insert { get; init; } = new();
     public PillSettings Pill { get; init; } = new();
     public IndicatorSettings Indicator { get; init; } = new();
@@ -178,6 +179,12 @@ public sealed record LlmSettings
     /// consent.json (<see cref="CloudConsentFile"/>), which only that dialog writes; never read from settings.json.
     /// </summary>
     public string? CloudConsent { get; init; }
+}
+
+public sealed record CleanupSettings
+{
+    /// <summary>Quiet between segmented speech parts that starts a paragraph after terminal punctuation. Zero disables it.</summary>
+    public double ParagraphPauseSeconds { get; init; } = 2.0;
 }
 
 public sealed record InsertSettings

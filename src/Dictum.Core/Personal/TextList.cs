@@ -108,6 +108,22 @@ public static class SentenceStart
     /// <summary>A sentence starts at the end of <paramref name="text"/>: whatever is appended next.</summary>
     public static bool AtEnd(StringBuilder text) => At(text.Length, i => text[i]);
 
+    /// <summary>
+    /// <paramref name="text"/> ends a sentence: past trailing spaces, quotes and brackets its last character is a mark that
+    /// ends one (<see cref="IsEndMark"/>). False for an empty text and for one ending in a line break.
+    /// </summary>
+    public static bool EndsSentence(string text)
+    {
+        for (var i = text.Length - 1; i >= 0; i--)
+        {
+            var c = text[i];
+            if (IsEndMark(c)) return true;
+            if (c == '\n') return false;
+            if (!char.IsWhiteSpace(c) && c is not ('"' or '\'' or '“' or '”' or '‘' or '’' or '«' or '»' or '(' or ')' or '[' or ']')) return false;
+        }
+        return false;
+    }
+
     private static bool At(int index, Func<int, char> charAt)
     {
         for (var i = index - 1; i >= 0; i--)

@@ -19,7 +19,10 @@ public enum CutReason
 /// </param>
 /// <param name="Reason">Why the part ended.</param>
 /// <param name="Peak">The loudest block RMS of the part that ends here (what <see cref="RecordingGate"/> compares with silence_threshold).</param>
-public readonly record struct SegmentCut(long Block, CutReason Reason, float Peak);
+public readonly record struct SegmentCut(long Block, CutReason Reason, float Peak)
+{
+    public TimeSpan? QuietBefore { get; init; }
+}
 
 /// <summary>
 /// Hands-free "segments as you speak" (product owner, 16/10/2026): reads the 20 ms block levels <see cref="CaptureBuffer"/>
@@ -46,6 +49,9 @@ public sealed class SpeechSegmenter
     /// <summary>2 s of speech before a pause may end a part: enough words for whisper to transcribe well on its own.</summary>
     public const int MinSpeechBlocks = 100;
 
+    /// <summary>60 ms of consecutive voiced blocks confirm speech after a cut; a shorter run (a click, a cough) inside a pause belongs to the pause.</summary>
+    public const int ConfirmBlocks = 3;
+
     /// <summary>30 s, whisper's own window: a part with no pause is cut here.</summary>
     public const int LimitBlocks = 1500;
 
@@ -71,10 +77,14 @@ public sealed class SpeechSegmenter
     private readonly float _threshold;
     private readonly float[] _rms = new float[LookBackBlocks];
     private readonly bool[] _quiet = new bool[LookBackBlocks];
+    private readonly int[] _quietBeforeBlocks = new int[LookBackBlocks];
+    private TimeSpan? _quietBefore;
     private long _block;        // blocks fed so far (the next block's index)
     private long _start;        // the first block of the current part
     private int _speech;        // blocks above the floor in the current part
     private int _quietRun;      // quiet blocks ending at the latest block
+    private int _gap;           // after a cut: quiet blocks since the last real speech, isolated voiced blocks included
+    private int _voicedRun;     // after a cut: consecutive voiced blocks ending at the latest block
     private float _level;       // the recent speech level
     private float _earlierPeak; // the loudest block of the current part no longer in the rings
 
@@ -94,6 +104,9 @@ public sealed class SpeechSegmenter
     /// <summary>The loudest block since the last cut: the peak of what the stop hands over.</summary>
     public float TailPeak => PeakOf(_start, _block);
 
+    /// <summary>The full quiet run before the tail's first speech block; unknown until speech arrives.</summary>
+    public TimeSpan? TailQuietBefore => _quietBefore;
+
     /// <summary>The level below which the next block counts as quiet.</summary>
     public float Floor => Math.Max(_threshold, RelativeFloor * _level);
 
@@ -103,16 +116,23 @@ public sealed class SpeechSegmenter
         var slot = Slot(_block);
         if (_block - LookBackBlocks >= _start) _earlierPeak = Math.Max(_earlierPeak, _rms[slot]); // leaving the ring, still in this part
         var quiet = rms < Floor;
+        _quietBeforeBlocks[slot] = _quietRun;
         _rms[slot] = rms;
         _quiet[slot] = quiet;
         _level = Math.Max(rms, _level * LevelDecay);
         _block++;
+        var waiting = _start > 0 && _quietBefore is null; // after a cut, before the new part's speech is confirmed
         if (quiet)
         {
             _quietRun++;
+            if (waiting) { _gap += _voicedRun + 1; _voicedRun = 0; }
         }
         else
         {
+            // simplification: a voiced run under 3 blocks inside a pause is ignored, and soft speech that only reaches the floor in
+            // 1-2 block bursts lengthens the measured pause; retire if a user's quick "yes" is lost at a paragraph boundary or a
+            // false paragraph appears after quiet speech on a real recording.
+            if (waiting && ++_voicedRun >= ConfirmBlocks) _quietBefore = QuietTime(_gap);
             _quietRun = 0;
             _speech++;
         }
@@ -147,16 +167,25 @@ public sealed class SpeechSegmenter
     private SegmentCut Cut(long boundary, CutReason reason)
     {
         var peak = PeakOf(_start, boundary);
+        var quietBefore = _quietBefore;
+        _quietBefore = null;
         var speech = 0; // the next part's speech so far: voiced blocks after the boundary (a 30 s cut can leave some)
         for (var b = boundary; b < _block; b++)
         {
-            if (!_quiet[Slot(b)]) speech++;
+            if (!_quiet[Slot(b)])
+            {
+                if (speech == 0) _quietBefore = QuietTime(_quietBeforeBlocks[Slot(b)]);
+                speech++;
+            }
         }
         _start = boundary;
+        (_gap, _voicedRun) = (_quietRun, 0); // no speech after the boundary: the quiet run so far is the gap
         _speech = speech;
         _earlierPeak = 0f;
-        return new SegmentCut(boundary, reason, peak);
+        return new SegmentCut(boundary, reason, peak) { QuietBefore = quietBefore };
     }
+
+    private static TimeSpan QuietTime(int blocks) => TimeSpan.FromMilliseconds((long)blocks * BlockMs);
 
     /// <summary>The loudest block in [from, to) of the current part: the blocks gone from the rings, then the rings.</summary>
     private float PeakOf(long from, long to)

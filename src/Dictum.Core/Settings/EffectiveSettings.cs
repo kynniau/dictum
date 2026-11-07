@@ -11,6 +11,17 @@ namespace Dictum.Settings;
 /// </summary>
 public static class EffectiveSettings
 {
+    public const string PROPOSED_ParagraphPauseClamped = "cleanup.paragraph_pause_seconds {0} is outside 0 (off) or 0.5–30 seconds: using {1} seconds.";
+
+    public static CleanupSettings ParagraphPause(CleanupSettings settings, Action<string> warn)
+    {
+        var seconds = settings.ParagraphPauseSeconds;
+        var clamped = seconds <= 0 ? 0 : Math.Clamp(seconds, 0.5, 30);
+        if (seconds == clamped) return settings;
+        warn(string.Format(System.Globalization.CultureInfo.InvariantCulture, PROPOSED_ParagraphPauseClamped, seconds, clamped));
+        return settings with { ParagraphPauseSeconds = clamped };
+    }
+
     /// <param name="anthropicKeyPresent">ANTHROPIC_API_KEY found in the environment or .env; its absence repairs Anthropic only when no consent is on file.</param>
     /// <param name="gpuRuntime">Whether a GPU runtime loads; asked only when a recommendation is needed.</param>
     /// <param name="warn">Receives one line per repair, for the log.</param>
