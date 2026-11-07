@@ -155,7 +155,7 @@ public sealed partial class MeetingBundleTests
         var importer = Importer(target, (_, _, _) => { prompted = true; return Task.FromResult<Agreement?>(null); });
         var error = await Assert.ThrowsAsync<InvalidDataException>(() => importer.ImportAsync(path, PhoneBundleFixture.Code,
             "Synthetic importer", ct: TestContext.Current.CancellationToken));
-        Assert.Equal(BundleText.PROPOSED_Invalid, error.Message);
+        Assert.Equal(BundleText.APPROVED_Invalid, error.Message);
         Assert.False(prompted);
         Assert.Empty(target.Store().List());
         Assert.Empty(Directory.GetDirectories(target.Root));

@@ -3,7 +3,7 @@ namespace Dictum.Meetings.Voice;
 /// <summary>
 /// New user-facing words for the voice print (design 1.6 C and D). PROPOSED: each is the v2 text of its row in
 /// .demo-preview/two-model-voiceprint.md (Fable draft, GPT challenge, 08/11/2026), copied verbatim; the owner approves or rewords them.
-/// Row V14 is not here: the card reuses <see cref="Speakers.SpeakerText.PROPOSED_ModelsMissing"/> as it stands.
+/// Row V14 is not here: the card reuses <see cref="Speakers.SpeakerText.APPROVED_ModelsMissing"/> as it stands.
 /// </summary>
 public static class VoiceText
 {

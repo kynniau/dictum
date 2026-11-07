@@ -4,33 +4,34 @@ using System.Text.RegularExpressions;
 
 namespace Dictum.Meetings.Speakers;
 
-/// <summary>New user-facing words for speaker separation (design 1.6 B). PROPOSED: the owner approves or rewords them.</summary>
+/// <summary>User-facing words for speaker separation (design 1.6 B). APPROVED 08/11/2026 (owner, round 2 rows 23-45): do not reword.</summary>
 public static class SpeakerText
 {
-    public const string PROPOSED_Other = "Other {0}";
-    public const string PROPOSED_SeparateSpeakers = "Identify speakers";
-    public const string PROPOSED_SeparateAgain = "Identify speakers again";
-    public const string PROPOSED_FewerSpeakers = "Fewer speakers";
-    public const string PROPOSED_MoreSpeakers = "More speakers";
-    public const string PROPOSED_Limits = "Two similar voices on one line may be merged. Names apply to this meeting only.";
-    public const string PROPOSED_Separating = "Identifying speakers…";
-    public const string PROPOSED_Separated = "Speakers identified: {0}.";
-    public const string PROPOSED_RenameSpeaker = "Name for {0}";
-    public const string PROPOSED_SaveNames = "Save names";
-    public const string PROPOSED_NamesSaved = "Names saved for this meeting.";
+    // APPROVED 08/11/2026 (owner, round 2): do not reword.
+    public const string APPROVED_Other = "Other {0}";
+    public const string APPROVED_SeparateSpeakers = "Identify speakers";
+    public const string APPROVED_SeparateAgain = "Identify speakers again";
+    public const string APPROVED_FewerSpeakers = "Fewer speakers";
+    public const string APPROVED_MoreSpeakers = "More speakers";
+    public const string APPROVED_Limits = "Two similar voices on one line may be merged. Names apply to this meeting only.";
+    public const string APPROVED_Separating = "Identifying speakers…";
+    public const string APPROVED_Separated = "Speakers identified: {0}.";
+    public const string APPROVED_RenameSpeaker = "Name for {0}";
+    public const string APPROVED_SaveNames = "Save names";
+    public const string APPROVED_NamesSaved = "Names saved for this meeting.";
     /// <summary>Said when Save names meets a name <see cref="MeetingSpeakers.IsValidName"/> refuses; nothing is saved.</summary>
-    public const string PROPOSED_InvalidName = "Use letters, numbers, spaces, full stops, hyphens and apostrophes in a name.";
-    public const string PROPOSED_ModelsMissing = "Download the speaker model in Settings > Meetings first.";
-    public const string PROPOSED_NothingToSeparate = "This meeting has no recording of other people to separate.";
-    public const string PROPOSED_TooLittleSpeech = "Too little speech from other people to tell the voices apart.";
-    public const string PROPOSED_SettingsRow = "Identify speakers";
-    public const string PROPOSED_SettingsNote = "One model, downloaded once, lets Dictum tell the other voices in a recorded meeting apart. It runs on this computer.";
-    public const string PROPOSED_ModelsReady = "Speaker model: downloaded";
-    public const string PROPOSED_ModelsNotReady = "Speaker model: not downloaded";
-    public const string PROPOSED_DownloadModels = "Download the speaker model";
-    public const string PROPOSED_DownloadNote = "For Identify speakers in Meetings; the recording never leaves this computer";
+    public const string APPROVED_InvalidName = "Use letters, numbers, spaces, full stops, hyphens and apostrophes in a name.";
+    public const string APPROVED_ModelsMissing = "Download the speaker model in Settings > Meetings first.";
+    public const string APPROVED_NothingToSeparate = "This meeting has no recording of other people to separate.";
+    public const string APPROVED_TooLittleSpeech = "Too little speech from other people to tell the voices apart.";
+    public const string APPROVED_SettingsRow = "Identify speakers";
+    public const string APPROVED_SettingsNote = "One model, downloaded once, lets Dictum tell the other voices in a recorded meeting apart. It runs on this computer.";
+    public const string APPROVED_ModelsReady = "Speaker model: downloaded";
+    public const string APPROVED_ModelsNotReady = "Speaker model: not downloaded";
+    public const string APPROVED_DownloadModels = "Download the speaker model";
+    public const string APPROVED_DownloadNote = "For Identify speakers in Meetings; the recording never leaves this computer";
     /// <summary>Shown beside the (separately approved) delete question, only when the meeting has a speakers file.</summary>
-    public const string PROPOSED_NamesDeleted = "Names you gave the speakers in this meeting are deleted with it.";
+    public const string APPROVED_NamesDeleted = "Names you gave the speakers in this meeting are deleted with it.";
 }
 
 /// <summary>One speaker turn: seconds from the meeting start, and its speaker (1 = the first voice heard).</summary>
@@ -88,7 +89,7 @@ public sealed record MeetingSpeakers(
 
     // "Other n" as Label writes it, with any number: a name shaped like a label would read as another speaker.
     private static readonly Regex LabelShape =
-        new("^" + Regex.Escape(SpeakerText.PROPOSED_Other).Replace(@"\{0}", "[0-9]+", StringComparison.Ordinal) + @"\z", RegexOptions.CultureInvariant);
+        new("^" + Regex.Escape(SpeakerText.APPROVED_Other).Replace(@"\{0}", "[0-9]+", StringComparison.Ordinal) + @"\z", RegexOptions.CultureInvariant);
 
     /// <summary>
     /// The one test of a typed name, used on save (<see cref="WithNames"/>), on read (<see cref="Validated"/>) and by the name box:
@@ -127,7 +128,7 @@ public sealed record MeetingSpeakers(
     public string Label(int speaker) => speaker == YouSpeaker ? YouLabel : TypedName(speaker) ?? OtherLabel(speaker);
 
     /// <summary>"Other n" for any speaker number, named or not.</summary>
-    public static string OtherLabel(int speaker) => string.Format(CultureInfo.InvariantCulture, SpeakerText.PROPOSED_Other, speaker);
+    public static string OtherLabel(int speaker) => string.Format(CultureInfo.InvariantCulture, SpeakerText.APPROVED_Other, speaker);
 
     /// <summary>The trimmed name the user typed for this speaker, or null if none.</summary>
     public string? TypedName(int speaker) =>
@@ -179,7 +180,7 @@ public sealed record MeetingSpeakers(
     public MeetingSpeakers WithNames(IReadOnlyDictionary<int, string> names)
     {
         var given = names.Where(n => !string.IsNullOrWhiteSpace(n.Value)).ToList();
-        if (given.Any(n => !IsValidName(n.Value))) throw new ArgumentException(SpeakerText.PROPOSED_InvalidName, nameof(names));
+        if (given.Any(n => !IsValidName(n.Value))) throw new ArgumentException(SpeakerText.APPROVED_InvalidName, nameof(names));
         return this with { Names = given.ToDictionary(n => n.Key.ToString(CultureInfo.InvariantCulture), n => n.Value.Trim()) };
     }
 }

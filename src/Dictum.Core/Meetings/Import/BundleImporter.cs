@@ -68,7 +68,7 @@ internal sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber
             store.DiscardStaging(target);
             Directory.CreateDirectory(target);
             staged = target;
-            progress?.Report(BundleText.PROPOSED_Verifying);
+            progress?.Report(BundleText.APPROVED_Verifying);
             foreach (var file in manifest.Files)
             {
                 ct.ThrowIfCancellationRequested();
@@ -93,7 +93,7 @@ internal sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber
                 string.IsNullOrWhiteSpace(importerIdentity) || confirmation.ImporterIdentity != importerIdentity ||
                 confirmation.ScriptVersion != approvedScriptVersion || confirmation.Script != approvedScript(confirmation.Route) ||
                 confirmation.Answer is not ("spoken" or "written"))
-                throw new InvalidOperationException(BundleText.PROPOSED_ConfirmationRequired);
+                throw new InvalidOperationException(BundleText.APPROVED_ConfirmationRequired);
             using var route = useConfirmedRoute?.Invoke(agreement);
             MeetingProcessingConsent.Check(ct);
             Write(staged, meta.Id, "confirmations.json.enc", confirmations.Append(confirmation).ToArray(), content);
@@ -106,7 +106,7 @@ internal sealed class BundleImporter(FileMeetingStore store, IMeetingTranscriber
                 f.Name == $"audio-{c.ToString().ToLowerInvariant()}.wav.enc" || f.Name == $"audio-{c.ToString().ToLowerInvariant()}.chunks.enc")).ToArray();
             if (tracks.Length != 0 && store.ReadTranscript(meta.Id).Count == 0)
             {
-                progress?.Report(BundleText.PROPOSED_Transcribing);
+                progress?.Report(BundleText.APPROVED_Transcribing);
                 MeetingProcessingConsent.Check(ct);
                 await transcriber.RunAsync(meta.Id, new BundleAudioSource(store, meta.Id, tracks), _ => { }, ct).ConfigureAwait(false);
                 MeetingProcessingConsent.Check(ct);

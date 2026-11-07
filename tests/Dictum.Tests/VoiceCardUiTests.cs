@@ -50,8 +50,8 @@ public sealed class VoiceCardUiTests
 
         var texts = Texts(card);
         Assert.Contains(PROPOSED_CardNoPrint, texts);
-        Assert.Contains(SpeakerText.PROPOSED_ModelsMissing, texts); // row V14, reused as it stands
-        Assert.True(Named<Button>(card, SpeakerText.PROPOSED_DownloadModels).IsTabStop);
+        Assert.Contains(SpeakerText.APPROVED_ModelsMissing, texts); // row V14, reused as it stands
+        Assert.True(Named<Button>(card, SpeakerText.APPROVED_DownloadModels).IsTabStop);
         Assert.False(Named<Button>(card, PROPOSED_RecordNow).IsEffectivelyVisible);
         foreach (var name in new[] { PROPOSED_UseInMeetings, PROPOSED_YourVoiceOnly })
         {

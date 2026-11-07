@@ -39,8 +39,8 @@ internal sealed class VoiceCard : UserControl
         _shell = shell;
         _write = write;
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
-        _modelRow = Ui.Stack(8, Ui.Text(SpeakerText.PROPOSED_ModelsMissing),
-            Ui.Row(8, MeetingsWindow.Button(SpeakerText.PROPOSED_DownloadModels, () => MeetingsPage.DownloadSpeakerModel(_shell, Refresh))));
+        _modelRow = Ui.Stack(8, Ui.Text(SpeakerText.APPROVED_ModelsMissing),
+            Ui.Row(8, MeetingsWindow.Button(SpeakerText.APPROVED_DownloadModels, () => MeetingsPage.DownloadSpeakerModel(_shell, Refresh))));
         _useCalibration = MeetingsWindow.Button(PROPOSED_UseCalibration, () => Guarded(() => Enrol(fromCalibration: true)));
         _recordNow = MeetingsWindow.Button(PROPOSED_RecordNow, () => Guarded(() => Enrol(fromCalibration: false)));
         _enrolRow = Ui.Row(8, _useCalibration, _recordNow);

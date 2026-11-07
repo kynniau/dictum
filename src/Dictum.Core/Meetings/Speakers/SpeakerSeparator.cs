@@ -90,7 +90,7 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
     /// <summary>The speakers written, or null (nothing written) when no window survives: an empty transcript, or every segment too short.</summary>
     public async Task<MeetingSpeakers?> SeparateAsync(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        var track = TrackFor(store, id) ?? throw new InvalidOperationException(SpeakerText.PROPOSED_NothingToSeparate);
+        var track = TrackFor(store, id) ?? throw new InvalidOperationException(SpeakerText.APPROVED_NothingToSeparate);
         if (track == Channel.You) throw new InvalidOperationException("The You track is never separated.");
         var previous = store.ReadSpeakers(id);
         var turns = Turns(store.ReadTranscript(id));

@@ -42,7 +42,7 @@ public sealed partial class MeetingsWorkflowUiTests
         string? suggested = null;
         var window = new MeetingsWindow(fixture.Host with { ChooseBundleDestination = name => { suggested = name; return Task.FromResult<string?>(null); } });
         window.Show(); window.ShowMeeting(id);
-        Click(window, PROPOSED_MoveToAnotherDevice); Click(Assert.Single(window.OwnedWindows), APPROVED_ShareContinue);
+        Click(window, APPROVED_MoveToAnotherDevice); Click(Assert.Single(window.OwnedWindows), APPROVED_ShareContinue);
         await Until(() => suggested is not null);
         Assert.Matches(new Regex("^meeting-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-f]{8}\\.dictum$"), suggested!);
         Assert.Equal("meeting-" + meta.StartedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "-" + id.Value[..8] + ".dictum", suggested);
@@ -61,9 +61,9 @@ public sealed partial class MeetingsWorkflowUiTests
         recipient.ImportsEnabled = true;
         var incoming = new MeetingsWindow(recipient.Host with { ChooseBundle = () => Task.FromResult<string?>(path) });
         incoming.Show();
-        Click(incoming, PROPOSED_ImportBundle);
+        Click(incoming, APPROVED_ImportBundle);
         All<TextBox>(incoming).First().Text = code; Dispatcher.UIThread.RunJobs();
-        Click(incoming, PROPOSED_CheckBundle);
+        Click(incoming, APPROVED_CheckBundle);
         await Until(() => Texts(incoming).Contains(APPROVED_ImportAgreement) && incoming.IsEnabled);
         var staging = Path.Combine(recipient.Files.Root, "meetings", ".import-" + id.Value);
         Assert.True(Directory.Exists(staging)); // the import is waiting on the notice, holding the import gate

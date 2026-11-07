@@ -88,7 +88,7 @@ internal sealed record MeetingsHost(
     public async Task<Speakers.MeetingSpeakers?> SeparateSpeakers(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellation)
     {
         using var separator = await Task.Run(() => SpeakerSeparator(Store), cancellation)
-            ?? throw new InvalidOperationException(Speakers.SpeakerText.PROPOSED_ModelsMissing);
+            ?? throw new InvalidOperationException(Speakers.SpeakerText.APPROVED_ModelsMissing);
         return await separator.SeparateAsync(id, threshold, progress, cancellation);
     }
     public static MeetingsHost Create(AppPaths paths, Func<MeetingsSettings> settings, ICredentialStore credentials,

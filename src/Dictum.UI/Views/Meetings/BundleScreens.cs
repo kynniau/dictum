@@ -49,11 +49,11 @@ internal sealed partial class MeetingsWindow
             "spoken" => Agreed(APPROVED_Spoken),
             "written" => Agreed(APPROVED_Written),
             "platform-announced" => Agreed(PROPOSED_Platform),
-            "refused" => Line(PROPOSED_RecordRefused),
-            "agreed" => Line(PROPOSED_RecordAgreedAgain),
-            "unconfirmed" => Line(PROPOSED_RecordUnconfirmed),
-            "discard-requested" => Line(PROPOSED_RecordDiscardRequested),
-            _ => Line(PROPOSED_RecordUnknown),
+            "refused" => Line(APPROVED_RecordRefused),
+            "agreed" => Line(APPROVED_RecordAgreedAgain),
+            "unconfirmed" => Line(APPROVED_RecordUnconfirmed),
+            "discard-requested" => Line(APPROVED_RecordDiscardRequested),
+            _ => Line(APPROVED_RecordUnknown),
         };
     }
 
@@ -62,12 +62,12 @@ internal sealed partial class MeetingsWindow
     {
         var lines = info.OriginAgreement is { } agreement ? [RecordText(agreement.Kind, agreement.AcknowledgedAt, agreement.How)] : new List<string>();
         lines.AddRange(info.OriginConfirmations.Select(c => RecordText(c.Kind, c.At, c.Answer)));
-        return Ui.Card(Ui.Stack(8, (lines.Count == 0 ? [PROPOSED_NotesText] : lines).Select(line => (Control)Ui.Text(line)).ToArray()), PROPOSED_Record);
+        return Ui.Card(Ui.Stack(8, (lines.Count == 0 ? [PROPOSED_NotesText] : lines).Select(line => (Control)Ui.Text(line)).ToArray()), APPROVED_RecordHeading);
     }
 
     /// <summary>The suggested bundle file name: no title, people or words from the meeting, only its local start date and a short id.</summary>
     internal static string SuggestedBundleName(MeetingMeta meta) =>
-        PROPOSED_BundleSlug + "-" + meta.StartedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "-" + meta.Id.Value[..8] + ".dictum";
+        APPROVED_BundleSlug + "-" + meta.StartedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "-" + meta.Id.Value[..8] + ".dictum";
 
     private async Task MoveBundle(MeetingId id)
     {
@@ -80,19 +80,19 @@ internal sealed partial class MeetingsWindow
             {
                 var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
                 {
-                    Title = PROPOSED_MoveToAnotherDevice, SuggestedFileName = name, DefaultExtension = "dictum",
-                    FileTypeChoices = [new FilePickerFileType(PROPOSED_MoveToAnotherDevice) { Patterns = ["*.dictum"] }],
+                    Title = APPROVED_MoveToAnotherDevice, SuggestedFileName = name, DefaultExtension = "dictum",
+                    FileTypeChoices = [new FilePickerFileType(APPROVED_MoveToAnotherDevice) { Patterns = ["*.dictum"] }],
                 });
                 destination = file?.TryGetLocalPath();
             }
             if (destination is null) return;
             var code = TransferCode.New();
             await Task.Run(() => _host.Store.ExportBundle(id, destination, code), _lifetime.Token);
-            Screen(Ui.Heading(PROPOSED_TransferCode), Named(new TextBlock
-                { Text = code, FontSize = 28, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, PROPOSED_TransferCode),
-                Ui.Text(PROPOSED_BundleNeedsCode), Ui.Text(PROPOSED_SendCodeSeparately),
-                SafeButton(PROPOSED_CopyCode, () => { _host.CopyOutOfHistory(code); Say(PROPOSED_Copied); }),
-                SafeButton(PROPOSED_Done, () => ShowMeeting(id)));
+            Screen(Ui.Heading(APPROVED_TransferCode), Named(new TextBlock
+                { Text = code, FontSize = 28, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, APPROVED_TransferCode),
+                Ui.Text(APPROVED_BundleNeedsCode), Ui.Text(APPROVED_SendCodeSeparately),
+                SafeButton(APPROVED_CopyCode, () => { _host.CopyOutOfHistory(code); Say(PROPOSED_Copied); }),
+                SafeButton(APPROVED_Done, () => ShowMeeting(id)));
         });
     }
 
@@ -106,8 +106,8 @@ internal sealed partial class MeetingsWindow
             {
                 var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    Title = PROPOSED_ImportBundle, AllowMultiple = false,
-                    FileTypeFilter = [new FilePickerFileType(PROPOSED_ImportBundle) { Patterns = ["*.dictum"] }],
+                    Title = APPROVED_ImportBundle, AllowMultiple = false,
+                    FileTypeFilter = [new FilePickerFileType(APPROVED_ImportBundle) { Patterns = ["*.dictum"] }],
                 });
                 path = files.FirstOrDefault()?.TryGetLocalPath();
             }
@@ -115,13 +115,13 @@ internal sealed partial class MeetingsWindow
         }
         catch (Exception error) { BundleFailure(error); }
     }
-    private void BundleFailure(Exception error) => Say(error.Message is BundleText.PROPOSED_AlreadyHere or BundleText.PROPOSED_Invalid or
-        BundleText.PROPOSED_Unsupported or BundleText.PROPOSED_CodeRequired ? error.Message : PROPOSED_BundleFailed);
+    private void BundleFailure(Exception error) => Say(error.Message is BundleText.APPROVED_AlreadyHere or BundleText.APPROVED_Invalid or
+        BundleText.APPROVED_Unsupported or BundleText.APPROVED_CodeRequired ? error.Message : APPROVED_BundleFailed);
 
     internal void ShowBundleCode(string path)
     {
         var info = _host.CreateBundleImporter((_, _, _) => Task.FromResult<Agreement?>(null), ApprovedScriptVersion, BundleImportScript).Inspect(path);
-        var boxes = Enumerable.Range(1, 6).Select(i => Named(new TextBox { MinWidth = 76, MaxWidth = 120 }, string.Format(PROPOSED_CodeWord, i))).ToArray();
+        var boxes = Enumerable.Range(1, 6).Select(i => Named(new TextBox { MinWidth = 76, MaxWidth = 120 }, string.Format(APPROVED_CodeWord, i))).ToArray();
         for (var i = 0; i < boxes.Length; i++)
         {
             var index = i;
@@ -133,9 +133,9 @@ internal sealed partial class MeetingsWindow
                 boxes[Math.Min(5, index + words.Length - 1)].Focus(NavigationMethod.Tab);
             };
         }
-        Screen(Ui.Heading(PROPOSED_ImportBundle), Ui.Text(string.Format(PROPOSED_BundleInfo, info.FileCount, info.Bytes, info.Platform, info.AppVersion)),
-            Ui.Heading(PROPOSED_TransferCode), Ui.Row(8, boxes),
-            SafeButton(PROPOSED_CheckBundle, () =>
+        Screen(Ui.Heading(APPROVED_ImportBundle), Ui.Text(string.Format(APPROVED_BundleInfo, info.FileCount, info.Bytes, info.Platform, info.AppVersion)),
+            Ui.Heading(APPROVED_TransferCode), Ui.Row(8, boxes),
+            SafeButton(APPROVED_CheckBundle, () =>
             {
                 var code = string.Join(' ', boxes.Select(b => b.Text ?? ""));
                 _importCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -177,7 +177,7 @@ internal sealed partial class MeetingsWindow
         }
         // A declined notice already chose the next screen (list, notes, or Meetings turned off).
         catch (OperationCanceledException) { if (!declined && !_exitPending) ShowList(); }
-        catch (InvalidOperationException error) when (error.Message == BundleText.PROPOSED_ConfirmationRequired) { }
+        catch (InvalidOperationException error) when (error.Message == BundleText.APPROVED_ConfirmationRequired) { }
         catch (Exception error) { BundleFailure(error); }
         finally
         {

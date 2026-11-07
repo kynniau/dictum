@@ -3,18 +3,19 @@ namespace Dictum.UI.Views.Meetings;
 // The PROPOSED_ strings added for 1.5.1 (pill labels, headphones tip, summaries screens) were APPROVED by the owner 07/11/2026 00:30 AEDT (.demo-preview/approve-1.5.1-wording.md): do not reword.
 internal static class MeetingsText
 {
-    public const string PROPOSED_MoveToAnotherDevice = "Move to another device";
-    public const string PROPOSED_ImportBundle = "Import a .dictum file";
-    public const string PROPOSED_TransferCode = "Transfer code";
-    public const string PROPOSED_CopyCode = "Copy the code";
-    public const string PROPOSED_BundleNeedsCode = "The file is useless without this code.";
-    public const string PROPOSED_SendCodeSeparately = "Send the code another way than the file.";
-    public const string PROPOSED_BundleInfo = "{0} files · {1:N0} bytes · {2} · Dictum {3}";
-    public const string PROPOSED_CodeWord = "Transfer code word {0}";
-    public const string PROPOSED_CheckBundle = "Check the meeting";
-    public const string PROPOSED_BundleFailed = "The meeting could not be imported. Check the transfer code and the .dictum file.";
-    public const string PROPOSED_Done = "Done";
-    public const string PROPOSED_BundleSlug = "meeting";
+    // APPROVED 07/11/2026 (owner, round 1 rows 1-12): do not reword.
+    public const string APPROVED_MoveToAnotherDevice = "Move to another device";
+    public const string APPROVED_ImportBundle = "Import a .dictum file";
+    public const string APPROVED_TransferCode = "Transfer code";
+    public const string APPROVED_CopyCode = "Copy the code";
+    public const string APPROVED_BundleNeedsCode = "The file is useless without this code.";
+    public const string APPROVED_SendCodeSeparately = "Send the code another way than the file.";
+    public const string APPROVED_BundleInfo = "{0} files · {1:N0} bytes · {2} · Dictum {3}";
+    public const string APPROVED_CodeWord = "Transfer code word {0}";
+    public const string APPROVED_CheckBundle = "Check the meeting";
+    public const string APPROVED_BundleFailed = "The meeting could not be imported. Check the transfer code and the .dictum file.";
+    public const string APPROVED_Done = "Done";
+    public const string APPROVED_BundleSlug = "meeting";
     public const string PROPOSED_SummaryModel = "Summary model";
     public const string PROPOSED_DefaultSummaryModel = "Use the clean-up model, or the recommended model";
     public const string PROPOSED_ModelMissing = "This summary model is not installed. Open Settings > Models to download it.";
@@ -148,15 +149,17 @@ internal static class MeetingsText
     public const string PROPOSED_Status = "Meeting status";
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.
     public const string APPROVED_Record = "{0}. At {1:g}, you said everyone agreed: {2}. This is your note. It does not prove that anyone agreed.";
-    public const string PROPOSED_Record = "Meeting record";
+    // APPROVED 07/11/2026 (owner, round 1 row 19a): do not reword.
+    public const string APPROVED_RecordHeading = "Meeting record";
     // Origin-record lines for confirmations that are not an agreement (1.6 bundle import, 07/11/2026). Only "spoken",
     // "written" and "platform-announced" may use APPROVED_Record; every other saved answer gets its own line, so a refusal
     // is never shown as "Each person said yes". {0} = APPROVED_LiveKind or APPROVED_ImportKind, {1} = the time.
-    public const string PROPOSED_RecordRefused = "{0}. At {1:g}: " + APPROVED_Refused + ".";
-    public const string PROPOSED_RecordAgreedAgain = "{0}. At {1:g}, you confirmed the notice again.";
-    public const string PROPOSED_RecordUnconfirmed = "{0}. At {1:g}, someone joined and you did not confirm that they agreed.";
-    public const string PROPOSED_RecordDiscardRequested = "{0}. At {1:g}, you asked to discard this meeting.";
-    public const string PROPOSED_RecordUnknown = "{0}. At {1:g}, a record this version of Dictum does not recognise.";
+    // APPROVED 07/11/2026 (owner, round 1 rows 19b-19f): do not reword.
+    public const string APPROVED_RecordRefused = "{0}. At {1:g}: " + APPROVED_Refused + ".";
+    public const string APPROVED_RecordAgreedAgain = "{0}. At {1:g}, you confirmed the notice again.";
+    public const string APPROVED_RecordUnconfirmed = "{0}. At {1:g}, someone joined and you did not confirm that they agreed.";
+    public const string APPROVED_RecordDiscardRequested = "{0}. At {1:g}, you asked to discard this meeting.";
+    public const string APPROVED_RecordUnknown = "{0}. At {1:g}, a record this version of Dictum does not recognise.";
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.
     public const string APPROVED_LiveKind = "Live recording";
     // APPROVED 05/11/2026 09:13 AEDT (owner; not reviewed by a lawyer): do not reword.

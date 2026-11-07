@@ -181,14 +181,15 @@ public static class SettingsLoader
         return s;
     }
 
-    private const string PROPOSED_ParagraphPauseExpected = "expected 0, or a number from 0.5 to 30";
+    // APPROVED 07/11/2026 (owner, round 1 row 22): do not reword.
+    private const string APPROVED_ParagraphPauseExpected = "expected 0, or a number from 0.5 to 30";
 
     private static CleanupSettings BindCleanup(ObjectReader? r)
     {
         var d = new CleanupSettings();
         if (r is null) return d;
         // Any finite number is read; EffectiveSettings clamps it (and warns) afterwards.
-        var seconds = r.Double("paragraph_pause_seconds", d.ParagraphPauseSeconds, -double.MaxValue, double.MaxValue, PROPOSED_ParagraphPauseExpected);
+        var seconds = r.Double("paragraph_pause_seconds", d.ParagraphPauseSeconds, -double.MaxValue, double.MaxValue, APPROVED_ParagraphPauseExpected);
         var settings = EffectiveSettings.ParagraphPause(d with { ParagraphPauseSeconds = seconds }, r.Warn);
         r.WarnUnknown();
         return settings;

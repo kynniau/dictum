@@ -15,7 +15,7 @@ internal static class SpeakerNameSwap
     // "Other {0}" today; built from the label text so a reworded label still round-trips. A whole label only: not inside a longer
     // word or number ("Other 1" never matches in "Other 10"), and "Others" (the channel in a citation) never matches.
     private const string NotWordBefore = @"(?<![\p{L}\p{N}_])", NotWordAfter = @"(?![\p{L}\p{N}_])";
-    private static readonly string LabelPattern = BuildLabel(SpeakerText.PROPOSED_Other);
+    private static readonly string LabelPattern = BuildLabel(SpeakerText.APPROVED_Other);
     private static readonly Regex Label = new(NotWordBefore + LabelPattern + NotWordAfter, RegexOptions.CultureInvariant);
 
     /// <summary>The speakers as a cloud engine may see them: the same turns, every name removed, so each voice is "Other n".</summary>

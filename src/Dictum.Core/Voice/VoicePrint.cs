@@ -50,7 +50,7 @@ public sealed record EnrolmentResult(EnrolmentOutcome Outcome, VoicePrint? Print
     {
         EnrolmentOutcome.TooLittleSpeech => VoiceText.PROPOSED_TooShort,
         EnrolmentOutcome.Inconsistent => VoiceText.PROPOSED_Inconsistent,
-        EnrolmentOutcome.ModelMissing => SpeakerText.PROPOSED_ModelsMissing,
+        EnrolmentOutcome.ModelMissing => SpeakerText.APPROVED_ModelsMissing,
         _ => null,
     };
 }
