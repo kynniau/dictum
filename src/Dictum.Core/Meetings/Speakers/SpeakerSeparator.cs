@@ -41,6 +41,14 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
 
     private const int Rate = 16000;
 
+    /// <summary>The most windows embedded and clustered; above it the windows are sub-sampled evenly (two hours of others' speech at a 1 s hop).</summary>
+    // simplification: above 7200 windows only an even 7200 of them are embedded and clustered, because the distance triangle grows
+    // with the square (7200 windows are about 100 MB of distances) and the worst case is cubic. Ceiling: a meeting with more than two
+    // hours of other people's speech is labelled from every nth window, so a short turn between kept windows can be missed (it takes
+    // the speaker of the nearest kept window in time). Trigger to retire: a user with a meeting longer than two hours of others'
+    // speech reporting wrong labels; then port hclust-cpp's nearest-neighbour chain and cluster every window.
+    internal const int MaxWindows = 7200;
+
     /// <summary>Frees the native model behind the embedder, if it holds one.</summary>
     public void Dispose() => (embedder as IDisposable)?.Dispose();
 
@@ -69,7 +77,8 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
             .Select(s => (s.Start.TotalSeconds, s.End.TotalSeconds)).OrderBy(t => t.Item1),
     ];
 
-    public async Task<MeetingSpeakers> SeparateAsync(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
+    /// <summary>The speakers written, or null (nothing written) when no window survives: an empty transcript, or every segment too short.</summary>
+    public async Task<MeetingSpeakers?> SeparateAsync(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var track = TrackFor(store, id) ?? throw new InvalidOperationException(SpeakerText.PROPOSED_NothingToSeparate);
         if (track == Channel.You) throw new InvalidOperationException("The You track is never separated.");
@@ -81,10 +90,12 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
             try
             {
                 var speakerTurns = Diarize(samples, turns, embedder, threshold, progress, cancellationToken);
+                if (speakerTurns.Length == 0) return null;
                 return new MeetingSpeakers(MeetingSpeakers.CurrentVersion, modelTag, threshold, speakerTurns, new Dictionary<string, string>());
             }
             finally { Array.Clear(samples); }
         }, cancellationToken).ConfigureAwait(false);
+        if (result is null) return null;
         result = CarryNames(previous, result);
         MeetingProcessingConsent.Check(cancellationToken);
         store.WriteSpeakers(id, result);
@@ -112,20 +123,36 @@ public sealed class SpeakerSeparator(IMeetingStore store, IVoiceEmbedder embedde
         double threshold, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var windows = segments.SelectMany((s, i) => Windows(s.Start, s.End, samples.Length).Select(w => (Segment: i, w.From, w.To))).ToArray();
+        var skipped = new HashSet<int>(); // segments with a window the cap left out
+        if (windows.Length > MaxWindows) // even sub-sampling, in time order, before the costly embedding and clustering
+        {
+            var all = windows; var kept = new HashSet<int>(Enumerable.Range(0, MaxWindows).Select(k => (int)((long)k * all.Length / MaxWindows)));
+            for (var k = 0; k < all.Length; k++) if (!kept.Contains(k)) skipped.Add(all[k].Segment);
+            windows = [.. Enumerable.Range(0, MaxWindows).Select(k => all[(int)((long)k * all.Length / MaxWindows)])];
+        }
         var owners = new List<int>();
+        var centres = new List<double>();
         var embeddings = new List<float[]>();
         for (var k = 0; k < windows.Length; k++)
         {
             MeetingProcessingConsent.Check(cancellationToken);
             var (segment, from, to) = windows[k];
-            if (embedder.Embed(samples[from..to]) is { } embedding) { owners.Add(segment); embeddings.Add(embedding); }
+            // A non-finite value would poison every distance, so that window is dropped like a too-short one.
+            if (embedder.Embed(samples[from..to]) is { } embedding && Array.TrueForAll(embedding, float.IsFinite))
+            { owners.Add(segment); centres.Add((from + to) / 2.0 / Rate); embeddings.Add(embedding); }
             progress?.Report((k + 1) / (double)windows.Length);
         }
-        var labels = SpeakerClustering.Cluster(embeddings, threshold);
+        var labels = SpeakerClustering.Cluster(embeddings, threshold, 0, cancellationToken);
         var turns = new List<(double Start, double End, int Label)>();
         for (var i = 0; i < segments.Count; i++)
         {
             var heard = Enumerable.Range(0, owners.Count).Where(k => owners[k] == i).Select(k => labels[k]).ToList();
+            if (heard.Count == 0 && skipped.Contains(i) && centres.Count > 0)
+            {
+                // Its windows were not kept: the speaker of the kept window nearest in time.
+                var middle = (segments[i].Start + segments[i].End) / 2;
+                heard.Add(labels[Enumerable.Range(0, centres.Count).MinBy(k => Math.Abs(centres[k] - middle))]);
+            }
             if (heard.Count == 0) continue;
             // GroupBy keeps first-appearance order, so the first group with the top count holds the earliest tied window.
             var majority = heard.GroupBy(l => l).Select(g => (Label: g.Key, Count: g.Count())).Aggregate((best, next) => next.Count > best.Count ? next : best);

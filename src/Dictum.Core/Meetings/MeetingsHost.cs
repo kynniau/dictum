@@ -82,10 +82,10 @@ internal sealed record MeetingsHost(
     // simplification: there is no audio-off setting yet; always use the saved-audio retention notices.
     // simplification: Ollama model forwarding is not reliably detectable; show the approved conditional notice.
     /// <summary>
-    /// Separates the voices on a meeting's Others (else Mixed) track with the downloaded model and writes speakers.json.enc (1.6 B).
+    /// Separates the voices on a meeting's Others (else Mixed) track with the downloaded model and writes speakers.json.enc (1.6 B); null, with nothing written, when too little speech survives.
     /// <paramref name="threshold"/> is the clustering cut: higher merges more voices.
     /// </summary>
-    public async Task<Speakers.MeetingSpeakers> SeparateSpeakers(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellation)
+    public async Task<Speakers.MeetingSpeakers?> SeparateSpeakers(MeetingId id, double threshold, IProgress<double>? progress, CancellationToken cancellation)
     {
         using var separator = await Task.Run(() => SpeakerSeparator(Store), cancellation)
             ?? throw new InvalidOperationException(Speakers.SpeakerText.PROPOSED_ModelsMissing);

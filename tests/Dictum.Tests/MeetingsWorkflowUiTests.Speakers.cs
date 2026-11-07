@@ -55,6 +55,28 @@ public sealed partial class MeetingsWorkflowUiTests
     });
 
     [Fact]
+    public Task Identify_speakers_with_too_little_speech_says_so_and_writes_nothing() => UiSession.RunAsync(async () =>
+    {
+        using var fixture = new Fixture();
+        var (samples, turns) = SyntheticVoices.Track((1, 1.0)); // under the 1.5 s window minimum
+        var id = fixture.Store.Create(fixture.Files.Meta());
+        using (var audio = new MemoryStream(SyntheticVoices.Wav(samples))) fixture.Store.WriteAudio(id, Channel.Others, audio);
+        fixture.Store.AppendSegments(id, [new Segment(TimeSpan.FromSeconds(turns[0].Start), TimeSpan.FromSeconds(turns[0].End), Channel.Others, "Synthetic line 0")]);
+        var host = fixture.Host with
+        {
+            SpeakerModelsReady = () => true,
+            SpeakerSeparator = store => new SpeakerSeparator(store, new LevelEmbedder(SyntheticVoices.Distinct()), "synthetic@00000000"),
+        };
+        var window = new MeetingsWindow(host); window.Show(); window.ShowMeeting(id);
+        Click(window, PROPOSED_SeparateSpeakers);
+        await Until(() => Texts(window).Contains(PROPOSED_TooLittleSpeech));
+        Assert.DoesNotContain(PROPOSED_Error, Texts(window));
+        Assert.Null(fixture.Store.ReadSpeakers(id));
+        Assert.False(fixture.Store.HasSpeakers(id));
+        window.Close(); return true;
+    });
+
+    [Fact]
     public Task Settings_Meetings_shows_the_speaker_models_state_and_a_named_download_button() => UiSession.Run(() =>
     {
         using var fixture = new Fixture();

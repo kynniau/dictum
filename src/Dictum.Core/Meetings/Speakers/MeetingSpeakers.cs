@@ -22,6 +22,7 @@ public static class SpeakerText
     public const string PROPOSED_InvalidName = "Use letters, numbers, spaces, full stops, hyphens and apostrophes in a name.";
     public const string PROPOSED_ModelsMissing = "Download the speaker model in Settings > Meetings first.";
     public const string PROPOSED_NothingToSeparate = "This meeting has no recording of other people to separate.";
+    public const string PROPOSED_TooLittleSpeech = "Too little speech from other people to tell the voices apart.";
     public const string PROPOSED_SettingsRow = "Identify speakers";
     public const string PROPOSED_SettingsNote = "One model, downloaded once, lets Dictum tell the other voices in a recorded meeting apart. It runs on this computer.";
     public const string PROPOSED_ModelsReady = "Speaker model: downloaded";

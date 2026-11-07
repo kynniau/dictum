@@ -22,7 +22,7 @@ public static class SpeakerClustering
     // simplification: a row whose nearest cluster merged is searched in full again. Ceiling: the worst case is still n cubed, and
     // the triangle grows with the square (an hour of others' speech, about 3,600 windows, is about 26 MB). Trigger to retire: a
     // clustering step that takes more than a few seconds; then port hclust-cpp's nearest-neighbour chain.
-    public static int[] Cluster(IReadOnlyList<float[]> embeddings, double threshold, int count = 0)
+    public static int[] Cluster(IReadOnlyList<float[]> embeddings, double threshold, int count = 0, CancellationToken cancellationToken = default)
     {
         var n = embeddings.Count;
         if (n == 0) return [];
@@ -30,8 +30,11 @@ public static class SpeakerClustering
         var distance = new float[(long)n * (n - 1) / 2];
         long At(int i, int j) => i < j ? (long)i * (2L * n - i - 1) / 2 + (j - i - 1) : At(j, i);
         for (var i = 0; i < n; i++)
+        {
+            MeetingProcessingConsent.Check(cancellationToken);
             for (var j = i + 1; j < n; j++)
                 distance[At(i, j)] = (float)Math.Max(0, 1 - Dot(unit[i], unit[j]));
+        }
 
         var active = Enumerable.Repeat(true, n).ToArray();
         var members = Enumerable.Range(0, n).Select(i => new List<int> { i }).ToArray();
@@ -47,9 +50,11 @@ public static class SpeakerClustering
 
         for (var left = n; left > 1 && (count <= 0 || left > count); left--)
         {
+            MeetingProcessingConsent.Check(cancellationToken); // every merge: Cancel, or a changed processing route, stops a long clustering
             var a = -1;
             for (var i = 0; i < n; i++)
                 if (active[i] && nearest[i] >= 0 && (a < 0 || nearestDistance[i] < nearestDistance[a])) a = i;
+            if (a < 0) break; // no finite distance left (a non-finite embedding): stop merging rather than index -1
             var (b, height) = (nearest[a], (double)nearestDistance[a]);
             if (count <= 0 && height >= threshold) break; // cutree_cdist: only merges below the threshold
             active[b] = false;

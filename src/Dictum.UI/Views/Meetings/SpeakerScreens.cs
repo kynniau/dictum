@@ -78,7 +78,7 @@ internal sealed partial class MeetingsWindow
             var report = new Progress<double>(value => Dispatcher.UIThread.Post(() => progress.Value = value));
             var result = await _host.SeparateSpeakers(id, threshold, report, _lifetime.Token);
             ShowMeeting(id);
-            Say(string.Format(CultureInfo.InvariantCulture, PROPOSED_Separated, result.Count));
+            Say(result is null ? PROPOSED_TooLittleSpeech : string.Format(CultureInfo.InvariantCulture, PROPOSED_Separated, result.Count));
         });
     }
 }

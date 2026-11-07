@@ -83,6 +83,18 @@ internal sealed class LevelEmbedder(Dictionary<int, float[]> voices) : IVoiceEmb
     }
 }
 
+/// <summary>Cancels the token once it has embedded its last expected window, so only the clustering step after it can notice.</summary>
+internal sealed class CancelAfterEmbedding(IVoiceEmbedder inner, CancellationTokenSource source, int windows = 2) : IVoiceEmbedder
+{
+    private int _calls;
+    public float[]? Embed(float[] samples16kMono)
+    {
+        var result = inner.Embed(samples16kMono);
+        if (++_calls == windows) source.Cancel();
+        return result;
+    }
+}
+
 public sealed class MeetingSpeakersTests
 {
     private static MeetingId Meeting(MeetingFixture files, FileMeetingStore store, float[]? others = null, float[]? you = null, float[]? mixed = null,
@@ -408,6 +420,69 @@ public sealed class MeetingSpeakersTests
         Assert.Equal([new SpeakerTurn(0, 2, 1), new SpeakerTurn(3, 7, 2), new SpeakerTurn(8, 10.5, 2)], turns);
     }
 
+
+    [Fact]
+    public void A_window_with_a_non_finite_embedding_is_ignored_and_the_others_cluster_as_before()
+    {
+        var (samples, turns) = SyntheticVoices.Track((1, 2), (2, 2), (1, 2));
+        var voices = SyntheticVoices.Distinct();
+        voices[2] = [float.NaN, 1, 0, 0]; // the middle segment's only window
+        var result = SpeakerSeparator.Diarize(samples, [.. turns.Select(t => (t.Start, t.End))], new LevelEmbedder(voices), 0.5, null,
+            TestContext.Current.CancellationToken);
+        Assert.Equal([new SpeakerTurn(Math.Round(turns[0].Start, 3), Math.Round(turns[0].End, 3), 1), new SpeakerTurn(Math.Round(turns[2].Start, 3), Math.Round(turns[2].End, 3), 1)], result);
+    }
+
+    [Fact]
+    public void Clustering_embeddings_that_are_all_non_finite_does_not_throw()
+    {
+        float[][] nan = [[float.NaN, 1], [float.NaN, 2], [float.NaN, 3]];
+        Assert.Equal([0, 1, 2], SpeakerClustering.Cluster(nan, 0.5));
+    }
+
+    [Fact]
+    public void Clustering_stops_at_once_when_the_token_is_cancelled()
+    {
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        Assert.Throws<OperationCanceledException>(() => SpeakerClustering.Cluster([[1f, 0], [0, 1f], [1f, 1f]], 0.5, 0, cancel.Token));
+    }
+
+    [Fact]
+    public async Task Cancelling_before_clustering_writes_no_speakers_file()
+    {
+        using var files = new MeetingFixture(); var store = files.Store();
+        var (samples, turns) = SyntheticVoices.Track((1, 2), (2, 2));
+        var id = Meeting(files, store, others: samples, segments: [.. turns.Select((t, i) => At(t, Channel.Others, $"Synthetic line {i}"))]);
+        using var cancel = new CancellationTokenSource();
+        var embedder = new CancelAfterEmbedding(new LevelEmbedder(SyntheticVoices.Distinct()), cancel); // cancels once the last window is embedded
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new SpeakerSeparator(store, embedder, "synthetic@00000000").SeparateAsync(id, 0.5, null, cancel.Token));
+        Assert.Null(store.ReadSpeakers(id));
+        Assert.False(store.HasSpeakers(id));
+    }
+
+    [Fact]
+    public async Task No_surviving_window_writes_no_speakers_file_and_returns_null()
+    {
+        using var files = new MeetingFixture(); var store = files.Store();
+        var (samples, turns) = SyntheticVoices.Track((1, 1.0), (2, 1.2)); // each under the 1.5 s minimum
+        var id = Meeting(files, store, others: samples, segments: [.. turns.Select((t, i) => At(t, Channel.Others, $"Synthetic line {i}"))]);
+        Assert.Null(await Separator(store, SyntheticVoices.Distinct()).SeparateAsync(id, 0.5, null, TestContext.Current.CancellationToken));
+        Assert.False(store.HasSpeakers(id));
+        var none = Meeting(files, store, others: samples); // no transcript at all
+        Assert.Null(await Separator(store, SyntheticVoices.Distinct()).SeparateAsync(none, 0.5, null, TestContext.Current.CancellationToken));
+        Assert.False(store.HasSpeakers(none));
+    }
+
+    [Fact]
+    public void More_than_the_cap_of_windows_are_sub_sampled_evenly_and_every_segment_still_gets_a_label()
+    {
+        var (samples, turns) = SyntheticVoices.Track((1, 2), (2, 2));
+        var segments = Enumerable.Range(0, SpeakerSeparator.MaxWindows + 101).Select(i => (turns[i % 2].Start, turns[i % 2].End)).ToArray(); // one window each, over the same audio
+        var embedder = new LevelEmbedder(SyntheticVoices.Distinct());
+        var result = SpeakerSeparator.Diarize(samples, segments, embedder, 0.5, null, TestContext.Current.CancellationToken);
+        Assert.Equal(SpeakerSeparator.MaxWindows, embedder.Heard.Count); // the clustering input is capped
+        Assert.Equal(segments.Length, result.Length);
+        for (var i = 0; i < result.Length; i++) Assert.Equal(i % 2 + 1, result[i].Speaker); // a segment with no kept window takes the nearest kept window's speaker
+    }
     [Fact]
     public async Task A_speakers_file_from_a_later_version_reads_as_none_and_separating_again_replaces_it()
     {

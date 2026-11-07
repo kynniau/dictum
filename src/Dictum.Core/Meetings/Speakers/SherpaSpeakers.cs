@@ -33,7 +33,9 @@ public sealed class SherpaVoiceEmbedder : IVoiceEmbedder, IDisposable
             using var stream = _extractor.CreateStream();
             stream.AcceptWaveform(16000, samples16kMono);
             stream.InputFinished();
-            return _extractor.IsReady(stream) ? _extractor.Compute(stream) : null;
+            if (!_extractor.IsReady(stream)) return null;
+            var embedding = _extractor.Compute(stream);
+            return Array.TrueForAll(embedding, float.IsFinite) ? embedding : null; // a NaN or infinite value would poison every distance
         }
     }
 
