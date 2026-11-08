@@ -14,6 +14,7 @@ namespace Dictum.UI.Shell;
 public sealed partial class AppShell
 {
     private MeetingsWindow? _meetingsWindow;
+    internal bool MeetingsWindowOpen => _meetingsWindow is not null; // a test reads it
     private readonly SemaphoreSlim _meetingSummaryGate = new(1, 1);
     private Func<float>? _meetingLevel;
     internal bool MeetingOwnsPill => Volatile.Read(ref _meetingLevel) is not null;
@@ -147,6 +148,7 @@ public sealed partial class AppShell
 
     internal void OpenMeetings(bool start = false)
     {
+        if (!MeetingsAvailable) return; // no credential store, no owner key: nothing here can work (see MeetingsAvailable)
         _flyout?.Close();
         if (start && !MeetingsSettings.Enabled) return;
         if (_meetingsWindow is null)

@@ -60,6 +60,8 @@ internal sealed class VoiceCard : UserControl
     /// <summary>Redraws from the print on disk, the speaker model and settings.json. Never throws: a print that cannot be read is said.</summary>
     public void Refresh()
     {
+        IsVisible = _shell.MeetingsAvailable; // no credential store, no owner key to seal a print with (AppShell.MeetingsAvailable)
+        if (!IsVisible) return;
         _refreshing = true;
         try
         {

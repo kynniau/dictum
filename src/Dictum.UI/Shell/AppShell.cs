@@ -119,6 +119,9 @@ public sealed partial class AppShell : IDisposable
     /// <summary>The API keys added in Dictum (several per service, in the system's credential store), read at every load; the Settings lane adds and removes through it.</summary>
     public SecretVault Vault { get; }
 
+    /// <summary>Meetings and the voice print need the owner key in a credential store; a platform without one (macOS until the Keychain store lands) hides them.</summary>
+    internal bool MeetingsAvailable => Vault.Available;
+
     /// <summary>The input-access grant (macOS Accessibility) as the hotkey surfaces show it: its state, and the one Request button.</summary>
     public InputAccessWatch Access { get; }
 

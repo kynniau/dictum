@@ -20,11 +20,17 @@ internal sealed class SettingsWindow : Window
     private readonly ListBox _nav = new() { Width = 180 };
     private readonly ContentControl _host = new();
     private readonly Dictionary<string, SettingsPage> _pages = [];
-    private readonly string[] _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", Meetings.MeetingsText.PROPOSED_Meetings, "Privacy", "About", Dictum.Core.HowItWorksText.PageTitle, HelpText.PageTitle];
+    private readonly string[] _names;
+
+    /// <summary>The navigation entries in order (a test reads them).</summary>
+    internal IReadOnlyList<string> PageNames => _names;
 
     public SettingsWindow(AppShell shell)
     {
         _shell = shell;
+        // The Meetings entry is left out, so its page is never built, where the platform has no credential store (AppShell.MeetingsAvailable).
+        _names = ["General", "Mode", "Models", "Storage", "Microphone", "Clean-up", .. shell.MeetingsAvailable ? new[] { Meetings.MeetingsText.PROPOSED_Meetings } : [],
+            "Privacy", "About", Dictum.Core.HowItWorksText.PageTitle, HelpText.PageTitle];
         Title = "Dictum settings";
         Width = 860;
         Height = 640;
@@ -58,7 +64,10 @@ internal sealed class SettingsWindow : Window
     /// <summary>Selects a page by name ("Storage", "Clean-up"…); an unknown name keeps the current page.</summary>
     public void ShowPage(string name)
     {
-        if (Array.IndexOf(_names, name) is var index and >= 0 && _nav.SelectedIndex != index)
+        // A name that is not listed (Meetings where there is no credential store) never builds its page.
+        var index = Array.IndexOf(_names, name);
+        if (index < 0) return;
+        if (_nav.SelectedIndex != index)
         {
             _nav.SelectedIndex = index; // raises SelectionChanged, which lands here again
             return;
