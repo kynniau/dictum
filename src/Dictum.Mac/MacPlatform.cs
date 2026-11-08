@@ -20,7 +20,7 @@ namespace Dictum.Mac;
 public sealed class MacPlatform : IPlatform, IDisposable
 {
     private readonly ILog _log;
-    private readonly Lazy<Pasteboard> _clipboard = new(() => new Pasteboard());
+    private readonly Lazy<Pasteboard> _clipboard;
     private readonly Lazy<IStartupRegistration> _startup;
     private readonly Lazy<IRemovalSteps> _removal;
 
@@ -34,6 +34,7 @@ public sealed class MacPlatform : IPlatform, IDisposable
         Package = new MacPackageInfo();
         _startup = new(() => new LoginItem(_log, Bundle));
         _removal = new(() => new RemovalSteps(_log, Bundle, ExeDir, () => _startup.Value));
+        _clipboard = new(() => new Pasteboard(_log));
         _access = new MacInputAccess(Open, _log);
         _posted = new PostedEvents();
         _swallowed = new SwallowedEvents();

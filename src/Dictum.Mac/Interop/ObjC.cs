@@ -23,6 +23,8 @@ internal static partial class ObjC
     [DllImport(Lib, EntryPoint = "objc_allocateClassPair")] private static extern nint objc_allocateClassPair(nint superclass, string name, nint extraBytes);
     [DllImport(Lib, EntryPoint = "objc_registerClassPair")] private static extern void objc_registerClassPair(nint cls);
     [DllImport(Lib, EntryPoint = "class_addMethod")] [return: MarshalAs(UnmanagedType.I1)] private static extern bool class_addMethod(nint cls, nint sel, nint imp, string types);
+    [DllImport(Lib, EntryPoint = "objc_getProtocol")] private static extern nint objc_getProtocol(string name);
+    [DllImport(Lib, EntryPoint = "class_addProtocol")] [return: MarshalAs(UnmanagedType.I1)] private static extern bool class_addProtocol(nint cls, nint protocol);
 
     // objc_msgSend, one declaration per signature, by return type: Send (id or any pointer-sized value), SendBool, SendVoid,
     // SendPoint, SendRect, SendDouble, SendInt, SendLong. BOOL is one byte (signed char on Apple Silicon), so every bool
@@ -120,10 +122,24 @@ internal static partial class ObjC
     /// pointers), for targets of AppKit callbacks such as a notification delegate. The type encodings follow Apple's
     /// runtime type encoding ("v@:@" for <c>- (void)method:(id)arg</c>). Returns the registered class; call once per name.
     /// </summary>
-    public static unsafe nint DefineClass(string name, string superclass, params (string Selector, nint Imp, string Types)[] methods)
+    public static unsafe nint DefineClass(string name, string superclass, params (string Selector, nint Imp, string Types)[] methods) =>
+        DefineClass(name, superclass, [], methods);
+
+    /// <summary>
+    /// <see cref="DefineClass(string, string, (string Selector, nint Imp, string Types)[])"/>, also declaring conformance to
+    /// each named protocol (<c>class_addProtocol</c>) before the class is registered, for AppKit APIs that check
+    /// <c>conformsToProtocol:</c> at runtime (NSPasteboardItem's <c>setDataProvider:forTypes:</c> refuses a provider that
+    /// does not declare NSPasteboardItemDataProvider). Throws when a protocol is not known to the runtime.
+    /// </summary>
+    public static unsafe nint DefineClass(string name, string superclass, string[] protocols, params (string Selector, nint Imp, string Types)[] methods)
     {
         var cls = objc_allocateClassPair(Class(superclass), name, 0);
         if (cls == 0) throw new InvalidOperationException($"Objective-C class {name} could not be allocated (already defined?).");
+        foreach (var protocolName in protocols)
+        {
+            var protocol = objc_getProtocol(protocolName);
+            if (protocol == 0 || !class_addProtocol(cls, protocol)) throw new InvalidOperationException($"Protocol {protocolName} could not be added to {name}.");
+        }
         foreach (var (selector, imp, types) in methods)
         {
             if (!class_addMethod(cls, Sel(selector), imp, types)) throw new InvalidOperationException($"Method {selector} could not be added to {name}.");
