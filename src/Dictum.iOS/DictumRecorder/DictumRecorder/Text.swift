@@ -112,15 +112,22 @@ let PROPOSED_TranscriptCopied = "Copied"
 
 let PROPOSED_FactsHeading = "Experiment facts"
 let PROPOSED_FactLocale = "Language used"
-let PROPOSED_FactAssets = "Speech model downloaded"
+let PROPOSED_FactAssets = "Speech model"
+let PROPOSED_FactAssetsPreinstalled = "Already on this device (no download)"
 /// "{0}" is seconds, one decimal place.
-let PROPOSED_FactAssetsYes = "Yes, in %.1f seconds"
-let PROPOSED_FactAssetsNo = "No, it was already on this device"
+let PROPOSED_FactAssetsInstalled = "Installed on request in %.1f seconds (network event to Apple)"
+/// "{0}" is the status before: supported, downloading, installed or unsupported.
+let PROPOSED_FactAssetsNoRequest = "No installation request was needed (status before: %@)"
+let PROPOSED_FactAssetStatusBefore = "Model status before Start"
 let PROPOSED_FactStopToFinal = "Stop to last final words"
 /// "{0}" is seconds, one decimal place.
 let PROPOSED_FactSeconds = "%.1f seconds"
 let PROPOSED_FactNoFinalAfterStop = "No final words arrived after Stop"
 let PROPOSED_FactThermal = "Thermal state at Stop"
+let PROPOSED_FactOffline = "Transcribed with networking off"
+/// Shown when no network path was ever available between Start and Stop.
+let PROPOSED_FactYes = "Yes"
+let PROPOSED_FactNo = "No (a network was available)"
 
 /// Copied by hand into Info.plist as NSSpeechRecognitionUsageDescription (a plist cannot read this constant).
 let PROPOSED_SpeechUsage = "Dictum Recorder can show an experimental on-device transcript while you record. Speech is processed on this device only."

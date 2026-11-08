@@ -513,15 +513,24 @@ struct SealedTranscriptView: View {
                         .font(.headline)
                         .accessibilityAddTraits(.isHeader)
                     LabeledContent(PROPOSED_FactLocale, value: facts.locale)
-                    LabeledContent(PROPOSED_FactAssets, value: facts.assetSeconds.map { String(format: PROPOSED_FactAssetsYes, $0) }
-                                   ?? PROPOSED_FactAssetsNo)
+                    LabeledContent(PROPOSED_FactAssets, value: assetText(facts.assets))
+                    LabeledContent(PROPOSED_FactAssetStatusBefore, value: facts.assetStatusBefore)
                     LabeledContent(PROPOSED_FactStopToFinal, value: facts.stopToLastFinalSeconds.map { String(format: PROPOSED_FactSeconds, $0) }
                                    ?? PROPOSED_FactNoFinalAfterStop)
                     LabeledContent(PROPOSED_FactThermal, value: facts.thermalAtStop)
+                    LabeledContent(PROPOSED_FactOffline, value: facts.networkingOff ? PROPOSED_FactYes : PROPOSED_FactNo)
                 }
                 .padding()
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
+        }
+    }
+
+    private func assetText(_ outcome: OnDeviceTranscript.AssetOutcome) -> String {
+        switch outcome {
+        case .preinstalled: return PROPOSED_FactAssetsPreinstalled
+        case let .installed(seconds): return String(format: PROPOSED_FactAssetsInstalled, seconds)
+        case let .noRequest(before): return String(format: PROPOSED_FactAssetsNoRequest, before)
         }
     }
 }

@@ -60,9 +60,11 @@ What it does:
 - While recording, the tap's original buffer (before the 16 kHz conversion) also goes to `SpeechAnalyzer` through a
   separate `AVAudioConverter`. Finalised words show in the primary colour; words still being recognised show in the
   secondary colour and italic.
-- After sealing, the full transcript is shown with a Copy button and an "Experiment facts" box: locale used, whether
-  the model was downloaded in this session and how long it took, seconds from Stop to the last final result, and
-  `ProcessInfo.thermalState` at Stop.
+- After sealing, the full transcript is shown with a Copy button and an "Experiment facts" box: locale used; the
+  speech model outcome (already on the device, installed on request with the seconds, or no installation request
+  needed) and the `AssetInventory` status the switch found before Start; seconds from Stop to the last final result;
+  `ProcessInfo.thermalState` at Stop; and whether it transcribed with networking off (an `NWPathMonitor` that only
+  observes the path from Start to Stop and makes no requests: "Yes" when no path was ever `.satisfied`).
 
 What it never does:
 

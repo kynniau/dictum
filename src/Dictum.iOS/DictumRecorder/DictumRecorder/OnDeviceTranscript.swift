@@ -1,4 +1,5 @@
 import AVFoundation
+import Network
 import Observation
 import os
 import Speech
@@ -35,14 +36,27 @@ final class OnDeviceTranscript {
         case failed(String)
     }
 
+    enum AssetOutcome: Equatable {
+        /// The switch found the model already installed; no request was made.
+        case preinstalled
+        /// An installation request existed and completed in this many seconds (a network event to Apple).
+        case installed(seconds: Double)
+        /// The download was tapped but `assetInstallationRequest` returned nil; carries the status found before.
+        case noRequest(statusBefore: String)
+    }
+
     /// Measured values shown on screen 3.
     struct Facts: Equatable {
         var locale: String
-        /// Seconds the model download took in this app session, or nil when it was already on the device.
-        var assetSeconds: Double?
+        /// How the speech model came to be on the device for this recording.
+        var assets: AssetOutcome
+        /// The AssetInventory status the switch first found: supported, downloading, installed or unsupported.
+        var assetStatusBefore: String
         /// Seconds from Stop to the last final result, or nil when no final result arrived after Stop.
         var stopToLastFinalSeconds: Double?
         var thermalAtStop: String
+        /// True when no network path was ever satisfied between Start and Stop.
+        var networkingOff: Bool
     }
 
     /// True once the device and OS are known to support it. The switch is not shown until then.
@@ -64,9 +78,18 @@ final class OnDeviceTranscript {
 
     private var localeIdentifier: String?
     private var assetSeconds: Double?
+    /// The status the switch first found, kept until Done so a later re-check after a download cannot overwrite it.
+    private var assetStatusBefore: String?
+    /// True only when `assetInstallationRequest` returned a request and `downloadAndInstall()` was called.
+    private var assetRequestMade = false
     private var engine: AnyObject?
     private var resultsTask: Task<Void, Never>?
     private var lastFinalAt: ContinuousClock.Instant?
+    /// Watches the network path between Start and Stop, only with the switch on. It only observes the path; it makes
+    /// no network requests.
+    private var pathMonitor: NWPathMonitor?
+    /// Set from the monitor's queue; read once at Stop.
+    private var networkSeen = OSAllocatedUnfairLock(initialState: false)
 
     init() {
         Task { await checkSupport() }
@@ -102,6 +125,7 @@ final class OnDeviceTranscript {
         }
         localeIdentifier = locale.identifier
         let status = await SpeechEngine.assetStatus(locale)
+        if assetStatusBefore == nil { assetStatusBefore = Self.statusText(status) }
         guard enabled, setup == .checking else { return }
         switch status {
         case .installed: setup = .ready
@@ -120,9 +144,10 @@ final class OnDeviceTranscript {
         do {
             if let request = try await SpeechEngine.installationRequest(Locale(identifier: id)) {
                 downloadProgress = request.progress
+                assetRequestMade = true
                 try await request.downloadAndInstall()
+                assetSeconds = Self.seconds(clock.now - began)
             }
-            assetSeconds = Self.seconds(clock.now - began)
             downloadProgress = nil
             guard enabled else { return }
             setup = await SpeechEngine.assetStatus(Locale(identifier: id)) == .installed
@@ -175,6 +200,14 @@ final class OnDeviceTranscript {
     /// Starts analysis after capture has started. Never downloads: a missing model shows the unavailable line.
     func recordingStarted() {
         guard #available(iOS 26, *), let engine = engine as? SpeechEngine else { return }
+        let seen = OSAllocatedUnfairLock(initialState: false)
+        networkSeen = seen
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            if path.status == .satisfied { seen.withLock { $0 = true } }
+        }
+        monitor.start(queue: DispatchQueue(label: "dictum.transcript.path"))
+        pathMonitor = monitor
         resultsTask = Task { [weak self] in
             do {
                 for try await result in engine.transcriber.results {
@@ -213,6 +246,10 @@ final class OnDeviceTranscript {
         guard #available(iOS 26, *), let engine = engine as? SpeechEngine else { return }
         let stoppedAt = ContinuousClock.now
         let thermal = Self.thermalText(ProcessInfo.processInfo.thermalState)
+        if pathMonitor?.currentPath.status == .satisfied { networkSeen.withLock { $0 = true } }
+        pathMonitor?.cancel()
+        pathMonitor = nil
+        let networkingOff = !networkSeen.withLock { $0 }
         finishing = true
         Task { [weak self] in
             await engine.finish()
@@ -220,8 +257,18 @@ final class OnDeviceTranscript {
             guard let self, self.engine === engine else { return }
             self.volatileText = ""
             let toFinal = self.lastFinalAt.flatMap { $0 >= stoppedAt ? Self.seconds($0 - stoppedAt) : nil }
-            self.facts = Facts(locale: self.localeIdentifier ?? "", assetSeconds: self.assetSeconds,
-                               stopToLastFinalSeconds: toFinal, thermalAtStop: thermal)
+            let before = self.assetStatusBefore ?? ""
+            let assets: AssetOutcome
+            if self.assetRequestMade, let seconds = self.assetSeconds {
+                assets = .installed(seconds: seconds)
+            } else if before == "installed" {
+                assets = .preinstalled
+            } else {
+                // Start needs the model installed, so a non-installed status with no request means the request was nil.
+                assets = .noRequest(statusBefore: before)
+            }
+            self.facts = Facts(locale: self.localeIdentifier ?? "", assets: assets, assetStatusBefore: before,
+                               stopToLastFinalSeconds: toFinal, thermalAtStop: thermal, networkingOff: networkingOff)
             self.finishing = false
         }
     }
@@ -244,12 +291,16 @@ final class OnDeviceTranscript {
         facts = nil
         lastFinalAt = nil
         assetSeconds = nil
+        assetStatusBefore = nil
+        assetRequestMade = false
         enabled = false
         setup = .off
         downloadProgress = nil
     }
 
     private func cancelEngine() {
+        pathMonitor?.cancel()
+        pathMonitor = nil
         resultsTask?.cancel()
         resultsTask = nil
         if #available(iOS 26, *), let engine = engine as? SpeechEngine {
@@ -263,6 +314,17 @@ final class OnDeviceTranscript {
     private static func seconds(_ duration: Duration) -> Double {
         let parts = duration.components
         return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
+    }
+
+    @available(iOS 26, *)
+    private static func statusText(_ status: AssetInventory.Status) -> String {
+        switch status {
+        case .supported: return "supported"
+        case .downloading: return "downloading"
+        case .installed: return "installed"
+        case .unsupported: return "unsupported"
+        @unknown default: return "unknown"
+        }
     }
 
     private static func thermalText(_ state: ProcessInfo.ThermalState) -> String {
