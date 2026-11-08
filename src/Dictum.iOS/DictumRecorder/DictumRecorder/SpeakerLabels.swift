@@ -219,10 +219,12 @@ struct SpeakerParameters: Equatable, Sendable {
     static let desktop = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
                                            linkage: .complete, threshold: 0.5, segmentMean: false)
 
-    // simplification: interim values set by the coordinator on 08/11/2026 until a sweep reports. Ceiling: not tuned on
-    // any measured meeting yet. Trigger to retire: the sweep's chosen values; change them here only.
+    // simplification: values from a Mac sweep on 08/11/2026 over ONE solo recording (Apple transcript segments, 20 segments,
+    // 49 windows) and ONE public two-speaker clip: average linkage at 0.7 gave the solo voice 2 clusters (1 of 20 segments
+    // off its majority) and the clip 2; the desktop's complete linkage at 0.5 gave the solo voice 14 clusters. Ceiling: not
+    // tuned on any real two-person meeting. Trigger to retire: measured meetings on the device; change them here only.
     static let current = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
-                                           linkage: .average, threshold: 0.6, segmentMean: true)
+                                           linkage: .average, threshold: 0.7, segmentMean: true)
 }
 
 /// src/Dictum.Core/Meetings/Speakers/SpeakerSeparator.cs, without the owner's voice print (the phone has none), with
