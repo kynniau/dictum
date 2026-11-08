@@ -82,8 +82,12 @@ public sealed class MacPackagingTests
         // The owner approved the Mac copy on 23/10/2026 (DECISIONS); the label is gone and must not come back. Nothing else is
         // in the file: the pre-release shows it as it is.
         Assert.DoesNotContain("PROPOSED", macNotes);
-        Assert.StartsWith("**Dictum for macOS (beta).**", macNotes, StringComparison.Ordinal);
-        Assert.Equal(1, macNotes.TrimEnd().Split('\n').Length); // one paragraph, no internal notes (those live in ci.yml)
+        // 09/11/2026 00:29 AEDT the owner approved a first line for the dictation-only Mac 1.6.0 beta (DECISIONS), above the 23/10 paragraph.
+        Assert.StartsWith("**Dictum 1.6.0 for Mac is dictation only.** Meetings and Learn my voice are not in the Mac beta yet.", macNotes, StringComparison.Ordinal);
+        var macParagraphs = macNotes.TrimEnd().Replace("\r", "").Split("\n\n");
+        Assert.Equal(2, macParagraphs.Length); // the 1.6.0 line, then the 23/10 paragraph; no internal notes (those live in ci.yml)
+        Assert.StartsWith("**Dictum for macOS (beta).**", macParagraphs[1], StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", macParagraphs[1]); // the 23/10 paragraph stays one line
         Assert.Contains("mac-v", yaml); // the version check runs on the Mac tag too
         Assert.Contains("startsWith(github.ref, 'refs/tags/mac-v') && (env.HAS_MAC_SIGNING != 'true' || env.HAS_MAC_NOTARY != 'true')", yaml); // never an ad-hoc pre-release
         Assert.DoesNotContain("macOS", File.ReadAllText(Repo("packaging", "release-notes-preamble.md")));
