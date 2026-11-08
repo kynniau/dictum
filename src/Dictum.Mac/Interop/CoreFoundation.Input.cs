@@ -22,10 +22,5 @@ internal static partial class CF
     public static nint BooleanTrue => TrueValue.Value;
 
     /// <summary>A new CFDictionary of one CF key and value, retained with the standard CFType callbacks (the caller releases it).</summary>
-    public static nint DictionaryCreate1(nint key, nint value)
-    {
-        var lib = NativeLibrary.Load(Lib);
-        // The callback structs are exported as data: their addresses are what CFDictionaryCreate takes.
-        return DictionaryCreate(0, [key], [value], 1, NativeLibrary.GetExport(lib, "kCFTypeDictionaryKeyCallBacks"), NativeLibrary.GetExport(lib, "kCFTypeDictionaryValueCallBacks"));
-    }
+    public static nint DictionaryCreate1(nint key, nint value) => DictionaryCreate([key], [value]);
 }
