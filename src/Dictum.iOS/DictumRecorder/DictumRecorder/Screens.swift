@@ -202,10 +202,9 @@ struct RecordingView: View {
             }
 
             // Bar length shows the input level; VoiceOver reads it as a percentage.
-            ProgressView(value: controller.level)
-                .progressViewStyle(.linear)
-                .tint(DictumTheme.accent)
-                .frame(maxWidth: 280)
+            DictumLevelMeter(level: controller.level, active: controller.captureStatus == .running, height: 64)
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(PROPOSED_InputLevel)
                 .accessibilityValue(String(format: PROPOSED_InputLevelValue, Int((controller.level * 100).rounded())))
 

@@ -304,3 +304,84 @@ struct StatusPill: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+// MARK: - Level meter
+
+/// The mark's three bars as an input-level meter: short, tall, medium (site/dictum.svg bars of 16, 34 and 22 in a bubble
+/// 56 wide and 52 tall, corner 14) inside a tile shaped like the mark's bubble, ink in light and surface in dark. Bars
+/// are on-accent white at rest and recording red while capture runs. With `level` nil it is static (the mark's own
+/// proportions, no animation). Heights rise fast and fall over about 300 ms; the outer bars follow the middle a moment
+/// later and a little lower, so they move like a wave. With Reduce Motion the heights change without animation.
+/// It carries no accessibility of its own: the caller gives it a label and value, or hides it.
+struct DictumLevelMeter: View {
+    /// 0...1 peak level, or nil for the static illustration.
+    var level: Double?
+    /// Capture is running: bars tinted recording red.
+    var active = false
+    var height: CGFloat = 64
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var middle: Double = 0
+    @State private var outer: Double = 0
+
+    /// The mark's bar heights over the tallest bar, left to right.
+    private static let proportions: [CGFloat] = [16.0 / 34, 1, 22.0 / 34]
+
+    var body: some View {
+        // The mark's bubble is 56 × 52 with its tail below, in a 64 × 64 box; everything scales from `height`.
+        let unit = height / 64
+        let width = 56 * unit
+        let bubble = 52 * unit
+        ZStack(alignment: .topLeading) {
+            BubbleTail()
+                .fill(tile)
+                .frame(width: 13 * unit, height: 13 * unit)
+                .offset(x: 10 * unit, y: bubble - 0.5)
+            RoundedRectangle(cornerRadius: 14 * unit, style: .continuous)
+                .fill(tile)
+                .frame(width: width, height: bubble)
+            HStack(alignment: .center, spacing: 5 * unit) {
+                ForEach(0..<3, id: \.self) { index in
+                    Capsule()
+                        .fill(active ? DictumTheme.recording : DictumTheme.onAccent)
+                        .frame(width: 6 * unit, height: barHeight(index, unit: unit))
+                }
+            }
+            .frame(width: width, height: bubble)
+        }
+        .frame(width: width, height: height, alignment: .topLeading)
+        .onChange(of: level) { old, new in
+            guard let new else { return }
+            let rising = new > (old ?? 0)
+            let move: Animation = rising ? .easeOut(duration: 0.08) : .easeOut(duration: 0.3)
+            withAnimation(reduceMotion ? nil : move) { middle = new }
+            withAnimation(reduceMotion ? nil : move.delay(0.07)) { outer = new * 0.8 }
+        }
+    }
+
+    /// Ink in light, as the mark; the surface colour in dark, so the tile shows on the ink page.
+    private var tile: Color { colorScheme == .dark ? DictumTheme.surface : DictumTheme.ink }
+
+    private func barHeight(_ index: Int, unit: CGFloat) -> CGFloat {
+        let tallest = 34 * unit
+        let full = tallest * Self.proportions[index]
+        guard level != nil else { return full }
+        // Square root, so ordinary speech peaks (about 0.1 to 0.5) still move the bars visibly.
+        let value = index == 1 ? middle : outer
+        let fraction = 0.25 + 0.75 * CGFloat(min(max(value, 0), 1)).squareRoot()
+        return max(6 * unit, full * fraction)
+    }
+}
+
+/// The mark's speech-bubble tail (path M14 50 L14 63 L27 50 Z), drawn in a square.
+private struct BubbleTail: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}

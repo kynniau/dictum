@@ -103,7 +103,8 @@ struct HomeView: View {
             if files.isEmpty {
                 DictumCard {
                     HStack(alignment: .center, spacing: 14) {
-                        DictumMarkView(size: 44)
+                        DictumLevelMeter(height: 56)
+                            .accessibilityHidden(true)
                         Text(PROPOSED_NoRecordings)
                             .font(.callout)
                             .foregroundStyle(DictumTheme.muted)
