@@ -63,6 +63,7 @@ let PROPOSED_CodeHint = "Read these six words into Dictum on your computer when 
 let PROPOSED_Share = "Send the file"
 let PROPOSED_Done = "Done"
 let PROPOSED_FilesHint = "The file is also in Files → On My iPhone → Dictum Recorder."
+let PROPOSED_FilesHintPad = "The file is also in Files → On My iPad → Dictum Recorder."
 let PROPOSED_IncompleteNote = "Cut short: Dictum will show this when it is imported."
 
 // MARK: - Screen 4: Recovered

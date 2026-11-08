@@ -186,9 +186,10 @@ struct RecordingView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 16) {
             DictumTopBar()
-            Spacer(minLength: 8)
+            // The indicator, timer, meter and title are centred in all the height above Stop (iPad landscape too).
+            VStack(spacing: 24) {
             RecordingIndicator()
 
             if let start = controller.startedAt {
@@ -217,9 +218,20 @@ struct RecordingView: View {
                 LiveTranscriptView(transcript: controller.transcript)
             }
 
-            Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
-                .dictumTitle(.title2)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 4) {
+                Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
+                    .dictumTitle(.title2)
+                    .multilineTextAlignment(.center)
+                // The meeting type's own name, when it is not the default. Muted in tone, but the text colour at 72 %
+                // rather than the muted token, which the site keeps for surfaces (under 4.5:1 on bg).
+                if controller.settings.meetingTypeId != "general" {
+                    Text(controller.settings.meetingType.name)
+                        .font(.subheadline)
+                        .foregroundStyle(DictumTheme.text.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .accessibilityElement(children: .combine)
 
             if controller.captureStatus != .running {
                 VStack(spacing: 12) {
@@ -229,7 +241,8 @@ struct RecordingView: View {
                     }
                 }
             }
-            Spacer(minLength: 8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
             Button {
                 Task { await controller.stopTapped() }
@@ -253,6 +266,7 @@ struct RecordingView: View {
             .accessibilityIdentifier("recording.stop")
         }
         .padding(.vertical, 12)
+        .frame(maxHeight: .infinity)
         .dictumPage()
         .background(DictumTheme.bg.ignoresSafeArea())
     }
@@ -346,7 +360,7 @@ struct SealedView: View {
             .buttonStyle(.dictumPrimary)
             .accessibilityLabel(PROPOSED_Share)
 
-            Text(PROPOSED_FilesHint)
+            Text(UIDevice.current.userInterfaceIdiom == .pad ? PROPOSED_FilesHintPad : PROPOSED_FilesHint)
                 .font(.footnote)
                 .foregroundStyle(DictumTheme.text)
 
