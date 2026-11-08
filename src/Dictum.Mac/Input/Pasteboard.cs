@@ -132,7 +132,7 @@ internal sealed class Pasteboard : IClipboard, IDisposable
         return new ClipboardSnapshot(formats);
     }
 
-    private static bool TooLong(nint data) => (nuint)ObjC.Send(data, ObjC.Sel("length")) > int.MaxValue;
+    private static bool TooLong(nint data) => (nuint)ObjC.Send(data, ObjC.Sel("length")) > (nuint)Array.MaxLength; // the largest byte[] .NET allocates, 2,147,483,591 bytes, below int.MaxValue
 
     /// <summary>
     /// An incomplete snapshot: the marker and the item count, plus, for the only item of a one-item pasteboard

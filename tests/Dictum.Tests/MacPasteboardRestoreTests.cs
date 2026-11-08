@@ -114,7 +114,11 @@ public class MacPasteboardRestoreTests
         var source = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "src", "Dictum.Mac", "Input", "Pasteboard.cs"));
         var restore = source[source.IndexOf("public void Restore(ClipboardSnapshot snapshot)", StringComparison.Ordinal)..];
         restore = restore[..restore.IndexOf("internal static nuint RestoreOptions(", StringComparison.Ordinal)];
-        Assert.Contains("WriteItems(items, RestoreOptions(items))", restore);
+        // Both writes in Restore (the one-item fallback and the main restore) carry the options, and there is no other write
+        // (merge lens 08/11/2026: a Contains check was satisfied by the fallback call alone, so a main restore without the
+        // options passed every pin).
+        Assert.Equal(2, restore.Split("WriteItems(items, RestoreOptions(items))").Length - 1);
+        Assert.Equal(2, restore.Split("WriteItems(").Length - 1);
     }
 
     // ---- On a Mac: the real general pasteboard ---------------------------------------------------------------------
