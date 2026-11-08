@@ -213,18 +213,25 @@ struct SpeakerParameters: Equatable, Sendable {
     /// When true, each window's voice print is L2-normalised, a segment's windows are averaged and re-normalised, and
     /// one vector per segment is clustered; every window of a segment then carries that segment's cluster.
     var segmentMean: Bool
+    /// A segment that overlaps no turn takes the nearest turn's speaker when it is at most this many seconds away; nil
+    /// means at any distance. The desktop's MeetingSpeakers.SpeakerOf uses 1.0.
+    var nearestTurnSeconds: Double?
 
     /// The desktop's rule: SpeakerSeparator's windows 2/1/1.5 s, SpeakerClustering's complete linkage, and
     /// MeetingSpeakers.DefaultThreshold 0.5, one vector per window.
     static let desktop = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
-                                           linkage: .complete, threshold: 0.5, segmentMean: false)
+                                           linkage: .complete, threshold: 0.5, segmentMean: false,
+                                           nearestTurnSeconds: 1.0)
 
     // simplification: values from a Mac sweep on 08/11/2026 over ONE solo recording (Apple transcript segments, 20 segments,
     // 49 windows) and ONE public two-speaker clip: average linkage at 0.7 gave the solo voice 2 clusters (1 of 20 segments
     // off its majority) and the clip 2; the desktop's complete linkage at 0.5 gave the solo voice 14 clusters. Ceiling: not
     // tuned on any real two-person meeting. Trigger to retire: measured meetings on the device; change them here only.
     static let current = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
-                                           linkage: .average, threshold: 0.7, segmentMean: true)
+                                           linkage: .average, threshold: 0.7, segmentMean: true,
+                                           nearestTurnSeconds: nil)
+    // nearestTurnSeconds nil is a phone deviation (coordinator, 08/11/2026, after the first iPad run left "Okay.", "How
+    // does that sound?" and "Hmm." unlabelled): every timed line takes the nearest turn's speaker, however far.
 }
 
 /// src/Dictum.Core/Meetings/Speakers/SpeakerSeparator.cs, without the owner's voice print (the phone has none), with
@@ -379,9 +386,10 @@ enum SpeakerSeparation {
         return length == 0 ? v : v.map { $0 / length }
     }
 
-    /// MeetingSpeakers.SpeakerOf: the turn a segment overlaps most, else the nearest turn within a second; nil when the
-    /// segment has no length or no turn is near. MaxBy and MinBy keep the first of equals.
-    static func speakerOf(start: Double, end: Double, turns: [SpeakerTurn]) -> Int? {
+    /// MeetingSpeakers.SpeakerOf: the turn a segment overlaps most, else the nearest turn within `within` seconds (the
+    /// desktop's 1.0; nil for any distance); nil when the segment has no length or no turn is near. MaxBy and MinBy keep
+    /// the first of equals.
+    static func speakerOf(start: Double, end: Double, turns: [SpeakerTurn], within: Double? = 1.0) -> Int? {
         if end <= start || turns.isEmpty { return nil }
         let end = max(end, start)
         var best = (speaker: turns[0].speaker, overlap: min(end, turns[0].end) - max(start, turns[0].start))
@@ -393,7 +401,13 @@ enum SpeakerSeparation {
         func gap(_ t: SpeakerTurn) -> Double { t.end < start ? start - t.end : t.start - end }
         var nearest = (speaker: turns[0].speaker, gap: gap(turns[0]))
         for t in turns.dropFirst() where gap(t) < nearest.gap { nearest = (t.speaker, gap(t)) }
-        return nearest.gap <= 1.0 ? nearest.speaker : nil
+        return within.map { nearest.gap <= $0 } ?? true ? nearest.speaker : nil
+    }
+
+    /// mm:ss from the recording start, whole seconds rounded down; minutes go past 59 rather than adding hours.
+    static func clock(_ seconds: Double) -> String {
+        let whole = Swift.max(0, Int(seconds.rounded(.down)))
+        return String(format: "%02d:%02d", whole / 60, whole % 60)
     }
 
     /// Math.Round(x, 3) (half to even).
@@ -572,9 +586,12 @@ final class SpeakerLabels {
         case wholeRecording
     }
 
-    /// One line on screen 3: "Other n: …", or the text alone when no turn is near (SpeakerOf returned nil).
+    /// One line on screen 3: "00:12  Other n: …"; no label when no turn is near or the segment has no time, and no
+    /// time when it has no time range.
     struct Line: Equatable, Identifiable {
         let id: Int
+        /// Seconds from the recording start (the PCM copy's first sample).
+        let start: Double?
         let speaker: Int?
         let text: String
     }
@@ -676,8 +693,11 @@ final class SpeakerLabels {
                     }
                 }
                 let lines = segmentsShown.enumerated().map { i, s in
-                    Line(id: i, speaker: s.start.flatMap { start in
-                        s.end.flatMap { SpeakerSeparation.speakerOf(start: start, end: $0, turns: outcome.turns) }
+                    Line(id: i, start: s.start, speaker: s.start.flatMap { start in
+                        s.end.flatMap {
+                            SpeakerSeparation.speakerOf(start: start, end: $0, turns: outcome.turns,
+                                                        within: parameters.nearestTurnSeconds)
+                        }
                     }, text: s.text)
                 }
                 facts.windowsCut = outcome.windowsCut
@@ -787,6 +807,11 @@ enum SpeakerSelfCheck {
         check("SpeakerOf: nearest 0.8 s away", SpeakerSeparation.speakerOf(start: 2.8, end: 3.2, turns: turns), 1)
         check("SpeakerOf: none within 1 s", SpeakerSeparation.speakerOf(start: 3.1, end: 3.9, turns: turns), nil)
         check("SpeakerOf: no length", SpeakerSeparation.speakerOf(start: 1, end: 1, turns: turns), nil)
+        check("SpeakerOf, any distance: 1.1 s away", SpeakerSeparation.speakerOf(start: 3.1, end: 3.9, turns: turns, within: nil), 1)
+        check("SpeakerOf, any distance: 20 s away", SpeakerSeparation.speakerOf(start: 28, end: 29, turns: turns, within: nil), 2)
+        check("SpeakerOf, any distance: no length", SpeakerSeparation.speakerOf(start: 1, end: 1, turns: turns, within: nil), nil)
+        check("clock", [0, 12.9, 59.99, 61, 3599, 3600, 4503.2].map(SpeakerSeparation.clock),
+              ["00:00", "00:12", "00:59", "01:01", "59:59", "60:00", "75:03"])
 
         // Desktop: Clustering_matches_the_plain_complete_linkage_loop_on_random_voices (60 rounds; this generator is not
         // .NET's Random, so the vectors differ from the desktop's but the comparison is the same).

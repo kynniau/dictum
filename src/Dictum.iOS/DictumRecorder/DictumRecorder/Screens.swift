@@ -486,11 +486,12 @@ struct SealedTranscriptView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(labelled) { line in
                                 speakerLine(line)
+                                    .accessibilityElement(children: .ignore)
+                                    .accessibilityLabel(Self.spoken(line))
                             }
                         }
-                        .accessibilityElement(children: .ignore)
+                        .accessibilityElement(children: .contain)
                         .accessibilityLabel(PROPOSED_SpeakerLinesRegion)
-                        .accessibilityValue(labelledText)
                     } else if transcript.finalText.isEmpty && transcript.volatileText.isEmpty && !transcript.finishing {
                         Text(PROPOSED_TranscriptNone)
                     } else {
@@ -555,15 +556,34 @@ struct SealedTranscriptView: View {
         line.speaker.map { String(format: APPROVED_Other, $0) }
     }
 
-    /// "Other 1: …" per line (the text alone when no speaker is near), one line each; for Copy and VoiceOver.
-    private var labelledText: String {
-        labelled.map { line in Self.label(line).map { "\($0): \(line.text)" } ?? line.text }.joined(separator: "\n")
+    /// "Other 1: …", or the words alone when no speaker is near.
+    private static func labelledWords(_ line: SpeakerLabels.Line) -> String {
+        label(line).map { "\($0): \(line.text)" } ?? line.text
     }
 
-    /// The label in bold, so it is not told apart by colour.
+    /// "00:12  Other 1: …" per line, one line each, for Copy; no time when the segment has none.
+    private var labelledText: String {
+        labelled.map { line in
+            line.start.map { "\(SpeakerSeparation.clock($0))  \(Self.labelledWords(line))" } ?? Self.labelledWords(line)
+        }.joined(separator: "\n")
+    }
+
+    /// VoiceOver: "at 00:12, Other 1: …".
+    private static func spoken(_ line: SpeakerLabels.Line) -> String {
+        line.start.map { String(format: PROPOSED_LineAt, SpeakerSeparation.clock($0)) + ", " + labelledWords(line) }
+            ?? labelledWords(line)
+    }
+
+    /// The time in the secondary colour with monospaced digits, then the label in bold (so neither is told apart by
+    /// colour alone), then the words.
     private func speakerLine(_ line: SpeakerLabels.Line) -> Text {
-        guard let label = Self.label(line) else { return Text(line.text) }
-        return Text("\(Text(label + ":").bold()) \(line.text)")
+        var parts: [Text] = []
+        if let start = line.start {
+            parts.append(Text(SpeakerSeparation.clock(start) + "  ").monospacedDigit().foregroundStyle(.secondary))
+        }
+        if let label = Self.label(line) { parts.append(Text(label + ": ").bold()) }
+        parts.append(Text(line.text))
+        return parts.dropFirst().reduce(parts[0]) { Text("\($0)\($1)") }
     }
 
     private func assetText(_ outcome: OnDeviceTranscript.AssetOutcome) -> String {

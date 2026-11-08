@@ -181,6 +181,8 @@ let PROPOSED_FactSmallestBetween = "Smallest distance between clusters at the cu
 let PROPOSED_FactLargestMerge = "Largest merge applied"
 /// "{0}" is a cosine distance, three decimal places.
 let PROPOSED_FactDistanceValue = "%.3f"
+/// VoiceOver before a line's words: "{0}" is the mm:ss shown before the line.
+let PROPOSED_LineAt = "at %@"
 let PROPOSED_SpeakersExperimentalNote = "Experimental: speaker labels are a test of the method, not a result. Compare the count with who was actually speaking."
 let PROPOSED_FactPcm = "Sound kept in memory"
 /// "{0}" is megabytes (1,000,000 bytes), one decimal place.
