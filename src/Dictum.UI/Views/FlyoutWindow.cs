@@ -161,7 +161,7 @@ internal sealed class FlyoutWindow : Window
         var footerBox = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 10, 0, 0), Child = footer };
         footerBox[!Border.BorderBrushProperty] = new DynamicResourceExtension("HairlineBrush");
 
-        _meetings = new Meetings.MeetingsEntries(() => shell.MeetingsSettings, () => shell.OpenMeetings(start: true), () => shell.OpenMeetings());
+        _meetings = new Meetings.MeetingsEntries(() => shell.MeetingsSettings, () => shell.OpenMeetings(start: true), () => shell.OpenMeetings(), () => shell.MeetingsAvailable);
         var body = Ui.Stack(14,
             header,
             _problemBox,
