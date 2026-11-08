@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.5.1, so the package is 1.5.1.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 to 1.3.1 on 23/10/2026, to 1.4.0 on 05/11/2026, to 1.5.0 on 05/11/2026 and to 1.5.1 on 07/11/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.6.0, so the package is 1.6.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 to 1.3.1 on 23/10/2026, to 1.4.0 on 05/11/2026, to 1.5.0 on 05/11/2026 and to 1.5.1 on 07/11/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -159,6 +159,14 @@ Offline-only mode: no connection to anything outside your PC
 Free: no subscription, no account, no ads, no analytics, no telemetry.
 Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
+```
+
+### What's new in this version (1.6.0)
+
+APPROVED by the owner 08/11/2026 15:34 AEDT: the 1.6.0 "What is new" paragraph (approved 14:05, speaker-names sentence 15:05, "after a sentence ends" 15:34) is also the Store listing text.
+
+```text
+Dictum 1.6.0 adds four things to Meetings and one to dictation. You can move a meeting to another computer: Export a .dictum file seals the meeting with a six-word transfer code you type on the other computer, and Import a .dictum file brings it in after you confirm the same agreement notice; the code is never stored anywhere. Meetings recorded on one track, including phone recordings, can be separated into speakers (Other 1, Other 2, and so on) once you download the speaker model from Settings > Meetings. You can name the speakers; Dictum keeps those names encrypted with the meeting on your computer, includes them in .dictum exports, and never sends them to cloud services. Learn my voice: label speech that sounds like you as You in one-track meeting recordings, and, if you choose, skip dictation that does not sound like you. Mistakes are possible; the print stays encrypted on your computer. In hands-free dictation, a pause of two seconds or more after a sentence ends now starts a new paragraph; Settings > Clean-up lets you change or turn off the pause. Nothing is sent anywhere unless you have chosen cloud speech or a cloud summary, each with its own consent.
 ```
 
 ### What's new in this version (1.5.1)
@@ -316,7 +324,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.5.1 (set 07/11/2026; 1.5.0 from 05/11/2026, 1.4.0 from 05/11/2026, 1.3.1 from 23/10/2026, 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.6.0 (set 08/11/2026; 1.5.1 from 07/11/2026, 1.5.0 from 05/11/2026, 1.4.0 from 05/11/2026, 1.3.1 from 23/10/2026, 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
@@ -423,6 +431,16 @@ Notes written 23/10/2026 for Dictum 1.3.1.
 CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.1 adds a Terms of Use step. On the first start, including the first start after an upgrade from an earlier version, Dictum shows its Terms of Use before anything else: the Welcome window's first step has a Continue button, and pressing Continue accepts the Terms. Closing the window, or pressing Esc on that step, quits Dictum and nothing is recorded as accepted; the later steps are as before. The command-line modes --transcribe and --bench-cleanup refuse to run until the Terms have been accepted once. Settings > About has two new buttons, Terms of use and Third-party notices. Settings > Storage names its folders more precisely, Calibration says Downloading only after the download question has been agreed, and the Offline only description names Check for updates and cloud speech. The two cloud consent dialogs (clean-up and speech) now say what hands-free mode sends with each part (for clean-up, up to ten words of what the user said just before; for speech, the closing words). The Qwen2.5-3B clean-up model is no longer offered. No download is needed to test: the base.en speech model ships inside the package and dictation works as soon as the user has pressed Continue on the Terms step; larger speech models and AI clean-up are optional downloads.
 
 Everything else is as in the notes for 1.3.0 above: cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
+```
+
+### Notes for certification for 1.6.0 (APPROVED by the owner 08/11/2026 14:05 AEDT)
+
+APPROVED by the owner 08/11/2026 14:05 AEDT: all wording in the following block. In Partner Center it replaces the 1.5.1 header and "CHANGED SINCE" paragraph; the rest of the notes stay as they are.
+
+```text
+Notes written <date of submission> for Dictum 1.6.0.
+
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.6.0 extends Meetings. A meeting can be exported as a .dictum file sealed with a six-word transfer code and imported on another computer after the same agreement notice; one-track recordings can be separated into speakers after the user downloads the speaker model from Settings > Meetings; the user can make a voice print (Settings > General > Learn my voice) that labels their own speech as You and, if they turn it on, skips dictation that does not sound like them; the print is a list of numbers kept encrypted on the computer, never uploaded. Hands-free dictation starts a new paragraph after a pause. The steps to test Meetings are unchanged from the 1.5.0 notes; to test separation, download the speaker model first. Nothing is sent anywhere unless the user has chosen cloud speech or a cloud summary, each with its own consent, and the notice names that service before recording starts.
 ```
 
 ### Notes for certification for 1.5.1 (APPROVED by the owner 07/11/2026 00:36 AEDT)

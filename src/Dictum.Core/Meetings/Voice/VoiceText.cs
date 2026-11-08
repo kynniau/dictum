@@ -8,8 +8,8 @@ namespace Dictum.Meetings.Voice;
 public static class VoiceText
 {
     // APPROVED 08/11/2026 08:48 (owner, voice print rows V1–V20): do not reword.
-    /// <summary>V1: the card title.</summary>
-    public const string APPROVED_CardTitle = "Your voice";
+    /// <summary>V1: the card title. Second edition, APPROVED 08/11/2026 15:34 (owner): "Learn my voice", so "Learn my voice (Settings > General)" in the help, the FAQ, the Store notes and the privacy policy names the card the reader sees; the first edition (08:48) was "Your voice".</summary>
+    public const string APPROVED_CardTitle = "Learn my voice";
 
     /// <summary>V2: the card sentence while there is no print.</summary>
     public const string APPROVED_CardNoPrint = "Dictum can learn how your voice sounds. It keeps your voice print, a list of numbers and not a recording, encrypted on this computer. In meetings recorded on one track, it labels parts that sound like you as You. You can also turn on a filter that skips dictation that does not sound like you. It can make mistakes.";

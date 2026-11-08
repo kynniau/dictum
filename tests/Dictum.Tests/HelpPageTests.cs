@@ -920,4 +920,42 @@ public class HelpPageTests
         Assert.Equal("Dictum sends nothing about you to Kynni. It has no account, no analytics, no telemetry (automatic reports on how you use an app) and no crash reporting. We never receive your audio or your text unless you send it to us yourself.",
             Plain(quote.Groups[1].Value));
     }
+
+    /// <summary>
+    /// Pin (1.6 voice print, row V18, APPROVED by the owner 08/11/2026 08:48 AEDT): the site guide carries
+    /// <see cref="Dictum.Meetings.Voice.VoiceText.APPROVED_HelpParagraph"/> word for word, as its own paragraph inside the Meetings section,
+    /// under its APPROVED comment. The in-app Help carries no Meetings text (as with the 1.5.1 paragraph), so it is not checked there.
+    /// </summary>
+    [Fact]
+    public void The_site_guide_carries_the_voice_print_help_paragraph_word_for_word()
+    {
+        // Line endings normalised: a Windows checkout with core.autocrlf on reads the page with CRLF (CI, 08/11/2026), and the
+        // comment-then-paragraph check below spans a line break.
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html")).Replace(((char)13).ToString(), "", StringComparison.Ordinal);
+        var expected = "<p>" + Dictum.Meetings.Voice.VoiceText.APPROVED_HelpParagraph.Replace(">", "&gt;", StringComparison.Ordinal) + "</p>";
+        Assert.Contains("<!-- APPROVED by the owner 08/11/2026 08:48 AEDT (1.6 voice print help paragraph, row V18): do not reword -->\n    " + expected, html, StringComparison.Ordinal);
+        var meetings = html.IndexOf("<h2 id=\"meetings-title\">", StringComparison.Ordinal);
+        var faq = html.IndexOf("<h2 id=\"faq-title\">", StringComparison.Ordinal);
+        var at = html.IndexOf(expected, StringComparison.Ordinal);
+        Assert.True(meetings > 0 && meetings < at && at < faq, "the voice print paragraph sits inside the Meetings section");
+    }
+
+    /// <summary>
+    /// The help FAQ "Does Dictum learn my voice?" carries the whole 1.6 answer (APPROVED by the owner 08/11/2026 14:40 AEDT; record
+    /// .demo-preview/two-model-faq-learn-my-voice.md on the owner's PC) word for word, with its APPROVED comment, and the homepage FAQ opens
+    /// with the same first sentence (APPROVED 15:34). Mutation: the answer's first sentence reverted to the pre-1.6 "No." (both fail).
+    /// </summary>
+    [Fact]
+    public void The_site_guide_and_homepage_carry_the_learn_my_voice_faq_answer_word_for_word()
+    {
+        const string first = "You can choose to let Dictum recognise your voice with a voice print, but nothing is trained and no model is changed.";
+        const string answer = first + " Calibrate my voice checks which model hears you best and can suggest words for your dictionary. From 1.6, Learn my voice (Settings &gt; General) makes a voice print from your calibration recordings or a new recording: a list of numbers describing how your voice sounds, not a recording. It cannot be played back, is kept encrypted on this PC, is never uploaded even if you turn on cloud speech, and is never included in exported meeting files. Dictum uses it only to label your speech as You in one-track meeting recordings and, if you turn on a separate setting, to skip dictation that does not sound like you. It can make mistakes. You can delete the voice print at any time. Cloud speech, if you turn it on, sends speech audio off your PC; see the privacy policy for more about voice prints.";
+        var newline = ((char)10).ToString(); var quote = ((char)34).ToString();
+        var help = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html")).Replace(((char)13).ToString(), "", StringComparison.Ordinal);
+        Assert.Contains("<!-- APPROVED by the owner 08/11/2026 14:40 AEDT (1.6 FAQ: learn my voice; two-model checked, not reviewed by a lawyer): do not reword -->" + newline + "          <p>" + answer + "</p>", help, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>No. Nothing is trained", help, StringComparison.Ordinal);
+        var home = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "index.html"));
+        Assert.Contains("<p>" + first + " <a href=" + quote + "/help#faq-learn" + quote + ">More in the help guide</a>.</p>", home, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>No. Nothing is trained", home, StringComparison.Ordinal);
+    }
 }

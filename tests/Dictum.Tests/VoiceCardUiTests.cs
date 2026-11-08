@@ -10,7 +10,7 @@ using static Dictum.Meetings.Voice.VoiceText;
 namespace Dictum.Tests;
 
 /// <summary>
-/// Settings > General > "Your voice" (design 1.6 C and D), headless: the card's states (model missing, no print, a print, a print from
+/// Settings > General > "Learn my voice" (design 1.6 C and D), headless: the card's states (model missing, no print, a print, a print from
 /// another model), every enabled control reachable by keyboard with an accessible name, the uses greyed with a reason without a print,
 /// and Delete returning the card to its un-enrolled state with both uses off.
 /// </summary>

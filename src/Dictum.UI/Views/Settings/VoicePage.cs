@@ -13,7 +13,7 @@ using static Dictum.Meetings.Voice.VoiceText;
 namespace Dictum.UI.Views.Settings;
 
 /// <summary>
-/// Settings > General > "Your voice" (design 1.6 C and D): make a voice print from the calibration recordings or a fresh recording,
+/// Settings > General > "Learn my voice" (design 1.6 C and D; the card was "Your voice" until 08/11/2026 15:34): make a voice print from the calibration recordings or a fresh recording,
 /// the two uses as switches, and Delete my voice print. Every string is a PROPOSED row of .demo-preview/two-model-voiceprint.md (V1–V13),
 /// or reused as it stands (V14: the speaker model's download row from Settings > Meetings). The print itself is read and written by
 /// Dictum.Meetings.Voice; this card never sees a file's bytes.

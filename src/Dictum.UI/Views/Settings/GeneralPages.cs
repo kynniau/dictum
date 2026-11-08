@@ -52,7 +52,7 @@ internal sealed class GeneralPage : SettingsPage
     private readonly ComboBox _insert = new() { ItemsSource = new[] { "Paste (Ctrl+V)", "Type the characters" }, Width = 200 };
     private readonly ToggleSwitch _trailing;
     private readonly ToggleSwitch _restore;
-    private readonly VoiceCard _voice; // "Your voice" (design 1.6 C and D), in VoicePage.cs
+    private readonly VoiceCard _voice; // "Learn my voice" (design 1.6 C and D), in VoicePage.cs
 
     /// <summary>
     /// The Remote Desktop caption under the hotkey box: it describes reaching a Windows PC from a Mac, so it is not shown on a Mac (the
