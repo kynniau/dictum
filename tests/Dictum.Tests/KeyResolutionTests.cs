@@ -253,6 +253,7 @@ public class KeyResolutionTests
         public bool Available => true;
         public string? Name => "Throwing store";
         public void Write(string variable, string id, string value) => throw new Dictum.Platform.CredentialStoreException("CredWrite failed (5).");
+        public bool TryCreate(string variable, string id, string value) => throw new Dictum.Platform.CredentialStoreException("CredWrite failed (5).");
         public string? Read(string variable, string id) => throw new Dictum.Platform.CredentialStoreException("CredRead failed (5).");
         public bool Delete(string variable, string id) => false;
         public IReadOnlyList<(string Variable, string Id)> List() => throw new Dictum.Platform.CredentialStoreException("CredEnumerate failed (5).");

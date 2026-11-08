@@ -25,6 +25,13 @@ internal sealed class FakeCredentialStore : ICredentialStore
         _entries[(variable, id)] = value;
     }
 
+    /// <summary>Add-only, as the real stores: false when the entry exists (left unchanged).</summary>
+    public bool TryCreate(string variable, string id, string value)
+    {
+        if (!Available || RefuseWrites) throw new CredentialStoreException("CredWrite failed: refused (5).");
+        return _entries.TryAdd((variable, id), value);
+    }
+
     public string? Read(string variable, string id) => _entries.TryGetValue((variable, id), out var v) ? v : null;
 
     /// <summary>The Nth delete call (1-based) throws, as the system refusing with error 5; null: none does.</summary>
