@@ -68,6 +68,67 @@ internal sealed class CredentialManagerStore : ICredentialStore
         }
     }
 
+    private static readonly TimeSpan CreateLockTimeout = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// CredWrite has no add-only flag, so the read-then-write runs under a named mutex that every Dictum process in this
+    /// Windows session shares; a process that writes with <see cref="Write"/> instead does not take it, so only TryCreate
+    /// callers are serialised.
+    /// <para>
+    /// Namespace: Local\, the session's own. Read on Microsoft Learn on 08/11/2026
+    /// (https://learn.microsoft.com/windows/win32/termserv/kernel-object-namespaces): each session has a separate namespace for
+    /// mutexes, and client processes "can use the "Local\" prefix to explicitly create an object in their session namespace";
+    /// CreateMutexW (https://learn.microsoft.com/windows/win32/api/synchapi/nf-synchapi-createmutexw) says the rest of the name
+    /// "can contain any character except the backslash". Local\ rather than Global\ because the credential is per user and the
+    /// race that matters is two processes of one user in one session; the same Learn page says "The global namespace is not
+    /// available for Windows Store apps", and a machine-wide name could be created first, with access denied, by another account.
+    /// <see cref="SingleInstance"/> names its mutex in Local\ as well.
+    /// </para>
+    /// <para>
+    /// Gap left: one user signed in to two Windows sessions at once (Credential Manager is per user, so this is the only
+    /// cross-session case) is not serialised, and two first uses in those sessions at the same moment could still each store a
+    /// key. SingleInstance is Local\ too, so each such session can run its own app.
+    /// </para>
+    /// </summary>
+    public bool TryCreate(string variable, string id, string value)
+    {
+        Mutex mutex;
+        try
+        {
+            mutex = new Mutex(false, $@"Local\Dictum.Credentials.{variable}.{id}");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or WaitHandleCannotBeOpenedException)
+        {
+            throw new CredentialStoreException($"TryCreate: the credential lock could not be opened ({ex.GetType().Name}).");
+        }
+        using (mutex)
+        {
+            bool acquired;
+            try
+            {
+                acquired = mutex.WaitOne(CreateLockTimeout);
+            }
+            catch (AbandonedMutexException)
+            {
+                // Its holder exited without releasing. Learn (https://learn.microsoft.com/dotnet/standard/threading/mutexes, read
+                // 08/11/2026): the exception "is thrown in the next thread that acquires the mutex", so this thread owns it. The
+                // Read below re-checks the store, so a key the holder did store is found and kept.
+                acquired = true;
+            }
+            if (!acquired) throw new CredentialStoreException("TryCreate: the credential lock was not released");
+            try
+            {
+                if (Read(variable, id) is not null) return false;
+                Write(variable, id, value);
+                return true;
+            }
+            finally
+            {
+                mutex.ReleaseMutex();
+            }
+        }
+    }
+
     public string? Read(string variable, string id)
     {
         if (!CredReadW(Target(variable, id), CRED_TYPE_GENERIC, 0, out var pointer))

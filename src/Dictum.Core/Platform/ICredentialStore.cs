@@ -18,6 +18,9 @@ public interface ICredentialStore
     /// <summary>Creates or replaces the entry. Throws <see cref="CredentialStoreException"/> when the system refuses (the message never holds the value).</summary>
     void Write(string variable, string id, string value);
 
+    /// <summary>Creates the entry only if none exists: true when it was written now, false when an entry with that variable and id already existed (left unchanged). Throws <see cref="CredentialStoreException"/> when the system refuses (the message never holds the value).</summary>
+    bool TryCreate(string variable, string id, string value);
+
     /// <summary>The entry's value, or null when there is none.</summary>
     string? Read(string variable, string id);
 
@@ -49,6 +52,9 @@ public sealed class NoCredentialStore : ICredentialStore
     public string? Name => null;
 
     public void Write(string variable, string id, string value) => throw new CredentialStoreException("This platform has no credential store Dictum can use.");
+
+    // Refused as Write is: a silent false would send the keyring to re-read null and report a misleading locked error.
+    public bool TryCreate(string variable, string id, string value) => throw new CredentialStoreException("This platform has no credential store Dictum can use.");
 
     public string? Read(string variable, string id) => null;
 
