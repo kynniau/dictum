@@ -23,6 +23,7 @@ public sealed class MacPlatform : IPlatform, IDisposable
     private readonly Lazy<Pasteboard> _clipboard = new(() => new Pasteboard());
     private readonly Lazy<IStartupRegistration> _startup;
     private readonly Lazy<IRemovalSteps> _removal;
+    private readonly Lazy<ICredentialStore> _credentials;
 
     /// <param name="log">Where platform warnings go before the app's own log exists (the CLI passes its log).</param>
     public MacPlatform(ILog? log = null, string? exeDir = null)
@@ -37,6 +38,9 @@ public sealed class MacPlatform : IPlatform, IDisposable
         _access = new MacInputAccess(Open, _log);
         _posted = new PostedEvents();
         _swallowed = new SwallowedEvents();
+        var (keychainOn, offLine) = CodeSignature.Decide(CodeSignature.TeamIdentifier(_log));
+        if (offLine is not null) _log.Info(offLine);
+        _credentials = keychainOn ? new(() => new KeychainStore(_log)) : new(() => NoCredentialStore.Instance);
     }
 
     public string Name => "macOS";
@@ -46,8 +50,13 @@ public sealed class MacPlatform : IPlatform, IDisposable
     /// <summary>The Accessibility grant: checked silently, asked for with the system prompt and the Settings page (<see cref="MacInputAccess"/>).</summary>
     public IInputAccess InputAccess => _access;
 
-    /// <summary>No credential store yet: the Keychain is the K-Mac lane's (docs/DECISIONS.md, API keys, 30/10/2026). Keys from the environment and .env still work.</summary>
-    public ICredentialStore Credentials => NoCredentialStore.Instance;
+    /// <summary>
+    /// The login keychain (<see cref="KeychainStore"/>: service Dictum/{VARIABLE}, account {id}) when this binary is signed with
+    /// Dictum's own team identity (<see cref="CodeSignature.DictumTeam"/>), decided once at construction; otherwise no store, as on
+    /// an ad-hoc, unsigned or other-team build, whose signature would make the keychain prompt (design D2: never a prompt).
+    /// Keys from the environment and .env work either way.
+    /// </summary>
+    public ICredentialStore Credentials => _credentials.Value;
 
     private readonly MacInputAccess _access;
     private readonly PostedEvents _posted;

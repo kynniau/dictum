@@ -6967,3 +6967,78 @@ Pipeline: the turns are the meeting's own transcript segments on the separated t
 Names (merge lens on 91baf0e): one rule, MeetingSpeakers.IsValidName, used on save, on read and by the name box: trimmed, 1 to 80 characters of the action-item owner's characters (letters, digits, white space, full stop, the two apostrophes, hyphen), and not shaped like "Other n". A typed name is masked from the figure rule only when it starts with a letter, so a name such as "40" cannot hide that number. The owner rule matches labels and typed names exactly (ordinal).
 
 Not yet measured on real speech: `Dictum.exe --speaker-check <folder>` prints DER (10 ms frames, 0.25 s collar, overlap scored) and EER for the owner's own recordings, with turns from the meetings pause segmenter (FileSource, as imports are cut; the voice gate and whisper are not applied, so silent stretches inside a part count); the numbers belong here when he runs it. Smoke runs on synthetic Windows TTS voices only (not a quality measure), at threshold 0.5: a file of six turns 0.5 s apart from the earlier smoke run DER 13.31 %, 3 voices found for 2; a new 13-utterance file with 1.2 s pauses DER 19.50 % (confusion 0.7 s; false alarm 8.5 s, the pauses inside each segment) and the same utterances 0.3 s apart DER 30.93 % (confusion 14.6 s, the one-speaker-per-segment ceiling).
+
+### API keys and the Meetings owner key in the macOS keychain, behind a team-identity gate (08/11/2026, branch mac/keychain-store)
+
+- **Finding (plan, mac-16 lane; orchestrator rulings 08/11/2026 13:35 and 13:40 AEDT):** `MacPlatform.Credentials` was
+  `NoCredentialStore`, so the Mac build could not hold API keys in a system store and Meetings stayed locked
+  (`MeetingKeyring` throws `MeetingsLockedException` when the store is unavailable). Design D2: the owner key is created
+  silently, and Dictum never shows a keychain prompt, dev builds included.
+- **API, verified 08/11/2026 from the installed macOS SDK headers** (macOS 27.2 build 26B123, Xcode 27.2 build 27B52,
+  `$(xcrun --show-sdk-path)/System/Library/Frameworks/Security.framework/Headers`): `SecItemCopyMatching(query, CFTypeRef *
+  CF_RETURNS_RETAINED result)` SecItem.h:1178; `SecItemAdd` :1227; `SecItemUpdate` :1246; `SecItemDelete` :1277 (deletes every
+  match); keys kSecClass :53, kSecClassGenericPassword :70, kSecAttrSynchronizable :456, kSecAttrLabel :472, kSecAttrAccount
+  :478, kSecAttrService :480, kSecMatchLimit/One/All :926/:928/:930, kSecReturnData :964, kSecReturnAttributes :966,
+  kSecValueData :991. kSecAttrAccessible "is currently not supported for macOS keychain items, unless the
+  kSecAttrSynchronizable attribute is also present" (:185-186); synchronizable absent or false means "no synchronizable items
+  will be added or returned" (:223-224); kSecUseNoAuthenticationUI "on macOS ... only applies to items stored in the Data
+  Protection keychain. Legacy keychain items will still activate UI if needed" (:1019-1020); kSecUseAuthenticationUISkip:
+  items needing UI "will be silently skipped" (:1072-1074). SecBase.h: `SecCopyErrorMessageString` :251; errSecSuccess 0
+  :326, errSecDuplicateItem -25299 :352, errSecItemNotFound -25300 :353, errSecInteractionNotAllowed -25308 :361,
+  errSecMissingEntitlement -34018 :341. SecCode.h: `SecCodeCopySelf(SecCSFlags, SecCodeRef * CF_RETURNS_RETAINED)` :63;
+  `SecCodeCopySigningInformation(SecStaticCodeRef, SecCSFlags, CFDictionaryRef * CF_RETURNS_RETAINED)` :528; unsigned code
+  succeeds with no kSecCodeInfoIdentifier (:341-343); kSecCSSigningInformation = 1 << 1 (:470), and for ad-hoc code "there are
+  no certificates" (:371-373); kSecCodeInfoTeamIdentifier is a "Signing" key (:512). CSCommon.h:253 kSecCSDefaultFlags = 0.
+- **Change:** `KeychainStore` (src/Dictum.Mac/Shell/KeychainStore.cs): one generic password per key in the login keychain,
+  service `Dictum/{VARIABLE}`, account `{id}`, label `Dictum/{VARIABLE}/{id}` (the Windows Credential Manager target name),
+  kSecAttrSynchronizable = false, value as UTF-8 bytes. No kSecAttrAccessible, no kSecUseDataProtectionKeychain, no
+  access-control keys and no kSecUseAuthenticationUI (Skip would make a refused owner-key read look like no key, and
+  MeetingKeyring would then mint and write a new key over the real one, making every meeting unreadable). Write is Add,
+  then Update on errSecDuplicateItem, and one more Add if that Update finds the item gone (deleted in between); every SecItem status goes through one pure classifier (`KeychainStore.Classify`: errSecSuccess, errSecItemNotFound, or
+  refused) used by Read, Delete, List and the availability probe; Read returns null only for errSecItemNotFound and throws
+  `CredentialStoreException` (carrying the status) for anything else; any unexpected status is logged by name (never a value, label or id) and marks the store unavailable
+  for the rest of the process. List queries attributes only, one query per `SecretStore.KeyNames` variable, and keeps
+  `StoredKeyId.IsValid` ids, so the owner key is never listed. Available is a once-per-process attribute-only lookup of an
+  item Dictum never writes. Key bytes go through a mutable CFData zeroed after the call; the CFData Security returns on a
+  read is immutable and is released unzeroed (marked `// simplification:`). Name is `PROPOSED_Name` "macOS Keychain" (owner
+  wording pending), shown only where Windows shows "Windows Credential Manager". README Credentials row rewritten; the scheme
+  supersedes the K-Mac plan's service `au.kynni.dictum`, account `{VARIABLE}/{id}`, so both platforms share one naming.
+- **Team-identity gate (D2), pinned to Dictum's own team:** `MacPlatform` decides at construction
+  (`CodeSignature.TeamIdentifier`, then the pure `CodeSignature.Decide`). Only a binary whose team identifier equals
+  `CodeSignature.DictumTeam` = `PX6W25UNPP` gets `KeychainStore` (verified 08/11/2026 about 14:45 AEDT by the Mac lane from
+  `security find-identity -v -p codesigning` on Kyle's Mac, run outside the Bash sandbox: "Developer ID Application: Kynni Pty Ltd (PX6W25UNPP)"). An ad-hoc or
+  unsigned build gets `NoCredentialStore` and logs once "Keychain store off: this build is not signed with a team identity";
+  a build signed by another team logs "Keychain store off: this build is not signed with Dictum's team identity (team X
+  present)" (a team id is public). Why: a legacy keychain item trusts the code that
+  created it, and an ad-hoc signature changes with every build (recalled, not yet measured), so a rebuilt ad-hoc Dictum would
+  likely prompt at launch, and D2 has no dev carve-out. The signature is not validated before it is read (SecCode.h:345-348):
+  the gate is an on/off switch, not a security boundary; the keychain's own access control is. If measurement (b) shows a
+  rebuilt ad-hoc binary rereads with no dialog, the gate is dropped.
+- **Pins:** tests/Dictum.Tests/MacKeychainStoreTests.cs, no native call (run on Windows CI):
+  `MacKeychain_only_item_not_found_means_no_entry_and_a_refusal_locks_the_store` (errSecItemNotFound is no entry;
+  errSecInteractionNotAllowed -25308, errSecAuthFailed -25293, errSecUserCanceled -128 and others are refusals; Read's step
+  throws for each with the code; after one refusal a fresh store is unavailable without probing and refuses writes) and
+  `MacKeychain_store_is_on_only_for_dictums_own_team` (`Decide` for PX6W25UNPP, none, and another team). Then: `MacKeychain_is_available_on_a_signed_in_Mac`,
+  `MacKeychain_write_then_read_returns_the_same_value`, `MacKeychain_write_twice_replaces_the_value`,
+  `MacKeychain_delete_removes_and_reports`, `MacKeychain_read_of_a_missing_item_is_null`,
+  `MacKeychain_list_names_only_valid_dictum_entries`, `MacKeychain_meeting_keyring_creates_then_rereads_the_owner_key` (real
+  login keychain, gated DICTUM_UI_TESTS=1 on a Mac, scratch service prefix `DictumTest-{guid}/`, every item deleted and
+  List() asserted empty after each test); `MacKeychain_signature_gate_agrees_with_codesign_and_decides_the_store` (macOS;
+  compares the helper with `codesign -dv` of the test host and checks MacPlatform's choice and log line);
+  `MacKeychain_status_names_and_entry_names_match_the_headers_and_windows` (no native call; runs on Windows CI). Fake-store
+  contract sibling: MeetingCryptoTests.cs:23 `No_credential_store_means_MeetingsLockedException_and_no_file_written`.
+- **Mutation check, classification (08/11/2026 14:23 AEDT):** Read's step changed to `status == Sec.Success` (any
+  non-success reads as no entry): `MacKeychain_only_item_not_found_means_no_entry_and_a_refusal_locks_the_store` failed with
+  "Assert.Throws() Failure: No exception was thrown / Expected: typeof(Dictum.Platform.CredentialStoreException)"; 11 total, 1
+  failed. Reverted: 11 passed (UI gate on).
+- **Mutation check, availability (08/11/2026 14:06 AEDT):** `Available => false` in KeychainStore: `MacKeychain_is_available_on_a_signed_in_Mac`
+  failed ("Assert.True() Failure"), `MacKeychain_meeting_keyring_creates_then_rereads_the_owner_key` failed with
+  MeetingsLockedException, and `MacKeychain_read_of_a_missing_item_is_null` failed; 9 total, 3 failed. Reverted: 9 passed.
+- **Not verified (separate probe, Kyle runs it in a foreground Terminal, Deny on every dialog):** (a) whether a write then
+  read by an ad-hoc-signed app bundle prompts; (b) whether a rebuilt, re-signed ad-hoc bundle (new CDHash) rereads and lists
+  without a dialog; (c) whether a Developer-ID-signed build reads an item an ad-hoc build created, and whether a re-signed
+  Developer ID update rereads its own items without a dialog; M4 whether the data-protection keychain works without an
+  access-group entitlement (expected errSecMissingEntitlement, recalled). Recalled and measured only by the probe: a locked login keychain may show an unlock dialog even for the attribute-only
+  availability lookup; and the legacy-ACL behaviour of a Developer-ID-signed bundle (that its own items reread with no dialog
+  across signed updates). Also not verified: Dictum.app itself (the tests ran
+  under the test host, not the app bundle), the Keychain Access display of the label, and a locked login keychain at start-up.
