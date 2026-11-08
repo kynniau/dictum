@@ -213,4 +213,70 @@ public sealed class VoiceCardUiTests
         calibrate.Close();
         shell.Dispose();
     });
+
+    /// <summary>
+    /// Rows V21 (owner 08/11/2026 12:07): the header bar inside the recording window reads "Learn my voice" when opened from "Record my
+    /// voice now"; opened for calibration it still reads "Calibrate my voice". Mutation: the header ternary reverted to the plain string.
+    /// </summary>
+    [Fact]
+    public Task The_recording_window_header_reads_Learn_my_voice_only_when_opened_for_it() => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "calibration-sentences.txt"), scratch.Paths.CalibrationScriptFile);
+        var (shell, _, _) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        static string Header(Window window) => All<TextBlock>(window).Single(t => t.Text is "Learn my voice" or "Calibrate my voice").Text!;
+
+        var learn = new CalibrationWindow(shell, VoiceEnrolment.NewTemporaryFolder(scratch.Paths));
+        learn.Show();
+        Assert.Equal(APPROVED_LearnMyVoiceHeader, Header(learn));
+        Assert.Equal("Learn my voice", APPROVED_LearnMyVoiceHeader);
+        learn.Close();
+
+        var calibrate = new CalibrationWindow(shell);
+        calibrate.Show();
+        Assert.Equal("Calibrate my voice", Header(calibrate));
+        calibrate.Close();
+        shell.Dispose();
+    });
+
+    /// <summary>
+    /// Row V22 (owner 08/11/2026 12:07): both Delete-all questions end with the voice-print note only when a voice print exists; a
+    /// leftover recording folder alone does not add it; the recordings and logs questions never carry it. Mutation: the append removed.
+    /// </summary>
+    [Theory]
+    [InlineData(Dictum.Storage.RemovalScope.AllData)]
+    [InlineData(Dictum.Storage.RemovalScope.AllDataIncludingSettings)]
+    public Task The_Delete_all_question_names_the_voice_print_only_when_one_exists(Dictum.Storage.RemovalScope scope) => UiSession.Run(() =>
+    {
+        using var scratch = new Scratch("""{ "hotkey": "F24" }""");
+        var (shell, _, dialogs) = scratch.Shell();
+        shell.Reload(userRequested: false);
+        Directory.CreateDirectory(scratch.Paths.DefaultModelsDir);
+        File.WriteAllBytes(Path.Combine(scratch.Paths.DefaultModelsDir, "ggml-tiny.en.bin"), new byte[10]); // something to delete
+        var print = VoicePrintStore.PathFor(scratch.Paths);
+        LeaveRecordingFolder(scratch.Paths); // a leftover folder without a print
+
+        shell.DeleteData(scope); // cancelled: no answer queued
+        var without = dialogs.Asked.Last().Text;
+        Assert.DoesNotContain(APPROVED_DeleteAllNote, without, StringComparison.Ordinal);
+
+        VoicePrintStore.Write(print, Print(VoicePrintStore.CurrentModel), shell.VoiceKeyring);
+        shell.DeleteData(scope);
+        Assert.EndsWith(" " + APPROVED_DeleteAllNote, dialogs.Asked.Last().Text, StringComparison.Ordinal);
+        Assert.Equal(APPROVED_DeleteAllNote, "Your voice print is deleted too, and both of its uses turn off.");
+
+        Directory.CreateDirectory(scratch.Paths.CalibrationDir);
+        File.WriteAllBytes(Path.Combine(scratch.Paths.CalibrationDir, "clip-01.wav"), Dictum.Audio.Wav.Encode(new float[16000]));
+        Directory.CreateDirectory(scratch.Paths.LogsDir);
+        File.WriteAllText(Path.Combine(scratch.Paths.LogsDir, "2026-11-08.log"), "x");
+        foreach (var other in new[] { Dictum.Storage.RemovalScope.CalibrationRecordings, Dictum.Storage.RemovalScope.Logs })
+        {
+            var before = dialogs.Asked.Count;
+            shell.DeleteData(other);
+            Assert.Equal(before + 1, dialogs.Asked.Count);
+            Assert.DoesNotContain(APPROVED_DeleteAllNote, dialogs.Asked.Last().Text, StringComparison.Ordinal);
+        }
+        shell.Dispose();
+    });
 }

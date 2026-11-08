@@ -127,7 +127,7 @@ internal sealed partial class CalibrationWindow : Window
         footer.Children.AddRange([_delete, close, save]);
         var footerBar = new Border { Padding = new Thickness(24, 10), BorderThickness = new Thickness(0, 1, 0, 0), Child = footer };
         footerBar.Classes.Add("headerbar");
-        var header = new Border { Padding = new Thickness(16, 10), BorderThickness = new Thickness(0, 0, 0, 1), Child = Ui.Row(10, new MarkIcon(20), new TextBlock { Text = "Calibrate my voice", FontSize = 13, FontWeight = FontWeight.SemiBold }) };
+        var header = new Border { Padding = new Thickness(16, 10), BorderThickness = new Thickness(0, 0, 0, 1), Child = Ui.Row(10, new MarkIcon(20), new TextBlock { Text = Enrolment ? Dictum.Meetings.Voice.VoiceText.APPROVED_LearnMyVoiceHeader : "Calibrate my voice", FontSize = 13, FontWeight = FontWeight.SemiBold }) };
         header.Classes.Add("headerbar");
         DockPanel.SetDock(header, Dock.Top);
         DockPanel.SetDock(footerBar, Dock.Bottom);
