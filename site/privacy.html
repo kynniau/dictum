@@ -105,8 +105,8 @@
         <li><code>models</code>: the speech and clean-up models you downloaded, unless you chose another folder for them.</li>
         <li><code>logs</code>: one file per day; the newest 14 are kept.</li>
         <li><code>calibration</code>: your calibration recordings and their list, if you made any.</li>
-        <!-- APPROVED by the owner 08/11/2026 08:48 AEDT (new edition of this list: one line added, nothing else changed): do not reword -->
-        <li><code>voiceprint.enc</code>: your voice print, encrypted, if you made one.</li>
+        <!-- APPROVED by the owner 08/11/2026 12:07 AEDT (second edition of this line: the temporary recording folder added, nothing else changed; first edition 08:48): do not reword -->
+        <li><code>voiceprint.enc</code>: your voice print, encrypted, if you made one; and, only while you record your voice for it, a <code>voice-enrolment-…</code> folder that is deleted when the attempt ends.</li>
         <li><code>verified-models.json</code>: which model files passed the fingerprint check.</li>
         <li>Working files: one while a download or a save is under way, removed when it ends; and <code>gpu-load-speech.txt</code> and <code>gpu-load-cleanup.txt</code>, which name a model while it loads on the graphics card and stay if Dictum stops during that load, so that the next start loads that model on the main processor instead.</li>
       </ul>

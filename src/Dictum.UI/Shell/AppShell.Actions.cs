@@ -143,6 +143,7 @@ public sealed partial class AppShell
     /// Settings → Storage: delete recordings, logs, or all app data (SPEC §17). Shows the size it frees, asks once, then
     /// deletes. "All app data" releases the loaded models first and never touches .env or the program folder, and its question
     /// names a chosen models folder outside the user's profile that it leaves alone (<see cref="DataCategory.SharedModels"/>).
+    /// Both "all data" questions end with the approved voice-print note (row V22) when a voice print exists.
     /// </summary>
     public string DeleteData(RemovalScope scope)
     {
@@ -160,7 +161,11 @@ public sealed partial class AppShell
         var leftAlone = scope is RemovalScope.AllData or RemovalScope.AllDataIncludingSettings
             ? string.Concat(PathRegistry.Locations(Paths, _settings).Where(l => l.Category == DataCategory.SharedModels).Select(l => " " + LeftAlone(RealPath(l.Path))))
             : "";
-        if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.{leftAlone}",
+        // APPROVED 08/11/2026 12:07 (V22): only when a voice print exists (a leftover enrolment folder without a print does not add it).
+        var voiceNote = scope is RemovalScope.AllData or RemovalScope.AllDataIncludingSettings && Dictum.Meetings.Voice.VoicePrintStore.Exists(Dictum.Meetings.Voice.VoicePrintStore.PathFor(Paths))
+            ? " " + Dictum.Meetings.Voice.VoiceText.APPROVED_DeleteAllNote
+            : "";
+        if (Dialogs.Ask("Delete data", $"Delete {what}? {files} file(s), {ModelCatalog.FormatSize(plan.TotalBytes)}.{leftAlone}{voiceNote}",
                 new DialogChoice("Delete", IsDefault: true, IsDanger: true), new DialogChoice("Cancel")) != 0)
         {
             return "Nothing was deleted.";

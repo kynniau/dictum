@@ -64,4 +64,10 @@ public static class VoiceText
 
     /// <summary>V20 (added 08/11/2026 after the merge lens; Fable draft, not yet GPT-challenged): the instruction line at the top of that window.</summary>
     public const string APPROVED_LearnMyVoiceInstruction = "Read the sentences, then close this window. Dictum makes your voice print from the recording and deletes the recording.";
+
+    // APPROVED 08/11/2026 12:07 (owner, rows V21–V23): do not reword.
+    /// <summary>V21: the header bar inside the recording window when opened from V4 (the window title is V19).</summary>
+    public const string APPROVED_LearnMyVoiceHeader = "Learn my voice";
+    /// <summary>V22: added to the "Delete all app data" question (both scopes) only when a voice print exists.</summary>
+    public const string APPROVED_DeleteAllNote = "Your voice print is deleted too, and both of its uses turn off.";
 }
