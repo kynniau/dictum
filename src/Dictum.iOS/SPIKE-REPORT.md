@@ -181,6 +181,35 @@ yet; an in-room end-of-meeting review (brief summary and who-does-what list conf
 leaves) followed by a summary email to attendees with their actions (design position: the app composes
 the email in the user's Mail app and never sends itself).
 
+### 8.6 Proof of concept build and first screenshots (same evening, later)
+
+Kyle reframed at about 17:20: "for now this is proof of concept, a long way off a launchable app", then
+asked for a professional Dictum look and the most comprehensive demonstration possible. Built on
+`spike/v2-ondevice` (240b349 proof of concept; eb6ae1d level meter; d98b3f0 appearance setting and
+screenshot UI test; later polish), all under the standing guard rails (memory only, no store, no network
+from the app, bundle writer unchanged, demo branch frozen):
+
+- Dictum theme from `site/styles.css` tokens and the mark from `site/dictum.svg` only, light and dark,
+  with an Appearance setting (Automatic / Light / Dark); the home screen carries "Proof of concept, not a
+  released product".
+- Home (sealed-file list with share and delete), Settings (engine: Apple on-device available, whisper.cpp
+  rows shown as not yet measured; speaker labels and threshold; meeting type from `SummaryTemplates.Builtins`
+  names as PROPOSED_; summary route: on-device Apple model if available, own API key shown as not in this
+  build; keep-on-device shown as coming; About with licences), Review before the sealed file (labelled,
+  timestamped transcript; `Name for Other n`; `Fewer speakers` / `More speakers` re-clustering on kept
+  vectors; on-device summary via Apple FoundationModels under an experimental line; editable who-does-what;
+  "Everyone confirmed" recorded in memory only, with a note saying so), Compose summary email
+  (MFMailComposeViewController with a `mailto:` fallback; recipients typed, never stored; the user sends).
+  FoundationModels API names compiled against the iOS 27.2 SDK; `PrivateCloudComputeLanguageModel` exists
+  in the SDK and is never referenced (nm on the objects). The level meter is the Dictum mark's three bars
+  moving with the input.
+- Screenshots: this Mac has no simulator runtimes, so a UI test (`DictumRecorderUITests`) drives the real
+  iPad through home, settings, consent, recording and sealed in light and dark, with the experimental
+  switch off. First run on the iPad Pro M4 at 21:42–21:43 AEDT, build d98b3f0: passed in 50 s, 14 screens
+  exported with `xcrun xcresulttool export attachments` (stored rotated; `sips -r 270` to upright). All
+  screens rendered as designed (V, images read by this session and sent to Kyle). The Review and email
+  screens were not in the run and have not been seen rendered; the on-device summary has not been run.
+
 ### 8.5 Not run this evening
 
 Five-minute recording with the switch on; two-person speaker test on the iPad (pending Kyle); peak
