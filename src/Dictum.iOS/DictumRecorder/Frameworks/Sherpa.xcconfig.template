@@ -1,0 +1,6 @@
+// Copy to Frameworks/Sherpa.xcconfig (not committed) to link the real speaker embedder. Delete that copy to go back to
+// the stub. Paths are the slices inside the two xcframeworks in this folder.
+FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) "$(PROJECT_DIR)/Frameworks/sherpa-onnx.xcframework/ios-arm64" "$(PROJECT_DIR)/Frameworks/onnxruntime.xcframework/ios-arm64"
+FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) "$(PROJECT_DIR)/Frameworks/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator" "$(PROJECT_DIR)/Frameworks/onnxruntime.xcframework/ios-arm64_x86_64-simulator"
+// Both are static frameworks: linked into the app, nothing embedded.
+OTHER_LDFLAGS = $(inherited) -framework SherpaOnnxC -framework onnxruntime -lc++

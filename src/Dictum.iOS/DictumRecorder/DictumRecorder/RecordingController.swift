@@ -96,7 +96,18 @@ final class RecordingController {
             self.captureFailed = true
             Task { await self.stopTapped() }
         }
-        let capture = AudioCapture(sink: writer.append)
+        // Switch off: rawSink and keep are nil, and the seal writer's sink is passed exactly as before. Switch on: the
+        // seal writer gets each buffer first, then the in-memory copy for the experimental speaker step.
+        let rawSink = transcript.makeSink()
+        let capture: AudioCapture
+        if let keep = transcript.pcmSink {
+            capture = AudioCapture(sink: { pcm in
+                writer.append(pcm)
+                keep(pcm)
+            })
+        } else {
+            capture = AudioCapture(sink: writer.append)
+        }
         capture.onStatus = { [weak self] status in
             guard let self else { return }
             self.captureStatus = status
@@ -107,7 +118,7 @@ final class RecordingController {
         capture.onLevel = { [weak self] level in
             self?.levelReported(level)
         }
-        capture.rawSink = transcript.makeSink()
+        capture.rawSink = rawSink
         self.writer = writer
         self.capture = capture
 

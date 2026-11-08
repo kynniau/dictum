@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreMedia
 import Network
 import Observation
 import os
@@ -10,8 +11,11 @@ import Speech
 // anywhere, or download anything while a recording runs. The speech model is downloaded only when the user taps the
 // download button on screen 1, before Start. The text lives in this object's memory and is cleared on Done.
 //
-// With the switch off, `makeSink()` returns nil, so `AudioCapture` gets no second sink and the recording path is the
-// same as without this file.
+// With the switch off, `makeSink()` returns nil and `pcmSink` is nil, so `AudioCapture` gets no second sink, the seal
+// writer's sink is not wrapped, and the recording path is the same as without this file.
+//
+// With it on, each final result also keeps its audio time range (min start, max end of its runs), and the 16 kHz PCM
+// the seal writer gets is copied into memory for the experimental speaker step (SpeakerLabels.swift) after Stop.
 
 /// Screen state for the experiment. Main thread only.
 @MainActor
@@ -75,6 +79,10 @@ final class OnDeviceTranscript {
     /// True between Stop and the analyzer finishing.
     private(set) var finishing = false
     private(set) var facts: Facts?
+    /// Experimental speaker labels, made after Stop from `segments` and the in-memory PCM.
+    let speakers = SpeakerLabels()
+    /// The 16 kHz PCM copy for the speaker step: set by `makeSink()`, nil with the switch off.
+    private(set) var pcmSink: ((Data) -> Void)?
 
     private var localeIdentifier: String?
     private var assetSeconds: Double?
@@ -85,6 +93,10 @@ final class OnDeviceTranscript {
     private var engine: AnyObject?
     private var resultsTask: Task<Void, Never>?
     private var lastFinalAt: ContinuousClock.Instant?
+    /// Each final result's words with seconds on the analyzer's timeline. Memory only.
+    private var segments: [SpeakerLabels.Segment] = []
+    private var wordRangeSegments = 0
+    private var resultRangeSegments = 0
     /// Watches the network path between Start and Stop, only with the switch on. It only observes the path; it makes
     /// no network requests.
     private var pathMonitor: NWPathMonitor?
@@ -185,15 +197,21 @@ final class OnDeviceTranscript {
     /// The second capture sink, or nil when the switch is off or the model is not ready (the recording path is then
     /// unchanged). Call before `AudioCapture.start()`.
     func makeSink() -> ((AVAudioPCMBuffer) -> Void)? {
+        pcmSink = nil
         guard enabled, setup == .ready, #available(iOS 26, *), let id = localeIdentifier else { return nil }
-        let engine = SpeechEngine(locale: Locale(identifier: id))
+        let store = speakers.makeStore()
+        let engine = SpeechEngine(locale: Locale(identifier: id), onFirstInput: store.markAnalyzerStart)
         self.engine = engine
+        pcmSink = store.append
         active = true
         live = .preparing
         finalText = ""
         volatileText = ""
         facts = nil
         lastFinalAt = nil
+        segments = []
+        wordRangeSegments = 0
+        resultRangeSegments = 0
         return engine.feed
     }
 
@@ -211,7 +229,8 @@ final class OnDeviceTranscript {
         resultsTask = Task { [weak self] in
             do {
                 for try await result in engine.transcriber.results {
-                    self?.received(String(result.text.characters), isFinal: result.isFinal)
+                    self?.received(String(result.text.characters), isFinal: result.isFinal,
+                                   span: result.isFinal ? SpeechEngine.span(result) : nil)
                 }
             } catch is CancellationError {
             } catch {
@@ -230,9 +249,18 @@ final class OnDeviceTranscript {
         }
     }
 
-    private func received(_ text: String, isFinal: Bool) {
+    private func received(_ text: String, isFinal: Bool, span: TranscriptSpan?) {
         if live == .preparing { live = .listening }
         if isFinal {
+            let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !words.isEmpty {
+                switch span?.source {
+                case .words: wordRangeSegments += 1
+                case .result: resultRangeSegments += 1
+                case nil: break
+                }
+                segments.append(SpeakerLabels.Segment(text: words, start: span?.start, end: span?.end))
+            }
             finalText += text
             volatileText = ""
             lastFinalAt = ContinuousClock.now
@@ -270,20 +298,34 @@ final class OnDeviceTranscript {
             self.facts = Facts(locale: self.localeIdentifier ?? "", assets: assets, assetStatusBefore: before,
                                stopToLastFinalSeconds: toFinal, thermalAtStop: thermal, networkingOff: networkingOff)
             self.finishing = false
+            // After the analyzer has finished, so every final segment is in. A segment without a time range keeps no
+            // time (it is shown without a label); with no range at all, one segment covers the whole recording.
+            let source: SpeakerLabels.TimeSource = self.wordRangeSegments > 0 ? .wordRanges
+                : self.resultRangeSegments > 0 ? .resultRanges : .wholeRecording
+            self.speakers.run(segments: self.segments, timeSource: source)
         }
     }
 
     /// Start failed before any audio was captured.
     func recordingAbandoned() {
         cancelEngine()
+        speakers.clear()
+        pcmSink = nil
+        segments = []
         active = false
     }
 
     // MARK: - Screen 3
 
-    /// Done: drop the transcript and the facts from memory and put the switch back to its default, off.
+    /// Done: drop the transcript, the facts, the PCM copy, the voice prints and the speaker labels from memory, and put
+    /// the switch back to its default, off.
     func clear() {
         cancelEngine()
+        speakers.clear()
+        pcmSink = nil
+        segments = []
+        wordRangeSegments = 0
+        resultRangeSegments = 0
         active = false
         finishing = false
         finalText = ""
@@ -338,11 +380,19 @@ final class OnDeviceTranscript {
     }
 }
 
+/// A final result's seconds on the analyzer's timeline, and where they came from.
+struct TranscriptSpan {
+    enum Source { case words, result }
+    var start: Double
+    var end: Double
+    var source: Source
+}
+
 /// SpeechAnalyzer + SpeechTranscriber fed from the capture tap.
 ///
-/// `@unchecked Sendable`: `converter` and `converterInput` are touched only on the audio tap's thread (tap callbacks
-/// arrive one at a time); `target` is behind a lock the tap only tries, never waits on; everything else is immutable
-/// or Sendable.
+/// `@unchecked Sendable`: `converter`, `converterInput` and `fedAny` are touched only on the audio tap's thread (tap
+/// callbacks arrive one at a time); `target` is behind a lock the tap only tries, never waits on; everything else is
+/// immutable or Sendable.
 @available(iOS 26, *)
 final class SpeechEngine: @unchecked Sendable {
     enum EngineError: Error { case assetsMissing, noFormat }
@@ -355,8 +405,12 @@ final class SpeechEngine: @unchecked Sendable {
     // Audio tap thread only.
     private var converter: AVAudioConverter?
     private var converterInput: AVAudioFormat?
+    private var fedAny = false
+    /// Called on the audio tap's thread once, when the analyzer is given its first buffer.
+    private let onFirstInput: () -> Void
 
-    init(locale: Locale) {
+    init(locale: Locale, onFirstInput: @escaping () -> Void = {}) {
+        self.onFirstInput = onFirstInput
         transcriber = Self.makeTranscriber(locale)
         analyzer = SpeechAnalyzer(modules: [transcriber])
         // simplification: unbounded buffering between the tap and the analyzer. Ceiling: if the analyzer falls far
@@ -366,7 +420,23 @@ final class SpeechEngine: @unchecked Sendable {
 
     private static func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
         SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults],
-                          attributeOptions: [])
+                          attributeOptions: [.audioTimeRange])
+    }
+
+    /// The min start and max end of the runs' `audioTimeRange`; else the result's own `range`; else nil.
+    static func span(_ result: SpeechTranscriber.Result) -> TranscriptSpan? {
+        var start = Double.infinity, end = -Double.infinity
+        for run in result.text.runs {
+            guard let range = run.audioTimeRange, range.start.isNumeric, range.duration.isNumeric else { continue }
+            start = min(start, range.start.seconds)
+            end = max(end, range.end.seconds)
+        }
+        if start.isFinite, end.isFinite, end >= start { return TranscriptSpan(start: start, end: end, source: .words) }
+        let range = result.range
+        if range.start.isNumeric, range.duration.isNumeric, range.duration.seconds > 0 {
+            return TranscriptSpan(start: range.start.seconds, end: range.end.seconds, source: .result)
+        }
+        return nil
     }
 
     /// en_AU, then en_US, then the first supported English locale.
@@ -424,6 +494,10 @@ final class SpeechEngine: @unchecked Sendable {
             return buffer
         }
         guard status != .error, out.frameLength > 0 else { return }
+        if !fedAny {
+            fedAny = true
+            onFirstInput()
+        }
         continuation.yield(AnalyzerInput(buffer: out))
     }
 

@@ -105,6 +105,49 @@ Not measured or not verified:
   network, are not verified.
 - Audio that arrives before the analyzer is ready is dropped, so the first moment of speech may be missing.
 
+## Speaker identification (experimental, with the on-device transcript)
+
+With the transcript switch on, after Stop and after the last final words, the Sealed screen labels each line of the
+transcript "Other 1", "Other 2" and so on (`APPROVED_Other`, copied from the desktop). It follows the desktop's own rule
+(`src/Dictum.Core/Meetings/Speakers/SpeakerSeparator.cs`, `SpeakerClustering.cs`, `MeetingSpeakers.SpeakerOf`), ported
+in `DictumRecorder/SpeakerLabels.swift`:
+
+- Segments: each final Apple result, timed by the min start and max end of its runs' `audioTimeRange` (the transcriber
+  is created with `attributeOptions: [.audioTimeRange]`), else the result's own `range`. With no time range at all, one
+  segment covers the whole recording.
+- Windows: 2 s every 1 s, a tail window at the segment's end, one window for a segment of 1.5 to 2 s, none below 1.5 s.
+- Voice prints: CAM++ (`3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`) through the sherpa-onnx 2.0.1 C API, on a
+  background task, CPU, half the processors (1 to 4), as on the desktop.
+- Clustering: agglomerative on cosine distance. Each segment takes the majority speaker of its windows (a tie goes to the
+  earliest window); speakers are numbered by first appearance; a segment with no window takes the turn it overlaps most,
+  else the nearest within 1 s.
+- Parameters: all in one struct, `SpeakerParameters`. `.desktop` is the desktop's rule exactly (windows 2/1/1.5 s,
+  complete linkage, threshold `MeetingSpeakers.DefaultThreshold` = 0.5, one vector per window). `.current`, which the
+  beta runs, is interim (coordinator, 08/11/2026, pending a sweep): the same windows, `segmentMean` (each segment's
+  L2-normalised window voice prints averaged and re-normalised, one vector per segment), average linkage (UPGMA) and
+  threshold 0.6. The facts box shows the parameters used, the number of segment vectors, the median, 90th percentile and
+  largest distance between vectors, the smallest distance left between clusters at the cut and the largest merge applied.
+  Under labelled lines the screen says the labels are a test of the method, not a result.
+- Not used: pyannote, sherpa's OfflineSpeakerDiarization (owner decision), and the desktop's owner voice print (the phone
+  has none, so the person holding the phone is also an "Other n").
+
+Memory only: while recording, the same 16 kHz PCM the seal writer gets is also copied into memory (capped at 60
+minutes, 115,200,000 bytes; the facts box says if the cap was hit). The copy is dropped when the labels are made, and the
+labels and facts on Done. Nothing is written to disk and the `.dictum` bundle is unchanged; `SealWriter.swift` and
+`DictumBundle` are untouched.
+
+The native library and the model are not in the repository (too large). See `Frameworks/README.md` and
+`Models/README.md`. Without them the app builds with a stub and the Sealed screen says the speaker model is not in this
+build.
+
+A self-check of the ported rule runs without a device: `SpeakerSelfCheck.run()` (Debug builds only) prints one PASS or
+FAIL line per case, the cases being the desktop's own tests in `tests/Dictum.Tests/MeetingSpeakersTests.cs`. To run it
+on a Mac: write a `main.swift` with `for line in SpeakerSelfCheck.run() { print(line) }` and build it with
+`xcrun swiftc -D DEBUG DictumRecorder/SpeakerLabels.swift main.swift` (outside any sandbox that blocks Swift macros).
+
+Not measured or not verified: accuracy on real voices, the time the voice prints and clustering take on a device, peak
+memory, and whether Apple's analyzer time 0 is exactly the first buffer it was given (the offset the PCM copy uses).
+
 ## Files
 
 - `DictumRecorder/Text.swift` – every user-facing string.
@@ -117,6 +160,9 @@ Not measured or not verified:
 - `DictumRecorder/RecordingController.swift` – screen state.
 - `DictumRecorder/Screens.swift` – the four screens.
 - `DictumRecorder/OnDeviceTranscript.swift` – the experimental on-device transcript (memory only).
+- `DictumRecorder/SpeakerLabels.swift` – the experimental speaker identification (memory only): the ported desktop rule,
+  the voice-print embedder (sherpa-onnx or the stub) and the in-memory PCM copy.
+- `DictumRecorder.xcconfig` – the target's base settings: optionally includes `Frameworks/Sherpa.xcconfig`.
 
 ## Licence
 

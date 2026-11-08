@@ -131,3 +131,60 @@ let PROPOSED_FactNo = "No (a network was available)"
 
 /// Copied by hand into Info.plist as NSSpeechRecognitionUsageDescription (a plist cannot read this constant).
 let PROPOSED_SpeechUsage = "Dictum Recorder can show an experimental on-device transcript while you record. Speech is processed on this device only."
+
+// MARK: - Experimental speaker identification (with the on-device transcript switch)
+
+/// Copied from the approved desktop copy in src/Dictum.Core/Meetings/Speakers/MeetingSpeakers.cs (SpeakerText, "APPROVED
+/// 08/11/2026 (owner, round 2): do not reword"): "Other {0}", with the placeholder written as %d. "%d" is the speaker
+/// number, 1 for the first voice heard.
+let APPROVED_Other = "Other %d"
+
+let PROPOSED_SpeakersWorking = "Identifying speakers (experimental)…"
+let PROPOSED_SpeakersUnavailable = "Speaker identification needs the speaker model (not in this build)."
+let PROPOSED_SpeakersTooLittle = "Too little speech to tell the voices apart."
+/// "{0}" is the system's error description.
+let PROPOSED_SpeakersFailed = "Speaker identification stopped: %@"
+/// "{0} percent" for VoiceOver on the speaker progress bar.
+let PROPOSED_SpeakersProgressValue = "%d percent"
+let PROPOSED_SpeakerLinesRegion = "On-device transcript by speaker"
+
+let PROPOSED_FactSegments = "Transcript segments"
+let PROPOSED_FactSegmentTimes = "Segment times from"
+let PROPOSED_FactTimesWords = "Word time ranges"
+let PROPOSED_FactTimesResults = "Result time ranges"
+let PROPOSED_FactTimesWhole = "No time ranges: one segment for the whole recording"
+let PROPOSED_FactWindows = "Voice windows"
+/// "{0}" windows cut from the segments, "{1}" of them with a voice print.
+let PROPOSED_FactWindowsValue = "%d cut, %d with a voice print"
+let PROPOSED_FactEmbedding = "Voice print time"
+/// "{0}" is seconds, "{1}" seconds per minute of audio, one decimal place each.
+let PROPOSED_FactEmbeddingValue = "%.1f seconds (%.1f seconds per minute of audio)"
+let PROPOSED_FactClustering = "Clustering time"
+let PROPOSED_FactSpeakers = "Speakers found"
+let PROPOSED_FactThreshold = "Separation threshold"
+/// "{0}" is the cosine-distance threshold, two decimal places.
+let PROPOSED_FactThresholdValue = "%.2f"
+let PROPOSED_FactWindowRule = "Window rule"
+/// "{0}" window seconds, "{1}" seconds between window starts, "{2}" the shortest segment given a window.
+let PROPOSED_FactWindowRuleValue = "%.1f s every %.1f s, none under %.1f s"
+let PROPOSED_FactLinkage = "Linkage"
+let PROPOSED_FactLinkageComplete = "Complete"
+let PROPOSED_FactLinkageAverage = "Average (UPGMA)"
+let PROPOSED_FactSegmentMean = "One voice print per segment"
+let PROPOSED_FactClustered = "Vectors clustered"
+let PROPOSED_FactDesktopRule = "Same as the desktop"
+let PROPOSED_FactSegmentVectors = "Segment vectors"
+let PROPOSED_FactDistanceP50 = "Distance between vectors, median"
+let PROPOSED_FactDistanceP90 = "Distance between vectors, 90th percentile"
+let PROPOSED_FactDistanceMax = "Distance between vectors, largest"
+let PROPOSED_FactSmallestBetween = "Smallest distance between clusters at the cut"
+let PROPOSED_FactLargestMerge = "Largest merge applied"
+/// "{0}" is a cosine distance, three decimal places.
+let PROPOSED_FactDistanceValue = "%.3f"
+let PROPOSED_SpeakersExperimentalNote = "Experimental: speaker labels are a test of the method, not a result. Compare the count with who was actually speaking."
+let PROPOSED_FactPcm = "Sound kept in memory"
+/// "{0}" is megabytes (1,000,000 bytes), one decimal place.
+let PROPOSED_FactMegabytes = "%.1f MB"
+let PROPOSED_FactCap = "60-minute memory limit reached"
+let PROPOSED_FactCapNo = "No"
+let PROPOSED_FactNotRun = "Not run"

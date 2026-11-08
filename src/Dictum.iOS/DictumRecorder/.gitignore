@@ -1,0 +1,9 @@
+# The speaker-identification beta's native library and model are too large for this repository (over the 5 MiB
+# private-material limit). They are copied in by hand; only the two READMEs and the xcconfig template are committed.
+# The repository's own "models/" rule also matches Models/ on a case-insensitive disk, so it is re-included here first.
+!Models/
+Models/*
+!Models/README.md
+Frameworks/*
+!Frameworks/README.md
+!Frameworks/Sherpa.xcconfig.template

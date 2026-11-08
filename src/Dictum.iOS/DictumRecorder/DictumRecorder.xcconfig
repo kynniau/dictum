@@ -1,0 +1,5 @@
+// Dictum Recorder target settings. The only setting here is an optional include: when Frameworks/Sherpa.xcconfig
+// exists (copied from Frameworks/Sherpa.xcconfig.template once the two xcframeworks are in Frameworks/), the target
+// links sherpa-onnx and onnxruntime and SpeakerLabels.swift compiles the real CAM++ embedder. When it does not exist,
+// nothing is added and the stub embedder builds. See Frameworks/README.md.
+#include? "Frameworks/Sherpa.xcconfig"

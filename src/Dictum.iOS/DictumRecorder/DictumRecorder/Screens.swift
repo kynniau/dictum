@@ -478,9 +478,20 @@ struct SealedTranscriptView: View {
                 .accessibilityElement(children: .combine)
             }
 
+            SpeakerStatusView(speakers: transcript.speakers)
+
             ScrollView {
                 Group {
-                    if transcript.finalText.isEmpty && transcript.volatileText.isEmpty && !transcript.finishing {
+                    if !labelled.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(labelled) { line in
+                                speakerLine(line)
+                            }
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(PROPOSED_SpeakerLinesRegion)
+                        .accessibilityValue(labelledText)
+                    } else if transcript.finalText.isEmpty && transcript.volatileText.isEmpty && !transcript.finishing {
                         Text(PROPOSED_TranscriptNone)
                     } else {
                         transcriptText(final: transcript.finalText, volatile: transcript.volatileText)
@@ -492,9 +503,15 @@ struct SealedTranscriptView: View {
             }
             .frame(maxHeight: 260)
 
+            if !labelled.isEmpty {
+                Text(PROPOSED_SpeakersExperimentalNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             if !transcript.finalText.isEmpty {
                 Button {
-                    UIPasteboard.general.string = transcript.finalText
+                    UIPasteboard.general.string = labelled.isEmpty ? transcript.finalText : labelledText
                     copied = true
                 } label: {
                     Label(copied ? PROPOSED_TranscriptCopied : PROPOSED_CopyTranscript, systemImage: "doc.on.doc")
@@ -519,6 +536,9 @@ struct SealedTranscriptView: View {
                                    ?? PROPOSED_FactNoFinalAfterStop)
                     LabeledContent(PROPOSED_FactThermal, value: facts.thermalAtStop)
                     LabeledContent(PROPOSED_FactOffline, value: facts.networkingOff ? PROPOSED_FactYes : PROPOSED_FactNo)
+                    if let speakerFacts = transcript.speakers.facts {
+                        SpeakerFactsView(facts: speakerFacts)
+                    }
                 }
                 .padding()
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -526,11 +546,110 @@ struct SealedTranscriptView: View {
         }
     }
 
+    /// The lines by speaker, once the speaker step is done; empty before then and when it did not run.
+    private var labelled: [SpeakerLabels.Line] {
+        transcript.speakers.state == .done ? transcript.speakers.lines : []
+    }
+
+    private static func label(_ line: SpeakerLabels.Line) -> String? {
+        line.speaker.map { String(format: APPROVED_Other, $0) }
+    }
+
+    /// "Other 1: …" per line (the text alone when no speaker is near), one line each; for Copy and VoiceOver.
+    private var labelledText: String {
+        labelled.map { line in Self.label(line).map { "\($0): \(line.text)" } ?? line.text }.joined(separator: "\n")
+    }
+
+    /// The label in bold, so it is not told apart by colour.
+    private func speakerLine(_ line: SpeakerLabels.Line) -> Text {
+        guard let label = Self.label(line) else { return Text(line.text) }
+        return Text("\(Text(label + ":").bold()) \(line.text)")
+    }
+
     private func assetText(_ outcome: OnDeviceTranscript.AssetOutcome) -> String {
         switch outcome {
         case .preinstalled: return PROPOSED_FactAssetsPreinstalled
         case let .installed(seconds): return String(format: PROPOSED_FactAssetsInstalled, seconds)
         case let .noRequest(before): return String(format: PROPOSED_FactAssetsNoRequest, before)
+        }
+    }
+}
+
+/// Screen 3: where the experimental speaker step is up to.
+struct SpeakerStatusView: View {
+    let speakers: SpeakerLabels
+
+    var body: some View {
+        switch speakers.state {
+        case .idle, .done:
+            EmptyView()
+        case let .working(fraction):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(PROPOSED_SpeakersWorking)
+                ProgressView(value: fraction)
+                    .accessibilityLabel(PROPOSED_SpeakersWorking)
+                    .accessibilityValue(String(format: PROPOSED_SpeakersProgressValue, Int(fraction * 100)))
+            }
+        case .unavailable:
+            Label(PROPOSED_SpeakersUnavailable, systemImage: "person.2.slash")
+                .accessibilityLabel(PROPOSED_SpeakersUnavailable)
+        case .tooLittleSpeech:
+            Label(PROPOSED_SpeakersTooLittle, systemImage: "person.2")
+                .accessibilityLabel(PROPOSED_SpeakersTooLittle)
+        case let .failed(reason):
+            Label(String(format: PROPOSED_SpeakersFailed, reason), systemImage: "exclamationmark.triangle")
+                .accessibilityLabel(String(format: PROPOSED_SpeakersFailed, reason))
+        }
+    }
+}
+
+/// The speaker step's measured values, inside the experiment facts box.
+struct SpeakerFactsView: View {
+    let facts: SpeakerLabels.Facts
+
+    var body: some View {
+        LabeledContent(PROPOSED_FactSegments, value: String(facts.segments))
+        LabeledContent(PROPOSED_FactSegmentTimes, value: timesText)
+        LabeledContent(PROPOSED_FactWindows, value: facts.windowsCut.map { cut in
+            String(format: PROPOSED_FactWindowsValue, cut, facts.windowsEmbedded ?? 0)
+        } ?? PROPOSED_FactNotRun)
+        LabeledContent(PROPOSED_FactEmbedding, value: facts.embedSeconds.map { seconds in
+            String(format: PROPOSED_FactEmbeddingValue, seconds, facts.embedSecondsPerAudioMinute ?? 0)
+        } ?? PROPOSED_FactNotRun)
+        LabeledContent(PROPOSED_FactClustering, value: facts.clusterSeconds.map { String(format: PROPOSED_FactSeconds, $0) }
+                       ?? PROPOSED_FactNotRun)
+        LabeledContent(PROPOSED_FactClustered, value: facts.clustered.map(String.init) ?? PROPOSED_FactNotRun)
+        if facts.parameters.segmentMean {
+            LabeledContent(PROPOSED_FactSegmentVectors, value: facts.clustered.map(String.init) ?? PROPOSED_FactNotRun)
+        }
+        LabeledContent(PROPOSED_FactDistanceP50, value: distance(facts.diagnostics?.p50))
+        LabeledContent(PROPOSED_FactDistanceP90, value: distance(facts.diagnostics?.p90))
+        LabeledContent(PROPOSED_FactDistanceMax, value: distance(facts.diagnostics?.max))
+        LabeledContent(PROPOSED_FactSmallestBetween, value: distance(facts.diagnostics?.smallestBetweenClusters))
+        LabeledContent(PROPOSED_FactLargestMerge, value: distance(facts.diagnostics?.largestMerge))
+        LabeledContent(PROPOSED_FactSpeakers, value: facts.speakersFound.map(String.init) ?? PROPOSED_FactNotRun)
+        let p = facts.parameters
+        LabeledContent(PROPOSED_FactWindowRule, value: String(format: PROPOSED_FactWindowRuleValue, p.windowSeconds,
+                                                              p.hopSeconds, p.minWindowSeconds))
+        LabeledContent(PROPOSED_FactLinkage, value: p.linkage == .complete ? PROPOSED_FactLinkageComplete
+                       : PROPOSED_FactLinkageAverage)
+        LabeledContent(PROPOSED_FactThreshold, value: String(format: PROPOSED_FactThresholdValue, p.threshold))
+        LabeledContent(PROPOSED_FactSegmentMean, value: p.segmentMean ? PROPOSED_FactYes : PROPOSED_FactCapNo)
+        LabeledContent(PROPOSED_FactDesktopRule, value: p == .desktop ? PROPOSED_FactYes : PROPOSED_FactCapNo)
+        LabeledContent(PROPOSED_FactPcm, value: String(format: PROPOSED_FactMegabytes, Double(facts.pcmBytes) / 1_000_000))
+        LabeledContent(PROPOSED_FactCap, value: facts.capHit ? PROPOSED_FactYes : PROPOSED_FactCapNo)
+    }
+
+    /// Three decimals, or "Not run" when there was no such distance.
+    private func distance(_ value: Double?) -> String {
+        value.map { String(format: PROPOSED_FactDistanceValue, $0) } ?? PROPOSED_FactNotRun
+    }
+
+    private var timesText: String {
+        switch facts.timeSource {
+        case .wordRanges: return PROPOSED_FactTimesWords
+        case .resultRanges: return PROPOSED_FactTimesResults
+        case .wholeRecording: return PROPOSED_FactTimesWhole
         }
     }
 }

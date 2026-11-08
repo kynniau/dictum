@@ -14,12 +14,31 @@
 		D1C700000000000000000002 /* DictumRecorder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DictumRecorder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1C700000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D1C700000000000000000004 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		D1C700000000000000000005 /* DictumRecorder.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DictumRecorder.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D1C700000000000000000012 /* Exceptions for "Models" folder in "DictumRecorder" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				README.md,
+			);
+			target = D1C700000000000000000040 /* DictumRecorder */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D1C700000000000000000010 /* DictumRecorder */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DictumRecorder;
+			sourceTree = "<group>";
+		};
+		D1C700000000000000000011 /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D1C700000000000000000012 /* Exceptions for "Models" folder in "DictumRecorder" target */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -40,6 +59,8 @@
 			isa = PBXGroup;
 			children = (
 				D1C700000000000000000010 /* DictumRecorder */,
+				D1C700000000000000000011 /* Models */,
+				D1C700000000000000000005 /* DictumRecorder.xcconfig */,
 				D1C700000000000000000003 /* Info.plist */,
 				D1C700000000000000000004 /* README.md */,
 				D1C700000000000000000031 /* Products */,
@@ -71,6 +92,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				D1C700000000000000000010 /* DictumRecorder */,
+				D1C700000000000000000011 /* Models */,
 			);
 			name = DictumRecorder;
 			packageProductDependencies = (
@@ -191,6 +213,7 @@
 		};
 		D1C700000000000000000061 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1C700000000000000000005 /* DictumRecorder.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -225,6 +248,7 @@
 		};
 		D1C700000000000000000062 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1C700000000000000000005 /* DictumRecorder.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
