@@ -64,7 +64,10 @@ internal sealed class SettingsWindow : Window
     /// <summary>Selects a page by name ("Storage", "Clean-up"…); an unknown name keeps the current page.</summary>
     public void ShowPage(string name)
     {
-        if (Array.IndexOf(_names, name) is var index and >= 0 && _nav.SelectedIndex != index)
+        // A name that is not listed (Meetings where there is no credential store) never builds its page.
+        var index = Array.IndexOf(_names, name);
+        if (index < 0) return;
+        if (_nav.SelectedIndex != index)
         {
             _nav.SelectedIndex = index; // raises SelectionChanged, which lands here again
             return;

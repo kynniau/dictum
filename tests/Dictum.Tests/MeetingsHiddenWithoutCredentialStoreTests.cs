@@ -42,6 +42,22 @@ public sealed class MeetingsHiddenWithoutCredentialStoreTests
     });
 
     [Fact]
+    public Task ShowPage_by_name_never_builds_the_Meetings_page_without_a_store() => UiSession.Run(() =>
+    {
+        var (without, s1) = Make(storeAvailable: false);
+        var (with, s2) = Make(storeAvailable: true);
+        using (s1) using (s2) using (without) using (with)
+        {
+            var hidden = new SettingsWindow(without);
+            hidden.ShowPage(MeetingsText.PROPOSED_Meetings);
+            Assert.Empty(hidden.GetLogicalDescendants().OfType<MeetingsPage>());
+            var shown = new SettingsWindow(with);
+            shown.ShowPage(MeetingsText.PROPOSED_Meetings);
+            Assert.Single(shown.GetLogicalDescendants().OfType<MeetingsPage>());
+        }
+    });
+
+    [Fact]
     public Task Learn_my_voice_card_is_hidden_without_a_store_and_shown_with_one() => UiSession.Run(() =>
     {
         var (without, s1) = Make(storeAvailable: false);

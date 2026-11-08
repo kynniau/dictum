@@ -7023,3 +7023,5 @@ Return: the gate is one property; it lifts by itself when the Mac Keychain store
 Pins (tests/Dictum.Tests/MeetingsHiddenWithoutCredentialStoreTests.cs): navigation has no Meetings entry without a store and keeps its place with one; the Learn my voice card is hidden without a store; the flyout shows neither entry without a store even with `meetings.enabled`; `OpenMeetings()` and `OpenMeetings(start: true)` open no window. Mutation-checked for the navigation filter and the flyout gate.
 
 Release note: the owner approved at 00:29 AEDT the first line of packaging/release-notes-mac.md, "**Dictum 1.6.0 for Mac is dictation only.** Meetings and Learn my voice are not in the Mac beta yet.", placed above the 23/10/2026 paragraph, which is unchanged; MacPackagingTests now pins two paragraphs in that order.
+
+Lens follow-up (same day): `SettingsWindow.ShowPage` now returns for a name that is not in the navigation, so a future `OpenSettings("Meetings")` on a platform without a store never builds the Meetings page; pinned by `ShowPage_by_name_never_builds_the_Meetings_page_without_a_store` (observed failing on the original condition).
