@@ -24,6 +24,11 @@ final class RecordingController {
     var startedAt: Date?
     /// Capture status while recording. Anything but .running means no sound is being captured right now.
     var captureStatus: AudioCapture.Status = .running
+    /// Peak input level of the converted audio over the last ~100 ms, 0...1.
+    var level: Double = 0
+    /// How long every converted sample has been exactly zero while capture was running, in seconds.
+    var silentSeconds: TimeInterval = 0
+    private var silentSince: Date?
     /// True when capture stopped early because the encrypted file could not be written.
     var captureFailed = false
 
@@ -90,13 +95,21 @@ final class RecordingController {
         }
         let capture = AudioCapture(sink: writer.append)
         capture.onStatus = { [weak self] status in
-            self?.captureStatus = status
+            guard let self else { return }
+            self.captureStatus = status
+            // Silence is only counted while capture runs; a pause restarts the count.
+            self.silentSince = nil
+            self.silentSeconds = 0
+        }
+        capture.onLevel = { [weak self] level in
+            self?.levelReported(level)
         }
         self.writer = writer
         self.capture = capture
 
         try capture.start()
         startedAt = now
+        resetLevel()
         captureFailed = false
         captureStatus = .running
         phase = .recording
@@ -120,6 +133,30 @@ final class RecordingController {
 
     // MARK: - Screen 2
 
+    private func levelReported(_ value: Double) {
+        guard case .recording = phase, captureStatus == .running else { return }
+        level = value
+        if value > 0 {
+            silentSince = nil
+            silentSeconds = 0
+        } else {
+            let now = Date()
+            if silentSince == nil { silentSince = now }
+            silentSeconds = now.timeIntervalSince(silentSince ?? now)
+        }
+    }
+
+    private func resetLevel() {
+        level = 0
+        silentSeconds = 0
+        silentSince = nil
+    }
+
+    /// True after 3 s of continuous all-zero input while capture is running.
+    var noSoundDetected: Bool {
+        captureStatus == .running && silentSeconds >= 3
+    }
+
     func resumeTapped() {
         capture?.resume()
     }
@@ -142,6 +179,7 @@ final class RecordingController {
         meetingHex = nil
         startedAt = nil
         captureStatus = .running
+        resetLevel()
     }
 
     // MARK: - Screen 3 and errors

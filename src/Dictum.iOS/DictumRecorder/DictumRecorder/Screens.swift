@@ -145,6 +145,19 @@ struct RecordingView: View {
                 }
             }
 
+            // Bar length shows the input level; VoiceOver reads it as a percentage.
+            ProgressView(value: controller.level)
+                .progressViewStyle(.linear)
+                .frame(maxWidth: 280)
+                .accessibilityLabel(PROPOSED_InputLevel)
+                .accessibilityValue(String(format: PROPOSED_InputLevelValue, Int((controller.level * 100).rounded())))
+
+            if controller.noSoundDetected {
+                Label(PROPOSED_NoSoundDetected, systemImage: "mic.slash")
+                    .font(.body.weight(.semibold))
+                    .multilineTextAlignment(.center)
+            }
+
             Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
                 .font(.title2)
                 .multilineTextAlignment(.center)

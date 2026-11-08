@@ -43,6 +43,10 @@ let PROPOSED_ScriptVersion = "PROPOSED-ios-2026-11-08-v1"
 
 let PROPOSED_RecordingIndicator = "Recording"
 let PROPOSED_ElapsedLabel = "Elapsed time"
+let PROPOSED_InputLevel = "Input level"
+/// "{0} percent" for VoiceOver on the input level bar.
+let PROPOSED_InputLevelValue = "%d percent"
+let PROPOSED_NoSoundDetected = "No sound is reaching the microphone. Check the phone is not being controlled from another device and that the microphone is allowed."
 let PROPOSED_Stop = "Stop and seal"
 let PROPOSED_Sealing = "Sealing…"
 /// Shown only when the system ended an interruption (for example a phone call) without allowing capture to resume.

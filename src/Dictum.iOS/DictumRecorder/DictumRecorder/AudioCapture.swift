@@ -21,6 +21,9 @@ final class AudioCapture {
 
     /// Called on the main thread whenever the capture status changes.
     var onStatus: ((Status) -> Void)?
+    /// Called on the main thread about ten times a second with the peak |sample| of the converted audio since the
+    /// last report, 0...1 (0 means every converted sample was exactly zero). Set before `start()`.
+    var onLevel: ((Double) -> Void)?
 
     init(sink: @escaping (Data) -> Void) {
         self.sink = sink
@@ -75,8 +78,12 @@ final class AudioCapture {
         converter.downmix = true
 
         let sink = self.sink
+        let meter = LevelMeter(report: onLevel)
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
-            if let data = Self.convert(buffer, with: converter) { sink(data) }
+            if let data = Self.convert(buffer, with: converter) {
+                meter.add(data)
+                sink(data)
+            }
         }
         engine.prepare()
         try engine.start()
@@ -173,5 +180,32 @@ final class AudioCapture {
         observers = []
         engine = AVAudioEngine()
         observe(AVAudioSession.sharedInstance())
+    }
+}
+
+/// Peak meter for the converted PCM. Used only from the audio tap's thread (tap callbacks arrive one at a time);
+/// it reports to the main thread at most every 100 ms.
+private final class LevelMeter {
+    private let report: ((Double) -> Void)?
+    private var peak: Int32 = 0
+    private var lastReport: UInt64 = 0
+    private static let intervalNanos: UInt64 = 100_000_000
+
+    init(report: ((Double) -> Void)?) { self.report = report }
+
+    func add(_ pcm: Data) {
+        guard let report else { return }
+        pcm.withUnsafeBytes { raw in
+            for sample in raw.bindMemory(to: Int16.self) {
+                let magnitude = abs(Int32(Int16(littleEndian: sample)))
+                if magnitude > peak { peak = magnitude }
+            }
+        }
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now &- lastReport >= Self.intervalNanos else { return }
+        lastReport = now
+        let level = min(1, Double(peak) / Double(Int16.max))
+        peak = 0
+        DispatchQueue.main.async { report(level) }
     }
 }
