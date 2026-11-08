@@ -134,4 +134,29 @@ public class MeetingKeyringRaceTests
             Assert.Skip("This logon session has no credential set (ERROR_NO_SUCH_LOGON_SESSION).");
         }
     }
+
+    /// <summary>The other process won the create, then its entry vanished before this process could read it back.</summary>
+    private sealed class VanishingStore : ICredentialStore
+    {
+        public int Writes { get; private set; }
+        public bool Available => true;
+        public string? Name => "Vanishing store";
+        public void Write(string variable, string id, string value) => Writes++;
+        public bool TryCreate(string variable, string id, string value) => false;
+        public string? Read(string variable, string id) => null;
+        public bool Delete(string variable, string id) => false;
+        public IReadOnlyList<(string Variable, string Id)> List() => [];
+    }
+
+    /// <summary>
+    /// Losing the create and then reading nothing is reported as locked, never papered over with a new key (merge lens 08/11/2026):
+    /// writing one here would be the overwrite this change exists to prevent.
+    /// </summary>
+    [Fact]
+    public void Losing_the_create_and_then_reading_nothing_is_locked_and_writes_nothing()
+    {
+        var store = new VanishingStore();
+        Assert.Throws<MeetingsLockedException>(() => new MeetingKeyring(store).OwnerKey());
+        Assert.Equal(0, store.Writes);
+    }
 }
