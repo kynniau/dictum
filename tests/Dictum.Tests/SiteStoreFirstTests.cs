@@ -188,7 +188,7 @@ public sealed class SiteStoreFirstTests
     [InlineData("index.html", "Cloud clean-up and cloud speech only if you turn them on. Once your models are downloaded it works with the internet off.")]
     [InlineData("index.html", "Cloud speech (off by default): the recording of each dictation goes to the service you chose, OpenAI, Azure OpenAI, Groq or a server you name, with your own key where the service needs one, behind its own consent step. Your dictionary words go with it as a hint. Dictum does not validate or certify how that service handles your voice.")]
     [InlineData("index.html", "api.openai.com, {resource}.openai.azure.com, api.groq.com Off by default")]
-    [InlineData("index.html", "No. Nothing is trained, and your voice stays on your PC unless you turn on cloud speech. More in the help guide.")]
+    [InlineData("index.html", "You can choose to let Dictum recognise your voice with a voice print, but nothing is trained and no model is changed. More in the help guide.")]
     [InlineData("index.html", "Where your speech is processed On your PC by default")]
     [InlineData("index.html", "Runs on your PC by default")] // owner, 22/10/2026 22:05 AEDT (qualifier added)
     [InlineData("index.html", "Dictum does the work on your own computer by default, for free.")] // owner, 22/10/2026 22:05 AEDT (qualifier added)

@@ -22,7 +22,7 @@ re-check every line against the release build before submitting.
 | Generative AI report path (section 9, item 12) | Not in the app | A "Report a problem" action in the app. |
 | Cloud clean-up consent (section 9, item 13) | Enabled only by editing settings.json | An in-app opt-in that says what is sent and to whom. |
 | Privacy link inside the app (section 9, item 5) | Not in the app | A Privacy link in About or Settings. |
-| Package version (added 16/10/2026) | `<Version>` 1.5.1, so the package is 1.5.1.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 to 1.3.1 on 23/10/2026, to 1.4.0 on 05/11/2026, to 1.5.0 on 05/11/2026 and to 1.5.1 on 07/11/2026, so `package-msix.ps1 -Store` builds. |
+| Package version (added 16/10/2026) | `<Version>` 1.6.0, so the package is 1.6.0.0 (1.0.0.0 was the first submission) | The Store rejects a first part of 0 (section 6); the product moved to 1.0.0 on 16/10/2026, to 1.1.0 on 17/10/2026, to 1.1.1 on 19/10/2026, to 1.1.2 on 21/10/2026, to 1.2.0 on 22/10/2026, to 1.2.1 on 22/10/2026 to 1.3.0 on 23/10/2026 to 1.3.1 on 23/10/2026, to 1.4.0 on 05/11/2026, to 1.5.0 on 05/11/2026 and to 1.5.1 on 07/11/2026, so `package-msix.ps1 -Store` builds. |
 | Visual C++ runtime (added 17/10/2026) | The second submission (resubmitted 16/10/2026) failed certification: the tester's screenshot showed "model error". Reproduced 16/10/2026 in Windows Sandbox: whisper.cpp and llama.cpp import the Visual C++ runtime, which a clean Windows lacks, and the package neither declared nor carried it | Fix in package; packaged self-test pending: the manifest declares Microsoft's framework package `Microsoft.VCLibs.140.00.UWPDesktop` (section 6), but no packaged app has yet loaded an engine with it. Rebuild with `package-msix.ps1 -Store`, pass the packaged self-test (section 10, step 4), then upload that file. |
 
 ## 2. Identity (verified: SPEC §18.1, from the Partner Center Product identity page)
@@ -159,6 +159,14 @@ Offline-only mode: no connection to anything outside your PC
 Free: no subscription, no account, no ads, no analytics, no telemetry.
 Runs on PCs without a graphics card and over Remote Desktop
 Delete models, recordings and logs from Settings, or remove everything at once
+```
+
+### What's new in this version (1.6.0)
+
+APPROVED by the owner 08/11/2026 15:34 AEDT: the 1.6.0 "What is new" paragraph (approved 14:05, speaker-names sentence 15:05, "after a sentence ends" 15:34) is also the Store listing text.
+
+```text
+Dictum 1.6.0 adds four things to Meetings and one to dictation. You can move a meeting to another computer: Export a .dictum file seals the meeting with a six-word transfer code you type on the other computer, and Import a .dictum file brings it in after you confirm the same agreement notice; the code is never stored anywhere. Meetings recorded on one track, including phone recordings, can be separated into speakers (Other 1, Other 2, and so on) once you download the speaker model from Settings > Meetings. You can name the speakers; Dictum keeps those names encrypted with the meeting on your computer, includes them in .dictum exports, and never sends them to cloud services. Learn my voice: label speech that sounds like you as You in one-track meeting recordings, and, if you choose, skip dictation that does not sound like you. Mistakes are possible; the print stays encrypted on your computer. In hands-free dictation, a pause of two seconds or more after a sentence ends now starts a new paragraph; Settings > Clean-up lets you change or turn off the pause. Nothing is sent anywhere unless you have chosen cloud speech or a cloud summary, each with its own consent.
 ```
 
 ### What's new in this version (1.5.1)
@@ -316,7 +324,7 @@ Guidance for the answers (the questionnaire wording itself is **recalled, not ve
   make (same pages, 16/10/2026).
 - **Version: resolved.** The Store requires the package version's first part to be non-zero and
   its fourth part to be 0 ("App package requirements for MSIX app", Package version numbering,
-  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.5.1 (set 07/11/2026; 1.5.0 from 05/11/2026, 1.4.0 from 05/11/2026, 1.3.1 from 23/10/2026, 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
+  retrieved 16/10/2026). `<Version>` in `Directory.Build.props` is 1.6.0 (set 08/11/2026; 1.5.1 from 07/11/2026, 1.5.0 from 05/11/2026, 1.4.0 from 05/11/2026, 1.3.1 from 23/10/2026, 1.3.0 from 23/10/2026, 1.2.1 from 22/10/2026, 1.2.0 from 22/10/2026, 1.1.2 from 21/10/2026, 1.1.1 from 19/10/2026, 1.1.0 from 17/10/2026, 1.0.0 from 16/10/2026), so
   `package-msix.ps1 -Store` builds.
 - **Dependency: the Visual C++ runtime (added 17/10/2026).** whisper.cpp and llama.cpp import `msvcp140.dll`,
   `vcruntime140.dll` and `vcruntime140_1.dll`, and their CPU builds `vcomp140.dll`. The manifest declares
