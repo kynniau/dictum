@@ -425,6 +425,16 @@ CHANGED SINCE THE LAST SUBMISSION: Dictum 1.3.1 adds a Terms of Use step. On the
 Everything else is as in the notes for 1.3.0 above: cloud clean-up (Anthropic, OpenAI or Google Gemini with the user's own key, or the user's own server) and cloud speech (OpenAI, Azure OpenAI or Groq with the user's own key, or the user's own server) are optional and off by default; each needs its own in-app consent and, for a cloud service, the user's own API key. Neither is needed for testing.
 ```
 
+### Notes for certification for 1.6.0 (APPROVED by the owner 08/11/2026 14:05 AEDT)
+
+APPROVED by the owner 08/11/2026 14:05 AEDT: all wording in the following block. In Partner Center it replaces the 1.5.1 header and "CHANGED SINCE" paragraph; the rest of the notes stay as they are.
+
+```text
+Notes written <date of submission> for Dictum 1.6.0.
+
+CHANGED SINCE THE LAST SUBMISSION: Dictum 1.6.0 extends Meetings. A meeting can be exported as a .dictum file sealed with a six-word transfer code and imported on another computer after the same agreement notice; one-track recordings can be separated into speakers after the user downloads the speaker model from Settings > Meetings; the user can make a voice print (Settings > General > Learn my voice) that labels their own speech as You and, if they turn it on, skips dictation that does not sound like them; the print is a list of numbers kept encrypted on the computer, never uploaded. Hands-free dictation starts a new paragraph after a pause. The steps to test Meetings are unchanged from the 1.5.0 notes; to test separation, download the speaker model first. Nothing is sent anywhere unless the user has chosen cloud speech or a cloud summary, each with its own consent, and the notice names that service before recording starts.
+```
+
 ### Notes for certification for 1.5.1 (APPROVED by the owner 07/11/2026 00:36 AEDT)
 
 APPROVED by the owner 07/11/2026 00:36 AEDT: all wording in the following block. In Partner Center it replaces the 1.5.0 header and "CHANGED SINCE" paragraph; the rest of the notes stay as they are.

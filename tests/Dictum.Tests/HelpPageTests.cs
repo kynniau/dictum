@@ -920,4 +920,21 @@ public class HelpPageTests
         Assert.Equal("Dictum sends nothing about you to Kynni. It has no account, no analytics, no telemetry (automatic reports on how you use an app) and no crash reporting. We never receive your audio or your text unless you send it to us yourself.",
             Plain(quote.Groups[1].Value));
     }
+
+    /// <summary>
+    /// Pin (1.6 voice print, row V18, APPROVED by the owner 08/11/2026 08:48 AEDT): the site guide carries
+    /// <see cref="Dictum.Meetings.Voice.VoiceText.APPROVED_HelpParagraph"/> word for word, as its own paragraph inside the Meetings section,
+    /// under its APPROVED comment. The in-app Help carries no Meetings text (as with the 1.5.1 paragraph), so it is not checked there.
+    /// </summary>
+    [Fact]
+    public void The_site_guide_carries_the_voice_print_help_paragraph_word_for_word()
+    {
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        var expected = "<p>" + Dictum.Meetings.Voice.VoiceText.APPROVED_HelpParagraph.Replace(">", "&gt;", StringComparison.Ordinal) + "</p>";
+        Assert.Contains("<!-- APPROVED by the owner 08/11/2026 08:48 AEDT (1.6 voice print help paragraph, row V18): do not reword -->\n    " + expected, html, StringComparison.Ordinal);
+        var meetings = html.IndexOf("<h2 id=\"meetings-title\">", StringComparison.Ordinal);
+        var faq = html.IndexOf("<h2 id=\"faq-title\">", StringComparison.Ordinal);
+        var at = html.IndexOf(expected, StringComparison.Ordinal);
+        Assert.True(meetings > 0 && meetings < at && at < faq, "the voice print paragraph sits inside the Meetings section");
+    }
 }
