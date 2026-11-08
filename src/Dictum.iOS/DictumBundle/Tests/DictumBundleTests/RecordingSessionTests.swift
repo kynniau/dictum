@@ -118,6 +118,35 @@ final class RecordingSessionTests: XCTestCase {
         XCTAssertNil(try RecordingSession.recover(directory: dir, appVersion: "0.1.0", contentKey: key), "nothing left to recover")
     }
 
+    /// Desktop import of a recovered bundle showed Duration 00:00:00 for 2 s of audio (coordinator, 08/11/2026).
+    func testRecoveredMetaCarriesSealedAudioDuration() throws {
+        let id = MeetingId.random()
+        var keySource = SystemByteSource()
+        let key = keySource.bytes(32)
+        let dir = root.appendingPathComponent("killed-two-seconds")
+        var session: RecordingSession? = try newSession(dir, id: id, key: key)
+        try appendInPieces(session!, syntheticPcm().prefix(64_000))
+        session = nil
+
+        let recovered = try XCTUnwrap(RecordingSession.recover(directory: dir, appVersion: "0.1.0", contentKey: key))
+        XCTAssertTrue(recovered.incomplete)
+        let zipData = try Data(contentsOf: recovered.url)
+        XCTAssertEqual(Int64(zipData.count), recovered.bytes)
+        let entries = try readZip(zipData)
+        let transfer = (try JSONSerialization.jsonObject(with: entries[3].data) as! [String: Any])["transfer"] as! [String: Any]
+        let salt = try XCTUnwrap(Data(base64Encoded: transfer["salt"] as! String))
+        let wrap = try XCTUnwrap(Data(base64Encoded: transfer["wrap"] as! String))
+        let content = try KeyWrap.unwrap(wrap, recipientKey: try TransferCode.deriveKey(code: recovered.transferCode, salt: salt),
+                                         recipientId: "transfer")
+        let meta = try SealedFile.open(entries[2].data, contentKey: content, meetingId: id, entryName: "meta.json.enc")
+        let expected = MeetingMeta(id: id, title: "Synthetic session", startedAt: Fixture.at, duration: 2, source: 3,
+                                   agreement: Fixture.agreement, incompleteAudioChannels: [2]).json()
+        XCTAssertEqual(String(decoding: meta, as: UTF8.self), String(decoding: expected, as: UTF8.self))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: meta) as? [String: Any])
+        XCTAssertEqual(object["Duration"] as? String, "00:00:02")
+        XCTAssertEqual(object["IncompleteAudioChannels"] as? [Int], [2])
+    }
+
     func testSecondSessionInSameDirectoryIsRefused() throws {
         let id = MeetingId.random()
         let key = Fixture.contentKey

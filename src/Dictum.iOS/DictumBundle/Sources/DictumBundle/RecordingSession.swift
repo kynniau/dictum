@@ -102,9 +102,9 @@ public final class RecordingSession {
                                 appVersion: appVersion, code: code, at: at, incomplete: false, bytes: &bytes)
     }
 
-    /// Packages an unfinished session (the app was killed): the audio stays as it is (no terminal record) and the
-    /// sealed metadata on disk is kept, so a provisional `IncompleteAudioChannels [2]` stays. Returns nil when the
-    /// directory holds no audio file.
+    /// Packages an unfinished session (the app was killed): the audio stays as it is (no terminal record). The
+    /// sealed metadata is rewritten with fresh nonces, keeping id, title, start and agreement, with the duration of
+    /// the PCM actually sealed and `IncompleteAudioChannels [2]`. Returns nil when the directory holds no audio file.
     public static func recover(directory: URL, appVersion: String, contentKey: Data,
                                bytes: some ByteSource = SystemByteSource()) throws -> FinishedBundle? {
         let fm = FileManager.default
@@ -116,11 +116,36 @@ public final class RecordingSession {
         defer { plain.zeroise() }
         guard let object = try JSONSerialization.jsonObject(with: plain) as? [String: Any],
               let started = object["StartedAt"] as? String, let startedAt = parseUtcPrefix(started),
-              let channels = object["IncompleteAudioChannels"] as? [Int] else { throw DictumBundleError.invalidMetadata }
+              object["IncompleteAudioChannels"] is [Int] else { throw DictumBundleError.invalidMetadata }
+        // The provisional meta says duration 0; measure what was actually sealed (EOF or a torn final record accepted).
+        var pcm = try ChunkedAudio.open(try Data(contentsOf: directory.appendingPathComponent(audioName)), contentKey: contentKey,
+                                        meetingId: id, channel: "mixed", incomplete: true)
+        let duration = Double(pcm.count) / 32_000.0
+        pcm.zeroise()
         var source = SharedBytes(box: SharedByteBox(bytes))
+        var updated = try recoveredMeta(plain, duration: duration)
+        defer { updated.zeroise() }
+        try writeAtomic(try SealedFile.seal(plaintext: updated, contentKey: contentKey, meetingId: id, entryName: metaName, bytes: &source),
+                        to: directory.appendingPathComponent(metaName))
         let code = TransferCode.random(using: &source)
         return try package(directory: directory, meetingId: id, contentKey: contentKey, startedAt: startedAt,
-                           appVersion: appVersion, code: code, at: Date(), incomplete: !channels.isEmpty, bytes: &source)
+                           appVersion: appVersion, code: code, at: Date(), incomplete: true, bytes: &source)
+    }
+
+    /// Rewrites only `Duration` and the incomplete-channel fields of this package's own meta JSON, so the id, title,
+    /// dates (including any fraction) and agreement stay byte-identical. A literal `"` cannot occur inside a string
+    /// value (the escaper writes it as "), so the first `,"Duration":"` is the key itself, and the incomplete
+    /// fields are always the last two properties.
+    static func recoveredMeta(_ plain: Data, duration: TimeInterval) throws -> Data {
+        var s = String(decoding: plain, as: UTF8.self)
+        guard let key = s.range(of: ",\"Duration\":\""),
+              let close = s[key.upperBound...].firstIndex(of: "\"") else { throw DictumBundleError.invalidMetadata }
+        s.replaceSubrange(s.index(before: key.upperBound)...close, with: JsonText.timeSpan(duration))
+        guard let tail = s.range(of: ",\"IncompleteAudioChannels\":", options: .backwards) else { throw DictumBundleError.invalidMetadata }
+        s.replaceSubrange(tail.lowerBound..., with: ",\"IncompleteAudioChannels\":[2],\"AudioIncomplete\":true}")
+        let data = Data(s.utf8)
+        guard (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { throw DictumBundleError.invalidMetadata }
+        return data
     }
 
     // MARK: - Internals
