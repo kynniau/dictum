@@ -210,6 +210,15 @@ from the app, bundle writer unchanged, demo branch frozen):
   screens rendered as designed (V, images read by this session and sent to Kyle). The Review and email
   screens were not in the run and have not been seen rendered; the on-device summary has not been run.
 
+### 8.7 Stage build decision (22:25–23:34)
+
+Kyle chose to replace the frozen demo build on the iPhone with the proof of concept ("yes, install on
+iphone"), superseding the orchestrator's frozen-iPhone condition. Installed on the iPhone 17 Pro Max at
+23:33:51 AEDT: build stamped `43da2eb` (app code identical to eb43094; 43da2eb adds only this report). The
+iPad carries eb43094 (22:20). Gate agreed with the orchestrator: a rung-3 rehearsal bundle recorded on the
+iPhone by this build with the experimental switch OFF must open on the PC before the day (decrypt, meta,
+audio levels, import); if it does not, 43ce329 is reinstalled tonight. Result: pending at the time of writing.
+
 ### 8.5 Not run this evening
 
 Five-minute recording with the switch on; two-person speaker test on the iPad (pending Kyle); peak
