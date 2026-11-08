@@ -10,6 +10,7 @@ namespace Dictum.Tests;
 /// (ICredentialStore.TryCreate). The process that loses must use the winner's key: a replaced owner key leaves every meeting
 /// sealed with the first one unreadable for ever (decision D2).
 /// </summary>
+[Collection("Windows Credential Manager")]
 public class MeetingKeyringRaceTests
 {
     /// <summary>Another process stores its key between this process's first Read and its TryCreate.</summary>

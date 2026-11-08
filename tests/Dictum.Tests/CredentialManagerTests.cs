@@ -9,6 +9,11 @@ namespace Dictum.Tests;
 /// API keys on Windows (decision D1, 30/10/2026): the real Credential Manager under the account running the tests. Each test
 /// removes only the entries it made, by id; RemoveAll is never called here, so no key the user stored is touched.
 /// </summary>
+/// <summary>Tests that write the real Windows Credential Manager run one class at a time: a count or a listing taken while another class adds or removes its scratch credential is wrong (seen 08/11/2026 when MeetingKeyringRaceTests joined).</summary>
+[CollectionDefinition("Windows Credential Manager", DisableParallelization = true)]
+public sealed class WindowsCredentialManagerCollection;
+
+[Collection("Windows Credential Manager")]
 public class CredentialManagerTests
 {
     private const int ErrorNoSuchLogonSession = 1312;
