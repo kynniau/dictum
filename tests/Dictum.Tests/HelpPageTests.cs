@@ -929,7 +929,9 @@ public class HelpPageTests
     [Fact]
     public void The_site_guide_carries_the_voice_print_help_paragraph_word_for_word()
     {
-        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html"));
+        // Line endings normalised: a Windows checkout with core.autocrlf on reads the page with CRLF (CI, 08/11/2026), and the
+        // comment-then-paragraph check below spans a line break.
+        var html = File.ReadAllText(Path.Combine(FixBatchDownloadTests.RepoRoot(), "site", "help.html")).Replace(((char)13).ToString(), "", StringComparison.Ordinal);
         var expected = "<p>" + Dictum.Meetings.Voice.VoiceText.APPROVED_HelpParagraph.Replace(">", "&gt;", StringComparison.Ordinal) + "</p>";
         Assert.Contains("<!-- APPROVED by the owner 08/11/2026 08:48 AEDT (1.6 voice print help paragraph, row V18): do not reword -->\n    " + expected, html, StringComparison.Ordinal);
         var meetings = html.IndexOf("<h2 id=\"meetings-title\">", StringComparison.Ordinal);
