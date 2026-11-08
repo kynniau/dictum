@@ -15,6 +15,7 @@
 		D1C700000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D1C700000000000000000004 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D1C700000000000000000005 /* DictumRecorder.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DictumRecorder.xcconfig; sourceTree = "<group>"; };
+		D1C700000000000000000080 /* DictumRecorderUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DictumRecorderUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -41,6 +42,11 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		D1C700000000000000000081 /* DictumRecorderUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DictumRecorderUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +58,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D1C700000000000000000082 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -60,6 +73,7 @@
 			children = (
 				D1C700000000000000000010 /* DictumRecorder */,
 				D1C700000000000000000011 /* Models */,
+				D1C700000000000000000081 /* DictumRecorderUITests */,
 				D1C700000000000000000005 /* DictumRecorder.xcconfig */,
 				D1C700000000000000000003 /* Info.plist */,
 				D1C700000000000000000004 /* README.md */,
@@ -71,6 +85,7 @@
 			isa = PBXGroup;
 			children = (
 				D1C700000000000000000002 /* DictumRecorder.app */,
+				D1C700000000000000000080 /* DictumRecorderUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -102,7 +117,48 @@
 			productReference = D1C700000000000000000002 /* DictumRecorder.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D1C700000000000000000085 /* DictumRecorderUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D1C700000000000000000088 /* Build configuration list for PBXNativeTarget "DictumRecorderUITests" */;
+			buildPhases = (
+				D1C700000000000000000083 /* Sources */,
+				D1C700000000000000000082 /* Frameworks */,
+				D1C700000000000000000084 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D1C700000000000000000087 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D1C700000000000000000081 /* DictumRecorderUITests */,
+			);
+			name = DictumRecorderUITests;
+			packageProductDependencies = (
+			);
+			productName = DictumRecorderUITests;
+			productReference = D1C700000000000000000080 /* DictumRecorderUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		D1C700000000000000000086 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D1C700000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D1C700000000000000000040;
+			remoteInfo = DictumRecorder;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		D1C700000000000000000087 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D1C700000000000000000040 /* DictumRecorder */;
+			targetProxy = D1C700000000000000000086 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		D1C700000000000000000001 /* Project object */ = {
@@ -114,6 +170,10 @@
 				TargetAttributes = {
 					D1C700000000000000000040 = {
 						CreatedOnToolsVersion = 27.2;
+					};
+					D1C700000000000000000085 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = D1C700000000000000000040;
 					};
 				};
 			};
@@ -135,6 +195,7 @@
 			projectRoot = "";
 			targets = (
 				D1C700000000000000000040 /* DictumRecorder */,
+				D1C700000000000000000085 /* DictumRecorderUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -147,10 +208,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D1C700000000000000000084 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D1C700000000000000000021 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D1C700000000000000000083 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -281,6 +356,44 @@
 			};
 			name = Release;
 		};
+		D1C700000000000000000089 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PX6W25UNPP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kynni.dictum.recorder.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DictumRecorder;
+			};
+			name = Debug;
+		};
+		D1C70000000000000000008A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PX6W25UNPP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kynni.dictum.recorder.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DictumRecorder;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -298,6 +411,15 @@
 			buildConfigurations = (
 				D1C700000000000000000061 /* Debug */,
 				D1C700000000000000000062 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D1C700000000000000000088 /* Build configuration list for PBXNativeTarget "DictumRecorderUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D1C700000000000000000089 /* Debug */,
+				D1C70000000000000000008A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

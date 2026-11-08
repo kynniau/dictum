@@ -87,6 +87,7 @@ struct HomeView: View {
             }
             .buttonStyle(.dictumCompact)
             .accessibilityLabel(PROPOSED_SettingsButton)
+            .accessibilityIdentifier("home.settings")
         } content: {
             Text(PROPOSED_ProofOfConcept)
                 .font(.footnote.weight(.medium))
@@ -97,6 +98,7 @@ struct HomeView: View {
 
             PrimaryButton(title: PROPOSED_NewMeeting, systemImage: "mic.fill") { controller.newMeetingTapped() }
                 .font(.title3)
+                .accessibilityIdentifier("home.newMeeting")
 
             SectionHeader(PROPOSED_SealedRecordings)
 

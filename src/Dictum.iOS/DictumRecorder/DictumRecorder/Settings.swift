@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 // Non-sensitive choices only, kept in UserDefaults: which engine, whether the experimental transcript and speaker labels
 // are on, the separation threshold, the meeting type and the summary engine. Nothing said in a meeting, no name, no
@@ -36,6 +37,27 @@ final class AppSettings {
         static let meetingType = "settings.meetingType"
         static let engine = "settings.transcriptionEngine"
         static let summaryEngine = "settings.summaryEngine"
+        static let appearance = "settings.appearance"
+    }
+
+    /// Automatic follows the system; Light and Dark force one.
+    enum Appearance: String, CaseIterable, Identifiable {
+        case automatic, light, dark
+        var id: String { rawValue }
+        var name: String {
+            switch self {
+            case .automatic: return PROPOSED_AppearanceAutomatic
+            case .light: return PROPOSED_AppearanceLight
+            case .dark: return PROPOSED_AppearanceDark
+            }
+        }
+        var colorScheme: ColorScheme? {
+            switch self {
+            case .automatic: return nil
+            case .light: return .light
+            case .dark: return .dark
+            }
+        }
     }
 
     /// The beta's speaker threshold (SpeakerParameters.current), and the slider's range and step.
@@ -55,6 +77,18 @@ final class AppSettings {
     var transcriptionEngine: String { didSet { defaults.set(transcriptionEngine, forKey: Key.engine) } }
     /// Only "apple" (the on-device model) is selectable in this build.
     var summaryEngine: String { didSet { defaults.set(summaryEngine, forKey: Key.summaryEngine) } }
+    var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: Key.appearance) } }
+
+    /// `-DictumAppearance light|dark|automatic` on the launch command line overrides the stored value for that launch
+    /// only (screenshot tests); it is never stored.
+    let launchAppearance: Appearance? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let at = arguments.firstIndex(of: "-DictumAppearance"), at + 1 < arguments.count else { return nil }
+        return Appearance(rawValue: arguments[at + 1].lowercased())
+    }()
+
+    /// What the root applies with `.preferredColorScheme`: nil follows the system.
+    var colorScheme: ColorScheme? { (launchAppearance ?? appearance).colorScheme }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -65,6 +99,7 @@ final class AppSettings {
         meetingTypeId = MeetingType.with(id: defaults.string(forKey: Key.meetingType) ?? "general").id
         transcriptionEngine = "apple"
         summaryEngine = "apple"
+        appearance = Appearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .automatic
     }
 
     var meetingType: MeetingType { MeetingType.with(id: meetingTypeId) }

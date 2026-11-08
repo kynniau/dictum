@@ -8,6 +8,7 @@ struct DictumRecorderApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(controller: controller)
+                .preferredColorScheme(controller.settings.colorScheme)
         }
     }
 }

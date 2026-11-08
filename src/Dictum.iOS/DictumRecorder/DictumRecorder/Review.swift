@@ -79,6 +79,7 @@ struct ReviewView: View {
 
             SecondaryButton(title: PROPOSED_ComposeEmail, systemImage: "envelope") { composing = true }
             PrimaryButton(title: PROPOSED_ContinueToSealed, systemImage: "lock.fill") { controller.continueToSealed() }
+                .accessibilityIdentifier("review.continue")
         }
         .sheet(isPresented: $composing) {
             ComposeEmailSheet(review: review)

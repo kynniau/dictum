@@ -127,6 +127,7 @@ struct ConsentView: View {
             .buttonStyle(.dictumPrimary)
             .disabled(starting || !controller.transcript.canStart)
             .accessibilityLabel(APPROVED_Start)
+            .accessibilityIdentifier("consent.start")
 
             if !controller.transcript.canStart {
                 Text(PROPOSED_StartNeedsModel)
@@ -249,6 +250,7 @@ struct RecordingView: View {
             .buttonStyle(.dictumPrimary)
             .disabled(sealing)
             .accessibilityLabel(sealing ? PROPOSED_Sealing : PROPOSED_Stop)
+            .accessibilityIdentifier("recording.stop")
         }
         .padding(.vertical, 12)
         .dictumPage()
@@ -351,6 +353,7 @@ struct SealedView: View {
             SecondaryButton(title: PROPOSED_ComposeEmail, systemImage: "envelope") { composing = true }
 
             SecondaryButton(title: PROPOSED_Done, action: done)
+                .accessibilityIdentifier("sealed.done")
         }
         .sheet(isPresented: $composing) {
             ComposeEmailSheet(review: review)

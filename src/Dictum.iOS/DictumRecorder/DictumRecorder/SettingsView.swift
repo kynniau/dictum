@@ -15,6 +15,7 @@ struct SettingsView: View {
                 speakerSection
                 meetingTypeSection
                 summarySection
+                appearanceSection
                 keepSection
                 aboutSection
             }
@@ -27,6 +28,7 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(PROPOSED_SettingsDone) { dismiss() }
                         .accessibilityLabel(PROPOSED_SettingsDone)
+                        .accessibilityIdentifier("settings.back")
                 }
             }
         }
@@ -122,6 +124,22 @@ struct SettingsView: View {
             engineRow(PROPOSED_SummaryOwnKey, detail: PROPOSED_NotInThisBuild, selected: false, enabled: false) {}
         } header: {
             Text(PROPOSED_SectionSummary).accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section {
+            Picker(PROPOSED_SectionAppearance, selection: $settings.appearance) {
+                ForEach(AppSettings.Appearance.allCases) { option in
+                    Text(option.name).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(minHeight: DictumTheme.minTarget)
+            .accessibilityLabel(PROPOSED_SectionAppearance)
+            .listRowBackground(DictumTheme.surface)
+        } header: {
+            Text(PROPOSED_SectionAppearance).accessibilityAddTraits(.isHeader)
         }
     }
 
