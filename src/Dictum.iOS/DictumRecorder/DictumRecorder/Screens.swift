@@ -1,19 +1,45 @@
 import DictumBundle
 import SwiftUI
 
-// Plain screens with large touch targets. Every control has an accessibility label; text uses Dynamic Type styles;
-// no meaning is carried by colour alone.
+// The recording screens in Dictum's design language (Theme.swift). Every control has an accessibility label; text uses
+// Dynamic Type styles; no meaning is carried by colour alone; targets are at least 44 pt.
 
-private struct WideButton: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .contentShape(Rectangle())
+/// A text field on a surface, with the site's control radius and border.
+struct DictumFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .font(.body)
+            .foregroundStyle(DictumTheme.text)
+            .padding(.horizontal, 12)
+            .frame(minHeight: DictumTheme.minTarget)
+            .background(DictumTheme.surface, in: RoundedRectangle(cornerRadius: DictumTheme.radiusControl))
+            .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusControl).strokeBorder(DictumTheme.borderStrong, lineWidth: 1))
     }
 }
 
-private extension View {
-    func wide() -> some View { modifier(WideButton()) }
+/// A scrolling page on bg with the top bar, content at a readable width.
+struct DictumScreen<Trailing: View, Content: View>: View {
+    @ViewBuilder var trailing: Trailing
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                DictumTopBar { trailing }
+                content
+            }
+            .padding(.vertical, 12)
+            .dictumPage()
+        }
+        .background(DictumTheme.bg.ignoresSafeArea())
+    }
+}
+
+extension DictumScreen where Trailing == EmptyView {
+    init(@ViewBuilder content: () -> Content) {
+        trailing = EmptyView()
+        self.content = content()
+    }
 }
 
 // MARK: - Screen 1: Before you record
@@ -23,84 +49,98 @@ struct ConsentView: View {
     @State private var starting = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text(APPROVED_Before)
-                    .font(.largeTitle.bold())
-                    .accessibilityAddTraits(.isHeader)
+        DictumScreen {
+            Button { controller.backToHomeTapped() } label: {
+                Label(PROPOSED_Back, systemImage: "chevron.left")
+            }
+            .buttonStyle(.dictumCompact)
+            .disabled(starting)
+            .accessibilityLabel(PROPOSED_Back)
+        } content: {
+            Text(APPROVED_Before)
+                .dictumTitle()
+                .accessibilityAddTraits(.isHeader)
 
+            DictumCard {
                 Text(APPROVED_Agreement)
                     .font(.body)
+                    .foregroundStyle(DictumTheme.text)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(PROPOSED_Points, id: \.self) { point in
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text("•").accessibilityHidden(true)
+                    ForEach(Array(PROPOSED_Points.enumerated()), id: \.offset) { index, point in
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text("\(index + 1)")
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(DictumTheme.text)
+                                .frame(minWidth: 26, minHeight: 26)
+                                .background(DictumTheme.accentSoft, in: Circle())
+                                .accessibilityHidden(true)
                             Text(point)
+                                .font(.body)
+                                .foregroundStyle(DictumTheme.text)
                         }
                         .accessibilityElement(children: .combine)
                     }
                 }
+            }
 
-                Text(APPROVED_How)
+            SectionHeader(APPROVED_How)
+            // A segmented control truncates these approved labels on an iPhone, so the two choices are full-width
+            // rows; each shows a filled or empty circle and announces itself as selected.
+            VStack(spacing: 8) {
+                choice(APPROVED_Spoken, value: "spoken")
+                choice(APPROVED_Written, value: "written")
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(PROPOSED_TitleLabel)
                     .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                // A segmented control truncates these approved labels on an iPhone, so the two choices are full-width
-                // rows; each shows a filled or empty circle and announces itself as selected.
-                VStack(spacing: 8) {
-                    choice(APPROVED_Spoken, value: "spoken")
-                    choice(APPROVED_Written, value: "written")
-                }
+                    .foregroundStyle(DictumTheme.text)
+                TextField(PROPOSED_TitleLabel, text: $controller.title)
+                    .textFieldStyle(DictumFieldStyle())
+                    .submitLabel(.done)
+                    .accessibilityLabel(PROPOSED_TitleLabel)
+            }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(PROPOSED_TitleLabel).font(.headline)
-                    TextField(PROPOSED_TitleLabel, text: $controller.title)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.body)
-                        .submitLabel(.done)
-                        .accessibilityLabel(PROPOSED_TitleLabel)
-                }
+            if controller.transcript.supported {
+                TranscriptSetupView(transcript: controller.transcript, settings: controller.settings)
+            }
 
-                if controller.transcript.supported {
-                    TranscriptSetupView(transcript: controller.transcript)
-                }
-
-                if controller.micDenied {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label(PROPOSED_MicDenied, systemImage: "mic.slash")
-                            .font(.body.weight(.semibold))
-                        Button(PROPOSED_OpenSettings) { controller.openSettings() }
-                            .buttonStyle(.bordered)
-                            .controlSize(.large)
-                            .accessibilityLabel(PROPOSED_OpenSettings)
-                    }
-                    .padding()
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                }
-
-                Button {
-                    starting = true
-                    Task {
-                        await controller.startTapped()
-                        starting = false
-                    }
-                } label: {
-                    Text(APPROVED_Start)
-                        .font(.headline)
-                        .multilineTextAlignment(.center)
-                        .wide()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(starting || !controller.transcript.canStart)
-                .accessibilityLabel(APPROVED_Start)
-
-                if !controller.transcript.canStart {
-                    Text(PROPOSED_StartNeedsModel)
-                        .font(.footnote)
+            if controller.micDenied {
+                DictumCard {
+                    Label(PROPOSED_MicDenied, systemImage: "mic.slash")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(DictumTheme.text)
+                    SecondaryButton(title: PROPOSED_OpenSettings) { controller.openSettings() }
                 }
             }
-            .padding(20)
+
+            Button {
+                starting = true
+                Task {
+                    await controller.startTapped()
+                    starting = false
+                }
+            } label: {
+                Text(APPROVED_Start)
+            }
+            .buttonStyle(.dictumPrimary)
+            .disabled(starting || !controller.transcript.canStart)
+            .accessibilityLabel(APPROVED_Start)
+
+            if !controller.transcript.canStart {
+                Text(PROPOSED_StartNeedsModel)
+                    .font(.footnote)
+                    .foregroundStyle(DictumTheme.text)
+            }
+        }
+        // The stored experimental switch (Settings) is applied once support is known; Done turns it off in memory,
+        // so it is re-applied for each new meeting.
+        .task(id: controller.transcript.supported) {
+            let transcript = controller.transcript
+            if transcript.supported, controller.settings.transcribeOnDevice, !transcript.enabled {
+                await transcript.setEnabled(true)
+            }
         }
     }
 
@@ -112,16 +152,21 @@ struct ConsentView: View {
             HStack(spacing: 12) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.title2)
+                    .foregroundStyle(selected ? DictumTheme.link : DictumTheme.text)
                     .accessibilityHidden(true)
                 Text(label)
                     .font(.body)
+                    .foregroundStyle(DictumTheme.text)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)
-            .wide()
-            .background(RoundedRectangle(cornerRadius: 12).strokeBorder(selected ? Color.accentColor : Color.secondary,
-                                                                        lineWidth: selected ? 3 : 1))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(selected ? DictumTheme.accentSoft : DictumTheme.surface,
+                        in: RoundedRectangle(cornerRadius: DictumTheme.radiusCard))
+            .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusCard)
+                .strokeBorder(selected ? DictumTheme.accent : DictumTheme.borderStrong, lineWidth: selected ? 2 : 1))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -140,15 +185,17 @@ struct RecordingView: View {
     }
 
     var body: some View {
-        VStack(spacing: 28) {
-            Spacer()
+        VStack(spacing: 24) {
+            DictumTopBar()
+            Spacer(minLength: 8)
             RecordingIndicator()
 
             if let start = controller.startedAt {
                 TimelineView(.periodic(from: start, by: 1)) { context in
                     let text = Self.elapsed(from: start, to: context.date)
                     Text(text)
-                        .font(.system(.largeTitle, design: .rounded).monospacedDigit())
+                        .font(.system(.largeTitle, design: .rounded).weight(.semibold).monospacedDigit())
+                        .foregroundStyle(DictumTheme.text)
                         .accessibilityLabel(PROPOSED_ElapsedLabel)
                         .accessibilityValue(text)
                 }
@@ -157,14 +204,13 @@ struct RecordingView: View {
             // Bar length shows the input level; VoiceOver reads it as a percentage.
             ProgressView(value: controller.level)
                 .progressViewStyle(.linear)
+                .tint(DictumTheme.accent)
                 .frame(maxWidth: 280)
                 .accessibilityLabel(PROPOSED_InputLevel)
                 .accessibilityValue(String(format: PROPOSED_InputLevelValue, Int((controller.level * 100).rounded())))
 
             if controller.noSoundDetected {
-                Label(PROPOSED_NoSoundDetected, systemImage: "mic.slash")
-                    .font(.body.weight(.semibold))
-                    .multilineTextAlignment(.center)
+                StatusPill(kind: .warning, text: PROPOSED_NoSoundDetected)
             }
 
             if controller.transcript.active {
@@ -172,23 +218,18 @@ struct RecordingView: View {
             }
 
             Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
-                .font(.title2)
+                .dictumTitle(.title2)
                 .multilineTextAlignment(.center)
 
             if controller.captureStatus != .running {
                 VStack(spacing: 12) {
-                    Label(PROPOSED_Interrupted, systemImage: "pause.circle")
-                        .font(.body.weight(.semibold))
-                        .multilineTextAlignment(.center)
+                    StatusPill(kind: .warning, text: PROPOSED_Interrupted)
                     if controller.captureStatus == .needsUser {
-                        Button { controller.resumeTapped() } label: { Text(PROPOSED_Resume).font(.headline).wide() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                        .accessibilityLabel(PROPOSED_Resume)
+                        SecondaryButton(title: PROPOSED_Resume) { controller.resumeTapped() }
                     }
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
 
             Button {
                 Task { await controller.stopTapped() }
@@ -196,22 +237,23 @@ struct RecordingView: View {
                 Group {
                     if sealing {
                         HStack(spacing: 10) {
-                            ProgressView()
+                            ProgressView().tint(DictumTheme.onAccent)
                             Text(PROPOSED_Sealing)
                         }
                     } else {
                         Label(PROPOSED_Stop, systemImage: "stop.fill")
                     }
                 }
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity, minHeight: 72)
+                .font(.title2.weight(.semibold))
+                .frame(minHeight: 48)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.dictumPrimary)
             .disabled(sealing)
             .accessibilityLabel(sealing ? PROPOSED_Sealing : PROPOSED_Stop)
         }
-        .padding(20)
+        .padding(.vertical, 12)
+        .dictumPage()
+        .background(DictumTheme.bg.ignoresSafeArea())
     }
 
     static func elapsed(from start: Date, to now: Date) -> String {
@@ -228,14 +270,18 @@ struct RecordingIndicator: View {
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(Color.red)
-                .frame(width: 28, height: 28)
+                .fill(DictumTheme.recording)
+                .frame(width: 24, height: 24)
                 .scaleEffect(pulse && !reduceMotion ? 1.25 : 1)
                 .opacity(pulse && !reduceMotion ? 0.55 : 1)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
             Text(PROPOSED_RecordingIndicator)
-                .font(.title.bold())
+                .dictumTitle(.title)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(DictumTheme.recording.opacity(0.12), in: RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
+        .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusPill).strokeBorder(DictumTheme.recording.opacity(0.5), lineWidth: 1))
         .onAppear { pulse = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PROPOSED_RecordingIndicator)
@@ -247,63 +293,68 @@ struct RecordingIndicator: View {
 struct SealedView: View {
     let bundle: FinishedBundle
     let captureFailed: Bool
-    let transcript: OnDeviceTranscript
+    let review: MeetingReview
     let done: () -> Void
+    @State private var composing = false
 
     /// Decimal megabytes (1 MB = 1 000 000 bytes, as Files shows), one decimal place, from the file's byte count.
     private var size: String { String(format: "%.1f MB", Double(bundle.bytes) / 1_000_000) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Label(PROPOSED_SealedHeading, systemImage: "lock.fill")
-                    .font(.largeTitle.bold())
-                    .accessibilityAddTraits(.isHeader)
-
-                if bundle.incomplete {
-                    Label(PROPOSED_IncompleteNote, systemImage: "exclamationmark.triangle")
-                        .font(.body.weight(.semibold))
-                }
-                if captureFailed {
-                    Label(PROPOSED_CaptureFailed, systemImage: "exclamationmark.triangle")
-                        .font(.body.weight(.semibold))
-                }
-
-                LabeledContent(PROPOSED_FileLabel, value: bundle.url.lastPathComponent)
-                LabeledContent(PROPOSED_SizeLabel, value: size)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(PROPOSED_CodeLabel).font(.headline)
-                    Text(bundle.transferCode)
-                        .font(.system(.title, design: .monospaced).weight(.semibold))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel(PROPOSED_CodeLabel)
-                        .accessibilityValue(bundle.transferCode)
-                    Text(PROPOSED_CodeHint)
-                }
-
-                ShareLink(item: bundle.url) {
-                    Label(PROPOSED_Share, systemImage: "square.and.arrow.up")
-                        .font(.headline)
-                        .wide()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .accessibilityLabel(PROPOSED_Share)
-
-                Text(PROPOSED_FilesHint)
-                    .font(.footnote)
-
-                if transcript.active {
-                    SealedTranscriptView(transcript: transcript)
-                }
-
-                Button(action: done) { Text(PROPOSED_Done).font(.headline).wide() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .accessibilityLabel(PROPOSED_Done)
+        DictumScreen {
+            HStack(spacing: 12) {
+                Image(systemName: "lock.fill")
+                    .font(.title)
+                    .foregroundStyle(DictumTheme.done)
+                    .accessibilityHidden(true)
+                Text(PROPOSED_SealedHeading)
+                    .dictumTitle()
             }
-            .padding(20)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+
+            if bundle.incomplete {
+                StatusPill(kind: .warning, text: PROPOSED_IncompleteNote)
+            }
+            if captureFailed {
+                StatusPill(kind: .warning, text: PROPOSED_CaptureFailed)
+            }
+
+            DictumCard {
+                FactRow(PROPOSED_FileLabel, value: bundle.url.lastPathComponent)
+                FactRow(PROPOSED_SizeLabel, value: size)
+            }
+
+            DictumCard {
+                SectionHeader(PROPOSED_CodeLabel)
+                Text(bundle.transferCode)
+                    .font(.system(.title2, design: .monospaced).weight(.semibold))
+                    .foregroundStyle(DictumTheme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityLabel(PROPOSED_CodeLabel)
+                    .accessibilityValue(bundle.transferCode)
+                Text(PROPOSED_CodeHint)
+                    .font(.callout)
+                    .foregroundStyle(DictumTheme.muted)
+            }
+
+            ShareLink(item: bundle.url) {
+                Label(PROPOSED_Share, systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.dictumPrimary)
+            .accessibilityLabel(PROPOSED_Share)
+
+            Text(PROPOSED_FilesHint)
+                .font(.footnote)
+                .foregroundStyle(DictumTheme.text)
+
+            SecondaryButton(title: PROPOSED_ComposeEmail, systemImage: "envelope") { composing = true }
+
+            SecondaryButton(title: PROPOSED_Done, action: done)
+        }
+        .sheet(isPresented: $composing) {
+            ComposeEmailSheet(review: review)
         }
     }
 }
@@ -314,18 +365,15 @@ struct RecoverView: View {
     let seal: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Label(PROPOSED_RecoverHeading, systemImage: "exclamationmark.triangle")
-                    .font(.title.bold())
-                    .accessibilityAddTraits(.isHeader)
+        DictumScreen {
+            StatusPill(kind: .warning, text: PROPOSED_RecoverHeading)
+                .accessibilityAddTraits(.isHeader)
+            DictumCard {
                 Text(PROPOSED_RecoverBody)
-                Button(action: seal) { Text(PROPOSED_RecoverSeal).font(.headline).wide() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .accessibilityLabel(PROPOSED_RecoverSeal)
+                    .font(.body)
+                    .foregroundStyle(DictumTheme.text)
             }
-            .padding(20)
+            PrimaryButton(title: PROPOSED_RecoverSeal, action: seal)
         }
     }
 }
@@ -337,38 +385,69 @@ struct FailedView: View {
     let back: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Label(PROPOSED_FailedHeading, systemImage: "xmark.octagon")
-                    .font(.title.bold())
-                    .accessibilityAddTraits(.isHeader)
-                Text(message)
-                Button(action: back) { Text(PROPOSED_BackToStart).font(.headline).wide() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .accessibilityLabel(PROPOSED_BackToStart)
+        DictumScreen {
+            HStack(spacing: 12) {
+                Image(systemName: "xmark.octagon")
+                    .font(.title)
+                    .foregroundStyle(DictumTheme.recording)
+                    .accessibilityHidden(true)
+                Text(PROPOSED_FailedHeading)
+                    .dictumTitle(.title)
             }
-            .padding(20)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            DictumCard {
+                Text(message)
+                    .font(.body)
+                    .foregroundStyle(DictumTheme.text)
+            }
+            SecondaryButton(title: PROPOSED_BackToStart, action: back)
         }
+    }
+}
+
+/// While a recovered session is sealed: nothing is being recorded, so no recording indicator.
+struct SealingRecoveredView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            DictumTopBar()
+            Spacer()
+            StatusPill(kind: .working, text: PROPOSED_Sealing)
+            ProgressView().accessibilityHidden(true)
+            Spacer()
+        }
+        .padding(.vertical, 12)
+        .dictumPage()
+        .background(DictumTheme.bg.ignoresSafeArea())
     }
 }
 
 // MARK: - Experimental on-device transcript
 
-/// Screen 1: the switch, its note, and the one place the speech model can be downloaded.
+/// Screen 1: the switch, its note, and the one place the speech model can be downloaded. The switch also sets the
+/// stored setting, so Settings and this screen show the same value.
 struct TranscriptSetupView: View {
     let transcript: OnDeviceTranscript
+    let settings: AppSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        DictumCard {
             Toggle(isOn: Binding(get: { transcript.enabled },
-                                 set: { on in Task { await transcript.setEnabled(on) } })) {
-                Text(PROPOSED_OnDeviceTranscriptToggle).font(.headline)
+                                 set: { on in
+                                     settings.transcribeOnDevice = on
+                                     Task { await transcript.setEnabled(on) }
+                                 })) {
+                Text(PROPOSED_OnDeviceTranscriptToggle)
+                    .font(.headline)
+                    .foregroundStyle(DictumTheme.text)
             }
+            .tint(DictumTheme.accent)
+            .frame(minHeight: DictumTheme.minTarget)
             .accessibilityLabel(PROPOSED_OnDeviceTranscriptToggle)
 
             Text(PROPOSED_OnDeviceTranscriptNote)
                 .font(.footnote)
+                .foregroundStyle(DictumTheme.muted)
 
             switch transcript.setup {
             case .off:
@@ -376,42 +455,35 @@ struct TranscriptSetupView: View {
             case .checking:
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text(PROPOSED_TranscriptChecking)
+                    Text(PROPOSED_TranscriptChecking).foregroundStyle(DictumTheme.text)
                 }
                 .accessibilityElement(children: .combine)
             case .needsAssets:
-                Text(PROPOSED_TranscriptAssetsNeeded)
-                Button { Task { await transcript.downloadTapped() } } label: {
-                    Label(PROPOSED_TranscriptDownload, systemImage: "arrow.down.circle").font(.headline).wide()
+                Text(PROPOSED_TranscriptAssetsNeeded).foregroundStyle(DictumTheme.text)
+                SecondaryButton(title: PROPOSED_TranscriptDownload, systemImage: "arrow.down.circle") {
+                    Task { await transcript.downloadTapped() }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityLabel(PROPOSED_TranscriptDownload)
             case .downloading:
                 if let progress = transcript.downloadProgress {
                     ProgressView(progress)
+                        .tint(DictumTheme.accent)
                         .accessibilityLabel(PROPOSED_TranscriptDownloading)
                 } else {
                     ProgressView()
                         .accessibilityHidden(true)
                 }
-                Text(PROPOSED_TranscriptDownloading)
+                StatusPill(kind: .working, text: PROPOSED_TranscriptDownloading)
             case .ready:
-                Label(PROPOSED_TranscriptReady, systemImage: "checkmark.circle")
+                StatusPill(kind: .done, text: PROPOSED_TranscriptReady)
             case .unavailable:
-                Label(PROPOSED_TranscriptUnavailable, systemImage: "exclamationmark.triangle")
+                StatusPill(kind: .warning, text: PROPOSED_TranscriptUnavailable)
             case let .failed(reason):
-                Label(String(format: PROPOSED_TranscriptDownloadFailed, reason), systemImage: "exclamationmark.triangle")
-                Button { Task { await transcript.retryDownload() } } label: {
-                    Label(PROPOSED_TranscriptDownload, systemImage: "arrow.down.circle").font(.headline).wide()
+                StatusPill(kind: .warning, text: String(format: PROPOSED_TranscriptDownloadFailed, reason))
+                SecondaryButton(title: PROPOSED_TranscriptDownload, systemImage: "arrow.down.circle") {
+                    Task { await transcript.retryDownload() }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityLabel(PROPOSED_TranscriptDownload)
             }
         }
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -438,6 +510,7 @@ struct LiveTranscriptView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(status)
                 .font(.footnote.weight(.semibold))
+                .foregroundStyle(DictumTheme.text)
             ScrollView {
                 transcriptText(final: transcript.finalText, volatile: transcript.volatileText)
                     .font(.body)
@@ -450,148 +523,14 @@ struct LiveTranscriptView: View {
             .accessibilityValue(liveValue)
         }
         .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DictumTheme.surface, in: RoundedRectangle(cornerRadius: DictumTheme.radiusCard))
+        .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusCard).strokeBorder(DictumTheme.border, lineWidth: 1))
     }
 
     private var liveValue: String {
         let text = transcript.finalText + transcript.volatileText
         return text.isEmpty ? PROPOSED_TranscriptEmpty : text
-    }
-}
-
-/// Screen 3: the full transcript, a Copy button (the user's explicit act), and the measured experiment facts.
-struct SealedTranscriptView: View {
-    let transcript: OnDeviceTranscript
-    @State private var copied = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(PROPOSED_TranscriptHeading)
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-
-            if transcript.finishing {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(PROPOSED_TranscriptFinishing)
-                }
-                .accessibilityElement(children: .combine)
-            }
-
-            SpeakerStatusView(speakers: transcript.speakers)
-
-            ScrollView {
-                Group {
-                    if !labelled.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(labelled) { line in
-                                speakerLine(line)
-                                    .accessibilityElement(children: .ignore)
-                                    .accessibilityLabel(Self.spoken(line))
-                            }
-                        }
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel(PROPOSED_SpeakerLinesRegion)
-                    } else if transcript.finalText.isEmpty && transcript.volatileText.isEmpty && !transcript.finishing {
-                        Text(PROPOSED_TranscriptNone)
-                    } else {
-                        transcriptText(final: transcript.finalText, volatile: transcript.volatileText)
-                    }
-                }
-                .font(.body)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 260)
-
-            if !labelled.isEmpty {
-                Text(PROPOSED_SpeakersExperimentalNote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if !transcript.finalText.isEmpty {
-                Button {
-                    UIPasteboard.general.string = labelled.isEmpty ? transcript.finalText : labelledText
-                    copied = true
-                } label: {
-                    Label(copied ? PROPOSED_TranscriptCopied : PROPOSED_CopyTranscript, systemImage: "doc.on.doc")
-                        .font(.headline)
-                        .wide()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityLabel(PROPOSED_CopyTranscript)
-                .accessibilityValue(copied ? PROPOSED_TranscriptCopied : "")
-            }
-
-            if let facts = transcript.facts {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(PROPOSED_FactsHeading)
-                        .font(.headline)
-                        .accessibilityAddTraits(.isHeader)
-                    LabeledContent(PROPOSED_FactLocale, value: facts.locale)
-                    LabeledContent(PROPOSED_FactAssets, value: assetText(facts.assets))
-                    LabeledContent(PROPOSED_FactAssetStatusBefore, value: facts.assetStatusBefore)
-                    LabeledContent(PROPOSED_FactStopToFinal, value: facts.stopToLastFinalSeconds.map { String(format: PROPOSED_FactSeconds, $0) }
-                                   ?? PROPOSED_FactNoFinalAfterStop)
-                    LabeledContent(PROPOSED_FactThermal, value: facts.thermalAtStop)
-                    LabeledContent(PROPOSED_FactOffline, value: facts.networkingOff ? PROPOSED_FactYes : PROPOSED_FactNo)
-                    if let speakerFacts = transcript.speakers.facts {
-                        SpeakerFactsView(facts: speakerFacts)
-                    }
-                }
-                .padding()
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
-    }
-
-    /// The lines by speaker, once the speaker step is done; empty before then and when it did not run.
-    private var labelled: [SpeakerLabels.Line] {
-        transcript.speakers.state == .done ? transcript.speakers.lines : []
-    }
-
-    private static func label(_ line: SpeakerLabels.Line) -> String? {
-        line.speaker.map { String(format: APPROVED_Other, $0) }
-    }
-
-    /// "Other 1: …", or the words alone when no speaker is near.
-    private static func labelledWords(_ line: SpeakerLabels.Line) -> String {
-        label(line).map { "\($0): \(line.text)" } ?? line.text
-    }
-
-    /// "00:12  Other 1: …" per line, one line each, for Copy; no time when the segment has none.
-    private var labelledText: String {
-        labelled.map { line in
-            line.start.map { "\(SpeakerSeparation.clock($0))  \(Self.labelledWords(line))" } ?? Self.labelledWords(line)
-        }.joined(separator: "\n")
-    }
-
-    /// VoiceOver: "at 00:12, Other 1: …".
-    private static func spoken(_ line: SpeakerLabels.Line) -> String {
-        line.start.map { String(format: PROPOSED_LineAt, SpeakerSeparation.clock($0)) + ", " + labelledWords(line) }
-            ?? labelledWords(line)
-    }
-
-    /// The time in the secondary colour with monospaced digits, then the label in bold (so neither is told apart by
-    /// colour alone), then the words.
-    private func speakerLine(_ line: SpeakerLabels.Line) -> Text {
-        var parts: [Text] = []
-        if let start = line.start {
-            parts.append(Text(SpeakerSeparation.clock(start) + "  ").monospacedDigit().foregroundStyle(.secondary))
-        }
-        if let label = Self.label(line) { parts.append(Text(label + ": ").bold()) }
-        parts.append(Text(line.text))
-        return parts.dropFirst().reduce(parts[0]) { Text("\($0)\($1)") }
-    }
-
-    private func assetText(_ outcome: OnDeviceTranscript.AssetOutcome) -> String {
-        switch outcome {
-        case .preinstalled: return PROPOSED_FactAssetsPreinstalled
-        case let .installed(seconds): return String(format: PROPOSED_FactAssetsInstalled, seconds)
-        case let .noRequest(before): return String(format: PROPOSED_FactAssetsNoRequest, before)
-        }
     }
 }
 

@@ -12,13 +12,15 @@ struct DictumRecorderApp: App {
     }
 }
 
-/// One screen at a time, chosen by the controller's phase. No sheets or navigation stack, so the recording screen
-/// cannot be swiped away.
+/// One screen at a time, chosen by the controller's phase. No navigation stack, and the only sheets are on the home and
+/// end-of-meeting screens, so the recording screen cannot be swiped away.
 struct RootView: View {
     @Bindable var controller: RecordingController
 
     var body: some View {
         switch controller.phase {
+        case .home:
+            HomeView(controller: controller)
         case .consent:
             ConsentView(controller: controller)
         case .recording:
@@ -28,10 +30,12 @@ struct RootView: View {
                 RecordingView(controller: controller)
             } else {
                 // Sealing a recovered session: nothing is being recorded, so no recording indicator.
-                ProgressView(PROPOSED_Sealing).font(.title2)
+                SealingRecoveredView()
             }
+        case let .review(bundle):
+            ReviewView(controller: controller, bundle: bundle)
         case let .sealed(bundle):
-            SealedView(bundle: bundle, captureFailed: controller.captureFailed, transcript: controller.transcript) {
+            SealedView(bundle: bundle, captureFailed: controller.captureFailed, review: controller.review) {
                 controller.doneTapped()
             }
         case .recover:

@@ -3,3 +3,7 @@
 // links sherpa-onnx and onnxruntime and SpeakerLabels.swift compiles the real CAM++ embedder. When it does not exist,
 // nothing is added and the stub embedder builds. See Frameworks/README.md.
 #include? "Frameworks/Sherpa.xcconfig"
+
+// The commit the app shows under Settings → About. "unknown" unless stamped on the command line, for example
+// xcodebuild ... DICTUM_BUILD_SHA=$(git rev-parse --short HEAD)
+DICTUM_BUILD_SHA = unknown

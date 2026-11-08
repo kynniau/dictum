@@ -3,20 +3,24 @@ import DictumBundle
 import Observation
 import SwiftUI
 
-/// UI state for the whole app: consent → recording → sealing → sealed, plus recovery of a cut-short session.
+/// UI state for the whole app: home → consent → recording → sealing → sealed, plus recovery of a cut-short session.
 @MainActor
 @Observable
 final class RecordingController {
     enum Phase {
+        /// The sealed files and New meeting.
+        case home
         case consent
         case recording
         case sealing
+        /// After Stop with the on-device transcript: the end-of-meeting review. The bundle is already sealed.
+        case review(FinishedBundle)
         case sealed(FinishedBundle)
         case recover(url: URL, hex: String)
         case failed(String)
     }
 
-    var phase: Phase = .consent
+    var phase: Phase = .home
     var title = ""
     /// "spoken" or "written", the values the desktop importer accepts. Defaults to spoken, as the desktop picker does.
     var how = "spoken"
@@ -34,6 +38,10 @@ final class RecordingController {
 
     /// Experimental on-device transcript (switch on screen 1, default off). Memory only; never written to disk.
     let transcript = OnDeviceTranscript()
+    /// Non-sensitive choices in UserDefaults (engine, switches, threshold, meeting type). Never meeting content.
+    let settings = AppSettings()
+    /// The end-of-meeting review: names, summary, actions, agreement time. Memory only; cleared on Done.
+    let review = MeetingReview()
 
     private var capture: AudioCapture?
     private var writer: SealWriter?
@@ -41,6 +49,22 @@ final class RecordingController {
 
     init() {
         checkForUnfinished()
+    }
+
+    // MARK: - Home
+
+    func newMeetingTapped() {
+        micDenied = false
+        phase = .consent
+    }
+
+    /// Back from the consent screen: nothing has started, so only the typed title is dropped.
+    func backToHomeTapped() {
+        guard case .consent = phase else { return }
+        title = ""
+        how = "spoken"
+        micDenied = false
+        phase = .home
     }
 
     // MARK: - Screen 1
@@ -98,6 +122,8 @@ final class RecordingController {
         }
         // Switch off: rawSink and keep are nil, and the seal writer's sink is passed exactly as before. Switch on: the
         // seal writer gets each buffer first, then the in-memory copy for the experimental speaker step.
+        transcript.labelsEnabled = settings.speakerLabels
+        transcript.threshold = settings.speakerThreshold
         let rawSink = transcript.makeSink()
         let capture: AudioCapture
         if let keep = transcript.pcmSink {
@@ -188,7 +214,8 @@ final class RecordingController {
             let bundle = try await writer.finish(at: Date())
             SessionFiles.protect(bundle.url)
             if let hex = meetingHex { ContentKeyStore.delete(meetingHex: hex) }
-            phase = .sealed(bundle)
+            review.meetingDate = startedAt
+            phase = transcript.active ? .review(bundle) : .sealed(bundle)
         } catch {
             // The session folder and its key stay, so the recovery screen offers it on the next launch.
             phase = .failed(PROPOSED_SealFailed)
@@ -200,7 +227,12 @@ final class RecordingController {
         resetLevel()
     }
 
-    // MARK: - Screen 3 and errors
+    // MARK: - Review, screen 3 and errors
+
+    func continueToSealed() {
+        guard case let .review(bundle) = phase else { return }
+        phase = .sealed(bundle)
+    }
 
     func doneTapped() {
         title = ""
@@ -208,7 +240,8 @@ final class RecordingController {
         micDenied = false
         captureFailed = false
         transcript.clear()
-        phase = .consent
+        review.clear()
+        phase = .home
         checkForUnfinished()
     }
 

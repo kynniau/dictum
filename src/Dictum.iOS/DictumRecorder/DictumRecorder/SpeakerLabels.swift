@@ -280,6 +280,28 @@ enum SpeakerSeparation {
     /// With `parameters.segmentMean`, the clustered vectors are the segments' mean voice prints instead of the windows.
     static func separate(samples: [Int16], segments: [(start: Double, end: Double)], embedder: VoiceEmbedder,
                          parameters: SpeakerParameters, progress: (Double) -> Void) throws -> Outcome {
+        let embedded = try embed(samples: samples, segments: segments, embedder: embedder, parameters: parameters,
+                                 progress: progress)
+        return try assign(embedded, segments: segments, parameters: parameters)
+    }
+
+    /// The voice prints of every kept window, made once; `assign` can cluster them again at another threshold without
+    /// embedding again. Memory only, dropped on Done.
+    struct Embedded: Sendable {
+        var windowsCut: Int
+        /// Segments with a window the cap left out.
+        var skipped: Set<Int>
+        /// Per voice print: its segment, its window's centre in seconds, and the print.
+        var owners: [Int]
+        var centres: [Double]
+        var embeddings: [[Float]]
+        var embedSeconds: Double
+    }
+
+    /// The windows of each segment and one voice print per window (the costly half of `separate`). Only the window rule
+    /// in `parameters` is used here.
+    static func embed(samples: [Int16], segments: [(start: Double, end: Double)], embedder: VoiceEmbedder,
+                      parameters: SpeakerParameters, progress: (Double) -> Void) throws -> Embedded {
         var windows: [(segment: Int, from: Int, to: Int)] = []
         for (i, s) in segments.enumerated() {
             for w in Self.windows(start: s.start, end: s.end, trackLength: samples.count, parameters: parameters) {
@@ -313,7 +335,17 @@ enum SpeakerSeparation {
             progress(Double(k + 1) / Double(windows.count))
         }
         let embedSeconds = seconds(clock.now - embedBegan)
+        return Embedded(windowsCut: windowsCut, skipped: skipped, owners: owners, centres: centres, embeddings: embeddings,
+                        embedSeconds: embedSeconds)
+    }
 
+    /// Clustering of the voice prints, the majority speaker of each segment, and numbering by first appearance (the
+    /// cheap half of `separate`). Uses the linkage, threshold and segment-mean values in `parameters`.
+    static func assign(_ embedded: Embedded, segments: [(start: Double, end: Double)],
+                       parameters: SpeakerParameters) throws -> Outcome {
+        let (windowsCut, skipped, owners, centres, embeddings, embedSeconds) = (embedded.windowsCut, embedded.skipped,
+            embedded.owners, embedded.centres, embedded.embeddings, embedded.embedSeconds)
+        let clock = ContinuousClock()
         let clusterBegan = clock.now
         let labels: [Int]
         let clustered: Int
@@ -625,9 +657,81 @@ final class SpeakerLabels {
     private(set) var lines: [Line] = []
     private(set) var facts: Facts?
 
+    /// True while Fewer or More speakers re-clusters the kept voice prints.
+    private(set) var reclustering = false
+
     private var store: PcmStore?
     private var task: Task<Void, Never>?
     private var generation = 0
+
+    /// What re-clustering needs, kept after a run: the voice prints, the turns' times, the lines' segments and the
+    /// parameters last used. Memory only; dropped on Done.
+    private struct Kept {
+        var embedded: SpeakerSeparation.Embedded
+        var turnsIn: [(start: Double, end: Double)]
+        var segments: [Segment]
+        var parameters: SpeakerParameters
+    }
+    private var kept: Kept?
+
+    /// The threshold the current labels were made at.
+    var threshold: Double? { kept?.parameters.threshold ?? facts?.parameters.threshold }
+
+    /// True when Fewer or More speakers can run: labels made and their voice prints kept.
+    var canRecluster: Bool { kept != nil && state == .done && !reclustering }
+
+    /// The desktop's step (SpeakerSeparator.Step): threshold ± MeetingSpeakers.ThresholdStep 0.1, clamped 0.1 to 0.9,
+    /// rounded to two places. Fewer speakers raises the threshold (more merges).
+    nonisolated static let thresholdStep = 0.1
+    nonisolated static func step(_ threshold: Double, fewer: Bool) -> Double {
+        let next = min(max(threshold + (fewer ? thresholdStep : -thresholdStep), 0.1), 0.9)
+        return (next * 100).rounded(.toNearestOrAwayFromZero) / 100
+    }
+
+    /// Each shown segment's line, with the speaker of the turn it overlaps or is nearest to.
+    nonisolated static func lines(_ segments: [Segment], turns: [SpeakerTurn], parameters: SpeakerParameters) -> [Line] {
+        segments.enumerated().map { i, s in
+            Line(id: i, start: s.start, speaker: s.start.flatMap { start in
+                s.end.flatMap {
+                    SpeakerSeparation.speakerOf(start: start, end: $0, turns: turns, within: parameters.nearestTurnSeconds)
+                }
+            }, text: s.text)
+        }
+    }
+
+    /// Fewer or More speakers: cluster the kept voice prints again at the desktop's next threshold, with no new
+    /// embedding. The numbering may change, so names given for the old numbers no longer apply (the caller clears them).
+    func recluster(fewer: Bool) {
+        guard canRecluster, var kept else { return }
+        kept.parameters.threshold = Self.step(kept.parameters.threshold, fewer: fewer)
+        let run = kept
+        generation += 1
+        let mine = generation
+        reclustering = true
+        task = Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let outcome = try SpeakerSeparation.assign(run.embedded, segments: run.turnsIn, parameters: run.parameters)
+                let lines = SpeakerLabels.lines(run.segments, turns: outcome.turns, parameters: run.parameters)
+                await self?.finish(mine) {
+                    $0.kept = run
+                    $0.lines = lines
+                    $0.facts?.parameters = run.parameters
+                    $0.facts?.clusterSeconds = outcome.clusterSeconds
+                    $0.facts?.clustered = outcome.clustered
+                    $0.facts?.diagnostics = outcome.diagnostics
+                    $0.facts?.speakersFound = outcome.turns.map(\.speaker).max() ?? 0
+                    $0.reclustering = false
+                }
+            } catch is CancellationError {
+            } catch {
+                let reason = error.localizedDescription
+                await self?.finish(mine) {
+                    $0.reclustering = false
+                    $0.state = .failed(reason)
+                }
+            }
+        }
+    }
 
     /// Before capture starts, with the switch on: a fresh in-memory store.
     func makeStore() -> PcmStore {
@@ -639,11 +743,12 @@ final class SpeakerLabels {
 
     /// After the analyzer has finished: label the segments. `timeSource` says how their times were found; with
     /// `.wholeRecording` the one segment's times are filled in here from the PCM length.
-    func run(segments: [Segment], timeSource: TimeSource) {
+    func run(segments: [Segment], timeSource: TimeSource, threshold: Double = SpeakerParameters.current.threshold) {
         guard let store else { return }
         self.store = nil
         let (samples, analyzerStart, capHit) = store.take()
-        let parameters = SpeakerParameters.current
+        var parameters = SpeakerParameters.current
+        parameters.threshold = threshold
         let audioMinutes = Double(samples.count) / Double(SpeakerSeparation.rate) / 60
         // The analyzer's timeline starts at `analyzerStart` samples into the PCM.
         let offset = Double(analyzerStart ?? 0) / Double(SpeakerSeparation.rate)
@@ -682,8 +787,8 @@ final class SpeakerLabels {
             var facts = known
             do {
                 var lastReported = -1
-                let outcome = try SpeakerSeparation.separate(samples: samples, segments: turnsIn, embedder: embedder,
-                                                             parameters: parameters) { fraction in
+                let embedded = try SpeakerSeparation.embed(samples: samples, segments: turnsIn, embedder: embedder,
+                                                           parameters: parameters) { fraction in
                     let percent = Int(fraction * 100)
                     guard percent != lastReported else { return }
                     lastReported = percent
@@ -692,14 +797,9 @@ final class SpeakerLabels {
                         self.state = .working(fraction)
                     }
                 }
-                let lines = segmentsShown.enumerated().map { i, s in
-                    Line(id: i, start: s.start, speaker: s.start.flatMap { start in
-                        s.end.flatMap {
-                            SpeakerSeparation.speakerOf(start: start, end: $0, turns: outcome.turns,
-                                                        within: parameters.nearestTurnSeconds)
-                        }
-                    }, text: s.text)
-                }
+                let outcome = try SpeakerSeparation.assign(embedded, segments: turnsIn, parameters: parameters)
+                let lines = SpeakerLabels.lines(segmentsShown, turns: outcome.turns, parameters: parameters)
+                let keep = Kept(embedded: embedded, turnsIn: turnsIn, segments: segmentsShown, parameters: parameters)
                 facts.windowsCut = outcome.windowsCut
                 facts.windowsEmbedded = outcome.windowsEmbedded
                 facts.embedSeconds = outcome.embedSeconds
@@ -712,6 +812,7 @@ final class SpeakerLabels {
                 await self?.finish(mine) {
                     $0.facts = final
                     $0.lines = lines
+                    $0.kept = keep
                     $0.state = outcome.turns.isEmpty ? .tooLittleSpeech : .done
                 }
             } catch is CancellationError {
@@ -728,220 +829,17 @@ final class SpeakerLabels {
         task = nil
     }
 
-    /// Done, or a start that failed: drop the sound, the voice prints (they live only inside the task) and the labels.
+    /// Done, or a start that failed: drop the sound, the kept voice prints and the labels.
     func clear() {
         generation += 1
         task?.cancel()
         task = nil
         store?.clear()
         store = nil
+        kept = nil
+        reclustering = false
         state = .idle
         lines = []
         facts = nil
     }
 }
-
-// MARK: - Self-check (no device needed)
-
-#if DEBUG
-/// Runs the ported rule on fixed inputs and returns one line per check, "PASS …" or "FAIL …". The cases are the brief's
-/// and the desktop's own (tests/Dictum.Tests/MeetingSpeakersTests.cs).
-enum SpeakerSelfCheck {
-    static func run() -> [String] {
-        var out: [String] = []
-        func check<T: Equatable>(_ name: String, _ got: T, _ want: T) {
-            out.append("\(got == want ? "PASS" : "FAIL") \(name): got \(got), want \(want)")
-        }
-        func cluster(_ v: [[Float]], _ t: Double, _ c: Int = 0, linkage: SpeakerParameters.Linkage = .complete) -> [Int] {
-            (try? SpeakerClustering.cluster(v, threshold: t, count: c, linkage: linkage)) ?? [-1]
-        }
-        func windows(_ s: Double, _ e: Double, _ n: Int) -> [[Int]] {
-            SpeakerSeparation.windows(start: s, end: e, trackLength: n).map { [$0.from, $0.to] }
-        }
-
-        // The brief: two near-identical vectors and one orthogonal at 0.5.
-        check("brief: near, near, orthogonal at 0.5", cluster([[1, 0, 0], [0.999, 0.001, 0], [0, 0, 1]], 0.5), [0, 0, 1])
-        // The brief: Windows(0, 5.5): 2 s windows at 0, 1, 2, 3 s, then the tail 3.5-5.5 s.
-        check("brief: Windows(0, 5.5)", windows(0, 5.5, 16_000 * 60),
-              [[0, 32_000], [16_000, 48_000], [32_000, 64_000], [48_000, 80_000], [56_000, 88_000]])
-
-        // Desktop: Clustering_follows_sherpa_cut_rules.
-        let points: [[Float]] = [[1, 0], [0.9, 0.1], [0, 1], [0.1, 0.9]]
-        check("desktop: cut at 0.5", cluster(points, 0.5), [0, 0, 1, 1])
-        check("desktop: cut at 0.001", cluster(points, 0.001), [0, 1, 2, 3])
-        check("desktop: cut at 1.01", cluster(points, 1.01), [0, 0, 0, 0])
-        check("desktop: count 2", cluster(points, 0.001, 2), [0, 0, 1, 1])
-        check("desktop: empty", cluster([], 0.5), [])
-        // Desktop: A_merge_exactly_at_the_threshold_is_not_made.
-        check("desktop: orthogonal at 1.0", cluster([[1, 0], [0, 1]], 1.0), [0, 1])
-        check("desktop: orthogonal just above 1.0", cluster([[1, 0], [0, 1]], (1.0).nextUp), [0, 0])
-        check("desktop: identical at 0.0", cluster([[1, 0], [1, 0]], 0.0), [0, 1])
-        // Desktop: Clustering_embeddings_that_are_all_non_finite_does_not_throw.
-        check("desktop: all NaN", cluster([[.nan, 1], [.nan, 2], [.nan, 3]], 0.5), [0, 1, 2])
-        // Desktop: Each_segment_is_cut_into_overlapping_windows_and_a_short_one_into_none.
-        let track = 16_000 * 60
-        check("desktop: Windows(0, 1.49)", windows(0, 1.49, track), [])
-        check("desktop: Windows(0, 1.5)", windows(0, 1.5, track), [[0, 24_000]])
-        check("desktop: Windows(1, 3)", windows(1, 3, track), [[16_000, 48_000]])
-        check("desktop: Windows(0, 4)", windows(0, 4, track), [[0, 32_000], [16_000, 48_000], [32_000, 64_000]])
-        check("desktop: Windows(0, 2.5)", windows(0, 2.5, track), [[0, 32_000], [8_000, 40_000]])
-        check("desktop: Windows(0, 5) in 30000", windows(0, 5, 30_000), [[0, 30_000]])
-        check("desktop: Windows(0, 5) in 20000", windows(0, 5, 20_000), [])
-
-        // Desktop: A_segment_takes_the_majority_speaker_of_its_windows_and_a_tie_goes_to_the_earliest_window.
-        var samples = [Int16](repeating: 0, count: 16_000 * 21 / 2)
-        func fill(_ from: Double, _ to: Double, _ voice: Int16) {
-            for i in Int(from * 16_000)..<Int(to * 16_000) { samples[i] = voice * 1000 }
-        }
-        fill(0, 2, 1); fill(3, 4.2, 1); fill(4.2, 7, 2); fill(8, 9.25, 2); fill(9.25, 10.5, 1)
-        let majority = try? SpeakerSeparation.separate(samples: samples, segments: [(0, 2), (3, 7), (8, 10.5)],
-                                                       embedder: LevelEmbedder(), parameters: .desktop) { _ in }
-        check("desktop: majority and earliest-window tie", majority?.turns ?? [],
-              [SpeakerTurn(start: 0, end: 2, speaker: 1), SpeakerTurn(start: 3, end: 7, speaker: 2),
-               SpeakerTurn(start: 8, end: 10.5, speaker: 2)])
-
-        // Desktop: SpeakerOf, the nearest-turn rule for a segment too short to embed.
-        let turns = [SpeakerTurn(start: 0, end: 2, speaker: 1), SpeakerTurn(start: 5, end: 8, speaker: 2)]
-        check("SpeakerOf: overlap", SpeakerSeparation.speakerOf(start: 1.5, end: 3, turns: turns), 1)
-        check("SpeakerOf: nearest within 1 s", SpeakerSeparation.speakerOf(start: 4.2, end: 4.8, turns: turns), 2)
-        check("SpeakerOf: nearest 0.8 s away", SpeakerSeparation.speakerOf(start: 2.8, end: 3.2, turns: turns), 1)
-        check("SpeakerOf: none within 1 s", SpeakerSeparation.speakerOf(start: 3.1, end: 3.9, turns: turns), nil)
-        check("SpeakerOf: no length", SpeakerSeparation.speakerOf(start: 1, end: 1, turns: turns), nil)
-        check("SpeakerOf, any distance: 1.1 s away", SpeakerSeparation.speakerOf(start: 3.1, end: 3.9, turns: turns, within: nil), 1)
-        check("SpeakerOf, any distance: 20 s away", SpeakerSeparation.speakerOf(start: 28, end: 29, turns: turns, within: nil), 2)
-        check("SpeakerOf, any distance: no length", SpeakerSeparation.speakerOf(start: 1, end: 1, turns: turns, within: nil), nil)
-        check("clock", [0, 12.9, 59.99, 61, 3599, 3600, 4503.2].map(SpeakerSeparation.clock),
-              ["00:00", "00:12", "00:59", "01:01", "59:59", "60:00", "75:03"])
-
-        // Desktop: Clustering_matches_the_plain_complete_linkage_loop_on_random_voices (60 rounds; this generator is not
-        // .NET's Random, so the vectors differ from the desktop's but the comparison is the same).
-        var rng = SplitMix(seed: 20_261_107)
-        var mismatches = 0
-        for _ in 0..<60 {
-            let size = 1 + Int(rng.next() % 39)
-            let vectors = (0..<size).map { _ in (0..<6).map { _ in Float(rng.unit() * 2 - 1) } }
-            let threshold = rng.unit() * 1.2
-            let fixed = 1 + Int(rng.next() % UInt64(size))
-            if cluster(vectors, threshold) != plainLinkage(vectors, threshold) { mismatches += 1 }
-            if cluster(vectors, threshold, fixed) != plainLinkage(vectors, threshold, fixed) { mismatches += 1 }
-        }
-        check("desktop: matches plain complete linkage on 120 random cases (mismatches)", mismatches, 0)
-
-        // Average linkage (phone beta only). Unit vectors at 0, 50 and 100 degrees: 0-1 and 1-2 are 1 - cos 50 = 0.357
-        // apart, 0-2 is 1 - cos 100 = 1.174. After 0 and 1 merge, the distance to 2 is 1.174 complete, 0.765 average.
-        func angle(_ degrees: Double) -> [Float] { [Float(cos(degrees * .pi / 180)), Float(sin(degrees * .pi / 180))] }
-        let chain = [angle(0), angle(50), angle(100)]
-        check("average: chain at 0.8", cluster(chain, 0.8, linkage: .average), [0, 0, 0])
-        check("complete: chain at 0.8", cluster(chain, 0.8, linkage: .complete), [0, 0, 1])
-        check("average: chain at 0.6", cluster(chain, 0.6, linkage: .average), [0, 0, 1])
-        check("average: cut at 0.5", cluster(points, 0.5, linkage: .average), [0, 0, 1, 1])
-        // Chain at 0.6 average: pair distances 0.357, 0.357, 1.174; one merge at 0.357; then (1.174 + 0.357) / 2 = 0.765
-        // is left between the two clusters.
-        let d = try? SpeakerClustering.clusterWithDiagnostics(chain, threshold: 0.6, linkage: .average).diagnostics
-        func r3(_ x: Double?) -> String { x.map { String(format: "%.3f", $0) } ?? "nil" }
-        check("diagnostics: p50, p90, max", [r3(d?.p50), r3(d?.p90), r3(d?.max)], ["0.357", "1.174", "1.174"])
-        check("diagnostics: largest merge, smallest left", [r3(d?.largestMerge), r3(d?.smallestBetweenClusters)],
-              ["0.357", "0.765"])
-        var averageMismatches = 0
-        for _ in 0..<60 {
-            let size = 1 + Int(rng.next() % 39)
-            let vectors = (0..<size).map { _ in (0..<6).map { _ in Float(rng.unit() * 2 - 1) } }
-            let threshold = rng.unit() * 1.2
-            let fixed = 1 + Int(rng.next() % UInt64(size))
-            if cluster(vectors, threshold, linkage: .average) != plainLinkage(vectors, threshold, average: true) { averageMismatches += 1 }
-            if cluster(vectors, threshold, fixed, linkage: .average) != plainLinkage(vectors, threshold, fixed, average: true) {
-                averageMismatches += 1
-            }
-        }
-        check("average: matches the plain mean-pair loop on 120 random cases (mismatches)", averageMismatches, 0)
-
-        // Segment mean: segments 0-3 s and 4-7 s are voice 1 (two windows each), 8-10 s voice 2 (one window). One vector
-        // per segment, so 3 clustered; the desktop rule clusters the 5 windows.
-        var meanSamples = [Int16](repeating: 0, count: 16_000 * 11)
-        for (from, to, voice) in [(0.0, 3.0, Int16(1)), (4, 7, 1), (8, 10, 2)] {
-            for i in Int(from * 16_000)..<Int(to * 16_000) { meanSamples[i] = voice * 1000 }
-        }
-        let meanRun = try? SpeakerSeparation.separate(samples: meanSamples, segments: [(0, 3), (4, 7), (8, 10)],
-                                                      embedder: LevelEmbedder(), parameters: .current) { _ in }
-        check("segment mean: speakers", meanRun?.turns.map(\.speaker) ?? [], [1, 1, 2])
-        check("segment mean: vectors clustered", meanRun?.clustered ?? -1, 3)
-        check("desktop rule: vectors clustered", (try? SpeakerSeparation.separate(
-            samples: meanSamples, segments: [(0, 3), (4, 7), (8, 10)], embedder: LevelEmbedder(), parameters: .desktop) { _ in })?
-            .clustered ?? -1, 5)
-        return out
-    }
-
-    /// The desktop test's LevelEmbedder with SyntheticVoices.Distinct: the window's most common non-zero level picks a
-    /// fixed voice (levels here are multiples of 1000 in Int16, i.e. about voice / 32.768).
-    private final class LevelEmbedder: VoiceEmbedder {
-        var dim: Int { 4 }
-        func embed(_ samples16k: [Float]) -> [Float]? {
-            if samples16k.count < 1600 { return nil }
-            var counts: [Int: Int] = [:]
-            var order: [Int] = []
-            for s in samples16k where s != 0 {
-                let level = Int((s * 32768 / 1000).rounded())
-                if counts[level] == nil { order.append(level) }
-                counts[level, default: 0] += 1
-            }
-            guard var best = order.first else { return nil }
-            for level in order.dropFirst() where counts[level]! > counts[best]! { best = level }
-            var voice: [Float] = [0, 0, 0, 0]
-            voice[best - 1] = 1
-            return voice
-        }
-    }
-
-    /// The desktop test's reference loop (PlainCompleteLinkage); with `average`, the link is the mean over member pairs.
-    private static func plainLinkage(_ embeddings: [[Float]], _ threshold: Double, _ count: Int = 0,
-                                     average: Bool = false) -> [Int] {
-        let n = embeddings.count
-        let unit = embeddings.map { v -> [Float] in
-            let l = v.reduce(0.0) { $0 + Double($1) * Double($1) }.squareRoot()
-            return v.map { Float(Double($0) / l) }
-        }
-        var distance = [[Float]](repeating: [Float](repeating: 0, count: n), count: n)
-        for i in 0..<n {
-            for j in (i + 1)..<max(i + 1, n) {
-                var sum = 0.0
-                for k in unit[i].indices { sum += Double(unit[i][k]) * Double(unit[j][k]) }
-                distance[i][j] = Float(max(0, 1 - sum))
-                distance[j][i] = distance[i][j]
-            }
-        }
-        var clusters = (0..<n).map { [$0] }
-        while clusters.count > 1 && (count <= 0 || clusters.count > count) {
-            var (a, b, height) = (-1, -1, Double.infinity)
-            for i in clusters.indices {
-                for j in (i + 1)..<max(i + 1, clusters.count) {
-                    let pairs = clusters[i].flatMap { x in clusters[j].map { y in distance[x][y] } }
-                    let link = average ? Double(Float(pairs.reduce(0.0) { $0 + Double($1) } / Double(pairs.count)))
-                        : Double(pairs.max()!)
-                    if link < height { (a, b, height) = (i, j, link) }
-                }
-            }
-            if count <= 0 && height >= threshold { break }
-            clusters[a].append(contentsOf: clusters[b])
-            clusters.remove(at: b)
-        }
-        var labels = [Int](repeating: 0, count: n)
-        for (label, cluster) in clusters.sorted(by: { $0.min()! < $1.min()! }).enumerated() {
-            for member in cluster { labels[member] = label }
-        }
-        return labels
-    }
-
-    private struct SplitMix {
-        var state: UInt64
-        init(seed: UInt64) { state = seed }
-        mutating func next() -> UInt64 {
-            state &+= 0x9E37_79B9_7F4A_7C15
-            var z = state
-            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-            return z ^ (z >> 31)
-        }
-        mutating func unit() -> Double { Double(next() >> 11) / Double(1 << 53) }
-    }
-}
-#endif

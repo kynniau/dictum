@@ -81,8 +81,11 @@ final class OnDeviceTranscript {
     private(set) var facts: Facts?
     /// Experimental speaker labels, made after Stop from `segments` and the in-memory PCM.
     let speakers = SpeakerLabels()
-    /// The 16 kHz PCM copy for the speaker step: set by `makeSink()`, nil with the switch off.
+    /// The 16 kHz PCM copy for the speaker step: set by `makeSink()`, nil with the switch off or labels off.
     private(set) var pcmSink: ((Data) -> Void)?
+    /// From Settings, set before `makeSink()`: run the speaker step after Stop, and at what threshold.
+    var labelsEnabled = true
+    var threshold = SpeakerParameters.current.threshold
 
     private var localeIdentifier: String?
     private var assetSeconds: Double?
@@ -199,10 +202,12 @@ final class OnDeviceTranscript {
     func makeSink() -> ((AVAudioPCMBuffer) -> Void)? {
         pcmSink = nil
         guard enabled, setup == .ready, #available(iOS 26, *), let id = localeIdentifier else { return nil }
-        let store = speakers.makeStore()
-        let engine = SpeechEngine(locale: Locale(identifier: id), onFirstInput: store.markAnalyzerStart)
+        // Labels off: no PCM copy is kept, and the speaker step does not run after Stop.
+        let store: PcmStore? = labelsEnabled ? speakers.makeStore() : nil
+        if store == nil { speakers.clear() }
+        let engine = SpeechEngine(locale: Locale(identifier: id), onFirstInput: { store?.markAnalyzerStart() })
         self.engine = engine
-        pcmSink = store.append
+        pcmSink = store.map { kept in { kept.append($0) } }
         active = true
         live = .preparing
         finalText = ""
@@ -302,7 +307,7 @@ final class OnDeviceTranscript {
             // time (it is shown without a label); with no range at all, one segment covers the whole recording.
             let source: SpeakerLabels.TimeSource = self.wordRangeSegments > 0 ? .wordRanges
                 : self.resultRangeSegments > 0 ? .resultRanges : .wholeRecording
-            self.speakers.run(segments: self.segments, timeSource: source)
+            self.speakers.run(segments: self.segments, timeSource: source, threshold: self.threshold)
         }
     }
 

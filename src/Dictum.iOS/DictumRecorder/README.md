@@ -47,7 +47,7 @@ compliance rules and whether this use is exempt or needs documentation. This has
 
 ## On-device transcript (experimental)
 
-A switch on the first screen, "Experimental: transcribe on this device", default off. It is shown only on iOS 26 or
+A switch on the "Before you record" screen, "Experimental: transcribe on this device", default off (the same stored setting as in Settings). It is shown only on iOS 26 or
 later when Apple's Speech framework reports `SpeechTranscriber.isAvailable` and a supported English locale.
 
 What it does:
@@ -60,7 +60,7 @@ What it does:
 - While recording, the tap's original buffer (before the 16 kHz conversion) also goes to `SpeechAnalyzer` through a
   separate `AVAudioConverter`. Finalised words show in the primary colour; words still being recognised show in the
   secondary colour and italic.
-- After sealing, the full transcript is shown with a Copy button and an "Experiment facts" box: locale used; the
+- After sealing, the end-of-meeting review (see below) shows the full transcript with a Copy button and an "Experiment facts" box: locale used; the
   speech model outcome (already on the device, installed on request with the seconds, or no installation request
   needed) and the `AssetInventory` status the switch found before Start; seconds from Stop to the last final result;
   `ProcessInfo.thermalState` at Stop; and whether it transcribed with networking off (an `NWPathMonitor` that only
@@ -74,7 +74,8 @@ What it never does:
 - It never downloads anything during a recording. If the model is missing when recording starts, the status line says
   the transcript is not available and the recording carries on.
 - With the switch off, `AudioCapture` gets no second sink and the recording path is unchanged.
-- Done clears the transcript and the facts from memory and turns the switch back off.
+- Done clears the transcript and the facts from memory and turns the switch off in memory; the stored Settings value
+  (on or off, nothing else) turns it back on for the next meeting.
 
 How to test:
 
@@ -107,7 +108,7 @@ Not measured or not verified:
 
 ## Speaker identification (experimental, with the on-device transcript)
 
-With the transcript switch on, after Stop and after the last final words, the Sealed screen labels each line of the
+With the transcript switch on, after Stop and after the last final words, the review screen labels each line of the
 transcript "Other 1", "Other 2" and so on (`APPROVED_Other`, copied from the desktop). It follows the desktop's own rule
 (`src/Dictum.Core/Meetings/Speakers/SpeakerSeparator.cs`, `SpeakerClustering.cs`, `MeetingSpeakers.SpeakerOf`), ported
 in `DictumRecorder/SpeakerLabels.swift`:
@@ -137,13 +138,13 @@ labels and facts on Done. Nothing is written to disk and the `.dictum` bundle is
 `DictumBundle` are untouched.
 
 The native library and the model are not in the repository (too large). See `Frameworks/README.md` and
-`Models/README.md`. Without them the app builds with a stub and the Sealed screen says the speaker model is not in this
+`Models/README.md`. Without them the app builds with a stub and the review screen says the speaker model is not in this
 build.
 
 A self-check of the ported rule runs without a device: `SpeakerSelfCheck.run()` (Debug builds only) prints one PASS or
 FAIL line per case, the cases being the desktop's own tests in `tests/Dictum.Tests/MeetingSpeakersTests.cs`. To run it
 on a Mac: write a `main.swift` with `for line in SpeakerSelfCheck.run() { print(line) }` and build it with
-`xcrun swiftc -D DEBUG DictumRecorder/SpeakerLabels.swift main.swift` (outside any sandbox that blocks Swift macros).
+`xcrun swiftc -D DEBUG DictumRecorder/SpeakerLabels.swift DictumRecorder/SpeakerSelfCheck.swift main.swift` (outside any sandbox that blocks Swift macros).
 
 Not measured or not verified: accuracy on real voices, the time the voice prints and clustering take on a device, peak
 memory, and whether Apple's analyzer time 0 is exactly the first buffer it was given (the offset the PCM copy uses).
@@ -167,3 +168,24 @@ memory, and whether Apple's analyzer time 0 is exactly the first buffer it was g
 ## Licence
 
 MIT. Copyright (c) Kynni Pty Ltd.
+
+## Proof-of-concept screens (08/11/2026)
+
+Proof of concept, not a released product. Dictum's colours, radii and mark come only from `site/styles.css` and
+`site/dictum.svg` (`Theme.swift`, colour sets and `DictumMark` in `Assets.xcassets`).
+
+- **Home** (`Home.swift`): New meeting, and the sealed `.dictum` files in Documents (name, date, size) with Send and
+  Delete (confirmed; deletes that one file). No meeting content is read or shown.
+- **Settings** (`SettingsView.swift`, `Settings.swift`): UserDefaults hold only the engine, the transcript and speaker
+  switches, the threshold, the meeting type and the summary engine. whisper.cpp, own API key and keeping transcripts are
+  shown disabled. About shows the version and `DICTUM_BUILD_SHA` (set on the xcodebuild command line; "Not stamped"
+  otherwise).
+- **Review** (`Review.swift`), after Stop when the transcript ran: the recording is already sealed. Speaker naming,
+  Fewer / More speakers (the desktop's 0.1 step, clamped 0.1 to 0.9, re-clustering the voice prints kept in memory,
+  no new embedding), an on-device summary with FoundationModels' `SystemLanguageModel.default` only
+  (`OnDeviceSummary.swift`; never Private Cloud Compute), who does what, and "Everyone confirmed" (time shown on screen,
+  never saved).
+- **Compose email** (`ComposeEmail.swift`): Mail's compose sheet (MessageUI) filled with the summary and actions, else a
+  `mailto:` link. The user sends it from their own mail app; the app sends nothing and keeps no recipient.
+
+Everything on the review and email screens lives in memory and is cleared on Done. The bundle is unchanged.
