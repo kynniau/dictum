@@ -32,6 +32,9 @@ final class RecordingController {
     /// True when capture stopped early because the encrypted file could not be written.
     var captureFailed = false
 
+    /// Experimental on-device transcript (switch on screen 1, default off). Memory only; never written to disk.
+    let transcript = OnDeviceTranscript()
+
     private var capture: AudioCapture?
     private var writer: SealWriter?
     private var meetingHex: String?
@@ -104,10 +107,12 @@ final class RecordingController {
         capture.onLevel = { [weak self] level in
             self?.levelReported(level)
         }
+        capture.rawSink = transcript.makeSink()
         self.writer = writer
         self.capture = capture
 
         try capture.start()
+        transcript.recordingStarted()
         startedAt = now
         resetLevel()
         captureFailed = false
@@ -117,6 +122,7 @@ final class RecordingController {
 
     /// Start failed before any audio was captured: remove the empty session and its key.
     private func abandonStart() {
+        transcript.recordingAbandoned()
         capture?.stop()
         capture = nil
         writer = nil
@@ -166,6 +172,7 @@ final class RecordingController {
         phase = .sealing
         capture?.stop()
         capture = nil
+        transcript.recordingStopped()
         do {
             let bundle = try await writer.finish(at: Date())
             SessionFiles.protect(bundle.url)
@@ -189,6 +196,7 @@ final class RecordingController {
         how = "spoken"
         micDenied = false
         captureFailed = false
+        transcript.clear()
         phase = .consent
         checkForUnfinished()
     }

@@ -61,6 +61,10 @@ struct ConsentView: View {
                         .accessibilityLabel(PROPOSED_TitleLabel)
                 }
 
+                if controller.transcript.supported {
+                    TranscriptSetupView(transcript: controller.transcript)
+                }
+
                 if controller.micDenied {
                     VStack(alignment: .leading, spacing: 10) {
                         Label(PROPOSED_MicDenied, systemImage: "mic.slash")
@@ -88,8 +92,13 @@ struct ConsentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(starting)
+                .disabled(starting || !controller.transcript.canStart)
                 .accessibilityLabel(APPROVED_Start)
+
+                if !controller.transcript.canStart {
+                    Text(PROPOSED_StartNeedsModel)
+                        .font(.footnote)
+                }
             }
             .padding(20)
         }
@@ -156,6 +165,10 @@ struct RecordingView: View {
                 Label(PROPOSED_NoSoundDetected, systemImage: "mic.slash")
                     .font(.body.weight(.semibold))
                     .multilineTextAlignment(.center)
+            }
+
+            if controller.transcript.active {
+                LiveTranscriptView(transcript: controller.transcript)
             }
 
             Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
@@ -234,6 +247,7 @@ struct RecordingIndicator: View {
 struct SealedView: View {
     let bundle: FinishedBundle
     let captureFailed: Bool
+    let transcript: OnDeviceTranscript
     let done: () -> Void
 
     /// Decimal megabytes (1 MB = 1 000 000 bytes, as Files shows), one decimal place, from the file's byte count.
@@ -279,6 +293,10 @@ struct SealedView: View {
 
                 Text(PROPOSED_FilesHint)
                     .font(.footnote)
+
+                if transcript.active {
+                    SealedTranscriptView(transcript: transcript)
+                }
 
                 Button(action: done) { Text(PROPOSED_Done).font(.headline).wide() }
                     .buttonStyle(.bordered)
@@ -331,6 +349,179 @@ struct FailedView: View {
                     .accessibilityLabel(PROPOSED_BackToStart)
             }
             .padding(20)
+        }
+    }
+}
+
+// MARK: - Experimental on-device transcript
+
+/// Screen 1: the switch, its note, and the one place the speech model can be downloaded.
+struct TranscriptSetupView: View {
+    let transcript: OnDeviceTranscript
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(isOn: Binding(get: { transcript.enabled },
+                                 set: { on in Task { await transcript.setEnabled(on) } })) {
+                Text(PROPOSED_OnDeviceTranscriptToggle).font(.headline)
+            }
+            .accessibilityLabel(PROPOSED_OnDeviceTranscriptToggle)
+
+            Text(PROPOSED_OnDeviceTranscriptNote)
+                .font(.footnote)
+
+            switch transcript.setup {
+            case .off:
+                EmptyView()
+            case .checking:
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(PROPOSED_TranscriptChecking)
+                }
+                .accessibilityElement(children: .combine)
+            case .needsAssets:
+                Text(PROPOSED_TranscriptAssetsNeeded)
+                Button { Task { await transcript.downloadTapped() } } label: {
+                    Label(PROPOSED_TranscriptDownload, systemImage: "arrow.down.circle").font(.headline).wide()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityLabel(PROPOSED_TranscriptDownload)
+            case .downloading:
+                if let progress = transcript.downloadProgress {
+                    ProgressView(progress)
+                        .accessibilityLabel(PROPOSED_TranscriptDownloading)
+                } else {
+                    ProgressView()
+                        .accessibilityHidden(true)
+                }
+                Text(PROPOSED_TranscriptDownloading)
+            case .ready:
+                Label(PROPOSED_TranscriptReady, systemImage: "checkmark.circle")
+            case .unavailable:
+                Label(PROPOSED_TranscriptUnavailable, systemImage: "exclamationmark.triangle")
+            case let .failed(reason):
+                Label(String(format: PROPOSED_TranscriptDownloadFailed, reason), systemImage: "exclamationmark.triangle")
+                Button { Task { await transcript.retryDownload() } } label: {
+                    Label(PROPOSED_TranscriptDownload, systemImage: "arrow.down.circle").font(.headline).wide()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityLabel(PROPOSED_TranscriptDownload)
+            }
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// Finalised words in the primary colour; the words still being recognised in the secondary colour and italic, so
+/// the difference is not shown by colour alone.
+private func transcriptText(final: String, volatile: String) -> Text {
+    Text("\(Text(final))\(Text(volatile).italic().foregroundStyle(.secondary))")
+}
+
+/// Screen 2: status line and the live words. VoiceOver reads the region on demand; nothing is announced by itself.
+struct LiveTranscriptView: View {
+    let transcript: OnDeviceTranscript
+
+    private var status: String {
+        switch transcript.live {
+        case .preparing: return PROPOSED_TranscriptPreparing
+        case .listening: return PROPOSED_TranscriptListening
+        case .unavailable: return PROPOSED_TranscriptUnavailable
+        case let .failed(reason): return String(format: PROPOSED_TranscriptFailed, reason)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(status)
+                .font(.footnote.weight(.semibold))
+            ScrollView {
+                transcriptText(final: transcript.finalText, volatile: transcript.volatileText)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .defaultScrollAnchor(.bottom)
+            .frame(maxHeight: 180)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(PROPOSED_TranscriptRegion)
+            .accessibilityValue(liveValue)
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var liveValue: String {
+        let text = transcript.finalText + transcript.volatileText
+        return text.isEmpty ? PROPOSED_TranscriptEmpty : text
+    }
+}
+
+/// Screen 3: the full transcript, a Copy button (the user's explicit act), and the measured experiment facts.
+struct SealedTranscriptView: View {
+    let transcript: OnDeviceTranscript
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(PROPOSED_TranscriptHeading)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+
+            if transcript.finishing {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(PROPOSED_TranscriptFinishing)
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            ScrollView {
+                Group {
+                    if transcript.finalText.isEmpty && transcript.volatileText.isEmpty && !transcript.finishing {
+                        Text(PROPOSED_TranscriptNone)
+                    } else {
+                        transcriptText(final: transcript.finalText, volatile: transcript.volatileText)
+                    }
+                }
+                .font(.body)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 260)
+
+            if !transcript.finalText.isEmpty {
+                Button {
+                    UIPasteboard.general.string = transcript.finalText
+                    copied = true
+                } label: {
+                    Label(copied ? PROPOSED_TranscriptCopied : PROPOSED_CopyTranscript, systemImage: "doc.on.doc")
+                        .font(.headline)
+                        .wide()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityLabel(PROPOSED_CopyTranscript)
+                .accessibilityValue(copied ? PROPOSED_TranscriptCopied : "")
+            }
+
+            if let facts = transcript.facts {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(PROPOSED_FactsHeading)
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    LabeledContent(PROPOSED_FactLocale, value: facts.locale)
+                    LabeledContent(PROPOSED_FactAssets, value: facts.assetSeconds.map { String(format: PROPOSED_FactAssetsYes, $0) }
+                                   ?? PROPOSED_FactAssetsNo)
+                    LabeledContent(PROPOSED_FactStopToFinal, value: facts.stopToLastFinalSeconds.map { String(format: PROPOSED_FactSeconds, $0) }
+                                   ?? PROPOSED_FactNoFinalAfterStop)
+                    LabeledContent(PROPOSED_FactThermal, value: facts.thermalAtStop)
+                }
+                .padding()
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
         }
     }
 }

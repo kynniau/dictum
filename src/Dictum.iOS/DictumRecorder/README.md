@@ -45,6 +45,64 @@ The app uses encryption (AES-256-GCM and PBKDF2-HMAC-SHA256, through `DictumBund
 deliberately NOT set in `Info.plist`. Before any TestFlight or App Store upload, check Apple's current export
 compliance rules and whether this use is exempt or needs documentation. This has not been checked.
 
+## On-device transcript (experimental)
+
+A switch on the first screen, "Experimental: transcribe on this device", default off. It is shown only on iOS 26 or
+later when Apple's Speech framework reports `SpeechTranscriber.isAvailable` and a supported English locale.
+
+What it does:
+
+- Turning the switch on asks for speech-recognition permission, picks a locale (`en_AU`, else `en_US`, else the first
+  supported English locale), and checks whether Apple's speech model for it is installed.
+- If the model is missing, the first screen says so and offers "Download the speech model". That button is the only
+  place a download can start, and it needs the internet. Start stays disabled with the switch on until the model is
+  installed. The seconds the download took are measured with `ContinuousClock`.
+- While recording, the tap's original buffer (before the 16 kHz conversion) also goes to `SpeechAnalyzer` through a
+  separate `AVAudioConverter`. Finalised words show in the primary colour; words still being recognised show in the
+  secondary colour and italic.
+- After sealing, the full transcript is shown with a Copy button and an "Experiment facts" box: locale used, whether
+  the model was downloaded in this session and how long it took, seconds from Stop to the last final result, and
+  `ProcessInfo.thermalState` at Stop.
+
+What it never does:
+
+- It never writes the transcript to disk in any form, and the `.dictum` bundle never gains a transcript entry.
+  `SealWriter.swift` and every call into `DictumBundle` are unchanged.
+- It never sends the transcript anywhere. Copy puts it on the general pasteboard only when you tap it.
+- It never downloads anything during a recording. If the model is missing when recording starts, the status line says
+  the transcript is not available and the recording carries on.
+- With the switch off, `AudioCapture` gets no second sink and the recording path is unchanged.
+- Done clears the transcript and the facts from memory and turns the switch back off.
+
+How to test:
+
+1. On an iOS 26 or later device, turn the switch on and allow speech recognition.
+2. If asked, download the speech model while online. Note the seconds in the facts box later.
+3. Turn on airplane mode (with Wi-Fi off too). Record, speak, then stop and seal.
+4. Check words appeared while recording, the transcript and facts show after sealing, and the bundle imports into
+   Dictum as before, with no transcript inside it.
+5. Tap Done and check the transcript is gone. Record once more with the switch off and compare the bundle with one
+   made before this change.
+
+Speech API names that compiled against the iOS 27.2 SDK (Xcode 27.2): `SpeechTranscriber(locale:transcriptionOptions:
+reportingOptions:attributeOptions:)` with `.volatileResults`, `SpeechTranscriber.isAvailable`,
+`SpeechTranscriber.supportedLocales`, `SpeechTranscriber.supportedLocale(equivalentTo:)`, `SpeechAnalyzer(modules:)`,
+`SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)`, `AnalyzerInput(buffer:)`, `analyzer.start(inputSequence:)`,
+`finalizeAndFinishThroughEndOfInput()`, `cancelAndFinishNow()`, `transcriber.results` with `result.text` and
+`result.isFinal`, `AssetInventory.status(forModules:)`, `AssetInventory.assetInstallationRequest(supporting:)`,
+`AssetInstallationRequest.downloadAndInstall()` and `.progress`. Speech permission uses
+`SFSpeechRecognizer.requestAuthorization`; the SDK interface for `SpeechAnalyzer` does not say whether it needs that
+permission, so it is asked as a precaution.
+
+Not measured or not verified:
+
+- Peak memory is not measured.
+- Nothing has been run on a device: availability on iOS 27.2, the model download, airplane-mode behaviour, latency,
+  accuracy and thermal effect are all unverified.
+- Whether the speech permission is actually required, and whether listing supported locales at launch touches the
+  network, are not verified.
+- Audio that arrives before the analyzer is ready is dropped, so the first moment of speech may be missing.
+
 ## Files
 
 - `DictumRecorder/Text.swift` – every user-facing string.
@@ -56,6 +114,7 @@ compliance rules and whether this use is exempt or needs documentation. This has
   unlock) until the bundle is sealed.
 - `DictumRecorder/RecordingController.swift` – screen state.
 - `DictumRecorder/Screens.swift` – the four screens.
+- `DictumRecorder/OnDeviceTranscript.swift` – the experimental on-device transcript (memory only).
 
 ## Licence
 

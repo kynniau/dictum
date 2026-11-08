@@ -24,6 +24,10 @@ final class AudioCapture {
     /// Called on the main thread about ten times a second with the peak |sample| of the converted audio since the
     /// last report, 0...1 (0 means every converted sample was exactly zero). Set before `start()`.
     var onLevel: ((Double) -> Void)?
+    /// Optional second sink for the experimental on-device transcript: receives the tap's original buffer, before
+    /// conversion, after `sink` has been given the converted audio. Must not block. nil (the default) leaves capture
+    /// exactly as it is without it. Set before `start()`.
+    var rawSink: ((AVAudioPCMBuffer) -> Void)?
 
     init(sink: @escaping (Data) -> Void) {
         self.sink = sink
@@ -79,11 +83,13 @@ final class AudioCapture {
 
         let sink = self.sink
         let meter = LevelMeter(report: onLevel)
+        let rawSink = self.rawSink
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
             if let data = Self.convert(buffer, with: converter) {
                 meter.add(data)
                 sink(data)
             }
+            rawSink?(buffer)
         }
         engine.prepare()
         try engine.start()

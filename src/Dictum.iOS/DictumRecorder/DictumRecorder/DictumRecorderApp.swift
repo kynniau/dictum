@@ -31,7 +31,9 @@ struct RootView: View {
                 ProgressView(PROPOSED_Sealing).font(.title2)
             }
         case let .sealed(bundle):
-            SealedView(bundle: bundle, captureFailed: controller.captureFailed) { controller.doneTapped() }
+            SealedView(bundle: bundle, captureFailed: controller.captureFailed, transcript: controller.transcript) {
+                controller.doneTapped()
+            }
         case .recover:
             RecoverView { Task { await controller.recoverTapped() } }
         case let .failed(message):

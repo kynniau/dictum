@@ -81,3 +81,46 @@ let PROPOSED_SealFailed = "The recording could not be sealed. The encrypted part
 let PROPOSED_CaptureFailed = "Capture stopped early because the encrypted file could not be written. What was captured before then has been sealed."
 let PROPOSED_NoMicrophone = "No microphone is available on this device."
 let PROPOSED_BackToStart = "Back to start"
+
+// MARK: - Experimental on-device transcript (switch on screen 1, default off)
+
+let PROPOSED_OnDeviceTranscriptToggle = "Experimental: transcribe on this device"
+let PROPOSED_OnDeviceTranscriptNote = "Experimental. The words appear on this device only while you record and until you tap Done. They are not saved and are not sent anywhere. The computer that imports the file makes the real transcript."
+let PROPOSED_TranscriptChecking = "Checking for the on-device speech model…"
+let PROPOSED_TranscriptAssetsNeeded = "The on-device speech model is not on this device yet. Downloading it from Apple is a one-off and needs the internet."
+let PROPOSED_TranscriptDownload = "Download the speech model"
+let PROPOSED_TranscriptDownloading = "Downloading the speech model…"
+let PROPOSED_TranscriptReady = "The on-device speech model is on this device."
+let PROPOSED_TranscriptNotInstalled = "The speech model did not finish installing."
+/// "{0}" is the system's error description.
+let PROPOSED_TranscriptDownloadFailed = "The speech model could not be downloaded: %@"
+let PROPOSED_StartNeedsModel = "To start, download the speech model or turn off the experimental switch."
+
+let PROPOSED_TranscriptPreparing = "Preparing the on-device speech model…"
+let PROPOSED_TranscriptListening = "On-device transcript (experimental)"
+let PROPOSED_TranscriptUnavailable = "On-device transcript is not available on this device."
+/// "{0}" is the system's error description.
+let PROPOSED_TranscriptFailed = "On-device transcript stopped: %@"
+let PROPOSED_TranscriptRegion = "On-device transcript so far"
+let PROPOSED_TranscriptEmpty = "No words yet."
+
+let PROPOSED_TranscriptHeading = "On-device transcript (experimental, not saved)"
+let PROPOSED_TranscriptFinishing = "Finishing the on-device transcript…"
+let PROPOSED_TranscriptNone = "No words were recognised."
+let PROPOSED_CopyTranscript = "Copy transcript"
+let PROPOSED_TranscriptCopied = "Copied"
+
+let PROPOSED_FactsHeading = "Experiment facts"
+let PROPOSED_FactLocale = "Language used"
+let PROPOSED_FactAssets = "Speech model downloaded"
+/// "{0}" is seconds, one decimal place.
+let PROPOSED_FactAssetsYes = "Yes, in %.1f seconds"
+let PROPOSED_FactAssetsNo = "No, it was already on this device"
+let PROPOSED_FactStopToFinal = "Stop to last final words"
+/// "{0}" is seconds, one decimal place.
+let PROPOSED_FactSeconds = "%.1f seconds"
+let PROPOSED_FactNoFinalAfterStop = "No final words arrived after Stop"
+let PROPOSED_FactThermal = "Thermal state at Stop"
+
+/// Copied by hand into Info.plist as NSSpeechRecognitionUsageDescription (a plist cannot read this constant).
+let PROPOSED_SpeechUsage = "Dictum Recorder can show an experimental on-device transcript while you record. Speech is processed on this device only."
