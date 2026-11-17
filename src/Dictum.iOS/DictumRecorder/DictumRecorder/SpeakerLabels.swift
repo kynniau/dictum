@@ -624,6 +624,8 @@ final class SpeakerLabels {
         let id: Int
         /// Seconds from the recording start (the PCM copy's first sample).
         let start: Double?
+        /// The segment's end on the same timeline, kept for the saved meeting record.
+        var end: Double? = nil
         let speaker: Int?
         let text: String
     }
@@ -691,7 +693,7 @@ final class SpeakerLabels {
     /// Each shown segment's line, with the speaker of the turn it overlaps or is nearest to.
     nonisolated static func lines(_ segments: [Segment], turns: [SpeakerTurn], parameters: SpeakerParameters) -> [Line] {
         segments.enumerated().map { i, s in
-            Line(id: i, start: s.start, speaker: s.start.flatMap { start in
+            Line(id: i, start: s.start, end: s.end, speaker: s.start.flatMap { start in
                 s.end.flatMap {
                     SpeakerSeparation.speakerOf(start: start, end: $0, turns: turns, within: parameters.nearestTurnSeconds)
                 }

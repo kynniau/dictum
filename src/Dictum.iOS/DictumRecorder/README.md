@@ -188,4 +188,55 @@ Proof of concept, not a released product. Dictum's colours, radii and mark come 
 - **Compose email** (`ComposeEmail.swift`): Mail's compose sheet (MessageUI) filled with the summary and actions, else a
   `mailto:` link. The user sends it from their own mail app; the app sends nothing and keeps no recipient.
 
-Everything on the review and email screens lives in memory and is cleared on Done. The bundle is unchanged.
+With "Keep meetings on this device" off, everything on the review and email screens lives in memory and is cleared on
+Done. With it on, see the next section. The bundle is unchanged either way.
+
+## Meetings kept on this device (17/11/2026)
+
+Owner request, 17/11/2026: finished meetings can be reopened later (transcript, summary, actions, email), protected by
+Face ID. This supersedes the earlier "memory only" rule for the beta. Setting: Settings → "Keep meetings on this
+device", default on. Off behaves as before (key deleted at seal, nothing kept).
+
+How it works (`LibraryStore.swift`, `MeetingDetail.swift`, `LibraryTranscribe.swift`):
+
+- **Key.** At Start the per-meeting key goes into the crash-recovery Keychain item as before
+  (`com.kynni.dictum.recorder.contentkey`, after first unlock). At seal it is saved as a generic password, service
+  `com.kynni.dictum.recorder.library`, account = meeting id hex, with `kSecAttrAccessControl` from
+  `SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, .userPresence, nil)`,
+  `kSecAttrSynchronizable` false; the recovery item is then deleted. The controller keeps the key in memory until Done
+  so the record is written without a second prompt, then zeroes it.
+- **Opening.** `LAContext.evaluatePolicy(.deviceOwnerAuthentication, …)` (Face ID / Touch ID, passcode fallback), then
+  `SecItemCopyMatching` with that context in `kSecUseAuthenticationContext`. The evaluated context is reused for 120 s
+  and dropped when the app leaves the foreground (`// simplification:` in `LibraryAuth`). The home list reads only
+  Keychain attributes, through a context with `interactionNotAllowed`, so listing never prompts.
+- **Audio.** The sealed `.dictum` in Documents stays the audio store. Its entries are sealed under the content key, so
+  the app opens its own bundle with the kept key and no code.
+- **Record.** `Documents/Library/<meeting-hex>/record.json.enc`: DCTMENC sealed with the content key (identity
+  `<meeting-id>/record.json.enc`), JSON with schema version, title, meeting type, start, duration, transcript segments
+  (start, end, text, speaker number), speaker names, summary, actions, confirmation time and facts (engine, locale,
+  speakers found, threshold). Written minimally at seal, fully at Done, and again after edits on the meeting screen;
+  atomic, file protection complete. It is not inside the bundle, so the file a computer imports is unchanged in format.
+  `Documents/Library` is visible in the Files app (Documents is shared); its content is ciphertext only.
+- **Meeting screen.** Transcript with times and names (rename as in Review; Fewer/More speakers is not offered because
+  the voice prints are not kept), editable summary text and "Write the summary on this device", who does what,
+  confirmation time (read-only), facts, Compose summary email, Send to computer (`BundleFile.rewrap`: a fresh salt,
+  wrap and six-word code each time; the earlier code stops working; payload entries byte-identical), Play recording
+  (decrypted into memory and played with `AVAudioPlayer(data:)` from an in-memory WAV; first 60 minutes only), Delete
+  meeting (file, record folder and key).
+- **Row titles.** A title is encrypted, so a row reads "Meeting on <date>" until that meeting has been opened in this
+  foreground session. Duration on a row is estimated from the audio entry's length in the plaintext manifest ("about").
+- **Older files.** A `.dictum` with no kept key shows "Sealed — code needed" and "Unlock with the six words"
+  (`BundleFile.unlock`); the key is then kept and a minimal record (title, start, duration) made from `meta.json.enc`.
+  At launch the app also checks the old crash-recovery service for a leftover key per file and adopts one that opens
+  the file. This is expected to find nothing, because the earlier build deleted the key at seal.
+- **Transcribe on this device.** For a kept meeting with audio and no transcript: SpeechAnalyzer fed the decrypted PCM
+  from memory (no file), then the speaker step. Offered only when the meeting's recorded notice is
+  `PROPOSED-ios-2026-11-17-v2`; a meeting recorded under the earlier notice (which said the computer makes transcripts)
+  shows a note instead. Never downloads the speech model.
+- **Notice.** With keeping on, points 3 and 4 of the phone notice change and the recorded script version is
+  `PROPOSED-ios-2026-11-17-v2`; with it off, the earlier points and `PROPOSED-ios-2026-11-08-v1` stay. A recovered
+  meeting is kept only when its recorded notice is v2.
+
+Only a real device can verify: the Face ID prompt and passcode fallback, the access-control behaviour of the Keychain
+item (including whether the attributes-only listing works without a prompt), playback, transcribing from memory, and
+that the PC imports a re-wrapped file with its new code. None of these has been run.

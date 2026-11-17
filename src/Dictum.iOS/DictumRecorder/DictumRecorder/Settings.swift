@@ -3,8 +3,9 @@ import Observation
 import SwiftUI
 
 // Non-sensitive choices only, kept in UserDefaults: which engine, whether the experimental transcript and speaker labels
-// are on, the separation threshold, the meeting type and the summary engine. Nothing said in a meeting, no name, no
-// recipient and no summary is ever stored here or anywhere else.
+// are on, the separation threshold, the meeting type, the summary engine and whether meetings are kept on this device.
+// Nothing said in a meeting, no name, no recipient and no summary is ever stored here. Kept meetings live only in the
+// encrypted library (LibraryStore.swift).
 
 /// A meeting type: the desktop's built-in summary types (src/Dictum.Core/Meetings/Summary/SummaryTemplate.cs,
 /// `SummaryTemplates.Builtins`, ids and names) with the section headings of each built-in template file
@@ -38,6 +39,7 @@ final class AppSettings {
         static let engine = "settings.transcriptionEngine"
         static let summaryEngine = "settings.summaryEngine"
         static let appearance = "settings.appearance"
+        static let keepOnDevice = "settings.keepOnDevice"
     }
 
     /// Automatic follows the system; Light and Dark force one.
@@ -78,6 +80,9 @@ final class AppSettings {
     /// Only "apple" (the on-device model) is selectable in this build.
     var summaryEngine: String { didSet { defaults.set(summaryEngine, forKey: Key.summaryEngine) } }
     var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: Key.appearance) } }
+    /// Keep each meeting's key (behind Face ID or the passcode) and its encrypted record on this device. Default on.
+    /// Off: the key is deleted at seal and nothing is kept, as before 17/11/2026.
+    var keepOnDevice: Bool { didSet { defaults.set(keepOnDevice, forKey: Key.keepOnDevice) } }
 
     /// `-DictumAppearance light|dark|automatic` on the launch command line overrides the stored value for that launch
     /// only (screenshot tests); it is never stored.
@@ -100,6 +105,7 @@ final class AppSettings {
         transcriptionEngine = "apple"
         summaryEngine = "apple"
         appearance = Appearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .automatic
+        keepOnDevice = defaults.object(forKey: Key.keepOnDevice) as? Bool ?? true
     }
 
     var meetingType: MeetingType { MeetingType.with(id: meetingTypeId) }

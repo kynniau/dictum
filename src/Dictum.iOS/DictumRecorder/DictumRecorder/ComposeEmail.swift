@@ -11,21 +11,29 @@ struct SummaryEmail: Equatable {
     var subject: String
     var body: String
 
+    /// From the end-of-meeting review (the meeting just recorded).
     @MainActor
-    static func make(from review: MeetingReview) -> SummaryEmail {
+    static func make(from review: MeetingReview, footer: String = PROPOSED_EmailSealedLine) -> SummaryEmail {
+        make(summary: review.summary.state == .done ? review.summary.summary : "", actions: review.actions,
+             date: review.meetingDate, footer: footer)
+    }
+
+    /// From any summary text and actions (a kept meeting reopened later uses this).
+    static func make(summary: String, actions all: [MeetingReview.Action], date: Date?,
+                     footer: String = PROPOSED_EmailSealedLine) -> SummaryEmail {
         let day = DateFormatter()
         day.locale = Locale(identifier: "en_AU")
         day.dateFormat = "dd/MM/yyyy"
-        let subject = String(format: PROPOSED_EmailSubject, day.string(from: review.meetingDate ?? Date()))
+        let subject = String(format: PROPOSED_EmailSubject, day.string(from: date ?? Date()))
 
         var lines: [String] = [PROPOSED_EmailSummaryHeading]
-        let summary = review.summary.state == .done ? review.summary.summary : ""
+        let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
         lines.append(summary.isEmpty ? PROPOSED_EmailNoSummary : summary)
         lines.append("")
         lines.append(PROPOSED_EmailActionsHeading)
 
         // Grouped by owner, owners in the order they first appear; actions with no text are left out.
-        let actions = review.actions.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let actions = all.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if actions.isEmpty {
             lines.append(PROPOSED_EmailNoActions)
         } else {
@@ -48,7 +56,7 @@ struct SummaryEmail: Equatable {
             }
         }
         lines.append("")
-        lines.append(PROPOSED_EmailSealedLine)
+        lines.append(footer)
         return SummaryEmail(subject: subject, body: lines.joined(separator: "\n"))
     }
 
@@ -68,7 +76,8 @@ struct SummaryEmail: Equatable {
 }
 
 struct ComposeEmailSheet: View {
-    let review: MeetingReview
+    /// Built by the caller when the sheet opens (from the review, or from a kept meeting).
+    let email: SummaryEmail
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var recipients: [String] = []
@@ -159,8 +168,6 @@ struct ComposeEmailSheet: View {
             }
         }
     }
-
-    private var email: SummaryEmail { SummaryEmail.make(from: review) }
 
     private func add() {
         let address = draft.trimmingCharacters(in: .whitespacesAndNewlines)

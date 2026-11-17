@@ -3,11 +3,12 @@ import Observation
 import SwiftUI
 
 // The end-of-meeting review, between Stop and the sealed screen: the transcript with speaker naming, an on-device
-// summary, who does what, and the spoken agreement. Everything on it lives in memory only (this object, the transcript
-// and the speaker labels) and is cleared on Done. Nothing here is written to disk, put in the bundle or sent: the
-// recording was already sealed at Stop, exactly as before.
+// summary, who does what, and the spoken agreement. Everything on it lives in memory (this object, the transcript and
+// the speaker labels) and is cleared on Done. With "Keep meetings on this device" on for this meeting, Done first seals
+// it into the meeting's encrypted record (LibraryStore.swift); with it off, nothing here is written anywhere. Nothing is
+// put in the bundle or sent: the recording was already sealed at Stop, exactly as before.
 
-/// Review state for one meeting. Main thread only; memory only.
+/// Review state for one meeting (also the editable state of a reopened kept meeting). Main thread only.
 @MainActor
 @Observable
 final class MeetingReview {
@@ -67,22 +68,23 @@ struct ReviewView: View {
             Text(PROPOSED_ReviewHeading)
                 .dictumTitle()
                 .accessibilityAddTraits(.isHeader)
-            Text(PROPOSED_ReviewIntro)
+            Text(controller.keepThisMeeting ? PROPOSED_ReviewIntroKept : PROPOSED_ReviewIntro)
                 .font(.body)
                 .foregroundStyle(DictumTheme.text)
             StatusPill(kind: .done, text: PROPOSED_ReviewSealedNote)
 
-            ReviewTranscriptView(transcript: transcript, review: review)
+            ReviewTranscriptView(transcript: transcript, review: review, kept: controller.keepThisMeeting)
             ReviewSummaryView(controller: controller)
             ReviewActionsView(review: review, owners: owners)
-            ReviewAgreementView(review: review)
+            ReviewAgreementView(review: review, kept: controller.keepThisMeeting)
 
             SecondaryButton(title: PROPOSED_ComposeEmail, systemImage: "envelope") { composing = true }
             PrimaryButton(title: PROPOSED_ContinueToSealed, systemImage: "lock.fill") { controller.continueToSealed() }
                 .accessibilityIdentifier("review.continue")
         }
         .sheet(isPresented: $composing) {
-            ComposeEmailSheet(review: review)
+            ComposeEmailSheet(email: SummaryEmail.make(from: review, footer: controller.keepThisMeeting
+                                                       ? PROPOSED_EmailKeptLine : PROPOSED_EmailSealedLine))
         }
     }
 
@@ -98,6 +100,8 @@ struct ReviewView: View {
 struct ReviewTranscriptView: View {
     let transcript: OnDeviceTranscript
     @Bindable var review: MeetingReview
+    /// This meeting is kept on this device (its notice said so).
+    var kept = false
     @State private var copied = false
     @State private var renaming: Int?
     @State private var draftName = ""
@@ -113,7 +117,7 @@ struct ReviewTranscriptView: View {
     var body: some View {
         DictumCard {
             SectionHeader(PROPOSED_ReviewTranscript)
-            Text(PROPOSED_TranscriptHeading)
+            Text(kept ? PROPOSED_TranscriptHeadingKept : PROPOSED_TranscriptHeading)
                 .font(.footnote)
                 .foregroundStyle(DictumTheme.muted)
 
@@ -535,6 +539,7 @@ struct ReviewActionsView: View {
 
 struct ReviewAgreementView: View {
     @Bindable var review: MeetingReview
+    var kept = false
 
     private static let time: DateFormatter = {
         let f = DateFormatter()
@@ -561,7 +566,7 @@ struct ReviewAgreementView: View {
                 .buttonStyle(.dictumSecondary)
                 .accessibilityLabel(PROPOSED_EveryoneConfirmed)
             }
-            Text(PROPOSED_ConfirmedNote)
+            Text(kept ? PROPOSED_ConfirmedNoteKept : PROPOSED_ConfirmedNote)
                 .font(.footnote)
                 .foregroundStyle(DictumTheme.muted)
         }

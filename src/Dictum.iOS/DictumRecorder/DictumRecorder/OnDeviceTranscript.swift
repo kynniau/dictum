@@ -182,7 +182,7 @@ final class OnDeviceTranscript {
 
     /// The speech-recognition permission prompt. Whether SpeechAnalyzer needs it is not stated in the iOS 27.2 SDK
     /// interface; it is asked as a precaution, only after the user turns the switch on.
-    private static func speechAuthorised() async -> Bool {
+    static func speechAuthorised() async -> Bool {
         switch SFSpeechRecognizer.authorizationStatus() {
         case .authorized: return true
         case .denied, .restricted: return false
@@ -319,6 +319,24 @@ final class OnDeviceTranscript {
         segments = []
         active = false
     }
+
+    // MARK: - Saving with the meeting (keep on this device)
+
+    /// The transcript as the meeting record keeps it: the labelled lines when the speaker step finished, else the final
+    /// segments on the analyzer's timeline with no speaker, else the final text as one untimed segment. Read at Done.
+    var recordSegments: [MeetingRecord.Segment] {
+        if speakers.state == .done, !speakers.lines.isEmpty {
+            return speakers.lines.map { MeetingRecord.Segment(start: $0.start, end: $0.end, text: $0.text, speaker: $0.speaker) }
+        }
+        if !segments.isEmpty {
+            return segments.map { MeetingRecord.Segment(start: $0.start, end: $0.end, text: $0.text, speaker: nil) }
+        }
+        let text = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? [] : [MeetingRecord.Segment(start: nil, end: nil, text: text, speaker: nil)]
+    }
+
+    /// The locale the transcript ran in, when it ran.
+    var recordLocale: String? { active ? (facts?.locale ?? localeIdentifier) : nil }
 
     // MARK: - Screen 3
 
@@ -474,6 +492,9 @@ final class SpeechEngine: @unchecked Sendable {
         target.withLockUnchecked { $0 = format }
         try await analyzer.start(inputSequence: input)
     }
+
+    /// True once `start()` knows the analyzer's audio format, so `feed` no longer drops buffers.
+    var isReady: Bool { target.withLockUnchecked { $0 != nil } }
 
     /// Called on the audio tap's thread with the tap's own buffer. Converts into a new buffer and hands it on; never
     /// waits. Buffers are dropped while the analyzer's format is not yet known.

@@ -17,8 +17,16 @@ struct DictumRecorderApp: App {
 /// end-of-meeting screens, so the recording screen cannot be swiped away.
 struct RootView: View {
     @Bindable var controller: RecordingController
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        screen
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { controller.enteredBackground() }
+            }
+    }
+
+    @ViewBuilder private var screen: some View {
         switch controller.phase {
         case .home:
             HomeView(controller: controller)
@@ -36,13 +44,22 @@ struct RootView: View {
         case let .review(bundle):
             ReviewView(controller: controller, bundle: bundle)
         case let .sealed(bundle):
-            SealedView(bundle: bundle, captureFailed: controller.captureFailed, review: controller.review) {
+            SealedView(bundle: bundle, captureFailed: controller.captureFailed, keepFailed: controller.keepFailed,
+                       email: SummaryEmail.make(from: controller.review,
+                                                footer: controller.keepThisMeeting ? PROPOSED_EmailKeptLine : PROPOSED_EmailSealedLine)) {
                 controller.doneTapped()
             }
         case .recover:
             RecoverView { Task { await controller.recoverTapped() } }
         case let .failed(message):
             FailedView(message: message) { controller.doneTapped() }
+        case .detail:
+            if let detail = controller.detail {
+                MeetingDetailView(model: detail, settings: controller.settings,
+                                  close: { controller.closeDetail() }, deleted: { controller.detailDeleted() })
+            } else {
+                HomeView(controller: controller)
+            }
         }
     }
 }

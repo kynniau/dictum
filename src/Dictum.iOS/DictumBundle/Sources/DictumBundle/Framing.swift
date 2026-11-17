@@ -49,6 +49,11 @@ public struct KeyWrap {
         return nonce + cipher + tag
     }
 
+    /// Opens a 60-byte wrap made by `wrap`; a wrong recipient key or id throws `authenticationFailed`.
+    public static func unwrap(wrapped: Data, recipientKey: Data, recipientId: String) throws -> Data {
+        try unwrap(wrapped, recipientKey: recipientKey, recipientId: recipientId)
+    }
+
     static func unwrap(_ wrap: Data, recipientKey: Data, recipientId: String) throws -> Data {
         guard wrap.count == 60 else { throw DictumBundleError.malformed }
         let w = Data(wrap)
@@ -84,8 +89,10 @@ public enum SealedFile {
         return out
     }
 
-    /// Verify-then-release decryption of a whole DCTMENC file (internal; used by recovery and tests).
-    static func open(_ sealedData: Data, contentKey: Data, meetingId: MeetingId, entryName: String) throws -> Data {
+    /// Verify-then-release decryption of a whole DCTMENC file: every record, including the zero-length terminal
+    /// record, is authenticated before any plaintext is returned; trailing data, a missing terminal record or any
+    /// failed tag throws.
+    public static func open(_ sealedData: Data, contentKey: Data, meetingId: MeetingId, entryName: String) throws -> Data {
         let data = Data(sealedData)
         let key = try Framing.key(contentKey)
         guard data.count >= 24, data.prefix(8) == Framing.sealedMagic else { throw DictumBundleError.malformed }
@@ -201,11 +208,25 @@ public final class ChunkedAudioWriter {
     deinit { if !closed { try? handle.close() } }
 }
 
-/// Internal reader mirroring the desktop's verification rules; used by tests and recovery checks.
+/// Public read of a DCTMAUD stream (`audio-<channel>.chunks.enc`) to PCM16 mono 16 kHz.
+public enum ChunkedAudioReader {
+    /// Verifies every record it returns. `incomplete` reads an interrupted snapshot (no terminal record, or a torn
+    /// final record after a verified framing tag); otherwise the terminal record and end of file are required.
+    /// `limit` stops after at least that many PCM bytes (every returned record still verified; the terminal record
+    /// is then not reached, so a complete stream is not checked for its end).
+    public static func pcm(_ fileData: Data, contentKey: Data, meetingId: MeetingId, channel: String = "mixed",
+                           incomplete: Bool, limit: Int? = nil) throws -> Data {
+        try ChunkedAudio.open(fileData, contentKey: contentKey, meetingId: meetingId, channel: channel,
+                              incomplete: incomplete, limit: limit)
+    }
+}
+
+/// Internal reader mirroring the desktop's verification rules; used by tests, recovery and `ChunkedAudioReader`.
 enum ChunkedAudio {
     /// Returns the PCM after verifying every record. `incomplete` accepts EOF without a terminal record and a
     /// torn final record, but only after an intact framing tag has verified (section 13.2).
-    static func open(_ fileData: Data, contentKey: Data, meetingId: MeetingId, channel: String, incomplete: Bool) throws -> Data {
+    static func open(_ fileData: Data, contentKey: Data, meetingId: MeetingId, channel: String, incomplete: Bool,
+                     limit: Int? = nil) throws -> Data {
         let data = Data(fileData)
         let key = try Framing.key(contentKey)
         guard data.count >= 24, data.prefix(8) == Framing.audioMagic else { throw DictumBundleError.malformed }
@@ -233,6 +254,7 @@ enum ChunkedAudio {
                                         nonce: data.subdata(in: body..<body + 12), aad: aad))
             position = body + 28 + length
             sequence += 1
+            if let limit, pcm.count >= limit { return pcm }
             if length == 0 {
                 guard position == data.count else { throw DictumBundleError.malformed }
                 return pcm

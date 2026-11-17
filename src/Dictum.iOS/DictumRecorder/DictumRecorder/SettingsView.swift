@@ -51,7 +51,7 @@ struct SettingsView: View {
                     Toggle(PROPOSED_OnDeviceTranscriptToggle, isOn: $settings.transcribeOnDevice)
                         .tint(DictumTheme.accent)
                         .accessibilityLabel(PROPOSED_OnDeviceTranscriptToggle)
-                    Text(PROPOSED_OnDeviceTranscriptNote)
+                    Text(settings.keepOnDevice ? PROPOSED_OnDeviceTranscriptNoteKept : PROPOSED_OnDeviceTranscriptNote)
                         .font(.footnote)
                         .foregroundStyle(DictumTheme.muted)
                 }
@@ -146,11 +146,12 @@ struct SettingsView: View {
     private var keepSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
-                Toggle(PROPOSED_KeepToggle, isOn: .constant(false))
-                    .disabled(true)
+                Toggle(PROPOSED_KeepToggle, isOn: $settings.keepOnDevice)
+                    .tint(DictumTheme.accent)
                     .accessibilityLabel(PROPOSED_KeepToggle)
-                    .accessibilityHint(PROPOSED_KeepNote)
-                Text(PROPOSED_KeepNote)
+                    .accessibilityHint(settings.keepOnDevice ? PROPOSED_KeepNote : PROPOSED_KeepOffNote)
+                    .accessibilityIdentifier("settings.keep")
+                Text(settings.keepOnDevice ? PROPOSED_KeepNote : PROPOSED_KeepOffNote)
                     .font(.footnote)
                     .foregroundStyle(DictumTheme.muted)
             }

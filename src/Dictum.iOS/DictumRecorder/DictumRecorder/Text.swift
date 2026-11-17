@@ -39,6 +39,19 @@ let PROPOSED_OpenSettings = "Open Settings"
 let PROPOSED_ConsentScript = APPROVED_Agreement + "\n\n" + PROPOSED_Points.joined(separator: "\n")
 let PROPOSED_ScriptVersion = "PROPOSED-ios-2026-11-08-v1"
 
+// With "Keep meetings on this device" on (17/11/2026), points 3 and 4 say what is kept, and the script version changes.
+// The points and version above stay for keep-off.
+let PROPOSED_PointProcessingKept = "Transcripts and summaries can be made on this device and are kept on it, encrypted, until you delete them. A computer that imports the file works under its own notice."
+let PROPOSED_PointKeepKept = "The recording and its notes stay on this device, encrypted and opened with Face ID or the passcode, until you delete them. Cloud copies you make have their own rules."
+let PROPOSED_PointsKept = [PROPOSED_PointRecord, PROPOSED_PointTransfer, PROPOSED_PointProcessingKept, PROPOSED_PointKeepKept]
+let PROPOSED_ConsentScriptKept = APPROVED_Agreement + "\n\n" + PROPOSED_PointsKept.joined(separator: "\n")
+let PROPOSED_ScriptVersionKept = "PROPOSED-ios-2026-11-17-v2"
+
+/// The points shown, and the script and version recorded, for the keep setting in force when Start is tapped.
+func PROPOSED_PointsFor(keep: Bool) -> [String] { keep ? PROPOSED_PointsKept : PROPOSED_Points }
+func PROPOSED_ConsentScriptFor(keep: Bool) -> String { keep ? PROPOSED_ConsentScriptKept : PROPOSED_ConsentScript }
+func PROPOSED_ScriptVersionFor(keep: Bool) -> String { keep ? PROPOSED_ScriptVersionKept : PROPOSED_ScriptVersion }
+
 // MARK: - Screen 2: Recording
 
 let PROPOSED_RecordingIndicator = "Recording"
@@ -87,6 +100,7 @@ let PROPOSED_BackToStart = "Back to start"
 
 let PROPOSED_OnDeviceTranscriptToggle = "Experimental: transcribe on this device"
 let PROPOSED_OnDeviceTranscriptNote = "Experimental. The words appear on this device only while you record and until you tap Done. They are not saved and are not sent anywhere. The computer that imports the file makes the real transcript."
+let PROPOSED_OnDeviceTranscriptNoteKept = "Experimental. The words are made on this device and kept with the meeting on it, encrypted, until you delete the meeting. They are not sent anywhere. The computer that imports the file makes its own transcript."
 let PROPOSED_TranscriptChecking = "Checking for the on-device speech model…"
 let PROPOSED_TranscriptAssetsNeeded = "The on-device speech model is not on this device yet. Downloading it from Apple is a one-off and needs the internet."
 let PROPOSED_TranscriptDownload = "Download the speech model"
@@ -106,6 +120,7 @@ let PROPOSED_TranscriptRegion = "On-device transcript so far"
 let PROPOSED_TranscriptEmpty = "No words yet."
 
 let PROPOSED_TranscriptHeading = "On-device transcript (experimental, not saved)"
+let PROPOSED_TranscriptHeadingKept = "On-device transcript (experimental, kept on this device, encrypted)"
 let PROPOSED_TranscriptFinishing = "Finishing the on-device transcript…"
 let PROPOSED_TranscriptNone = "No words were recognised."
 let PROPOSED_CopyTranscript = "Copy transcript"
@@ -242,9 +257,10 @@ let PROPOSED_SectionAppearance = "Appearance"
 let PROPOSED_AppearanceAutomatic = "Automatic"
 let PROPOSED_AppearanceLight = "Light"
 let PROPOSED_AppearanceDark = "Dark"
-let PROPOSED_SectionKeep = "Keep transcripts on this device"
-let PROPOSED_KeepToggle = "Keep transcripts on this device"
-let PROPOSED_KeepNote = "Coming in a later build; nothing is kept today"
+let PROPOSED_SectionKeep = "Keep meetings on this device"
+let PROPOSED_KeepToggle = "Keep meetings on this device"
+let PROPOSED_KeepNote = "Saved meetings are encrypted on this device and open with Face ID or your passcode. Nothing is sent anywhere."
+let PROPOSED_KeepOffNote = "Off: after sealing, the key is deleted and nothing about the meeting is kept on this device except the sealed file."
 let PROPOSED_SectionAbout = "About"
 let PROPOSED_AboutVersion = "Version"
 let PROPOSED_AboutBuild = "Build"
@@ -326,6 +342,8 @@ let PROPOSED_EveryoneConfirmed = "Everyone confirmed"
 /// "{0}" is the time, for example 4:05 pm.
 let PROPOSED_ConfirmedAt = "Everyone confirmed at %@"
 let PROPOSED_ConfirmedNote = "Recorded on this screen only for this proof of concept; nothing is saved."
+let PROPOSED_ConfirmedNoteKept = "The confirmation time is saved with the meeting on this device, encrypted."
+let PROPOSED_ReviewIntroKept = "Check the transcript, name the speakers, agree the actions, then continue to the sealed file. What you do here is saved with the meeting on this device, encrypted, when you tap Done."
 let PROPOSED_ContinueToSealed = "Continue to the sealed file"
 let PROPOSED_ReviewSealedNote = "The recording is already sealed. This screen only helps you agree the actions before everyone leaves."
 
@@ -351,3 +369,79 @@ let PROPOSED_EmailUnassigned = "Not yet assigned"
 /// "{0}" is the by-when text.
 let PROPOSED_EmailByWhen = " (by %@)"
 let PROPOSED_EmailSealedLine = "The recording of this meeting is sealed and held by the organiser."
+
+// MARK: - Meetings kept on this device (17/11/2026)
+
+/// Copied by hand into Info.plist as NSFaceIDUsageDescription (a plist cannot read this constant).
+let PROPOSED_FaceIDUsage = "Dictum Recorder uses Face ID to open your saved meetings."
+/// The reason shown in the Face ID / passcode prompt.
+let PROPOSED_FaceIDReason = "Open your saved meetings"
+let PROPOSED_Meetings = "Meetings"
+let PROPOSED_NoMeetings = "No meetings yet. Each meeting you record is kept here, encrypted, until you delete it."
+let PROPOSED_StateSaved = "Saved on this device"
+let PROPOSED_StateCodeNeeded = "Sealed — code needed"
+/// Row title before the meeting is opened (the title is encrypted): "{0}" is the date and time.
+let PROPOSED_MeetingOn = "Meeting on %@"
+/// "{0}" is the duration, for example 12:04.
+let PROPOSED_DurationAbout = "about %@"
+/// VoiceOver for a meeting row: "{0}" title, "{1}" date, "{2}" duration, "{3}" size, "{4}" state.
+let PROPOSED_MeetingRow = "%@, %@, %@, %@, %@"
+let PROPOSED_OpenMeeting = "Open this meeting"
+let PROPOSED_OpenFailed = "The meeting could not be opened."
+let PROPOSED_AuthFailed = "Face ID or the passcode was not confirmed, so the meeting stays locked."
+let PROPOSED_AuthUnavailable = "This device has no passcode set, so saved meetings cannot be opened. Set a passcode in Settings."
+let PROPOSED_KeyMissing = "This meeting's key is no longer on this device. Unlock it with its six words."
+let PROPOSED_UnlockWithWords = "Unlock with the six words"
+let PROPOSED_UnlockTitle = "Unlock with the six words"
+let PROPOSED_UnlockIntro = "Type the six words shown when this meeting was sealed. The meeting is then kept on this device, encrypted, and opens with Face ID or your passcode."
+let PROPOSED_UnlockField = "Six words"
+let PROPOSED_UnlockButton = "Unlock"
+let PROPOSED_Unlocking = "Checking the words…"
+let PROPOSED_UnlockWrong = "Those words do not unlock this meeting."
+let PROPOSED_UnlockNeedsSix = "Type exactly six words."
+let PROPOSED_UnlockFailed = "The meeting could not be unlocked."
+let PROPOSED_KeepOffUnlock = "Turn on Keep meetings on this device in Settings to unlock and keep this meeting."
+let PROPOSED_KeepFailed = "This meeting could not be kept on this device. The sealed file and its six words are unaffected."
+
+// Meeting detail
+let PROPOSED_MeetingBack = "Meetings"
+let PROPOSED_DetailTranscript = "Transcript"
+let PROPOSED_DetailNoTranscript = "No transcript was made for this meeting."
+let PROPOSED_DetailSummaryField = "Summary text"
+let PROPOSED_DetailNoSummary = "No summary yet."
+let PROPOSED_DetailConfirmed = "Confirmed"
+let PROPOSED_DetailNotConfirmed = "Not confirmed on this device"
+let PROPOSED_DetailFacts = "Facts"
+let PROPOSED_FactEngine = "Transcription engine"
+let PROPOSED_FactStarted = "Started"
+let PROPOSED_FactDuration = "Duration"
+let PROPOSED_FactMeetingType = "Meeting type"
+let PROPOSED_Saved = "Saved on this device"
+let PROPOSED_SaveFailed = "Changes could not be saved on this device."
+let PROPOSED_SendToComputer = "Send to computer"
+let PROPOSED_Rewrapping = "Making a new six-word code…"
+let PROPOSED_RewrapFailed = "A new code could not be made. The file is unchanged."
+let PROPOSED_NewCodeNote = "This is a new code for this file. The code shown earlier no longer opens it."
+let PROPOSED_PlayRecording = "Play recording"
+let PROPOSED_PauseRecording = "Pause"
+let PROPOSED_StopPlayback = "Stop"
+let PROPOSED_Decrypting = "Opening the recording in memory…"
+let PROPOSED_PlayFailed = "The recording could not be played."
+let PROPOSED_NoAudio = "This meeting has no recording to play."
+/// "{0}" is minutes.
+let PROPOSED_PlayCapNote = "Only the first %d minutes play on this device in this build."
+let PROPOSED_PlaybackPosition = "Playback position"
+let PROPOSED_DeleteMeeting = "Delete meeting"
+let PROPOSED_DeleteMeetingTitle = "Delete this meeting?"
+let PROPOSED_DeleteMeetingMessage = "This deletes the sealed file, the transcript, the summary and the key from this device. It cannot be undone. Copies you have already sent are not affected."
+let PROPOSED_DeleteMeetingConfirm = "Delete the meeting"
+let PROPOSED_TranscribeHere = "Transcribe on this device"
+let PROPOSED_Transcribing = "Transcribing on this device…"
+let PROPOSED_TranscribeNeedsModel = "The on-device speech model is not on this device. Turn on the experimental transcript for a new meeting to download it, then try again."
+let PROPOSED_TranscribeUnavailable = "Transcribing on this device needs iOS 26 or later with Apple's on-device speech model."
+/// "{0}" is the system's error description.
+let PROPOSED_TranscribeFailed = "The transcript could not be made: %@"
+let PROPOSED_TranscribeNone = "No words were recognised in the recording."
+/// The email footer for a kept meeting.
+let PROPOSED_EmailKeptLine = "The recording of this meeting is kept by the organiser, encrypted."
+let PROPOSED_TranscribeEarlierNotice = "This meeting was recorded under the earlier notice, which said transcripts are made on the computer that imports the file, so it is not transcribed on this device."

@@ -20,7 +20,7 @@ struct Crc32 {
 /// Minimal classic-ZIP writer: STORED entries only, ASCII names, no extra fields, comments, data
 /// descriptors or ZIP64; made-by 2.0/DOS, version needed 2.0, flags 0, attributes 0.
 public struct ZipWriter {
-    private enum Source { case data(Data), file(URL) }
+    private enum Source { case data(Data), file(URL), range(URL, offset: UInt64) }
     private struct Entry { let name: String; let source: Source; let crc: UInt32; let size: Int64; let date: UInt16; let time: UInt16 }
     private var entries: [Entry] = []
     private static let copyBlock = 1 << 20
@@ -37,6 +37,13 @@ public struct ZipWriter {
     public mutating func addStored(name: String, fileURL: URL, dosDate: UInt16, dosTime: UInt16) throws {
         let (crc, size) = try Self.scan(fileURL, into: nil)
         entries.append(Entry(name: name, source: .file(fileURL), crc: crc, size: size, date: dosDate, time: dosTime))
+    }
+
+    /// Copies `size` bytes starting at `offset` of an existing file (a stored entry's data inside another ZIP) without
+    /// loading them; `write(to:)` streams them and refuses them unless the CRC and size still match `crc`.
+    mutating func addStored(name: String, fileURL: URL, offset: UInt64, size: Int64, crc: UInt32,
+                            dosDate: UInt16, dosTime: UInt16) {
+        entries.append(Entry(name: name, source: .range(fileURL, offset: offset), crc: crc, size: size, date: dosDate, time: dosTime))
     }
 
     /// Writes a temporary archive beside the destination, syncs it, then renames it over the destination.
@@ -77,6 +84,9 @@ public struct ZipWriter {
             case .file(let fileURL):
                 let (crc, size) = try Self.scan(fileURL, into: handle)
                 guard crc == e.crc, size == e.size else { throw DictumBundleError.entryChanged }
+            case let .range(fileURL, offset):
+                let (crc, size) = try Self.scan(fileURL, into: handle, offset: offset, length: e.size)
+                guard crc == e.crc, size == e.size else { throw DictumBundleError.entryChanged }
             }
             central.appendLE(UInt32(0x0201_4b50))
             central.appendLE(UInt16(20)); central.appendLE(UInt16(20)) // made by 2.0 / DOS, needed 2.0
@@ -115,12 +125,15 @@ public struct ZipWriter {
         return (d, t)
     }
 
-    private static func scan(_ url: URL, into output: FileHandle?) throws -> (UInt32, Int64) {
+    private static func scan(_ url: URL, into output: FileHandle?, offset: UInt64 = 0, length: Int64? = nil) throws -> (UInt32, Int64) {
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
+        if offset > 0 { try input.seek(toOffset: offset) }
         var crc = Crc32()
         var size: Int64 = 0
-        while let block = try input.read(upToCount: copyBlock), !block.isEmpty {
+        while length.map({ size < $0 }) ?? true,
+              let block = try input.read(upToCount: length.map { Int(min(Int64(copyBlock), $0 - size)) } ?? copyBlock),
+              !block.isEmpty {
             crc.update(block)
             size += Int64(block.count)
             try output?.write(contentsOf: block)

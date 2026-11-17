@@ -67,7 +67,7 @@ struct ConsentView: View {
                     .foregroundStyle(DictumTheme.text)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(PROPOSED_Points.enumerated()), id: \.offset) { index, point in
+                    ForEach(Array(PROPOSED_PointsFor(keep: controller.settings.keepOnDevice).enumerated()), id: \.offset) { index, point in
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text("\(index + 1)")
                                 .font(.subheadline.weight(.semibold).monospacedDigit())
@@ -272,7 +272,12 @@ struct RecordingView: View {
     }
 
     static func elapsed(from start: Date, to now: Date) -> String {
-        let total = max(0, Int(now.timeIntervalSince(start)))
+        elapsed(seconds: now.timeIntervalSince(start))
+    }
+
+    /// h:mm:ss, whole seconds rounded down.
+    static func elapsed(seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds.isFinite ? seconds : 0))
         return String(format: "%d:%02d:%02d", total / 3600, (total / 60) % 60, total % 60)
     }
 }
@@ -308,7 +313,9 @@ struct RecordingIndicator: View {
 struct SealedView: View {
     let bundle: FinishedBundle
     let captureFailed: Bool
-    let review: MeetingReview
+    var keepFailed = false
+    /// Built from the review when this screen is shown.
+    let email: SummaryEmail
     let done: () -> Void
     @State private var composing = false
 
@@ -333,6 +340,9 @@ struct SealedView: View {
             }
             if captureFailed {
                 StatusPill(kind: .warning, text: PROPOSED_CaptureFailed)
+            }
+            if keepFailed {
+                StatusPill(kind: .warning, text: PROPOSED_KeepFailed)
             }
 
             DictumCard {
@@ -370,7 +380,7 @@ struct SealedView: View {
                 .accessibilityIdentifier("sealed.done")
         }
         .sheet(isPresented: $composing) {
-            ComposeEmailSheet(review: review)
+            ComposeEmailSheet(email: email)
         }
     }
 }
@@ -461,7 +471,7 @@ struct TranscriptSetupView: View {
             .frame(minHeight: DictumTheme.minTarget)
             .accessibilityLabel(PROPOSED_OnDeviceTranscriptToggle)
 
-            Text(PROPOSED_OnDeviceTranscriptNote)
+            Text(settings.keepOnDevice ? PROPOSED_OnDeviceTranscriptNoteKept : PROPOSED_OnDeviceTranscriptNote)
                 .font(.footnote)
                 .foregroundStyle(DictumTheme.muted)
 
