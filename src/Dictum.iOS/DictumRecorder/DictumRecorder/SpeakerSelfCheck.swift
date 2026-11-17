@@ -131,8 +131,8 @@ enum SpeakerSelfCheck {
             .clustered ?? -1, 5)
 
         // Fewer / More speakers: the desktop's SpeakerSeparator.Step (0.1, clamped 0.1-0.9, two places).
-        check("step: fewer from 0.75", SpeakerLabels.step(0.75, fewer: true), 0.85)
-        check("step: more from 0.75", SpeakerLabels.step(0.75, fewer: false), 0.65)
+        check("step: fewer from 0.80", SpeakerLabels.step(0.80, fewer: true), 0.9)
+        check("step: more from 0.80", SpeakerLabels.step(0.80, fewer: false), 0.7)
         check("step: fewer clamps at 0.9", SpeakerLabels.step(0.85, fewer: true), 0.9)
         check("step: more clamps at 0.1", SpeakerLabels.step(0.15, fewer: false), 0.1)
         // Re-clustering the kept voice prints gives what a full run at that threshold gives, with no new embedding.
@@ -160,7 +160,7 @@ enum SpeakerSelfCheck {
         check("fold: every group small, nothing folded",
               SpeakerSeparation.foldSmallGroups(labels: [0, 1], vectors: [[1, 0], [0, 1]], seconds: [1, 1], share: 0.9,
                                                 underSeconds: 20), [0, 1])
-        check("current: threshold", SpeakerParameters.current.threshold, 0.75)
+        check("current: threshold", SpeakerParameters.current.threshold, 0.80)
         check("desktop: no folding", SpeakerParameters.desktop.smallGroupShare, nil)
         return out
     }

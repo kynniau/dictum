@@ -232,10 +232,13 @@ struct SpeakerParameters: Equatable, Sendable {
     // linkage at 0.5 gave the solo voice 14. 17/11/2026, ONE real three-person meeting (828.8 s, 85 voice-printed
     // segments, 268.0 s): average linkage gave 6 groups at 0.65, 5 at 0.70 and 4 at 0.75 to 0.85 (111/91/57/8 s), so the
     // threshold moved to 0.75 (owner, 17/11/2026) and the small leftover group is folded into its nearest voice.
-    // Ceiling: tuned on one real meeting; a person who says less than 5 % of the speech and under 20 s loses their own
+    // 18/11/2026, ONE solo 30 s test (5 voice-printed segments, 17.0 s): 2 groups up to 0.70 and 1 from 0.75, the two
+    // 0.742 apart, so the threshold moved to 0.80 (owner, 18/11/2026): the three-person meeting gives 3 from 0.70 to
+    // 0.85 with the fold, the solo test 1 from 0.75 to 0.90.
+    // Ceiling: tuned on two recordings; a person who says less than 5 % of the speech and under 20 s loses their own
     // label. Trigger to retire: more measured meetings on the device; change the values here only.
     static let current = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
-                                           linkage: .average, threshold: 0.75, segmentMean: true,
+                                           linkage: .average, threshold: 0.80, segmentMean: true,
                                            nearestTurnSeconds: nil, smallGroupShare: 0.05, smallGroupSeconds: 20)
     // nearestTurnSeconds nil is a phone deviation (coordinator, 08/11/2026, after the first iPad run left "Okay.", "How
     // does that sound?" and "Hmm." unlabelled): every timed line takes the nearest turn's speaker, however far.

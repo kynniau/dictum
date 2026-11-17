@@ -64,7 +64,7 @@ final class AppSettings {
     }
 
     /// The beta's speaker threshold (SpeakerParameters.current), and the slider's range and step.
-    static let defaultThreshold = 0.75
+    static let defaultThreshold = 0.80
     static let thresholdRange: ClosedRange<Double> = 0.5...0.9
     static let thresholdStep = 0.05
 
