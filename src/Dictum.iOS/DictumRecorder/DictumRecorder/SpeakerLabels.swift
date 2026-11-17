@@ -216,6 +216,10 @@ struct SpeakerParameters: Equatable, Sendable {
     /// A segment that overlaps no turn takes the nearest turn's speaker when it is at most this many seconds away; nil
     /// means at any distance. The desktop's MeetingSpeakers.SpeakerOf uses 1.0.
     var nearestTurnSeconds: Double?
+    /// Segment-mean mode only. A group holding less than this share of the voice-printed speech, and less than
+    /// `smallGroupSeconds`, is folded into the group nearest to it. nil turns folding off.
+    var smallGroupShare: Double? = nil
+    var smallGroupSeconds: Double = 0
 
     /// The desktop's rule: SpeakerSeparator's windows 2/1/1.5 s, SpeakerClustering's complete linkage, and
     /// MeetingSpeakers.DefaultThreshold 0.5, one vector per window.
@@ -223,13 +227,16 @@ struct SpeakerParameters: Equatable, Sendable {
                                            linkage: .complete, threshold: 0.5, segmentMean: false,
                                            nearestTurnSeconds: 1.0)
 
-    // simplification: values from a Mac sweep on 08/11/2026 over ONE solo recording (Apple transcript segments, 20 segments,
-    // 49 windows) and ONE public two-speaker clip: average linkage at 0.7 gave the solo voice 2 clusters (1 of 20 segments
-    // off its majority) and the clip 2; the desktop's complete linkage at 0.5 gave the solo voice 14 clusters. Ceiling: not
-    // tuned on any real two-person meeting. Trigger to retire: measured meetings on the device; change them here only.
+    // simplification: values from two Mac sweeps. 08/11/2026, ONE solo recording (20 segments, 49 windows) and ONE public
+    // two-speaker clip: average linkage at 0.7 gave the solo voice 2 clusters and the clip 2; the desktop's complete
+    // linkage at 0.5 gave the solo voice 14. 17/11/2026, ONE real three-person meeting (828.8 s, 85 voice-printed
+    // segments, 268.0 s): average linkage gave 6 groups at 0.65, 5 at 0.70 and 4 at 0.75 to 0.85 (111/91/57/8 s), so the
+    // threshold moved to 0.75 (owner, 17/11/2026) and the small leftover group is folded into its nearest voice.
+    // Ceiling: tuned on one real meeting; a person who says less than 5 % of the speech and under 20 s loses their own
+    // label. Trigger to retire: more measured meetings on the device; change the values here only.
     static let current = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
-                                           linkage: .average, threshold: 0.7, segmentMean: true,
-                                           nearestTurnSeconds: nil)
+                                           linkage: .average, threshold: 0.75, segmentMean: true,
+                                           nearestTurnSeconds: nil, smallGroupShare: 0.05, smallGroupSeconds: 20)
     // nearestTurnSeconds nil is a phone deviation (coordinator, 08/11/2026, after the first iPad run left "Okay.", "How
     // does that sound?" and "Hmm." unlabelled): every timed line takes the nearest turn's speaker, however far.
 }
@@ -366,7 +373,12 @@ enum SpeakerSeparation {
             let means = order.map { unitVector(sums[$0]!).map { Float($0) } }
             let result = try SpeakerClustering.clusterWithDiagnostics(means, threshold: parameters.threshold,
                                                                       linkage: parameters.linkage)
-            let segmentLabels = result.labels
+            var segmentLabels = result.labels
+            if let share = parameters.smallGroupShare {
+                segmentLabels = foldSmallGroups(labels: segmentLabels, vectors: means,
+                                                seconds: order.map { max(0, segments[$0].end - segments[$0].start) },
+                                                share: share, underSeconds: parameters.smallGroupSeconds)
+            }
             diagnostics = result.diagnostics
             var labelOf: [Int: Int] = [:]
             for (n, segment) in order.enumerated() { labelOf[segment] = segmentLabels[n] }
@@ -410,6 +422,37 @@ enum SpeakerSeparation {
                        windowsCut: windowsCut, windowsEmbedded: embeddings.count,
                        embedSeconds: embedSeconds, clusterSeconds: clusterSeconds, clustered: clustered,
                        diagnostics: diagnostics)
+    }
+
+    /// Folds every small group into the kept group nearest to it. A group is small when its seconds are below both
+    /// `share` of all the seconds and `underSeconds`. Nearest is the smallest mean cosine distance between the two
+    /// groups' vectors (the first of equals, in label order). When every group is small, nothing is folded.
+    static func foldSmallGroups(labels: [Int], vectors: [[Float]], seconds: [Double], share: Double,
+                                underSeconds: Double) -> [Int] {
+        var total: [Int: Double] = [:]
+        for (i, label) in labels.enumerated() { total[label, default: 0] += seconds[i] }
+        let limit = min(share * total.values.reduce(0, +), underSeconds)
+        let kept = total.keys.filter { total[$0]! >= limit }.sorted()
+        let small = total.keys.filter { total[$0]! < limit }.sorted()
+        if kept.isEmpty || small.isEmpty { return labels }
+        let units = vectors.map { unitVector($0.map(Double.init)) }
+        func distance(_ a: Int, _ b: Int) -> Double {
+            var sum = 0.0, pairs = 0
+            for i in labels.indices where labels[i] == a {
+                for j in labels.indices where labels[j] == b {
+                    sum += max(0, 1 - zip(units[i], units[j]).reduce(0) { $0 + $1.0 * $1.1 })
+                    pairs += 1
+                }
+            }
+            return pairs == 0 ? .infinity : sum / Double(pairs)
+        }
+        var target: [Int: Int] = [:]
+        for group in small {
+            var best = kept[0]
+            for other in kept.dropFirst() where distance(group, other) < distance(group, best) { best = other }
+            target[group] = best
+        }
+        return labels.map { target[$0] ?? $0 }
     }
 
     /// v / |v|, or v unchanged when it has no length.

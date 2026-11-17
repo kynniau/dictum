@@ -131,8 +131,8 @@ enum SpeakerSelfCheck {
             .clustered ?? -1, 5)
 
         // Fewer / More speakers: the desktop's SpeakerSeparator.Step (0.1, clamped 0.1-0.9, two places).
-        check("step: fewer from 0.7", SpeakerLabels.step(0.7, fewer: true), 0.8)
-        check("step: more from 0.7", SpeakerLabels.step(0.7, fewer: false), 0.6)
+        check("step: fewer from 0.75", SpeakerLabels.step(0.75, fewer: true), 0.85)
+        check("step: more from 0.75", SpeakerLabels.step(0.75, fewer: false), 0.65)
         check("step: fewer clamps at 0.9", SpeakerLabels.step(0.85, fewer: true), 0.9)
         check("step: more clamps at 0.1", SpeakerLabels.step(0.15, fewer: false), 0.1)
         // Re-clustering the kept voice prints gives what a full run at that threshold gives, with no new embedding.
@@ -148,6 +148,20 @@ enum SpeakerSelfCheck {
         check("recluster: kept prints at 1.5 give one speaker",
               kept.flatMap { try? SpeakerSeparation.assign($0, segments: segs, parameters: high) }?.turns.map(\.speaker) ?? [],
               [1, 1, 1])
+        // Small groups (17/11/2026): a group under 5 % of the speech and under 20 s joins its nearest kept group.
+        let foldVectors: [[Float]] = [[1, 0, 0], [1, 0.05, 0], [0, 1, 0], [0, 1, 0.05], [0.2, 0.9, 0.1]]
+        func fold(_ seconds: [Double], share: Double = 0.05, under: Double = 20) -> [Int] {
+            SpeakerSeparation.foldSmallGroups(labels: [0, 0, 1, 1, 2], vectors: foldVectors, seconds: seconds,
+                                              share: share, underSeconds: under)
+        }
+        check("fold: a 3 s group of 203 s joins its nearest voice", fold([50, 50, 50, 50, 3]), [0, 0, 1, 1, 1])
+        check("fold: a group at 5 % or more stays", fold([10, 10, 10, 10, 3]), [0, 0, 1, 1, 2])
+        check("fold: a group of 20 s or more stays", fold([300, 300, 300, 300, 25]), [0, 0, 1, 1, 2])
+        check("fold: every group small, nothing folded",
+              SpeakerSeparation.foldSmallGroups(labels: [0, 1], vectors: [[1, 0], [0, 1]], seconds: [1, 1], share: 0.9,
+                                                underSeconds: 20), [0, 1])
+        check("current: threshold", SpeakerParameters.current.threshold, 0.75)
+        check("desktop: no folding", SpeakerParameters.desktop.smallGroupShare, nil)
         return out
     }
 
