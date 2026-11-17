@@ -445,3 +445,9 @@ let PROPOSED_TranscribeNone = "No words were recognised in the recording."
 /// The email footer for a kept meeting.
 let PROPOSED_EmailKeptLine = "The recording of this meeting is kept by the organiser, encrypted."
 let PROPOSED_TranscribeEarlierNotice = "This meeting was recorded under the earlier notice, which said transcripts are made on the computer that imports the file, so it is not transcribed on this device."
+
+// Test mode (owner testing only, DEBUG builds; 17/11/2026).
+let PROPOSED_SectionTestMode = "Testing"
+let PROPOSED_TestModeToggle = "Use one code for every meeting"
+let PROPOSED_TestModeNote = "For your own testing only. Every meeting sealed while this is on opens with the same six words, shown below. Turn it off before recording anything that is not a test."
+let PROPOSED_TestModeNoCode = "The code could not be saved. Meetings will get a fresh code."

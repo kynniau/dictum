@@ -40,6 +40,7 @@ final class AppSettings {
         static let summaryEngine = "settings.summaryEngine"
         static let appearance = "settings.appearance"
         static let keepOnDevice = "settings.keepOnDevice"
+        static let testMode = TestMode.flagKey
     }
 
     /// Automatic follows the system; Light and Dark force one.
@@ -84,6 +85,9 @@ final class AppSettings {
     /// Off: the key is deleted at seal and nothing is kept, as before 17/11/2026.
     var keepOnDevice: Bool { didSet { defaults.set(keepOnDevice, forKey: Key.keepOnDevice) } }
 
+    /// Owner testing only (TestMode): one standing code for every meeting sealed on this phone. Default off.
+    var testMode: Bool { didSet { defaults.set(testMode, forKey: Key.testMode) } }
+
     /// `-DictumAppearance light|dark|automatic` on the launch command line overrides the stored value for that launch
     /// only (screenshot tests); it is never stored.
     let launchAppearance: Appearance? = {
@@ -106,6 +110,7 @@ final class AppSettings {
         summaryEngine = "apple"
         appearance = Appearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .automatic
         keepOnDevice = defaults.object(forKey: Key.keepOnDevice) as? Bool ?? true
+        testMode = defaults.bool(forKey: Key.testMode)
     }
 
     var meetingType: MeetingType { MeetingType.with(id: meetingTypeId) }

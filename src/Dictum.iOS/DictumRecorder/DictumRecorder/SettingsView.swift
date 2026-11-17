@@ -17,6 +17,9 @@ struct SettingsView: View {
                 summarySection
                 appearanceSection
                 keepSection
+                #if DEBUG
+                testSection
+                #endif
                 aboutSection
             }
             .scrollContentBackground(.hidden)
@@ -161,6 +164,33 @@ struct SettingsView: View {
             Text(PROPOSED_SectionKeep).accessibilityAddTraits(.isHeader)
         }
     }
+
+    #if DEBUG
+    private var testSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(PROPOSED_TestModeToggle, isOn: $settings.testMode)
+                    .tint(DictumTheme.accent)
+                    .accessibilityLabel(PROPOSED_TestModeToggle)
+                    .accessibilityHint(PROPOSED_TestModeNote)
+                    .accessibilityIdentifier("settings.testMode")
+                    .onChange(of: settings.testMode) { _, on in if on { TestMode.ensureCode() } }
+                Text(PROPOSED_TestModeNote).font(.footnote).foregroundStyle(DictumTheme.muted)
+                if settings.testMode {
+                    Text(TestMode.ensureCode() ?? PROPOSED_TestModeNoCode)
+                        .font(.body.monospaced())
+                        .foregroundStyle(DictumTheme.text)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("settings.testCode")
+                }
+            }
+            .frame(minHeight: DictumTheme.minTarget)
+            .listRowBackground(DictumTheme.surface)
+        } header: {
+            Text(PROPOSED_SectionTestMode).accessibilityAddTraits(.isHeader)
+        }
+    }
+    #endif
 
     private var aboutSection: some View {
         Section {

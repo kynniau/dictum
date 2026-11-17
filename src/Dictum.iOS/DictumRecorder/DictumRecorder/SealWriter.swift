@@ -40,7 +40,7 @@ final class SealWriter: @unchecked Sendable {
             queue.async { [self] in
                 closed = true
                 let duration = TimeInterval(bytesAppended) / 32_000
-                continuation.resume(with: Result { try session.finish(duration: duration, at: date) })
+                continuation.resume(with: Result { try session.finish(duration: duration, at: date, transferCode: TestMode.sealingCode()) })
             }
         }
     }

@@ -100,7 +100,7 @@ final class MeetingDetailModel {
         do {
             let code = try await offMain {
                 var bytes = SystemByteSource()
-                return try BundleFile.rewrap(url: url, contentKey: key, bytes: &bytes).code.text
+                return try BundleFile.rewrap(url: url, contentKey: key, newCode: TestMode.sealingCode(), bytes: &bytes).code.text
             }
             SessionFiles.protect(url)
             newCode = code
