@@ -225,3 +225,30 @@ Five-minute recording with the switch on; two-person speaker test on the iPad (p
 memory (Instruments); whisper.cpp; PBKDF2 timing on the phones; the PC-vs-iPad cosine of the same
 30 s window (Mac-side floats delivered; PC side waits on Kyle's email of 8efdbec8); the lock-screen
 30-minute recording and incoming call; the 3-second fixture re-record; the PC screen import of 5aa22eab.
+
+## 9. Meetings kept on the device behind Face ID (17/11/2026, branch `spike/v2-ondevice`, commit b97633e)
+
+Owner order, 17/11/2026: "build the library now with face id, can we also unlock the current recordings in the existing app".
+This supersedes the round-2 rule that the transcript lives in memory only.
+
+- **Design (V: code read, 17/11/2026).** The sealed `.dictum` in Documents stays the audio store. The meeting's content key
+  is kept in the Keychain behind user presence (Face ID or Touch ID with passcode fallback), this device only, never
+  synchronised. What the review made (transcript, names, summary, actions, confirmation time) is one JSON record sealed
+  under the same key at `Documents/Library/<meeting-hex>/record.json.enc`. It is not inside the bundle, so the file a
+  computer imports is unchanged. One check is reused for 120 seconds and dropped when the app leaves the foreground
+  (marked `// simplification:` in `LibraryStore.swift`).
+- **Sending again.** "Send to computer" re-wraps the kept key under a fresh six-word code (`BundleFile.rewrap`).
+- **Older recordings.** A bundle sealed before this build has no kept key. It opens only with its six words
+  ("Unlock with the six words"), after which its key is kept like the rest. Without the words it cannot be opened by
+  anyone, by design.
+- **Consent gate.** "Transcribe on this device" is offered only for meetings recorded under the new notice
+  (`PROPOSED-ios-2026-11-17-v2`); earlier meetings told participants the computer makes the transcript. Owner to confirm.
+- **Verified (V, 17/11/2026 11:08–11:09 AEDT, this Mac).** `swift test`: 28 tests, 0 failures. Device build
+  (`generic/platform=iOS`, Debug): BUILD SUCCEEDED, no compiler warnings. Installed on the iPhone 17 Pro Max by
+  `devicectl` as an in-place update. Earlier the same day the re-wrap test was observed failing with the wrap label
+  changed, then passing when restored (agent report, 07:28; the 28-test pass was re-run by the main session).
+- **Not verified.** Nothing has been exercised on a device: the Face ID prompt, reopening a meeting, playback,
+  transcribing a kept recording, deleting, and a PC import of a re-coded file. The simulator build was not re-run after
+  the last `Home.swift` edit. The iPad was not connected and still has the previous build.
+- **Finding.** The six multi-person recordings of 09–11/11/2026 cannot be analysed: their codes were not kept, and the
+  earlier build deleted the key at seal.
