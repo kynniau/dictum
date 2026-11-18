@@ -298,10 +298,11 @@ enum Library {
         return items.compactMap { $0["ScriptVersion"] as? String }
     }
 
-    /// True when the people in the meeting were told transcripts and summaries could be made and kept on this device:
-    /// a keep-on notice, for a meeting recorded here or a recording brought in (OnDeviceNotice, CallImport.swift).
-    /// Meetings under a keep-off notice were told the computer makes them, so they are not transcribed on the phone.
+    /// True when a transcript may be made on this device: the meeting was recorded here under the keep-on notice, which
+    /// tells the people in it so. A recording brought in counts only in the owner's test mode, because the people on it
+    /// were not told (OnDeviceNotice, CallImport.swift). Meetings under a keep-off notice were told the computer makes
+    /// them, so they are never transcribed on the phone.
     static func consentCoversOnDevice(_ versions: [String]) -> Bool {
-        OnDeviceNotice.covers(versions)
+        OnDeviceNotice.covers(versions, testMode: TestMode.isOn)
     }
 }

@@ -64,15 +64,24 @@ enum ImportNotice {
     }
 }
 
-/// The notices that say transcripts and summaries can be made and kept on this device: the keep-on notice read to a
-/// room, and the keep-on notice confirmed for a recording brought in. A meeting whose first recorded notice is any
-/// other (the keep-off notices say the computer makes them) is never transcribed on the phone.
+/// Which notices allow a transcript to be made on this device.
+///
+/// The keep-on notice read to a room says transcripts and summaries can be made and kept on this device, so it covers
+/// it. The notice confirmed for a recording brought in does not: the people on that recording were told only that it
+/// was being recorded (the phone's own announcement is one of the answers), not that a transcript would be made on
+/// this phone. So a recording brought in is transcribed here only in the owner's test mode (TestMode, DEBUG builds),
+/// until an import notice that tells people so is approved (owner's decision, 18/11/2026). Every other notice (the
+/// keep-off notices say the computer makes them) is never transcribed on the phone.
 enum OnDeviceNotice {
-    static let versions: Set<String> = [PROPOSED_ScriptVersionKept, PROPOSED_ImportScriptVersionKept]
+    /// Notices that tell the people in the meeting about transcripts on this device.
+    static let told: Set<String> = [PROPOSED_ScriptVersionKept]
+    /// Notices that cover it in the owner's test mode only.
+    static let testOnly: Set<String> = [PROPOSED_ImportScriptVersionKept]
 
     /// `history` is the bundle's recorded script versions, oldest first; the first is the notice it was made under.
-    static func covers(_ history: [String]) -> Bool {
-        history.first.map(versions.contains) ?? false
+    static func covers(_ history: [String], testMode: Bool) -> Bool {
+        guard let first = history.first else { return false }
+        return told.contains(first) || (testMode && testOnly.contains(first))
     }
 }
 
@@ -219,13 +228,21 @@ enum CallImportSelfCheck {
         check("notice: keep-off says the computer makes it", ImportNotice.points(keep: false).contains(PROPOSED_PointProcessing), true)
 
         // Which notices allow a transcript on this device.
-        check("on-device: the keep-on room notice", OnDeviceNotice.covers([PROPOSED_ScriptVersionKept]), true)
-        check("on-device: the keep-on brought-in notice", OnDeviceNotice.covers([ImportNotice.version(keep: true)]), true)
-        check("on-device: not the keep-off room notice", OnDeviceNotice.covers([PROPOSED_ScriptVersion]), false)
-        check("on-device: not the keep-off brought-in notice", OnDeviceNotice.covers([ImportNotice.version(keep: false)]), false)
-        check("on-device: no notice, no transcript", OnDeviceNotice.covers([]), false)
+        check("on-device: the keep-on room notice", OnDeviceNotice.covers([PROPOSED_ScriptVersionKept], testMode: false), true)
+        check("on-device: the keep-on room notice, test mode on", OnDeviceNotice.covers([PROPOSED_ScriptVersionKept], testMode: true), true)
+        check("on-device: a recording brought in is not covered outside test mode",
+              OnDeviceNotice.covers([ImportNotice.version(keep: true)], testMode: false), false)
+        check("on-device: a recording brought in is covered in test mode",
+              OnDeviceNotice.covers([ImportNotice.version(keep: true)], testMode: true), true)
+        check("on-device: not the keep-off room notice", OnDeviceNotice.covers([PROPOSED_ScriptVersion], testMode: false), false)
+        check("on-device: not the keep-off room notice, even in test mode", OnDeviceNotice.covers([PROPOSED_ScriptVersion], testMode: true), false)
+        check("on-device: not the keep-off brought-in notice, even in test mode",
+              OnDeviceNotice.covers([ImportNotice.version(keep: false)], testMode: true), false)
+        check("on-device: no notice, no transcript", OnDeviceNotice.covers([], testMode: true), false)
         check("on-device: the first notice decides",
-              OnDeviceNotice.covers([ImportNotice.version(keep: false), ImportNotice.version(keep: true)]), false)
+              OnDeviceNotice.covers([ImportNotice.version(keep: false), ImportNotice.version(keep: true)], testMode: true), false)
+        check("on-device: a later room notice does not cover a recording brought in",
+              OnDeviceNotice.covers([ImportNotice.version(keep: true), PROPOSED_ScriptVersionKept], testMode: false), false)
 
         // The handed-over copy: only a file directly in Documents/Inbox is ever removed.
         check("inbox: a file in Inbox", ImportInbox.isHandedOver("/d/Documents/Inbox/call.m4a", documents: "/d/Documents"), true)
