@@ -158,18 +158,21 @@ final class OnDeviceSummary {
 struct GeneratedNotes {
     @Guide(description: "A brief summary of the meeting in three to five sentences, using only what was said.")
     var summary: String
-    @Guide(description: "Every action someone agreed to do in the meeting. Empty if none.")
+    @Guide(description: "Tasks a person explicitly committed to doing after the meeting, or was asked to do and accepted. Most short conversations have none: then this is an empty list.")
     var actions: [GeneratedAction]
 }
 
 @available(iOS 26, *)
 @Generable
 struct GeneratedAction {
+    // Asked for first so the model finds the words before it writes the task; checked by SummaryGrounding, never shown.
+    @Guide(description: "The exact words from the transcript in which the person commits to this task, copied word for word.")
+    var quote: String
     @Guide(description: "Who will do it: exactly one of the speaker names or labels used in the transcript, or an empty string if nobody was named.")
     var owner: String
     @Guide(description: "What they will do, as one short instruction.")
     var action: String
-    @Guide(description: "When it is due, in the words used in the meeting, or an empty string if no time was given.")
+    @Guide(description: "When it is due, copied from the transcript word for word, or an empty string if no date or time was said.")
     var byWhen: String
 }
 
@@ -181,7 +184,10 @@ enum SummaryWriter {
         "You write meeting notes for a meeting of the type \"\(type.name)\". Think about it under these headings: "
             + type.sections.joined(separator: ", ")
             + ". Use only what was said in the transcript. Never invent names, dates, figures or actions. Each line of "
-            + "the transcript starts with the time and, where known, who spoke (a name or a label such as \"Other 1\")."
+            + "the transcript starts with the time and, where known, who spoke (a name or a label such as \"Other 1\"). "
+            + "An action is a task a person explicitly commits to doing after the meeting, or is asked to do and accepts. "
+            + "A wish, a question, a thought, or a description of what is happening now is not an action. If nobody "
+            + "commits to a task, the list of actions is empty."
     }
 
     // simplification: the transcript is split by characters at about 3 characters per token, with a fixed reserve for
@@ -220,18 +226,21 @@ enum SummaryWriter {
             let session = LanguageModelSession(model: SystemLanguageModel.default, instructions: instructions(type))
             let combined = notes.enumerated().map { i, n in
                 "Part \(i + 1) summary: \(n.summary)\nPart \(i + 1) actions:\n"
-                    + n.actions.map { "- \($0.owner): \($0.action)\($0.byWhen.isEmpty ? "" : " (by \($0.byWhen))")" }
+                    + n.actions.map { "- \($0.owner): \($0.action)\($0.byWhen.isEmpty ? "" : " (by \($0.byWhen))") [said: \($0.quote)]" }
                     .joined(separator: "\n")
             }.joined(separator: "\n\n")
             let prompt = "These are notes from consecutive parts of one meeting. Combine them into one brief summary of "
-                + "three to five sentences and one list of every action, without repeating any.\n\n" + combined
+                + "three to five sentences and one list of every action, without repeating any. Keep each action's "
+                + "quoted words exactly as given after \"said:\".\n\n" + combined
             final = try await session.respond(to: prompt, generating: GeneratedNotes.self).content
         }
-        let actions = final.actions.map {
-            OnDeviceSummary.Action(owner: $0.owner.trimmingCharacters(in: .whitespacesAndNewlines),
-                                   text: $0.action.trimmingCharacters(in: .whitespacesAndNewlines),
-                                   byWhen: $0.byWhen.trimmingCharacters(in: .whitespacesAndNewlines))
-        }.filter { !$0.text.isEmpty }
+        let suggested = final.actions.map {
+            SummaryGrounding.Suggested(quote: $0.quote, owner: $0.owner.trimmingCharacters(in: .whitespacesAndNewlines),
+                                       text: $0.action.trimmingCharacters(in: .whitespacesAndNewlines),
+                                       byWhen: $0.byWhen.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        let actions = SummaryGrounding.ground(suggested, transcript: parts.joined(separator: "\n"))
+            .map { OnDeviceSummary.Action(owner: $0.owner, text: $0.text, byWhen: $0.byWhen) }
         return (final.summary.trimmingCharacters(in: .whitespacesAndNewlines), actions)
     }
 }
