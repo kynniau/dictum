@@ -536,6 +536,8 @@ final class SpeechEngine: @unchecked Sendable {
             return buffer
         }
         guard status != .error, out.frameLength > 0 else { return }
+        // `out` is the transcriber's own copy; the tap's buffer, which the recording is saved from, is not changed.
+        TranscriberLevel.turnDown(out)
         if !fedAny {
             fedAny = true
             onFirstInput()
