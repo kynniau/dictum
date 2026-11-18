@@ -348,8 +348,14 @@ final class RecordingController {
 extension RecordingController {
     /// A sound file handed over by the share menu or picked in Files. Taken only from the home screen: at any other
     /// time (a recording running, a meeting open) nothing changes and the handed-over copy is removed.
-    func openedFile(_ url: URL) async {
-        let scoped = url.startAccessingSecurityScopedResource()
+    func openedFile(_ arrived: URL) async {
+        var scoped = arrived.startAccessingSecurityScopedResource()
+        // A copy the share menu handed over leaves Documents at once (ImportInbox); a file picked in Files stays put.
+        let url = ImportInbox.takeIn(arrived, documents: SessionFiles.documents)
+        if url != arrived, scoped {
+            arrived.stopAccessingSecurityScopedResource()
+            scoped = false
+        }
         let draft: ImportDraft?
         if case .home = phase {
             let seconds = (try? await offMain { try ImportAudio.duration(url: url) }) ?? 0
@@ -357,6 +363,8 @@ extension RecordingController {
             if draft == nil, case .home = phase { homeMessage = PROPOSED_ImportUnreadable }
         } else {
             draft = nil
+            // Shown the next time the home screen is: the file was turned away, not lost without a word.
+            homeMessage = PROPOSED_ImportBusy
         }
         // The screen may have changed while the file was being read.
         guard let draft, case .home = phase else {
@@ -557,5 +565,7 @@ extension RecordingController {
         auth.invalidate()
         openedTitles = [:]
         if case .detail = phase { closeDetail() }
+        // A copy waiting on the bring-in screen is not encrypted by this app, so it does not outlive the screen.
+        if case .importing = phase { importBackTapped() }
     }
 }

@@ -33,6 +33,7 @@ let PROPOSED_ImportLength = "Length: %@"
 let PROPOSED_ImportConfirm = "I confirm that everyone on this recording agreed. Bring it in"
 let PROPOSED_ImportUnreadable = "That file could not be read as a sound recording."
 let PROPOSED_ImportFailed = "The recording could not be brought in. The file you chose has not been changed."
+let PROPOSED_ImportBusy = "That recording was not brought in because the app was busy. Share it again from this screen."
 
 let PROPOSED_ImportScriptVersion = "PROPOSED-ios-import-2026-11-18-v1"
 let PROPOSED_ImportScriptVersionKept = "PROPOSED-ios-import-kept-2026-11-18-v1"
@@ -166,42 +167,88 @@ enum ImportAudio {
 
 // MARK: - The copy the system hands over
 
-/// The share menu hands the app its own copy of the file, in `Documents/Inbox`, not encrypted by this app. That copy is
-/// removed as soon as it has been sealed or turned away. A file opened where it lives (picked in Files) is the user's
-/// original and is never removed.
+/// The share menu hands the app its own copy of the file, in `Documents/Inbox`, not encrypted by this app. Documents
+/// shows in the Files app and is backed up, so that copy is moved at once into a holding folder in the app's temporary
+/// folder (not shown in Files, not backed up), and removed as soon as it has been sealed, turned away, or the app
+/// leaves the screen. A file opened where it lives (picked in Files) is the user's original and is never moved or
+/// removed.
 enum ImportInbox {
     static let folder = "Inbox"
-    /// A handed-over copy still there this long after it arrived was left by an import that never finished.
+    static let holdingFolder = "Import"
+    /// A handed-over copy still in Inbox this long after it arrived was left by a hand-over the app never received.
     static let staleAfter: TimeInterval = 3600
 
-    /// True only for a file directly inside `<documents>/Inbox/`. Paths are compared after resolving links.
-    static func isHandedOver(_ path: String, documents: String) -> Bool {
-        let inbox = (documents.hasSuffix("/") ? documents : documents + "/") + folder + "/"
-        guard path.hasPrefix(inbox) else { return false }
-        let name = path.dropFirst(inbox.count)
+    /// Where a handed-over copy waits while the bring-in screen is open.
+    static var holding: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent(holdingFolder, isDirectory: true)
+    }
+
+    /// True only for a file directly inside `folder`. Paths are compared as given: resolve links first.
+    static func isDirectlyInside(_ path: String, folder: String) -> Bool {
+        let root = folder.hasSuffix("/") ? folder : folder + "/"
+        guard path.hasPrefix(root) else { return false }
+        let name = path.dropFirst(root.count)
         return !name.isEmpty && !name.contains("/")
+    }
+
+    /// True only for a file directly inside `<documents>/Inbox/`.
+    static func isHandedOver(_ path: String, documents: String) -> Bool {
+        isDirectlyInside(path, folder: (documents.hasSuffix("/") ? documents : documents + "/") + folder)
     }
 
     static func isStale(modified: Date, now: Date) -> Bool {
         now.timeIntervalSince(modified) > staleAfter
     }
 
-    /// Removes `url` when it is a handed-over copy; leaves every other file alone.
-    static func remove(_ url: URL, documents: URL) {
-        guard isHandedOver(url.resolvingSymlinksInPath().path, documents: documents.resolvingSymlinksInPath().path) else { return }
+    /// Moves a handed-over copy out of `Documents/Inbox` into the holding folder and returns where it now is. Any other
+    /// file, and a copy that could not be moved, is returned as it came.
+    static func takeIn(_ url: URL, documents: URL, holding: URL = holding) -> URL {
+        guard isHandedOver(url.resolvingSymlinksInPath().path, documents: documents.resolvingSymlinksInPath().path) else { return url }
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: holding, withIntermediateDirectories: true)
+            var folder = holding
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try? folder.setResourceValues(values)
+            // The file keeps its own name after the prefix, so the sound decoder still sees its type.
+            let held = holding.appendingPathComponent(UUID().uuidString + "-" + url.lastPathComponent)
+            try fm.moveItem(at: url, to: held)
+            try? fm.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: held.path)
+            return held
+        } catch {
+            return url
+        }
+    }
+
+    /// Removes `url` when it is a handed-over copy, in Inbox or in the holding folder; leaves every other file alone.
+    static func remove(_ url: URL, documents: URL, holding: URL = holding) {
+        let path = url.resolvingSymlinksInPath().path
+        guard isHandedOver(path, documents: documents.resolvingSymlinksInPath().path)
+            || isDirectlyInside(path, folder: holding.resolvingSymlinksInPath().path) else { return }
         try? FileManager.default.removeItem(at: url)
     }
 
-    /// At launch: removes handed-over copies left by an import that never finished.
-    /// simplification: only copies older than `staleAfter` go, because the app can be launched to receive a copy that
-    /// arrived a moment before. Ceiling: a copy from an import cut short stays, unencrypted by this app, for up to an
-    /// hour and until the next launch. Retire if the system offers a way to tell the copy being delivered from the rest.
-    static func sweep(documents: URL, now: Date = Date()) {
+    /// At launch: empties the holding folder (nothing can be waiting there before a file has been opened), and removes
+    /// copies left in Inbox by a hand-over the app never received.
+    /// simplification: an Inbox copy goes only once it has been there longer than `staleAfter`, because the app can be
+    /// launched to receive a copy that arrived a moment before. Ceiling: a copy the app never received stays in Inbox,
+    /// unencrypted by this app, for up to an hour and until the next launch. Retire if the system offers a way to tell
+    /// the copy being delivered from the rest.
+    static func sweep(documents: URL, holding: URL = holding, now: Date = Date()) {
+        let fm = FileManager.default
+        for item in (try? fm.contentsOfDirectory(at: holding, includingPropertiesForKeys: nil)) ?? [] {
+            try? fm.removeItem(at: item)
+        }
         let inbox = documents.appendingPathComponent(folder, isDirectory: true)
-        let items = (try? FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        for item in items {
-            let modified = (try? item.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            if isStale(modified: modified, now: now) { remove(item, documents: documents) }
+        // When the copy was put in Inbox, not when the sound was last changed: a copy keeps its original's dates, so
+        // an old recording shared in a moment ago would otherwise look stale.
+        let keys: [URLResourceKey] = [.addedToDirectoryDateKey, .creationDateKey]
+        for item in (try? fm.contentsOfDirectory(at: inbox, includingPropertiesForKeys: keys)) ?? [] {
+            let values = try? item.resourceValues(forKeys: Set(keys))
+            // A copy with no date it arrived by is left: better an hour's leftover than a file removed as it arrives.
+            guard let arrived = values?.addedToDirectoryDate else { continue }
+            if isStale(modified: arrived, now: now) { remove(item, documents: documents, holding: holding) }
         }
     }
 }
@@ -253,6 +300,42 @@ enum CallImportSelfCheck {
         check("inbox: not a folder with a longer name", ImportInbox.isHandedOver("/d/Documents/Inboxes/call.m4a", documents: "/d/Documents"), false)
         check("inbox: not deeper than Inbox", ImportInbox.isHandedOver("/d/Documents/Inbox/sub/call.m4a", documents: "/d/Documents"), false)
         check("inbox: not another app's Inbox", ImportInbox.isHandedOver("/other/Documents/Inbox/call.m4a", documents: "/d/Documents"), false)
+        check("holding: a file in the holding folder", ImportInbox.isDirectlyInside("/t/tmp/Import/abc-call.m4a", folder: "/t/tmp/Import"), true)
+        check("holding: not the holding folder itself", ImportInbox.isDirectlyInside("/t/tmp/Import/", folder: "/t/tmp/Import"), false)
+        check("holding: not deeper than the holding folder", ImportInbox.isDirectlyInside("/t/tmp/Import/x/call.m4a", folder: "/t/tmp/Import"), false)
+        check("holding: not a file beside the holding folder", ImportInbox.isDirectlyInside("/t/tmp/call.m4a", folder: "/t/tmp/Import"), false)
+        // Real files, in a made-up Documents and holding folder under the temporary folder.
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("import-check-" + UUID().uuidString, isDirectory: true)
+        let docs = base.appendingPathComponent("Documents", isDirectory: true)
+        let inbox = docs.appendingPathComponent(ImportInbox.folder, isDirectory: true)
+        let hold = base.appendingPathComponent("tmp/Import", isDirectory: true)
+        try? fm.createDirectory(at: inbox, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: base) }
+        func put(_ url: URL) -> URL { fm.createFile(atPath: url.path, contents: Data([1, 2, 3])); return url }
+        func there(_ url: URL) -> Bool { fm.fileExists(atPath: url.path) }
+        let shared = put(inbox.appendingPathComponent("call.m4a"))
+        let held = ImportInbox.takeIn(shared, documents: docs, holding: hold)
+        check("take in: the copy leaves Inbox", there(shared), false)
+        check("take in: it is now in the holding folder",
+              ImportInbox.isDirectlyInside(held.resolvingSymlinksInPath().path, folder: hold.resolvingSymlinksInPath().path) && there(held), true)
+        check("take in: it keeps its type", held.pathExtension, "m4a")
+        check("take in: the sound is the same", (try? Data(contentsOf: held)) ?? Data(), Data([1, 2, 3]))
+        let own = put(docs.appendingPathComponent("picked.m4a"))
+        check("take in: a file that is not a handed-over copy is not moved", ImportInbox.takeIn(own, documents: docs, holding: hold) == own && there(own), true)
+        ImportInbox.remove(own, documents: docs, holding: hold)
+        check("remove: a file that is not a handed-over copy is never removed", there(own), true)
+        ImportInbox.remove(held, documents: docs, holding: hold)
+        check("remove: the held copy goes", there(held), false)
+        let waiting = put(inbox.appendingPathComponent("just-arrived.m4a"))
+        try? fm.createDirectory(at: hold, withIntermediateDirectories: true)
+        let left = put(hold.appendingPathComponent("left-behind.m4a"))
+        ImportInbox.sweep(documents: docs, holding: hold)
+        check("sweep: the holding folder is emptied", there(left), false)
+        check("sweep: a copy that just arrived in Inbox stays", there(waiting), true)
+        check("sweep: the user's own file stays", there(own), true)
+        ImportInbox.sweep(documents: docs, holding: hold, now: Date().addingTimeInterval(ImportInbox.staleAfter + 60))
+        check("sweep: an Inbox copy over an hour old goes", there(waiting), false)
         let now = Date(timeIntervalSince1970: 1_000_000)
         check("inbox: a copy that just arrived stays", ImportInbox.isStale(modified: now.addingTimeInterval(-5), now: now), false)
         check("inbox: a copy an hour old stays", ImportInbox.isStale(modified: now.addingTimeInterval(-3600), now: now), false)
