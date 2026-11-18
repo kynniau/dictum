@@ -14,6 +14,7 @@ struct SettingsView: View {
                 engineSection
                 speakerSection
                 hostVoiceSection
+                yourWordsSection
                 meetingTypeSection
                 summarySection
                 appearanceSection
@@ -118,6 +119,25 @@ struct SettingsView: View {
             .listRowBackground(DictumTheme.surface)
         } header: {
             Text(PROPOSED_HostVoiceTitle).accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    private var yourWordsSection: some View {
+        Section {
+            NavigationLink {
+                YourWordsView()
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(PROPOSED_YourWordsTitle).foregroundStyle(DictumTheme.text)
+                    Text(PROPOSED_YourWordsRowNote).font(.footnote).foregroundStyle(DictumTheme.muted)
+                }
+                .frame(minHeight: DictumTheme.minTarget)
+            }
+            .accessibilityLabel(PROPOSED_YourWordsTitle)
+            .accessibilityHint(PROPOSED_YourWordsRowNote)
+            .listRowBackground(DictumTheme.surface)
+        } header: {
+            Text(PROPOSED_YourWordsTitle).accessibilityAddTraits(.isHeader)
         }
     }
 

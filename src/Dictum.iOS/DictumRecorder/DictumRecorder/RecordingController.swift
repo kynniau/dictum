@@ -368,7 +368,8 @@ extension RecordingController {
                 let speakerFacts = transcript.speakers.facts
                 record.facts = MeetingRecord.Facts(engine: settings.transcriptionEngine, locale: transcript.recordLocale,
                                                    speakersFound: speakerFacts?.speakersFound,
-                                                   threshold: speakerFacts == nil ? nil : transcript.speakers.threshold)
+                                                   threshold: speakerFacts == nil ? nil : transcript.speakers.threshold,
+                                                   wordFixes: transcript.wordFixes)
             }
             record.speakerNames = review.names
             record.summary = review.summary.state == .done ? review.summary.summary : ""

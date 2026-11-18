@@ -100,6 +100,10 @@ final class OnDeviceTranscript {
     private var segments: [SpeakerLabels.Segment] = []
     private var wordRangeSegments = 0
     private var resultRangeSegments = 0
+    /// "Your words" (YourWords.swift): the kept fixes, read when a recording is set up, and how many were made in this
+    /// recording's final lines. Memory only.
+    private var fixes: [WordFix] = []
+    private(set) var wordFixes = 0
     /// Watches the network path between Start and Stop, only with the switch on. It only observes the path; it makes
     /// no network requests.
     private var pathMonitor: NWPathMonitor?
@@ -217,6 +221,12 @@ final class OnDeviceTranscript {
         segments = []
         wordRangeSegments = 0
         resultRangeSegments = 0
+        fixes = []
+        wordFixes = 0
+        Task { [weak self] in
+            let kept = await YourWordsStore.current()
+            if self?.engine === engine { self?.fixes = kept }
+        }
         return engine.feed
     }
 
@@ -254,9 +264,13 @@ final class OnDeviceTranscript {
         }
     }
 
-    private func received(_ text: String, isFinal: Bool, span: TranscriptSpan?) {
+    private func received(_ heard: String, isFinal: Bool, span: TranscriptSpan?) {
         if live == .preparing { live = .listening }
+        // "Your words": the kept fixes are made in each final line as it arrives; the line still forming is shown as heard.
+        let fixed = isFinal ? YourWords.apply(heard, fixes) : (text: heard, changed: 0)
+        let text = fixed.text
         if isFinal {
+            wordFixes += fixed.changed
             let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !words.isEmpty {
                 switch span?.source {
@@ -349,6 +363,8 @@ final class OnDeviceTranscript {
         segments = []
         wordRangeSegments = 0
         resultRangeSegments = 0
+        fixes = []
+        wordFixes = 0
         active = false
         finishing = false
         finalText = ""

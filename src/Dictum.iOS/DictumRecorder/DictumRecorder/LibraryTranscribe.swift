@@ -24,6 +24,8 @@ enum LibraryTranscriber {
         var threshold: Double?
         /// Each speaker's group centre, for "Your voice" (memory only; never saved).
         var centres: [Int: [Float]] = [:]
+        /// How many "Your words" fixes were made in the lines.
+        var wordFixes = 0
     }
 
     static func transcribe(pcm: Data, labels: Bool, threshold: Double) async throws -> Outcome {
@@ -83,8 +85,16 @@ enum LibraryTranscriber {
         }.value
         await engine.finish()
         _ = try? await starter.value
-        let finals = try await collector.value
+        var finals = try await collector.value
         guard !finals.isEmpty else { throw Failure.noWords }
+        // "Your words": the kept fixes are made in every final line before anything else reads the words.
+        let fixes = await YourWordsStore.current()
+        var wordFixes = 0
+        for at in finals.indices {
+            let fixed = YourWords.apply(finals[at].text, fixes)
+            finals[at].text = fixed.text
+            wordFixes += fixed.changed
+        }
 
         let wordSpans = finals.filter { $0.span?.source == .words }.count
         let resultSpans = finals.filter { $0.span?.source == .result }.count
@@ -93,7 +103,7 @@ enum LibraryTranscriber {
 
         guard labels else {
             return Outcome(segments: segments.map { .init(start: $0.start, end: $0.end, text: $0.text, speaker: nil) },
-                           locale: locale.identifier, speakersFound: nil, threshold: nil)
+                           locale: locale.identifier, speakersFound: nil, threshold: nil, wordFixes: wordFixes)
         }
         // The speaker step, exactly as after a live recording: the PCM's first sample is the analyzer's time 0 here.
         let speakers = SpeakerLabels()
@@ -114,7 +124,7 @@ enum LibraryTranscriber {
                 let centres = done ? speakers.groupCentres : [:]
                 speakers.clear()
                 return Outcome(segments: lines, locale: locale.identifier, speakersFound: found, threshold: used,
-                               centres: centres)
+                               centres: centres, wordFixes: wordFixes)
             }
         }
     }

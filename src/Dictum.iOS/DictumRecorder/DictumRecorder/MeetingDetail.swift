@@ -26,6 +26,8 @@ final class MeetingDetailModel {
     let review = MeetingReview()
     var summaryText: String
     private(set) var saveFailed = false
+    /// The last "always fix" could not be added to Your words (the line itself was still fixed).
+    private(set) var fixNotKept = false
     /// The newest six-word code made by Send to computer; memory only, gone when the screen closes.
     private(set) var newCode: String?
     private(set) var rewrap: Work = .idle
@@ -144,7 +146,7 @@ final class MeetingDetailModel {
             // otherwise it would reach the record only when the screen closes.
             if labels { review.applyHostVoice(centres: outcome.centres) { [weak self] in self?.save() } }
             record.facts = MeetingRecord.Facts(engine: "apple", locale: outcome.locale, speakersFound: outcome.speakersFound,
-                                               threshold: outcome.threshold)
+                                               threshold: outcome.threshold, wordFixes: outcome.wordFixes)
             save(force: true)
             transcribe = .idle
         } catch LibraryTranscriber.Failure.needsModel {
@@ -156,6 +158,29 @@ final class MeetingDetailModel {
         } catch {
             transcribe = .failed(String(format: PROPOSED_TranscribeFailed, error.localizedDescription))
         }
+    }
+
+    /// One line's words as the user typed them. With `always`, that fix is also kept in Your words and made on every
+    /// other line of this meeting. The recording itself is never changed.
+    func fixLine(_ index: Int, to text: String, always fix: WordFix?) async {
+        let text = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard record.segments.indices.contains(index), !text.isEmpty else { return }
+        let line = record.segments[index]
+        fixNotKept = false
+        if let fix { fixNotKept = !(await YourWordsStore.add(fix)) }
+        // The list is kept off the main thread; if the meeting was transcribed again meanwhile, this is another line.
+        guard record.segments.indices.contains(index), record.segments[index] == line else { return }
+        record.segments[index].text = text
+        if let fix {
+            var made = 0
+            for at in record.segments.indices where at != index {
+                let fixed = YourWords.apply(record.segments[at].text, [fix])
+                record.segments[at].text = fixed.text
+                made += fixed.changed
+            }
+            record.facts.wordFixes = (record.facts.wordFixes ?? 0) + made
+        }
+        save(force: true)
     }
 
     /// Leaving the screen: save, stop playback, drop the summary state and the key.
@@ -291,6 +316,7 @@ struct MeetingDetailView: View {
     @State private var invalidName = false
     @State private var copied = false
     @State private var confirmAgain = false
+    @State private var fixing: FixTarget?
 
     private static let dateTime: DateFormatter = {
         let f = DateFormatter()
@@ -353,6 +379,11 @@ struct MeetingDetailView: View {
         .sheet(isPresented: $composing) {
             ComposeEmailSheet(email: model.email)
         }
+        .sheet(item: $fixing) { target in
+            FixLineSheet(heading: heading(target.segment), original: target.segment.text) { text, always in
+                Task { await model.fixLine(target.index, to: text, always: always) }
+            }
+        }
         .confirmationDialog(PROPOSED_DeleteMeetingTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
             Button(PROPOSED_DeleteMeetingConfirm, role: .destructive) {
                 if model.delete() { deleted() } else { deleteFailed = true }
@@ -411,17 +442,29 @@ struct MeetingDetailView: View {
                         }
                     }
                 }
+                Text(PROPOSED_FixLineHint)
+                    .font(.footnote)
+                    .foregroundStyle(DictumTheme.muted)
+                if model.fixNotKept {
+                    StatusPill(kind: .warning, text: PROPOSED_FixNotKept)
+                }
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(record.segments.enumerated()), id: \.offset) { _, segment in
-                            line(segment)
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel(spoken(segment))
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(record.segments.enumerated()), id: \.offset) { index, segment in
+                            Button { fixing = FixTarget(index: index, segment: segment) } label: {
+                                line(segment)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, minHeight: DictumTheme.minTarget, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.transcribe == .working)
+                            .accessibilityLabel(spoken(segment))
+                            .accessibilityHint(PROPOSED_FixLineAction)
                         }
                     }
                     .font(.body)
                     .foregroundStyle(DictumTheme.text)
-                    .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: 360)
@@ -486,6 +529,11 @@ struct MeetingDetailView: View {
 
     private func copyLine(_ s: MeetingRecord.Segment) -> String {
         s.start.map { "\(SpeakerSeparation.clock($0))  \(words(s))" } ?? words(s)
+    }
+
+    /// The time and the speaker of a line, for the fix sheet.
+    private func heading(_ s: MeetingRecord.Segment) -> String {
+        [s.start.map { SpeakerSeparation.clock($0) }, s.speaker.map { model.label($0) }].compactMap { $0 }.joined(separator: "  ")
     }
 
     private func spoken(_ s: MeetingRecord.Segment) -> String {
@@ -581,6 +629,9 @@ struct MeetingDetailView: View {
                     FactRow(PROPOSED_FactSpeakers, value: record.facts.speakersFound.map(String.init) ?? PROPOSED_FactNotRun)
                     FactRow(PROPOSED_FactThreshold, value: record.facts.threshold.map { String(format: PROPOSED_FactThresholdValue, $0) }
                             ?? PROPOSED_FactNotRun)
+                    if let made = record.facts.wordFixes {
+                        FactRow(PROPOSED_FactYourWords, value: String(made))
+                    }
                     if let host = model.review.hostVoice {
                         FactRow(PROPOSED_FactHostVoice, value: host.text)
                     }

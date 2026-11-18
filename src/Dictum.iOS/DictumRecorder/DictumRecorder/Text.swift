@@ -489,3 +489,32 @@ let PROPOSED_FactHostVoiceNoGroups = "Set up; no speaker groups to compare"
 let PROPOSED_FactHostVoiceMatched = "Set up; matched speaker %d at distance %.3f"
 /// "{0}" is the nearest group's cosine distance.
 let PROPOSED_FactHostVoiceNoMatch = "Set up; no match (nearest distance %.3f)"
+
+// "Your words": fixes for names and terms the phone keeps getting wrong (Settings and a kept meeting; 18/11/2026).
+let PROPOSED_YourWordsTitle = "Your words"
+let PROPOSED_YourWordsRowNote = "Fix names and terms the phone keeps writing wrongly."
+let PROPOSED_YourWordsIntro = "When the phone keeps writing a name or a term wrongly, add it here. After each transcription, the words on the left are changed to the words on the right."
+let PROPOSED_YourWordsHeardField = "The phone writes"
+let PROPOSED_YourWordsMeantField = "It should say"
+let PROPOSED_YourWordsAdd = "Add"
+let PROPOSED_YourWordsListHeading = "Your fixes"
+let PROPOSED_YourWordsEmpty = "Nothing added yet."
+/// "{0}" is what the phone writes, "{1}" what it should say.
+let PROPOSED_YourWordsPair = "\u{201C}%@\u{201D} becomes \u{201C}%@\u{201D}"
+/// "{0}" is what the phone writes.
+let PROPOSED_YourWordsRemove = "Remove the fix for \u{201C}%@\u{201D}"
+let PROPOSED_YourWordsRisk = "A fix is made every time those words appear, even when someone really said them. Short everyday words are best left out."
+let PROPOSED_YourWordsPrivacy = "This list stays on this phone and is never put in a meeting file. You can remove a fix here at any time. Transcripts already made keep the words they have."
+let PROPOSED_YourWordsFull = "The list is full. Remove a fix to add another."
+let PROPOSED_YourWordsSaveFailed = "Your words could not be saved on this phone. Try again."
+let PROPOSED_FixLineHint = "Tap a line to fix words the phone got wrong."
+let PROPOSED_FixLineAction = "Opens this line so you can fix its words"
+let PROPOSED_FixLineTitle = "Fix this line"
+let PROPOSED_FixLineField = "What was said"
+let PROPOSED_FixLineNote = "Change only the words that are wrong. The recording itself is not changed, and the summary and actions stay as they are."
+let PROPOSED_FixLineSave = "Save"
+let PROPOSED_FixAlways = "Always fix this"
+/// "{0}" is what the phone wrote, "{1}" what it should say.
+let PROPOSED_FixAlwaysNote = "Every time the phone writes \u{201C}%@\u{201D}, it is changed to \u{201C}%@\u{201D}: in the rest of this meeting and in every transcript made from now on, even when someone really said those words. The fix is kept in Your words in Settings, where you can remove it."
+let PROPOSED_FixNotKept = "The line was fixed, but the fix could not be added to Your words."
+let PROPOSED_FactYourWords = "Your words fixes made"

@@ -157,6 +157,8 @@ struct MeetingRecord: Codable, Equatable {
         var locale: String?
         var speakersFound: Int?
         var threshold: Double?
+        /// How many "Your words" fixes were made in this transcript; nil when it was made before 18/11/2026.
+        var wordFixes: Int?
     }
 
     var schemaVersion = MeetingRecord.currentSchema
