@@ -210,7 +210,9 @@ final class MeetingDetailModel {
             if labels { review.applyHostVoice(centres: outcome.centres) { [weak self] in self?.save() } }
             record.facts = MeetingRecord.Facts(engine: "whisper-turbo", locale: outcome.locale, speakersFound: outcome.speakersFound,
                                                threshold: outcome.threshold, wordFixes: outcome.wordFixes,
-                                               transcribeSeconds: report.seconds)
+                                               transcribeSeconds: report.seconds,
+                                               peakMemoryMB: report.peakBytes.map { Int((Double($0) / 1_048_576).rounded()) },
+                                               thermalAtEnd: Self.thermal(report.thermal))
             save(force: true)
             whisperNote = String(format: PROPOSED_WhisperTrialNote, RecordingView.elapsed(seconds: report.seconds),
                                  RecordingView.elapsed(seconds: report.audioSeconds), report.loadSeconds,

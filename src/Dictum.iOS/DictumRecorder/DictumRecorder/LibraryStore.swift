@@ -161,6 +161,10 @@ struct MeetingRecord: Codable, Equatable {
         var wordFixes: Int?
         /// Seconds the engine took, model load included; set only by the Whisper test in test builds, nil otherwise.
         var transcribeSeconds: Double?
+        /// The Whisper test's largest memory footprint in MB and the device's thermal state at the end ("nominal", "fair",
+        /// "serious", "critical"); set only by that test, nil otherwise.
+        var peakMemoryMB: Int?
+        var thermalAtEnd: String?
     }
 
     var schemaVersion = MeetingRecord.currentSchema
