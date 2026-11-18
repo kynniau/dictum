@@ -71,6 +71,7 @@ final class RecordingController {
     var homeMessage: String?
 
     init() {
+        review.follow(transcript.speakers)
         checkForUnfinished()
         if settings.keepOnDevice { adoptLeftoverKeys() }
     }
@@ -93,20 +94,19 @@ final class RecordingController {
 
     // MARK: - Screen 1
 
+    /// The microphone permission, asked for when not yet decided. Also used by "Your voice" set-up.
+    static func microphoneAllowed() async -> Bool {
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted: return true
+        case .undetermined: return await AVAudioApplication.requestRecordPermission()
+        case .denied: return false
+        @unknown default: return false
+        }
+    }
+
     func startTapped() async {
         micDenied = false
-        switch AVAudioApplication.shared.recordPermission {
-        case .granted:
-            break
-        case .undetermined:
-            guard await AVAudioApplication.requestRecordPermission() else { micDenied = true; return }
-        case .denied:
-            micDenied = true
-            return
-        @unknown default:
-            micDenied = true
-            return
-        }
+        guard await Self.microphoneAllowed() else { micDenied = true; return }
         do {
             try begin()
         } catch AudioCapture.CaptureError.noInput {

@@ -451,3 +451,37 @@ let PROPOSED_SectionTestMode = "Testing"
 let PROPOSED_TestModeToggle = "Use one code for every meeting"
 let PROPOSED_TestModeNote = "For your own testing only. Every meeting sealed while this is on opens with the same six words, shown below. Turn it off before recording anything that is not a test."
 let PROPOSED_TestModeNoCode = "The code could not be saved. Meetings will get a fresh code."
+
+// "Your voice" set-up (Settings) and its facts line (18/11/2026).
+let PROPOSED_HostVoiceTitle = "Your voice"
+let PROPOSED_HostVoiceRowNote = "Record a short sample once, so your own lines in each meeting's transcript show your name."
+let PROPOSED_HostVoiceIntro = "Read the passage below aloud in your normal voice for about 30 seconds. After that, in each meeting, the speaker whose voice matches yours is shown with the name you type here."
+let PROPOSED_HostVoicePrivacy = "Dictum Recorder keeps a voice-print, a list of numbers made from your voice, not the recording. The recording is discarded as soon as the voice-print is made. The voice-print stays on this phone, is never put in a meeting file, and you can remove it here at any time."
+let PROPOSED_HostVoiceNameField = "Name to show for you"
+let PROPOSED_HostVoicePassageHeading = "Read this aloud"
+let PROPOSED_HostVoicePassage = "On most mornings I make a cup of tea before I open the window and check the weather. If the sky is clear, I walk to the shops to buy bread, milk and a few pieces of fruit. Along the way I pass a small park where children play and dogs chase each other across the grass. Later I sort the post, water the plants on the back step, and write a short list of the jobs I would like to finish before dinner."
+let PROPOSED_HostVoiceStart = "Start reading"
+let PROPOSED_HostVoiceStop = "Stop and save"
+/// "{0}" is the shortest recording in seconds, "{1}" the longest.
+let PROPOSED_HostVoiceRecordingHint = "Keep reading. You can stop after %d seconds. Recording stops by itself at %d seconds."
+/// "{0}" is whole seconds recorded so far.
+let PROPOSED_HostVoiceSeconds = "%d seconds"
+let PROPOSED_HostVoiceWorking = "Making your voice-print…"
+let PROPOSED_HostVoiceNotEnough = "Not enough speech was heard to make a voice-print. Find a quiet place and try again."
+let PROPOSED_HostVoiceUnavailable = "The voice model is not in this build, so a voice-print cannot be made."
+let PROPOSED_HostVoiceInterrupted = "Recording was interrupted, so nothing was kept. Try again."
+let PROPOSED_HostVoiceSaveFailed = "The voice-print could not be saved on this phone. Try again."
+/// "{0}" is the name the user typed.
+let PROPOSED_HostVoiceSavedAs = "Your voice is set up. The matching speaker in each meeting is shown as \u{201C}%@\u{201D}."
+let PROPOSED_HostVoiceAgain = "Do it again"
+let PROPOSED_HostVoiceRemove = "Remove my voice"
+let PROPOSED_HostVoiceRemoveTitle = "Remove your voice-print?"
+let PROPOSED_HostVoiceRemoveMessage = "This deletes the voice-print and the name from this phone. Names already given in kept meetings stay as they are."
+let PROPOSED_HostVoiceRemoveFailed = "The voice-print could not be removed. Try again."
+let PROPOSED_FactHostVoice = "Your voice"
+let PROPOSED_FactHostVoiceNone = "Not set up"
+let PROPOSED_FactHostVoiceNoGroups = "Set up; no speaker groups to compare"
+/// "{0}" is the speaker number, "{1}" the cosine distance.
+let PROPOSED_FactHostVoiceMatched = "Set up; matched speaker %d at distance %.3f"
+/// "{0}" is the nearest group's cosine distance.
+let PROPOSED_FactHostVoiceNoMatch = "Set up; no match (nearest distance %.3f)"

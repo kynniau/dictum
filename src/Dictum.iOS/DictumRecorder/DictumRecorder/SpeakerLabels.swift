@@ -282,6 +282,8 @@ enum SpeakerSeparation {
         /// Vectors clustered: windows, or segments in segment-mean mode.
         var clustered: Int
         var diagnostics: SpeakerClustering.Diagnostics
+        /// Each speaker's group centre (HostVoice.centres of the clustered vectors), for matching "Your voice".
+        var centres: [Int: [Float]] = [:]
     }
 
     /// SpeakerSeparator.Separate with no owner print: windows of each segment, one voice print per window, clustering of
@@ -359,6 +361,7 @@ enum SpeakerSeparation {
         let clusterBegan = clock.now
         let labels: [Int]
         let clustered: Int
+        var groupVectors: [[Float]] = [], groupLabels: [Int] = [] // the clustered vectors and their final labels
         var diagnostics = SpeakerClustering.Diagnostics()
         if parameters.segmentMean {
             // One vector per segment that has a voice print: the mean of its unit windows, made unit again.
@@ -387,12 +390,14 @@ enum SpeakerSeparation {
             for (n, segment) in order.enumerated() { labelOf[segment] = segmentLabels[n] }
             labels = owners.map { labelOf[$0]! }
             clustered = means.count
+            (groupVectors, groupLabels) = (means, segmentLabels)
         } else {
             let result = try SpeakerClustering.clusterWithDiagnostics(embeddings, threshold: parameters.threshold,
                                                                       linkage: parameters.linkage)
             labels = result.labels
             diagnostics = result.diagnostics
             clustered = embeddings.count
+            (groupVectors, groupLabels) = (embeddings, labels)
         }
         let clusterSeconds = seconds(clock.now - clusterBegan)
 
@@ -424,7 +429,8 @@ enum SpeakerSeparation {
         return Outcome(turns: turns.map { SpeakerTurn(start: round3($0.start), end: round3($0.end), speaker: numbers[$0.label]!) },
                        windowsCut: windowsCut, windowsEmbedded: embeddings.count,
                        embedSeconds: embedSeconds, clusterSeconds: clusterSeconds, clustered: clustered,
-                       diagnostics: diagnostics)
+                       diagnostics: diagnostics,
+                       centres: HostVoice.centres(vectors: groupVectors, speakers: groupLabels.map { numbers[$0] }))
     }
 
     /// Folds every small group into the kept group nearest to it. A group is small when its seconds are below both
@@ -708,6 +714,11 @@ final class SpeakerLabels {
     /// True while Fewer or More speakers re-clusters the kept voice prints.
     private(set) var reclustering = false
 
+    /// Each speaker's group centre from the last run or re-cluster ("Your voice" matching). Memory only; dropped on Done.
+    private(set) var groupCentres: [Int: [Float]] = [:]
+    /// Called on the main thread each time labels are made or re-made (HostVoiceNaming.swift sets it).
+    var onLabelled: (@MainActor () -> Void)?
+
     private var store: PcmStore?
     private var task: Task<Void, Never>?
     private var generation = 0
@@ -768,7 +779,9 @@ final class SpeakerLabels {
                     $0.facts?.clustered = outcome.clustered
                     $0.facts?.diagnostics = outcome.diagnostics
                     $0.facts?.speakersFound = outcome.turns.map(\.speaker).max() ?? 0
+                    $0.groupCentres = outcome.centres
                     $0.reclustering = false
+                    $0.onLabelled?()
                 }
             } catch is CancellationError {
             } catch {
@@ -861,7 +874,9 @@ final class SpeakerLabels {
                     $0.facts = final
                     $0.lines = lines
                     $0.kept = keep
+                    $0.groupCentres = outcome.centres
                     $0.state = outcome.turns.isEmpty ? .tooLittleSpeech : .done
+                    if $0.state == .done { $0.onLabelled?() }
                 }
             } catch is CancellationError {
             } catch {
@@ -885,6 +900,7 @@ final class SpeakerLabels {
         store?.clear()
         store = nil
         kept = nil
+        groupCentres = [:]
         reclustering = false
         state = .idle
         lines = []

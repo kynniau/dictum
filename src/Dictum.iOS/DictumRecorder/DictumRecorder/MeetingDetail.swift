@@ -133,6 +133,7 @@ final class MeetingDetailModel {
             let outcome = try await LibraryTranscriber.transcribe(pcm: Data(pcm.prefix(MeetingPlayer.capBytes)), labels: labels,
                                                                   threshold: threshold)
             record.segments = outcome.segments
+            if labels { review.applyHostVoice(centres: outcome.centres) }
             record.facts = MeetingRecord.Facts(engine: "apple", locale: outcome.locale, speakersFound: outcome.speakersFound,
                                                threshold: outcome.threshold)
             save(force: true)
@@ -474,10 +475,10 @@ struct MeetingDetailView: View {
         guard let number = renaming else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            model.review.names[number] = nil
+            model.review.setName(nil, for: number)
             renaming = nil
         } else if MeetingReview.isValidName(trimmed) {
-            model.review.names[number] = trimmed
+            model.review.setName(trimmed, for: number)
             renaming = nil
         } else {
             invalidName = true
@@ -548,6 +549,9 @@ struct MeetingDetailView: View {
                     FactRow(PROPOSED_FactSpeakers, value: record.facts.speakersFound.map(String.init) ?? PROPOSED_FactNotRun)
                     FactRow(PROPOSED_FactThreshold, value: record.facts.threshold.map { String(format: PROPOSED_FactThresholdValue, $0) }
                             ?? PROPOSED_FactNotRun)
+                    if let host = model.review.hostVoice {
+                        FactRow(PROPOSED_FactHostVoice, value: host.text)
+                    }
                 }
                 .padding(.top, 8)
             } label: {

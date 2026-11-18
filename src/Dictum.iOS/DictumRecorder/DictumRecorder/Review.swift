@@ -21,6 +21,11 @@ final class MeetingReview {
 
     /// Names given to speaker numbers for this meeting.
     var names: [Int: String] = [:]
+    /// The speaker whose name "Your voice" put there (HostVoiceNaming.swift); nil once the user names that speaker.
+    var autoNamed: Int?
+    /// What "Your voice" found last, for the facts box (never the voice-print), and its run counter.
+    var hostVoice: HostVoiceFacts?
+    var hostRun = 0
     var actions: [Action] = []
     /// When "Everyone confirmed" was tapped.
     var confirmedAt: Date?
@@ -38,6 +43,9 @@ final class MeetingReview {
 
     func clear() {
         names = [:]
+        autoNamed = nil
+        hostVoice = nil
+        hostRun += 1
         actions = []
         confirmedAt = nil
         meetingDate = nil
@@ -177,7 +185,7 @@ struct ReviewTranscriptView: View {
             }
 
             if let facts = transcript.facts {
-                TranscriptFactsView(facts: facts, speakers: speakers)
+                TranscriptFactsView(facts: facts, speakers: speakers, hostVoice: review.hostVoice)
             }
         }
         .alert(renaming.map { String(format: APPROVED_RenameSpeaker, String(format: APPROVED_Other, $0)) } ?? "",
@@ -235,6 +243,7 @@ struct ReviewTranscriptView: View {
         // carried to the new numbers. Ceiling: names must be typed again after Fewer or More speakers. Retire with a
         // rule that maps old clusters to new ones (for example by shared segments).
         review.names = [:]
+        review.autoNamed = nil
         showSeparated = true
         speakers.recluster(fewer: fewer)
     }
@@ -243,10 +252,10 @@ struct ReviewTranscriptView: View {
         guard let number = renaming else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            review.names[number] = nil
+            review.setName(nil, for: number)
             renaming = nil
         } else if MeetingReview.isValidName(trimmed) {
-            review.names[number] = trimmed
+            review.setName(trimmed, for: number)
             renaming = nil
         } else {
             // The alert closes on any button; open it again with the desktop's approved message.
@@ -291,6 +300,7 @@ struct ReviewTranscriptView: View {
 struct TranscriptFactsView: View {
     let facts: OnDeviceTranscript.Facts
     let speakers: SpeakerLabels
+    var hostVoice: HostVoiceFacts?
 
     var body: some View {
         DisclosureGroup {
@@ -304,6 +314,9 @@ struct TranscriptFactsView: View {
                 FactRow(PROPOSED_FactOffline, value: facts.networkingOff ? PROPOSED_FactYes : PROPOSED_FactNo)
                 if let speakerFacts = speakers.facts {
                     SpeakerFactsView(facts: speakerFacts)
+                }
+                if let hostVoice {
+                    FactRow(PROPOSED_FactHostVoice, value: hostVoice.text)
                 }
             }
             .padding(.top, 8)

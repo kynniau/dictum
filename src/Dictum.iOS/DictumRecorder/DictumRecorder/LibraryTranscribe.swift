@@ -22,6 +22,8 @@ enum LibraryTranscriber {
         var locale: String
         var speakersFound: Int?
         var threshold: Double?
+        /// Each speaker's group centre, for "Your voice" (memory only; never saved).
+        var centres: [Int: [Float]] = [:]
     }
 
     static func transcribe(pcm: Data, labels: Bool, threshold: Double) async throws -> Outcome {
@@ -109,8 +111,10 @@ enum LibraryTranscriber {
                 } : segments.map { MeetingRecord.Segment(start: $0.start, end: $0.end, text: $0.text, speaker: nil) }
                 let found = done ? speakers.facts?.speakersFound : nil
                 let used = done ? speakers.threshold : nil
+                let centres = done ? speakers.groupCentres : [:]
                 speakers.clear()
-                return Outcome(segments: lines, locale: locale.identifier, speakersFound: found, threshold: used)
+                return Outcome(segments: lines, locale: locale.identifier, speakersFound: found, threshold: used,
+                               centres: centres)
             }
         }
     }

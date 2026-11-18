@@ -13,6 +13,7 @@ struct SettingsView: View {
             Form {
                 engineSection
                 speakerSection
+                hostVoiceSection
                 meetingTypeSection
                 summarySection
                 appearanceSection
@@ -98,6 +99,25 @@ struct SettingsView: View {
             .listRowBackground(DictumTheme.surface)
         } header: {
             Text(PROPOSED_SectionSpeakers).accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    private var hostVoiceSection: some View {
+        Section {
+            NavigationLink {
+                HostVoiceView()
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(PROPOSED_HostVoiceTitle).foregroundStyle(DictumTheme.text)
+                    Text(PROPOSED_HostVoiceRowNote).font(.footnote).foregroundStyle(DictumTheme.muted)
+                }
+                .frame(minHeight: DictumTheme.minTarget)
+            }
+            .accessibilityLabel(PROPOSED_HostVoiceTitle)
+            .accessibilityHint(PROPOSED_HostVoiceRowNote)
+            .listRowBackground(DictumTheme.surface)
+        } header: {
+            Text(PROPOSED_HostVoiceTitle).accessibilityAddTraits(.isHeader)
         }
     }
 
