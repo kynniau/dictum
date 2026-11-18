@@ -140,7 +140,9 @@ final class MeetingDetailModel {
             // Transcribe again numbers the speakers afresh, so names given to the old numbers are dropped, not carried.
             if !record.segments.isEmpty { review.forgetNames() }
             record.segments = outcome.segments
-            if labels { review.applyHostVoice(centres: outcome.centres) }
+            // The name is placed a moment later (the voice-print is read off the main thread), so save again then;
+            // otherwise it would reach the record only when the screen closes.
+            if labels { review.applyHostVoice(centres: outcome.centres) { [weak self] in self?.save() } }
             record.facts = MeetingRecord.Facts(engine: "apple", locale: outcome.locale, speakersFound: outcome.speakersFound,
                                                threshold: outcome.threshold)
             save(force: true)

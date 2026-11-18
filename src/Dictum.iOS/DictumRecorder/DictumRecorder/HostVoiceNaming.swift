@@ -36,7 +36,8 @@ extension MeetingReview {
     }
 
     /// Loads the kept voice-print off the main thread, matches it against `centres`, then places the name.
-    func applyHostVoice(centres: [Int: [Float]]) {
+    /// `placed` runs on the main actor once the name has been placed or left alone, so a kept meeting can save it.
+    func applyHostVoice(centres: [Int: [Float]], placed: (@MainActor () -> Void)? = nil) {
         hostRun += 1
         let run = hostRun
         Task { [weak self] in
@@ -49,6 +50,7 @@ extension MeetingReview {
             guard let self, self.hostRun == run else { return } // a newer run, or Done, came first
             self.hostVoice = found.facts
             self.placeHostName(found.name, on: found.facts.matched)
+            placed?()
         }
     }
 
