@@ -54,18 +54,22 @@ extension MeetingReview {
 
     /// Moves the auto-applied name to `speaker`; never over a name the user typed.
     func placeHostName(_ name: String?, on speaker: Int?) {
-        if let old = autoNamed {
-            names[old] = nil
-            autoNamed = nil
-        }
-        guard let name, let speaker, names[speaker] == nil else { return }
-        names[speaker] = name
-        autoNamed = speaker
+        var rules = SpeakerNames(names: names, autoNamed: autoNamed)
+        rules.place(name, on: speaker)
+        (names, autoNamed) = (rules.names, rules.autoNamed)
     }
 
     /// A name typed by the user (nil clears it). It is the user's from now on, so re-matching leaves it alone.
     func setName(_ name: String?, for speaker: Int) {
-        if speaker == autoNamed { autoNamed = nil }
-        names[speaker] = name
+        var rules = SpeakerNames(names: names, autoNamed: autoNamed)
+        rules.type(name, for: speaker)
+        (names, autoNamed) = (rules.names, rules.autoNamed)
+    }
+
+    /// The speakers were numbered afresh: drop every name (SpeakerNames.forget).
+    func forgetNames() {
+        var rules = SpeakerNames(names: names, autoNamed: autoNamed)
+        rules.forget()
+        (names, autoNamed) = (rules.names, rules.autoNamed)
     }
 }

@@ -437,6 +437,10 @@ let PROPOSED_DeleteMeetingMessage = "This deletes the sealed file, the transcrip
 let PROPOSED_DeleteMeetingConfirm = "Delete the meeting"
 let PROPOSED_TranscribeHere = "Transcribe on this device"
 let PROPOSED_Transcribing = "Transcribing on this device…"
+let PROPOSED_TranscribeAgain = "Transcribe again"
+let PROPOSED_TranscribeAgainTitle = "Transcribe this meeting again?"
+let PROPOSED_TranscribeAgainMessage = "The new transcript replaces this one. Speaker names you typed are removed, because the speakers are numbered afresh. The summary and actions stay as they are."
+let PROPOSED_TranscribeAgainConfirm = "Replace the transcript"
 let PROPOSED_TranscribeNeedsModel = "The on-device speech model is not on this device. Turn on the experimental transcript for a new meeting to download it, then try again."
 let PROPOSED_TranscribeUnavailable = "Transcribing on this device needs iOS 26 or later with Apple's on-device speech model."
 /// "{0}" is the system's error description.

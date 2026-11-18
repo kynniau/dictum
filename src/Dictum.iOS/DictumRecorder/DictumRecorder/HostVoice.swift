@@ -136,6 +136,37 @@ enum HostVoice {
     }
 }
 
+/// The names shown for speaker numbers in one meeting, and which of them "Your voice" put there. Pure rules, so the
+/// self-check below covers them: a wrong name on someone's words is worse than "Other 1".
+struct SpeakerNames: Equatable {
+    var names: [Int: String] = [:]
+    /// The speaker whose name "Your voice" put there; nil once the user names that speaker.
+    var autoNamed: Int?
+
+    /// Moves the kept name to `speaker`; never over a name the user typed.
+    mutating func place(_ name: String?, on speaker: Int?) {
+        if let old = autoNamed {
+            names[old] = nil
+            autoNamed = nil
+        }
+        guard let name, let speaker, names[speaker] == nil else { return }
+        names[speaker] = name
+        autoNamed = speaker
+    }
+
+    /// A name typed by the user (nil clears it). It is the user's from now on.
+    mutating func type(_ name: String?, for speaker: Int) {
+        if speaker == autoNamed { autoNamed = nil }
+        names[speaker] = name
+    }
+
+    /// The speakers were numbered afresh (Fewer or More speakers, Transcribe again): old numbers mean nothing now.
+    mutating func forget() {
+        names = [:]
+        autoNamed = nil
+    }
+}
+
 #if DEBUG
 /// One line per check, "PASS …" or "FAIL …". No device or model needed.
 enum HostVoiceSelfCheck {
@@ -144,6 +175,24 @@ enum HostVoiceSelfCheck {
         func check<T: Equatable>(_ name: String, _ got: T, _ want: T) {
             out.append("\(got == want ? "PASS" : "FAIL") \(name): got \(got), want \(want)")
         }
+        // Speaker names: the kept name never lands on, or stays on, the wrong speaker.
+        var n = SpeakerNames()
+        n.place("Host", on: 2)
+        check("names: the kept name goes on the matched speaker", n, SpeakerNames(names: [2: "Host"], autoNamed: 2))
+        n.place("Host", on: 3)
+        check("names: a new match moves the kept name", n, SpeakerNames(names: [3: "Host"], autoNamed: 3))
+        n.place("Host", on: nil)
+        check("names: no match takes the kept name off", n, SpeakerNames())
+        n.type("Typed", for: 1)
+        n.place("Host", on: 1)
+        check("names: a typed name is never overwritten", n, SpeakerNames(names: [1: "Typed"], autoNamed: nil))
+        n.place("Host", on: 2)
+        n.type("Mine", for: 2)
+        n.place("Host", on: nil)
+        check("names: typing over the kept name makes it the user's", n, SpeakerNames(names: [1: "Typed", 2: "Mine"], autoNamed: nil))
+        n.place("Host", on: 4)
+        n.forget()
+        check("names: new speaker numbers drop every name", n, SpeakerNames())
         func near(_ a: [Float]?, _ b: [Float]) -> Bool {
             guard let a, a.count == b.count else { return false }
             return zip(a, b).allSatisfy { abs($0 - $1) < 1e-6 }

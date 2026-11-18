@@ -115,7 +115,12 @@ final class MeetingDetailModel {
         player.toggle()
     }
 
-    /// Transcribes the decrypted audio in memory, then saves the transcript into the record.
+    /// Whether "Transcribe again" is offered: the notice read to the room covers it, and the whole meeting fits under
+    /// the cap, so a new transcript can never be shorter than the one it replaces.
+    var canTranscribeAgain: Bool { consentCoversOnDevice && record.duration <= Double(MeetingPlayer.capMinutes * 60) }
+
+    /// Transcribes the decrypted audio in memory, then saves the transcript into the record. The transcript, and on a
+    /// second run the names, change only when the new transcript is ready; a failure leaves the meeting as it was.
     func transcribeHere(labels: Bool, threshold: Double) async {
         guard #available(iOS 26, *) else {
             transcribe = .failed(PROPOSED_TranscribeUnavailable)
@@ -132,6 +137,8 @@ final class MeetingDetailModel {
             defer { pcm.resetBytes(in: 0..<pcm.count) }
             let outcome = try await LibraryTranscriber.transcribe(pcm: Data(pcm.prefix(MeetingPlayer.capBytes)), labels: labels,
                                                                   threshold: threshold)
+            // Transcribe again numbers the speakers afresh, so names given to the old numbers are dropped, not carried.
+            if !record.segments.isEmpty { review.forgetNames() }
             record.segments = outcome.segments
             if labels { review.applyHostVoice(centres: outcome.centres) }
             record.facts = MeetingRecord.Facts(engine: "apple", locale: outcome.locale, speakersFound: outcome.speakersFound,
@@ -281,6 +288,7 @@ struct MeetingDetailView: View {
     @State private var draftName = ""
     @State private var invalidName = false
     @State private var copied = false
+    @State private var confirmAgain = false
 
     private static let dateTime: DateFormatter = {
         let f = DateFormatter()
@@ -350,6 +358,14 @@ struct MeetingDetailView: View {
             Button(PROPOSED_Cancel, role: .cancel) {}
         } message: {
             Text(PROPOSED_DeleteMeetingMessage)
+        }
+        .confirmationDialog(PROPOSED_TranscribeAgainTitle, isPresented: $confirmAgain, titleVisibility: .visible) {
+            Button(PROPOSED_TranscribeAgainConfirm, role: .destructive) {
+                Task { await model.transcribeHere(labels: settings.speakerLabels, threshold: settings.speakerThreshold) }
+            }
+            Button(PROPOSED_Cancel, role: .cancel) {}
+        } message: {
+            Text(PROPOSED_TranscribeAgainMessage)
         }
         .alert(renaming.map { String(format: APPROVED_RenameSpeaker, String(format: APPROVED_Other, $0)) } ?? "",
                isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
@@ -423,8 +439,22 @@ struct MeetingDetailView: View {
                 .buttonStyle(.dictumSecondary)
                 .accessibilityLabel(PROPOSED_CopyTranscript)
                 .accessibilityValue(copied ? PROPOSED_TranscriptCopied : "")
+                if model.canTranscribeAgain { transcribeAgainControls }
             }
         }
+    }
+
+    @ViewBuilder private var transcribeAgainControls: some View {
+        switch model.transcribe {
+        case .working:
+            StatusPill(kind: .working, text: PROPOSED_Transcribing)
+        case let .failed(message):
+            StatusPill(kind: .warning, text: message)
+        case .idle:
+            EmptyView()
+        }
+        SecondaryButton(title: PROPOSED_TranscribeAgain, systemImage: "arrow.clockwise") { confirmAgain = true }
+            .disabled(model.transcribe == .working)
     }
 
     @ViewBuilder private var transcribeControls: some View {

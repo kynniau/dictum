@@ -242,8 +242,7 @@ struct ReviewTranscriptView: View {
         // simplification: re-clustering renumbers the speakers, so names given before it are dropped rather than
         // carried to the new numbers. Ceiling: names must be typed again after Fewer or More speakers. Retire with a
         // rule that maps old clusters to new ones (for example by shared segments).
-        review.names = [:]
-        review.autoNamed = nil
+        review.forgetNames()
         showSeparated = true
         speakers.recluster(fewer: fewer)
     }
