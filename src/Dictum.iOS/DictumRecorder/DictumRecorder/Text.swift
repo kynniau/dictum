@@ -518,3 +518,27 @@ let PROPOSED_FixAlways = "Always fix this"
 let PROPOSED_FixAlwaysNote = "Every time the phone writes \u{201C}%@\u{201D}, it is changed to \u{201C}%@\u{201D}: in the rest of this meeting and in every transcript made from now on, even when someone really said those words. The fix is kept in Your words in Settings, where you can remove it."
 let PROPOSED_FixNotKept = "The line was fixed, but the fix could not be added to Your words."
 let PROPOSED_FactYourWords = "Your words fixes made"
+
+#if DEBUG
+// Whisper test: test builds only, never in a release (a kept meeting; 18/11/2026).
+let PROPOSED_WhisperTrialButton = "Test: transcribe again with Whisper"
+let PROPOSED_WhisperTrialTitle = "Transcribe again with Whisper? (test)"
+let PROPOSED_WhisperTrialMessage = "This is a test. The meeting is transcribed again on this phone with the Whisper model you copied here, and the new transcript replaces this one. Speaker names you typed are removed, because the speakers are numbered afresh. The summary and actions stay as they are. Keep this screen open until it finishes."
+let PROPOSED_WhisperTrialConfirm = "Replace the transcript (test)"
+let PROPOSED_WhisperTrialLoading = "Whisper test: loading the model…"
+/// "{0}" is the piece being transcribed, "{1}" how many pieces there are.
+let PROPOSED_WhisperTrialPiece = "Whisper test: piece %d of %d…"
+/// "{0}" time taken, "{1}" recording length, "{2}" seconds to load the model, "{3}" peak memory in MB, "{4}" thermal state.
+let PROPOSED_WhisperTrialNote = "Whisper test: took %@ for a %@ recording (model load %.1f s). Peak memory %@ MB. Thermal state at the end: %@."
+let PROPOSED_WhisperTrialMemoryUnknown = "unknown"
+let PROPOSED_WhisperTrialMissing = "Whisper test: the model files are not on this phone. Copy turbo-encoder.int8.onnx, turbo-decoder.int8.onnx and turbo-tokens.txt into Library/Application Support/WhisperTrial in the app's container to try it."
+let PROPOSED_WhisperTrialNotLoaded = "Whisper test: the model could not be loaded."
+let PROPOSED_WhisperTrialNoLibrary = "Whisper test: this build does not include the speech library."
+let PROPOSED_WhisperTrialStopped = "Whisper test: stopped. The transcript was not changed."
+let PROPOSED_FactTranscribeTime = "Time to transcribe (test)"
+let PROPOSED_ThermalNominal = "nominal"
+let PROPOSED_ThermalFair = "fair"
+let PROPOSED_ThermalSerious = "serious"
+let PROPOSED_ThermalCritical = "critical"
+let PROPOSED_ThermalUnknown = "unknown"
+#endif

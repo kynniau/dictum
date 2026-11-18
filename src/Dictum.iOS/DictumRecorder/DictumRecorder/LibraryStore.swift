@@ -159,6 +159,8 @@ struct MeetingRecord: Codable, Equatable {
         var threshold: Double?
         /// How many "Your words" fixes were made in this transcript; nil when it was made before 18/11/2026.
         var wordFixes: Int?
+        /// Seconds the engine took, model load included; set only by the Whisper test in test builds, nil otherwise.
+        var transcribeSeconds: Double?
     }
 
     var schemaVersion = MeetingRecord.currentSchema

@@ -7,7 +7,6 @@ import Speech
 // then the same speaker step (SpeakerLabels). File-less: the PCM is decrypted into memory and handed over in buffers;
 // nothing is written. Never downloads: the speech model must already be on the device.
 
-@available(iOS 26, *)
 @MainActor
 enum LibraryTranscriber {
     enum Failure: Error {
@@ -28,6 +27,7 @@ enum LibraryTranscriber {
         var wordFixes = 0
     }
 
+    @available(iOS 26, *)
     static func transcribe(pcm: Data, labels: Bool, threshold: Double) async throws -> Outcome {
         guard SpeechTranscriber.isAvailable, await OnDeviceTranscript.speechAuthorised(),
               let locale = await SpeechEngine.pickLocale() else { throw Failure.unavailable }
@@ -85,7 +85,27 @@ enum LibraryTranscriber {
         }.value
         await engine.finish()
         _ = try? await starter.value
-        var finals = try await collector.value
+        let finals = try await collector.value
+        return try await finish(finals: finals, pcm: pcm, labels: labels, threshold: threshold, locale: locale.identifier)
+    }
+
+    #if DEBUG
+    /// Test builds only: the same, with Whisper (WhisperTrial) in place of Apple's speech model. Needs no speech
+    /// authorisation and no Apple model; the three Whisper files must be on the device. Each Whisper segment is one final
+    /// line timed by its result, as Apple's results without word times.
+    static func transcribeWithWhisper(pcm: Data, labels: Bool, threshold: Double,
+                                      progress: @escaping @Sendable (Int, Int) -> Void) async throws -> (Outcome, WhisperTrial.Report) {
+        let run = try await WhisperTrial.transcribe(pcm: pcm, progress: progress)
+        let finals = run.lines.map { (text: $0.text, span: Optional(TranscriptSpan(start: $0.start, end: $0.end, source: .result))) }
+        let outcome = try await finish(finals: finals, pcm: pcm, labels: labels, threshold: threshold, locale: "en")
+        return (outcome, run.report)
+    }
+    #endif
+
+    /// After either engine: the "Your words" fixes, then the speaker step on the same PCM.
+    private static func finish(finals: [(text: String, span: TranscriptSpan?)], pcm: Data, labels: Bool, threshold: Double,
+                               locale: String) async throws -> Outcome {
+        var finals = finals
         guard !finals.isEmpty else { throw Failure.noWords }
         // "Your words": the kept fixes are made in every final line before anything else reads the words.
         let fixes = await YourWordsStore.current()
@@ -103,7 +123,7 @@ enum LibraryTranscriber {
 
         guard labels else {
             return Outcome(segments: segments.map { .init(start: $0.start, end: $0.end, text: $0.text, speaker: nil) },
-                           locale: locale.identifier, speakersFound: nil, threshold: nil, wordFixes: wordFixes)
+                           locale: locale, speakersFound: nil, threshold: nil, wordFixes: wordFixes)
         }
         // The speaker step, exactly as after a live recording: the PCM's first sample is the analyzer's time 0 here.
         let speakers = SpeakerLabels()
@@ -123,7 +143,7 @@ enum LibraryTranscriber {
                 let used = done ? speakers.threshold : nil
                 let centres = done ? speakers.groupCentres : [:]
                 speakers.clear()
-                return Outcome(segments: lines, locale: locale.identifier, speakersFound: found, threshold: used,
+                return Outcome(segments: lines, locale: locale, speakersFound: found, threshold: used,
                                centres: centres, wordFixes: wordFixes)
             }
         }

@@ -160,6 +160,89 @@ final class MeetingDetailModel {
         }
     }
 
+    #if DEBUG
+    /// Whisper test: the piece being transcribed and how many there are; nil while the model loads or when not running.
+    private(set) var whisperPiece: (piece: Int, of: Int)?
+    /// Whisper test: a run is under way (from the decrypt to the save).
+    private(set) var whisperRunning = false
+    /// Whisper test: one line after a run that finished (time, recording length, peak memory, thermal state).
+    private(set) var whisperNote: String?
+    private var whisperTask: Task<Void, Never>?
+
+    func startWhisperTrial(labels: Bool, threshold: Double) {
+        guard transcribe != .working else { return }
+        whisperTask = Task { await transcribeWithWhisper(labels: labels, threshold: threshold) }
+    }
+
+    /// Test builds only: transcribeHere with Whisper in place of Apple's speech model, measured. The same in-memory
+    /// decrypt and wipe, cap, names, voice and save. The screen stays awake while it runs. Leaving the screen cancels
+    /// it (close() wipes the key), and a cancelled run saves nothing.
+    private func transcribeWithWhisper(labels: Bool, threshold: Double) async {
+        transcribe = .working
+        whisperNote = nil
+        whisperPiece = nil
+        whisperRunning = true
+        let wasIdleDisabled = UIApplication.shared.isIdleTimerDisabled
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer {
+            UIApplication.shared.isIdleTimerDisabled = wasIdleDisabled
+            whisperRunning = false
+        }
+        let url = self.url, key = contentKey
+        do {
+            guard var pcm = try await offMain({ try BundleFile.audio(url: url, contentKey: key, limit: MeetingPlayer.capBytes) }),
+                  !pcm.isEmpty else {
+                transcribe = .failed(PROPOSED_NoAudio)
+                return
+            }
+            defer { pcm.resetBytes(in: 0..<pcm.count) }
+            let (outcome, report) = try await LibraryTranscriber.transcribeWithWhisper(
+                pcm: Data(pcm.prefix(MeetingPlayer.capBytes)), labels: labels, threshold: threshold
+            ) { [weak self] piece, of in
+                Task { @MainActor [weak self] in
+                    guard let self, self.whisperRunning else { return }
+                    self.whisperPiece = (piece, of)
+                }
+            }
+            try Task.checkCancellation()
+            if !record.segments.isEmpty { review.forgetNames() }
+            record.segments = outcome.segments
+            if labels { review.applyHostVoice(centres: outcome.centres) { [weak self] in self?.save() } }
+            record.facts = MeetingRecord.Facts(engine: "whisper-turbo", locale: outcome.locale, speakersFound: outcome.speakersFound,
+                                               threshold: outcome.threshold, wordFixes: outcome.wordFixes,
+                                               transcribeSeconds: report.seconds)
+            save(force: true)
+            whisperNote = String(format: PROPOSED_WhisperTrialNote, RecordingView.elapsed(seconds: report.seconds),
+                                 RecordingView.elapsed(seconds: report.audioSeconds), report.loadSeconds,
+                                 report.peakBytes.map { String(format: "%.0f", Double($0) / 1_048_576) } ?? PROPOSED_WhisperTrialMemoryUnknown,
+                                 Self.thermal(report.thermal))
+            transcribe = .idle
+        } catch is CancellationError {
+            transcribe = .failed(PROPOSED_WhisperTrialStopped)
+        } catch WhisperTrial.Failure.modelMissing {
+            transcribe = .failed(PROPOSED_WhisperTrialMissing)
+        } catch WhisperTrial.Failure.recogniserNotCreated {
+            transcribe = .failed(PROPOSED_WhisperTrialNotLoaded)
+        } catch WhisperTrial.Failure.libraryMissing {
+            transcribe = .failed(PROPOSED_WhisperTrialNoLibrary)
+        } catch LibraryTranscriber.Failure.noWords {
+            transcribe = .failed(PROPOSED_TranscribeNone)
+        } catch {
+            transcribe = .failed(String(format: PROPOSED_TranscribeFailed, error.localizedDescription))
+        }
+    }
+
+    private static func thermal(_ state: ProcessInfo.ThermalState) -> String {
+        switch state {
+        case .nominal: return PROPOSED_ThermalNominal
+        case .fair: return PROPOSED_ThermalFair
+        case .serious: return PROPOSED_ThermalSerious
+        case .critical: return PROPOSED_ThermalCritical
+        @unknown default: return PROPOSED_ThermalUnknown
+        }
+    }
+    #endif
+
     /// One line's words as the user typed them. With `always`, that fix is also kept in Your words and made on every
     /// other line of this meeting. The recording itself is never changed.
     func fixLine(_ index: Int, to text: String, always fix: WordFix?) async {
@@ -186,6 +269,9 @@ final class MeetingDetailModel {
     /// Leaving the screen: save, stop playback, drop the summary state and the key.
     func close() {
         saveTask?.cancel()
+        #if DEBUG
+        whisperTask?.cancel()
+        #endif
         save()
         player.stop()
         review.clear()
@@ -194,6 +280,9 @@ final class MeetingDetailModel {
 
     func delete() -> Bool {
         saveTask?.cancel()
+        #if DEBUG
+        whisperTask?.cancel()
+        #endif
         player.stop()
         guard Library.delete(url: url, meetingHex: meetingId.hex) else { return false }
         review.clear()
@@ -316,6 +405,9 @@ struct MeetingDetailView: View {
     @State private var invalidName = false
     @State private var copied = false
     @State private var confirmAgain = false
+    #if DEBUG
+    @State private var confirmWhisper = false
+    #endif
     @State private var fixing: FixTarget?
 
     private static let dateTime: DateFormatter = {
@@ -400,6 +492,16 @@ struct MeetingDetailView: View {
         } message: {
             Text(PROPOSED_TranscribeAgainMessage)
         }
+        #if DEBUG
+        .confirmationDialog(PROPOSED_WhisperTrialTitle, isPresented: $confirmWhisper, titleVisibility: .visible) {
+            Button(PROPOSED_WhisperTrialConfirm, role: .destructive) {
+                model.startWhisperTrial(labels: settings.speakerLabels, threshold: settings.speakerThreshold)
+            }
+            Button(PROPOSED_Cancel, role: .cancel) {}
+        } message: {
+            Text(PROPOSED_WhisperTrialMessage)
+        }
+        #endif
         .alert(renaming.map { String(format: APPROVED_RenameSpeaker, String(format: APPROVED_Other, $0)) } ?? "",
                isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField(PROPOSED_NameField, text: $draftName)
@@ -500,7 +602,33 @@ struct MeetingDetailView: View {
         }
         SecondaryButton(title: PROPOSED_TranscribeAgain, systemImage: "arrow.clockwise") { confirmAgain = true }
             .disabled(model.transcribe == .working)
+        #if DEBUG
+        whisperTrialControls
+        #endif
     }
+
+    #if DEBUG
+    /// Test builds only, under "Transcribe again" and only where it is offered (canTranscribeAgain covers the notice).
+    @ViewBuilder private var whisperTrialControls: some View {
+        if model.whisperRunning {
+            StatusPill(kind: .working, text: model.whisperPiece.map { String(format: PROPOSED_WhisperTrialPiece, $0.piece, $0.of) }
+                       ?? PROPOSED_WhisperTrialLoading)
+        } else if let note = model.whisperNote {
+            Text(note)
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(DictumTheme.text)
+                .textSelection(.enabled)
+        }
+        if WhisperTrial.isReady {
+            SecondaryButton(title: PROPOSED_WhisperTrialButton, systemImage: "testtube.2") { confirmWhisper = true }
+                .disabled(model.transcribe == .working)
+        } else {
+            Text(PROPOSED_WhisperTrialMissing)
+                .font(.footnote)
+                .foregroundStyle(DictumTheme.muted)
+        }
+    }
+    #endif
 
     @ViewBuilder private var transcribeControls: some View {
         if !model.consentCoversOnDevice {
@@ -632,6 +760,11 @@ struct MeetingDetailView: View {
                     if let made = record.facts.wordFixes {
                         FactRow(PROPOSED_FactYourWords, value: String(made))
                     }
+                    #if DEBUG
+                    if let took = record.facts.transcribeSeconds {
+                        FactRow(PROPOSED_FactTranscribeTime, value: RecordingView.elapsed(seconds: took))
+                    }
+                    #endif
                     if let host = model.review.hostVoice {
                         FactRow(PROPOSED_FactHostVoice, value: host.text)
                     }
