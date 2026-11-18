@@ -277,7 +277,13 @@ extension WhisperTrial {
         config.model_config.whisper.language = c("en")
         config.model_config.whisper.task = c("transcribe")
         config.model_config.whisper.tail_paddings = -1
-        config.model_config.whisper.enable_segment_timestamps = 1
+        // Segment times are left off: with them on, this model stops early inside a piece. Measured 18/11/2026 on one
+        // 95 s recording: 177 words with segment times against 208 without (Mac, same library version), and on the
+        // phone the lines came back with repeats. Token times are not given by this model at all. So each piece is
+        // one line.
+        // simplification: a line is a whole piece of 15 to 25 s, so the speaker step gives one speaker to everything
+        // said in it. Ceiling: speaker labels are coarse where people take turns quickly. Retire by cutting at pauses
+        // found by a voice-activity model, or with shorter pieces (8 to 15 s kept 509 of 514 and 205 of 208 words).
         config.model_config.tokens = c(folder.appendingPathComponent(tokensName).path)
         config.model_config.num_threads = 4
         config.model_config.provider = c("cpu")
