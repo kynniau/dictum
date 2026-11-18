@@ -206,7 +206,10 @@ final class RecordingController {
     }
 
     private func dropContentKey() {
-        contentKey?.resetBytes(in: 0..<(contentKey?.count ?? 0))
+        // The count is read first, on its own line. Reading `contentKey` inside the call that is changing it is two
+        // accesses at once, and Swift stops the app there (found by the screenshot test, 19/11/2026: Done crashed).
+        let count = contentKey?.count ?? 0
+        contentKey?.resetBytes(in: 0..<count)
         contentKey = nil
         keptMeeting = nil
     }
