@@ -12,6 +12,8 @@ final class RecordingController {
         /// The sealed files and New meeting.
         case home
         case consent
+        /// "Before you bring in a recording": a sound file from the share menu or Files (`importDraft` holds it).
+        case importing
         case recording
         case sealing
         /// After Stop with the on-device transcript: the end-of-meeting review. The bundle is already sealed.
@@ -69,9 +71,12 @@ final class RecordingController {
     private(set) var openedTitles: [String: String] = [:]
     /// A message for the home screen after a failed open or save.
     var homeMessage: String?
+    /// The sound file on the bring-in screen, while `phase == .importing`.
+    private(set) var importDraft: ImportDraft?
 
     init() {
         review.follow(transcript.speakers)
+        ImportInbox.sweep(documents: SessionFiles.documents)
         checkForUnfinished()
         if settings.keepOnDevice { adoptLeftoverKeys() }
     }
@@ -335,6 +340,89 @@ final class RecordingController {
         } catch {
             phase = .failed(PROPOSED_SealFailed)
         }
+    }
+}
+
+// MARK: - A recording brought in from outside the app (CallImport.swift, CallImportFlow.swift)
+
+extension RecordingController {
+    /// A sound file handed over by the share menu or picked in Files. Taken only from the home screen: at any other
+    /// time (a recording running, a meeting open) nothing changes and the handed-over copy is removed.
+    func openedFile(_ url: URL) async {
+        let scoped = url.startAccessingSecurityScopedResource()
+        let draft: ImportDraft?
+        if case .home = phase {
+            let seconds = (try? await offMain { try ImportAudio.duration(url: url) }) ?? 0
+            draft = seconds > 0 ? ImportDraft(url: url, scoped: scoped, seconds: seconds) : nil
+            if draft == nil, case .home = phase { homeMessage = PROPOSED_ImportUnreadable }
+        } else {
+            draft = nil
+        }
+        // The screen may have changed while the file was being read.
+        guard let draft, case .home = phase else {
+            ImportDraft(url: url, scoped: scoped, seconds: 0).release()
+            return
+        }
+        homeMessage = nil
+        title = ""
+        importDraft = draft
+        phase = .importing
+    }
+
+    /// Back from the bring-in screen: nothing was sealed, and the file is left as it was.
+    func importBackTapped() {
+        guard case .importing = phase else { return }
+        importDraft?.release()
+        importDraft = nil
+        title = ""
+        phase = .home
+    }
+
+    /// The confirming button: seals the file as a meeting. Kept on this device, it opens straight away, ready to be
+    /// transcribed; otherwise the sealed screen shows its six words, as after a recording.
+    func importTapped(how: String) async {
+        guard case .importing = phase, let draft = importDraft else { return }
+        phase = .sealing
+        let keep = settings.keepOnDevice
+        let typed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = typed.isEmpty ? PROPOSED_ImportDefaultTitle : typed
+        let version = AppInfo.version
+        let id = MeetingId.random()
+        do {
+            // The key is in the Keychain before the session exists, as for a recording (see begin()).
+            var key = try ContentKeyStore.newKey()
+            defer { key.resetBytes(in: 0..<key.count) }
+            try ContentKeyStore.save(key, meetingHex: id.hex)
+            let sealingKey = Data(key)
+            let bundle = try await offMain {
+                try CallImporter.seal(draft.url, id: id, key: sealingKey, title: name, how: how, keep: keep, appVersion: version)
+            }
+            SessionFiles.protect(bundle.url)
+            keepFailed = false
+            captureFailed = false
+            if keep {
+                keepSealed(id: id, url: bundle.url, key: key)
+                // No review to write at Done: the meeting screen saves its own record.
+                keptMeeting = nil
+            }
+            ContentKeyStore.delete(meetingHex: id.hex)
+            if keep, !keepFailed, let record = try? LibraryFiles.read(contentKey: key, meetingId: id) {
+                openedTitles[id.hex] = record.title
+                detail = MeetingDetailModel(url: bundle.url, meetingId: id, contentKey: Data(key), record: record,
+                                            consentCoversOnDevice: Library.consentCoversOnDevice([ImportNotice.version(keep: true)]))
+                phase = .detail
+            } else {
+                phase = .sealed(bundle)
+            }
+        } catch {
+            // Nothing of the user's is lost: the file they chose is untouched, so the half-made session and its key go.
+            SessionFiles.remove(SessionFiles.sessionDirectory(hex: id.hex))
+            ContentKeyStore.delete(meetingHex: id.hex)
+            phase = .failed(PROPOSED_ImportFailed)
+        }
+        draft.release()
+        importDraft = nil
+        title = ""
     }
 }
 

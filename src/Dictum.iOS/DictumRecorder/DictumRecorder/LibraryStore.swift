@@ -298,10 +298,10 @@ enum Library {
         return items.compactMap { $0["ScriptVersion"] as? String }
     }
 
-    /// True when the people in the meeting were told transcripts and summaries could be made and kept on this device
-    /// (the keep-on notice, PROPOSED_ScriptVersionKept). Meetings recorded under the earlier notice were told the
-    /// computer makes them, so they are not transcribed on the phone.
+    /// True when the people in the meeting were told transcripts and summaries could be made and kept on this device:
+    /// a keep-on notice, for a meeting recorded here or a recording brought in (OnDeviceNotice, CallImport.swift).
+    /// Meetings under a keep-off notice were told the computer makes them, so they are not transcribed on the phone.
     static func consentCoversOnDevice(_ versions: [String]) -> Bool {
-        versions.first == PROPOSED_ScriptVersionKept
+        OnDeviceNotice.covers(versions)
     }
 }

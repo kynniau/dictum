@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // The home screen: New meeting, and the meetings: each sealed `.dictum` in Documents. The list is built without any
 // prompt or decryption, from the files' names, dates and sizes and their plaintext manifests (meeting id, audio length),
@@ -83,6 +84,7 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var unlocking: LibraryEntry?
     @State private var opening = false
+    @State private var choosingFile = false
 
     private var keep: Bool { controller.settings.keepOnDevice }
 
@@ -106,6 +108,9 @@ struct HomeView: View {
             PrimaryButton(title: PROPOSED_NewMeeting, systemImage: "mic.fill") { controller.newMeetingTapped() }
                 .font(.title3)
                 .accessibilityIdentifier("home.newMeeting")
+
+            SecondaryButton(title: PROPOSED_ImportButton, systemImage: "square.and.arrow.down") { choosingFile = true }
+                .accessibilityIdentifier("home.import")
 
             SectionHeader(keep ? PROPOSED_Meetings : PROPOSED_SealedRecordings)
 
@@ -134,6 +139,10 @@ struct HomeView: View {
             }
         }
         .onAppear(perform: refresh)
+        // A sound file picked in Files. It is read where it is; nothing is copied until it is sealed.
+        .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.audio]) { result in
+            if case let .success(url) = result { Task { await controller.openedFile(url) } }
+        }
         .confirmationDialog(pendingDelete.map(deleteTitle) ?? "",
                             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                             titleVisibility: .visible, presenting: pendingDelete) { entry in

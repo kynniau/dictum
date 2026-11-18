@@ -146,32 +146,7 @@ struct ConsentView: View {
     }
 
     private func choice(_ label: String, value: String) -> some View {
-        let selected = controller.how == value
-        return Button {
-            controller.how = value
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(selected ? DictumTheme.link : DictumTheme.text)
-                    .accessibilityHidden(true)
-                Text(label)
-                    .font(.body)
-                    .foregroundStyle(DictumTheme.text)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(selected ? DictumTheme.accentSoft : DictumTheme.surface,
-                        in: RoundedRectangle(cornerRadius: DictumTheme.radiusCard))
-            .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusCard)
-                .strokeBorder(selected ? DictumTheme.accent : DictumTheme.borderStrong, lineWidth: selected ? 2 : 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        AgreementChoiceRow(label: label, selected: controller.how == value) { controller.how = value }
     }
 }
 
