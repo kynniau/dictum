@@ -1,12 +1,14 @@
 import SwiftUI
 
-// Dictum's design language for the recorder. Every colour comes from site/styles.css (brand tokens, light and dark),
-// held as colour sets in Assets.xcassets so the system switches them with the appearance. Radii are the site's
-// --radius-control, --radius-card and --radius-pill. Type is the system font: titles at weight 600 with slight negative
-// tracking (the site's display face), monospaced digits for times and codes.
+// Dictum's design language for the recorder ("Chambers": editorial, light, serif titles). Every colour comes from
+// site/styles.css (brand tokens, light and dark), held as colour sets in Assets.xcassets so the system switches them with
+// the appearance, plus `mutedStrong` for muted words on the page background. Titles and long reading text use Apple's
+// serif (New York) at weight medium with slight negative tracking; everything else is the system font; times and codes use
+// monospaced digits. Corners are continuous.
 //
-// Accessibility rules every component keeps: 44 pt minimum targets, Dynamic Type text styles only, no meaning carried
-// by colour alone (each status has an icon and words), and the reduced-motion setting respected.
+// Accessibility rules every component keeps: 44 pt minimum targets, Dynamic Type text styles only (any fixed size goes
+// through @ScaledMetric), no meaning carried by colour alone (each status has an icon and words), and the reduced-motion
+// setting respected.
 
 enum DictumTheme {
     // Brand tokens, the same in both themes.
@@ -24,6 +26,8 @@ enum DictumTheme {
     static let text = Color(.dictumText)
     /// Captions on `surface` only: the site notes it is under 4.5:1 on `bg`.
     static let muted = Color(.dictumMuted)
+    /// Muted words on the page background (`bg`): #55607A light (5.8:1 on bg), #9AA6BA dark (7.6:1 on bg).
+    static let mutedStrong = Color(.dictumMutedStrong)
     static let border = Color(.dictumBorder)
     static let borderStrong = Color(.dictumBorderStrong)
     static let accentSoft = Color(.dictumAccentSoft)
@@ -31,8 +35,10 @@ enum DictumTheme {
     /// The site's --mark-halo: clear in light, a hairline glow in dark so the ink mark shows on the ink page.
     static let markHalo = Color(.dictumMarkHalo)
 
-    static let radiusControl: CGFloat = 8
-    static let radiusCard: CGFloat = 12
+    static let radiusControl: CGFloat = 12
+    static let radiusCard: CGFloat = 20
+    static let radiusButton: CGFloat = 18
+    static let radiusChip: CGFloat = 10
     static let radiusPill: CGFloat = 22
 
     /// Readable content width on iPad, so screens do not look like a stretched phone.
@@ -44,43 +50,53 @@ enum DictumTheme {
 // MARK: - Type
 
 extension Font {
-    /// Display title: weight 600 (semibold).
-    static func dictumDisplay(_ style: Font.TextStyle = .largeTitle) -> Font { .system(style).weight(.semibold) }
+    /// Display title: the serif (New York) at weight medium.
+    static func dictumDisplay(_ style: Font.TextStyle = .largeTitle) -> Font {
+        .system(style, design: .serif).weight(.medium)
+    }
+
+    /// Long reading text (a summary, a transcript on a light screen): the serif at regular weight.
+    static func dictumReading(_ style: Font.TextStyle = .body) -> Font { .system(style, design: .serif) }
 }
 
 extension View {
-    /// A display title: semibold with slight negative tracking, in the text colour.
+    /// A display title: serif, medium, slight negative tracking, in the text colour.
     func dictumTitle(_ style: Font.TextStyle = .largeTitle) -> some View {
-        font(.dictumDisplay(style)).tracking(-0.4).foregroundStyle(DictumTheme.text)
+        font(.dictumDisplay(style)).tracking(style == .largeTitle ? -0.6 : -0.3).foregroundStyle(DictumTheme.text)
     }
 
-    /// The page: bg behind everything, content centred at a readable width, 20 pt gutters.
+    /// Long reading text: serif body with a little extra leading, in the text colour.
+    func dictumReading(_ style: Font.TextStyle = .body) -> some View {
+        font(.dictumReading(style)).lineSpacing(3).foregroundStyle(DictumTheme.text)
+    }
+
+    /// The page: bg behind everything, content centred at a readable width, 24 pt gutters.
     func dictumPage() -> some View {
         frame(maxWidth: DictumTheme.maxContentWidth, alignment: .leading)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 24)
             .frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Top bar
 
-/// The mark, the word "Dictum" and the muted "Recorder · beta" tag, with an optional control on the right.
+/// The mark, the word "Dictum" in the serif and the muted "Recorder · beta" tag, with an optional control on the right.
 struct DictumTopBar<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
         HStack(spacing: 10) {
             DictumMarkView(size: 28)
-            Text(PROPOSED_BrandName)
-                .font(.dictumDisplay(.title3))
-                .tracking(-0.3)
-                .foregroundStyle(DictumTheme.text)
-            Text(PROPOSED_RecorderTag)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(DictumTheme.text.opacity(0.75))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(DictumTheme.accentSoft, in: Capsule())
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(PROPOSED_BrandName)
+                    .font(.dictumDisplay(.title3))
+                    .tracking(-0.3)
+                    .foregroundStyle(DictumTheme.text)
+                Text(PROPOSED_RecorderTag)
+                    .font(.footnote)
+                    .tracking(0.3)
+                    .foregroundStyle(DictumTheme.mutedStrong)
+            }
             Spacer(minLength: 8)
             trailing
         }
@@ -111,30 +127,53 @@ struct DictumMarkView: View {
 
 // MARK: - Cards and sections
 
-/// Content on a surface card: 12 pt radius, hairline border.
+/// Content on a surface card: 20 pt continuous corners, hairline border, and in light mode a very soft shadow.
 struct DictumCard<Content: View>: View {
-    var padding: CGFloat = 16
+    var padding: CGFloat = 18
+    var spacing: CGFloat = 12
     @ViewBuilder var content: Content
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) { content }
+        let shape = RoundedRectangle(cornerRadius: DictumTheme.radiusCard, style: .continuous)
+        VStack(alignment: .leading, spacing: spacing) { content }
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DictumTheme.surface, in: RoundedRectangle(cornerRadius: DictumTheme.radiusCard))
-            .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusCard).strokeBorder(DictumTheme.border, lineWidth: 1))
+            .background(DictumTheme.surface, in: shape)
+            .overlay(shape.strokeBorder(DictumTheme.border, lineWidth: 1))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 8, y: 6)
     }
 }
 
-/// A section heading on the page or in a card, announced as a header.
+/// A section heading on the page or in a card, announced as a header. `.label` (the default) is a small tracked
+/// uppercase label in `mutedStrong` (which passes on both bg and surface); `.heading` is a serif headline, for long or
+/// approved headings that should keep the case they were written in.
 struct SectionHeader: View {
-    let title: String
+    enum Style { case label, heading }
 
-    init(_ title: String) { self.title = title }
+    let title: String
+    var style: Style
+
+    init(_ title: String, style: Style = .label) {
+        self.title = title
+        self.style = style
+    }
 
     var body: some View {
-        Text(title)
-            .dictumTitle(.headline)
-            .accessibilityAddTraits(.isHeader)
+        Group {
+            switch style {
+            case .label:
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .tracking(1)
+                    .textCase(.uppercase)
+                    .foregroundStyle(DictumTheme.mutedStrong)
+            case .heading:
+                Text(title).dictumTitle(.title3)
+            }
+        }
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -160,30 +199,47 @@ struct FactRow: View {
 
 // MARK: - Buttons
 
-/// The main action: an accent pill with the on-accent label. White on #2457E6 passes AA in both themes.
+/// A slight press-in, off with Reduce Motion.
+private struct PressScale: ViewModifier {
+    let pressed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(pressed && !reduceMotion ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: pressed)
+    }
+}
+
+/// The main action: an accent block with the on-accent label, 58 pt tall, 18 pt corners, a soft accent shadow in light
+/// mode. White on #2457E6 passes AA in both themes.
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DictumTheme.radiusButton, style: .continuous)
         configuration.label
             .font(.headline)
             .multilineTextAlignment(.center)
             .foregroundStyle(DictumTheme.onAccent)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(configuration.isPressed ? DictumTheme.accentHover : DictumTheme.accent,
-                        in: RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .background(configuration.isPressed ? DictumTheme.accentHover : DictumTheme.accent, in: shape)
+            .shadow(color: DictumTheme.accent.opacity(colorScheme == .dark || !enabled ? 0 : 0.22), radius: 9, y: 8)
             .opacity(enabled ? 1 : 0.45)
-            .contentShape(RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
+            .contentShape(shape)
+            .modifier(PressScale(pressed: configuration.isPressed))
     }
 }
 
-/// A secondary action: surface pill with a strong border and the text colour.
+/// A secondary action: surface block with a strong border and the text colour.
 struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DictumTheme.radiusButton, style: .continuous)
         configuration.label
             .font(.headline)
             .multilineTextAlignment(.center)
@@ -191,28 +247,43 @@ struct SecondaryButtonStyle: ButtonStyle {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(configuration.isPressed ? DictumTheme.accentSoft : DictumTheme.surface,
-                        in: RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
-            .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusPill).strokeBorder(DictumTheme.borderStrong, lineWidth: 1))
+            .background(configuration.isPressed ? DictumTheme.accentSoft : DictumTheme.surface, in: shape)
+            .overlay(shape.strokeBorder(DictumTheme.borderStrong, lineWidth: 1))
             .opacity(enabled ? 1 : 0.45)
-            .contentShape(RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
+            .contentShape(shape)
+            .modifier(PressScale(pressed: configuration.isPressed))
     }
 }
 
-/// A small control (rename, remove, add): accent-soft capsule, 44 pt tall.
+/// A small control (rename, remove, add): accent-soft block, 12 pt corners, 44 pt tall.
 struct CompactButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DictumTheme.radiusControl, style: .continuous)
         configuration.label
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(DictumTheme.text)
             .padding(.horizontal, 14)
             .frame(minWidth: DictumTheme.minTarget, minHeight: DictumTheme.minTarget)
-            .background(configuration.isPressed ? DictumTheme.borderStrong : DictumTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: DictumTheme.radiusControl))
+            .background(configuration.isPressed ? DictumTheme.borderStrong : DictumTheme.accentSoft, in: shape)
             .opacity(enabled ? 1 : 0.45)
-            .contentShape(RoundedRectangle(cornerRadius: DictumTheme.radiusControl))
+            .contentShape(shape)
+    }
+}
+
+/// A text-style action (link colour, no fill), 44 pt tall, for a quieter action beside a primary one.
+struct TextButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(DictumTheme.link)
+            .multilineTextAlignment(.leading)
+            .frame(minHeight: DictumTheme.minTarget)
+            .opacity(configuration.isPressed ? 0.6 : (enabled ? 1 : 0.45))
+            .contentShape(Rectangle())
     }
 }
 
@@ -226,6 +297,10 @@ extension ButtonStyle where Self == SecondaryButtonStyle {
 
 extension ButtonStyle where Self == CompactButtonStyle {
     static var dictumCompact: CompactButtonStyle { CompactButtonStyle() }
+}
+
+extension ButtonStyle where Self == TextButtonStyle {
+    static var dictumText: TextButtonStyle { TextButtonStyle() }
 }
 
 /// `Button(title, action:)` in the primary style, with its accessibility label.
@@ -260,8 +335,9 @@ struct SecondaryButton: View {
 
 // MARK: - Status
 
-/// Recording (red), working (amber) or done (green). Always an icon plus words; the colour is only a tint on the icon
-/// and a soft background, and the words stay in the text colour so contrast never depends on the status colour.
+/// Recording (red), working (amber) or done (green), as a quiet chip. Always an icon plus words; the colour is only a
+/// tint on the icon and a soft background, and the words stay in the text colour so contrast never depends on the
+/// status colour.
 struct StatusPill: View {
     enum Kind {
         case recording, working, done, warning
@@ -288,19 +364,18 @@ struct StatusPill: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: kind.icon)
                 .foregroundStyle(kind.colour)
                 .accessibilityHidden(true)
             Text(text)
-                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(DictumTheme.text)
                 .multilineTextAlignment(.leading)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(kind.colour.opacity(0.14), in: RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
-        .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusPill).strokeBorder(kind.colour.opacity(0.45), lineWidth: 1))
+        .font(.footnote.weight(.semibold))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(kind.colour.opacity(0.14), in: RoundedRectangle(cornerRadius: DictumTheme.radiusChip, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

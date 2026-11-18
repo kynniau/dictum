@@ -137,7 +137,7 @@ struct ComposeEmailSheet: View {
                     }
 
                     DictumCard {
-                        SectionHeader(email.subject)
+                        SectionHeader(email.subject, style: .heading)
                         Text(email.body)
                             .font(.callout)
                             .foregroundStyle(DictumTheme.text)

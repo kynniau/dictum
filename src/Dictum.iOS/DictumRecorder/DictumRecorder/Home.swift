@@ -98,21 +98,36 @@ struct HomeView: View {
             .accessibilityLabel(PROPOSED_SettingsButton)
             .accessibilityIdentifier("home.settings")
         } content: {
-            Text(PROPOSED_ProofOfConcept)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(DictumTheme.text)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusControl).strokeBorder(DictumTheme.borderStrong, lineWidth: 1))
+            // The heading, today's date, then the proof-of-concept notice: it stays on the first screenful.
+            VStack(alignment: .leading, spacing: 6) {
+                Text(keep ? PROPOSED_Meetings : PROPOSED_SealedRecordings)
+                    .dictumTitle()
+                    .accessibilityAddTraits(.isHeader)
+                Text(Date.now, format: .dateTime.weekday(.wide).day().month(.wide))
+                    .font(.subheadline)
+                    .foregroundStyle(DictumTheme.mutedStrong)
+                Label(PROPOSED_ProofOfConcept, systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(DictumTheme.mutedStrong)
+                    .padding(.top, 4)
+            }
 
-            PrimaryButton(title: PROPOSED_NewMeeting, systemImage: "mic.fill") { controller.newMeetingTapped() }
-                .font(.title3)
-                .accessibilityIdentifier("home.newMeeting")
-
-            SecondaryButton(title: PROPOSED_ImportButton, systemImage: "square.and.arrow.down") { choosingFile = true }
-                .accessibilityIdentifier("home.import")
-
-            SectionHeader(keep ? PROPOSED_Meetings : PROPOSED_SealedRecordings)
+            VStack(alignment: .leading, spacing: 6) {
+                PrimaryButton(title: PROPOSED_NewMeeting, systemImage: "mic.fill") { controller.newMeetingTapped() }
+                    .accessibilityIdentifier("home.newMeeting")
+                ViewThatFits(in: .horizontal) {
+                    // Side by side only when both fit on one line each; otherwise stacked, never squeezed.
+                    HStack(spacing: 12) {
+                        homeCaption.fixedSize()
+                        Spacer(minLength: 8)
+                        importButton.fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        homeCaption
+                        importButton
+                    }
+                }
+            }
 
             if let message = controller.homeMessage {
                 StatusPill(kind: .warning, text: message)
@@ -129,8 +144,14 @@ struct HomeView: View {
                     }
                 }
             } else {
-                VStack(spacing: 10) {
-                    ForEach(entries) { entry in row(entry) }
+                // One card of rows separated by hairlines.
+                DictumCard(padding: 0, spacing: 0) {
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        row(entry)
+                        if index < entries.count - 1 {
+                            Divider().overlay(DictumTheme.border).padding(.leading, 18)
+                        }
+                    }
                 }
             }
 
@@ -184,51 +205,68 @@ struct HomeView: View {
             .joined(separator: " · ")
     }
 
-    private func row(_ entry: LibraryEntry) -> some View {
-        DictumCard(padding: 14) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    details(entry)
-                    Spacer(minLength: 8)
-                    actions(entry)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    details(entry)
-                    actions(entry)
-                }
-            }
-            if !entry.saved, keep, entry.meetingHex != nil {
-                Button { unlocking = entry } label: {
-                    Label(PROPOSED_UnlockWithWords, systemImage: "key")
-                }
-                .buttonStyle(.dictumSecondary)
-                .accessibilityLabel(PROPOSED_UnlockWithWords)
-            }
-        }
+    private var homeCaption: some View {
+        Text(PROPOSED_HomeCaption)
+            .font(.footnote)
+            .foregroundStyle(DictumTheme.mutedStrong)
     }
 
-    @ViewBuilder private func details(_ entry: LibraryEntry) -> some View {
-        let content = HStack(spacing: 12) {
-            Image(systemName: entry.saved ? "waveform" : "lock.doc")
-                .font(.title2)
-                .foregroundStyle(DictumTheme.link)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title(entry))
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(DictumTheme.text)
-                    .lineLimit(2)
+    private var importButton: some View {
+        Button { choosingFile = true } label: {
+            Label(PROPOSED_ImportButton, systemImage: "square.and.arrow.down")
+        }
+        .buttonStyle(.dictumText)
+        .accessibilityLabel(PROPOSED_ImportButton)
+        .accessibilityIdentifier("home.import")
+    }
+
+    /// The row's own action: open a saved meeting, or unlock a sealed one with its six words.
+    private enum RowAction { case open, unlock }
+
+    private func rowAction(_ entry: LibraryEntry) -> RowAction? {
+        if entry.saved { return .open }
+        if keep, entry.meetingHex != nil { return .unlock }
+        return nil
+    }
+
+    /// The whole row is the button for its own action; share and delete are in the trailing "more" menu.
+    private func row(_ entry: LibraryEntry) -> some View {
+        HStack(alignment: .center, spacing: 4) {
+            primary(entry)
+            moreMenu(entry)
+        }
+        .padding(.leading, 18)
+        .padding(.trailing, 6)
+        .padding(.vertical, 12)
+    }
+
+    private func details(_ entry: LibraryEntry, action: RowAction?) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title(entry))
+                .font(.dictumDisplay(.title3).monospacedDigit())
+                .foregroundStyle(DictumTheme.text)
+                .multilineTextAlignment(.leading)
+            Text(subtitle(entry))
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(DictumTheme.muted)
+                .multilineTextAlignment(.leading)
+            StatusPill(kind: entry.saved ? .done : .warning, text: entry.saved ? PROPOSED_StateSaved : PROPOSED_StateCodeNeeded)
+            if action == .unlock {
+                Label(PROPOSED_UnlockWithWords, systemImage: "key")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DictumTheme.link)
                     .multilineTextAlignment(.leading)
-                Text(subtitle(entry))
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(DictumTheme.muted)
-                    .multilineTextAlignment(.leading)
-                StatusPill(kind: entry.saved ? .done : .warning, text: entry.saved ? PROPOSED_StateSaved : PROPOSED_StateCodeNeeded)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private func primary(_ entry: LibraryEntry) -> some View {
         let label = String(format: PROPOSED_MeetingRow, title(entry), entry.file.dateText, durationText(entry) ?? "",
                            entry.file.sizeText, entry.saved ? PROPOSED_StateSaved : PROPOSED_StateCodeNeeded)
-        if entry.saved {
+        switch rowAction(entry) {
+        case .open:
             Button {
                 guard !opening else { return }
                 opening = true
@@ -237,35 +275,63 @@ struct HomeView: View {
                     opening = false
                 }
             } label: {
-                content.contentShape(Rectangle())
+                details(entry, action: .open)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(RowButtonStyle())
             .disabled(opening)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(label)
             .accessibilityHint(PROPOSED_OpenMeeting)
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("home.meeting")
-        } else {
-            content
+        case .unlock:
+            Button { unlocking = entry } label: {
+                details(entry, action: .unlock)
+            }
+            .buttonStyle(RowButtonStyle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(PROPOSED_UnlockWithWords)
+            .accessibilityValue(label)
+            .accessibilityAddTraits(.isButton)
+        case nil:
+            details(entry, action: nil)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(label)
         }
     }
 
-    private func actions(_ entry: LibraryEntry) -> some View {
-        HStack(spacing: 8) {
+    /// Share and delete, with the same labels and the same delete confirmation as before.
+    private func moreMenu(_ entry: LibraryEntry) -> some View {
+        Menu {
             ShareLink(item: entry.file.url) {
-                Image(systemName: "square.and.arrow.up")
+                Label(PROPOSED_ShareRecording, systemImage: "square.and.arrow.up")
             }
-            .buttonStyle(.dictumCompact)
             .accessibilityLabel(PROPOSED_ShareRecording)
-            Button { pendingDelete = entry } label: {
-                Image(systemName: "trash")
+            Button(role: .destructive) { pendingDelete = entry } label: {
+                Label(entry.saved ? PROPOSED_DeleteMeeting : PROPOSED_DeleteRecording, systemImage: "trash")
             }
-            .buttonStyle(.dictumCompact)
             .accessibilityLabel(entry.saved ? PROPOSED_DeleteMeeting : PROPOSED_DeleteRecording)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(DictumTheme.text)
+                .frame(minWidth: DictumTheme.minTarget, minHeight: DictumTheme.minTarget)
+                .contentShape(Rectangle())
         }
+        .accessibilityLabel(PROPOSED_RowMoreActions)
+        .accessibilityIdentifier("home.meetingMore")
+    }
+}
+
+/// A list row pressed: a faint wash, no other change.
+private struct RowButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? DictumTheme.accentSoft.opacity(0.6) : .clear,
+                        in: RoundedRectangle(cornerRadius: DictumTheme.radiusControl, style: .continuous))
+            .opacity(enabled ? 1 : 0.6)
     }
 }
 

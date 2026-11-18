@@ -542,3 +542,14 @@ let PROPOSED_ThermalSerious = "serious"
 let PROPOSED_ThermalCritical = "critical"
 let PROPOSED_ThermalUnknown = "unknown"
 #endif
+
+// MARK: - Redesign (Chambers), 19/11/2026
+
+/// Home: the caption beside "Bring in a recording", under New meeting.
+let PROPOSED_HomeCaption = "Encrypted as it records"
+/// Home: the "more" menu at the end of each meeting row (share, delete).
+let PROPOSED_RowMoreActions = "More actions"
+/// Recording screen: beside the lock, top right. The sound is encrypted as it is recorded.
+let PROPOSED_Encrypted = "Encrypted"
+/// Meeting page: opens the fields to change, add or remove actions under the read-only list.
+let PROPOSED_EditActions = "Edit actions"

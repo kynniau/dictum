@@ -18,9 +18,12 @@ final class ScreenshotTests: XCTestCase {
         // The stored transcript switch is overridden off for this launch (UserDefaults argument domain), so the test
         // never turns the experimental transcript on.
         app.launchArguments = ["-DictumAppearance", appearance, "-settings.transcribeOnDevice", "NO"]
+        // A permission answered "Don't Allow" by an earlier interrupted run would block recording; ask afresh each pass.
+        app.resetAuthorizationStatus(for: .microphone)
         let monitor = addUIInterruptionMonitor(withDescription: "Microphone permission") { alert in
-            for label in ["Allow", "OK"] where alert.buttons[label].exists {
-                alert.buttons[label].tap()
+            // firstMatch: the microphone alert can expose more than one "Allow" element (seen on the test simulator, 19/11/2026).
+            for label in ["Allow", "OK"] where alert.buttons[label].firstMatch.exists {
+                alert.buttons[label].firstMatch.tap()
                 return true
             }
             return false
@@ -52,7 +55,7 @@ final class ScreenshotTests: XCTestCase {
             // The permission alert belongs to SpringBoard; an interaction lets the monitor handle it, else tap it here.
             app.tap()
             let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-            let allow = springboard.alerts.buttons["Allow"]
+            let allow = springboard.alerts.buttons["Allow"].firstMatch
             if allow.waitForExistence(timeout: 2) { allow.tap() }
             if !stop.waitForExistence(timeout: 3), start.exists { start.tap() }
         }

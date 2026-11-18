@@ -126,7 +126,7 @@ struct ImportView: View {
                 }
             }
 
-            SectionHeader(APPROVED_How)
+            SectionHeader(APPROVED_How, style: .heading)
             VStack(spacing: 8) {
                 ForEach(ImportNotice.hows, id: \.self) { value in
                     AgreementChoiceRow(label: ImportNotice.label(how: value), selected: how == value) { how = value }

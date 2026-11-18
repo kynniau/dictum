@@ -437,16 +437,16 @@ struct MeetingDetailView: View {
                     .accessibilityAddTraits(.isHeader)
                 Text(Self.dateTime.string(from: record.startedAt) + " · " + RecordingView.elapsed(seconds: record.duration))
                     .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(DictumTheme.text)
+                    .foregroundStyle(DictumTheme.mutedStrong)
                 StatusPill(kind: .done, text: PROPOSED_Saved)
             }
             if model.saveFailed {
                 StatusPill(kind: .warning, text: PROPOSED_SaveFailed)
             }
 
-            transcriptCard
             summaryCard
-            ReviewActionsView(review: model.review, owners: numbers.map(model.label))
+            MeetingActionsCard(review: model.review, owners: numbers.map(model.label))
+            transcriptCard
             agreementCard
             factsCard
 
@@ -553,10 +553,11 @@ struct MeetingDetailView: View {
                     StatusPill(kind: .warning, text: PROPOSED_FixNotKept)
                 }
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(record.segments.enumerated()), id: \.offset) { index, segment in
                             Button { fixing = FixTarget(index: index, segment: segment) } label: {
-                                line(segment)
+                                TranscriptLineView(segment: segment, label: segment.speaker.map(model.label),
+                                                   name: segment.speaker.flatMap { model.review.names[$0] })
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, minHeight: DictumTheme.minTarget, alignment: .leading)
                                     .contentShape(Rectangle())
@@ -670,17 +671,6 @@ struct MeetingDetailView: View {
         s.start.map { String(format: PROPOSED_LineAt, SpeakerSeparation.clock($0)) + ", " + words(s) } ?? words(s)
     }
 
-    /// Time in muted monospaced digits, the speaker in bold, then the words (not told apart by colour alone).
-    private func line(_ s: MeetingRecord.Segment) -> Text {
-        var parts: [Text] = []
-        if let start = s.start {
-            parts.append(Text(SpeakerSeparation.clock(start) + "  ").monospacedDigit().foregroundStyle(DictumTheme.muted))
-        }
-        if let speaker = s.speaker { parts.append(Text(model.label(speaker) + ": ").bold()) }
-        parts.append(Text(s.text))
-        return parts.dropFirst().reduce(parts[0]) { Text("\($0)\($1)") }
-    }
-
     private func saveName() {
         guard let number = renaming else { return }
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -705,7 +695,7 @@ struct MeetingDetailView: View {
             SectionHeader(PROPOSED_ReviewSummary)
             TextField(PROPOSED_DetailSummaryField, text: $model.summaryText, prompt: Text(PROPOSED_DetailNoSummary), axis: .vertical)
                 .lineLimit(3...12)
-                .textFieldStyle(DictumFieldStyle())
+                .textFieldStyle(DictumFieldStyle(reading: true))
                 .accessibilityLabel(PROPOSED_DetailSummaryField)
             switch model.review.summary.state {
             case .idle, .done:

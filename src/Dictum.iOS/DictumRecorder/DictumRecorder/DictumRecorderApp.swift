@@ -8,7 +8,20 @@ struct DictumRecorderApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(controller: controller)
-                .preferredColorScheme(controller.settings.colorScheme)
+                // The recording screen is always dark (it sets its own colours); this matches the status bar to it.
+                // Every other screen follows the Appearance setting.
+                .preferredColorScheme(controller.showsRecordingScreen ? .dark : controller.settings.colorScheme)
+        }
+    }
+}
+
+extension RecordingController {
+    /// RootView is showing RecordingView: recording, or sealing a meeting that was being recorded.
+    var showsRecordingScreen: Bool {
+        switch phase {
+        case .recording: return true
+        case .sealing: return startedAt != nil
+        default: return false
         }
     }
 }

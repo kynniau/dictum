@@ -4,16 +4,21 @@ import SwiftUI
 // The recording screens in Dictum's design language (Theme.swift). Every control has an accessibility label; text uses
 // Dynamic Type styles; no meaning is carried by colour alone; targets are at least 44 pt.
 
-/// A text field on a surface, with the site's control radius and border.
+/// A text field on a surface, with the control radius and border. `reading` sets the serif reading face, for long text
+/// such as a summary.
 struct DictumFieldStyle: TextFieldStyle {
+    var reading = false
+
     func _body(configuration: TextField<Self._Label>) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DictumTheme.radiusControl, style: .continuous)
         configuration
-            .font(.body)
+            .font(reading ? .dictumReading() : .body)
             .foregroundStyle(DictumTheme.text)
             .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .frame(minHeight: DictumTheme.minTarget)
-            .background(DictumTheme.surface, in: RoundedRectangle(cornerRadius: DictumTheme.radiusControl))
-            .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusControl).strokeBorder(DictumTheme.borderStrong, lineWidth: 1))
+            .background(DictumTheme.surface, in: shape)
+            .overlay(shape.strokeBorder(DictumTheme.borderStrong, lineWidth: 1))
     }
 }
 
@@ -84,7 +89,7 @@ struct ConsentView: View {
                 }
             }
 
-            SectionHeader(APPROVED_How)
+            SectionHeader(APPROVED_How, style: .heading)
             // A segmented control truncates these approved labels on an iPhone, so the two choices are full-width
             // rows; each shows a filled or empty circle and announces itself as selected.
             VStack(spacing: 8) {
@@ -155,32 +160,91 @@ struct ConsentView: View {
 struct RecordingView: View {
     @Bindable var controller: RecordingController
 
+    @ScaledMetric(relativeTo: .largeTitle) private var timerSize: CGFloat = 64
+
     private var sealing: Bool {
         if case .sealing = controller.phase { return true }
         return false
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            DictumTopBar()
-            // The indicator, timer, meter and title are centred in all the height above Stop (iPad landscape too).
-            VStack(spacing: 24) {
-            RecordingIndicator()
+        // This screen alone is always dark ("Studio"): the colour sets resolve to their dark values here. The status bar
+        // follows from RootView's preferredColorScheme.
+        VStack(spacing: 12) {
+            topRow
+            // Centred in all the height above Stop when it fits; scrolls when it does not (large text, a long transcript).
+            GeometryReader { proxy in
+                ScrollView {
+                    middle
+                        .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .center)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            stopControl
+        }
+        .padding(.vertical, 12)
+        .frame(maxHeight: .infinity)
+        .dictumPage()
+        .background(DictumTheme.bg.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
+    }
+
+    /// The recording indicator on the left; the lock and "Encrypted" on the right.
+    private var topRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                RecordingIndicator()
+                Spacer(minLength: 8)
+                encrypted
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                RecordingIndicator()
+                encrypted
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var encrypted: some View {
+        Label(PROPOSED_Encrypted, systemImage: "lock.fill")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(DictumTheme.mutedStrong)
+            .accessibilityElement(children: .combine)
+    }
+
+    private var middle: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 4) {
+                Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
+                    .font(.headline)
+                    .foregroundStyle(DictumTheme.mutedStrong)
+                    .multilineTextAlignment(.center)
+                // The meeting type's own name, when it is not the default.
+                if controller.settings.meetingTypeId != "general" {
+                    Text(controller.settings.meetingType.name)
+                        .font(.subheadline)
+                        .foregroundStyle(DictumTheme.mutedStrong)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .accessibilityElement(children: .combine)
 
             if let start = controller.startedAt {
                 TimelineView(.periodic(from: start, by: 1)) { context in
                     let text = Self.elapsed(from: start, to: context.date)
                     Text(text)
-                        .font(.system(.largeTitle, design: .rounded).weight(.semibold).monospacedDigit())
-                        .foregroundStyle(DictumTheme.text)
+                        .font(.system(size: timerSize, weight: .medium).monospacedDigit())
+                        .tracking(-1)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.4)
                         .accessibilityLabel(PROPOSED_ElapsedLabel)
                         .accessibilityValue(text)
                 }
             }
 
-            // Bar length shows the input level; VoiceOver reads it as a percentage.
-            DictumLevelMeter(level: controller.level, active: controller.captureStatus == .running, height: 64)
-                .frame(maxWidth: .infinity)
+            // Bar heights show the recent input level; VoiceOver reads the current level as a percentage.
+            LevelHistoryWaveform(level: controller.level, active: controller.captureStatus == .running)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(PROPOSED_InputLevel)
                 .accessibilityValue(String(format: PROPOSED_InputLevelValue, Int((controller.level * 100).rounded())))
@@ -193,21 +257,6 @@ struct RecordingView: View {
                 LiveTranscriptView(transcript: controller.transcript)
             }
 
-            VStack(spacing: 4) {
-                Text(controller.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PROPOSED_DefaultTitle : controller.title)
-                    .dictumTitle(.title2)
-                    .multilineTextAlignment(.center)
-                // The meeting type's own name, when it is not the default. Muted in tone, but the text colour at 72 %
-                // rather than the muted token, which the site keeps for surfaces (under 4.5:1 on bg).
-                if controller.settings.meetingTypeId != "general" {
-                    Text(controller.settings.meetingType.name)
-                        .font(.subheadline)
-                        .foregroundStyle(DictumTheme.text.opacity(0.72))
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .accessibilityElement(children: .combine)
-
             if controller.captureStatus != .running {
                 VStack(spacing: 12) {
                     StatusPill(kind: .warning, text: PROPOSED_Interrupted)
@@ -216,34 +265,30 @@ struct RecordingView: View {
                     }
                 }
             }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-
-            Button {
-                Task { await controller.stopTapped() }
-            } label: {
-                Group {
-                    if sealing {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(DictumTheme.onAccent)
-                            Text(PROPOSED_Sealing)
-                        }
-                    } else {
-                        Label(PROPOSED_Stop, systemImage: "stop.fill")
-                    }
-                }
-                .font(.title2.weight(.semibold))
-                .frame(minHeight: 48)
-            }
-            .buttonStyle(.dictumPrimary)
-            .disabled(sealing)
-            .accessibilityLabel(sealing ? PROPOSED_Sealing : PROPOSED_Stop)
-            .accessibilityIdentifier("recording.stop")
         }
-        .padding(.vertical, 12)
-        .frame(maxHeight: .infinity)
-        .dictumPage()
-        .background(DictumTheme.bg.ignoresSafeArea())
+        .padding(.vertical, 8)
+    }
+
+    /// A round stop button (a ring in the text colour around a red rounded square), its words beneath. The whole stack
+    /// is the button.
+    private var stopControl: some View {
+        Button {
+            Task { await controller.stopTapped() }
+        } label: {
+            VStack(spacing: 8) {
+                StopGlyph(sealing: sealing)
+                Text(sealing ? PROPOSED_Sealing : PROPOSED_Stop)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DictumTheme.text)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(StopButtonStyle())
+        .disabled(sealing)
+        .accessibilityLabel(sealing ? PROPOSED_Sealing : PROPOSED_Stop)
+        .accessibilityIdentifier("recording.stop")
     }
 
     static func elapsed(from start: Date, to now: Date) -> String {
@@ -257,26 +302,58 @@ struct RecordingView: View {
     }
 }
 
+/// The stop button's mark: a 76 pt ring with a red rounded square, or a spinner while sealing. Decorative.
+private struct StopGlyph: View {
+    let sealing: Bool
+    @ScaledMetric(relativeTo: .title) private var size: CGFloat = 76
+
+    var body: some View {
+        ZStack {
+            Circle().strokeBorder(DictumTheme.text, lineWidth: 3)
+            if sealing {
+                ProgressView().tint(DictumTheme.text)
+            } else {
+                RoundedRectangle(cornerRadius: size * 0.1, style: .continuous)
+                    .fill(DictumTheme.recording)
+                    .frame(width: size * 0.37, height: size * 0.37)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Pressed: dimmed a little. Disabled (sealing): as the other buttons.
+private struct StopButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.7 : (enabled ? 1 : 0.6))
+    }
+}
+
 /// Red pulsing dot plus the word "Recording", so the state is never shown by colour alone.
 struct RecordingIndicator: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .subheadline) private var dot: CGFloat = 10
     @State private var pulse = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Circle()
                 .fill(DictumTheme.recording)
-                .frame(width: 24, height: 24)
-                .scaleEffect(pulse && !reduceMotion ? 1.25 : 1)
+                .frame(width: dot, height: dot)
+                .scaleEffect(pulse && !reduceMotion ? 1.3 : 1)
                 .opacity(pulse && !reduceMotion ? 0.55 : 1)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
             Text(PROPOSED_RecordingIndicator)
-                .dictumTitle(.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DictumTheme.text)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(DictumTheme.recording.opacity(0.12), in: RoundedRectangle(cornerRadius: DictumTheme.radiusPill))
-        .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusPill).strokeBorder(DictumTheme.recording.opacity(0.5), lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(DictumTheme.recording.opacity(0.16), in: RoundedRectangle(cornerRadius: DictumTheme.radiusChip, style: .continuous))
         .onAppear { pulse = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PROPOSED_RecordingIndicator)
@@ -508,13 +585,17 @@ struct LiveTranscriptView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        DictumCard(padding: 16, spacing: 8) {
             Text(status)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(DictumTheme.text)
+                .font(.caption.weight(.medium))
+                .tracking(1)
+                .textCase(.uppercase)
+                .foregroundStyle(DictumTheme.muted)
             ScrollView {
                 transcriptText(final: transcript.finalText, volatile: transcript.volatileText)
                     .font(.body)
+                    .lineSpacing(2)
+                    .foregroundStyle(DictumTheme.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .defaultScrollAnchor(.bottom)
@@ -523,10 +604,6 @@ struct LiveTranscriptView: View {
             .accessibilityLabel(PROPOSED_TranscriptRegion)
             .accessibilityValue(liveValue)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DictumTheme.surface, in: RoundedRectangle(cornerRadius: DictumTheme.radiusCard))
-        .overlay(RoundedRectangle(cornerRadius: DictumTheme.radiusCard).strokeBorder(DictumTheme.border, lineWidth: 1))
     }
 
     private var liveValue: String {

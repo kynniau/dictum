@@ -481,6 +481,19 @@ struct ReviewActionsView: View {
     var body: some View {
         DictumCard {
             SectionHeader(PROPOSED_ReviewActions)
+            ReviewActionsEditor(review: review, owners: owners)
+        }
+    }
+}
+
+/// The fields for who does what: one block per action (who, what, by when, remove), and Add. Shared by the review
+/// screen and the meeting page.
+struct ReviewActionsEditor: View {
+    @Bindable var review: MeetingReview
+    let owners: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
             if review.actions.isEmpty {
                 Text(PROPOSED_NoActions)
                     .font(.callout)
@@ -517,7 +530,8 @@ struct ReviewActionsView: View {
                                 Image(systemName: "person.crop.circle.badge.checkmark")
                                     .font(.title3)
                                     .frame(minWidth: DictumTheme.minTarget, minHeight: DictumTheme.minTarget)
-                                    .background(DictumTheme.accentSoft, in: RoundedRectangle(cornerRadius: DictumTheme.radiusControl))
+                                    .background(DictumTheme.accentSoft,
+                                                in: RoundedRectangle(cornerRadius: DictumTheme.radiusControl, style: .continuous))
                             }
                             .foregroundStyle(DictumTheme.text)
                             .accessibilityLabel(PROPOSED_ActionOwnerPick)
