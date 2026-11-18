@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+   Dictum Recorder's privacy manifest (Apple's "required reason API" declarations). Keys, categories and reason codes
+   were read from Apple's Bundle Resources documentation on 18/11/2026.
+
+   Tracking: none. Data collected: none (the app sends nothing anywhere itself).
+
+   File timestamps:
+     C617.1  dates and sizes of the app's own files: the sealed meetings listed on the home screen, the hand-over
+             folder swept at launch, and the bundled speaker model opened by the statically linked speaker library
+             (the release binary imports stat and fstat).
+     3B52.1  the creation date of a sound file the user picked or shared in, used as the meeting's start time.
+   User defaults:
+     CA92.1  the app's own settings only (Settings.swift). Never meeting content.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+				<string>3B52.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

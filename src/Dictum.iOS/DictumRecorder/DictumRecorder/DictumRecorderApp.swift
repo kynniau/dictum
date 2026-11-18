@@ -24,6 +24,10 @@ struct RootView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { controller.enteredBackground() }
             }
+            // A sound file handed over by the share menu ("Open in Dictum Recorder").
+            .onOpenURL { url in
+                Task { await controller.openedFile(url) }
+            }
     }
 
     @ViewBuilder private var screen: some View {
@@ -32,6 +36,8 @@ struct RootView: View {
             HomeView(controller: controller)
         case .consent:
             ConsentView(controller: controller)
+        case .importing:
+            ImportView(controller: controller)
         case .recording:
             RecordingView(controller: controller)
         case .sealing:
