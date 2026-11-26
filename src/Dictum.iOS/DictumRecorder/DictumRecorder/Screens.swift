@@ -410,6 +410,9 @@ struct SealedView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
                     .accessibilityLabel(PROPOSED_CodeLabel)
+                    // The words themselves: without a value VoiceOver read only the label, never the six words.
+                    .accessibilityValue(bundle.transferCode)
+                    .accessibilityIdentifier("sealed.code")
                     .accessibilityValue(bundle.transferCode)
                 Text(PROPOSED_CodeHint)
                     .font(.callout)

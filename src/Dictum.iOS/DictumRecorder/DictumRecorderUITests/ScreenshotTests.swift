@@ -81,6 +81,53 @@ final class ScreenshotTests: XCTestCase {
         app.terminate()
     }
 
+    /// Records a short meeting, taps Stop, then closes the app WITHOUT tapping Done. The meeting's six words are kept as
+    /// a text attachment named "code", so a check outside the test can open the kept record and see that the review was
+    /// saved at Stop (scratch tool check-stop-without-done.sh). Until 27/11/2026 the record was written only at Done.
+    func testStopWithoutDone() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-DictumAppearance", "light", "-settings.transcribeOnDevice", "NO"]
+        app.resetAuthorizationStatus(for: .microphone)
+        let monitor = addUIInterruptionMonitor(withDescription: "Microphone permission") { alert in
+            for label in ["Allow", "OK"] where alert.buttons[label].firstMatch.exists {
+                alert.buttons[label].firstMatch.tap()
+                return true
+            }
+            return false
+        }
+        defer { removeUIInterruptionMonitor(monitor) }
+        app.launch()
+
+        let newMeeting = app.buttons["home.newMeeting"]
+        XCTAssertTrue(newMeeting.waitForExistence(timeout: 10))
+        newMeeting.tap()
+        let start = app.buttons["consent.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        let stop = app.buttons["recording.stop"]
+        if !stop.waitForExistence(timeout: 3) {
+            app.tap()
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let allow = springboard.alerts.buttons["Allow"].firstMatch
+            if allow.waitForExistence(timeout: 2) { allow.tap() }
+            if !stop.waitForExistence(timeout: 3), start.exists { start.tap() }
+        }
+        XCTAssertTrue(stop.waitForExistence(timeout: 10))
+        sleep(3)
+        stop.tap()
+
+        let code = app.staticTexts["sealed.code"]
+        XCTAssertTrue(code.waitForExistence(timeout: 20))
+        let words = (code.value as? String) ?? ""
+        XCTAssertEqual(words.split(separator: " ").count, 6, "the six words are readable on the sealed screen")
+        let attachment = XCTAttachment(string: words)
+        attachment.name = "code"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        // No Done: the app is closed on the sealed screen.
+        app.terminate()
+    }
+
     private func shot(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name

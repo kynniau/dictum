@@ -165,6 +165,9 @@ struct MeetingRecord: Codable, Equatable {
         /// "serious", "critical"); set only by that test, nil otherwise.
         var peakMemoryMB: Int?
         var thermalAtEnd: String?
+        /// Whether the live transcript ran for this recording, in a word or two ("ran", "switch off", "model not
+        /// installed"…). Diagnosis only, never shown; nil for records written before 27/11/2026.
+        var liveTranscript: String?
     }
 
     var schemaVersion = MeetingRecord.currentSchema

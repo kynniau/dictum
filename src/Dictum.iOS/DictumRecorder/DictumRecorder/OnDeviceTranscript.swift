@@ -352,6 +352,29 @@ final class OnDeviceTranscript {
     /// The locale the transcript ran in, when it ran.
     var recordLocale: String? { active ? (facts?.locale ?? localeIdentifier) : nil }
 
+    /// Whether the live transcript ran, for the meeting record (MeetingRecord.Facts.liveTranscript). Never a message
+    /// from the system, only one of these fixed words.
+    var recordNote: String {
+        guard active else {
+            switch setup {
+            case .off: return "switch off"
+            case .checking: return "checking"
+            case .needsAssets: return "model not installed"
+            case .downloading: return "model downloading"
+            case .ready: return "ready, not started"
+            case .unavailable: return "unavailable"
+            case .failed: return "setup failed"
+            }
+        }
+        if finishing { return "finishing" }
+        switch live {
+        case .preparing: return "preparing"
+        case .listening: return "ran"
+        case .unavailable: return "unavailable"
+        case .failed: return "failed"
+        }
+    }
+
     // MARK: - Screen 3
 
     /// Done: drop the transcript, the facts, the PCM copy, the voice prints and the speaker labels from memory, and put

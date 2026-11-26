@@ -268,6 +268,9 @@ final class RecordingController {
             }
             review.meetingDate = startedAt
             phase = transcript.active ? .review(bundle) : .sealed(bundle)
+            // The kept meeting gets what the review holds from now on, not only at Done (saveReview).
+            saveReview()
+            followReview()
         } catch {
             // The session folder and its key stay, so the recovery screen offers it on the next launch.
             dropContentKey()
@@ -288,9 +291,7 @@ final class RecordingController {
     }
 
     func doneTapped() {
-        if let kept = keptMeeting, let key = contentKey {
-            writeRecordAtDone(id: kept.id, url: kept.url, key: key)
-        }
+        saveReview()
         dropContentKey()
         keepThisMeeting = false
         title = ""
@@ -456,8 +457,40 @@ extension RecordingController {
         }
     }
 
-    /// At Done: the review's transcript, names, summary, actions, confirmation time and facts, sealed into the record.
-    fileprivate func writeRecordAtDone(id: MeetingId, url: URL, key: Data) {
+    /// Saves what the review holds now into the kept meeting: when recording stops, each time the review changes
+    /// (followReview), when the app leaves the foreground, and at Done. Until 27/11/2026 this happened only at Done, so
+    /// a meeting whose review was never finished (the app left or closed after Stop) kept its sound and lost its
+    /// transcript, names, summary and actions. Nothing to do when the meeting is not kept on this device.
+    fileprivate func saveReview() {
+        guard let kept = keptMeeting, let key = contentKey else { return }
+        writeRecord(id: kept.id, url: kept.url, key: key)
+    }
+
+    /// Saves again whenever the review changes, until Done drops the kept meeting: the transcript finishing, the
+    /// speaker labels, the summary, a name or an action typed, the confirmation.
+    fileprivate func followReview() {
+        guard keptMeeting != nil else { return }
+        withObservationTracking {
+            _ = transcript.finishing
+            _ = transcript.speakers.state
+            _ = review.names
+            _ = review.actions
+            _ = review.confirmedAt
+            _ = review.summary.state
+            _ = review.summary.summary
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.keptMeeting != nil else { return }
+                // Not while the speaker step counts through its windows: its progress changes many times a second,
+                // and the lines are only worth saving once it has finished.
+                if case .working = self.transcript.speakers.state {} else { self.saveReview() }
+                self.followReview()
+            }
+        }
+    }
+
+    /// The review's transcript, names, summary, actions, confirmation time and facts, sealed into the record.
+    fileprivate func writeRecord(id: MeetingId, url: URL, key: Data) {
         do {
             let meta = try BundleFile.meta(url: url, contentKey: key)
             var record = (try LibraryFiles.read(contentKey: key, meetingId: id)) ?? .minimal(meta)
@@ -470,6 +503,7 @@ extension RecordingController {
                                                    threshold: speakerFacts == nil ? nil : transcript.speakers.threshold,
                                                    wordFixes: transcript.wordFixes)
             }
+            record.facts.liveTranscript = transcript.recordNote
             record.speakerNames = review.names
             record.summary = review.summary.state == .done ? review.summary.summary : ""
             record.actions = review.actions
@@ -568,6 +602,8 @@ extension RecordingController {
         auth.invalidate()
         openedTitles = [:]
         if case .detail = phase { closeDetail() }
+        // A recording just stopped and not yet Done: what the review holds is saved before the app can be closed.
+        saveReview()
         // A copy waiting on the bring-in screen is not encrypted by this app, so it does not outlive the screen.
         if case .importing = phase { importBackTapped() }
     }
