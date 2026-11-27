@@ -235,11 +235,30 @@ struct SpeakerParameters: Equatable, Sendable {
     // 18/11/2026, ONE solo 30 s test (5 voice-printed segments, 17.0 s): 2 groups up to 0.70 and 1 from 0.75, the two
     // 0.742 apart, so the threshold moved to 0.80 (owner, 18/11/2026): the three-person meeting gives 3 from 0.70 to
     // 0.85 with the fold, the solo test 1 from 0.75 to 0.90.
-    // Ceiling: tuned on two recordings; a person who says less than 5 % of the speech and under 20 s loses their own
-    // label. Trigger to retire: more measured meetings on the device; change the values here only.
+    // 27/11/2026, TEN recordings from the phone: a 24 minute phone call (two main voices, 773 and 261 s) gave 2 from
+    // 0.55 to 0.75 and ONE from 0.80, so every line carried the owner's name. At 0.75 with the fold all ten gave the
+    // expected count (five solo tests 1; a two-voice meeting 2; two three-voice meetings and a three-voice call 3; the
+    // long call 2); 0.80 failed the long call, 0.70 split one solo test. So the threshold moved back to 0.75 (owner,
+    // 27/11/2026).
+    // Ceiling: tuned on ten recordings from one phone; a person who says less than 5 % of the speech and under 20 s
+    // loses their own label. Trigger to retire: more measured meetings on the device; change the values here only.
     static let current = SpeakerParameters(windowSeconds: 2.0, hopSeconds: 1.0, minWindowSeconds: 1.5,
-                                           linkage: .average, threshold: 0.80, segmentMean: true,
+                                           linkage: .average, threshold: 0.75, segmentMean: true,
                                            nearestTurnSeconds: nil, smallGroupShare: 0.05, smallGroupSeconds: 20)
+
+    /// Raised each time `current.threshold` changes, so Settings can tell an old default from a choice.
+    static let thresholdRevision = 2
+    /// The default before revision 2 (18/11/2026).
+    static let earlierDefault = 0.80
+
+    /// The threshold Settings starts from. Nothing stored: the current default. A value stored before this revision that
+    /// equals the earlier default was that default, not a choice, so it moves to the current one. Any other stored
+    /// value is the user's own and stays.
+    static func startingThreshold(stored: Double?, storedRevision: Int) -> Double {
+        guard let stored else { return current.threshold }
+        if storedRevision < thresholdRevision, abs(stored - earlierDefault) < 0.001 { return current.threshold }
+        return stored
+    }
     // nearestTurnSeconds nil is a phone deviation (coordinator, 08/11/2026, after the first iPad run left "Okay.", "How
     // does that sound?" and "Hmm." unlabelled): every timed line takes the nearest turn's speaker, however far.
 }

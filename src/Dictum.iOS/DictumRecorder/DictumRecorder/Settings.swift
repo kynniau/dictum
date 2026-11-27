@@ -35,6 +35,7 @@ final class AppSettings {
         static let transcribe = "settings.transcribeOnDevice"
         static let labels = "settings.speakerLabels"
         static let threshold = "settings.speakerThreshold"
+        static let thresholdRevision = "settings.speakerThresholdRevision"
         static let meetingType = "settings.meetingType"
         static let engine = "settings.transcriptionEngine"
         static let summaryEngine = "settings.summaryEngine"
@@ -64,7 +65,7 @@ final class AppSettings {
     }
 
     /// The beta's speaker threshold (SpeakerParameters.current), and the slider's range and step.
-    static let defaultThreshold = 0.80
+    static let defaultThreshold = SpeakerParameters.current.threshold
     static let thresholdRange: ClosedRange<Double> = 0.5...0.9
     static let thresholdStep = 0.05
 
@@ -103,8 +104,15 @@ final class AppSettings {
         self.defaults = defaults
         transcribeOnDevice = defaults.object(forKey: Key.transcribe) as? Bool ?? false
         speakerLabels = defaults.object(forKey: Key.labels) as? Bool ?? true
-        let stored = defaults.object(forKey: Key.threshold) as? Double ?? Self.defaultThreshold
+        // A stored copy of an earlier default follows the default once (SpeakerParameters.startingThreshold).
+        let revision = defaults.integer(forKey: Key.thresholdRevision)
+        let before = defaults.object(forKey: Key.threshold) as? Double
+        let stored = SpeakerParameters.startingThreshold(stored: before, storedRevision: revision)
         speakerThreshold = min(max(stored, Self.thresholdRange.lowerBound), Self.thresholdRange.upperBound)
+        if revision < SpeakerParameters.thresholdRevision {
+            if let before, before != speakerThreshold { defaults.set(speakerThreshold, forKey: Key.threshold) }
+            defaults.set(SpeakerParameters.thresholdRevision, forKey: Key.thresholdRevision)
+        }
         meetingTypeId = MeetingType.with(id: defaults.string(forKey: Key.meetingType) ?? "general").id
         transcriptionEngine = "apple"
         summaryEngine = "apple"

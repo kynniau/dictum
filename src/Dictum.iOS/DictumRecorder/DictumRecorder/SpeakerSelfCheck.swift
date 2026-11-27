@@ -160,7 +160,14 @@ enum SpeakerSelfCheck {
         check("fold: every group small, nothing folded",
               SpeakerSeparation.foldSmallGroups(labels: [0, 1], vectors: [[1, 0], [0, 1]], seconds: [1, 1], share: 0.9,
                                                 underSeconds: 20), [0, 1])
-        check("current: threshold", SpeakerParameters.current.threshold, 0.80)
+        check("current: threshold", SpeakerParameters.current.threshold, 0.75)
+        check("starting threshold: nothing stored is the default", SpeakerParameters.startingThreshold(stored: nil, storedRevision: 0), 0.75)
+        check("starting threshold: the earlier default moves once", SpeakerParameters.startingThreshold(stored: 0.80, storedRevision: 0), 0.75)
+        check("starting threshold: the earlier default as stored by a slider", SpeakerParameters.startingThreshold(stored: 0.8000000000000002, storedRevision: 1), 0.75)
+        check("starting threshold: 0.80 chosen after the change stays",
+              SpeakerParameters.startingThreshold(stored: 0.80, storedRevision: SpeakerParameters.thresholdRevision), 0.80)
+        check("starting threshold: another stored value is the user's", SpeakerParameters.startingThreshold(stored: 0.65, storedRevision: 0), 0.65)
+        check("starting threshold: 0.85 is not the earlier default", SpeakerParameters.startingThreshold(stored: 0.85, storedRevision: 0), 0.85)
         check("desktop: no folding", SpeakerParameters.desktop.smallGroupShare, nil)
         return out
     }
