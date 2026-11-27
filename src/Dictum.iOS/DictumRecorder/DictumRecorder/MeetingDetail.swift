@@ -411,6 +411,8 @@ struct MeetingDetailView: View {
     @State private var confirmWhisper = false
     #endif
     @State private var fixing: FixTarget?
+    /// The user's kept fixes, read once for the fixes that are offered on a line (YourWords.suggestions).
+    @State private var yourWords: [WordFix] = []
 
     private static let dateTime: DateFormatter = {
         let f = DateFormatter()
@@ -473,6 +475,7 @@ struct MeetingDetailView: View {
         .sheet(isPresented: $composing) {
             ComposeEmailSheet(email: model.email)
         }
+        .task { yourWords = await YourWordsStore.current() }
         .sheet(item: $fixing) { target in
             FixLineSheet(heading: heading(target.segment), original: target.segment.text) { text, always in
                 Task { await model.fixLine(target.index, to: text, always: always) }
@@ -552,6 +555,7 @@ struct MeetingDetailView: View {
                 if model.fixNotKept {
                     StatusPill(kind: .warning, text: PROPOSED_FixNotKept)
                 }
+                let offers = Dictionary(grouping: YourWords.suggestions(lines: record.segments.map(\.text), fixes: yourWords), by: \.line)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(record.segments.enumerated()), id: \.offset) { index, segment in
@@ -566,6 +570,16 @@ struct MeetingDetailView: View {
                             .disabled(model.transcribe == .working)
                             .accessibilityLabel(spoken(segment))
                             .accessibilityHint(PROPOSED_FixLineAction)
+                            // A fix the user asked to be offered, not made: one tap changes this line only.
+                            if let offer = offers[index]?.first {
+                                Button(String(format: PROPOSED_SuggestionButton, offer.meant)) {
+                                    Task { await model.fixLine(index, to: offer.fixed, always: nil) }
+                                }
+                                .buttonStyle(.dictumCompact)
+                                .disabled(model.transcribe == .working)
+                                .padding(.leading, segment.speaker == nil ? 0 : 44)
+                                .accessibilityLabel(String(format: PROPOSED_SuggestionAction, offer.heard, offer.meant))
+                            }
                         }
                     }
                     .font(.body)

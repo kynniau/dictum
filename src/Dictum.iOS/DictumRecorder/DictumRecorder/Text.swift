@@ -553,3 +553,17 @@ let PROPOSED_RowMoreActions = "More actions"
 let PROPOSED_Encrypted = "Encrypted"
 /// Meeting page: opens the fields to change, add or remove actions under the read-only list.
 let PROPOSED_EditActions = "Edit actions"
+
+// MARK: - Your words: fixes that are offered, not made (27/11/2026)
+
+let PROPOSED_YourWordsAsk = "Ask me first"
+let PROPOSED_YourWordsAskNote = "The fix is offered on the line, and made only when you tap it."
+let PROPOSED_YourWordsHintsField = "Only in meetings that mention"
+let PROPOSED_YourWordsHintsNote = "Optional. Words separated by commas, for example: GST, lodge, lodged. Each is matched as a whole word. Leave it empty to offer the fix in every meeting."
+let PROPOSED_YourWordsAsksAlways = "Offered in every meeting"
+/// %@ is the hint words, separated by commas.
+let PROPOSED_YourWordsAsksWhen = "Offered when the meeting mentions: %@"
+/// The button under a transcript line; %@ is what the words would become.
+let PROPOSED_SuggestionButton = "%@?"
+/// VoiceOver: the first %@ is the words as written, the second what they would become.
+let PROPOSED_SuggestionAction = "Change \u{201C}%@\u{201D} to \u{201C}%@\u{201D} on this line"

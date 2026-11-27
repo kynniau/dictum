@@ -16,12 +16,28 @@ import Foundation
 struct WordFix: Codable, Equatable, Sendable {
     var heard: String
     var meant: String
+    /// True for a fix that is only offered: the line shows it and the user taps to accept. Nil or false: made every time.
+    var ask: Bool?
+    /// For an offered fix: it is offered only in a meeting that says one of these words somewhere. Nil or empty: in
+    /// every meeting.
+    var hints: [String]?
 }
 
 enum YourWords {
     /// The most fixes kept, and the longest either side may be, in characters.
     static let maxFixes = 200
     static let maxLength = 60
+    /// The most hint words one offered fix keeps, and the longest a hint may be.
+    static let maxHints = 8
+    static let maxHintLength = 30
+
+    /// A fix the user may accept on one line: the line's number, the pair, and the line as it would read.
+    struct Suggestion: Equatable {
+        var line: Int
+        var heard: String
+        var meant: String
+        var fixed: String
+    }
 
     /// A word of `text`: its comparison key (case and accents folded) and where it sits.
     struct Word: Equatable {
@@ -71,13 +87,64 @@ enum YourWords {
         }
         guard let heard = clean(fix.heard), let meant = clean(fix.meant), !words(heard).isEmpty, !meant.isEmpty, heard != meant
         else { return nil }
-        return WordFix(heard: heard, meant: meant)
+        let kept = hints(from: (fix.hints ?? []).joined(separator: ","))
+        return WordFix(heard: heard, meant: meant, ask: fix.ask == true ? true : nil, hints: fix.ask == true && !kept.isEmpty ? kept : nil)
+    }
+
+    /// Hint words as typed, separated by commas: spaces tidied, empties and repeats dropped, no more than `maxHints`,
+    /// none longer than `maxHintLength` or without a word in it.
+    static func hints(from text: String) -> [String] {
+        var out: [String] = []
+        var seen: Set<[String]> = []
+        for part in text.split(whereSeparator: { $0 == "," || $0 == "\n" }) {
+            let hint = part.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            let keys = words(hint).map(\.key)
+            guard !keys.isEmpty, hint.count <= maxHintLength, !seen.contains(keys), out.count < maxHints else { continue }
+            seen.insert(keys)
+            out.append(hint)
+        }
+        return out
     }
 
     /// `text` with every fix made, and how many were made. Whole words only, any capitals, any punctuation between the
     /// words. The longest `heard` wins where two could start at the same word; text already put in is not looked at
     /// again; words that already read as `meant` are left alone and not counted.
+    /// Offered fixes (`ask`) are never made here: see `suggestions`.
     static func apply(_ text: String, _ fixes: [WordFix]) -> (text: String, changed: Int) {
+        replace(text, fixes.filter { $0.ask != true })
+    }
+
+    /// The offered fixes that fit this meeting, one for each line an offered fix would change. A fix with hint words is
+    /// offered only when the meeting says one of them, as whole words, anywhere. Nothing is changed here: the user taps
+    /// to accept each one.
+    // simplification: a hint is looked for across the whole meeting, not near the line, and one hint is enough. Ceiling:
+    // a long meeting that touches two subjects offers the fix in both. Retire if offers in the wrong part of a meeting
+    // become a nuisance: then look only at the lines around the word.
+    static func suggestions(lines: [String], fixes: [WordFix]) -> [Suggestion] {
+        let offered = fixes.filter { $0.ask == true }
+        guard !offered.isEmpty else { return [] }
+        let spoken = lines.map { words($0).map(\.key) }
+        func said(_ hint: String) -> Bool {
+            let keys = words(hint).map(\.key)
+            guard !keys.isEmpty else { return false }
+            return spoken.contains { line in
+                line.count >= keys.count && (0...(line.count - keys.count)).contains { at in Array(line[at..<(at + keys.count)]) == keys }
+            }
+        }
+        var out: [Suggestion] = []
+        for fix in offered {
+            let hints = fix.hints ?? []
+            guard hints.isEmpty || hints.contains(where: said) else { continue }
+            for (at, line) in lines.enumerated() {
+                let made = replace(line, [fix])
+                if made.changed > 0 { out.append(Suggestion(line: at, heard: fix.heard, meant: fix.meant, fixed: made.text)) }
+            }
+        }
+        return out.sorted { ($0.line, $0.heard) < ($1.line, $1.heard) }
+    }
+
+    /// `apply` for the fixes given, whatever their `ask`.
+    private static func replace(_ text: String, _ fixes: [WordFix]) -> (text: String, changed: Int) {
         let rules = fixes.enumerated()
             .compactMap { at, fix -> (keys: [String], meant: String, at: Int)? in
                 let keys = words(fix.heard).map(\.key)
@@ -221,6 +288,34 @@ enum YourWordsSelfCheck {
               [grows, WordFix(heard: "The Stick To", meant: "Dictum app")])
         let full = (0..<YourWords.maxFixes).map { WordFix(heard: "word\($0)", meant: "x") }
         check("adding: a full list refuses a new fix", YourWords.adding(name, to: full) == nil, true)
+        // Offered fixes and hint words.
+        let asic = WordFix(heard: "Aztec", meant: "ASIC", ask: true, hints: ["GST", "lodge", "tax return"])
+        let finance = ["The GST return is due in February.", "The Aztec form has to be lodged before then.", "Nothing here."]
+        let history = ["Today we look at the Aztec empire.", "An Aztec form of writing used pictures.", "Traders paid a kind of tax."]
+        check("offered: never made by apply", applied("the Aztec form", [asic]), "the Aztec form")
+        check("offered: not counted by apply", count("the Aztec form", [asic]), 0)
+        check("offered: a meeting that says a hint offers it on the line",
+              YourWords.suggestions(lines: finance, fixes: [asic]),
+              [YourWords.Suggestion(line: 1, heard: "Aztec", meant: "ASIC", fixed: "The ASIC form has to be lodged before then.")])
+        check("offered: a meeting with no hint offers nothing", YourWords.suggestions(lines: history, fixes: [asic]), [])
+        check("offered: a hint is a whole word (lodged is not lodge)",
+              YourWords.suggestions(lines: ["The Aztec form was lodged."], fixes: [asic]), [])
+        check("offered: a hint of two words needs both, together",
+              YourWords.suggestions(lines: ["The Aztec form", "her tax return is late"], fixes: [asic]).count, 1)
+        check("offered: two words apart are not the hint",
+              YourWords.suggestions(lines: ["The Aztec form", "a tax on the return trip"], fixes: [asic]), [])
+        check("offered: no hints means every meeting",
+              YourWords.suggestions(lines: history, fixes: [WordFix(heard: "Aztec", meant: "ASIC", ask: true)]).map(\.line), [0, 1])
+        check("offered: a fix that is always made is never offered", YourWords.suggestions(lines: finance, fixes: [WordFix(heard: "Aztec", meant: "ASIC")]), [])
+        check("offered: a line already right is not offered", YourWords.suggestions(lines: ["The GST and the ASIC form"], fixes: [asic]), [])
+        check("hints: commas, spaces, repeats and empties", YourWords.hints(from: " GST,  tax   return ,, gst , lodge"), ["GST", "tax return", "lodge"])
+        check("hints: no more than the limit", YourWords.hints(from: (0..<20).map { "w\($0)" }.joined(separator: ",")).count, YourWords.maxHints)
+        check("hints: one too long is dropped", YourWords.hints(from: String(repeating: "a", count: 31) + ", ok"), ["ok"])
+        check("tidy: an offered fix keeps its hints, tidied",
+              YourWords.tidy(WordFix(heard: " Aztec ", meant: "ASIC", ask: true, hints: [" GST ", "", "gst"])),
+              WordFix(heard: "Aztec", meant: "ASIC", ask: true, hints: ["GST"]))
+        check("tidy: a fix that is always made keeps no hints",
+              YourWords.tidy(WordFix(heard: "Aztec", meant: "ASIC", ask: false, hints: ["GST"])), WordFix(heard: "Aztec", meant: "ASIC"))
         check("adding: a full list still replaces", YourWords.adding(WordFix(heard: "word0", meant: "y"), to: full)?.count, YourWords.maxFixes)
         return out
     }

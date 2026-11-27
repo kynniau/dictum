@@ -7,15 +7,19 @@ import SwiftUI
 // MARK: - Settings > Your words
 
 struct YourWordsView: View {
-    private enum Field { case heard, meant }
+    private enum Field { case heard, meant, hints }
 
     @State private var fixes: [WordFix] = []
     @State private var heard = ""
     @State private var meant = ""
+    @State private var ask = false
+    @State private var hints = ""
     @State private var message: String?
     @FocusState private var focus: Field?
 
-    private var draft: WordFix? { YourWords.tidy(WordFix(heard: heard, meant: meant)) }
+    private var draft: WordFix? {
+        YourWords.tidy(WordFix(heard: heard, meant: meant, ask: ask, hints: ask ? YourWords.hints(from: hints) : nil))
+    }
 
     var body: some View {
         ScrollView {
@@ -45,6 +49,19 @@ struct YourWordsView: View {
         DictumCard {
             field(PROPOSED_YourWordsHeardField, text: $heard, focused: .heard, submit: .next) { focus = .meant }
             field(PROPOSED_YourWordsMeantField, text: $meant, focused: .meant, submit: .done) { add() }
+            Toggle(PROPOSED_YourWordsAsk, isOn: $ask)
+                .tint(DictumTheme.accent)
+                .frame(minHeight: DictumTheme.minTarget)
+                .accessibilityHint(PROPOSED_YourWordsAskNote)
+            Text(PROPOSED_YourWordsAskNote)
+                .font(.footnote)
+                .foregroundStyle(DictumTheme.muted)
+            if ask {
+                field(PROPOSED_YourWordsHintsField, text: $hints, focused: .hints, submit: .done) { add() }
+                Text(PROPOSED_YourWordsHintsNote)
+                    .font(.footnote)
+                    .foregroundStyle(DictumTheme.muted)
+            }
             PrimaryButton(title: PROPOSED_YourWordsAdd, systemImage: "plus") { add() }
                 .disabled(draft == nil)
             Text(PROPOSED_YourWordsRisk)
@@ -84,10 +101,14 @@ struct YourWordsView: View {
                         Label(fix.meant, systemImage: "arrow.turn.down.right")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(DictumTheme.text)
+                        if let offered = Self.offered(fix) {
+                            Text(offered).font(.footnote).foregroundStyle(DictumTheme.muted)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(String(format: PROPOSED_YourWordsPair, fix.heard, fix.meant))
+                    .accessibilityLabel([String(format: PROPOSED_YourWordsPair, fix.heard, fix.meant), Self.offered(fix)]
+                        .compactMap { $0 }.joined(separator: ". "))
                     Button(role: .destructive) { remove(index) } label: {
                         Image(systemName: "trash")
                             .frame(minWidth: DictumTheme.minTarget, minHeight: DictumTheme.minTarget)
@@ -112,8 +133,16 @@ struct YourWordsView: View {
             guard await keep(next) else { return }
             heard = ""
             meant = ""
+            hints = ""
             focus = .heard
         }
+    }
+
+    /// For a fix that is offered, not made: when it is offered. Nil for a fix made every time.
+    private static func offered(_ fix: WordFix) -> String? {
+        guard fix.ask == true else { return nil }
+        let hints = fix.hints ?? []
+        return hints.isEmpty ? PROPOSED_YourWordsAsksAlways : String(format: PROPOSED_YourWordsAsksWhen, hints.joined(separator: ", "))
     }
 
     private func remove(_ index: Int) {
