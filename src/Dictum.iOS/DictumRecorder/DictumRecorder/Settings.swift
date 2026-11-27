@@ -108,9 +108,10 @@ final class AppSettings {
         let revision = defaults.integer(forKey: Key.thresholdRevision)
         let before = defaults.object(forKey: Key.threshold) as? Double
         let stored = SpeakerParameters.startingThreshold(stored: before, storedRevision: revision)
-        speakerThreshold = min(max(stored, Self.thresholdRange.lowerBound), Self.thresholdRange.upperBound)
+        let threshold = min(max(stored, Self.thresholdRange.lowerBound), Self.thresholdRange.upperBound)
+        speakerThreshold = threshold
         if revision < SpeakerParameters.thresholdRevision {
-            if let before, before != speakerThreshold { defaults.set(speakerThreshold, forKey: Key.threshold) }
+            if let before, before != threshold { defaults.set(threshold, forKey: Key.threshold) }
             defaults.set(SpeakerParameters.thresholdRevision, forKey: Key.thresholdRevision)
         }
         meetingTypeId = MeetingType.with(id: defaults.string(forKey: Key.meetingType) ?? "general").id
