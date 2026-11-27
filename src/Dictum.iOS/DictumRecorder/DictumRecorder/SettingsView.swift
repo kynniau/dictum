@@ -238,7 +238,7 @@ struct SettingsView: View {
             FactRow(PROPOSED_AboutBuild, value: BuildInfo.sha).listRowBackground(DictumTheme.surface)
             VStack(alignment: .leading, spacing: 6) {
                 Text(PROPOSED_AboutLicences).font(.footnote).foregroundStyle(DictumTheme.muted)
-                ForEach([PROPOSED_LicenceDictum, PROPOSED_LicenceSherpa, PROPOSED_LicenceCampPlus, PROPOSED_LicenceBip39],
+                ForEach([PROPOSED_LicenceDictum, PROPOSED_LicenceSherpa, PROPOSED_LicenceOnnx, PROPOSED_LicenceCampPlus, PROPOSED_LicenceBip39],
                         id: \.self) { line in
                     Text(line).font(.subheadline).foregroundStyle(DictumTheme.text)
                 }

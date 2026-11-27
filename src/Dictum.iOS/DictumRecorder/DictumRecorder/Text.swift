@@ -268,6 +268,7 @@ let PROPOSED_BuildShaUnknown = "Not stamped"
 let PROPOSED_AboutLicences = "Licences"
 let PROPOSED_LicenceDictum = "Dictum Recorder: MIT licence, Kynni Pty Ltd"
 let PROPOSED_LicenceSherpa = "sherpa-onnx: Apache License 2.0"
+let PROPOSED_LicenceOnnx = "ONNX Runtime: MIT licence, Microsoft"
 let PROPOSED_LicenceCampPlus = "3D-Speaker CAM++ speaker model: Apache License 2.0"
 let PROPOSED_LicenceBip39 = "BIP-39 English word list (transfer code): MIT licence"
 
